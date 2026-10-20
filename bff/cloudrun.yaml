@@ -43,10 +43,13 @@ spec:
               value: firebase
             - name: INSTANCE_MODE
               value: real
+            # the demonstration apartments (mock://) run on the BFF's built-in engine also here (D-97): real time
+            - name: MOCK_TIME_SCALE
+              value: "60"
             - name: REPOSITORY
               value: firestore
-            - name: FCM_ENABLED
-              value: "false"
+            - name: FCM_ENABLED            # push on, as in staging since D-39 (publish with VITE_FCM_ENABLED=true)
+              value: "true"
             - name: GCP_PROJECT_ID
               value: your-gcp-project-id
             - name: GCP_REGION

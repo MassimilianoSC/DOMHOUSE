@@ -305,9 +305,114 @@ comando con il file `before-restore-….db` indicato.
 Un nuovo appartamento sulla stessa VM: C2 con il suo `apartment_id` e la sua porta 81xx (8101, 8102, …), dopo aver
 creato il segreto `langbrain-api-key-<apartment_id>` e dato a `langbrain-vm@` Secret Accessor su di esso.
 
-## G. Non ancora qui
+## G. Collegare l'app al motore della VM (P-66, D-120)
+
+Da qui il server dell'app (BFF su Cloud Run) passa a `TARGET=prod`: `INSTANCE_MODE=real` e Direct VPC Egress sulla rete
+`default`, così raggiunge `10.198.0.2:8100`. Gli appartamenti dimostrativi (`mock://builtin`) restano come sono, serviti
+dal BFF stesso (D-97). Prerequisiti: C3 riuscito (il motore `dev` risponde dalla rete interna) e il commit da
+pubblicare già su GitHub (`git push` fatto).
+
+**G1. La chiave di `dev` è leggibile dal BFF** (sola lettura).
+Il BFF manda al motore la chiave del segreto `langbrain-api-key-<apartment_id>`, sempre ricavato dall'identificativo
+dell'appartamento (non si sceglie: correzione S3 di P-36). Per questo l'appartamento nell'app si chiama **`dev`**.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud secrets get-iam-policy langbrain-api-key-dev --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --flatten="bindings[].members" --filter="bindings.role=roles/secretmanager.secretAccessor" --format="value(bindings.members)"
+```
+
+Risultato atteso: fra le righe c'è `serviceAccount:domotica-bff@domotica-poc-511707.iam.gserviceaccount.com` (e quella di
+`langbrain-vm@`). Se manca, il BFF non può parlare con il motore: va concesso prima di G2.
+
+**G2. Pubblicare il BFF in produzione** (scrive su Google Cloud: Cloud Build, Cloud Run, Firebase Hosting).
+Cosa fa: `scripts/publish.sh` pubblica il commit indicato da una copia pulita (non la cartella di lavoro), con
+`bff/cloudrun.yaml`: `INSTANCE_MODE=real`, rete `default`/`default`, una sola istanza, notifiche push attive. Chiede di
+scrivere `prod` per confermare. Se l'immagine di quel commit esiste già, non la ricostruisce.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com TARGET=prod GCP_PROJECT_ID=domotica-poc-511707 GCP_REGION=europe-west8 \
+  VPC_NETWORK=default VPC_SUBNET=default SMTP_USER=m.scardovellicrac@gmail.com VITE_FCM_ENABLED=true \
+  scripts/publish.sh <COMMIT>
+```
+
+Alla fine stampa le «righe da incollare alla memoria storica»: `Pubblicazione prod …`, `commit: …`, `immagine: …`,
+`BFF: https://domotica-bff-444239063209.europe-west8.run.app`, `PWA: https://domotica-poc-511707.web.app`.
+
+**G3. Verificare la pubblicazione** (sola lettura).
+Cosa fa: chiede al BFF il suo stato e a Cloud Run la revisione attiva, il traffico, la rete e la modalità.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+curl -s https://domotica-bff-444239063209.europe-west8.run.app/health; echo
+gcloud run services describe domotica-bff --region=europe-west8 --project=domotica-poc-511707 \
+  --account=m.scardovellicrac@gmail.com \
+  --format="value(status.latestReadyRevisionName,status.traffic[0].percent,spec.template.metadata.annotations.'run.googleapis.com/vpc-access-egress')"
+gcloud run services describe domotica-bff --region=europe-west8 --project=domotica-poc-511707 \
+  --account=m.scardovellicrac@gmail.com --format="yaml(spec.template.spec.containers[0].env)" | grep -A1 -E "INSTANCE_MODE|APP_ENV"
+```
+
+Risultato atteso: `{"status":"ok","app_env":"prod"}`; una riga con il nome della nuova revisione, `100` e
+`private-ranges-only`; `APP_ENV` con `value: prod` e `INSTANCE_MODE` con `value: real`.
+
+**G4. Creare nell'app l'appartamento di sviluppo collegato a `dev`** (nell'app, come gestore della piattaforma).
+Nell'app: **Organizzazioni** → l'organizzazione di prova → **Appartamenti** → **Nuovo appartamento**, con:
+- **ID**: `dev` (deve essere proprio questo: è il nome della chiave `langbrain-api-key-dev`);
+- **Nome**: `Sviluppo (motore sulla VM)`;
+- **URL istanza**: `http://10.198.0.2:8100/api/v1`; **Porta**: vuota (è già nell'URL);
+- **Fuso orario**: `Europe/Rome`; **ID Italianway**: vuoto (nessuna prenotazione vera deve arrivarci);
+- **Istanza simulata (appartamento dimostrativo)**: attiva. Il motore `dev` ha dispositivi simulati (D-118): così gli
+  amministratori vedono il Simulatore e gli elenchi lo segnano «Dimostrativo».
+
+Poi, sulla riga dell'appartamento, **Verifica connessione**.
+Verifica: «Connessione OK»; l'ultima verifica risulta «riuscita». Nella pagina dell'appartamento compaiono i 5
+dispositivi del motore `dev` (climatizzatore, caldaia, presa stufetta, finestra, sensore), tutti online.
+
+**G5. Un comando arriva al motore sulla VM e torna confermato.**
+Nell'app, appartamento «Sviluppo (motore sulla VM)» → **Presa stufetta camera** → **Accendi**.
+Verifica nell'app: il comando passa da «in corso» ad acceso in circa 2 secondi (lo stato arriva dallo stream del
+motore), e nelle **Decisioni** compare l'accensione con esito applicato. Verifica sul motore (sola lettura sulla VM):
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+  --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --command='sudo bash /opt/domhouse/engine-vm.sh api dev GET "/decisions?limit=3" | head -1; sudo bash /opt/domhouse/engine-vm.sh api dev GET /devices | head -1 | grep -o "\"dev-presa-camera\"[^}]*}"'
+```
+
+Risultato atteso: fra le ultime decisioni una con `"action":"turn_on"`, `"outcome":"applied"`,
+`"device_id":"dev-presa-camera"` e `"actor":"user:…"` (lo pseudonimo di chi ha premuto, D-87); nella riga del
+dispositivo `"switch":{"on":true}`. (Con `sudo docker logs engine-dev --tail 20` si vedono solo avvio ed errori: i
+comandi riusciti non scrivono righe di log.)
+
+**G6. Gli appartamenti dimostrativi sono invariati.**
+Nell'app, un appartamento con il segno «Dimostrativo» e URL `mock://builtin`: si apre, mostra i suoi dispositivi, il
+Simulatore funziona e un comando va a buon fine come prima. Sono serviti dal BFF (una sola istanza, in memoria):
+dopo la pubblicazione ripartono dallo stato iniziale, come a ogni pubblicazione.
+
+**G7. Tornare indietro a staging** (scrive su Google Cloud), se qualcosa non va.
+Cosa fa: ripubblica lo stesso commit con `TARGET=staging` (`bff/cloudrun.staging.yaml`: `INSTANCE_MODE=mock`, niente
+rete VPC). I dati in Firestore non cambiano; l'appartamento `dev` resta, ma in staging il BFF raggiunge solo
+`mock://` e la sua verifica fallisce finché non si torna a prod.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com TARGET=staging GCP_PROJECT_ID=domotica-poc-511707 GCP_REGION=europe-west8 \
+  SMTP_USER=m.scardovellicrac@gmail.com VITE_FCM_ENABLED=true scripts/publish.sh <COMMIT>
+```
+
+Verifica: G3, con `{"status":"ok","app_env":"staging"}` e `INSTANCE_MODE` `value: mock`.
+
+---
+
+## H. Non ancora qui
 
 - Allarmi dai log dei container (D-104): passo 10 del piano. Il backup applicativo c'è (sezione E), insieme allo
   snapshot giornaliero del disco della VM.
-- Il collegamento dell'app al motore della VM (`instance_url` `http://10.198.0.2:8100`, `instance_secret_name`
-  `langbrain-api-key-dev`) e `TARGET=prod`: lotto a parte, P-66.
+- Righe di log del motore per i comandi riusciti (oggi solo avvio, avvisi ed errori): con gli allarmi, passo 10.
