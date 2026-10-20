@@ -177,7 +177,9 @@ quali appartamenti vedi.
 - Striscia di stato del sistema dell'appartamento: In salute, Degradata o Ferma.
 - **Modalità** comfort, eco o vuoto: dopo la scelta compare una rotellina finché il sistema conferma. Non compare un
   avviso verde: la conferma è la scelta che si illumina.
-- **Forza per…** 30 minuti, 2 ore o 6 ore: compare «Forzatura … attiva fino alle …» con «Annulla forzatura».
+- **Forza per…** 30 minuti, 2 ore o 6 ore: compare «Forzatura … attiva fino alle …» con «Annulla forzatura». Finché la
+  forzatura è attiva, un cambio di modalità programmato (per esempio il check-out) non la interrompe: aspetta la sua fine e
+  si esegue allora, e nelle Decisioni compare «rimandata per la forzatura».
 - **Dispositivi** raggruppati per stanza: interruttori Acceso/Spento, temperatura con − e +, modo del climatizzatore,
   velocità della ventola, letture di potenza, consumi, temperatura, umidità, finestre e movimento.
 - Sotto ogni comando compare l'esito: «in corso», poi «eseguito», oppure l'errore. Un dispositivo offline ha i comandi
@@ -220,7 +222,9 @@ domotico non raggiungibile, soggiorno non ancora iniziato), compare il motivo.
 ### Programmazione
 Azioni programmate («In programma») e storico degli ultimi 7 giorni. «Nuova azione» per programmare un cambio di
 modalità o un comando a un dispositivo a un orario (ora dell'appartamento). «Sposta» per cambiare orario, «Annulla
-azione» per toglierla. Le azioni nate da una prenotazione si ricalcolano quando la prenotazione cambia.
+azione» per toglierla. Le azioni nate da una prenotazione si ricalcolano quando la prenotazione cambia. Se una
+prenotazione viene annullata dopo che l'appartamento è già stato preparato per l'arrivo, il sistema lo rimette da solo a
+«vuoto» (salvo un'altra prenotazione per lo stesso giorno), lo scrive nelle Decisioni e manda l'avviso «Prenotazioni».
 
 ### Regole
 Le regole automatiche dell'appartamento, con interruttore e valori. Quelle con «Non modificabile» non si cambiano.
@@ -415,10 +419,13 @@ L'unico punto in comune è «Verifica connessione», presente in tutte e due le 
   cancellati il tuo accesso, il tuo nome, la tua email e le tue preferenze di notifica. Resta quello che hai fatto
   (decisioni, approvazioni, registro attività), ma al posto del tuo nome comparirà «utente rimosso». Per rientrare
   servirà un nuovo invito.»
-- **Notifiche:** quali avvisi ricevere. Le notifiche sul telefono sono attive anche nell'ambiente di prova (vedi sotto). Se in un
-  ambiente non lo fossero, la scheda direbbe «Notifiche sul telefono non attive in questo ambiente»: gli avvisi (nuove approvazioni, dispositivi
-  offline, istanza non raggiungibile) compaiono in alto nello schermo solo mentre l'app è aperta sulla pagina di un
-  appartamento.
+- **Notifiche:** quali avvisi ricevere, per categoria: «Approvazioni richieste», «Dispositivi e istanza offline» e
+  «Prenotazioni» (avvisi sulle prenotazioni che cambiano il programma dell'appartamento, per esempio una disdetta dopo
+  che l'appartamento è stato preparato per l'arrivo), tutte attive dall'inizio; «Decisioni del motore» (riepilogo delle
+  azioni automatiche, solo in app) è spenta finché non la attivi. Le notifiche sul telefono sono attive anche
+  nell'ambiente di prova (vedi sotto). Se in un ambiente non lo fossero, la scheda direbbe «Notifiche sul telefono non
+  attive in questo ambiente»: gli avvisi (nuove approvazioni, dispositivi offline, istanza non raggiungibile,
+  prenotazioni annullate) compaiono in alto nello schermo solo mentre l'app è aperta sulla pagina di un appartamento.
 - **Installa l'app** e **Lingua** (per ora solo italiano). In fondo «Esci».
 
 ### Notifiche sul telefono
@@ -430,8 +437,8 @@ L'unico punto in comune è «Verifica connessione», presente in tutte e due le 
   scheda lo dice e non mostra il pulsante. Installa l'app, aprila dall'icona e attivale da qui.
 - Se togli il permesso dalle impostazioni del telefono o del browser, la scheda lo segnala e propone di riattivarle.
 - Se il browser non può ricevere notifiche, gli avvisi compaiono solo dentro l'app.
-- Le notifiche arrivano anche ad app chiusa. Toccandone una si apre l'app sulla pagina giusta (Approvazioni, o la
-  Panoramica dell'appartamento).
+- Le notifiche arrivano anche ad app chiusa. Toccandone una si apre l'app sulla pagina giusta (Approvazioni, la
+  Panoramica dell'appartamento, o le Decisioni per una prenotazione annullata).
 - Con l'app aperta, una notifica compare come avviso in alto con il pulsante «Apri» (su iPhone arriva sempre anche come
   notifica del telefono). Se stai già guardando quell'appartamento non compare un secondo avviso.
 - «Disattiva» ferma le notifiche su quel dispositivo e mostra «Notifiche disattivate su questo dispositivo».

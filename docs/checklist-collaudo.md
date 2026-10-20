@@ -66,6 +66,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 |---|---|---|---|---|
 | D1 📱 | Qualsiasi | Apri l'elenco Appartamenti. | Schede con nome, stato, occupazione, kWh di oggi. | |
 | D2 | Operatore | Panoramica: cambia modalità in eco. | Rotellina, poi «eco» selezionata. | |
+| D3b | Operatore | «Forza per…» 2 ore, poi in Programmazione «Nuova azione»: modalità eco tra 2 minuti. | Allo scadere dei 2 minuti la modalità NON cambia; nelle Decisioni compare «rimandata per la forzatura, si esegue alla sua fine»; con «Annulla forzatura» l'azione si esegue e la modalità passa a eco. | |
 | D3 | Operatore | «Forza per…» 30 minuti, poi «Annulla forzatura». | «Forzatura … attiva fino alle …», poi la forzatura sparisce. | |
 | D4 | Operatore | Accendi e spegni un interruttore; alza la temperatura con +. | Sotto il dispositivo «in corso» e poi «eseguito». | |
 | D5 | Operatore | Menu ⋮ > «Rinomina o sposta», cambia il nome. | «Dispositivo aggiornato» e il nome nuovo. | |
@@ -126,6 +127,8 @@ Servono due account: A riceve, B fa scattare gli eventi dal Simulatore. Preferen
 | H3 | Android | App aperta su un'altra pagina, stesso evento. | Un solo avviso in alto con «Apri», nessun doppione. | |
 | H4 | Android | B: Simulatore, mettere offline un dispositivo e aspettare i minuti della regola. | Notifica «<appartamento>: dispositivo offline»; il tocco apre la Panoramica. Se il dispositivo torna online prima, nessuna notifica. | |
 | H5 | Android | Spegnere la preferenza «Dispositivi e istanza offline», ripetere H4. | Nessuna notifica. | |
+| H5b | Android | B: Simulatore, evento «Prenotazione creata» con arrivo tra pochi minuti; aspettare che l'appartamento passi a comfort; poi evento «Prenotazione cancellata». | L'appartamento torna a «vuoto»; nelle Decisioni compare «Prenotazione … annullata dopo il pre-arrivo: appartamento rimesso a vuoto»; ad A arriva la notifica «<appartamento>: prenotazione annullata, appartamento rimesso a vuoto» e il tocco apre le Decisioni. | |
+| H5c | Android | Spegnere la preferenza «Prenotazioni» (in Impostazioni > Notifiche risulta attiva dall'inizio), ripetere H5b. | Nessuna notifica; la decisione c'è comunque. | |
 | H6 | Android | «Disattiva», poi un nuovo evento. | «Notifiche disattivate su questo dispositivo»; nessuna notifica. | |
 | H7 | Android | Riattivare, ricaricare l'app, ripetere H2 e H3. | Funzionano ancora. | |
 | H8 | iPhone, Safari, senza installare | Impostazioni > Notifiche. | Testo «Su iPhone e iPad le notifiche arrivano solo all'app installata…» e nessun pulsante. | |

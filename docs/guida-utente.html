@@ -486,7 +486,9 @@ quali appartamenti vedi.</p>
 avviso verde: la conferma è la scelta che si illumina.</p>
 </li>
 <li>
-<p><strong>Forza per…</strong> 30 minuti, 2 ore o 6 ore: compare «Forzatura … attiva fino alle …» con «Annulla forzatura».</p>
+<p><strong>Forza per…</strong> 30 minuti, 2 ore o 6 ore: compare «Forzatura … attiva fino alle …» con «Annulla forzatura». Finché la
+forzatura è attiva, un cambio di modalità programmato (per esempio il check-out) non la interrompe: aspetta la sua fine e
+si esegue allora, e nelle Decisioni compare «rimandata per la forzatura».</p>
 </li>
 <li>
 <p><strong>Dispositivi</strong> raggruppati per stanza: interruttori Acceso/Spento, temperatura con − e +, modo del climatizzatore,
@@ -544,7 +546,9 @@ domotico non raggiungibile, soggiorno non ancora iniziato), compare il motivo.</
 <h3 id="programmazione-52b21ee8">Programmazione</h3>
 <p>Azioni programmate («In programma») e storico degli ultimi 7 giorni. «Nuova azione» per programmare un cambio di
 modalità o un comando a un dispositivo a un orario (ora dell&#x27;appartamento). «Sposta» per cambiare orario, «Annulla
-azione» per toglierla. Le azioni nate da una prenotazione si ricalcolano quando la prenotazione cambia.</p>
+azione» per toglierla. Le azioni nate da una prenotazione si ricalcolano quando la prenotazione cambia. Se una
+prenotazione viene annullata dopo che l&#x27;appartamento è già stato preparato per l&#x27;arrivo, il sistema lo rimette da solo a
+«vuoto» (salvo un&#x27;altra prenotazione per lo stesso giorno), lo scrive nelle Decisioni e manda l&#x27;avviso «Prenotazioni».</p>
 <h3 id="regole-2a4a6478">Regole</h3>
 <p>Le regole automatiche dell&#x27;appartamento, con interruttore e valori. Quelle con «Non modificabile» non si cambiano.
 Modificando compare in basso «N regole modificate» con «Salva le modifiche» o «Annulla le modifiche». Un valore fuori
@@ -788,10 +792,13 @@ cancellati il tuo accesso, il tuo nome, la tua email e le tue preferenze di noti
 servirà un nuovo invito.»</p>
 </li>
 <li>
-<p><strong>Notifiche:</strong> quali avvisi ricevere. Le notifiche sul telefono sono attive anche nell&#x27;ambiente di prova (vedi sotto). Se in un
-ambiente non lo fossero, la scheda direbbe «Notifiche sul telefono non attive in questo ambiente»: gli avvisi (nuove approvazioni, dispositivi
-offline, istanza non raggiungibile) compaiono in alto nello schermo solo mentre l&#x27;app è aperta sulla pagina di un
-appartamento.</p>
+<p><strong>Notifiche:</strong> quali avvisi ricevere, per categoria: «Approvazioni richieste», «Dispositivi e istanza offline» e
+«Prenotazioni» (avvisi sulle prenotazioni che cambiano il programma dell&#x27;appartamento, per esempio una disdetta dopo
+che l&#x27;appartamento è stato preparato per l&#x27;arrivo), tutte attive dall&#x27;inizio; «Decisioni del motore» (riepilogo delle
+azioni automatiche, solo in app) è spenta finché non la attivi. Le notifiche sul telefono sono attive anche
+nell&#x27;ambiente di prova (vedi sotto). Se in un ambiente non lo fossero, la scheda direbbe «Notifiche sul telefono non
+attive in questo ambiente»: gli avvisi (nuove approvazioni, dispositivi offline, istanza non raggiungibile,
+prenotazioni annullate) compaiono in alto nello schermo solo mentre l&#x27;app è aperta sulla pagina di un appartamento.</p>
 </li>
 <li>
 <p><strong>Installa l&#x27;app</strong> e <strong>Lingua</strong> (per ora solo italiano). In fondo «Esci».</p>
@@ -820,8 +827,8 @@ scheda lo dice e non mostra il pulsante. Installa l&#x27;app, aprila dall&#x27;i
 <p>Se il browser non può ricevere notifiche, gli avvisi compaiono solo dentro l&#x27;app.</p>
 </li>
 <li>
-<p>Le notifiche arrivano anche ad app chiusa. Toccandone una si apre l&#x27;app sulla pagina giusta (Approvazioni, o la
-Panoramica dell&#x27;appartamento).</p>
+<p>Le notifiche arrivano anche ad app chiusa. Toccandone una si apre l&#x27;app sulla pagina giusta (Approvazioni, la
+Panoramica dell&#x27;appartamento, o le Decisioni per una prenotazione annullata).</p>
 </li>
 <li>
 <p>Con l&#x27;app aperta, una notifica compare come avviso in alto con il pulsante «Apri» (su iPhone arriva sempre anche come
