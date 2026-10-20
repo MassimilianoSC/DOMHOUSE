@@ -1162,16 +1162,24 @@ class ApartmentEngine:
             raise bad_request("Periodo non valido: massimo 31 giorni per richiesta")
         tz = ZoneInfo(self.timezone)
         series, avoided = [], 0.0
+
+        def local_midnight(day) -> datetime:
+            return datetime(day.year, day.month, day.day, tzinfo=tz).astimezone(UTC)
+
+        def next_start(cur: datetime) -> datetime:
+            # a day is from local midnight to local midnight: 23 or 25 hours on the days the clock changes (P-60 step 4)
+            if bucket == "hour":
+                return cur + timedelta(hours=1)
+            return local_midnight(cur.astimezone(tz).date() + timedelta(days=1))
+
         if bucket == "hour":
             start = frm.replace(minute=0, second=0, microsecond=0)
-            step = timedelta(hours=1)
         else:
-            local = frm.astimezone(tz)
-            start = local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(UTC)
-            step = timedelta(days=1)
+            start = local_midnight(frm.astimezone(tz).date())
         cur = start
         now = utcnow()
         while cur < to and cur < now:
+            step = next_start(cur) - cur
             rnd = random.Random(f"{self.apartment_id}|{bucket}|{iso(cur)}")
             if bucket == "hour":
                 hour = cur.astimezone(tz).hour
@@ -1182,7 +1190,7 @@ class ApartmentEngine:
                 avoided += round(rnd.random() * 3, 1)
             frac = min(1.0, (min(to, now) - cur) / step)
             series.append({"ts": iso(cur), "kwh": round(kwh * frac, 2)})
-            cur += step
+            cur = next_start(cur)
         total = round(sum(s["kwh"] for s in series), 2)
         meters = [d for d in self.devices.values() if "power_meter" in d["capabilities"]]
         weights = [0.62, 0.28, 0.10][: len(meters)]
@@ -1358,6 +1366,10 @@ class ApartmentEngine:
                 if a["expires_action"] == "approve":
                     self._execute_proposed(a, "system:engine", corr, "system")
                 self._dequeue_approval()
+        # by time, and by creation for the same time (a stable sort on the creation order, which engine.db keeps too).
+        # An action is closed (done/failed) and saved in this same pass, so a later pass never runs it again. After a
+        # crash between its commands and that save it runs again at the restart (within ARREARS_MINUTES): harmless,
+        # commands are states to reach (P-60 step 4).
         for item in sorted(self.schedule.values(), key=lambda s: s["run_at"]):
             if item["status"] != "planned" or parse_dt(item["run_at"]) > now:
                 continue
