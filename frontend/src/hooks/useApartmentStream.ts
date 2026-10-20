@@ -48,7 +48,12 @@ export function useApartmentStream(aptId: string | undefined, onApproval?: (a: A
         onApproval?.(approval);
         void queryClient.invalidateQueries({ queryKey: ["approvals", aptId] });
       }
-      if (env.event === "decision.logged") void queryClient.invalidateQueries({ queryKey: ["decisions", aptId] });
+      if (env.event === "decision.logged") {
+        void queryClient.invalidateQueries({ queryKey: ["decisions", aptId] });
+        // An approval that expired (or was decided on another device) arrives only as a decision with its approval_id:
+        // the contract has no approval.updated, so the list is read again (D-118), not left "in attesa" until the poll.
+        if ((env.data as { approval_id?: string | null }).approval_id) void queryClient.invalidateQueries({ queryKey: ["approvals", aptId] });
+      }
       if (env.event === "device.online") {
         const d = env.data as unknown as { device_id: string; online: boolean };
         const label = useApartmentStore.getState().devices.find((x) => x.device_id === d.device_id)?.label ?? d.device_id;
