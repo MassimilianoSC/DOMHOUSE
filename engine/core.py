@@ -183,6 +183,7 @@ class ApartmentEngine:
         self.commands: dict[str, dict] = {}
         self.approvals: list[dict] = []
         self.approval_queue: list[dict] = []
+        self.deferred: dict[str, str] = {}      # schedule_id -> the hold's end, for mode actions waiting for it (D-122)
         self.decisions: list[dict] = []
         self.asks: dict[str, dict] = {}
         self.events: deque[dict] = deque()
@@ -292,6 +293,7 @@ class ApartmentEngine:
         self.processed_events = dict(st.all("processed_events"))
         self.approvals = [a for _, a in st.all("approvals")]
         self.approval_queue = st.get_meta("approval_queue", [])
+        self.deferred = st.get_meta("deferred", {})
         self.asks = dict(st.all("asks"))
         now = time.time()
         self.idem = {k: (v["until"], v["status"], v["body"]) for k, v in st.all("idem") if v["until"] > now}
@@ -320,7 +322,7 @@ class ApartmentEngine:
         now = utcnow()
         for item in sorted(self.schedule.values(), key=lambda s: s["run_at"]):
             late = now - parse_dt(item["run_at"])
-            if item["status"] != "planned" or late <= timedelta(minutes=ARREARS_MINUTES):
+            if item["status"] != "planned" or late <= timedelta(minutes=ARREARS_MINUTES) or item["schedule_id"] in self.deferred:
                 continue
             item["status"], item["executed_at"] = "failed", iso(now)
             self._save_schedule(item)
@@ -993,6 +995,7 @@ class ApartmentEngine:
                                                  "cancelled": False, "checked_in": False, "checked_out": False})
         items = [s for s in self.schedule.values() if s["booking_id"] == bid]
         ids: list[str] = []
+        reset = False
         if ev["type"] == "booking_cancelled":
             booking["cancelled"] = True
             for s in items:
@@ -1000,6 +1003,14 @@ class ApartmentEngine:
                     s["status"] = "cancelled"
                 ids.append(s["schedule_id"])
             reasoning = f"Prenotazione {bid} cancellata: azioni annullate"
+            # D-121: the prearrival already warmed the apartment up for nobody. Back to "empty" now, through the
+            # scheduler (so a hold defers it, D-122), unless another booking needs the warmth (in course, or its own
+            # prearrival already done); another booking's planned actions are never touched and warm it up later.
+            prearrival_done = any(s["kind"] == "prearrival" and s["status"] == "done" for s in items)
+            if prearrival_done and not booking["checked_out"] and not self._booking_needs_comfort(bid):
+                ids.append(self.add_schedule(utcnow(), {"type": "apartment_mode", "mode": "empty"}, "empty", "booking",
+                                             bid)["schedule_id"])
+                reset = True
         elif ev["type"] in ("checkin", "checkout"):
             booking["checked_in"] = ev["type"] == "checkin"
             booking["checked_out"] = ev["type"] == "checkout"
@@ -1030,9 +1041,25 @@ class ApartmentEngine:
                 self._save_schedule(item)
         self._save_processed(ev["event_id"], result, booking["checkout"])
         self.log("system", {"type": "schedule"}, ev["type"], None, bid, reasoning, "informational", correlation_id, emit=emit)
+        if reset:   # its own decision, which the BFF turns into a push to the managers (D-121)
+            self.log("system", {"type": "apartment"}, "booking_cancel_reset", self.mode, "empty",
+                     f"Prenotazione {bid} annullata dopo il pre-arrivo: appartamento rimesso a vuoto", "informational",
+                     correlation_id, emit=emit)
         if emit:
             self.apartment_changed(correlation_id)
         return 202, result
+
+    def _booking_needs_comfort(self, cancelled_id: str) -> bool:
+        """Another booking, not cancelled nor checked out, that is in course now or whose prearrival already ran."""
+        now = utcnow()
+        for b in self.bookings.values():
+            if b["booking_id"] == cancelled_id or b["cancelled"] or b["checked_out"]:
+                continue
+            if b["checkin"] <= now < b["checkout"] or any(
+                    s["booking_id"] == b["booking_id"] and s["kind"] == "prearrival" and s["status"] == "done"
+                    for s in self.schedule.values()):
+                return True
+        return False
 
     # ---- approvals ---------------------------------------------------------
     def pending_approval(self) -> dict | None:
@@ -1335,6 +1362,11 @@ class ApartmentEngine:
         retention clean-up."""
         if time.monotonic() - self.last_retention >= RETENTION_EVERY_S:
             self._purge_retention()
+        stale = [k for k in self.deferred if self.schedule.get(k, {}).get("status") != "planned"]
+        if stale:                                        # deferred actions cancelled or gone meanwhile (D-122)
+            for k in stale:
+                del self.deferred[k]
+            self.store.put_meta("deferred", self.deferred)
         t = time.time()
         self.store.prune_events(t - BUFFER_SECONDS)
         self.idem = {k: v for k, v in self.idem.items() if v[0] > t}
@@ -1377,6 +1409,19 @@ class ApartmentEngine:
             labels = {"prearrival": "pre-arrivo", "checkout": "check-out", "empty": "casa vuota", "manual": "manuale"}
             reasoning = f"Azione programmata ({labels[item['kind']]})" + (f", prenotazione {item['booking_id']}" if item["booking_id"] else "")
             act = item["action"]
+            if act["type"] == "apartment_mode" and self.hold:
+                # D-122: a mode action waits for the end of the hold (at most 12 hours, the contract's 720 minutes)
+                if item["schedule_id"] not in self.deferred:
+                    self.deferred[item["schedule_id"]] = self.hold["until"]
+                    self.store.put_meta("deferred", self.deferred)
+                    until = parse_dt(self.hold["until"]).astimezone(ZoneInfo(self.timezone)).strftime("%H:%M")
+                    self.log("system", {"type": "schedule"}, "schedule_deferred", item["run_at"], self.hold["until"],
+                             f"{reasoning}: rimandata per la forzatura, si esegue alla sua fine (alle {until})",
+                             "informational", corr)
+                continue
+            if self.deferred.pop(item["schedule_id"], None) is not None:
+                self.store.put_meta("deferred", self.deferred)
+                reasoning += " (rimandata per la forzatura)"
             try:
                 if act["type"] == "apartment_mode":
                     item["command_ids"] = self.set_mode(act["mode"], "system:engine", corr, reasoning, "system")
