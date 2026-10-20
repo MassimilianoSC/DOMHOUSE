@@ -358,20 +358,23 @@ La notifica la mostra il service worker della PWA, che ignora le chiavi in più.
 
 | Chiave di `data` (tutte stringhe) | Quando | Valore |
 |---|---|---|
-| `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: istanza non raggiungibile» |
+| `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: istanza non raggiungibile» / «…: prenotazione annullata, appartamento rimesso a vuoto» |
 | `body` | sempre | testo breve, tagliato a 200 caratteri con «…» |
-| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down) |
-| `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>` |
-| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` |
+| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking) |
+| `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>`, `booking:<decision_id>` |
+| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` |
 | `apartment_id` | sempre | |
 | `approval_id` | solo `approval` | |
 | `device_id` | solo `device_offline` | |
 | `ts` | se l'evento del motore lo porta | `ts` dell'evento, ISO 8601 UTC |
 
-`webpush.headers`: `Urgency: high`; `TTL` (secondi, stringa) `3600` per `approval`, `86400` per `device_offline` e
-`instance_down`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
+`webpush.headers`: `Urgency: high`; `TTL` (secondi, stringa) `3600` per `approval`, `86400` per `device_offline`,
+`instance_down` e `booking`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
 
-Preferenze: `approval` ← `notification_prefs.approvals`; `device_offline` e `instance_down` ← `notification_prefs.offline`.
+Preferenze: `approval` ← `notification_prefs.approvals`; `device_offline` e `instance_down` ← `notification_prefs.offline`;
+`booking` ← `notification_prefs.bookings` («Prenotazioni», D-123, attiva di default anche per chi aveva già salvato le
+preferenze). `booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
+annullata dopo il pre-arrivo, con l'appartamento rimesso a vuoto dal motore (D-121); il `body` è il testo della decisione.
 `device_offline` parte se il dispositivo è ancora offline dopo i minuti della regola `offline_alert` (15 se non
 leggibile); `instance_down` una volta sola finché l'istanza non torna su.
 

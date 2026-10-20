@@ -261,3 +261,38 @@ def test_suspended_organisation_gets_no_push(users, fcm):
     run(repo.update_tenant(TENANT, {"status": "active"}))
     auth.forget_tenant(TENANT)
     assert run(push.send_to_tenant(TENANT, "approvals", *push.approval_push(APT, "apv-r", "ok?", TS))) == before
+
+
+# -------- D-121 / D-123: booking cancelled after the prearrival («Prenotazioni») --------
+def test_booking_reset_message():
+    data, headers = push.booking_reset_push(APT, "dec-1", "Prenotazione bk-1 annullata dopo il pre-arrivo: appartamento rimesso a vuoto", TS)
+    assert data == {"title": "Milano Centro: prenotazione annullata, appartamento rimesso a vuoto",
+                    "body": "Prenotazione bk-1 annullata dopo il pre-arrivo: appartamento rimesso a vuoto",
+                    "link": "/a/apt-push/decisioni", "tag": "booking:dec-1", "kind": "booking", "apartment_id": "apt-push",
+                    "ts": TS}
+    assert headers == {"Urgency": "high", "TTL": "86400"}
+
+
+def test_booking_reset_goes_to_who_wants_bookings(users, fcm):
+    async def scenario():
+        repo = get_repository()
+        viewer = await repo.get_user("u-push-3")
+        viewer.notification_prefs = NotificationPrefs(approvals=False, offline=False, bookings=False)
+        await repo.upsert_user(viewer)
+        await push.on_stream_event(APT, event("decision.logged", {"decision_id": "dec-2", "action": "set_mode",
+                                                                  "reasoning": "x"}))        # any other decision: no push
+        await push.on_stream_event(APT, event("decision.logged", {"decision_id": "dec-3", "action": "booking_cancel_reset",
+                                                                  "reasoning": "Prenotazione bk-3 annullata"}))
+        await drain()
+    run(scenario())
+    assert len(fcm.sent) == 1 and fcm.sent[0].data["kind"] == "booking" and fcm.sent[0].data["tag"] == "booking:dec-3"
+    tokens = set(fcm.sent[0].tokens)        # other tests leave more users in the tenant: only who matters here
+    assert {"tok-a", "tok-b", "tok-c", "tok-d"} <= tokens and "tok-z" not in tokens
+
+
+def test_bookings_is_on_also_for_preferences_saved_before():
+    """Users who saved their preferences before D-123 have no "bookings" key: they get it, on, without doing anything."""
+    old = User.model_validate({"uid": "u-old", "email": "old@test.it", "tenant_id": TENANT, "role": "admin",
+                               "notification_prefs": {"approvals": True, "offline": False, "decisions": False}})
+    assert old.notification_prefs.bookings is True and old.notification_prefs.offline is False
+    assert NotificationPrefs().bookings is True

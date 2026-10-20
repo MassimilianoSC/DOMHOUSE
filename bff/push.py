@@ -14,7 +14,7 @@ from .repository import Apartment, get_repository
 from .sse_hub import SseEvent, envelope, hub_manager
 
 BODY_MAX = 200
-TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400}
+TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400, "booking": 86400}
 
 _offline_timers: dict[tuple[str, str], asyncio.Task] = {}
 _health_down: set[str] = set()
@@ -49,6 +49,13 @@ def device_offline_push(apt: Apartment, device_id: str, label: str, minutes: flo
 def instance_down_push(apt: Apartment, ts: str | None):
     return build_push("instance_down", apt, f"{apt.name}: istanza non raggiungibile", "Il connettore domotico risulta fermo",
                       f"/a/{apt.apartment_id}", f"instance:{apt.apartment_id}", ts)
+
+
+def booking_reset_push(apt: Apartment, decision_id: str, reasoning: str | None, ts: str | None):
+    """D-121/D-123: a booking cancelled after its prearrival, the engine put the apartment back to empty."""
+    body = (reasoning or "").strip() or "Prenotazione annullata dopo il pre-arrivo: appartamento rimesso a vuoto"
+    return build_push("booking", apt, f"{apt.name}: prenotazione annullata, appartamento rimesso a vuoto", body,
+                      f"/a/{apt.apartment_id}/decisioni", f"booking:{decision_id}", ts)
 
 
 async def send_to_tenant(tenant_id: str, pref: str, data: dict[str, str], headers: dict[str, str]) -> int:
@@ -169,6 +176,10 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
             task.cancel()
         if data.get("online") is False:
             _offline_timers[key] = _spawn(_offline_watch(apt, key[1], ts), "device_offline", apt.apartment_id)
+    elif ev.event == "decision.logged" and data.get("action") == "booking_cancel_reset":
+        decision_id = str(data.get("decision_id", ""))
+        _spawn(send_to_tenant(apt.tenant_id, "bookings", *booking_reset_push(apt, decision_id, data.get("reasoning"), ts)),
+               "booking", apt.apartment_id)
     elif ev.event == "instance.health":
         down = data.get("status") == "down"
         if down and apt.apartment_id not in _health_down:

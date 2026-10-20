@@ -33,6 +33,9 @@ class NotificationPrefs(BaseModel):
     approvals: bool = True
     offline: bool = True
     decisions: bool = False
+    # D-123 «Prenotazioni»: bookings that change the apartment's schedule (today: cancelled after the prearrival). On by
+    # default, also for preferences saved before it existed: a stored record without the key reads True.
+    bookings: bool = True
 
 
 class User(BaseModel):
