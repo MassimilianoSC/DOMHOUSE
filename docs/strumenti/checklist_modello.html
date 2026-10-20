@@ -1,0 +1,673 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Checklist di collaudo DOMHOUSE</title>
+<style>
+:root { color-scheme:light dark; --page:#f2f3ef; --paper:#fff; --ink:#23372f; --muted:#5b6c63; --accent:#17644e; --soft:#edf4ee; --line:#dde4dc; --code:#edf1eb; --focus:#006dcc; --ko:#a32128; --ko-bg:#fff0f0; --warning:#79510b; --warning-bg:#fff5df; --hero:#153e31; --hero-ink:#f5f7ef; --gold:#ddc58e; --shadow:0 8px 30px #23372f06; }
+@media(prefers-color-scheme:dark) {
+ :root { --page:#111b16; --paper:#1a2720; --ink:#e4ede5; --muted:#b3c3b7; --accent:#9bd9b8; --soft:#233d2f; --line:#354b3d; --code:#2b3b30; --focus:#8bbdff; --ko:#ffadb1; --ko-bg:#3b2025; --warning:#f2ce82; --warning-bg:#362c19; --hero:#1b4434; --shadow:none; }
+}
+*,*::before,*::after { box-sizing:border-box; }
+html { scroll-padding-top:100px; scroll-behavior:smooth; }
+body { margin:0; background:var(--page); color:var(--ink); font:1rem/1.7 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; overflow-wrap:anywhere; -webkit-text-size-adjust:100%; }
+main { max-width:1440px; padding:108px 36px 64px; margin:auto; }
+h1,h2,h3 { line-height:1.25; font-weight:680; text-wrap:pretty; }
+h1 { font-size:clamp(2rem,3.2vw,3rem); letter-spacing:-.045em; margin:0 0 16px; max-width:26ch; }
+h2 { font-size:1.5rem; letter-spacing:-.025em; margin:0 0 18px; }
+h3 { margin:0; }
+p { margin:0 0 1rem; }
+a { color:var(--accent); text-underline-offset:.2em; }
+code { background:var(--code); border-radius:4px; padding:.15em .4em; font:.86em ui-monospace,Consolas,monospace; }
+hr { border:0; border-top:1px solid var(--line); margin:24px 0; }
+ul { padding-left:1.4rem; }
+input,select,textarea,button,summary { font:inherit; color:inherit; }
+:focus-visible { outline:3px solid var(--focus); outline-offset:4px; }
+.skip-link { position:fixed; top:8px; left:16px; z-index:20; background:var(--paper); padding:10px 16px; transform:translateY(-200%); }
+.skip-link:focus { transform:none; }
+.site-header { height:76px; position:fixed; inset:0 0 auto; z-index:10; display:flex; align-items:center; gap:32px; padding:0 32px; background:var(--paper); border-bottom:1px solid var(--line); }
+.brand { display:flex; align-items:center; gap:11px; color:var(--ink); text-decoration:none; font-size:15px; font-weight:800; letter-spacing:.13em; }
+.brand-mark { display:grid; place-items:center; width:34px; height:38px; background:var(--hero); color:var(--gold); border-radius:10px 10px 4px 4px; }
+.brand-mark svg { width:21px; height:21px; }
+.document-nav { display:flex; gap:6px; margin-left:auto; }
+.document-nav a { padding:8px 15px; border-radius:8px; color:var(--muted); font-size:.85rem; font-weight:600; text-decoration:none; }
+.document-nav a[aria-current=page] { color:var(--accent); background:var(--soft); }
+.header-badge { color:var(--muted); font-size:.72rem; display:flex; gap:7px; align-items:center; }
+.header-badge::before { content:""; width:6px; height:6px; border-radius:50%; background:var(--accent); }
+.cover { position:relative; isolation:isolate; overflow:hidden; background:var(--hero); color:var(--hero-ink); padding:32px 40px; border-radius:18px; margin-bottom:16px; }
+.cover::after { content:""; position:absolute; z-index:-1; width:300px; height:300px; right:20px; top:-135px; border:1px solid #f5f7ef20; border-radius:50%; box-shadow:0 0 0 44px #f5f7ef06,0 0 0 88px #f5f7ef04; }
+.eyebrow { color:var(--gold); font-size:.69rem; font-weight:750; letter-spacing:.17em; text-transform:uppercase; margin:0 0 14px; }
+.cover>p:not(.eyebrow) { color:#e0e9df; font-size:.9rem; margin:0; max-width:82ch; }
+.cover>p>em { display:block; margin-top:10px; font-style:normal; font-size:.72rem; color:#e0e9df; }
+.cover code { background:#ffffff14; color:inherit; }
+.cover a { color:inherit; }
+.cover .start-link { position:absolute; right:40px; bottom:34px; display:inline-flex; gap:12px; align-items:center; padding:9px 15px; border:1px solid #f5f7ef45; border-radius:7px; font-size:.8rem; font-weight:600; text-decoration:none; }
+.cover .start-link:hover { background:#ffffff14; }
+.usage-fold { padding:14px 20px; border:1px solid var(--line); border-radius:10px; background:var(--paper); margin:0 0 26px; font-size:.9rem; }
+summary { cursor:pointer; font-size:.85rem; font-weight:650; }
+.usage-fold summary { color:var(--accent); }
+.usage-fold[open] summary { margin-bottom:20px; }
+.usage-fold h2 { font-size:1.2rem; }
+.usage-fold ul { margin:8px 0; }
+.usage-fold hr { display:none; }
+.workspace { display:grid; grid-template-columns:292px minmax(0,1fr); gap:28px; align-items:start; }
+.workbench { position:sticky; top:98px; max-height:calc(100dvh - 120px); overflow-y:auto; scrollbar-width:thin; padding:0 2px 4px; }
+.panel { background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:22px; margin:0 0 16px; box-shadow:var(--shadow); }
+.panel h2 { font-size:1rem; margin:0 0 18px; letter-spacing:-.015em; }
+.panel-label { font-size:.62rem; font-weight:750; text-transform:uppercase; letter-spacing:.13em; color:var(--muted); margin-bottom:8px; }
+.fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.workbench .fields { grid-template-columns:1fr; gap:13px; }
+label { display:block; font-size:.76rem; font-weight:650; margin-bottom:5px; }
+input,select,textarea { width:100%; background:var(--paper); border:1px solid #a9b7ac; border-radius:7px; padding:10px 12px; min-height:44px; font-size:.87rem; }
+input:focus,select:focus,textarea:focus { border-color:var(--accent); }
+textarea { resize:vertical; min-height:84px; line-height:1.5; }
+button { display:inline-flex; justify-content:center; align-items:center; gap:8px; min-height:44px; padding:10px 14px; border:1px solid var(--line); border-radius:7px; color:var(--ink); background:var(--paper); cursor:pointer; font-size:.8rem; font-weight:650; transition:background .15s,border-color .15s; }
+button:hover { background:var(--soft); border-color:var(--accent); }
+.actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.actions #export-csv { grid-column:1/-1; color:var(--hero-ink); background:var(--hero); border-color:var(--hero); }
+.actions #export-csv:hover { background:#22513d; }
+.actions #export-json,.actions #import-button { grid-column:1/-1; }
+.actions #reset { color:var(--muted); font-size:.72rem; }
+.hint,.section-progress,.device-label { color:var(--muted); font-size:.76rem; line-height:1.6; }
+.settings-help { padding-top:14px; margin-top:14px; border-top:1px solid var(--line); }
+.settings-help summary { font-size:.75rem; color:var(--muted); }
+.settings-help[open] summary { margin-bottom:12px; }
+.settings-help .hint { margin:0 0 12px; }
+#save-status { margin:14px 0 0; font-size:.7rem; padding-left:12px; position:relative; }
+#save-status::before { content:""; position:absolute; left:0; top:.55em; width:5px; height:5px; background:var(--accent); border-radius:50%; }
+.warning { padding:12px 14px; border-left:3px solid var(--warning); color:var(--warning); background:var(--warning-bg); border-radius:0 7px 7px 0; font-size:.84rem; }
+.error { color:var(--ko); }
+#message { margin:14px 0 0; font-size:.8rem; }
+#message:empty { display:none; }
+.stats { display:grid; grid-template-columns:1.5fr 1fr 1fr; align-items:end; gap:12px; margin-bottom:16px; }
+.stat strong { display:block; font-size:1.65rem; line-height:1.2; font-weight:700; letter-spacing:-.04em; }
+.stat span { display:block; font-size:.68rem; color:var(--muted); margin-top:4px; }
+.stat-ok strong { color:var(--accent); } .stat-ko strong { color:var(--ko); }
+#done-total { color:var(--muted); font-size:.85rem; font-weight:500; }
+#redo-count { margin:8px 0 0; color:var(--warning); }
+progress { display:block; width:100%; height:7px; border:0; border-radius:99px; overflow:hidden; background:var(--line); accent-color:var(--accent); }
+progress::-webkit-progress-bar { background:var(--line); border-radius:99px; }
+progress::-webkit-progress-value { background:var(--accent); border-radius:99px; }
+progress::-moz-progress-bar { background:var(--accent); border-radius:99px; }
+#version { font-family:ui-monospace,Consolas,monospace; font-size:.6rem; margin:14px 0 0; opacity:.85; }
+.filter-panel { padding:20px 24px; }
+.filter-panel h2 { margin-bottom:14px; }
+.checks { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
+.checks label { display:flex; align-items:center; gap:7px; font-weight:500; border:1px solid var(--line); border-radius:99px; padding:7px 11px; margin:0; cursor:pointer; font-size:.74rem; }
+.checks label:has(:checked) { background:var(--soft); color:var(--accent); border-color:var(--accent); }
+input[type=checkbox] { width:15px; min-height:15px; height:15px; padding:0; margin:0; accent-color:var(--accent); }
+#filter-summary { margin:12px 0 0; font-size:.7rem; }
+.test-section { margin:30px 0 36px; }
+.test-section>h2 { margin:0 0 8px; font-size:1.4rem; }
+.section-progress { margin:0 0 10px; }
+.test-section>progress { height:4px; margin-bottom:20px; }
+.test-section>p:not(.section-progress) { font-size:.88rem; }
+.test-card { display:grid; grid-template-columns:1fr 1fr; gap:18px 24px; background:var(--paper); border:1px solid var(--line); border-left:3px solid var(--line); border-radius:12px; padding:24px; margin:16px 0; box-shadow:var(--shadow); }
+.test-card[data-status=OK] { border-left-color:var(--accent); }
+.test-card[data-status=KO] { border-left-color:var(--ko); }
+.test-card[data-status=rifare] { border-left-color:var(--warning); }
+.test-card h3 { grid-column:1; grid-row:1; width:fit-content; border:1px solid var(--line); padding:6px 10px; border-radius:6px; background:var(--soft); font-size:.9rem; font-weight:750; letter-spacing:.03em; }
+.test-card>.role,.test-card>p:not(.steps):not(.expected) { grid-column:2; grid-row:1; text-align:right; font-size:.75rem; align-self:center; color:var(--muted); margin:0; }
+.test-card>.steps,.test-card>.expected { grid-row:2; margin:0; font-size:.9rem; line-height:1.75; }
+.steps { grid-column:1; padding:14px 0; }
+.expected { grid-column:2; padding:14px 16px; background:var(--soft); border-radius:8px; }
+.steps>strong,.expected>strong { display:block; margin-bottom:6px; font-size:.65rem; font-weight:750; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); }
+.expected>strong { color:var(--accent); }
+.test-controls { grid-column:1/-1; display:grid; grid-template-columns:1fr 1fr; gap:12px 24px; border-top:1px solid var(--line); padding-top:18px; }
+.test-controls>.warning { grid-column:1/-1; margin:0; }
+.device-label { font-size:.7rem; margin:0 0 9px; }
+fieldset { padding:0; border:0; margin:0; min-width:0; }
+legend { font-size:.7rem; font-weight:600; padding:0; margin-bottom:9px; }
+.outcomes { display:flex; flex-wrap:wrap; gap:6px; }
+.outcomes button { padding:8px 12px; min-height:40px; font-size:.75rem; }
+.outcomes button.ok { color:var(--accent); }
+.outcomes button[aria-pressed=true] { background:var(--soft); border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+.outcomes button.ko { color:var(--ko); }
+.outcomes button.ko[aria-pressed=true] { background:var(--ko-bg); border-color:var(--ko); box-shadow:inset 0 0 0 1px var(--ko); }
+.outcomes button.pending { color:var(--muted); }
+.outcomes button.pending[aria-pressed=true] { background:var(--page); border-color:var(--muted); box-shadow:none; }
+.note-help { display:block; font-size:.68rem; line-height:1.5; color:var(--muted); margin:0 0 8px; }
+.note-error { font-size:.73rem; color:var(--ko); margin:5px 0 0; }
+.print-results,.print-identity { display:none; }
+.document-footer { display:flex; justify-content:space-between; gap:16px; margin-top:32px; padding-top:20px; border-top:1px solid var(--line); font-size:.76rem; color:var(--muted); }
+.visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+[hidden] { display:none!important; }
+@media(max-width:1100px) {
+ main { padding:100px 24px 48px; }
+ .cover .start-link { position:static; margin-top:18px; }
+ .workspace { grid-template-columns:248px minmax(0,1fr); gap:20px; }
+ .panel { padding:18px; }
+ .test-card { gap:16px; padding:20px; }
+ .test-controls { grid-template-columns:1fr; }
+ .test-controls>.warning { grid-column:1; }
+}
+@media(max-width:820px) {
+ .workspace { grid-template-columns:1fr; gap:4px; }
+ .workbench { position:static; max-height:none; overflow:visible; display:grid; grid-template-columns:1fr 1fr; gap:16px; padding:0; }
+ .workbench .panel { margin:0; }
+ .identity-panel { grid-row:1/3; }
+ .export-panel { grid-column:2; }
+ .test-area { min-width:0; margin-top:16px; }
+ .test-controls { grid-template-columns:1fr 1fr; }
+ .cover { padding:30px; }
+}
+@media(max-width:560px) {
+ .site-header { height:64px; padding:0 16px; gap:10px; }
+ .brand { font-size:11px; gap:7px; letter-spacing:.08em; }
+ .brand-mark { width:27px; height:31px; border-radius:8px 8px 3px 3px; }
+ .document-nav { gap:2px; }
+ .document-nav a { font-size:.72rem; padding:7px 9px; }
+ .header-badge { display:none; }
+ main { padding:84px 14px 36px; }
+ .cover { padding:26px 24px; border-radius:14px; }
+ h1 { font-size:2.05rem; }
+ .eyebrow { font-size:.61rem; }
+ .cover>p:not(.eyebrow) { font-size:.83rem; }
+ .usage-fold { font-size:.85rem; padding:13px 16px; margin-bottom:20px; }
+ .usage-fold summary { font-size:.77rem; }
+ .workbench { grid-template-columns:1fr; gap:12px; }
+ .identity-panel { grid-row:auto; }
+ .export-panel { grid-column:auto; }
+ .workbench .fields { grid-template-columns:1fr; }
+ .export-panel h2 { margin-bottom:12px; }
+ .actions { grid-template-columns:1fr 1fr; }
+ .actions #export-json,.actions #import-button { grid-column:auto; }
+ .test-area { margin-top:12px; }
+ .fields { gap:12px; }
+ .filter-panel .fields { grid-template-columns:1fr; }
+ .test-card { grid-template-columns:1fr; padding:18px; gap:12px; }
+ .test-card h3 { grid-column:1; grid-row:auto; }
+ .test-card>.role,.test-card>p:not(.steps):not(.expected) { grid-column:1; grid-row:auto; text-align:left; }
+ .test-card>.steps,.test-card>.expected { grid-column:1; grid-row:auto; font-size:.9rem; padding:12px 0; }
+ .test-card>.expected { padding:14px; }
+ .test-controls { grid-template-columns:1fr; gap:16px; }
+ .test-controls>.warning { grid-column:1; }
+ .outcomes button { min-height:44px; }
+ textarea { min-height:100px; }
+ .test-section>h2 { font-size:1.3rem; }
+}
+@media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } button { transition:none; } }
+@page { size:A4; margin:18mm 16mm 20mm; }
+@media print {
+ :root { color-scheme:light; --page:#fff; --paper:#fff; --ink:#111; --muted:#333; --accent:#174c3b; --soft:#fff; --line:#aaa; --code:#fff; --ko:#8b1018; --ko-bg:#fff; --warning:#493000; --warning-bg:#fff; }
+ html { scroll-behavior:auto; scroll-padding-top:0; }
+ body { font-size:10pt; line-height:1.5; }
+ main { max-width:none; padding:0; }
+ .no-print,.test-controls,.skip-link,noscript,.site-header,.document-footer,.start-link { display:none!important; }
+ .workspace,.test-area { display:block; }
+ .workbench { position:static; max-height:none; display:block; overflow:visible; padding:0; }
+ .progress-panel { box-shadow:none; margin:12px 0; }
+ .cover { background:#fff; color:#111; padding:0 0 18px; border-radius:0; border-bottom:2px solid #174c3b; }
+ .cover::after { display:none; }
+ .cover>p:not(.eyebrow),.cover>p>em,.eyebrow { color:#333; }
+ .usage-fold { border:0; padding:0; margin:20px 0; }
+ .usage-fold>summary { display:none; }
+ .test-section[hidden],.test-card[hidden] { display:block!important; }
+ .print-results,.print-identity { display:block; }
+ .print-results { white-space:pre-wrap; border-top:1px solid var(--line); padding-top:8px; margin-top:10px; }
+ h1 { font-size:26pt; }
+ h2,.test-section>h2 { font-size:17pt; }
+ h3 { font-size:12pt; }
+ h1,h2,h3 { break-after:avoid; }
+ .test-card { display:block; break-inside:avoid; padding:12px; margin:12px 0; box-shadow:none; }
+ .test-card h3 { margin-bottom:8px; }
+ .test-card>.role,.test-card>p:not(.steps):not(.expected) { text-align:left; margin:8px 0; }
+ .test-card>.steps,.test-card>.expected { padding:4px 0; }
+ .test-section { margin:24px 0; }
+ p { orphans:3; widows:3; }
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#prove">Vai alle prove</a>
+<header class="site-header">
+  <a class="brand" href="#inizio" aria-label="DOMHOUSE, inizio del collaudo"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m3 10 9-7 9 7v11H3Z"/><path d="M9 21v-8h6v8"/></svg></span>DOMHOUSE</a>
+  <nav class="document-nav" aria-label="Documenti"><a href="guida-utente.html">Guida utente</a><a href="checklist-collaudo.html" aria-current="page">Checklist</a></nav>
+  <span class="header-badge">Disponibile offline</span>
+</header>
+<main id="inizio">
+<header class="cover">
+<p class="eyebrow">DOMHOUSE · Quaderno di collaudo</p>
+{{COPERTINA}}
+<a class="start-link" href="#prove">Vai alle prove <span aria-hidden="true">↓</span></a>
+</header>
+<noscript><p class="warning">Per registrare ed esportare gli esiti occorre attivare JavaScript nel browser. Il testo delle prove resta leggibile.</p></noscript>
+<div class="workspace">
+<aside class="workbench" aria-label="Il tuo collaudo e i risultati">
+<div class="panel identity-panel no-print">
+  <p class="panel-label">01 · Preparazione</p>
+  <h2>Il tuo collaudo</h2>
+  <div class="fields">
+    <div><label for="tester">Chi collauda</label><input id="tester" autocomplete="name" maxlength="160" placeholder="Nome e cognome"></div>
+    <div><label for="device">Dispositivo</label><select id="device"><option>Computer</option><option>Android</option><option>iPhone</option></select></div>
+  </div>
+  <details class="settings-help">
+  <summary>Come registrare gli esiti</summary>
+  <p class="hint">Conferma il nome uscendo dal campo: ogni nome ha il proprio lavoro salvato.</p>
+  <p class="hint">Per le prove 📱 cambia dispositivo per registrare ciascuno dei tre esiti. Le altre prove hanno un esito unico; se la colonna Dispositivo ne indica uno preciso, il risultato viene attribuito a quello.</p>
+  <p class="hint">Gli esiti KO richiedono una nota. «Da rifare» conserva il risultato precedente e richiede una nuova esecuzione. L'avanzamento conta tutte le prove, incluse le tre esecuzioni delle prove 📱, indipendentemente dai filtri.</p>
+  <p class="hint">Nessun dato viene inviato a internet. Il lavoro resta su questo browser finché scarichi un file: esportalo prima di passare a un altro dispositivo o a una nuova versione della checklist.</p>
+  </details>
+  <p id="storage-warning" class="warning" role="alert" hidden>Il salvataggio nel browser non è disponibile. Esporta i risultati prima di chiudere questa pagina.</p>
+  <p id="save-status" class="hint" role="status"></p>
+</div>
+<div class="panel progress-panel" aria-label="Avanzamento complessivo">
+  <p class="panel-label">02 · A che punto sei</p>
+  <h2>Avanzamento</h2>
+  <div class="stats" aria-hidden="true">
+    <div class="stat"><strong><b id="done-count">0</b><small id="done-total"> / 0</small></strong><span>prove fatte</span></div>
+    <div class="stat stat-ok"><strong id="ok-count">0</strong><span>OK</span></div>
+    <div class="stat stat-ko"><strong id="ko-count">0</strong><span>KO</span></div>
+  </div>
+  <p id="total-progress" class="visually-hidden" aria-live="polite"></p>
+  <progress id="progress" value="0" max="1" aria-label="Prove completate"></progress>
+  <p id="redo-count" class="hint" hidden></p>
+  <details class="settings-help"><summary>Versione della checklist</summary><p id="version" class="hint"></p></details>
+</div>
+<div class="panel export-panel no-print">
+  <p class="panel-label">03 · Consegna</p>
+  <h2>I tuoi risultati</h2>
+  <div class="actions">
+    <button id="export-csv" type="button">Scarica risultati (Excel)</button>
+    <button id="export-json" type="button">Scarica risultati (JSON)</button>
+    <button id="import-button" type="button">Importa risultati</button>
+    <input id="import-file" class="visually-hidden" type="file" accept=".json,.csv,application/json,text/csv" tabindex="-1" aria-label="File di risultati da importare">
+    <button id="print" type="button">Stampa / PDF</button>
+    <button id="reset" type="button">Ricomincia</button>
+  </div>
+  <details class="settings-help"><summary>Trasferire o inviare il lavoro</summary><p class="hint">Puoi importare CSV o JSON. JSON conserva anche lo storico delle prove rifatte. Ogni file si riferisce a una sola persona.</p></details>
+  <p id="message" role="status" aria-live="polite"></p>
+</div>
+</aside>
+<div class="test-area">
+<div class="print-identity" id="print-identity"></div>
+<div class="panel filter-panel no-print" aria-label="Filtri delle prove">
+  <h2>Trova le prove</h2>
+  <div class="fields">
+    <div><label for="section-filter">Sezione</label><select id="section-filter"><option value="">Tutte le sezioni</option></select></div>
+    <div><label for="role-filter">Ruolo</label><select id="role-filter"><option value="">Tutti i ruoli</option></select></div>
+  </div>
+  <div class="checks">
+    <label><input id="todo-filter" type="checkbox">Solo le prove da fare</label>
+    <label><input id="ko-filter" type="checkbox">Solo i KO</label>
+  </div>
+  <p id="filter-summary" class="hint" role="status"></p>
+</div>
+<div id="prove" tabindex="-1">
+{{CONTENUTO}}
+</div>
+</div>
+</div>
+<footer class="document-footer"><span>DOMHOUSE · Checklist di collaudo</span><a href="#inizio">Torna all’inizio ↑</a></footer>
+</main>
+<script id="checklist-data" type="application/json">{{DATI}}</script>
+<script>
+"use strict";
+(() => {
+  const data = JSON.parse(document.getElementById("checklist-data").textContent);
+  // Riordina soltanto la presentazione: le istruzioni originali restano integrali.
+  const cover = document.querySelector('.cover');
+  const instructions = cover.querySelector('h2');
+  if (instructions) {
+    const fold = document.createElement('details'); fold.className = 'usage-fold';
+    const summary = document.createElement('summary'); summary.textContent = 'Prima di iniziare · Istruzioni e requisiti'; fold.append(summary);
+    let node = instructions;
+    while (node) {
+      const next = node.nextSibling;
+      if (node.nodeType !== Node.ELEMENT_NODE || !node.classList.contains('start-link')) fold.append(node);
+      node = next;
+    }
+    cover.after(fold);
+  }
+  const devices = ["Computer", "Android", "iPhone"];
+  const outcomes = ["OK", "KO", "Non provata"];
+  const headers = ["sigla", "sezione", "dispositivo", "esito", "nota", "chi collauda", "data e ora", "impronta della prova"];
+  const $ = id => document.getElementById(id);
+  const tests = new Map(data.prove.map(p => [p.sigla, p]));
+  const sections = new Map(data.sezioni.map(s => [s.id, s]));
+  const profileKey = "domhouse:checklist:profilo:" + data.versione;
+  let person = "", device = "Computer", rows = {}, archive = [], storageOK = true;
+  // In memoria restano accessibili anche i profili quando localStorage non funziona.
+  const memory = new Map();
+  const key = () => "domhouse:checklist:" + data.versione + ":" + encodeURIComponent(person);
+  const slot = (p, dev = device) => p.sigla + "|" + (p.ripetuta ? dev : "unica");
+  const fixedDevice = p => devices.find(d => p.dispositivo.startsWith(d));
+  const defaultRow = (p, dev = device) => ({sigla:p.sigla, sezione:sections.get(p.sezione).titolo,
+    dispositivo:p.ripetuta ? dev : (fixedDevice(p) || dev), esito:"Non provata", nota:"",
+    chi_collauda:person, data_ora:"", impronta:p.impronta, precedenti:[]});
+  const getRow = (p, dev = device) => rows[slot(p, dev)] || defaultRow(p, dev);
+  const stale = (p, r) => r.impronta !== p.impronta;
+  const effective = (p, r) => stale(p, r) ? "Da rifare" : r.esito;
+  const entries = p => p.ripetuta ? devices.map(d => getRow(p, d)) : [getRow(p)];
+  const say = (message, error = false) => { $("message").textContent = message; $("message").className = error ? "error" : ""; };
+  function storageFailed() {
+    storageOK = false;
+    $("storage-warning").hidden = false;
+  }
+  function save() {
+    const state = {schema:1, versione:data.versione, chi_collauda:person, righe:rows, archivio:archive};
+    memory.set(key(), JSON.stringify(state));
+    try {
+      localStorage.setItem(key(), JSON.stringify(state));
+      localStorage.setItem(profileKey, JSON.stringify({nome:person, dispositivo:device}));
+      storageOK = true;
+      $("storage-warning").hidden = true;
+    } catch (_) { storageFailed(); }
+    $("save-status").textContent = storageOK ? "Salvato nel browser · " + (person || "Nome da compilare") : "Il lavoro è conservato solo in questa pagina aperta.";
+  }
+  function load() {
+    rows = {}; archive = [];
+    let raw = memory.get(key());
+    try { raw = raw || localStorage.getItem(key()); } catch (_) { storageFailed(); }
+    if (raw) {
+      try {
+        const saved = JSON.parse(raw);
+        if (saved.schema !== 1 || saved.versione !== data.versione || saved.chi_collauda !== person || !saved.righe || !Array.isArray(saved.archivio)) throw new Error("formato");
+        const validated = validateRows([...Object.values(saved.righe), ...saved.archivio], person);
+        for (const r of validated) {
+          const p = tests.get(r.sigla);
+          if (p) rows[slot(p, r.dispositivo)] = r;
+          else archive.push(r);
+        }
+      } catch (_) {
+        // Non sovrascrivere automaticamente dati illeggibili.
+        say("Il salvataggio precedente non è leggibile. Importa l'ultima esportazione prima di proseguire.", true);
+        storageFailed();
+        return;
+      }
+    }
+    $("save-status").textContent = raw ? "Lavoro recuperato per " + (person || "il nome ancora da compilare") + "." : "Compila gli esiti: il salvataggio è automatico.";
+  }
+  function changePerson() {
+    const next = $("tester").value.trim();
+    if (next === person) return;
+    save(); person = next; $("tester").value = person;
+    load();
+    try { localStorage.setItem(profileKey, JSON.stringify({nome:person, dispositivo:device})); } catch (_) { storageFailed(); }
+    render();
+  }
+  function create(tag, text, className = "") {
+    const el = document.createElement(tag);
+    if (text !== undefined) el.textContent = text;
+    if (className) el.className = className;
+    return el;
+  }
+  function renderControls(p) {
+    const r = getRow(p), host = document.querySelector('[data-controls="' + p.sigla + '"]');
+    host.replaceChildren();
+    const outcomeField = create('div', undefined, 'outcome-field');
+    const noteField = create('div', undefined, 'note-field');
+    outcomeField.append(create("p", "Esito su " + r.dispositivo + (p.ripetuta ? " · da ripetere su tutti e tre i dispositivi" : " · prova unica"), "device-label"));
+    if (stale(p, r)) host.append(create("p", "Da rifare: il testo della prova è cambiato. Esito precedente: " + r.esito + ". Nota e data precedenti sono conservate. Esegui di nuovo la prova e scegli un esito.", "warning"));
+    const field = create("fieldset"), legend = create("legend", "Esito " + p.sigla + " · " + r.dispositivo);
+    field.append(legend);
+    const buttons = create("div", undefined, "outcomes");
+    for (const status of outcomes) {
+      const b = create("button", status, status === "KO" ? "ko" : status === "Non provata" ? "pending" : "ok");
+      b.type = "button"; b.dataset.outcome = status;
+      b.setAttribute("aria-label", p.sigla + " · " + r.dispositivo + ": " + status);
+      b.setAttribute("aria-pressed", String(!stale(p, r) && r.esito === status));
+      b.addEventListener("click", () => setOutcome(p, status));
+      buttons.append(b);
+    }
+    field.append(buttons); outcomeField.append(field);
+    const label = create("label", "Nota" + (r.esito === "KO" ? " (obbligatoria per KO)" : ""));
+    label.htmlFor = "nota-" + p.sigla;
+    const help = create("span", "Scrivi cosa hai visto e, se c'è, l'ID richiesta mostrato dall'app.", "note-help");
+    help.id = "help-" + p.sigla;
+    const note = create("textarea"); note.id = "nota-" + p.sigla; note.value = r.nota;
+    note.setAttribute("aria-label", "Nota " + p.sigla + " · " + r.dispositivo);
+    note.setAttribute("aria-describedby", help.id + " error-" + p.sigla);
+    note.required = r.esito === "KO";
+    const error = create("p", "", "note-error"); error.id = "error-" + p.sigla;
+    noteField.append(label, help, note, error);
+    host.append(outcomeField, noteField);
+    note.addEventListener("input", () => {
+      const current = {...getRow(p), nota:note.value, chi_collauda:person, data_ora:new Date().toISOString()};
+      rows[slot(p)] = current;
+      save(); noteValidation(p); refresh();
+    });
+    noteValidation(p);
+  }
+  function noteValidation(p) {
+    const r = getRow(p), note = $("nota-" + p.sigla), invalid = r.esito === "KO" && !r.nota.trim();
+    note.required = r.esito === "KO";
+    note.setAttribute("aria-invalid", String(invalid));
+    note.setCustomValidity(invalid ? "Per un esito KO scrivi cosa hai visto." : "");
+    $("error-" + p.sigla).textContent = invalid ? "Completa la nota prima di esportare i risultati." : "";
+  }
+  function setOutcome(p, status) {
+    const old = getRow(p), previous = [...(old.precedenti || [])];
+    if (stale(p, old)) {
+      const {precedenti, ...snapshot} = old;
+      previous.push(snapshot);
+    }
+    rows[slot(p)] = {...old, esito:status, impronta:p.impronta, chi_collauda:person,
+      dispositivo:p.ripetuta ? device : (fixedDevice(p) || device),
+      data_ora:new Date().toISOString(), precedenti:previous};
+    save(); renderControls(p); refresh();
+    const host = document.querySelector('[data-controls="' + p.sigla + '"]');
+    const invalid = status === "KO" && !getRow(p).nota.trim();
+    if (invalid) $("nota-" + p.sigla).focus();
+    else host.querySelector('[data-outcome="' + status + '"]').focus();
+  }
+  function counts(prove) {
+    const all = prove.flatMap(p => entries(p).map(r => effective(p, r)));
+    return {total:all.length, ok:all.filter(s => s === "OK").length,
+      ko:all.filter(s => s === "KO").length, redo:all.filter(s => s === "Da rifare").length};
+  }
+  function progressText(c) {
+    return (c.ok + c.ko) + " / " + c.total + " prove fatte · " + c.ok + " OK · " + c.ko + " KO · " + c.redo + " da rifare";
+  }
+  function role(p) {
+    return p.ruolo || (/solo amministratore/.test(sections.get(p.sezione).titolo) ? "Amministratore" : "");
+  }
+  function refresh() {
+    const total = counts(data.prove);
+    $("total-progress").textContent = progressText(total);
+    $('done-count').textContent = total.ok + total.ko;
+    $('done-total').textContent = ' / ' + total.total;
+    $('ok-count').textContent = total.ok; $('ko-count').textContent = total.ko;
+    $('redo-count').textContent = total.redo + ' risultati da rifare'; $('redo-count').hidden = total.redo === 0;
+    $("progress").max = total.total; $("progress").value = total.ok + total.ko;
+    $("print-identity").textContent = "Chi collauda: " + (person || "Nome da compilare") + " · Versione checklist: " + data.versione;
+    let shown = 0;
+    for (const p of data.prove) {
+      const r = getRow(p), status = effective(p, r), card = $("prova-" + p.sigla);
+      card.dataset.status = stale(p, r) ? "rifare" : r.esito;
+      const roleFilter = $("role-filter").value;
+      card.hidden = Boolean(($("section-filter").value && $("section-filter").value !== p.sezione)
+        || (roleFilter && !role(p).toLocaleLowerCase("it").includes(roleFilter.toLocaleLowerCase("it")))
+        || ($("todo-filter").checked && !["Non provata", "Da rifare"].includes(status))
+        || ($("ko-filter").checked && status !== "KO"));
+      if (!card.hidden) shown++;
+      document.querySelector('[data-print="' + p.sigla + '"]').textContent = entries(p).map(row =>
+        row.dispositivo + ": " + effective(p, row) + (stale(p, row) ? " (precedente: " + row.esito + ")" : "")
+        + "\nNota: " + (row.nota || "—") + "\nData e ora: " + (row.data_ora || "—")).join("\n\n");
+    }
+    for (const s of data.sezioni) {
+      const prove = data.prove.filter(p => p.sezione === s.id);
+      const c = counts(prove);
+      document.querySelector('[data-section="' + s.id + '"]').textContent = progressText(c);
+      const meter = document.querySelector('[data-section-meter="' + s.id + '"]');
+      meter.max = c.total; meter.value = c.ok + c.ko;
+      $("sezione-" + s.id).hidden = prove.every(p => $("prova-" + p.sigla).hidden);
+    }
+    $("filter-summary").textContent = shown + " prove visibili su " + data.prove.length + " · dispositivo selezionato: " + device + ". La stampa include tutte le prove e tutti i dispositivi.";
+  }
+  function render() { for (const p of data.prove) renderControls(p); refresh(); }
+  function exportRows() {
+    return [...data.prove.flatMap(p => entries(p)), ...archive].map(r => ({...r, chi_collauda:person}));
+  }
+  function ready() {
+    changePerson();
+    if (!person) { say("Scrivi chi collauda prima di esportare.", true); $("tester").focus(); return false; }
+    const invalid = data.prove.flatMap(p => entries(p).map(r => ({p, r}))).find(({r}) => r.esito === "KO" && !r.nota.trim());
+    if (invalid) {
+      device = invalid.r.dispositivo; $("device").value = device;
+      $("section-filter").value = ""; $("role-filter").value = "";
+      $("todo-filter").checked = false; $("ko-filter").checked = false;
+      render(); $("nota-" + invalid.p.sigla).focus();
+      say("Completa la nota del KO " + invalid.p.sigla + " su " + device + " prima di esportare.", true);
+      return false;
+    }
+    return true;
+  }
+  const safeCell = value => {
+    const text = String(value ?? "");
+    // Neutralizza formule quando il CSV viene aperto in un foglio di calcolo.
+    const safe = /^'*(?:\s*[=+\-@]|[\t\r\n])/.test(text) ? "'" + text : text;
+    return '"' + safe.replace(/"/g, '""') + '"';
+  };
+  const restoreCell = value => /^'+(?:\s*[=+\-@]|[\t\r\n])/.test(value) ? value.slice(1) : value;
+  function download(content, extension, type) {
+    const url = URL.createObjectURL(new Blob([content], {type})), a = create("a");
+    const name = person.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-zA-Z0-9_-]+/g, "-").slice(0, 80) || "collaudatore";
+    // Data locale di chi esporta, senza dipendenze dal server.
+    const now = new Date(), date = [now.getFullYear(), String(now.getMonth()+1).padStart(2,"0"), String(now.getDate()).padStart(2,"0")].join("-");
+    a.href = url; a.download = "collaudo-" + name + "-" + date + "." + extension;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    say("Risultati scaricati. Puoi inviare il file alla memoria storica.");
+  }
+  $("export-csv").addEventListener("click", () => {
+    if (!ready()) return;
+    const lines = [headers.map(safeCell).join(";")];
+    for (const r of exportRows()) {
+      const p = tests.get(r.sigla), status = p && stale(p,r) ? "Da rifare: " + r.esito : r.esito;
+      lines.push([r.sigla,r.sezione,r.dispositivo,status,r.nota,r.chi_collauda,r.data_ora,r.impronta].map(safeCell).join(";"));
+    }
+    download("\ufeff" + lines.join("\r\n") + "\r\n", "csv", "text/csv;charset=utf-8");
+  });
+  $("export-json").addEventListener("click", () => {
+    if (!ready()) return;
+    download(JSON.stringify({schema:1, versione_checklist:data.versione, chi_collauda:person,
+      risultati:exportRows().map(r => ({...r, da_rifare:tests.has(r.sigla) && stale(tests.get(r.sigla),r)}))}, null, 2) + "\n", "json", "application/json;charset=utf-8");
+  });
+  function parseCSV(text) {
+    const table = [], row = []; let cell = "", quoted = false, closed = false;
+    text = text.replace(/^\ufeff/, "");
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (quoted) {
+        if (c === '"' && text[i+1] === '"') { cell += '"'; i++; }
+        else if (c === '"') { quoted = false; closed = true; }
+        else cell += c;
+      } else if (c === '"' && !cell && !closed) quoted = true;
+      else if (c === ";" || c === "\n" || c === "\r") {
+        row.push(restoreCell(cell)); cell = ""; closed = false;
+        if (c !== ";") {
+          if (c === "\r" && text[i+1] === "\n") i++;
+          table.push(row.splice(0));
+        }
+      } else {
+        if (closed || c === '"') throw new Error("CSV: virgolette non valide.");
+        cell += c;
+      }
+    }
+    if (quoted) throw new Error("CSV: campo non chiuso.");
+    if (cell || row.length || closed) { row.push(restoreCell(cell)); table.push(row); }
+    if (JSON.stringify(table.shift()) !== JSON.stringify(headers)) throw new Error("CSV: colonne diverse da quelle della checklist.");
+    return table.filter(r => r.some(Boolean)).map(r => {
+      if (r.length !== headers.length) throw new Error("CSV: numero di colonne non valido.");
+      return {sigla:r[0],sezione:r[1],dispositivo:r[2],esito:r[3].replace(/^Da rifare: /,""),nota:r[4],chi_collauda:r[5],data_ora:r[6],impronta:r[7],precedenti:[]};
+    });
+  }
+  function validateRows(input, expectedPerson) {
+    if (!Array.isArray(input) || input.length > 20000) throw new Error("Elenco dei risultati non valido.");
+    return input.map(raw => {
+      if (!raw || typeof raw !== "object") throw new Error("Risultato non valido.");
+      const fields = ["sigla","sezione","dispositivo","esito","nota","chi_collauda","data_ora","impronta"];
+      const r = {};
+      for (const field of fields) {
+        if (typeof raw[field] !== "string" || raw[field].length > 100000) throw new Error("Campo non valido: " + field);
+        r[field] = raw[field];
+      }
+      if (!/^[A-Z]\d+[a-z]?$/.test(r.sigla) || !devices.includes(r.dispositivo)
+          || !outcomes.includes(r.esito) || !/^[0-9a-f]{64}$/.test(r.impronta)
+          || r.chi_collauda !== expectedPerson || (r.data_ora && !/^\d{4}-\d\d-\d\dT.*(?:Z|[+-]\d\d:\d\d)$/.test(r.data_ora))
+          || (r.data_ora && !Number.isFinite(Date.parse(r.data_ora)))) throw new Error("Risultato non valido per " + r.sigla + ".");
+      // Lo storico è conservato come dati, mai inserito come HTML o eseguito.
+      if (raw.precedenti !== undefined && !Array.isArray(raw.precedenti)) throw new Error("Storico non valido.");
+      r.precedenti = raw.precedenti || [];
+      return r;
+    });
+  }
+  $("import-button").addEventListener("click", () => $("import-file").click());
+  $("import-file").addEventListener("change", async event => {
+    const file = event.target.files[0]; if (!file) return;
+    try {
+      if (file.size > 10 * 1024 * 1024) throw new Error("Il file supera 10 MB.");
+      const text = await file.text(); let imported, name;
+      if (/\.json$/i.test(file.name)) {
+        const doc = JSON.parse(text.replace(/^\ufeff/, ""));
+        if (doc.schema !== 1 || typeof doc.chi_collauda !== "string" || !/^[0-9a-f]{64}$/.test(doc.versione_checklist)) throw new Error("Formato JSON non riconosciuto.");
+        imported = doc.risultati; name = doc.chi_collauda;
+      } else { imported = parseCSV(text); name = imported[0]?.chi_collauda; }
+      if (typeof name !== "string" || !name.trim() || name.length > 160 || name !== name.trim()) throw new Error("Nome del collaudatore mancante o non valido.");
+      const validated = validateRows(imported, name);
+      if (!validated.length) throw new Error("Il file non contiene risultati.");
+      if (!window.confirm("Importare i risultati di " + name + "? Per una prova già presente verrà conservato il risultato con data più recente. Le prove cambiate saranno da rifare.")) return;
+      save(); person = name; $("tester").value = person; load();
+      let redo = 0, removed = 0;
+      for (const r of validated) {
+        const p = tests.get(r.sigla);
+        if (!p) {
+          const oldIndex = archive.findIndex(a => a.sigla === r.sigla && a.dispositivo === r.dispositivo);
+          if (oldIndex < 0) archive.push(r);
+          else if ((Date.parse(r.data_ora) || 0) >= (Date.parse(archive[oldIndex].data_ora) || 0)) archive[oldIndex] = r;
+          removed++; continue;
+        }
+        const k = slot(p,r.dispositivo), old = rows[k];
+        if (!old || (Date.parse(r.data_ora) || 0) >= (Date.parse(old.data_ora) || 0)) rows[k] = r;
+        if (stale(p,rows[k])) redo++;
+      }
+      save(); render(); say("Importazione completata: " + redo + " risultati da rifare; " + removed + " risultati di prove rimosse conservati nell'esportazione.");
+    } catch (error) { say("Importazione non riuscita: " + error.message, true); }
+    finally { event.target.value = ""; }
+  });
+  $("tester").addEventListener("change", changePerson);
+  $("device").addEventListener("change", () => { device = $("device").value; save(); render(); });
+  for (const id of ["section-filter","role-filter","todo-filter","ko-filter"]) $(id).addEventListener("change", () => {
+    if (id === "todo-filter" && $(id).checked) $("ko-filter").checked = false;
+    if (id === "ko-filter" && $(id).checked) $("todo-filter").checked = false;
+    refresh();
+  });
+  $("reset").addEventListener("click", () => {
+    changePerson();
+    if (!window.confirm("Cancellare tutti gli esiti e le note di " + (person || "questo collaudo senza nome") + " per questa versione, su tutti i dispositivi? Esporta prima per conservarli.")) return;
+    rows = {}; archive = []; save(); render(); say("Collaudo ricominciato.");
+  });
+  $("print").addEventListener("click", () => { changePerson(); refresh(); window.print(); });
+  let printDetails = [];
+  window.addEventListener("beforeprint", () => {
+    if (!printDetails.length) printDetails = [...document.querySelectorAll('details')].map(el => [el, el.open]);
+    for (const [el] of printDetails) el.open = true;
+    refresh();
+  });
+  window.addEventListener('afterprint', () => { for (const [el, open] of printDetails) el.open = open; printDetails = []; });
+  for (const s of data.sezioni) {
+    const option = create("option", s.titolo); option.value = s.id; $("section-filter").append(option);
+  }
+  const roles = new Set(data.prove.map(role).filter(Boolean));
+  for (const basic of ["Amministratore","Operatore","Sola lettura","Gestore"]) {
+    if (data.prove.some(p => role(p).toLowerCase().includes(basic.toLowerCase()))) roles.add(basic);
+  }
+  for (const r of [...roles].sort((a,b) => a.localeCompare(b,"it"))) {
+    const option = create("option", r); option.value = r; $("role-filter").append(option);
+  }
+  $("version").textContent = "Versione checklist: " + data.versione;
+  try {
+    const probe = profileKey + ":verifica"; localStorage.setItem(probe,"1"); localStorage.removeItem(probe);
+    const profile = JSON.parse(localStorage.getItem(profileKey) || "null");
+    if (profile && typeof profile.nome === "string" && devices.includes(profile.dispositivo)) { person = profile.nome; device = profile.dispositivo; }
+  } catch (_) { storageFailed(); }
+  $("tester").value = person; $("device").value = device;
+  load(); render();
+})();
+</script>
+</body>
+</html>

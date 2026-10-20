@@ -1,0 +1,7 @@
+# Build context of engine/Dockerfile (the repository's root): only engine/ goes to the builder.
+*
+!engine
+**/__pycache__
+**/.pytest_cache
+**/.env
+**/.env.*

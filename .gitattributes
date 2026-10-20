@@ -1,0 +1,17 @@
+# Generato da openapi-typescript (yarn gen:api, lanciato da ogni yarn build) sempre con fine riga LF:
+# tenuto LF anche nella copia di lavoro, così con core.autocrlf=true non risulta modificato dopo ogni build.
+frontend/src/api/schema.ts text eol=lf
+# Guida in HTML generata da docs/strumenti/guida_html.py (D-74): il controllo --check confronta i byte, quindi HTML e
+# modello restano LF anche nella copia di lavoro, altrimenti con core.autocrlf=true --check segnalerebbe una differenza.
+docs/guida-utente.html text eol=lf
+docs/strumenti/guida_modello.html text eol=lf
+# P-41: gli script di shell girano su Linux e Cloud Shell: sempre LF, anche nella copia di lavoro su Windows. Il bit
+# «eseguibile» (100755) non dipende da questo file: lo controlla run_tests.py (suite script_sh).
+*.sh text eol=lf
+# Checklist in HTML generata da docs/strumenti/checklist_html.py (D-100): stessa ragione della guida.
+docs/checklist-collaudo.html text eol=lf
+docs/strumenti/checklist_modello.html text eol=lf
+# Il modello Compose del motore si copia sulla VM (scripts/engine-vm.sh, docs/motore-vm.md): LF anche su Windows.
+engine/compose.yaml text eol=lf
+# L'ambiente del motore per la conformità: lo legge anche la shell della CI (. ci/engine.vars).
+ci/engine.vars text eol=lf

@@ -1,0 +1,22 @@
+{
+  "displayName": "BFF: scrittura non riuscita",
+  "documentation": {
+    "content": "Il server dell'app (BFF) ha scritto nel log che una scrittura «al meglio» non è riuscita: una voce del registro delle azioni, un passo della cancellazione di un account (GDPR), un accesso di assistenza, la scadenza di un accesso o il limite sulle email di invito; oppure, in produzione, un appartamento dimostrativo con un codice Italianway (le sue prenotazioni vere vengono rifiutate: va tolto il codice, D-99). Nel primo caso l'azione dell'utente è andata a buon fine, ma una traccia o una cancellazione può mancare. Primo passo: Cloud Run > domotica-bff > Log, cercare il messaggio indicato nell'avviso e il campo error. Istruzioni: scripts/monitoring/README.md, sezione «Scritture non riuscite».",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Messaggio di scrittura non riuscita nei log del BFF",
+      "conditionMatchedLog": {
+        "filter": "__FILTER__"
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": { "period": "3600s" },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": ["__CHANNEL__"],
+  "severity": "WARNING"
+}

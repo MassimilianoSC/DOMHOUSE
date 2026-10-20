@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Guida all'app DOMHOUSE</title>
+  <style>
+    :root {
+      color-scheme:light dark; --page:#f2f3ef; --paper:#fff; --ink:#23372f; --muted:#5b6c63;
+      --accent:#17644e; --accent-soft:#edf4ee; --line:#dde4dc; --sidebar:#f9faf7;
+      --warning:#79510b; --warning-bg:#fff5df; --coming:#67458c; --coming-bg:#f3edf9;
+      --code-bg:#edf1eb; --focus:#006dcc; --sidebar-width:284px; --hero:#153e31;
+      --hero-ink:#f5f7ef; --gold:#ddc58e; --shadow:0 8px 30px #23372f06;
+    }
+    @media(prefers-color-scheme:dark) {
+      :root { --page:#111b16; --paper:#1a2720; --ink:#e4ede5; --muted:#b3c3b7;
+        --accent:#9bd9b8; --accent-soft:#233d2f; --line:#354b3d; --sidebar:#15221b;
+        --warning:#f2ce82; --warning-bg:#362c19; --coming:#d6bdf6; --coming-bg:#30273f;
+        --code-bg:#2b3b30; --focus:#8bbdff; --hero:#1b4434; --hero-ink:#f5f7ef; --shadow:none; }
+    }
+    *,*::before,*::after { box-sizing:border-box; }
+    html { scroll-padding-top:108px; scroll-behavior:smooth; }
+    body { margin:0; background:var(--page); color:var(--ink); font:1rem/1.8 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; overflow-wrap:break-word; -webkit-text-size-adjust:100%; }
+    a { color:var(--accent); text-underline-offset:.22em; }
+    a:hover { text-decoration-thickness:2px; }
+    button,summary { font:inherit; }
+    button { cursor:pointer; }
+    :focus-visible { outline:3px solid var(--focus); outline-offset:4px; border-radius:4px; }
+    .skip-link { position:fixed; top:8px; left:16px; z-index:20; background:var(--paper); padding:10px 16px; transform:translateY(-180%); }
+    .skip-link:focus { transform:none; }
+    .site-header { height:76px; position:fixed; inset:0 0 auto; z-index:10; display:flex; align-items:center; gap:32px; padding:0 32px; background:var(--paper); border-bottom:1px solid var(--line); }
+    .brand { display:flex; align-items:center; gap:11px; color:var(--ink); text-decoration:none; font-size:15px; font-weight:800; letter-spacing:.13em; }
+    .brand-mark { display:grid; place-items:center; width:34px; height:38px; background:var(--hero); color:var(--gold); border-radius:10px 10px 4px 4px; }
+    .brand-mark svg { width:21px; height:21px; }
+    .document-nav { display:flex; gap:6px; margin-left:auto; }
+    .document-nav a { padding:8px 15px; border-radius:8px; color:var(--muted); font-size:.85rem; font-weight:600; text-decoration:none; }
+    .document-nav a[aria-current=page] { color:var(--accent); background:var(--accent-soft); }
+    .header-print { padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink); font-size:.82rem; }
+    .reading-track { height:3px; position:absolute; bottom:-1px; left:0; right:0; background:transparent; }
+    .reading-track span { display:block; height:100%; width:0; background:var(--accent); }
+    .document { margin-left:var(--sidebar-width); padding:112px clamp(24px,4.3vw,76px) 72px; }
+    .cover,article { max-width:960px; margin-inline:auto; min-width:0; }
+    .cover { position:relative; isolation:isolate; overflow:hidden; border-radius:18px; background:var(--hero); color:var(--hero-ink); padding:42px 44px; margin-bottom:32px; }
+    .cover::after { content:""; position:absolute; z-index:-1; width:290px; height:290px; right:-85px; top:-80px; border:1px solid #f5f7ef20; border-radius:50%; box-shadow:0 0 0 40px #f5f7ef06,0 0 0 80px #f5f7ef04; }
+    .eyebrow { color:var(--gold); font-size:.69rem; font-weight:750; letter-spacing:.17em; text-transform:uppercase; margin:0 0 18px; }
+    h1,h2,h3 { line-height:1.25; font-weight:680; text-wrap:pretty; }
+    h1 { max-width:18ch; font-size:clamp(2.2rem,3.5vw,3.2rem); letter-spacing:-.045em; margin:0 0 18px; }
+    .subtitle { max-width:58ch; font-size:1rem; color:#e0e9df; margin:0 0 22px; }
+    .version { display:inline-block; color:#e0e9df; font-size:.74rem; padding:6px 11px; border:1px solid #f5f7ef30; border-radius:6px; margin:0; }
+    .version em { font-style:normal; }
+    .toc { position:fixed; inset:76px auto 0 0; width:var(--sidebar-width); padding:30px 17px 30px 24px; background:var(--sidebar); border-right:1px solid var(--line); overflow-y:auto; scrollbar-width:thin; }
+    .toc summary { list-style:none; cursor:pointer; padding:0 10px 17px; color:var(--muted); font-size:.67rem; font-weight:750; letter-spacing:.14em; text-transform:uppercase; }
+    .toc summary::-webkit-details-marker { display:none; }
+    .toc summary::after { content:"−"; float:right; font-size:16px; line-height:1; }
+    .toc details:not([open]) summary::after { content:"+"; }
+    .toc ol { list-style:none; margin:0; padding:0; }
+    .toc>details>ol>li { margin-bottom:5px; padding:0; }
+    .toc a { display:block; padding:9px 11px; border-radius:7px; color:var(--muted); text-decoration:none; font-size:.79rem; line-height:1.5; transition:background .15s; }
+    .toc a:hover { color:var(--accent); background:var(--accent-soft); }
+    .toc a[aria-current=location] { color:var(--accent); font-weight:700; background:var(--accent-soft); box-shadow:inset 3px 0 var(--accent); }
+    .toc li ol { margin:4px 0 10px 12px; padding-left:10px; border-left:1px solid var(--line); }
+    .toc li ol a { font-size:.74rem; padding:5px 9px; }
+    article>p,article>blockquote { margin-inline:8px; }
+    article>p:first-child { font-size:1.1rem; line-height:1.8; }
+    p { margin:0 0 1.1em; }
+    strong { font-weight:680; }
+    section { background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:32px 36px; margin:24px 0; box-shadow:var(--shadow); }
+    section>:last-child { margin-bottom:0; }
+    h2 { font-size:1.6rem; letter-spacing:-.03em; margin:0 0 24px; padding-bottom:18px; border-bottom:1px solid var(--line); }
+    h3 { font-size:1.13rem; letter-spacing:-.015em; margin:32px 0 14px; color:var(--accent); }
+    .featured-section { border-top:3px solid var(--accent); }
+    .featured-section h2 { color:var(--accent); }
+    ul,ol { margin:.8rem 0 1.5rem; padding-left:1.45rem; }
+    li { padding-left:.2rem; margin-bottom:.65rem; }
+    li>p { margin-bottom:.5rem; }
+    li>:last-child { margin-bottom:0; }
+    li ul,li ol { margin-top:.6rem; }
+    li::marker { color:var(--accent); font-weight:600; }
+    code { padding:.15em .4em; background:var(--code-bg); border-radius:4px; font:.86em ui-monospace,"Cascadia Code",Consolas,monospace; overflow-wrap:anywhere; }
+    blockquote { padding:18px 22px; margin:24px 0; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; background:var(--accent-soft); }
+    blockquote p:last-child { margin-bottom:0; }
+    .test-notice { border-color:var(--warning); background:var(--warning-bg); color:var(--warning); }
+    .role-label,.upcoming-label { display:inline; padding:.1em .4em; border:1px solid var(--line); border-radius:4px; font-size:.84em; font-weight:650; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+    .role-label { color:var(--accent); background:var(--accent-soft); }
+    .upcoming-label,.upcoming-note { color:var(--coming); background:var(--coming-bg); border-radius:4px; padding:.1em .3em; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+    .upcoming-note { font-style:normal; border-bottom:1px solid var(--coming); }
+    .table-scroll { overflow-x:auto; max-width:100%; border:1px solid var(--line); border-radius:10px; margin:20px 0 26px; scrollbar-width:thin; }
+    table { width:100%; border-collapse:collapse; font-size:.86rem; line-height:1.65; }
+    th,td { padding:13px 16px; min-width:9rem; vertical-align:top; border-bottom:1px solid var(--line); }
+    th { background:var(--accent-soft); color:var(--accent); font-size:.77rem; font-weight:750; }
+    tbody tr:last-child td { border-bottom:0; }
+    tbody tr:nth-child(even) { background:var(--sidebar); }
+    .align-left { text-align:left; } .align-center { text-align:center; } .align-right { text-align:right; }
+    hr { border:0; border-top:1px solid var(--line); margin:28px 0; }
+    .document-footer { max-width:960px; margin:40px auto 0; display:flex; justify-content:space-between; gap:16px; font-size:.76rem; color:var(--muted); }
+    @media(min-width:1101px) { .toc summary { pointer-events:none; } .toc summary::after { display:none; } }
+    @media(max-width:1100px) {
+      .document { margin-left:0; padding:100px 24px 48px; }
+      .toc { position:static; width:auto; max-width:960px; margin:0 auto 24px; padding:18px 20px; border:1px solid var(--line); border-radius:12px; }
+      .toc summary { padding:0; font-size:.75rem; }
+      .toc details[open] summary { padding-bottom:16px; }
+      .toc>details>ol { columns:2; column-gap:20px; }
+      .toc>details>ol>li { break-inside:avoid; }
+    }
+    @media(max-width:560px) {
+      .site-header { height:64px; padding:0 16px; gap:10px; }
+      .brand { font-size:11px; gap:7px; letter-spacing:.08em; }
+      .brand-mark { width:27px; height:31px; border-radius:8px 8px 3px 3px; }
+      .document-nav { gap:2px; }
+      .document-nav a { font-size:.72rem; padding:7px 9px; }
+      .header-print { display:none; }
+      .document { padding:84px 14px 36px; }
+      .cover { padding:28px 24px; border-radius:14px; margin-bottom:20px; }
+      h1 { font-size:2.25rem; }
+      .eyebrow { font-size:.61rem; margin-bottom:14px; }
+      .subtitle { font-size:.92rem; }
+      .version { font-size:.67rem; }
+      .toc { padding:16px 18px; margin-bottom:20px; }
+      .toc>details>ol { columns:1; }
+      section { padding:24px 20px; border-radius:12px; margin:18px 0; }
+      h2 { font-size:1.38rem; padding-bottom:15px; margin-bottom:20px; }
+      h3 { font-size:1.08rem; }
+      body { font-size:.96rem; line-height:1.75; }
+      blockquote { padding:16px; }
+      th,td { padding:11px 12px; }
+      .document-footer { margin-inline:4px; }
+    }
+    @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .toc a { transition:none; } }
+    @page { size:A4; margin:18mm 16mm 20mm; }
+    @media print {
+      :root { color-scheme:light; --page:#fff; --paper:#fff; --ink:#111; --muted:#333; --accent:#174c3b; --accent-soft:#fff; --line:#aaa; --sidebar:#fff; --warning:#493000; --warning-bg:#fff; --coming:#45315d; --coming-bg:#fff; --code-bg:#fff; }
+      html { scroll-padding-top:0; scroll-behavior:auto; }
+      body { font-size:10pt; line-height:1.5; }
+      .site-header,.skip-link,.document-footer { display:none; }
+      .document { margin:0; padding:0; }
+      .cover,article { max-width:none; }
+      .cover { background:#fff; color:#111; border-radius:0; padding:0 0 20px; margin-bottom:20px; border-bottom:2px solid #174c3b; break-inside:avoid; }
+      .cover::after { display:none; }
+      .eyebrow,.subtitle,.version { color:#333; }
+      .version { border-color:#aaa; }
+      h1 { font-size:28pt; }
+      .toc { position:static; width:auto; max-width:none; height:auto; overflow:visible; padding:0; margin:0 0 24px; border:0; background:#fff; break-after:page; }
+      .toc summary { padding:0 0 10px; }
+      .toc summary::after { display:none; }
+      .toc>details>ol { columns:2; column-gap:20px; }
+      .toc a { font-size:8pt; padding:3px 0; color:#111; }
+      .toc a[aria-current=location] { box-shadow:none; background:transparent; }
+      .toc li ol a { font-size:7.5pt; padding:2px 0; }
+      section { padding:0; border:0; border-radius:0; margin:24px 0; box-shadow:none; }
+      h2 { font-size:17pt; padding-bottom:10px; }
+      h3 { font-size:12pt; margin-top:20px; }
+      h1,h2,h3 { break-after:avoid-page; }
+      p { orphans:3; widows:3; }
+      blockquote { background:transparent; break-inside:avoid; }
+      .table-scroll { overflow:visible; border-radius:0; }
+      table { table-layout:fixed; font-size:8.5pt; }
+      th,td { min-width:0; padding:7px; overflow-wrap:anywhere; }
+      thead { display:table-header-group; }
+      tr { break-inside:avoid; }
+      a { color:inherit; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#contenuto">Vai alla guida</a>
+  <header class="site-header">
+    <a class="brand" href="#guida" aria-label="DOMHOUSE, inizio della guida"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m3 10 9-7 9 7v11H3Z"/><path d="M9 21v-8h6v8"/></svg></span>DOMHOUSE</a>
+    <nav class="document-nav" aria-label="Documenti"><a href="guida-utente.html" aria-current="page">Guida utente</a><a href="checklist-collaudo.html">Checklist</a></nav>
+    <button class="header-print" id="print-guide" type="button">Stampa / PDF</button>
+    <div class="reading-track" aria-hidden="true"><span id="reading-progress"></span></div>
+  </header>
+  <main class="document" id="guida">
+    <header class="cover">
+      <p class="eyebrow">DOMHOUSE · Manuale operativo</p>
+<h1 id="guida-all-app-domhouse-bf67de07">Guida all&#x27;app DOMHOUSE</h1>
+<p class="subtitle">Per chi usa l&#x27;app e per chi la collauda. Non servono conoscenze tecniche.</p>
+<p class="version"><em>Versione del 16 ottobre 2026, ambiente di prova (staging).</em></p>
+    </header>
+    <nav class="toc" aria-label="Indice della guida">
+      <details open id="guide-index">
+      <summary>In questa guida</summary>
+      <ol>
+<li><a href="#chi-fa-cosa-nel-servizio-b17d0553">Chi fa cosa nel servizio</a>
+</li>
+<li><a href="#parole-usate-in-questa-guida-de914081">Parole usate in questa guida</a>
+</li>
+<li><a href="#novita-del-16-ottobre-2026-e630f88f">Novità del 16 ottobre 2026</a>
+</li>
+<li><a href="#1-entrare-nell-app-dedaa219">1. Entrare nell&#x27;app</a>
+</li>
+<li><a href="#2-installare-l-app-sul-telefono-o-sul-computer-3716b359">2. Installare l&#x27;app sul telefono o sul computer</a>
+</li>
+<li><a href="#3-chi-puo-fare-cosa-3ddd3df9">3. Chi può fare cosa</a>
+</li>
+<li><a href="#4-appartamenti-a2486ab4">4. Appartamenti</a>
+</li>
+<li><a href="#5-dentro-un-appartamento-145a3333">5. Dentro un appartamento</a>
+<ol>
+<li><a href="#panoramica-52533047">Panoramica</a></li>
+<li><a href="#approvazioni-a8023e2e">Approvazioni</a></li>
+<li><a href="#decisioni-58902ea6">Decisioni</a></li>
+<li><a href="#consumi-c49f62dc">Consumi</a></li>
+<li><a href="#programmazione-52b21ee8">Programmazione</a></li>
+<li><a href="#regole-2a4a6478">Regole</a></li>
+<li><a href="#assistente-6b623668">Assistente</a></li>
+<li><a href="#simulatore-solo-amministratori-solo-sugli-appartamenti-dimostrativo-bd04344a">Simulatore (solo amministratori, solo sugli appartamenti «Dimostrativo»)</a></li>
+</ol></li>
+<li><a href="#6-amministrazione-solo-amministratori-697536b6">6. Amministrazione (solo amministratori)</a>
+</li>
+<li><a href="#6b-organizzazioni-solo-per-il-gestore-della-piattaforma-14e00ae7">6b. Organizzazioni (solo per il gestore della piattaforma)</a>
+<ol>
+<li><a href="#amministrazione-e-organizzazioni-a-confronto-135c0ae1">Amministrazione e Organizzazioni a confronto</a></li>
+</ol></li>
+<li><a href="#7-impostazioni-42a614f2">7. Impostazioni</a>
+<ol>
+<li><a href="#notifiche-sul-telefono-0c2283fc">Notifiche sul telefono</a></li>
+</ol></li>
+<li><a href="#7b-per-quanto-tempo-l-app-conserva-i-dati-ad03c49c">7b. Per quanto tempo l&#x27;app conserva i dati</a>
+</li>
+<li><a href="#8-segnalare-un-problema-6fdca6d5">8. Segnalare un problema</a>
+</li>
+      </ol>
+      </details>
+    </nav>
+    <article id="contenuto" tabindex="-1">
+<p>L&#x27;app serve a chi gestisce appartamenti in affitto breve: vedere e comandare riscaldamento, clima e luci, controllare i
+consumi, approvare le azioni proposte dal sistema automatico e gestire chi può accedere.</p>
+<blockquote class="test-notice">
+<p><strong>Ambiente di prova.</strong> Oggi gli appartamenti sono simulati: nessun dispositivo reale viene acceso o spento. Lo stato
+degli appartamenti simulati riparte da zero ogni volta che l&#x27;app viene aggiornata.</p>
+</blockquote>
+<hr>
+<section class="featured-section" aria-labelledby="chi-fa-cosa-nel-servizio-b17d0553">
+<h2 id="chi-fa-cosa-nel-servizio-b17d0553">Chi fa cosa nel servizio</h2>
+<p><em>Decisione del 16 ottobre 2026, attiva dal 16 ottobre.</em></p>
+<p><strong>Attivare un nuovo appartamento</strong></p>
+<ol>
+<li>
+<p><strong>Flatsharing</strong>, il gestore degli appartamenti, installa sensori e dispositivi nell&#x27;appartamento e lo comunica a
+HQE.</p>
+</li>
+<li>
+<p><strong>HQE</strong> prepara il sistema domotico dell&#x27;appartamento e lo attiva nell&#x27;app, inserendo anche il codice Italianway
+(il codice con cui arrivano le prenotazioni).</p>
+</li>
+<li>
+<p>Da quel momento l&#x27;appartamento compare nell&#x27;elenco di Flatsharing. L&#x27;amministratore di Flatsharing gli dà nome e
+indirizzo, sceglie le funzioni attive e decide chi può vederlo.</p>
+</li>
+</ol>
+<p>L&#x27;amministratore di Flatsharing <strong>non può creare da solo un appartamento, né cambiarne il collegamento al sistema
+domotico o il codice Italianway</strong>: lo fa solo HQE. È una garanzia di sicurezza: nessuno può collegare un appartamento a
+un sistema che non è il suo, né ricevere le prenotazioni di una struttura altrui. Vale anche nell&#x27;ambiente di prova: gli appartamenti
+<strong>simulati</strong> per il collaudo li crea HQE, da Organizzazioni.</p>
+<p><strong>Organizzazioni</strong></p>
+<ul>
+<li>
+<p>Ogni azienda che usa l&#x27;app è un&#x27;<strong>organizzazione</strong> separata, con i suoi utenti e i suoi appartamenti: nessuna vede
+quelli delle altre. Oggi c&#x27;è una sola organizzazione, <strong>Flatsharing</strong>.</p>
+</li>
+<li>
+<p>Chi ha il ruolo di <strong>gestore della piattaforma</strong> (oggi HQE) crea nuove organizzazioni dall&#x27;app, dà loro un nome e
+invita via email il primo amministratore. Può dare lo stesso ruolo ad altre persone, sempre dall&#x27;app.</p>
+</li>
+<li>
+<p>Il gestore della piattaforma vede l&#x27;elenco delle organizzazioni e i dati di base dei loro appartamenti (nome e
+collegamento al sistema domotico). <strong>Non vede</strong> dispositivi, consumi, decisioni né utenti delle organizzazioni.</p>
+</li>
+<li>
+<p>Gli amministratori delle organizzazioni continuano a usare l&#x27;app esattamente come oggi.</p>
+</li>
+</ul>
+</section>
+<section class="featured-section" aria-labelledby="parole-usate-in-questa-guida-de914081">
+<h2 id="parole-usate-in-questa-guida-de914081">Parole usate in questa guida</h2>
+<ul>
+<li>
+<p><strong>Codice Italianway</strong>: il codice con cui il sistema di prenotazioni Italianway riconosce una struttura. L&#x27;app lo usa
+per far arrivare a ogni appartamento le sue prenotazioni (ospiti e date). Chi lo inserisce decide dove vanno quelle
+prenotazioni: per questo lo inserisce solo HQE.</p>
+</li>
+<li>
+<p><strong>Collegamento al sistema domotico</strong>: l&#x27;indirizzo del sistema che comanda davvero i dispositivi di un appartamento.
+Nell&#x27;ambiente di prova è <code>mock://builtin</code>, cioè un sistema simulato.</p>
+</li>
+<li>
+<p><strong>Organizzazione</strong>: un&#x27;azienda che usa l&#x27;app, con i suoi utenti e i suoi appartamenti (oggi Flatsharing).</p>
+</li>
+<li>
+<p><strong>Gestore della piattaforma</strong>: chi gestisce il servizio per tutte le organizzazioni (oggi HQE).</p>
+</li>
+</ul>
+</section>
+<section aria-labelledby="novita-del-16-ottobre-2026-e630f88f">
+<h2 id="novita-del-16-ottobre-2026-e630f88f">Novità del 16 ottobre 2026</h2>
+<p><em>Novità controllate da una revisione di sicurezza indipendente e attive dal 16 ottobre 2026.</em></p>
+<ul>
+<li>
+<p><strong>Organizzazioni</strong>: arriva la gestione di più organizzazioni (vedi «Chi fa cosa» e la sezione 6b).</p>
+</li>
+<li>
+<p><strong>Codice Italianway</strong>: lo inserisce solo HQE, quando attiva l&#x27;appartamento. L&#x27;amministratore lo vede ma non lo
+cambia: se è sbagliato, scrive all&#x27;assistenza.</p>
+</li>
+<li>
+<p><strong>Nome dell&#x27;organizzazione</strong>: lo cambia solo HQE.</p>
+</li>
+<li>
+<p><strong>Cambio di ruolo</strong>: quando un amministratore cambia il ruolo di una persona, l&#x27;app la fa uscire da tutti i
+dispositivi entro un minuto; rientrando ha il ruolo nuovo. Se intanto stava guardando un appartamento che non può più
+vedere, la pagina smette di aggiornarsi.</p>
+</li>
+<li>
+<p><strong>Notifiche su un dispositivo condiviso</strong>: se la sessione di una persona viene chiusa, anche da un altro dispositivo,
+quel telefono o computer smette di ricevere le sue notifiche; chi entra dopo non le riceve mai. Se l&#x27;app si apre senza
+rete, o il server ha un problema passeggero, le notifiche restano attive.</p>
+</li>
+<li>
+<p><strong>«Elimina il mio account»</strong> cancella davvero l&#x27;account di accesso. Non è permesso all&#x27;ultimo gestore della
+piattaforma, come già non lo è all&#x27;ultimo amministratore.</p>
+</li>
+<li>
+<p><strong>Nell&#x27;ambiente di prova</strong>, per provare le prenotazioni in arrivo da Italianway serve un gestore della piattaforma,
+perché solo lui inserisce il codice Italianway.</p>
+</li>
+<li>
+<p><strong>HQE non si può invitare come utente</strong> di un&#x27;organizzazione: se una persona di HQE deve essere anche amministratore
+di un&#x27;organizzazione, HQE assegna a quella persona il ruolo di amministratore con una procedura tecnica.</p>
+</li>
+<li>
+<p><strong>Nome dell&#x27;app</strong>: l&#x27;app si chiama <strong>DOMHOUSE</strong>. Sul telefono il nuovo nome compare sotto l&#x27;icona entro qualche
+giorno; se vuoi vederlo subito, disinstalla l&#x27;app e installala di nuovo.</p>
+</li>
+<li>
+<p><strong>Nuovi appartamenti solo da HQE</strong>, anche nell&#x27;ambiente di prova: in Amministrazione non ci sono più «Nuovo
+appartamento» né il cestino.</p>
+</li>
+<li>
+<p><strong>Prenotazioni ricevute</strong> e <strong>Prenotazioni non attribuite</strong>: le schede «Webhook» di Amministrazione e di
+Organizzazioni hanno un nuovo nome e righe leggibili.</p>
+</li>
+<li>
+<p><strong>Notifiche al rientro</strong>: quando la stessa persona rientra sullo stesso dispositivo, le notifiche si riaccendono da
+sole.</p>
+</li>
+<li>
+<p><strong>Elenco organizzazioni</strong>: nuovo nome della prima scheda della pagina Organizzazioni.</p>
+</li>
+<li>
+<p><strong>Registro attività</strong> in Amministrazione e in Organizzazioni: chi ha fatto cosa.</p>
+</li>
+<li>
+<p><strong>Sospensione delle organizzazioni</strong> e <strong>accesso di assistenza HQE</strong> a tempo, visibile all&#x27;amministratore.</p>
+</li>
+<li>
+<p><strong>Privacy</strong>: chi elimina il proprio account compare come «utente rimosso»; il sistema domotico riceve un codice
+anonimo al posto dell&#x27;email; i dati personali degli ospiti non vengono salvati; ogni ruolo riceve solo i dati che
+gli servono.</p>
+</li>
+<li>
+<p><strong>Barra laterale</strong> con tutti i tuoi ruoli.</p>
+</li>
+<li>
+<p><strong>Menu a tre righe sul telefono</strong>, al posto della barra in basso: tutte le pagine in un solo menu.</p>
+</li>
+<li>
+<p><strong>Conservazione dei dati</strong>: oltre i termini della sezione 7b i dati si cancellano da soli.</p>
+</li>
+<li>
+<p><strong>Appartamenti dimostrativi</strong>: etichetta «Dimostrativo», Simulatore solo su di loro (anche con gli appartamenti
+veri) e pulsante per ripristinare lo stato iniziale.</p>
+</li>
+<li>
+<p><strong>Rendiconti dei consumi in Excel</strong>, mensili e per soggiorno, con l&#x27;importo in euro dal prezzo per kWh.</p>
+</li>
+<li>
+<p><strong>Sicurezza</strong>: chiusi alcuni modi tecnici con cui un utente avrebbe potuto vedere dati di appartamenti di altre
+organizzazioni o raggiungere il sistema simulato da internet. Per chi usa l&#x27;app non cambia nulla.</p>
+</li>
+</ul>
+<hr>
+</section>
+<section aria-labelledby="1-entrare-nell-app-dedaa219">
+<h2 id="1-entrare-nell-app-dedaa219">1. Entrare nell&#x27;app</h2>
+<p>Indirizzo: <strong>https://domotica-poc-511707.web.app</strong></p>
+<p><strong>Il primo accesso</strong> avviene sempre da un invito. Si riceve un&#x27;email «Invito a DOMHOUSE» con il pulsante
+«Apri l&#x27;app».</p>
+<ul>
+<li>
+<p>Se la tua email è un account Google (per esempio Gmail), tocca <strong>«Accedi con Google»</strong> e scegli quell&#x27;account.</p>
+</li>
+<li>
+<p>Altrimenti usa il pulsante <strong>«Scegli la password»</strong> dell&#x27;email. Il link vale 1 ora. Poi entra con email e password.</p>
+</li>
+<li>
+<p>Se il link è scaduto, nella pagina di accesso usa <strong>«Password dimenticata?»</strong>.</p>
+</li>
+<li>
+<p>L&#x27;email può finire nello spam.</p>
+</li>
+</ul>
+<p><strong>Password dimenticata.</strong> Nella pagina di accesso tocca «Password dimenticata?», scrivi la tua email e tocca
+«Invia il link». Il messaggio di conferma è lo stesso anche se l&#x27;email non è registrata: è voluto.</p>
+<p><strong>Messaggi che puoi vedere all&#x27;accesso</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Messaggio</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
+<tbody>
+<tr><td class="align-left">«Accesso non riuscito: controlla email e password»</td><td class="align-left">Email o password sbagliate</td><td class="align-left">Riprova o usa «Password dimenticata?»</td></tr>
+<tr><td class="align-left">«Non hai i permessi per accedere. Chiedi un invito.»</td><td class="align-left">L&#x27;account esiste ma nessuno ti ha invitato</td><td class="align-left">Chiedi un invito a un amministratore</td></tr>
+<tr><td class="align-left">«Conferma il tuo indirizzo: abbiamo inviato un link a…»</td><td class="align-left">Il tuo indirizzo email non è ancora confermato</td><td class="align-left">Apri il link nell&#x27;email, poi accedi di nuovo</td></tr>
+<tr><td class="align-left">«Impossibile caricare il profilo, riprova tra poco»</td><td class="align-left">Il server non risponde</td><td class="align-left">Riprova dopo qualche minuto</td></tr>
+<tr><td class="align-left">«La tua organizzazione non è attiva: contatta HQE.»</td><td class="align-left">La tua organizzazione è stata sospesa o non è ancora pronta</td><td class="align-left">Contatta HQE</td></tr>
+</tbody></table></div>
+<hr>
+</section>
+<section aria-labelledby="2-installare-l-app-sul-telefono-o-sul-computer-3716b359">
+<h2 id="2-installare-l-app-sul-telefono-o-sul-computer-3716b359">2. Installare l&#x27;app sul telefono o sul computer</h2>
+<p>L&#x27;app si può aggiungere alla schermata Home: si apre a schermo intero come un&#x27;app normale.</p>
+<ul>
+<li>
+<p><strong>Su computer:</strong> in fondo alla barra laterale c&#x27;è «Installa l&#x27;app» (sul telefono è nel menu a tre righe). Con Chrome o Edge si apre la finestra di
+installazione; con altri browser compaiono le istruzioni.</p>
+</li>
+<li>
+<p><strong>Su Android con Chrome:</strong> Impostazioni &gt; «Installa l&#x27;app» &gt; «Installa», oppure menu di Chrome &gt; «Installa app».</p>
+</li>
+<li>
+<p><strong>Su iPhone:</strong> apri il sito con Safari, tocca Condividi e poi «Aggiungi alla schermata Home».</p>
+</li>
+<li>
+<p>Se l&#x27;app è già installata, in Impostazioni compare «App installata su questo dispositivo».</p>
+</li>
+</ul>
+<hr>
+</section>
+<section aria-labelledby="3-chi-puo-fare-cosa-3ddd3df9">
+<h2 id="3-chi-puo-fare-cosa-3ddd3df9">3. Chi può fare cosa</h2>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Ruolo</th><th scope="col" class="align-left">Cosa vede</th><th scope="col" class="align-left">Cosa può fare</th></tr></thead>
+<tbody>
+<tr><td class="align-left"><strong>Amministratore</strong></td><td class="align-left">Tutto, compresi Amministrazione e Simulatore (sugli appartamenti dimostrativi)</td><td class="align-left">Tutto, compresa la gestione di utenti, appartamenti e funzioni</td></tr>
+<tr><td class="align-left"><strong>Operatore</strong></td><td class="align-left">Tutto tranne Amministrazione e Simulatore</td><td class="align-left">Comandare dispositivi, cambiare modalità, programmare, approvare, modificare regole, usare l&#x27;assistente</td></tr>
+<tr><td class="align-left"><strong>Sola lettura</strong></td><td class="align-left">Tutto tranne Amministrazione e Simulatore</td><td class="align-left">Solo guardare: i pulsanti sono disattivati e compare «Il tuo ruolo consente solo la lettura»</td></tr>
+</tbody></table></div>
+<p>Alcune schermate (Approvazioni, Decisioni, Consumi, Programmazione, Regole, Assistente) compaiono solo se la funzione è
+attiva per quell&#x27;appartamento.</p>
+<p><strong>Come muoversi.</strong> Su computer c&#x27;è la barra laterale a sinistra. Sul telefono le pagine si aprono dal pulsante con le tre
+righe in alto a sinistra («Apri il menu»): si apre il menu con tutte le pagine, generali e dell&#x27;appartamento in cui sei;
+la pagina aperta è evidenziata e in fondo trovi il tuo nome, il ruolo e «Esci». Per chiuderlo tocca fuori dal menu o la
+X («Chiudi il menu»); si chiude anche scegliendo una pagina. In fondo alla barra laterale (o al menu), sotto l&#x27;email, ci sono i tuoi ruoli: per esempio
+«Amministratore · Flatsharing» e, se hai anche il ruolo di HQE, «Gestore della piattaforma». Quando le schede di una
+pagina non stanno sullo schermo del telefono, la loro barra scorre in orizzontale.</p>
+<p><strong>Esiti delle azioni.</strong> Il successo è un avviso verde in alto. L&#x27;errore è un avviso rosso con il messaggio e un
+<strong>«ID richiesta»</strong> copiabile: in caso di problemi, comunicalo insieme alla segnalazione. Le eliminazioni chiedono sempre
+conferma.</p>
+<hr>
+</section>
+<section aria-labelledby="4-appartamenti-a2486ab4">
+<h2 id="4-appartamenti-a2486ab4">4. Appartamenti</h2>
+<p>La prima schermata mostra una scheda per appartamento: nome, indirizzo, stato (Online, Non raggiungibile, oppure
+scheda grigia se disattivato), occupazione (vuoto, occupato, prenotato), modalità, campanella con le approvazioni in
+attesa, prossimo check-in e check-out, consumo di oggi in kWh. Tocca una scheda per aprire l&#x27;appartamento.</p>
+<p>Gli amministratori vedono la nota «Per un nuovo appartamento scrivi all&#x27;assistenza HQE.». Chi è anche gestore della
+piattaforma vede invece «+ Appartamento», che apre Organizzazioni con gli appartamenti della sua organizzazione. Se non
+c&#x27;è ancora nessun appartamento, la pagina dice a chi rivolgersi: all&#x27;assistenza HQE (amministratori), a Organizzazioni
+(gestori), a un amministratore della propria organizzazione (operatori e lettori).</p>
+<p>Se l&#x27;amministratore ti ha assegnato solo alcuni appartamenti, vedi solo quelli. Se apri l&#x27;indirizzo di un altro
+appartamento compare «Appartamento non disponibile» con il pulsante «Torna agli appartamenti». Se non hai appartamenti
+assegnati leggi «Nessun appartamento assegnato al tuo account». In Impostazioni &gt; Profilo la riga «Appartamenti» dice
+quali appartamenti vedi.</p>
+<hr>
+</section>
+<section aria-labelledby="5-dentro-un-appartamento-145a3333">
+<h2 id="5-dentro-un-appartamento-145a3333">5. Dentro un appartamento</h2>
+<h3 id="panoramica-52533047">Panoramica</h3>
+<ul>
+<li>
+<p>In alto: nome, occupazione, «In tempo reale» (oppure «Riconnessione…»), check-in e check-out, dispositivi online.</p>
+</li>
+<li>
+<p>Striscia di stato del sistema dell&#x27;appartamento: In salute, Degradata o Ferma.</p>
+</li>
+<li>
+<p><strong>Modalità</strong> comfort, eco o vuoto: dopo la scelta compare una rotellina finché il sistema conferma. Non compare un
+avviso verde: la conferma è la scelta che si illumina.</p>
+</li>
+<li>
+<p><strong>Forza per…</strong> 30 minuti, 2 ore o 6 ore: compare «Forzatura … attiva fino alle …» con «Annulla forzatura».</p>
+</li>
+<li>
+<p><strong>Dispositivi</strong> raggruppati per stanza: interruttori Acceso/Spento, temperatura con − e +, modo del climatizzatore,
+velocità della ventola, letture di potenza, consumi, temperatura, umidità, finestre e movimento.</p>
+</li>
+<li>
+<p>Sotto ogni comando compare l&#x27;esito: «in corso», poi «eseguito», oppure l&#x27;errore. Un dispositivo offline ha i comandi
+disattivati.</p>
+</li>
+<li>
+<p>Menu ⋮ di un dispositivo &gt; «Rinomina o sposta» per cambiare nome o stanza.</p>
+</li>
+<li>
+<p>Mentre guardi un appartamento possono arrivare avvisi: nuova approvazione, dispositivo offline, sistema non
+raggiungibile o di nuovo raggiungibile.</p>
+</li>
+</ul>
+<h3 id="approvazioni-a8023e2e">Approvazioni</h3>
+<p>Azioni che il sistema propone e che aspettano un sì o un no. Ogni scheda mostra cosa propone, perché, il tempo
+rimasto (rosso sotto i 5 minuti) e cosa succede alla scadenza. Si può aggiungere una nota e toccare «Approva» o
+«Respingi». Il filtro «In attesa» / «Tutte» mostra anche quelle già decise.</p>
+<h3 id="decisioni-58902ea6">Decisioni</h3>
+<p>Lo storico di tutto ciò che è stato fatto, da chi (motore automatico, regola, gestore, assistente, sistema) e con quale
+esito. Filtri per autore, dispositivo e <strong>Periodo</strong> (tutto lo storico, ultimi 7, 30 o 90 giorni); «Carica altri» per
+andare indietro.</p>
+<ul>
+<li>
+<p>Il campo di ricerca cerca in tutto lo storico (almeno 90 giorni): nel motivo, nell&#x27;azione, in chi ha deciso, nel
+dispositivo, nei valori e nei codici. Procede a blocchi di 1.000 decisioni, dalle più recenti alle più vecchie: leggi
+«Ricerca in corso…» e poi «Risultati: N · cercato fino al &lt;data&gt;». Per andare più indietro premi «Cerca più indietro»;
+quando lo storico è finito leggi «cercato in tutto lo storico disponibile».</p>
+</li>
+<li>
+<p>Per trovare subito l&#x27;operazione di un errore, incolla l&#x27;<strong>ID richiesta</strong> completo: la ricerca va su tutto lo storico
+in un colpo solo.</p>
+</li>
+<li>
+<p>Periodo, Chi e Dispositivo rendono la ricerca più veloce. Se i risultati superano 3.000 l&#x27;app chiede di restringere.</p>
+</li>
+<li>
+<p>Le decisioni che arrivano mentre una ricerca è in corso non entrano in quella ricerca: cancella la parola per vedere
+l&#x27;elenco aggiornato.</p>
+</li>
+</ul>
+<h3 id="consumi-c49f62dc">Consumi</h3>
+<p>Periodo: Oggi, 7 giorni, 30 giorni o «Soggiorno in corso» (solo se c&#x27;è un ospite). Totale in kWh, grafico, consumi per
+dispositivo e, durante un soggiorno, il confronto con il soggiorno precedente.</p>
+<p><strong>Rendiconto in Excel</strong> (in fondo alla pagina, per tutti, sugli appartamenti che vedi): scegli il mese (gli ultimi 12) e
+premi «Scarica Excel». Il file (per esempio <code>consumi-apt-001-2026-10.xlsx</code>) ha quattro fogli: Riepilogo (totale kWh,
+prezzo e importo in euro), Giornaliero, Orario e Dispositivi. Con il periodo «Soggiorno», «Excel del soggiorno» scarica
+il rendiconto dall&#x27;ora esatta di arrivo a quella di partenza, del soggiorno in corso o del precedente: serve per
+riaddebitare l&#x27;energia all&#x27;ospite. Il file non contiene dati personali degli ospiti. Se manca il prezzo per kWh, il
+file dice «prezzo non impostato» e riporta solo i kWh. Se il file non si può preparare (funzione non attiva, sistema
+domotico non raggiungibile, soggiorno non ancora iniziato), compare il motivo.</p>
+<h3 id="programmazione-52b21ee8">Programmazione</h3>
+<p>Azioni programmate («In programma») e storico degli ultimi 7 giorni. «Nuova azione» per programmare un cambio di
+modalità o un comando a un dispositivo a un orario (ora dell&#x27;appartamento). «Sposta» per cambiare orario, «Annulla
+azione» per toglierla. Le azioni nate da una prenotazione si ricalcolano quando la prenotazione cambia.</p>
+<h3 id="regole-2a4a6478">Regole</h3>
+<p>Le regole automatiche dell&#x27;appartamento, con interruttore e valori. Quelle con «Non modificabile» non si cambiano.
+Modificando compare in basso «N regole modificate» con «Salva le modifiche» o «Annulla le modifiche». Un valore fuori
+dai limiti viene segnalato sotto il campo.</p>
+<h3 id="assistente-6b623668">Assistente</h3>
+<p>Si scrive una richiesta in italiano (per esempio «Spegni il clima del soggiorno») e si tocca Invia. L&#x27;assistente risponde,
+oppure chiede un&#x27;approvazione con il link «Vai alle approvazioni». Se dopo 30 secondi non risponde compare «Nessuna
+risposta dall&#x27;assistente: riprova». La conversazione resta solo in quella scheda del browser.
+Chi ha il ruolo «Sola lettura» non fa domande all&#x27;Assistente e non vede quelle dei colleghi.</p>
+<h3 id="simulatore-solo-amministratori-solo-sugli-appartamenti-dimostrativo-bd04344a">Simulatore (solo amministratori, solo sugli appartamenti «Dimostrativo»)</h3>
+<p>Gli appartamenti dimostrativi (etichetta viola «Dimostrativo» accanto al nome, in ogni elenco) usano un sistema domotico
+simulato: servono per le prove e per le dimostrazioni, anche quando ci saranno gli appartamenti veri. Su questi
+appartamenti gli amministratori vedono la voce «Simulatore» («Provoca eventi su questo appartamento dimostrativo: lo
+vedono solo gli amministratori.»); su un appartamento vero la voce non c&#x27;è. Il Simulatore serve a provare l&#x27;app senza
+dispositivi veri: aprire e chiudere finestre, mettere offline un dispositivo, generare
+un&#x27;approvazione, inviare un evento di prenotazione (arrivo, partenza, ospiti) e vedere le azioni programmate che ne
+nascono. La prenotazione di prova fa lo stesso percorso di una prenotazione vera arrivata da Italianway, fino al sistema
+domotico dell&#x27;appartamento; ripetere lo stesso invio non la duplica.</p>
+<p><strong>Ripristina lo stato iniziale</strong> (in fondo al Simulatore): «Riporta l&#x27;appartamento dimostrativo com&#x27;era all&#x27;inizio, per
+ricominciare una prova da capo.» Il pulsante rosso «Ripristina…» chiede conferma. Tornano come all&#x27;inizio dispositivi e
+loro stati, modalità, forzatura, regole, approvazioni, programmazione, decisioni e comandi. Vengono cancellati tutti i
+soggiorni di quell&#x27;appartamento, anche quelli arrivati da Italianway. Restano nome, indirizzo e impostazioni
+dell&#x27;appartamento, prezzi, codice Italianway, utenti, registro attività ed elenco delle prenotazioni ricevute; i consumi
+non cambiano. Vale solo per quell&#x27;appartamento e non si può annullare. Dopo l&#x27;avviso
+«Stato iniziale ripristinato» l&#x27;app rilegge tutto; gli altri dispositivi aperti su quell&#x27;appartamento si aggiornano da
+soli. Se l&#x27;appartamento è collegato a un sistema domotico vero in modalità di prova, il pulsante è disattivato («Il
+ripristino è disponibile solo con il motore simulato integrato.»). Anche senza ripristino, gli appartamenti
+dimostrativi tornano allo stato iniziale ogni volta che l&#x27;app viene aggiornata.</p>
+<hr>
+</section>
+<section aria-labelledby="6-amministrazione-solo-amministratori-697536b6">
+<h2 id="6-amministrazione-solo-amministratori-697536b6">6. Amministrazione (solo amministratori)</h2>
+<p><strong>Utenti</strong></p>
+<ul>
+<li>
+<p>«Invita un utente»: email, nome e ruolo, poi «Invita». La persona riceve l&#x27;email di invito.</p>
+</li>
+<li>
+<p>Possibili esiti: «Invito inviato a …»; «… l&#x27;email non è partita. Riprova con «Reinvia»»; «L&#x27;invio email non è attivo:
+avvisa tu …». Se alla stessa persona sono partite troppe email in poco tempo, l&#x27;invito resta registrato ma l&#x27;email
+non parte: riprova più tardi con «Reinvia».</p>
+</li>
+<li>
+<p>Chi non è ancora entrato ha l&#x27;etichetta «in attesa del primo accesso» e il pulsante «Reinvia».</p>
+</li>
+<li>
+<p><strong>Quali appartamenti vede ogni utente</strong> (operatori e lettori): premi «Appartamenti» accanto all&#x27;utente, scegli
+«Tutti gli appartamenti» oppure spunta solo quelli che servono, poi «Salva». Nel modulo «Invita un utente» la stessa
+scelta compare sotto, già impostata su «Tutti gli appartamenti». Gli amministratori vedono sempre tutto e per loro la
+scelta non compare. Accanto a ogni utente l&#x27;elenco riassume cosa vede: «tutti gli appartamenti», i nomi, oppure
+«N appartamenti» (passa con il mouse per leggere i nomi). Se togli tutte le caselle l&#x27;utente non vedrà nessun
+appartamento: l&#x27;app chiede conferma. Serve per sospendere un accesso senza cancellare l&#x27;utente. Caso tipico: il
+proprietario di un immobile, invitato come «Sola lettura», che vede solo il suo appartamento. Un utente limitato vede,
+riceve notifiche e può agire solo sui suoi appartamenti. Se gli togli un appartamento mentre lo sta guardando, entro
+mezzo minuto la sua pagina smette di aggiornarsi e compare «Appartamento non disponibile».</p>
+</li>
+<li>
+<p>Il ruolo si cambia dal menu accanto al nome: entro un minuto la persona viene fatta uscire da tutti i dispositivi
+e, rientrando, ha il ruolo nuovo. Il cestino rimuove l&#x27;utente e il suo
+accesso. Non si può cambiare ruolo né eliminare se stessi.</p>
+</li>
+<li>
+<p>Le persone di HQE (gestori della piattaforma) non si possono invitare: l&#x27;app risponde che l&#x27;email non
+può essere invitata. Il nome dell&#x27;organizzazione lo cambia solo HQE.</p>
+</li>
+</ul>
+<p><strong>Appartamenti:</strong> «Modifica», interruttore Attivo e «Verifica connessione» per controllare che il sistema
+dell&#x27;appartamento risponda. I nuovi appartamenti li aggiunge HQE (gestore della piattaforma), anche nell&#x27;ambiente di
+prova: in Amministrazione non ci sono «Nuovo appartamento» né il cestino. «Modifica» cambia nome, indirizzo, fuso orario
+e «Attivo»; le funzioni si scelgono nella scheda Funzioni e chi lo vede nella scheda Utenti. Il collegamento al sistema
+domotico e il codice Italianway si vedono ma non si cambiano: se vanno cambiati, scrivi all&#x27;assistenza. Puoi sempre
+premere «Verifica connessione» e leggere l&#x27;esito dell&#x27;ultima verifica; se non riesce, avvisa l&#x27;assistenza. Per avere un
+nuovo appartamento, o per toglierne uno, scrivi all&#x27;assistenza HQE.</p>
+<p><strong>Prezzo dell&#x27;energia</strong> (in cima ad Amministrazione &gt; Appartamenti, solo per l&#x27;amministratore): «Prezzo per kWh (€)»,
+per esempio 0,25, poi «Salva». Serve per l&#x27;importo in euro nei rendiconti Excel e vale per tutti gli appartamenti. Per un
+appartamento se ne può impostare uno diverso da «Modifica» («Prezzo per kWh di questo appartamento (€)»; vuoto = quello
+dell&#x27;organizzazione). Ogni appartamento dice quale prezzo vale. Si scrive un numero da 0 a 10, con la virgola o il
+punto; svuotando il campo il prezzo viene tolto. Ogni cambio resta nel Registro attività.</p>
+<p><strong>Funzioni:</strong> quali schermate sono attive per tutta l&#x27;organizzazione, con eventuali eccezioni per singolo appartamento.
+Ogni interruttore ha un nome in italiano (Panoramica, Dispositivi, Comandi, Consumi, Programmazione, Regole,
+Approvazioni, Decisioni, Assistente) e sotto, in piccolo, il nome tecnico della funzione.</p>
+<p><strong>Prenotazioni ricevute:</strong> le ultime 100 comunicazioni di prenotazione arrivate da Italianway per i tuoi appartamenti,
+e se sono state trasmesse al sistema domotico che gestisce l&#x27;appartamento.</p>
+<ul>
+<li>
+<p>In cima, la sintesi: «Ultime 24 ore: N ricevute, N trasmesse, N con problemi».</p>
+</li>
+<li>
+<p>Ogni riga comincia con una frase, per esempio «Prenotazione creata · Milano Centro · dal 1 dic 2026 al 3 dic 2026».
+Gli eventi sono: Prenotazione creata, modificata o cancellata, Check-in, Check-out.</p>
+</li>
+<li>
+<p>Sotto c&#x27;è l&#x27;esito, con una spunta verde o una X rossa, e poi la data e l&#x27;ora di ricezione:</p>
+</li>
+</ul>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Esito</th><th scope="col" class="align-left">Cosa vuol dire</th></tr></thead>
+<tbody>
+<tr><td class="align-left">«Ricevuta e trasmessa al motore» (verde)</td><td class="align-left">Tutto a posto: il sistema domotico l&#x27;ha ricevuta, anche se l&#x27;aveva già.</td></tr>
+<tr><td class="align-left">«Ricevuta ma il motore non l&#x27;ha accettata (riprovato N volte)»</td><td class="align-left">Il sistema domotico non ha risposto o ha dato errore, anche dopo i tentativi. Avvisa l&#x27;assistenza.</td></tr>
+<tr><td class="align-left">«Ricevuta ma non trasmessa: appartamento disattivato»</td><td class="align-left">L&#x27;appartamento è spento con l&#x27;interruttore Attivo.</td></tr>
+<tr><td class="align-left">«Ricevuta ma non trasmessa: formato non riconosciuto»</td><td class="align-left">Il messaggio di Italianway non si è potuto leggere. Avvisa l&#x27;assistenza.</td></tr>
+<tr><td class="align-left">«Ricevuta ma rifiutata: firma non valida» e «Ricevuta: appartamento non riconosciuto»</td><td class="align-left">Qui non compaiono quasi mai: queste comunicazioni non si possono attribuire a nessuna organizzazione e le vede HQE.</td></tr>
+<tr><td class="align-left">«Ricevuta ma non trasmessa»</td><td class="align-left">Qualsiasi altro caso. Avvisa l&#x27;assistenza.</td></tr>
+</tbody></table></div>
+<ul>
+<li>
+<p>Se il messaggio non si può interpretare, la frase diventa «Evento ricevuto, formato non riconosciuto».</p>
+</li>
+<li>
+<p>«Dettagli tecnici» apre, per ogni riga, i dati per l&#x27;assistenza: firma, codice di risposta, «Codice Italianway»,
+«Ospiti» (il numero), identificativi (l&#x27;identificativo di correlazione si può copiare), inoltro e tentativi, corpo
+grezzo. Nel corpo grezzo i dati personali degli ospiti (nomi, email, telefoni) non ci sono: compare «[oscurato]»,
+oppure «[corpo non JSON, N byte]». L&#x27;app non salva i dati personali degli ospiti.</p>
+</li>
+<li>
+<p>Date e ore sono nel fuso orario italiano.</p>
+</li>
+<li>
+<p>Le prove fatte con il Simulatore non passano da qui e non compaiono in questa scheda.</p>
+</li>
+</ul>
+<p><strong>Registro attività:</strong> «Chi ha fatto cosa nella tua organizzazione: inviti, ruoli, appartamenti, funzioni e accessi di
+assistenza.» Ogni voce è una frase con la data, dalla più recente; «Carica altri» mostra le 50 successive. Esempio:
+«Anna Rossi ha cambiato il ruolo di bruno@… da «Sola lettura» a «Operatore»». Chi ha eliminato il proprio account
+compare come «utente rimosso».</p>
+<p><strong>Accesso di assistenza HQE.</strong> Quando HQE apre un accesso di assistenza alla tua organizzazione, in cima a ogni pagina
+compare «L&#x27;assistenza HQE (nome (email)) ha accesso alla tua organizzazione fino al …, con i permessi di un operatore.»
+con il motivo. «Chiudi accesso» lo termina subito (chiede conferma); la X nasconde solo l&#x27;avviso. Chiudere un accesso
+non impedisce a HQE di aprirne uno nuovo se serve: anche quello comparirà qui. Durante l&#x27;accesso la persona di HQE
+vede e comanda come un operatore, ma non gestisce utenti, appartamenti né funzioni. Apertura, chiusura e scadenza
+restano nel Registro attività.</p>
+<p><strong>Avvisi email (per gli amministratori del progetto):</strong> se il server dell&#x27;app non risponde per 5 minuti arriva
+un&#x27;email «BFF non raggiungibile»; quando torna su arriva l&#x27;email di chiusura.</p>
+<hr>
+</section>
+<section aria-labelledby="6b-organizzazioni-solo-per-il-gestore-della-piattaforma-14e00ae7">
+<h2 id="6b-organizzazioni-solo-per-il-gestore-della-piattaforma-14e00ae7">6b. Organizzazioni (solo per il <span class="role-label">gestore della piattaforma</span>)</h2>
+<p>Chi ha il ruolo di gestore della piattaforma (HQE) vede nel menu la voce <strong>Organizzazioni</strong>. Gli amministratori delle
+organizzazioni non la vedono. La pagina ha quattro schede: <strong>Elenco organizzazioni</strong>, <strong>Gestori della piattaforma</strong>,
+<strong>Prenotazioni non attribuite</strong> e <strong>Registro attività</strong>.</p>
+<ul>
+<li>
+<p><strong>Nuova organizzazione</strong> (in Elenco organizzazioni): scrivi il nome e l&#x27;email della persona che la amministrerà. Quella persona riceve un&#x27;email
+per entrare; una volta dentro invita da sola gli altri utenti. Due organizzazioni non possono avere lo stesso nome.</p>
+</li>
+<li>
+<p><strong>Reinvia invito:</strong> se l&#x27;email non è partita o la persona non la trova. Il pulsante sparisce quando l&#x27;amministratore
+è entrato. <strong>Rinomina</strong> cambia il nome dell&#x27;organizzazione.</p>
+</li>
+<li>
+<p><strong>Istanza simulata (appartamento dimostrativo)</strong>: casella nella creazione e in «Collegamento». Con il motore simulato
+integrato (<code>mock://builtin</code>) è sempre accesa. Con un sistema domotico vero si accende per prove e dimostrazioni: gli
+amministratori vedono il Simulatore e ogni elenco segna l&#x27;appartamento «Dimostrativo». Con gli appartamenti veri
+(produzione) un appartamento dimostrativo non può avere un codice Italianway, così nessuna prenotazione vera finisce
+in un appartamento finto. Passando dal motore simulato a un motore vero l&#x27;appartamento torna reale; per tenerlo
+dimostrativo, lascia accesa la casella «Istanza simulata». Ogni cambio resta nel Registro attività.</p>
+</li>
+<li>
+<p><strong>Appartamenti</strong> di un&#x27;organizzazione: «Nuovo appartamento» chiede un identificativo che non si potrà più cambiare,
+il nome, il collegamento al sistema domotico (nell&#x27;ambiente di prova <code>mock://builtin</code>) e il codice Italianway. È
+l&#x27;unico posto da cui si creano appartamenti, anche per il collaudo. In produzione, prima di usarlo, HQE crea la chiave di accesso al sistema domotico dell&#x27;appartamento (la procedura è
+nelle note tecniche per il team del motore); poi
+si preme «Verifica connessione». «Modifica collegamento» cambia indirizzo, porta e codice Italianway; «Elimina» toglie
+l&#x27;appartamento a tutti gli utenti dell&#x27;organizzazione.</p>
+</li>
+<li>
+<p><strong>Sospendi / Riattiva</strong> (in Elenco organizzazioni): «Sospendi» chiede il motivo, obbligatorio, che resta nel Registro
+attività. I suoi utenti escono dall&#x27;app con «La tua organizzazione è sospesa: l&#x27;app non è disponibile. Per
+informazioni contatta l&#x27;assistenza HQE.» e non possono rientrare; le notifiche si fermano. Le prenotazioni
+continuano ad arrivare al sistema domotico degli appartamenti, così gli ospiti non subiscono la sospensione.
+L&#x27;organizzazione mostra l&#x27;etichetta «Sospesa» e «Sospesa il … Motivo: …»; «Riattiva» chiede conferma. Se tu stesso
+sei membro dell&#x27;organizzazione sospesa resti dentro Organizzazioni, per poterla riattivare.</p>
+</li>
+<li>
+<p><strong>Accesso di assistenza</strong> (in Elenco organizzazioni): per entrare nei dati di un&#x27;organizzazione quando c&#x27;è un
+problema. Scegli la durata (da 1 a 24 ore) e scrivi il motivo, obbligatorio e visibile all&#x27;amministratore, poi «Apri
+l&#x27;accesso». Con «Entra come assistenza» lavori dentro l&#x27;organizzazione con i permessi di un operatore: l&#x27;app si
+svuota come a un cambio di utente e in alto compare «Stai lavorando come assistenza in … fino alle …, con i permessi
+di un operatore.» con «Termina». Alla fine (Termina, scadenza, chiusura da parte dell&#x27;amministratore o sospensione)
+compare «L&#x27;accesso di assistenza a … è finito: ora vedi di nuovo la tua area.». Non c&#x27;è per un&#x27;organizzazione
+sospesa. Se la chiusura sul server non riesce, compare «Chiusura dell&#x27;accesso sul server non riuscita: chiudilo da
+Organizzazioni.». Tutto resta nel Registro attività, con il tuo nome.</p>
+</li>
+<li>
+<p><strong>Registro attività:</strong> con «Registro di» scegli un&#x27;organizzazione, oppure «Azioni della piattaforma» (gestori
+nominati e tolti). Per le persone delle organizzazioni vedi solo il ruolo, non il nome né l&#x27;email: per esempio «Un
+amministratore ha invitato un utente come «Sola lettura»».</p>
+</li>
+<li>
+<p><strong>Gestori della piattaforma:</strong> aggiungi un altro gestore scrivendo la sua email; diventa gestore quando entra
+nell&#x27;app con quell&#x27;email. «Togli» gli toglie il ruolo; deve restare sempre almeno un gestore.</p>
+</li>
+<li>
+<p><strong>Prenotazioni non attribuite:</strong> le prenotazioni arrivate da Italianway che non si possono assegnare a nessuna
+organizzazione (codice Italianway sconosciuto o collegato a più appartamenti, firma non valida, formato non
+riconosciuto); utile per capire un codice Italianway sbagliato. Gli amministratori non le vedono. Le righe sono leggibili come in «Prenotazioni ricevute»; al posto del nome
+dell&#x27;appartamento compare il codice Italianway ricevuto.</p>
+</li>
+<li>
+<p>Il gestore della piattaforma non vede dispositivi, consumi, decisioni né utenti delle organizzazioni, se non durante
+un accesso di assistenza aperto.</p>
+</li>
+</ul>
+<h3 id="amministrazione-e-organizzazioni-a-confronto-135c0ae1">Amministrazione e Organizzazioni a confronto</h3>
+<p>Chi è sia amministratore di un&#x27;organizzazione sia gestore della piattaforma vede tutte e due le voci. Le schede hanno
+nomi simili ma fanno cose diverse:</p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Amministrazione (l&#x27;amministratore, per la sua organizzazione)</th><th scope="col" class="align-left">Organizzazioni (il gestore della piattaforma, per tutte)</th></tr></thead>
+<tbody>
+<tr><td class="align-left"><strong>Appartamenti:</strong> l&#x27;uso di ogni giorno: nome, indirizzo, attivo o no, «Verifica connessione».</td><td class="align-left"><strong>Appartamenti</strong> (dentro ogni organizzazione): la parte tecnica: creare, collegare al sistema domotico, codice Italianway, eliminare, «Verifica connessione».</td></tr>
+<tr><td class="align-left"><strong>Utenti:</strong> le persone della propria organizzazione, con ruolo e appartamenti visibili.</td><td class="align-left"><strong>Gestori della piattaforma:</strong> le persone di HQE che gestiscono il servizio. Della singola organizzazione il gestore vede solo il primo amministratore («Reinvia invito»).</td></tr>
+<tr><td class="align-left"><strong>Funzioni:</strong> quali schermate sono attive.</td><td class="align-left">Nessuna scheda corrispondente.</td></tr>
+<tr><td class="align-left"><strong>Prenotazioni ricevute:</strong> le prenotazioni arrivate ai propri appartamenti.</td><td class="align-left"><strong>Prenotazioni non attribuite:</strong> le prenotazioni che non corrispondono a nessun appartamento. Le due schede non si sovrappongono.</td></tr>
+<tr><td class="align-left"><strong>Registro attività:</strong> chi ha fatto cosa, con i nomi.</td><td class="align-left"><strong>Registro attività:</strong> cosa è successo in un&#x27;organizzazione, con i soli ruoli; più le azioni della piattaforma.</td></tr>
+<tr><td class="align-left">Avviso dell&#x27;accesso di assistenza, con «Chiudi accesso».</td><td class="align-left"><strong>Accesso di assistenza</strong> (in Elenco organizzazioni): aprirlo, entrare, chiuderlo.</td></tr>
+<tr><td class="align-left">Nessuna scheda corrispondente.</td><td class="align-left"><strong>Elenco organizzazioni:</strong> creare un&#x27;organizzazione, rinominarla, invitare il primo amministratore.</td></tr>
+</tbody></table></div>
+<p>L&#x27;unico punto in comune è «Verifica connessione», presente in tutte e due le schede Appartamenti.</p>
+</section>
+<section aria-labelledby="7-impostazioni-42a614f2">
+<h2 id="7-impostazioni-42a614f2">7. Impostazioni</h2>
+<ul>
+<li>
+<p><strong>Profilo:</strong> email, ruolo, organizzazione, ambiente.</p>
+</li>
+<li>
+<p><strong>Account:</strong> nome visualizzato, modificabile.</p>
+</li>
+<li>
+<p><strong>Password ed email</strong> (solo per chi entra con email e password): «Cambia password» chiede la password attuale e la
+nuova, di almeno 8 caratteri. «Cambia email» manda un link al nuovo indirizzo: il cambio avviene quando lo apri. Chi
+entra con Google gestisce password ed email dal proprio account Google.</p>
+</li>
+<li>
+<p><strong>Sicurezza:</strong> «Esci da tutti i dispositivi» chiude la sessione su tutti i telefoni e computer. «Elimina il mio
+account» è definitivo, e non è permesso all&#x27;ultimo amministratore, né all&#x27;ultimo gestore della piattaforma; per un
+altro gestore toglie anche il ruolo di gestore e chiude i suoi accessi di assistenza. La conferma spiega: «Vengono
+cancellati il tuo accesso, il tuo nome, la tua email e le tue preferenze di notifica. Resta quello che hai fatto
+(decisioni, approvazioni, registro attività), ma al posto del tuo nome comparirà «utente rimosso». Per rientrare
+servirà un nuovo invito.»</p>
+</li>
+<li>
+<p><strong>Notifiche:</strong> quali avvisi ricevere. Le notifiche sul telefono sono attive anche nell&#x27;ambiente di prova (vedi sotto). Se in un
+ambiente non lo fossero, la scheda direbbe «Notifiche sul telefono non attive in questo ambiente»: gli avvisi (nuove approvazioni, dispositivi
+offline, istanza non raggiungibile) compaiono in alto nello schermo solo mentre l&#x27;app è aperta sulla pagina di un
+appartamento.</p>
+</li>
+<li>
+<p><strong>Installa l&#x27;app</strong> e <strong>Lingua</strong> (per ora solo italiano). In fondo «Esci».</p>
+</li>
+</ul>
+<h3 id="notifiche-sul-telefono-0c2283fc">Notifiche sul telefono</h3>
+<ul>
+<li>
+<p>Premi «Attiva su questo dispositivo» e consenti le notifiche quando il telefono o il browser lo chiede. Se va a buon
+fine compare «Notifiche attive su questo dispositivo».</p>
+</li>
+<li>
+<p>Se rifiuti il permesso compare «Permesso non concesso: su questo dispositivo le notifiche restano spente.»</p>
+</li>
+<li>
+<p>Se le notifiche sono bloccate, la scheda spiega di consentirle nelle impostazioni del browser o del telefono.</p>
+</li>
+<li>
+<p><strong>Su iPhone e iPad</strong> le notifiche arrivano solo all&#x27;app installata: se apri il sito da Safari senza installarlo, la
+scheda lo dice e non mostra il pulsante. Installa l&#x27;app, aprila dall&#x27;icona e attivale da qui.</p>
+</li>
+<li>
+<p>Se togli il permesso dalle impostazioni del telefono o del browser, la scheda lo segnala e propone di riattivarle.</p>
+</li>
+<li>
+<p>Se il browser non può ricevere notifiche, gli avvisi compaiono solo dentro l&#x27;app.</p>
+</li>
+<li>
+<p>Le notifiche arrivano anche ad app chiusa. Toccandone una si apre l&#x27;app sulla pagina giusta (Approvazioni, o la
+Panoramica dell&#x27;appartamento).</p>
+</li>
+<li>
+<p>Con l&#x27;app aperta, una notifica compare come avviso in alto con il pulsante «Apri» (su iPhone arriva sempre anche come
+notifica del telefono). Se stai già guardando quell&#x27;appartamento non compare un secondo avviso.</p>
+</li>
+<li>
+<p>«Disattiva» ferma le notifiche su quel dispositivo e mostra «Notifiche disattivate su questo dispositivo».</p>
+</li>
+<li>
+<p>Quando premi «Esci» (o «Esci da tutti i dispositivi») quel telefono o computer smette di ricevere le tue notifiche.
+<strong>Quando rientri tu</strong>, sullo stesso dispositivo, si riaccendono da sole e compare «Notifiche riattivate su questo
+dispositivo, come prima della tua uscita.». Se nel frattempo il browser non dà più il permesso, compare invece
+«Notifiche non riattivate: il browser non ne dà più il permesso. Puoi riattivarle da Impostazioni › Notifiche.».
+Non si riaccendono se le avevi spente tu da Impostazioni. Su un telefono condiviso ognuno ritrova le sue. Se un&#x27;altra persona accede dallo
+stesso dispositivo, non riceve le tue notifiche e non vede nessun dato della tua sessione, nemmeno per un istante.
+Lo stesso vale quando la sessione viene chiusa da un&#x27;altra parte (per esempio con «Esci da tutti i
+dispositivi» da un altro telefono, o per un cambio di ruolo). Se l&#x27;app si apre senza rete le notifiche restano attive.
+Le conversazioni con l&#x27;Assistente si cancellano quando esci.</p>
+</li>
+</ul>
+<hr>
+</section>
+<section aria-labelledby="7b-per-quanto-tempo-l-app-conserva-i-dati-ad03c49c">
+<h2 id="7b-per-quanto-tempo-l-app-conserva-i-dati-ad03c49c">7b. Per quanto tempo l&#x27;app conserva i dati</h2>
+<p><em>Decisione del 17 ottobre 2026.</em> Oltre questi termini i dati si cancellano da soli (entro circa un giorno):</p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Dati</th><th scope="col" class="align-left">Per quanto tempo</th></tr></thead>
+<tbody>
+<tr><td class="align-left">Prenotazioni e presenze degli ospiti</td><td class="align-left">12 mesi dopo il check-out</td></tr>
+<tr><td class="align-left">Consumi</td><td class="align-left">24 mesi (li conserva il sistema domotico dell&#x27;appartamento)</td></tr>
+<tr><td class="align-left">Registro attività e storico degli accessi di assistenza</td><td class="align-left">24 mesi</td></tr>
+<tr><td class="align-left">Prenotazioni ricevute da Italianway (senza dati personali degli ospiti)</td><td class="align-left">90 giorni, e al massimo le ultime 100</td></tr>
+</tbody></table></div>
+<p>Utenti, organizzazioni e appartamenti restano finché non vengono tolti. Chi elimina il proprio account viene cancellato
+subito (vedi Impostazioni &gt; Sicurezza).</p>
+</section>
+<section aria-labelledby="8-segnalare-un-problema-6fdca6d5">
+<h2 id="8-segnalare-un-problema-6fdca6d5">8. Segnalare un problema</h2>
+<p>Per ogni problema annota:</p>
+<ol>
+<li>
+<p>cosa stavi facendo, passo per passo;</p>
+</li>
+<li>
+<p>cosa ti aspettavi e cosa è successo;</p>
+</li>
+<li>
+<p>l&#x27;<strong>ID richiesta</strong>, se compare;</p>
+</li>
+<li>
+<p>dispositivo e browser (per esempio «iPhone, Safari» o «PC, Chrome»), data e ora;</p>
+</li>
+<li>
+<p>uno screenshot, se possibile.</p>
+</li>
+</ol>
+</section>
+    </article>
+    <footer class="document-footer"><span>DOMHOUSE · Guida utente</span><a href="#guida">Torna all’inizio ↑</a></footer>
+  </main>
+  <script>
+  (() => {
+    const index = document.getElementById('guide-index');
+    const compact = matchMedia('(max-width: 1100px)');
+    const updateIndex = () => { index.open = !compact.matches; };
+    updateIndex(); compact.addEventListener('change', updateIndex);
+    document.getElementById('print-guide').addEventListener('click', () => window.print());
+    const links = [...document.querySelectorAll('.toc a')];
+    const headings = links.map(a => document.getElementById(a.hash.slice(1))).filter(Boolean);
+    let scheduled = false;
+    const update = () => {
+      scheduled = false;
+      const atEnd = scrollY + innerHeight >= document.documentElement.scrollHeight - 4;
+      const current = atEnd ? headings[headings.length - 1] : (headings.filter(h => h.getBoundingClientRect().top <= 140).pop() || headings[0]);
+      for (const a of links) {
+        if (current && a.hash === '#' + current.id) a.setAttribute('aria-current', 'location');
+        else a.removeAttribute('aria-current');
+      }
+      const max = document.documentElement.scrollHeight - innerHeight;
+      document.getElementById('reading-progress').style.width = (max > 0 ? Math.min(100, Math.max(0, scrollY / max * 100)) : 100) + '%';
+    };
+    addEventListener('scroll', () => { if (!scheduled) { scheduled = true; requestAnimationFrame(update); } }, {passive:true});
+    addEventListener('resize', update); update();
+    let wasOpen;
+    addEventListener('beforeprint', () => { if (wasOpen === undefined) wasOpen = index.open; index.open = true; });
+    addEventListener('afterprint', () => { if (wasOpen !== undefined) index.open = wasOpen; wasOpen = undefined; });
+  })();
+  </script>
+</body>
+</html>

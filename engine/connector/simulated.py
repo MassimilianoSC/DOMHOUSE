@@ -1,0 +1,214 @@
+"""SimulatedConnector: simulated devices behind the connector interface (per-youssouf/connector.md, §4). Ours.
+
+Extracted unchanged from the BFF's simulated engine (bff/mock_instance/state.py, P-60 step 1): the seeded catalog, the
+timing of a command (0.3 s to "sent", 0.2 s to "verifying", 1.0 s to the outcome), the power each appliance draws.
+It is what the demonstration apartments and the conformance suite run on, and the model for a real connector.
+
+Besides the interface it has two hooks, for the engine's POST /_test/state and for the tests' harness: set_online and
+set_state change the simulated world and return the resulting changes, also sent through changes() unless notify=False
+(the engine applies them itself, at once, with the request's correlation_id).
+changes() is a live stream: each call gets the changes pushed while it is being read, in its own event loop.
+DOMOTICA_TEST_CONNECTOR_DOWN=1 makes status() report the connector down (scenario C14 of the conformance suite).
+"""
+import asyncio
+import copy
+import os
+from collections.abc import AsyncIterator, Callable
+from datetime import UTC, datetime, timedelta
+
+from .interface import (CONNECTOR_API_VERSION, CommandResult, ConnectorCommand, ConnectorConfig, ConnectorStatus,
+                        DeviceInfo, Room, StateChange)
+
+SENT_AFTER_S, VERIFYING_AFTER_S, OUTCOME_AFTER_S = 0.3, 0.2, 1.0
+_STOP = object()
+# what a simulated device reports of each capability (connector.md §2.3: the "device" fields; the catalog's and the
+# engine's stay with the engine). The simulated power meter reports kwh_today itself instead of energy_total_wh.
+DEVICE_FIELDS = {"switch": ("on",), "power_meter": ("watts", "kwh_today"), "climate": ("on", "mode", "setpoint", "fan"),
+                 "heating": ("on",), "temperature": ("celsius",), "humidity": ("percent",), "contact": ("open", "since"),
+                 "motion": ("detected", "last_seen")}
+
+
+def utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def iso(dt: datetime) -> str:
+    return dt.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def seed_devices(variant: int) -> tuple[list[dict], dict[str, dict]]:
+    """The demonstration apartment: variant 0 is occupied and warm (Rimini), 1 is empty and cold (Bologna)."""
+    now = iso(utcnow())
+    rooms = [{"room_id": "soggiorno", "name": "Soggiorno"}, {"room_id": "camera", "name": "Camera"},
+             {"room_id": "tecnico", "name": "Vano tecnico"}]
+    warm = variant == 0
+    devices = [
+        {"device_id": "dev-clima-soggiorno", "label": "Climatizzatore soggiorno", "room_id": "soggiorno", "online": True,
+         "last_seen": now, "capabilities": {
+             "climate": {"on": warm, "mode": "heat", "setpoint": 21, "fan": "auto", "setpoint_min": 16,
+                         "setpoint_max": 24, "confirmation": "power"},
+             "power_meter": {"watts": 870 if warm else 0, "kwh_today": 3.4 if warm else 0.2}}},
+        {"device_id": "dev-caldaia", "label": "Caldaia", "room_id": "tecnico", "online": True, "last_seen": now,
+         "capabilities": {
+             "heating": {"on": warm, "setpoint": 21 if warm else 8, "setpoint_min": 7, "setpoint_max": 23},
+             "power_meter": {"watts": 95 if warm else 0, "kwh_today": 1.1 if warm else 0.3}}},
+        {"device_id": "dev-presa-camera", "label": "Presa stufetta camera", "room_id": "camera", "online": True,
+         "last_seen": now, "capabilities": {"switch": {"on": False}, "power_meter": {"watts": 0, "kwh_today": 0.6}}},
+        {"device_id": "dev-finestra-camera", "label": "Finestra camera", "room_id": "camera", "online": True,
+         "last_seen": now, "capabilities": {"contact": {"open": False, "since": iso(utcnow() - timedelta(hours=4))}}},
+        {"device_id": "dev-ambiente-soggiorno", "label": "Sensore soggiorno", "room_id": "soggiorno", "online": True,
+         "last_seen": now, "capabilities": {
+             "temperature": {"celsius": 20.6 if warm else 16.9}, "humidity": {"percent": 48 if warm else 57},
+             "motion": {"detected": warm, "last_seen": iso(utcnow() - timedelta(minutes=3 if warm else 2900))}}},
+    ]
+    return rooms, {d["device_id"]: d for d in devices}
+
+
+def watts_for(cap: str, state: dict) -> float:
+    """What a simulated appliance draws in that state (the power meter follows the command)."""
+    if not state.get("on"):
+        return 0
+    if cap == "climate":
+        return {"heat": 870, "cool": 650, "dry": 300, "fan": 60}.get(state.get("mode"), 500)
+    if cap == "heating":
+        return 95
+    return 1200
+
+
+class SimulatedDevice:
+    """One simulated device: its state as the "world" has it (the engine keeps its own copy)."""
+
+    def __init__(self, data: dict, links: dict[str, str] | None = None):
+        self.device_id = data["device_id"]
+        self.label, self.room_id = data["label"], data["room_id"]
+        self.online = data["online"]
+        self.last_seen = data["last_seen"]           # ISO string, as in the contract
+        self.capabilities = copy.deepcopy(data["capabilities"])
+        self.links = dict(links or {})
+
+    def info(self) -> DeviceInfo:
+        seen = datetime.fromisoformat(self.last_seen.replace("Z", "+00:00")) if self.last_seen else None
+        return DeviceInfo(device_id=self.device_id, label=self.label, room_id=self.room_id, online=self.online,
+                          last_seen=seen, capabilities=copy.deepcopy(self.capabilities), links=dict(self.links))
+
+    def reported(self, capability: str) -> dict:
+        """The capability as the device reports it: its own fields only."""
+        state = self.capabilities[capability]
+        return {k: copy.deepcopy(state[k]) for k in DEVICE_FIELDS.get(capability, state) if k in state}
+
+    def apply(self, capability: str, target: dict) -> list[tuple[str, dict]]:
+        """The device reaches the target; its power meter (if any) follows. Returns (capability, reported state)."""
+        self.capabilities[capability].update(copy.deepcopy(target))
+        self.last_seen = iso(utcnow())
+        changed = [(capability, self.reported(capability))]
+        if "power_meter" in self.capabilities:
+            self.capabilities["power_meter"]["watts"] = watts_for(capability, self.capabilities[capability])
+            changed.append(("power_meter", self.reported("power_meter")))
+        return changed
+
+
+class SimulatedConnector:
+    api_version = CONNECTOR_API_VERSION
+
+    def __init__(self, variant: int = 0):
+        rooms, devices = seed_devices(variant)
+        # the split is confirmed by its own meter and the boiler regulated on the living-room sensor (§2.2)
+        links = {"dev-clima-soggiorno": {"confirmation_device_id": "dev-clima-soggiorno"},
+                 "dev-caldaia": {"sensor_device_id": "dev-ambiente-soggiorno"}}
+        self._rooms = [Room(**r) for r in rooms]
+        self._devices = {k: SimulatedDevice(d, links.get(k)) for k, d in devices.items()}
+        self._readers: set[asyncio.Queue] = set()
+        self._stopped = False
+        self._last_event_at: datetime | None = None
+
+    # ---- interface ----------------------------------------------------------------------------------------------
+    async def start(self) -> None:
+        self._stopped = False
+
+    async def stop(self) -> None:
+        self._stopped = True
+        for q in list(self._readers):
+            q.put_nowait(_STOP)
+
+    def rooms(self) -> list[Room]:
+        return list(self._rooms)
+
+    def devices(self) -> list[DeviceInfo]:
+        return [d.info() for d in self._devices.values()]
+
+    def status(self) -> ConnectorStatus:
+        up = os.environ.get("DOMOTICA_TEST_CONNECTOR_DOWN") != "1"
+        online = sum(1 for d in self._devices.values() if d.online)
+        return ConnectorStatus(up=up, connected_devices=online if up else 0, last_event_at=self._last_event_at,
+                               detail=None if up else "simulated: DOMOTICA_TEST_CONNECTOR_DOWN=1")
+
+    async def changes(self) -> AsyncIterator[StateChange]:
+        # a queue per reader, made in the reader's loop: the tests run each case in a new event loop
+        queue: asyncio.Queue = asyncio.Queue()
+        self._readers.add(queue)
+        try:
+            while not self._stopped:
+                change = await queue.get()
+                if change is _STOP:
+                    return
+                yield change
+        finally:
+            self._readers.discard(queue)
+
+    async def execute(self, cmd: ConnectorCommand, on_progress: Callable[[str], None]) -> CommandResult:
+        device = self._devices.get(cmd.device_id)
+        if device is None:
+            return CommandResult("failed", "internal_error", detail="unknown device")
+        await asyncio.sleep(SENT_AFTER_S)
+        on_progress("sent")
+        await asyncio.sleep(VERIFYING_AFTER_S)
+        on_progress("verifying")
+        await asyncio.sleep(OUTCOME_AFTER_S)
+        if not device.online:
+            return CommandResult("failed", "device_offline", detail="went offline while verifying")
+        now = utcnow()
+        for cap, state in device.apply(cmd.capability, cmd.target):
+            self._push(StateChange(device.device_id, "state", now, capability=cap, state=state))
+        await asyncio.sleep(0)   # let the engine take the changes before it hears the outcome (same order as before)
+        return CommandResult("confirmed", state=device.reported(cmd.capability))
+
+    # ---- hooks of POST /_test/state and of the tests (simulated only) --------------------------------------------
+    def set_online(self, device_id: str, online: bool, notify: bool = True) -> list[StateChange]:
+        """The device goes away or comes back; back online it sends a full snapshot, as a real connector does."""
+        device = self._devices[device_id]
+        now = utcnow()
+        device.online = online
+        if online:
+            device.last_seen = iso(now)
+        out = [StateChange(device_id, "online", now, online=online)]
+        if online:
+            out += [StateChange(device_id, "state", now, capability=c, state=device.reported(c))
+                    for c in device.capabilities]
+        for c in out:
+            self._push(c, notify)
+        return out
+
+    def set_state(self, device_id: str, capability: str, state: dict, notify: bool = True) -> StateChange:
+        """Something changes in the world (a window opens, the temperature drops)."""
+        device = self._devices[device_id]
+        current = device.capabilities[capability]
+        was_open = current.get("open")
+        current.update(state)
+        now = utcnow()
+        if capability == "contact" and current.get("open") != was_open:
+            current["since"] = iso(now)
+        device.last_seen = iso(now)
+        change = StateChange(device_id, "state", now, capability=capability, state=device.reported(capability))
+        self._push(change, notify)
+        return change
+
+    def _push(self, change: StateChange, notify: bool = True) -> None:
+        self._last_event_at = change.ts
+        if notify:
+            for q in list(self._readers):
+                q.put_nowait(change)
+
+
+def make_connector(config: ConnectorConfig) -> SimulatedConnector:
+    """CONNECTOR=simulated: the demonstration catalog, the cold empty one for a "bologna" apartment."""
+    return SimulatedConnector(variant=1 if "bologna" in config.apartment_id else 0)

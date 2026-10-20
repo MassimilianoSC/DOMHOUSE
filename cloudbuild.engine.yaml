@@ -1,0 +1,13 @@
+# Cloud Build config used by scripts/deploy-engine.sh: the engine's image (engine/Dockerfile), built with the
+# repository root as context, as cloudbuild.yaml does for the BFF. The image name arrives as the _IMAGE substitution;
+# no real project values here.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "engine/Dockerfile", "-t", "${_IMAGE}", "."]
+images:
+  - "${_IMAGE}"
+substitutions:
+  _IMAGE: europe-west8-docker.pkg.dev/your-gcp-project-id/domotica/engine:latest
+options:
+  # with a user-chosen service account (--service-account, P-21) Cloud Build wants the logs in Cloud Logging only
+  logging: CLOUD_LOGGING_ONLY

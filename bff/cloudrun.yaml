@@ -1,0 +1,93 @@
+# Cloud Run service for the BFF — PRODUCTION (INSTANCE_MODE=real, engine on the VM via VPC egress).
+# Placeholders replaced by scripts/deploy.sh: your-gcp-project-id, europe-west8, image tag, your-vpc-network, your-vpc-subnet.
+# Apply with: gcloud run services replace bff/cloudrun.yaml --region europe-west8
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: domotica-bff
+  labels:
+    app: domotica-appartamenti
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "1"          # keeps SSE relays and FCM hooks warm
+        # 1 for the pilot (decision D-35): every instance keeps its own upstream streams and push hooks, so with N
+        # instances each notification would arrive N times. A few apartments fit in one instance; scaling out needs a
+        # cross-instance dedupe first (option B of D-35, still to be evaluated).
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/cpu-throttling: "false"     # background hubs need CPU between requests
+        run.googleapis.com/startup-cpu-boost: "true"
+        # The engine instances live on a VM with an internal IP only: route private ranges through the VPC.
+        # Replace network/subnetwork with the VPC and subnet of the VM (see infra notes).
+        run.googleapis.com/network-interfaces: '[{"network":"your-vpc-network","subnetwork":"your-vpc-subnet"}]'
+        run.googleapis.com/vpc-access-egress: private-ranges-only
+    spec:
+      serviceAccountName: domotica-bff@your-gcp-project-id.iam.gserviceaccount.com
+      containerConcurrency: 250
+      timeoutSeconds: 3600                             # SSE streams
+      containers:
+        - image: europe-west8-docker.pkg.dev/your-gcp-project-id/domotica/bff:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          env:
+            - name: APP_ENV
+              value: prod
+            - name: AUTH_MODE
+              value: firebase
+            - name: INSTANCE_MODE
+              value: real
+            - name: REPOSITORY
+              value: firestore
+            - name: FCM_ENABLED
+              value: "false"
+            - name: GCP_PROJECT_ID
+              value: your-gcp-project-id
+            - name: GCP_REGION
+              value: europe-west8
+            - name: FIREBASE_PROJECT_ID
+              value: your-gcp-project-id
+            - name: CORS_ORIGINS
+              value: https://your-gcp-project-id.web.app,https://your-gcp-project-id.firebaseapp.com
+            - name: SECRET_MANAGER_PREFIX
+              value: langbrain-api-key-
+            - name: INSTANCE_TIMEOUT_S
+              value: "10"
+            - name: ITALIANWAY_SIGNATURE_HEADER
+              value: X-Signature
+            - name: ITALIANWAY_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: italianway-webhook-secret
+                  key: latest
+            - name: APP_PUBLIC_URL
+              value: https://your-gcp-project-id.web.app
+            - name: SMTP_HOST
+              value: smtp.gmail.com
+            - name: SMTP_PORT
+              value: "465"
+            - name: SMTP_USER
+              value: your-smtp-user@example.com            # replaced by scripts/deploy.sh (SMTP_USER)
+            - name: SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smtp-app-password
+                  key: latest
+          startupProbe:
+            httpGet:
+              path: /healthz
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /healthz
+            periodSeconds: 30
+  traffic:
+    - percent: 100
+      latestRevision: true

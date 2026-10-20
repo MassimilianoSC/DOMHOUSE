@@ -1,0 +1,31 @@
+{
+  "displayName": "BFF non raggiungibile",
+  "documentation": {
+    "content": "Il server dell'app (BFF su Cloud Run) non risponde a /health da almeno 5 minuti da 2 o più delle 3 regioni del controllo. L'app non funziona per nessun utente finché non torna. Primo passo: Cloud Run > domotica-bff > Log, cercare gli errori degli ultimi minuti. Istruzioni: scripts/monitoring/README.md.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "/health fallisce da 5 minuti",
+      "conditionThreshold": {
+        "filter": "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND metric.label.check_id=\"__CHECK_ID__\" AND resource.type=\"uptime_url\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "perSeriesAligner": "ALIGN_NEXT_OLDER",
+            "crossSeriesReducer": "REDUCE_COUNT_FALSE",
+            "groupByFields": ["resource.label.project_id", "resource.label.host"]
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 1,
+        "duration": "300s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "alertStrategy": { "autoClose": "1800s" },
+  "notificationChannels": ["__CHANNEL__"],
+  "severity": "CRITICAL"
+}

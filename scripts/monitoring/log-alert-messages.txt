@@ -1,0 +1,7 @@
+audit: entry not written
+erasure: step failed
+support: access logged as opened but not saved
+support: expiry not logged yet
+invite: email limit not checked
+webhook refused: Italianway code on a demo apartment
+demo apartment with an Italianway code

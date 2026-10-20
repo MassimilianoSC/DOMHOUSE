@@ -1,0 +1,2164 @@
+openapi: 3.0.3
+
+# =============================================================================
+#  CONTRATTO DELL'APP – API DELL'ISTANZA DI APPARTAMENTO
+#  Versione 1.0.4 · 14 ottobre 2026 · proprietario: Massimiliano (HQ)
+#
+#  Questo file è l'unico punto di contatto tecnico tra l'app (PWA + BFF su
+#  GCP/Firebase, Massimiliano) e il motore domotico (LangBrain + nodo
+#  domotica, Youssouf). L'app usa SOLO ciò che è scritto qui. Il motore è
+#  conforme quando la suite di test di conformità (vedi x-conformita in
+#  fondo) passa contro la sua istanza.
+#
+#  Come leggerlo:
+#    - info.description        → guida per Youssouf: cosa deve fare, in ordine
+#    - paths                   → 20 percorsi, 23 operazioni, ognuna con esempi e con una
+#                                nota "x-youssouf" su cosa implementare
+#    - components.schemas      → modello del dominio e capacità
+#    - x-stream-events         → i 7 eventi SSE con i loro schemi
+#    - x-conformita            → scenari che i test verificano
+#    - x-informazioni-mancanti → cosa ancora non sappiamo e a chi chiederlo
+#
+#  Strumenti:
+#    mock:   npx @stoplight/prism-cli mock contract/openapi.yaml
+#            (Prism serve gli endpoint alla radice, senza /api/v1:
+#             http://127.0.0.1:4010/devices; il BFF ha la base URL configurabile)
+#    client: npx openapi-typescript contract/openapi.yaml -o src/api/schema.ts
+#    lint:   npx @redocly/cli lint contract/openapi.yaml
+# =============================================================================
+
+info:
+  title: Domotica appartamenti – API dell'istanza
+  version: 1.0.4
+  description: |
+    API esposta da **ogni istanza di appartamento** del motore domotico.
+    L'app (BFF su Cloud Run) chiama un'istanza alla volta, sulla rete interna,
+    con la chiave API dell'istanza e due header di contesto (`X-Actor`,
+    `X-Correlation-Id`).
+
+    ## Guida per Youssouf: cosa devi fare per essere conforme
+
+    1. **Esponi tutti gli endpoint di questo file** sotto il prefisso `/api/v1`
+       del nodo domotica, con gli stessi percorsi, campi, codici di risposta
+       ed errori. Gli endpoint nativi di LangBrain possono restare: l'app non
+       li usa.
+    2. **Dichiara le capacità di ogni dispositivo reale** usando solo le otto
+       capacità di `components.schemas.Capabilities`. La mappa Shelly →
+       capacità è tua (es. relè con misura sulla caldaia = `heating` +
+       `power_meter`; IR blaster = `climate`; sensore BLU porta = `contact`).
+       L'app non conosce marche né modelli.
+    3. **Un comando è asincrono**: `POST /devices/{id}/commands` risponde
+       `202` con `command_id` e stato `pending`; poi passa per `sent`,
+       `verifying` e finisce in `acked`, `failed` o `timeout` (10 s). Ogni
+       passaggio di stato produce un evento SSE `command.updated`. Per lo split
+       via infrarossi la conferma è la variazione di potenza assorbita.
+    4. **Idempotenza**: stesso `X-Correlation-Id` sullo stesso endpoint entro
+       60 s → stessa risposta, nessuna esecuzione doppia. `POST /bookings` è
+       idempotente su `event_id` senza limite di tempo.
+    5. **Limiti dal motore**: ogni capacità con un setpoint espone
+       `setpoint_min`/`setpoint_max`; `PUT /rules` rifiuta con `422` valori
+       fuori dai `limits`. L'app non ha numeri cablati: usa i tuoi.
+    6. **Approvazioni (HITL)** esposte come `approvals` con descrizione in
+       italiano e scadenza; decisione `approve`/`reject`. L'`OVERRIDE` di
+       LangBrain resta spento nel PoC.
+    7. **Log delle decisioni** nel formato `Decision`. Sulle chiamate API
+       `X-Correlation-Id` è obbligatorio (manca → `400`): lo usi così com'è.
+       Lo generi tu solo per i fatti che nascono nel motore (riflessi, timer,
+       azioni programmate). `X-Actor` valido = un indirizzo email oppure
+       `system:<nome>` (es. `system:bff`); altrimenti `400`. Nelle decisioni:
+       email → `actor: "user:<email>"`, `system:<nome>` → `actor: "system"`.
+    8. **Eventi SSE** su `GET /stream` con `id` progressivo e supporto a
+       `Last-Event-ID` (vedi `x-stream-events`). Un evento entro 1 s dal fatto.
+    9. **Implementazione a gradi**: ciò che non è ancora pronto risponde
+       `501` con `error: not_implemented` e non compare in `features` di
+       `GET /version`. L'app nasconde la funzione. La mappa feature →
+       endpoint è in `x-features` in fondo al file: usala da un solo modulo
+       sia per `/version` sia per il middleware del `501`, così non
+       divergono. Ordine consigliato: `version, health, devices, commands,
+       decisions, stream` → `apartment, rules, energy` → `bookings, schedule`
+       → `approvals, ask`. `decisions` sta nella prima tappa perché C01, C02
+       e C05 lo leggono e il log viene scritto comunque.
+    10. **Salute**: `GET /health` senza chiave, `503` se il connector Shelly è
+        fermo. `GET /version` dichiara la versione del contratto implementata.
+
+    Dove una cosa è fisicamente impossibile o costa troppo, apri una pull
+    request su `contract/` che spiega il motivo: è l'unico momento in cui si
+    rinegozia. Tutto il resto (grafo, agenti, modelli, connector, script
+    locali, file dell'appartamento, SQLite, compose) è tuo.
+
+    ## Convenzioni comuni
+
+    - Date e ore sempre in **UTC, ISO 8601 con millisecondi** (`2026-10-14T13:02:11.420Z`).
+    - Identificatori (`apartment_id`, `device_id`, `room_id`, ...) sono stringhe
+      opache scelte dal motore, uguali in API, log e file dell'appartamento.
+    - Testi mostrati al gestore (`label`, `description`, `reasoning`) sono in
+      italiano e l'app li mostra così come sono.
+    - Errori: sempre `components.schemas.Error` con un `error` leggibile.
+    - Paginazione: `limit` + `cursor` opaco; la risposta porta `next_cursor`
+      (null se finito).
+
+  contact:
+    name: Massimiliano (HQ) – proprietario del contratto
+  x-owner: Massimiliano
+  x-implementer: Youssouf
+  x-contract-policy: |
+    Modifica compatibile (campo o endpoint in più): versione minore, nessun
+    preavviso. Modifica non compatibile: versione maggiore, due giorni di
+    preavviso, approvazione di entrambi. La CI dell'app confronta questo file
+    con GET /api/v1/openapi.json dell'istanza di sviluppo, che espone lo
+    schema del solo adattatore (non le rotte native di LangBrain: o il nodo
+    serve questo file così com'è, o è montato come sotto-applicazione con il
+    proprio schema). La CI del nodo domotica esegue la suite di conformità a
+    ogni push.
+
+servers:
+  - url: http://{instance_host}:{port}/api/v1
+    description: Istanza di un appartamento sulla rete interna (mai esposta su internet)
+    variables:
+      instance_host:
+        default: 10.0.0.10
+      port:
+        default: "8101"
+  - url: http://127.0.0.1:4010
+    description: Mock Prism in locale (serve alla radice, senza /api/v1)
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Appartamento
+    description: Stato complessivo, modalità e forzature
+  - name: Dispositivi
+    description: Stanze, dispositivi, capacità e comandi
+  - name: Energia
+  - name: Programmazione
+    description: Azioni programmate da prenotazioni o manuali
+  - name: Regole
+  - name: Approvazioni
+    description: Human-in-the-loop
+  - name: Decisioni
+    description: Log di ciò che il motore ha deciso e perché
+  - name: Assistente
+    description: Richieste in linguaggio naturale al Brain
+  - name: Prenotazioni
+    description: Eventi inoltrati dal BFF (mai dalla PWA)
+  - name: Tempo reale
+  - name: Sistema
+
+paths:
+
+  # ---------------------------------------------------------------------------
+  # APPARTAMENTO
+  # ---------------------------------------------------------------------------
+
+  /apartment:
+    get:
+      tags: [Appartamento]
+      operationId: getApartment
+      summary: Stato dell'appartamento
+      description: |
+        Occupazione, modalità attiva, eventuale forzatura, prossimi check-in e
+        check-out, salute sintetica. L'app lo rilegge a ogni riconnessione SSE.
+      x-youssouf: |
+        `occupancy` è la tua stima (prenotazioni + presenza + consumi).
+        `mode` è la modalità applicata ora dalle regole; `hold` è valorizzato
+        solo durante una forzatura. `next_checkin`/`next_checkout` vengono
+        dalle prenotazioni ricevute via POST /bookings.
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '200':
+          description: Stato corrente
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Apartment' }
+              example:
+                apartment_id: apt-rimini-01
+                name: Via Roma 12 – interno 3
+                timezone: Europe/Rome
+                occupancy: occupied
+                mode: comfort
+                hold: null
+                next_checkin: null
+                next_checkout: '2026-10-16T08:00:00.000Z'
+                current_booking_id: bk-77812
+                online: true
+                devices_online: 5
+                devices_total: 5
+                updated_at: '2026-10-14T13:02:11.420Z'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  /apartment/mode:
+    post:
+      tags: [Appartamento]
+      operationId: setApartmentMode
+      summary: Imposta la modalità dell'appartamento
+      description: |
+        `comfort`, `eco` o `empty`. Il motore traduce la modalità in comandi ai
+        dispositivi secondo le regole dell'appartamento; l'app non conosce la
+        traduzione. Asincrona: l'esito arriva come eventi `command.updated` e
+        `apartment.changed`.
+      x-youssouf: |
+        Traduci la modalità nei comandi ai dispositivi (es. `empty` = clima
+        OFF, caldaia a setpoint antigelo). Restituisci i `command_id` generati
+        così l'app può seguirli. Se una regola o un limite impedisce la
+        modalità, rispondi 422 con il motivo.
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode: { $ref: '#/components/schemas/ApartmentMode' }
+            example: { mode: eco }
+      responses:
+        '202':
+          description: Modalità accettata; comandi generati
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mode, command_ids]
+                properties:
+                  mode: { $ref: '#/components/schemas/ApartmentMode' }
+                  command_ids:
+                    type: array
+                    items: { type: string }
+              example: { mode: eco, command_ids: [cmd-9f1c, cmd-9f1d] }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  /apartment/hold:
+    post:
+      tags: [Appartamento]
+      operationId: holdApartment
+      summary: Forzatura temporanea
+      description: |
+        Mantiene lo stato attuale (o una modalità indicata) per `minutes`
+        minuti sospendendo le regole non di sicurezza; alla scadenza il motore
+        torna alle regole. `minutes: 0` annulla una forzatura in corso.
+        I limiti hard (setpoint min/max, antigelo) restano attivi anche durante
+        la forzatura.
+      x-youssouf: |
+        Durante il hold le regole "di comfort" (finestra aperta, eco al
+        check-out) sono sospese; i limiti hard no. Emetti `apartment.changed`
+        all'inizio e alla fine. Registra una Decision con actor = X-Actor.
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [minutes]
+              properties:
+                minutes:
+                  type: integer
+                  minimum: 0
+                  maximum: 720
+                  description: 0 annulla la forzatura
+                mode:
+                  allOf: [{ $ref: '#/components/schemas/ApartmentMode' }]
+                  description: Se assente, mantiene lo stato attuale
+            example: { minutes: 120, mode: comfort }
+      responses:
+        '202':
+          description: Forzatura attiva
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Hold' }
+              example:
+                mode: comfort
+                until: '2026-10-14T15:02:11.420Z'
+                set_by: gestore@flatsharing.it
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ---------------------------------------------------------------------------
+  # DISPOSITIVI E COMANDI
+  # ---------------------------------------------------------------------------
+
+  /devices:
+    get:
+      tags: [Dispositivi]
+      operationId: listDevices
+      summary: Stanze e dispositivi con capacità e stato
+      description: |
+        L'app disegna i controlli leggendo `capabilities`: una chiave per
+        capacità presente. Un dispositivo nuovo o una capacità nuova compaiono
+        qui e l'app li mostra senza rilascio. Capacità sconosciute all'app
+        vengono ignorate.
+      x-youssouf: |
+        Leggi il file dell'appartamento, non il registro di LangBrain. I nomi
+        tecnici degli Shelly non arrivano all'app: `device_id` opaco, `label`
+        in italiano, `room_id` obbligatorio. `last_seen` è l'ultimo messaggio
+        ricevuto dal dispositivo (WebSocket o BLU via gateway).
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '200':
+          description: Elenco completo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [apartment_id, rooms, devices]
+                properties:
+                  apartment_id: { type: string }
+                  rooms:
+                    type: array
+                    items: { $ref: '#/components/schemas/Room' }
+                  devices:
+                    type: array
+                    items: { $ref: '#/components/schemas/Device' }
+              example:
+                apartment_id: apt-rimini-01
+                rooms:
+                  - { room_id: soggiorno, name: Soggiorno }
+                  - { room_id: camera, name: Camera }
+                  - { room_id: tecnico, name: Vano tecnico }
+                devices:
+                  - device_id: dev-clima-soggiorno
+                    label: Climatizzatore soggiorno
+                    room_id: soggiorno
+                    online: true
+                    last_seen: '2026-10-14T13:02:11.420Z'
+                    capabilities:
+                      climate:
+                        'on': true
+                        mode: heat
+                        setpoint: 21
+                        fan: auto
+                        setpoint_min: 16
+                        setpoint_max: 24
+                        confirmation: power
+                      power_meter:
+                        watts: 870
+                        kwh_today: 3.4
+                  - device_id: dev-caldaia
+                    label: Caldaia
+                    room_id: tecnico
+                    online: true
+                    last_seen: '2026-10-14T13:01:58.004Z'
+                    capabilities:
+                      heating:
+                        'on': false
+                        setpoint: 18
+                        setpoint_min: 7
+                        setpoint_max: 23
+                      power_meter:
+                        watts: 0
+                        kwh_today: 1.1
+                  - device_id: dev-presa-camera
+                    label: Presa stufetta camera
+                    room_id: camera
+                    online: true
+                    last_seen: '2026-10-14T13:01:40.000Z'
+                    capabilities:
+                      switch:
+                        'on': false
+                      power_meter:
+                        watts: 0
+                        kwh_today: 0.6
+                  - device_id: dev-finestra-camera
+                    label: Finestra camera
+                    room_id: camera
+                    online: true
+                    last_seen: '2026-10-14T12:58:00.000Z'
+                    capabilities:
+                      contact:
+                        open: false
+                        since: '2026-10-14T09:12:00.000Z'
+                  - device_id: dev-ambiente-soggiorno
+                    label: Sensore soggiorno
+                    room_id: soggiorno
+                    online: true
+                    last_seen: '2026-10-14T13:00:30.000Z'
+                    capabilities:
+                      temperature: { celsius: 20.6 }
+                      humidity: { percent: 48 }
+                      motion: { detected: true, last_seen: '2026-10-14T12:59:10.000Z' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  /devices/{device_id}:
+    patch:
+      tags: [Dispositivi]
+      operationId: updateDevice
+      summary: Rinomina un dispositivo o cambia stanza
+      description: Solo anagrafica visibile al gestore; non tocca la configurazione Shelly.
+      x-youssouf: |
+        Aggiorna `label` e `room_id` nel file dell'appartamento e rispondi con
+        il dispositivo aggiornato. `room_id` deve esistere, altrimenti 422.
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                label: { type: string, maxLength: 60 }
+                room_id: { type: string }
+            example: { label: Clima soggiorno }
+      responses:
+        '200':
+          description: Dispositivo aggiornato
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Device' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  /devices/{device_id}/commands:
+    post:
+      tags: [Dispositivi]
+      operationId: sendCommand
+      summary: Invia un comando a una capacità del dispositivo
+      description: |
+        Asincrono. Risponde subito `202` con `command_id` e `status: pending`.
+        Gli aggiornamenti arrivano come eventi SSE `command.updated` oppure con
+        `GET /commands/{command_id}`. Stati: `pending → sent → verifying →
+        acked | failed | timeout`. Timeout 10 secondi.
+
+        Combinazioni ammesse (capacità → azioni → params):
+        - `switch`  → `turn_on`, `turn_off` → nessun parametro
+        - `climate` → `set_climate` → `on`, `mode`, `setpoint`, `fan` (almeno uno); `turn_off`
+        - `heating` → `set_heating` → `on`, `setpoint` (almeno uno); `turn_off`
+      x-youssouf: |
+        Valida capacità/azione/params contro il dispositivo e i limiti del file
+        dell'appartamento (422 se fuori). Passa dal motore di priorità/blocchi
+        di LangBrain: un blocco attivo di un attore con priorità maggiore →
+        `failed` con `reason: blocked_by_rule`, non 4xx. Per `climate` via IR
+        invia il comando al blaster e passa a `verifying`: `acked` quando la
+        potenza misurata cambia coerentemente entro il timeout, altrimenti
+        `timeout`. Dispositivo offline: 409 (coda non ammessa nel PoC).
+        Idempotenza su X-Correlation-Id per 60 s. Registra una Decision con
+        actor = X-Actor e lo stesso correlation_id.
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Command' }
+            examples:
+              clima:
+                summary: Riscaldamento a 21 gradi
+                value:
+                  capability: climate
+                  action: set_climate
+                  params: { mode: heat, setpoint: 21 }
+              spegni:
+                summary: Spegni un carico
+                value:
+                  capability: switch
+                  action: turn_off
+      responses:
+        '202':
+          description: Comando accettato, esito asincrono
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommandStatus' }
+              example:
+                command_id: cmd-9f1c
+                device_id: dev-clima-soggiorno
+                status: pending
+                capability: climate
+                action: set_climate
+                params: { mode: heat, setpoint: 21 }
+                correlation_id: 2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10
+                created_at: '2026-10-14T13:02:11.420Z'
+                updated_at: '2026-10-14T13:02:11.420Z'
+                reason: null
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Dispositivo offline e coda non ammessa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: device_offline, message: Il dispositivo non è raggiungibile; riprova quando torna online }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  /commands/{command_id}:
+    get:
+      tags: [Dispositivi]
+      operationId: getCommand
+      summary: Esito di un comando
+      x-youssouf: |
+        Conserva i comandi almeno 7 giorni. `reason` valorizzato solo per
+        `failed` e `timeout`, con un codice tra quelli di CommandReason.
+      parameters:
+        - name: command_id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '200':
+          description: Stato del comando
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CommandStatus' }
+              example:
+                command_id: cmd-9f1c
+                device_id: dev-clima-soggiorno
+                status: acked
+                capability: climate
+                action: set_climate
+                params: { mode: heat, setpoint: 21 }
+                correlation_id: 2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10
+                created_at: '2026-10-14T13:02:11.420Z'
+                updated_at: '2026-10-14T13:02:14.980Z'
+                reason: null
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ---------------------------------------------------------------------------
+  # ENERGIA
+  # ---------------------------------------------------------------------------
+
+  /energy:
+    get:
+      tags: [Energia]
+      operationId: getEnergy
+      summary: Consumi per periodo e ore di clima evitate
+      description: |
+        Serie dei kWh per intervallo (`bucket` = `hour` o `day`) sommando tutti
+        i `power_meter`, più il dettaglio per dispositivo e, se il motore lo
+        calcola, le ore di clima evitate grazie alle regole.
+      x-youssouf: |
+        Aggrega dalla telemetria dei power_meter. `avoided_hvac_hours` è
+        opzionale (null se non calcolato): conta le ore in cui una regola ha
+        spento clima o caldaia a casa vuota. Massimo 31 giorni per richiesta.
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: bucket
+          in: query
+          required: false
+          schema: { type: string, enum: [hour, day], default: day }
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '200':
+          description: Serie e totali
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EnergyReport' }
+              example:
+                from: '2026-10-07T00:00:00.000Z'
+                to: '2026-10-14T00:00:00.000Z'
+                bucket: day
+                total_kwh: 41.8
+                avoided_hvac_hours: 17.5
+                series:
+                  - { ts: '2026-10-07T00:00:00.000Z', kwh: 6.1 }
+                  - { ts: '2026-10-08T00:00:00.000Z', kwh: 5.4 }
+                by_device:
+                  - { device_id: dev-clima-soggiorno, label: Climatizzatore soggiorno, kwh: 28.3 }
+                  - { device_id: dev-caldaia, label: Caldaia, kwh: 13.5 }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ---------------------------------------------------------------------------
+  # PROGRAMMAZIONE
+  # ---------------------------------------------------------------------------
+
+  /schedule:
+    get:
+      tags: [Programmazione]
+      operationId: listSchedule
+      summary: Azioni programmate
+      description: Da prenotazioni (pre-arrivo, check-out, vuoto) e manuali, in ordine di esecuzione.
+      x-youssouf: |
+        Ogni evento di prenotazione genera voci con `source: booking` e
+        `booking_id`. Le voci eseguite restano visibili 7 giorni con
+        `status: done`.
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '200':
+          description: Elenco
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ScheduleItem' }
+              example:
+                items:
+                  - schedule_id: sch-1001
+                    kind: prearrival
+                    source: booking
+                    booking_id: bk-77813
+                    run_at: '2026-10-16T13:00:00.000Z'
+                    action: { type: apartment_mode, mode: comfort }
+                    status: planned
+                  - schedule_id: sch-1002
+                    kind: checkout
+                    source: booking
+                    booking_id: bk-77812
+                    run_at: '2026-10-16T08:30:00.000Z'
+                    action: { type: apartment_mode, mode: empty }
+                    status: planned
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+    post:
+      tags: [Programmazione]
+      operationId: createScheduleItem
+      summary: Aggiunge un'azione programmata manuale
+      x-youssouf: |
+        `run_at` nel futuro, altrimenti 422. L'azione è una modalità di
+        appartamento o un comando a un dispositivo, validato come
+        POST /devices/{id}/commands.
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [run_at, action]
+              properties:
+                run_at: { type: string, format: date-time }
+                action: { $ref: '#/components/schemas/ScheduledAction' }
+            example:
+              run_at: '2026-10-15T17:00:00.000Z'
+              action: { type: apartment_mode, mode: comfort }
+      responses:
+        '201':
+          description: Creata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScheduleItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  /schedule/{schedule_id}:
+    patch:
+      tags: [Programmazione]
+      operationId: updateScheduleItem
+      summary: Anticipa o posticipa un'azione programmata
+      description: Vale anche per le voci generate dalle prenotazioni (l'ospite arriva prima).
+      x-youssouf: |
+        Una voce `done` o `cancelled` non si modifica (409). Se la voce viene
+        da una prenotazione, un successivo `booking_changed` la ricalcola e
+        sovrascrive la modifica manuale: documentalo nella Decision.
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [run_at]
+              properties:
+                run_at: { type: string, format: date-time }
+            example: { run_at: '2026-10-16T11:00:00.000Z' }
+      responses:
+        '200':
+          description: Aggiornata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ScheduleItem' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+    delete:
+      tags: [Programmazione]
+      operationId: cancelScheduleItem
+      summary: Annulla un'azione programmata
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '204':
+          description: Annullata
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ---------------------------------------------------------------------------
+  # REGOLE
+  # ---------------------------------------------------------------------------
+
+  /rules:
+    get:
+      tags: [Regole]
+      operationId: getRules
+      summary: Regole e soglie dell'appartamento con i loro limiti
+      description: |
+        Otto regole fisse. Ogni regola ha `enabled`, `params` modificabili dal
+        gestore e `limits` non superabili. L'app disegna i controlli dai
+        `limits`; non ha numeri cablati.
+      x-youssouf: |
+        Le stesse soglie alimentano i riflessi di LangBrain e gli script locali
+        sugli Shelly: un solo file per appartamento. `editable: false` per le
+        regole che il gestore può solo vedere (es. `compressor_min_off`).
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '200':
+          description: Regole
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleSet' }
+              example:
+                updated_at: '2026-10-10T09:00:00.000Z'
+                rules:
+                  - rule_id: window_open_off
+                    label: Finestra aperta spegne il clima
+                    enabled: true
+                    editable: true
+                    params: { minutes: 5 }
+                    limits: { minutes: { min: 1, max: 30 } }
+                  - rule_id: setpoint_limits
+                    label: Limiti del setpoint
+                    enabled: true
+                    editable: true
+                    params: { min: 16, max: 24 }
+                    limits: { min: { min: 7, max: 20 }, max: { min: 20, max: 28 } }
+                  - rule_id: frost_protection
+                    label: Antigelo a casa vuota
+                    enabled: true
+                    editable: true
+                    params: { celsius: 8 }
+                    limits: { celsius: { min: 5, max: 12 } }
+                  - rule_id: mold_protection
+                    label: Antimuffa a casa vuota
+                    enabled: true
+                    editable: true
+                    params: { humidity_percent: 65 }
+                    limits: { humidity_percent: { min: 50, max: 80 } }
+                  - rule_id: prearrival
+                    label: Pre-arrivo
+                    enabled: true
+                    editable: true
+                    params: { hours_before: 2 }
+                    limits: { hours_before: { min: 0, max: 6 } }
+                  - rule_id: checkout_eco
+                    label: Risparmio al check-out
+                    enabled: true
+                    editable: true
+                    params: { minutes_after: 30 }
+                    limits: { minutes_after: { min: 0, max: 180 } }
+                  - rule_id: compressor_min_off
+                    label: Pausa minima del compressore
+                    enabled: true
+                    editable: false
+                    params: { minutes: 3 }
+                    limits: { minutes: { min: 3, max: 3 } }
+                  - rule_id: offline_alert
+                    label: Avviso dispositivo offline
+                    enabled: true
+                    editable: true
+                    params: { minutes: 15 }
+                    limits: { minutes: { min: 5, max: 120 } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+    put:
+      tags: [Regole]
+      operationId: updateRules
+      summary: Modifica soglie o attiva/disattiva regole
+      description: Invia solo le regole da cambiare; le altre restano. Valori fuori dai `limits` → 422.
+      x-youssouf: |
+        Valida contro `limits`; una regola con `editable: false` → 422
+        `rule_not_editable`. Applica a caldo (nessun riavvio), aggiorna gli
+        script locali se la soglia li riguarda, registra una Decision con
+        actor = X-Actor e rispondi con il RuleSet completo.
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rules]
+              properties:
+                rules:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/RulePatch' }
+            example:
+              rules:
+                - { rule_id: window_open_off, params: { minutes: 10 } }
+                - { rule_id: mold_protection, enabled: false }
+      responses:
+        '200':
+          description: Regole aggiornate (set completo)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RuleSet' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ---------------------------------------------------------------------------
+  # APPROVAZIONI (HITL)
+  # ---------------------------------------------------------------------------
+
+  /approvals:
+    get:
+      tags: [Approvazioni]
+      operationId: listApprovals
+      summary: Coda delle approvazioni
+      description: |
+        Per default solo `pending`; con `status=all` anche le chiuse degli
+        ultimi 7 giorni. **Nel PoC un'istanza ha al massimo una approvazione
+        `pending` alla volta** (un interrupt per thread di appartamento):
+        l'app mostra una coda, che può essere lunga uno.
+      x-youssouf: |
+        Mappa gli interrupt HITL di LangBrain (flusso "brain" e wrapper sui
+        nodi) in Approval. Una sola pending per istanza: una seconda richiesta
+        di approvazione mentre una è aperta va accodata nel motore e esposta
+        quando la prima si chiude. `description` e `reason` in italiano, già pronti
+        per il gestore. `expires_at` dal timer HITL dell'appartamento;
+        `expires_action` dice cosa succede alla scadenza.
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [pending, all], default: pending }
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '200':
+          description: Elenco
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Approval' }
+              example:
+                items:
+                  - approval_id: apr-3301
+                    status: pending
+                    created_at: '2026-10-14T13:05:00.000Z'
+                    expires_at: '2026-10-14T13:35:00.000Z'
+                    expires_action: reject
+                    source: brain
+                    description: Spegnere la caldaia mentre l'appartamento risulta occupato
+                    reason: La finestra della camera è aperta da 12 minuti e la caldaia è accesa a 21 °C
+                    proposed_action:
+                      type: device_command
+                      device_id: dev-caldaia
+                      capability: heating
+                      action: turn_off
+                    correlation_id: 6b7d0c1e-1f3a-4a1e-8e3f-0c2d9a7b5e44
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  /approvals/{approval_id}/decision:
+    post:
+      tags: [Approvazioni]
+      operationId: decideApproval
+      summary: Approva o respinge
+      x-youssouf: |
+        Riprendi il grafo con APPROVA/RESPINGI; mai OVERRIDE. Dopo la
+        decisione emetti `decision.logged` con actor = X-Actor; se approvata,
+        i comandi generati seguono il ciclo normale (`command.updated`).
+        Approvazione già chiusa o scaduta → 409.
+      parameters:
+        - name: approval_id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, reject] }
+                note: { type: string, maxLength: 500 }
+            example: { decision: approve, note: Ospiti in uscita, va bene }
+      responses:
+        '200':
+          description: Decisione registrata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Approval' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ---------------------------------------------------------------------------
+  # DECISIONI
+  # ---------------------------------------------------------------------------
+
+  /decisions:
+    get:
+      tags: [Decisioni]
+      operationId: listDecisions
+      summary: Log delle decisioni
+      description: Chi ha deciso cosa, perché e con quale esito; ordinato dal più recente.
+      x-youssouf: |
+        Sorgente: il sistema nervoso di LangBrain. `actor` con prefisso:
+        `rule:<rule_id>`, `organ:<nome>`, `brain`, `user:<email>`, `assistant`,
+        `system`.
+        `reasoning` in italiano. Conserva almeno 90 giorni.
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          schema: { type: string, format: date-time }
+        - name: device_id
+          in: query
+          schema: { type: string }
+        - name: actor
+          in: query
+          schema: { type: string }
+        - name: correlation_id
+          in: query
+          schema: { type: string }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: cursor
+          in: query
+          schema: { type: string }
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '200':
+          description: Pagina di decisioni
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, next_cursor]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Decision' }
+                  next_cursor:
+                    type: string
+                    nullable: true
+              example:
+                items:
+                  - decision_id: dec-88120
+                    ts: '2026-10-14T13:05:00.120Z'
+                    actor: rule:window_open_off
+                    target: { type: device, device_id: dev-clima-soggiorno }
+                    action: turn_off
+                    old_value: 'on'
+                    new_value: 'off'
+                    reasoning: Finestra della camera aperta da 5 minuti con il clima acceso
+                    outcome: applied
+                    command_id: cmd-9f2a
+                    correlation_id: 6b7d0c1e-1f3a-4a1e-8e3f-0c2d9a7b5e44
+                  - decision_id: dec-88119
+                    ts: '2026-10-14T13:02:11.500Z'
+                    actor: user:gestore@flatsharing.it
+                    target: { type: device, device_id: dev-clima-soggiorno }
+                    action: set_climate
+                    old_value: 'off'
+                    new_value: 'heat 21'
+                    reasoning: Comando manuale dall'app
+                    outcome: applied
+                    command_id: cmd-9f1c
+                    correlation_id: 2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10
+                next_cursor: null
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ---------------------------------------------------------------------------
+  # ASSISTENTE
+  # ---------------------------------------------------------------------------
+
+  /ask:
+    post:
+      tags: [Assistente]
+      operationId: ask
+      summary: Richiesta in linguaggio naturale
+      description: |
+        Il gestore scrive in italiano ("porta a 22 gradi il soggiorno dalle
+        18"). Asincrona: la risposta e le eventuali azioni proposte arrivano
+        con `GET /ask/{ask_id}`. Se l'azione richiede approvazione, nasce un
+        Approval e `needs_approval` ne porta l'identificatore.
+      x-youssouf: |
+        Passa dal Brain. Il modello propone, i Tool validano contro limiti e
+        regole, nessuna esecuzione diretta: ogni azione eseguita è un comando
+        normale (ciclo pending → acked) o un Approval. Rispondi entro 30 s;
+        oltre, `status: failed` con `reason: timeout`.
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, maxLength: 500 }
+            example: { text: Porta il soggiorno a 22 gradi dalle 18 e spegni tutto a mezzanotte }
+      responses:
+        '202':
+          description: Richiesta presa in carico
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AskStatus' }
+              example:
+                ask_id: ask-5102
+                status: pending
+                text: Porta il soggiorno a 22 gradi dalle 18 e spegni tutto a mezzanotte
+                answer: null
+                actions: []
+                approval_id: null
+                correlation_id: 9c1f0e4a-2b6d-4c7e-9a1b-7d3e5f6a8b90
+                created_at: '2026-10-14T13:10:00.000Z'
+                updated_at: '2026-10-14T13:10:00.000Z'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  /ask/{ask_id}:
+    get:
+      tags: [Assistente]
+      operationId: getAsk
+      summary: Esito di una richiesta in linguaggio naturale
+      parameters:
+        - name: ask_id
+          in: path
+          required: true
+          schema: { type: string }
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '200':
+          description: Stato della richiesta
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AskStatus' }
+              example:
+                ask_id: ask-5102
+                status: answered
+                text: Porta il soggiorno a 22 gradi dalle 18 e spegni tutto a mezzanotte
+                answer: Ho programmato il soggiorno a 22 °C alle 18:00 e la modalità risparmio alle 00:00.
+                actions:
+                  - { type: schedule, schedule_id: sch-1010 }
+                  - { type: schedule, schedule_id: sch-1011 }
+                approval_id: null
+                correlation_id: 9c1f0e4a-2b6d-4c7e-9a1b-7d3e5f6a8b90
+                created_at: '2026-10-14T13:10:00.000Z'
+                updated_at: '2026-10-14T13:10:06.300Z'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ---------------------------------------------------------------------------
+  # PRENOTAZIONI (dal BFF)
+  # ---------------------------------------------------------------------------
+
+  /bookings:
+    post:
+      tags: [Prenotazioni]
+      operationId: ingestBookingEvent
+      summary: Riceve un evento di prenotazione (inoltrato dal BFF)
+      description: |
+        Formato interno, scelto dall'app. Il BFF traduce il webhook di
+        Italianway (o un iCal, o il simulatore di staging) in questo evento.
+        Idempotente su `event_id`: un evento già elaborato risponde `200` con
+        lo stesso esito, senza ricalcolare.
+      x-youssouf: |
+        Da ogni evento genera o ricalcola le voci di schedule (pre-arrivo,
+        check-out, vuoto) secondo le regole `prearrival` e `checkout_eco`.
+        Evento in ritardo (check-in già passato): applica subito. Emetti
+        `apartment.changed`. Conserva gli event_id elaborati senza limite.
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BookingEvent' }
+            example:
+              event_id: evt-italianway-000123
+              type: booking_created
+              booking_id: bk-77813
+              checkin_at: '2026-10-16T15:00:00.000Z'
+              checkout_at: '2026-10-19T08:00:00.000Z'
+              guests: 2
+              source: italianway
+              ts: '2026-10-14T13:00:00.000Z'
+      responses:
+        '202':
+          description: Evento accettato e azioni programmate
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingIngestResult' }
+              example:
+                event_id: evt-italianway-000123
+                accepted: true
+                duplicate: false
+                schedule_ids: [sch-1001, sch-1003]
+        '200':
+          description: Evento già elaborato in precedenza
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookingIngestResult' }
+              example:
+                event_id: evt-italianway-000123
+                accepted: true
+                duplicate: true
+                schedule_ids: [sch-1001, sch-1003]
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ---------------------------------------------------------------------------
+  # TEMPO REALE
+  # ---------------------------------------------------------------------------
+
+  /stream:
+    get:
+      tags: [Tempo reale]
+      operationId: stream
+      summary: Flusso degli eventi dell'appartamento (Server-Sent Events)
+      description: |
+        Connessione persistente `text/event-stream`. Ogni evento ha
+        `id` (progressivo per istanza), `event` (uno dei sette tipi in
+        `x-stream-events`) e `data` JSON con l'involucro `StreamEnvelope`.
+        Con l'header `Last-Event-ID` l'istanza reinvia ciò che il client ha
+        perso (finestra di almeno 1 ora). Un commento `: ping` ogni 25 s tiene
+        viva la connessione.
+
+        Il BFF apre una connessione per istanza e la rilancia alla PWA. Dopo
+        una riconnessione l'app rilegge `GET /devices` e `GET /apartment`
+        prima di applicare i nuovi eventi.
+      x-youssouf: |
+        Buffer circolare degli ultimi eventi (≥ 1 ora) per servire
+        Last-Event-ID. `id` monotono per istanza, mai riusato dopo un riavvio
+        (salvalo). Un evento entro 1 s dal fatto. Nessun evento di LangBrain
+        "interno" (node_runs, ecc.): solo i sette tipi del contratto.
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema: { type: string }
+          description: Ultimo `id` ricevuto; l'istanza riparte dal successivo
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      responses:
+        '200':
+          description: Flusso SSE
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: Vedi x-stream-events per gli schemi di `data`
+              example: |
+                id: 4182
+                event: device.state
+                data: {"id":"4182","event":"device.state","ts":"2026-10-14T13:02:14.980Z","apartment_id":"apt-rimini-01","correlation_id":"2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10","data":{"device_id":"dev-clima-soggiorno","capability":"climate","state":{"on":true,"mode":"heat","setpoint":21,"fan":"auto","setpoint_min":16,"setpoint_max":24,"confirmation":"power"}}}
+
+                id: 4183
+                event: command.updated
+                data: {"id":"4183","event":"command.updated","ts":"2026-10-14T13:02:14.990Z","apartment_id":"apt-rimini-01","correlation_id":"2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10","data":{"command_id":"cmd-9f1c","device_id":"dev-clima-soggiorno","status":"acked","reason":null}}
+
+                : ping
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '501': { $ref: '#/components/responses/NotImplemented' }
+
+  # ---------------------------------------------------------------------------
+  # SISTEMA
+  # ---------------------------------------------------------------------------
+
+  /health:
+    get:
+      tags: [Sistema]
+      operationId: health
+      summary: Salute dell'istanza
+      description: Senza chiave API. `503` se il connector Shelly è fermo o il database non risponde.
+      security: []
+      x-youssouf: |
+        `connector.status` = `up` se il servizio che riceve le connessioni
+        WebSocket degli Shelly è attivo; `connected_devices` quanti dispositivi
+        hanno una connessione aperta; `model_provider.status` dall'ultima
+        chiamata al modello (ok/degraded/unknown).
+        In modalità simulata (istanza di sviluppo, tappe 1–2) il connector è
+        l'insieme degli effettori simulati: `status: up` e
+        `connected_devices` = numero di dispositivi simulati.
+        Gancio di test: con la variabile d'ambiente
+        `DOMOTICA_TEST_CONNECTOR_DOWN=1` l'istanza considera il connector
+        fermo e risponde 503; serve alla suite per lo scenario C14 senza
+        toccare hardware.
+      responses:
+        '200':
+          description: Istanza in salute o degradata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+              example:
+                status: ok
+                apartment_id: apt-rimini-01
+                implementation: { name: langbrain-domotica, version: 0.3.0 }
+                uptime_s: 86112
+                database: { status: ok }
+                connector: { status: up, connected_devices: 5, last_event_at: '2026-10-14T13:02:14.980Z' }
+                model_provider: { status: ok, provider: agent_platform }
+                devices:
+                  - { device_id: dev-clima-soggiorno, online: true, last_seen: '2026-10-14T13:02:11.420Z' }
+                  - { device_id: dev-presa-camera, online: false, last_seen: '2026-10-14T08:40:00.000Z' }
+                checked_at: '2026-10-14T13:02:20.000Z'
+        '503':
+          description: Istanza non operativa
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Health' }
+              example:
+                status: down
+                apartment_id: apt-rimini-01
+                implementation: { name: langbrain-domotica, version: 0.3.0 }
+                uptime_s: 12
+                database: { status: ok }
+                connector: { status: down, connected_devices: 0, last_event_at: null }
+                model_provider: { status: unknown, provider: agent_platform }
+                devices: []
+                checked_at: '2026-10-14T13:02:20.000Z'
+
+  /_test/state:
+    post:
+      tags: [Sistema]
+      operationId: testSetState
+      summary: Imposta lo stato simulato (solo istanza di sviluppo)
+      description: |
+        Disponibile solo quando l'istanza gira con `DOMOTICA_SIMULATED=1`
+        (effettori simulati): in produzione risponde `404`. Serve alla suite di
+        conformità per creare le condizioni degli scenari C04 (dispositivo
+        offline), C05 e C11 (finestra aperta), C12 (azione che richiede
+        approvazione) senza hardware. Non appartiene a nessuna feature e non è
+        usato dall'app.
+      x-youssouf: |
+        Agisce direttamente sugli effettori simulati e sul loro stato
+        `online`; `trigger: approval` deve far nascere un Approval reale
+        (es. simulando la condizione che il Brain valuta con HITL), non un
+        Approval finto. Ogni cambio di stato emette gli eventi SSE normali
+        (`device.state`, `device.online`), così i test vedono ciò che vedrebbe
+        l'app.
+      parameters:
+        - $ref: '#/components/parameters/XActor'
+        - $ref: '#/components/parameters/XCorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                device_id: { type: string }
+                online: { type: boolean, description: Porta il dispositivo online o offline }
+                capability: { type: string }
+                state: { type: object, additionalProperties: true, description: "Stato della capacità da impostare (es. contact.open = true)" }
+                trigger:
+                  type: string
+                  enum: [approval]
+                  description: Provoca una condizione che richiede approvazione del gestore
+            examples:
+              offline:
+                value: { device_id: dev-presa-camera, online: false }
+              finestra:
+                value: { device_id: dev-finestra-camera, capability: contact, state: { open: true } }
+              approvazione:
+                value: { trigger: approval }
+      responses:
+        '204':
+          description: Stato applicato
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: Istanza non in modalità simulata
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: not_found, message: Endpoint disponibile solo in modalità simulata }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+
+  /version:
+    get:
+      tags: [Sistema]
+      operationId: version
+      summary: Versione del contratto e funzioni implementate
+      description: |
+        L'app lo legge all'avvio: rifiuta una `contract_version` con numero
+        maggiore diverso dal proprio e nasconde le sezioni assenti da
+        `features`. Un endpoint non in `features` risponde `501`.
+      security: []
+      x-youssouf: |
+        `features` elenca solo ciò che passa i test di conformità. Valori
+        ammessi: apartment, devices, commands, energy, schedule, rules,
+        approvals, decisions, ask, bookings, stream.
+      responses:
+        '200':
+          description: Versione
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Version' }
+              example:
+                contract_version: 1.0.4
+                implementation: { name: langbrain-domotica, version: 0.3.0 }
+                features: [apartment, devices, commands, decisions, energy, rules, stream]
+
+# =============================================================================
+# COMPONENTI
+# =============================================================================
+
+components:
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Chiave dell'istanza, letta dal BFF da Secret Manager (`langbrain-api-key-<apartment_id>`). Mai nella PWA.
+
+  parameters:
+    XActor:
+      name: X-Actor
+      in: header
+      required: true
+      schema: { type: string }
+      description: "Chi compie l'azione: l'email del gestore (dal token Firebase, via BFF) oppure `system:<nome>` per le chiamate di sistema (es. `system:bff`). Qualsiasi altro valore, o vuoto, → 400. Nelle decisioni diventa `user:<email>` oppure `system`."
+    XCorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+      description: UUID generato dall'app per ogni azione; lega comando, decisione ed eventi. Obbligatorio (manca o non è un UUID → 400). Idempotenza su 60 s per le POST. Le risposte lo riportano nel corpo dove previsto (comandi, decisioni, approvazioni, eventi), non in un header.
+    DeviceId:
+      name: device_id
+      in: path
+      required: true
+      schema: { type: string }
+    ScheduleId:
+      name: schedule_id
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: Parametri o header obbligatori mancanti o non validi (X-Actor, X-Correlation-Id, query)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: bad_request, message: Header X-Actor o X-Correlation-Id mancante o non valido }
+    Unauthorized:
+      description: Chiave API mancante o non valida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: unauthorized, message: Chiave API mancante o non valida }
+    NotFound:
+      description: Risorsa inesistente
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: not_found, message: Dispositivo inesistente }
+    Conflict:
+      description: Stato incompatibile con l'operazione
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: already_closed, message: L'approvazione è già stata decisa }
+    Unprocessable:
+      description: Valori non ammessi
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error: setpoint_out_of_range
+            message: Il setpoint deve essere tra 16 e 24
+            details: { min: 16, max: 24 }
+    NotImplemented:
+      description: Funzione non ancora implementata da questa istanza (assente da `features`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: not_implemented, message: Funzione non disponibile su questa istanza }
+
+  schemas:
+
+    # ---- errori --------------------------------------------------------------
+
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: Codice leggibile, stabile, in snake_case
+        message:
+          type: string
+          description: Testo in italiano mostrabile al gestore
+        details:
+          type: object
+          additionalProperties: true
+
+    # ---- appartamento --------------------------------------------------------
+
+    ApartmentMode:
+      type: string
+      enum: [comfort, eco, empty]
+      description: comfort = ospiti presenti · eco = risparmio con ospiti fuori o in arrivo · empty = casa vuota (antigelo, antimuffa)
+
+    Occupancy:
+      type: string
+      enum: [vacant, occupied, reserved]
+      description: vacant = nessuna prenotazione in corso · occupied = ospiti presenti · reserved = prenotazione in corso ma ospiti assenti
+
+    Hold:
+      type: object
+      nullable: true
+      required: [mode, until, set_by]
+      properties:
+        mode: { $ref: '#/components/schemas/ApartmentMode' }
+        until: { type: string, format: date-time }
+        set_by: { type: string, description: Actor che ha impostato la forzatura }
+
+    Apartment:
+      type: object
+      required: [apartment_id, name, timezone, occupancy, mode, hold, next_checkin, next_checkout, online, devices_online, devices_total, updated_at]
+      properties:
+        apartment_id: { type: string }
+        name: { type: string }
+        timezone: { type: string, example: Europe/Rome }
+        occupancy: { $ref: '#/components/schemas/Occupancy' }
+        mode: { $ref: '#/components/schemas/ApartmentMode' }
+        hold: { $ref: '#/components/schemas/Hold' }
+        next_checkin: { type: string, format: date-time, nullable: true }
+        next_checkout: { type: string, format: date-time, nullable: true }
+        current_booking_id: { type: string, nullable: true }
+        online: { type: boolean, description: Almeno un dispositivo raggiungibile e connector attivo }
+        devices_online: { type: integer }
+        devices_total: { type: integer }
+        updated_at: { type: string, format: date-time }
+
+    # ---- dispositivi e capacità ---------------------------------------------
+
+    Room:
+      type: object
+      required: [room_id, name]
+      properties:
+        room_id: { type: string }
+        name: { type: string }
+
+    Device:
+      type: object
+      required: [device_id, label, room_id, online, last_seen, capabilities]
+      properties:
+        device_id: { type: string }
+        label: { type: string, description: "In italiano, modificabile dal gestore" }
+        room_id: { type: string }
+        online: { type: boolean }
+        last_seen: { type: string, format: date-time, nullable: true }
+        capabilities: { $ref: '#/components/schemas/Capabilities' }
+
+    Capabilities:
+      type: object
+      description: Una chiave per capacità presente. L'app ignora chiavi che non conosce.
+      properties:
+        switch: { $ref: '#/components/schemas/CapSwitch' }
+        power_meter: { $ref: '#/components/schemas/CapPowerMeter' }
+        climate: { $ref: '#/components/schemas/CapClimate' }
+        heating: { $ref: '#/components/schemas/CapHeating' }
+        temperature: { $ref: '#/components/schemas/CapTemperature' }
+        humidity: { $ref: '#/components/schemas/CapHumidity' }
+        contact: { $ref: '#/components/schemas/CapContact' }
+        motion: { $ref: '#/components/schemas/CapMotion' }
+      additionalProperties: true
+
+    CapSwitch:
+      type: object
+      required: ['on']
+      properties:
+        'on': { type: boolean }
+
+    CapPowerMeter:
+      type: object
+      required: [watts, kwh_today]
+      properties:
+        watts: { type: number }
+        kwh_today: { type: number, description: Dalla mezzanotte locale dell'appartamento }
+
+    CapClimate:
+      type: object
+      description: Split via infrarossi. Senza conferma diretta; `confirmation` dice come il motore verifica l'esito.
+      required: ['on', mode, setpoint, fan, setpoint_min, setpoint_max, confirmation]
+      properties:
+        'on': { type: boolean }
+        mode: { type: string, enum: [cool, heat, dry, fan] }
+        setpoint: { type: number }
+        fan: { type: string, enum: [auto, low, mid, high] }
+        setpoint_min: { type: number }
+        setpoint_max: { type: number }
+        confirmation:
+          type: string
+          enum: [power, device, none]
+          description: power = verificato dalla variazione di potenza · device = conferma del dispositivo · none = nessuna verifica (lo stato mostrato è quello richiesto)
+
+    CapHeating:
+      type: object
+      description: Caldaia via contatto termostato oggi; pompa di calore via Modbus domani.
+      required: ['on', setpoint, setpoint_min, setpoint_max]
+      properties:
+        'on': { type: boolean }
+        setpoint: { type: number }
+        setpoint_min: { type: number }
+        setpoint_max: { type: number }
+
+    CapTemperature:
+      type: object
+      required: [celsius]
+      properties:
+        celsius: { type: number }
+
+    CapHumidity:
+      type: object
+      required: [percent]
+      properties:
+        percent: { type: number }
+
+    CapContact:
+      type: object
+      required: [open, since]
+      properties:
+        open: { type: boolean }
+        since: { type: string, format: date-time, nullable: true, description: Da quando è nello stato attuale }
+
+    CapMotion:
+      type: object
+      required: [detected, last_seen]
+      properties:
+        detected: { type: boolean }
+        last_seen: { type: string, format: date-time, nullable: true }
+
+    # ---- comandi -------------------------------------------------------------
+
+    Command:
+      type: object
+      required: [capability, action]
+      properties:
+        capability:
+          type: string
+          enum: [switch, climate, heating]
+          description: Solo le capacità comandabili
+        action:
+          type: string
+          enum: [turn_on, turn_off, set_climate, set_heating]
+        params:
+          type: object
+          description: Dipende dall'azione; vedi la descrizione di POST /devices/{id}/commands
+          properties:
+            'on': { type: boolean }
+            mode: { type: string, enum: [cool, heat, dry, fan] }
+            setpoint: { type: number }
+            fan: { type: string, enum: [auto, low, mid, high] }
+          additionalProperties: false
+
+    CommandState:
+      type: string
+      enum: [pending, sent, verifying, acked, failed, timeout]
+      description: pending e sent = in corso · verifying = inviato, in attesa di conferma · acked = eseguito · failed/timeout = errore con `reason`
+
+    CommandReason:
+      type: string
+      enum: [device_offline, device_rejected, blocked_by_rule, blocked_by_priority, out_of_limits, no_confirmation, internal_error]
+      nullable: true
+
+    CommandStatus:
+      type: object
+      required: [command_id, device_id, status, capability, action, correlation_id, created_at, updated_at, reason]
+      properties:
+        command_id: { type: string }
+        device_id: { type: string }
+        status: { $ref: '#/components/schemas/CommandState' }
+        capability: { type: string }
+        action: { type: string }
+        params: { type: object, additionalProperties: true }
+        correlation_id: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        reason: { $ref: '#/components/schemas/CommandReason' }
+
+    # ---- energia -------------------------------------------------------------
+
+    EnergyReport:
+      type: object
+      required: [from, to, bucket, total_kwh, avoided_hvac_hours, series, by_device]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        bucket: { type: string, enum: [hour, day] }
+        total_kwh: { type: number }
+        avoided_hvac_hours:
+          type: number
+          nullable: true
+          description: Ore di clima o caldaia spente dalle regole a casa vuota; null se il motore non le calcola
+        series:
+          type: array
+          items:
+            type: object
+            required: [ts, kwh]
+            properties:
+              ts: { type: string, format: date-time }
+              kwh: { type: number }
+        by_device:
+          type: array
+          items:
+            type: object
+            required: [device_id, label, kwh]
+            properties:
+              device_id: { type: string }
+              label: { type: string }
+              kwh: { type: number }
+
+    # ---- programmazione ------------------------------------------------------
+
+    ScheduledAction:
+      type: object
+      description: O una modalità di appartamento, o un comando a un dispositivo
+      required: [type]
+      properties:
+        type: { type: string, enum: [apartment_mode, device_command] }
+        mode: { $ref: '#/components/schemas/ApartmentMode' }
+        device_id: { type: string }
+        capability: { type: string }
+        action: { type: string }
+        params: { type: object, additionalProperties: true }
+
+    ScheduleItem:
+      type: object
+      required: [schedule_id, kind, source, run_at, action, status]
+      properties:
+        schedule_id: { type: string }
+        kind:
+          type: string
+          enum: [prearrival, checkout, empty, manual]
+        source:
+          type: string
+          enum: [booking, manual, assistant]
+        booking_id: { type: string, nullable: true }
+        run_at: { type: string, format: date-time }
+        action: { $ref: '#/components/schemas/ScheduledAction' }
+        status:
+          type: string
+          enum: [planned, done, cancelled, failed]
+        executed_at: { type: string, format: date-time, nullable: true }
+        command_ids:
+          type: array
+          items: { type: string }
+
+    # ---- regole --------------------------------------------------------------
+
+    Range:
+      type: object
+      required: [min, max]
+      properties:
+        min: { type: number }
+        max: { type: number }
+
+    Rule:
+      type: object
+      required: [rule_id, label, enabled, editable, params, limits]
+      properties:
+        rule_id:
+          type: string
+          enum: [window_open_off, setpoint_limits, frost_protection, mold_protection, prearrival, checkout_eco, compressor_min_off, offline_alert]
+        label: { type: string }
+        enabled: { type: boolean }
+        editable: { type: boolean, description: false = il gestore può solo vedere }
+        params:
+          type: object
+          additionalProperties: { type: number }
+        limits:
+          type: object
+          additionalProperties: { $ref: '#/components/schemas/Range' }
+
+    RuleSet:
+      type: object
+      required: [updated_at, rules]
+      properties:
+        updated_at: { type: string, format: date-time }
+        rules:
+          type: array
+          items: { $ref: '#/components/schemas/Rule' }
+
+    RulePatch:
+      type: object
+      required: [rule_id]
+      minProperties: 2
+      properties:
+        rule_id: { type: string }
+        enabled: { type: boolean }
+        params:
+          type: object
+          additionalProperties: { type: number }
+
+    # ---- approvazioni --------------------------------------------------------
+
+    Approval:
+      type: object
+      required: [approval_id, status, created_at, expires_at, expires_action, source, description, reason, proposed_action, correlation_id]
+      properties:
+        approval_id: { type: string }
+        status: { type: string, enum: [pending, approved, rejected, expired] }
+        created_at: { type: string, format: date-time }
+        expires_at: { type: string, format: date-time, nullable: true }
+        expires_action:
+          type: string
+          enum: [reject, approve, wait]
+          description: Cosa fa il motore alla scadenza senza risposta
+        source: { type: string, enum: [brain, organ, rule, assistant] }
+        description: { type: string, description: "In italiano, una frase" }
+        reason: { type: string, description: "In italiano, il perché" }
+        proposed_action: { $ref: '#/components/schemas/ScheduledAction' }
+        decided_by: { type: string, nullable: true }
+        decided_at: { type: string, format: date-time, nullable: true }
+        note: { type: string, nullable: true }
+        correlation_id: { type: string, format: uuid }
+
+    # ---- decisioni -----------------------------------------------------------
+
+    Decision:
+      type: object
+      required: [decision_id, ts, actor, target, action, old_value, new_value, reasoning, outcome, correlation_id]
+      properties:
+        decision_id: { type: string }
+        ts: { type: string, format: date-time }
+        actor:
+          type: string
+          description: "`rule:<rule_id>` · `organ:<nome>` · `brain` · `user:<email>` (da X-Actor email) · `assistant` · `system` (da X-Actor `system:<nome>` o fatti interni)"
+        target:
+          type: object
+          required: [type]
+          properties:
+            type: { type: string, enum: [device, apartment, rules, schedule] }
+            device_id: { type: string }
+        action: { type: string }
+        old_value: { type: string, nullable: true }
+        new_value: { type: string, nullable: true }
+        reasoning: { type: string, description: In italiano }
+        outcome:
+          type: string
+          enum: [applied, rejected, pending_approval, failed, informational]
+        command_id: { type: string, nullable: true }
+        approval_id: { type: string, nullable: true }
+        correlation_id: { type: string, format: uuid }
+
+    # ---- assistente ----------------------------------------------------------
+
+    AskStatus:
+      type: object
+      required: [ask_id, status, text, answer, actions, approval_id, correlation_id, created_at, updated_at]
+      properties:
+        ask_id: { type: string }
+        status: { type: string, enum: [pending, answered, needs_approval, failed] }
+        text: { type: string }
+        answer: { type: string, nullable: true, description: Risposta in italiano per il gestore }
+        actions:
+          type: array
+          description: Cosa il motore ha fatto o programmato
+          items:
+            type: object
+            required: [type]
+            properties:
+              type: { type: string, enum: [command, schedule, rules] }
+              command_id: { type: string }
+              schedule_id: { type: string }
+        approval_id: { type: string, nullable: true }
+        reason: { type: string, nullable: true }
+        correlation_id: { type: string, format: uuid }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    # ---- prenotazioni --------------------------------------------------------
+
+    BookingEvent:
+      type: object
+      description: Formato interno dell'app; il BFF traduce Italianway (o altro) in questo.
+      required: [event_id, type, booking_id, checkin_at, checkout_at, source, ts]
+      properties:
+        event_id: { type: string, description: Univoco per evento; chiave di idempotenza }
+        type:
+          type: string
+          enum: [booking_created, booking_changed, booking_cancelled, checkin, checkout]
+          description: checkin/checkout = effettivi, se la piattaforma li comunica
+        booking_id: { type: string }
+        checkin_at: { type: string, format: date-time }
+        checkout_at: { type: string, format: date-time }
+        guests: { type: integer, nullable: true }
+        source: { type: string, enum: [italianway, ical, simulator, manual] }
+        ts: { type: string, format: date-time, description: Quando la piattaforma ha emesso l'evento }
+
+    BookingIngestResult:
+      type: object
+      required: [event_id, accepted, duplicate, schedule_ids]
+      properties:
+        event_id: { type: string }
+        accepted: { type: boolean }
+        duplicate: { type: boolean }
+        schedule_ids:
+          type: array
+          items: { type: string }
+
+    # ---- tempo reale ---------------------------------------------------------
+
+    StreamEnvelope:
+      type: object
+      description: Involucro di ogni evento SSE (campo `data` della riga SSE)
+      required: [id, event, ts, apartment_id, correlation_id, data]
+      properties:
+        id: { type: string, description: "Uguale all'`id` SSE, progressivo per istanza" }
+        event:
+          type: string
+          enum: [device.state, device.online, command.updated, decision.logged, approval.pending, apartment.changed, instance.health]
+        ts: { type: string, format: date-time }
+        apartment_id: { type: string }
+        correlation_id: { type: string, nullable: true }
+        data:
+          type: object
+          additionalProperties: true
+
+    EventDeviceState:
+      type: object
+      required: [device_id, capability, state]
+      properties:
+        device_id: { type: string }
+        capability: { type: string }
+        state: { type: object, additionalProperties: true, description: "Lo stato completo della capacità, come in GET /devices" }
+
+    EventDeviceOnline:
+      type: object
+      required: [device_id, online, last_seen]
+      properties:
+        device_id: { type: string }
+        online: { type: boolean }
+        last_seen: { type: string, format: date-time, nullable: true }
+
+    EventCommandUpdated:
+      type: object
+      required: [command_id, device_id, status, reason]
+      properties:
+        command_id: { type: string }
+        device_id: { type: string }
+        status: { $ref: '#/components/schemas/CommandState' }
+        reason: { $ref: '#/components/schemas/CommandReason' }
+
+    EventApprovalPending:
+      allOf:
+        - $ref: '#/components/schemas/Approval'
+
+    # ---- sistema -------------------------------------------------------------
+
+    Implementation:
+      type: object
+      required: [name, version]
+      properties:
+        name: { type: string }
+        version: { type: string }
+
+    Health:
+      type: object
+      required: [status, apartment_id, implementation, uptime_s, database, connector, model_provider, devices, checked_at]
+      properties:
+        status: { type: string, enum: [ok, degraded, down] }
+        apartment_id: { type: string }
+        implementation: { $ref: '#/components/schemas/Implementation' }
+        uptime_s: { type: integer }
+        database:
+          type: object
+          required: [status]
+          properties:
+            status: { type: string, enum: [ok, error] }
+        connector:
+          type: object
+          required: [status, connected_devices, last_event_at]
+          properties:
+            status: { type: string, enum: [up, down] }
+            connected_devices: { type: integer }
+            last_event_at: { type: string, format: date-time, nullable: true }
+        model_provider:
+          type: object
+          required: [status, provider]
+          properties:
+            status: { type: string, enum: [ok, degraded, unknown] }
+            provider: { type: string }
+        devices:
+          type: array
+          items:
+            type: object
+            required: [device_id, online, last_seen]
+            properties:
+              device_id: { type: string }
+              online: { type: boolean }
+              last_seen: { type: string, format: date-time, nullable: true }
+        checked_at: { type: string, format: date-time }
+
+    Version:
+      type: object
+      required: [contract_version, implementation, features]
+      properties:
+        contract_version: { type: string, example: 1.0.4 }
+        implementation: { $ref: '#/components/schemas/Implementation' }
+        features:
+          type: array
+          items:
+            type: string
+            enum: [apartment, devices, commands, energy, schedule, rules, approvals, decisions, ask, bookings, stream]
+
+# =============================================================================
+# FEATURE → ENDPOINT (per GET /version e per il middleware del 501)
+# =============================================================================
+
+x-features:
+  description: |
+    Una feature entra in `features` di GET /version solo quando tutti i suoi
+    endpoint passano la suite di conformità. Un endpoint la cui feature non è
+    in `features` risponde 501 prima di qualsiasi validazione del body.
+    `/health`, `/version` e `/api/v1/openapi.json` non appartengono a nessuna
+    feature e rispondono sempre; `/_test/state` nemmeno, e risponde solo in
+    modalità simulata (`DOMOTICA_SIMULATED=1`).
+  map:
+    apartment: ["GET /apartment", "POST /apartment/mode", "POST /apartment/hold"]
+    devices: ["GET /devices", "PATCH /devices/{device_id}"]
+    commands: ["POST /devices/{device_id}/commands", "GET /commands/{command_id}"]
+    energy: ["GET /energy"]
+    schedule: ["GET /schedule", "POST /schedule", "PATCH /schedule/{schedule_id}", "DELETE /schedule/{schedule_id}"]
+    rules: ["GET /rules", "PUT /rules"]
+    approvals: ["GET /approvals", "POST /approvals/{approval_id}/decision"]
+    decisions: ["GET /decisions"]
+    ask: ["POST /ask", "GET /ask/{ask_id}"]
+    bookings: ["POST /bookings"]
+    stream: ["GET /stream"]
+
+# =============================================================================
+# EVENTI SSE (GET /stream)
+# =============================================================================
+
+x-stream-events:
+  description: |
+    Sette tipi di evento. Ogni riga SSE ha `id`, `event` e `data`; `data` è
+    uno `StreamEnvelope` il cui campo `data` segue lo schema indicato.
+    L'app non deduce mai lo stato dai soli eventi: alla riconnessione rilegge
+    GET /devices e GET /apartment e poi applica gli eventi successivi.
+  events:
+    device.state:
+      when: Cambia lo stato di una capacità di un dispositivo
+      data: '#/components/schemas/EventDeviceState'
+    device.online:
+      when: Un dispositivo va online o offline (offline dopo `offline_alert.minutes` senza messaggi)
+      data: '#/components/schemas/EventDeviceOnline'
+    command.updated:
+      when: Un comando cambia stato (ogni transizione, inclusa la finale)
+      data: '#/components/schemas/EventCommandUpdated'
+    decision.logged:
+      when: Il motore registra una decisione (regola, organo, Brain, gestore)
+      data: '#/components/schemas/Decision'
+    approval.pending:
+      when: Nasce una richiesta di approvazione; il BFF invia una notifica push
+      data: '#/components/schemas/EventApprovalPending'
+    apartment.changed:
+      when: Cambiano occupazione, modalità, forzatura o programmazione
+      data: '#/components/schemas/Apartment'
+    instance.health:
+      when: Cambia lo stato di salute dell'istanza o del connector
+      data: '#/components/schemas/Health'
+
+# =============================================================================
+# SUITE DI CONFORMITÀ (cosa i test verificano contro un'istanza)
+# =============================================================================
+
+x-conformita:
+  description: |
+    I test generati da Schemathesis coprono forma e codici di risposta di ogni
+    endpoint. A questi si aggiungono gli scenari qui sotto, scritti a mano,
+    eseguiti contro l'istanza passata come parametro (`--base-url`). Youssouf
+    li esegue nel CI del nodo domotica a ogni push; una funzione entra in
+    `features` solo quando i suoi scenari passano.
+  scenari:
+    - id: C01
+      nome: Percorso completo di un comando
+      passi: "POST /devices/{id}/commands su una capacità switch → 202 pending → entro 10 s GET /commands/{id} è acked → su /stream sono arrivati command.updated per ogni transizione e device.state con il nuovo stato → GET /decisions contiene una Decision con lo stesso correlation_id e actor = \"user:\" + X-Actor."
+    - id: C02
+      nome: Idempotenza del comando
+      passi: Due POST identiche con lo stesso X-Correlation-Id entro 60 s → stesso command_id, una sola esecuzione, una sola Decision in GET /decisions.
+    - id: C03
+      nome: Comando fuori limite
+      passi: set_climate con setpoint > setpoint_max → 422 con error setpoint_out_of_range e details {min, max}; nessun comando creato.
+    - id: C04
+      nome: Dispositivo offline
+      passi: Dispositivo portato offline con POST /_test/state (o realmente offline) → comando → 409 device_offline; nessun comando creato.
+    - id: C05
+      nome: Comando bloccato da una regola
+      passi: Finestra aperta (contact.open = true, via POST /_test/state in simulato) e comando set_climate on → 202, poi status failed con reason blocked_by_rule, Decision con outcome rejected in GET /decisions.
+    - id: C06
+      nome: Regole dentro e fuori limite
+      passi: PUT /rules con params dentro limits → 200 e GET /rules riflette il valore; con params fuori limits → 422; con rule editable = false → 422 rule_not_editable.
+    - id: C07
+      nome: Riconnessione SSE
+      passi: Aprire /stream, ricevere N eventi, chiudere; generare 3 eventi; riaprire con Last-Event-ID = ultimo id → arrivano esattamente i 3 eventi persi, in ordine, con id crescenti.
+    - id: C08
+      nome: Prenotazione e azioni programmate
+      passi: POST /bookings booking_created → 202 con schedule_ids; GET /schedule mostra prearrival a checkin_at − prearrival.hours_before e checkout a checkout_at + checkout_eco.minutes_after; secondo POST con lo stesso event_id → 200 duplicate = true e nessuna voce doppia.
+    - id: C09
+      nome: Modifica di prenotazione
+      passi: POST /bookings booking_changed con nuovo checkin_at → le voci di schedule della prenotazione vengono ricalcolate, non duplicate; booking_cancelled → voci cancelled.
+    - id: C10
+      nome: Modalità dell'appartamento
+      passi: POST /apartment/mode empty → 202 con command_ids; ogni command_id raggiunge uno stato finale; GET /apartment mostra mode = empty; evento apartment.changed emesso.
+    - id: C11
+      nome: Forzatura
+      passi: POST /apartment/hold 5 minuti → GET /apartment.hold valorizzato; durante il hold una finestra aperta (via POST /_test/state) non spegne il clima; alla scadenza hold = null e la regola torna attiva.
+    - id: C12
+      nome: Approvazione
+      passi: Provocare un'azione che richiede HITL (POST /_test/state con trigger approval, in simulato) → approval.pending su /stream e voce in GET /approvals; POST decision approve → 200, Decision con actor = X-Actor, comandi generati arrivano a stato finale; seconda decisione → 409.
+    - id: C13
+      nome: Funzione non implementata
+      passi: "Per ogni feature della mappa x-features: se assente da GET /version.features, ogni suo endpoint → 501 not_implemented (anche con body non valido); se presente → mai 501."
+    - id: C14
+      nome: Salute
+      passi: Con il connector fermo (istanza avviata con DOMOTICA_TEST_CONNECTOR_DOWN=1) GET /health → 503 status down; con il connector attivo (anche simulato) → 200 e connected_devices > 0; /health risponde senza X-API-Key.
+    - id: C15
+      nome: Header obbligatori
+      passi: "Chiamata senza X-API-Key → 401; senza X-Correlation-Id o X-Actor, o con X-Correlation-Id non UUID → 400 bad_request (dichiarato su ogni operazione). Solo se commands e decisions sono in features: con header validi → Decision e eventi portano quel correlation_id."
+    - id: C16
+      nome: Assistente
+      passi: POST /ask con una richiesta semplice → 202; entro 30 s GET /ask/{id} è answered con actions non vuote, oppure needs_approval con approval_id; nessun comando eseguito fuori dal ciclo normale (ogni action ha un command_id o schedule_id rintracciabile).
+
+# =============================================================================
+# INFORMAZIONI MANCANTI (a chi chiedere, cosa cambia)
+# =============================================================================
+
+x-informazioni-mancanti:
+  - tema: Webhook di Italianway
+    a_chi: Italianway (tramite Youssouf e Leonardo)
+    serve_per: Il traduttore nel BFF che converte il loro formato in BookingEvent. Fino ad allora lo staging usa source = simulator.
+    domande:
+      - Quali eventi inviano? creazione, modifica, cancellazione; anche check-in e check-out effettivi?
+      - Un payload di esempio per ciascun evento, con i nomi dei campi delle date e dell'appartamento.
+      - Come autenticano la chiamata? firma HMAC con segreto condiviso, token nell'header, IP fissi. Determina la verifica nel BFF e il segreto `italianway-webhook-secret`.
+      - Ritentano in caso di errore? per quanto tempo e con quale intervallo. Determina quanto deve essere veloce e idempotente l'endpoint del BFF.
+      - In che fuso orario sono le date, e come identificano l'appartamento (loro id → nostro apartment_id).
+    piano_b: Se non arriva entro la settimana 3, il traduttore si scrive per l'iCal di Airbnb/Booking (pubblico) con un polling ogni 15 minuti.
+
+  - tema: Dispositivi reali degli appartamenti pilota
+    a_chi: Leonardo (Flatsharing) e Youssouf
+    serve_per: "Confermare che le otto capacità coprono il kit; sapere se lo split ha `confirmation: power` (serve un power_meter sulla sua linea) o `none`."
+    domande:
+      - Marca e modello dei climatizzatori e della caldaia nei 1–2 appartamenti pilota.
+      - Quali Shelly sono arrivati in ufficio (modelli esatti) e se il Wall Display fa parte del kit.
+      - Il relè dello split è sulla linea di alimentazione (misura della potenza possibile) o no?
+
+  - tema: Regione e modelli su Agent Platform
+    a_chi: Massimiliano (verifica), poi comunicati a Youssouf
+    serve_per: Il provider agent_platform nel MAO.
+    domande:
+      - In quale regione UE sono disponibili i modelli scelti (uno piccolo per gli Organi, uno grande per il Brain)?
+      - Quote per minuto e budget mensile da impostare.
+
+  - tema: Occupazione e presenza
+    a_chi: Youssouf
+    serve_per: Il valore di `occupancy` in GET /apartment.
+    domande:
+      - Con quali segnali il motore distingue occupied da reserved (consumi, movimento, orari)? Va scritto nel nodo e deve essere spiegabile nel log.
+
+  - tema: Testi per il gestore
+    a_chi: Massimiliano con Leonardo
+    serve_per: Le `label` delle regole e le `description` delle approvazioni.
+    domande:
+      - Vocabolario che i gestori usano (per esempio "modalità vuoto" o "casa libera"), da fissare prima che Youssouf scriva i testi nel nodo.
+
+  - tema: Perimetro collaudato nel PoC
+    a_chi: Leonardo (Flatsharing) e Italianway
+    serve_per: Evitare che una funzione presente nell'app ma non collaudata venga considerata consegnata.
+    domande:
+      - Quali funzioni entrano nel collaudo sul campo (per esempio solo il condizionatore) e quali restano visibili ma fuori perimetro.

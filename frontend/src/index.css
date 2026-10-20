@@ -1,0 +1,90 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 20% 97%;
+    --foreground: 215 28% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 28% 17%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 28% 17%;
+    --primary: 18 72% 44%;
+    --primary-foreground: 40 20% 98%;
+    --secondary: 35 30% 92%;
+    --secondary-foreground: 215 28% 17%;
+    --muted: 35 15% 91%;
+    --muted-foreground: 215 14% 46%;
+    --accent: 158 45% 38%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 35 18% 86%;
+    --input: 35 18% 86%;
+    --ring: 18 72% 44%;
+    --radius: 0.75rem;
+    --chart-1: 18 72% 44%;
+    --chart-2: 158 45% 38%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 215 28% 30%;
+    --chart-5: 340 65% 50%;
+  }
+  .dark {
+    --background: 215 28% 9%;
+    --foreground: 40 15% 94%;
+    --card: 215 24% 13%;
+    --card-foreground: 40 15% 94%;
+    --popover: 215 24% 13%;
+    --popover-foreground: 40 15% 94%;
+    --primary: 18 80% 56%;
+    --primary-foreground: 215 28% 9%;
+    --secondary: 215 20% 18%;
+    --secondary-foreground: 40 15% 94%;
+    --muted: 215 18% 20%;
+    --muted-foreground: 215 12% 65%;
+    --accent: 158 50% 46%;
+    --accent-foreground: 215 28% 9%;
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 215 18% 22%;
+    --input: 215 18% 22%;
+    --ring: 18 80% 56%;
+  }
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    background-image: radial-gradient(hsl(var(--foreground) / 0.035) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+  h1, h2, h3 {
+    @apply font-heading;
+  }
+  ::selection {
+    background: hsl(var(--primary) / 0.2);
+  }
+}
+
+@layer utilities {
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+  .pl-safe {
+    padding-left: env(safe-area-inset-left);
+  }
+  /* Bottom of the pages: the usual room plus the iPhone's home indicator (no bottom bar any more, D-103). */
+  .main-safe {
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom));
+  }
+}

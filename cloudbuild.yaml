@@ -1,0 +1,14 @@
+# Cloud Build config used by scripts/deploy.sh: the BFF Dockerfile lives in bff/ but its build context is the
+# repository root (COPY bff ./bff, COPY contract ./contract), so `gcloud builds submit --tag` (which expects a root
+# Dockerfile) cannot be used. The image name arrives as the _IMAGE substitution; no real project values here.
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args: ["build", "-f", "bff/Dockerfile", "-t", "${_IMAGE}", "."]
+images:
+  - "${_IMAGE}"
+substitutions:
+  _IMAGE: europe-west8-docker.pkg.dev/your-gcp-project-id/domotica/bff:latest
+options:
+  # Required with a user-chosen service account (deploy.sh passes --service-account, P-21): without a logs bucket,
+  # Cloud Build refuses the build unless logs go only to Cloud Logging.
+  logging: CLOUD_LOGGING_ONLY

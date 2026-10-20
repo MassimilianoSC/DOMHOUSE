@@ -1,0 +1,15 @@
+# The engine (P-60) in service: what engine/ needs, same versions as the BFF (bff/requirements.txt). A connector's own
+# libraries (e.g. the WebSocket one) are added here, approved in review (connector.md §4).
+# For the tests also: pip install pytest httpx
+annotated-types==0.8.0
+anyio==4.15.1
+click==8.5.0
+fastapi==0.110.1
+h11==0.16.0
+idna==3.20
+pydantic==2.13.5
+sniffio==1.3.1
+starlette==0.37.2
+typing_extensions==4.16.0
+tzdata==2026.5
+uvicorn==0.25.0
