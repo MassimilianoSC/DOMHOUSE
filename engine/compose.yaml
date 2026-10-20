@@ -6,6 +6,9 @@
 #   docker compose --env-file /opt/domhouse/<apartment_id>.settings -f /opt/domhouse/compose.yaml up -d
 # Porta 81xx sull'IP interno della VM (quella dell'indirizzo dell'istanza nell'app), dati in /data/<apartment_id>
 # (proprietario uid 10001, l'utente del container), restart: unless-stopped (D-104), log JSON di Docker ruotati.
+# L'istanza «dev» (porta 8100) resta PER SEMPRE con CONNECTOR=simulated: è l'ambiente di prova, anche dopo il
+# connector Shelly (D-118). Gli appartamenti veri sono istanze a parte, ciascuna con il suo apartment_id, la sua porta
+# e il suo segreto langbrain-api-key-<apartment_id>.
 name: domhouse-${APARTMENT_ID:?APARTMENT_ID}
 
 services:

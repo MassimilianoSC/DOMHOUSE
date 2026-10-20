@@ -7,11 +7,21 @@
 #   sudo bash /opt/domhouse/engine-vm.sh update <apartment_id> <image>          # new image, same data
 #   sudo bash /opt/domhouse/engine-vm.sh key <apartment_id>                     # rewrite the key file, restart
 #   sudo bash /opt/domhouse/engine-vm.sh status <apartment_id>
+#   sudo bash /opt/domhouse/engine-vm.sh backup <apartment_id>                  # a consistent copy of engine.db now
+#   sudo bash /opt/domhouse/engine-vm.sh backup-all                             # every apartment (the daily timer)
+#   sudo bash /opt/domhouse/engine-vm.sh restore <apartment_id> <file>          # put a copy back, restart
+#   sudo bash /opt/domhouse/engine-vm.sh api <apartment_id> <METHOD> <path> [json]  # call the local engine
 #
 # install copies this script and compose.yaml (found next to it) to /opt/domhouse, prepares /data/<apartment_id>
 # (owner uid 10001, the container's user), writes /etc/domhouse/<apartment_id>.env with API_KEY from the Secret
-# Manager secret langbrain-api-key-<apartment_id> and starts the container engine-<apartment_id>.
-# The secret's value is read only to write that file (mode 600, root): never printed, logged or counted.
+# Manager secret langbrain-api-key-<apartment_id>, installs the daily backup timer and starts engine-<apartment_id>.
+# The secret's value is read only to write that file (mode 600, root): never printed, logged or counted; "api" reads
+# it from that file to send it to the local engine, never shows it.
+#
+# Backups (D-118): SQLite's online backup API (python3's sqlite3 on the VM, on the file in /data/<apartment_id>: a
+# consistent copy also while the engine writes), checked with PRAGMA integrity_check, in
+# /data/<apartment_id>/backup/engine-<UTC date>.db, kept BACKUP_DAYS days; every day at 22:30 UTC, before the disk
+# snapshot of 23:00, by the systemd timer domhouse-engine-backup.timer.
 set -euo pipefail
 set +x                                   # never trace: a traced line could show the key
 
@@ -20,6 +30,8 @@ ETC=/etc/domhouse
 ENGINE_UID=10001
 METADATA=http://metadata.google.internal/computeMetadata/v1
 SECRET_PREFIX="${SECRET_PREFIX:-langbrain-api-key-}"
+BACKUP_DAYS=7
+BACKUP_AT="22:30:00 UTC"                 # before the daily snapshot of the disk (23:00 UTC)
 
 die() { echo "errore: $*" >&2; exit 1; }
 step() { printf '\n== %s\n' "$*"; }
@@ -89,6 +101,56 @@ wait_healthy() {
   exit 1
 }
 
+db_of() { echo "/data/$1/engine.db"; }
+
+backup() {
+  local apt="$1" dir="/data/$1/backup" day file
+  [ -f "$(db_of "${apt}")" ] || die "$(db_of "${apt}") non esiste (motore mai avviato?)"
+  install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${dir}"
+  day="$(date -u +%Y-%m-%d)"
+  file="${dir}/engine-${day}.db"
+  python3 - "$(db_of "${apt}")" "${file}.tmp" <<'PY'
+import sqlite3, sys
+src, dst = sqlite3.connect(sys.argv[1]), sqlite3.connect(sys.argv[2])
+with dst:
+    src.backup(dst)                      # SQLite's online backup: consistent even while the engine writes (WAL)
+ok = dst.execute("PRAGMA integrity_check").fetchone()[0]
+dst.close(); src.close()
+sys.exit(0 if ok == "ok" else f"integrity_check: {ok}")
+PY
+  mv -f "${file}.tmp" "${file}"
+  chown "${ENGINE_UID}:${ENGINE_UID}" "${file}"
+  chmod 640 "${file}"
+  find "${dir}" -maxdepth 1 -name 'engine-*.db' -mtime "+$((BACKUP_DAYS - 1))" -print -delete | sed 's/^/tolto (oltre 7 giorni): /'
+  echo "backup ${apt}: ${file} ($(stat -c %s "${file}") byte, integrity_check ok)"
+}
+
+install_timer() {
+  step "Backup quotidiano (${BACKUP_AT}): domhouse-engine-backup.timer"
+  cat > /etc/systemd/system/domhouse-engine-backup.service <<UNIT
+[Unit]
+Description=DOMHOUSE engine: daily SQLite backup of every apartment (scripts/engine-vm.sh backup-all)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash ${OPT}/engine-vm.sh backup-all
+UNIT
+  cat > /etc/systemd/system/domhouse-engine-backup.timer <<UNIT
+[Unit]
+Description=DOMHOUSE engine: daily SQLite backup, before the disk snapshot of 23:00 UTC
+
+[Timer]
+OnCalendar=*-*-* ${BACKUP_AT}
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+UNIT
+  systemctl daemon-reload
+  systemctl enable --now domhouse-engine-backup.timer > /dev/null
+  systemctl list-timers domhouse-engine-backup.timer --no-pager | sed -n 1,2p
+}
+
 start() {
   local apt="$1" image="$2"
   registry_login "${image}"
@@ -114,9 +176,10 @@ case "${cmd}" in
       > "$(settings_file "${apt}")"
     cat "$(settings_file "${apt}")"
     step "Dati in /data/${apt} (proprietario ${ENGINE_UID})"
-    install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "/data/${apt}"
+    install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "/data/${apt}" "/data/${apt}/backup"
     ls -ld "/data/${apt}"
     write_key "${apt}"
+    install_timer
     start "${apt}" "${image}"
     ;;
   update)
@@ -135,6 +198,49 @@ case "${cmd}" in
     compose "${apt}" up -d --force-recreate
     wait_healthy "${apt}"
     ;;
+  backup)
+    [ $# -eq 1 ] || die "uso: backup <apartment_id>"
+    apt="$1"; valid_id "${apt}"
+    backup "${apt}"
+    ;;
+  backup-all)
+    shopt -s nullglob
+    failed=0
+    for settings in "${OPT}"/*.settings; do
+      apt="$(basename "${settings}" .settings)"
+      ( backup "${apt}" ) || { echo "backup ${apt} non riuscito" >&2; failed=1; }
+    done
+    exit "${failed}"
+    ;;
+  restore)
+    [ $# -eq 2 ] || die "uso: restore <apartment_id> <file di backup>"
+    apt="$1"; src="$2"; valid_id "${apt}"
+    [ -f "$(settings_file "${apt}")" ] || die "${apt} non è installato"
+    [ -f "${src}" ] || src="/data/${apt}/backup/${src}"
+    [ -f "${src}" ] || die "file di backup non trovato: $2"
+    python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); r = c.execute("PRAGMA integrity_check").fetchone()[0]; sys.exit(0 if r == "ok" else r)' "${src}" ||
+      die "il file di backup non è integro"
+    step "Ripristino di ${apt} da ${src}"
+    compose "${apt}" stop
+    db="$(db_of "${apt}")"; keep="/data/${apt}/backup/before-restore-$(date -u +%Y%m%dT%H%M%SZ).db"
+    for ext in "" -wal -shm; do
+      [ -f "${db}${ext}" ] && mv -f "${db}${ext}" "${keep}${ext}"
+    done
+    echo "il database di prima resta in ${keep}"
+    install -m 640 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${src}" "${db}"
+    compose "${apt}" up -d
+    wait_healthy "${apt}"
+    ;;
+  api)
+    [ $# -ge 3 ] || die "uso: api <apartment_id> <METHOD> <path> [json]"
+    apt="$1"; method="$2"; path="$3"; body="${4:-}"; valid_id "${apt}"
+    port="$(sed -n 's/^PORT=//p' "$(settings_file "${apt}")")"
+    # the key goes from the root-only file to curl through a header file in memory: never on a command line or screen
+    corr="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+    curl -s -w '\nHTTP %{http_code}\n' -X "${method}" -H @<(sed -n 's/^API_KEY=/X-API-Key: /p' "${ETC}/${apt}.env") \
+      -H "X-Actor: system:vm-admin" -H "X-Correlation-Id: ${corr}" -H "Content-Type: application/json" \
+      ${body:+--data "${body}"} "http://127.0.0.1:${port}/api/v1${path}"
+    ;;
   status)
     [ $# -eq 1 ] || die "uso: status <apartment_id>"
     apt="$1"; valid_id "${apt}"
@@ -143,6 +249,6 @@ case "${cmd}" in
     wait_healthy "${apt}"
     ;;
   *)
-    die "uso: install | update | key | status (vedi l'intestazione dello script)"
+    die "uso: install | update | key | status | backup | backup-all | restore | api (vedi l'intestazione)"
     ;;
 esac
