@@ -14,7 +14,7 @@ Shelly. Gli appartamenti veri sono istanze a parte, ciascuna con il suo `apartme
 Valori fissi usati sotto: progetto `domotica-poc-511707`, regione `europe-west8`, zona `europe-west8-a`, VM
 `langbrain-dev` (IP interno `10.198.0.2`), account di servizio della VM `langbrain-vm@domotica-poc-511707.iam.gserviceaccount.com`,
 account Owner `m.scardovellicrac@gmail.com` (l'account attivo di gcloud su questo PC è un altro: ogni comando lo
-indica con `--account` o `CLOUDSDK_CORE_ACCOUNT`). `MSYS_NO_PATHCONV=1` evita che Git Bash riscriva i percorsi.
+indica con `--account` o `CLOUDSDK_CORE_ACCOUNT`).
 
 Come funziona sulla VM (lo fa `scripts/engine-vm.sh`, che gira sulla VM come root con l'identità della VM):
 - `/opt/domhouse/`: lo script, `compose.yaml` (modello unico) e un file `<apartment_id>.settings` per appartamento
@@ -119,7 +119,7 @@ Cosa fa: copia `scripts/engine-vm.sh` ed `engine/compose.yaml` nella home sulla 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute scp scripts/engine-vm.sh engine/compose.yaml langbrain-dev:~/ \
+gcloud compute scp scripts/engine-vm.sh engine/compose.yaml langbrain-dev:~/ \
   --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
 ```
 
@@ -128,7 +128,7 @@ Verifica:
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command="ls -l ~/engine-vm.sh ~/compose.yaml"
 ```
 
@@ -142,7 +142,7 @@ segreto, permessi 600), scarica `<IMMAGINE>` e avvia il container `engine-dev` s
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
   --command="sudo bash ~/engine-vm.sh install dev 8100 <IMMAGINE> simulated"
 ```
@@ -158,7 +158,7 @@ Cosa fa: chiama `http://10.198.0.2:8100/api/v1/health`, cioè l'indirizzo intern
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
   --command="curl -s -w ' HTTP %{http_code}\n' http://10.198.0.2:8100/api/v1/health"
 ```
@@ -173,7 +173,7 @@ Cosa fa: mostra la politica di riavvio del container e i file del motore (sola l
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
   --command="sudo docker inspect -f '{{.HostConfig.RestartPolicy.Name}} {{.Config.Image}}' engine-dev; sudo ls -ln /data/dev; sudo ls -l /etc/domhouse; systemctl list-timers domhouse-engine-backup.timer --no-pager"
 ```
@@ -190,7 +190,7 @@ motore passano da `engine-vm.sh api`, che prende la chiave dal file di root senz
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
   --command='V=/opt/domhouse/engine-vm.sh; sudo bash $V backup dev && sudo bash $V api dev GET /apartment | head -1 | grep -o "\"mode\":\"[a-z]*\"" && sudo bash $V api dev POST /apartment/mode "{\"mode\":\"eco\"}" | tail -1 && sleep 3 && sudo bash $V api dev GET /apartment | head -1 | grep -o "\"mode\":\"[a-z]*\"" && sudo bash $V restore dev engine-$(date -u +%Y-%m-%d).db && sudo bash $V api dev GET /apartment | head -1 | grep -o "\"mode\":\"[a-z]*\""'
 ```
@@ -214,7 +214,7 @@ Cosa fa: aggiorna `ENGINE_IMAGE` in `/opt/domhouse/dev.settings`, scarica l'imma
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
   --command="sudo bash /opt/domhouse/engine-vm.sh update dev <IMMAGINE>"
 ```
@@ -231,7 +231,7 @@ Cosa fa: riscrive `/etc/domhouse/dev.env` dal segreto e ricrea il container.
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
   --command="sudo bash /opt/domhouse/engine-vm.sh key dev"
 ```
@@ -254,7 +254,7 @@ Cosa fa: la copia di oggi di `dev` (la riscrive, se c'è già).
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
   --command="sudo bash /opt/domhouse/engine-vm.sh backup dev"
 ```
@@ -266,7 +266,7 @@ Verifica: `backup dev: /data/dev/backup/engine-<oggi>.db (… byte, integrity_ch
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
   --command="sudo ls -ln /data/dev/backup; systemctl list-timers domhouse-engine-backup.timer --no-pager; sudo journalctl -u domhouse-engine-backup.service -n 5 --no-pager"
 ```
@@ -281,7 +281,7 @@ Cosa fa: controlla che la copia sia integra, ferma `engine-dev`, sposta il datab
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-MSYS_NO_PATHCONV=1 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
   --command="sudo bash /opt/domhouse/engine-vm.sh restore dev engine-<AAAA-MM-GG>.db"
 ```
