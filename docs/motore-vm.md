@@ -119,7 +119,7 @@ Cosa fa: copia `scripts/engine-vm.sh` ed `engine/compose.yaml` nella home sulla 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute scp scripts/engine-vm.sh engine/compose.yaml langbrain-dev:~/ \
+gcloud compute scp scripts/engine-vm.sh engine/compose.yaml langbrain-dev: \
   --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
 ```
 
