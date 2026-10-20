@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { toast } from "sonner";
 import { t } from "@/i18n";
 import { NotificationSettings } from "./NotificationSettings";
@@ -11,7 +11,11 @@ const state = vi.hoisted(() => {
       super(reason);
     }
   }
-  return { appEnv: "staging", env: {} as Record<string, unknown>, pushState: "off", PushError, enablePush: vi.fn(), disablePush: vi.fn() };
+  return {
+    appEnv: "staging", env: {} as Record<string, unknown>, pushState: "off", PushError, enablePush: vi.fn(), disablePush: vi.fn(),
+    prefs: { approvals: true, offline: true, decisions: false, bookings: true } as Record<string, boolean>,
+    setPrefs: vi.fn(async (p: Record<string, boolean>) => p),
+  };
 });
 
 vi.mock("@/lib/utils", async (importOriginal) => {
@@ -22,7 +26,7 @@ vi.mock("@/auth/AuthProvider", () => ({
   useAuth: () => ({ me: { user: { uid: "u1" }, env: { app_env: state.appEnv, auth_mode: "firebase", fcm_enabled: false, simulator: true, instance_mode: "mock" } } }),
 }));
 vi.mock("@/api/admin", () => ({
-  pushApi: { status: async () => ({ fcm_enabled: false, tokens: 2, prefs: { approvals: true, offline: true, decisions: false } }), setPrefs: vi.fn() },
+  pushApi: { status: async () => ({ fcm_enabled: false, tokens: 2, prefs: state.prefs }), setPrefs: state.setPrefs },
 }));
 vi.mock("@/lib/push", () => ({
   pushState: () => state.pushState,
@@ -156,5 +160,50 @@ describe("Impostazioni > Notifiche: uscita e rientro (P-44)", () => {
     state.env.fcmEnabled = true;
     renderCard();
     expect(screen.queryByTestId("settings-push-signout-hint")).not.toBeInTheDocument();
+  });
+});
+
+describe("Impostazioni > Notifiche: «Prenotazioni» (D-123)", () => {
+  beforeEach(() => {
+    state.prefs = { approvals: true, offline: true, decisions: false, bookings: true };
+  });
+
+  it("la voce c'è, con la sua descrizione, e parte attiva come dice il server", async () => {
+    const card = renderCard();
+    const sw = await screen.findByTestId("settings-pref-bookings");
+    await waitFor(() => expect(sw).toBeChecked());
+    expect(card).toHaveTextContent(t("settings.notifications.bookings"));
+    expect(card).toHaveTextContent(t("settings.notifications.bookingsHint"));
+  });
+
+  it("spenta: si salva, e il salvataggio manda SEMPRE tutte e quattro le voci", async () => {
+    renderCard();
+    const sw = await screen.findByTestId("settings-pref-bookings");
+    await waitFor(() => expect(sw).toBeChecked());
+    await act(async () => {
+      fireEvent.click(sw);
+    });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: true, decisions: false, bookings: false });
+    expect(screen.getByTestId("settings-pref-bookings")).not.toBeChecked();
+  });
+
+  it("cambiando un'altra voce, «Prenotazioni» viaggia comunque nel salvataggio", async () => {
+    renderCard();
+    const sw = await screen.findByTestId("settings-pref-decisions");
+    await waitFor(() => expect(screen.getByTestId("settings-pref-bookings")).toBeChecked());
+    await act(async () => {
+      fireEvent.click(sw);
+    });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: true, decisions: true, bookings: true });
+  });
+
+  it("server precedente, senza la voce: si mostra attiva (il predefinito) e si manda attiva", async () => {
+    state.prefs = { approvals: true, offline: true, decisions: false };
+    renderCard();
+    await waitFor(() => expect(screen.getByTestId("settings-pref-bookings")).toBeChecked());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("settings-pref-offline"));
+    });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: false, decisions: false, bookings: true });
   });
 });

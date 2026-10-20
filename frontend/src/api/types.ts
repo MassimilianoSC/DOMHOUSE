@@ -79,7 +79,7 @@ export interface Me {
     email: string;
     display_name: string;
     role: Role;
-    notification_prefs: { approvals: boolean; offline: boolean; decisions: boolean } | null;
+    notification_prefs: { approvals: boolean; offline: boolean; decisions: boolean; bookings?: boolean } | null;
     /** Apartments this user sees (P-18, D-43); absent from a BFF older than P-18 = "all". */
     apartment_ids?: ApartmentScope;
     /** Platform role (P-36, D-61a): manages the organizations, separate from admin/operator/viewer. */

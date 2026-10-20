@@ -5,8 +5,9 @@
 //   title, body       text of the notification
 //   link              path inside the app opened on tap, e.g. "/a/apt-001/approvazioni" (relative, starts with "/")
 //   tag               grouping key: a notification with the same tag replaces the previous one
-//                     ("approval:<approval_id>", "offline:<apartment_id>:<device_id>", "instance:<apartment_id>")
-//   kind              "approval" | "device_offline" | "instance_down"
+//                     ("approval:<approval_id>", "offline:<apartment_id>:<device_id>", "instance:<apartment_id>",
+//                     "booking:<decision_id>")
+//   kind              "approval" | "device_offline" | "instance_down" | "booking" (D-123); not used to filter
 //   apartment_id      always; approval_id / device_id / ts when relevant
 // Extra keys are ignored. A push is never silent: a missing title/body/link gives a generic notification opening "/".
 

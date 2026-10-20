@@ -29,7 +29,7 @@ const form = (tpl: string, values: readonly string[]): [string, string[]] => [tp
 const MODES = all<ApartmentMode>({ comfort: true, eco: true, empty: true });
 const NAV_KEYS = [...apartmentNav("x", true), ...globalNav(true, { platform: true })].map((i) => i.key);
 const FEATURE_NAV = APP_FEATURES.map((f) => (f === "ask" ? "assistant" : f === "apartment" ? "overview" : f));
-const NOTIFY = all<keyof NotificationPrefs>({ approvals: true, offline: true, decisions: true });
+const NOTIFY = all<keyof NotificationPrefs>({ approvals: true, offline: true, decisions: true, bookings: true });
 
 /** Runtime-built forms (placeholders written as ${}) → every key they can produce. */
 const FORMS: Record<string, string[]> = Object.fromEntries([

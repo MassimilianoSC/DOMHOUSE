@@ -514,7 +514,9 @@
       "offline": "Dispositivi e istanza offline",
       "offlineHint": "Dispositivo offline oltre la soglia della regola, istanza non raggiungibile",
       "decisions": "Decisioni del motore",
-      "decisionsHint": "Riepilogo delle azioni automatiche (solo in app)"
+      "decisionsHint": "Riepilogo delle azioni automatiche (solo in app)",
+      "bookings": "Prenotazioni",
+      "bookingsHint": "Avvisi sulle prenotazioni che cambiano il programma dell'appartamento"
     }
   },
   "notify": {

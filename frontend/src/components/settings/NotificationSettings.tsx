@@ -11,7 +11,7 @@ import { runAction, showError } from "@/lib/actions";
 import { disablePush, enablePush, PushError, pushState, type PushState } from "@/lib/push";
 import { env } from "@/lib/utils";
 
-const KEYS: (keyof NotificationPrefs)[] = ["approvals", "offline", "decisions"];
+const KEYS: (keyof NotificationPrefs)[] = ["approvals", "offline", "decisions", "bookings"];
 
 /** Why this device does not receive push (null when it can): the card says it instead of a silent disabled button. */
 function blockedText(state: PushState): string | null {
@@ -51,7 +51,8 @@ export function NotificationSettings() {
   const [state, setState] = useState<PushState>(() => pushState(uid));
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (q.data) setPrefs(q.data.prefs);
+    // A BFF without «Prenotazioni» yet: on, its default (D-123), so the saved preferences always carry all four.
+    if (q.data) setPrefs({ ...q.data.prefs, bookings: q.data.prefs.bookings ?? true });
   }, [q.data]);
 
   const toggle = async (k: keyof NotificationPrefs, v: boolean) => {

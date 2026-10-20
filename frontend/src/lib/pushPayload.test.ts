@@ -76,3 +76,16 @@ describe("push: dove compare l'avviso", () => {
     expect(isOpenMessage({ type: "domotica-open" })).toBe(false);
   });
 });
+
+describe("push: prenotazioni (D-123)", () => {
+  it("kind «booking»: notifica con il suo titolo, apre le decisioni dell'appartamento, raggruppata per decisione", () => {
+    const booking = { data: { kind: "booking", title: "Milano Centro: prenotazione annullata, appartamento rimesso a vuoto", body: "La prenotazione RES-7 è stata annullata dopo il pre-arrivo", link: "/a/apt-001/decisioni", tag: "booking:d-42", apartment_id: "apt-001" } };
+    expect(toNotice(booking, "DOMHOUSE")).toEqual({
+      title: "Milano Centro: prenotazione annullata, appartamento rimesso a vuoto",
+      body: "La prenotazione RES-7 è stata annullata dopo il pre-arrivo",
+      link: "/a/apt-001/decisioni",
+      tag: "booking:d-42",
+      apartmentId: "apt-001",
+    });
+  });
+});
