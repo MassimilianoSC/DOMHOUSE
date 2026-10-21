@@ -191,3 +191,12 @@ CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com TARGET=prod GCP_PROJECT_ID=dom
 
 Verifica: la nuova revisione al 100 %; nel sito di produzione nessuna fascia «Ambiente di prova» e nessun dimostrativo.
 Dopo: la memoria storica verifica in sola lettura i due servizi, e il motore `dev` sulla VM continua a servire lo staging.
+
+---
+
+## M13. Motore sulla VM e allarmi (lotti 21–23)
+
+Dopo M8 (o M12), con il commit del lotto scelto: immagine del motore (`docs/motore-vm.md` B1), copia del nuovo
+`engine-vm.sh` e di `compose.yaml` sulla VM (C1) e reinstallazione di `dev` con la nuova immagine (C2, ripetibile);
+facoltativo `engine-vm.sh set dev MODEL_BASE_URL=<indirizzo del server di staging>` per l'assistente vero (D2);
+poi i tre comandi del passo 10 (sezione E2: timer, log dei motori, allarmi).

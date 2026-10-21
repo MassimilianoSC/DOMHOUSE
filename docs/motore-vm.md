@@ -371,6 +371,64 @@ comando con il file `before-restore-….db` indicato.
 
 ---
 
+## E2. Controllo ogni 5 minuti, log dei motori e allarmi (passo 10, D-148)
+
+Sulla VM un «controllore» (timer `domhouse-engine-check`, ogni 5 minuti, `engine-vm.sh check-all`) chiede la salute a ogni motore installato e guarda l'età dell'ultimo backup; scrive nel syslog della VM righe riconoscibili (`engine ok|down|silent <id>`, `backup missing <id> age_h=…` oltre le 26 ore, riepilogo `domhouse-check: N motori, M muti`); il backup notturno scrive `backup ok <id>`. L'Ops Agent manda il syslog a Cloud Logging; con `logs-agent` manda anche i log dei container dei motori. Gli allarmi (`scripts/monitoring/engine-alerts.sh`, canale email «Avvisi BFF») leggono quelle righe: VM muta da 10 minuti (una sola email), motore muto o giù (al massimo ogni 30 minuti per appartamento), righe di errore (ogni 30 minuti), backup mancato (ogni 12 ore), disco oltre l'80 % per 10 minuti. Dettagli in `scripts/monitoring/README.md`, sezione «Motori sulla VM». Tre comandi, in quest'ordine, dopo aver copiato il nuovo `engine-vm.sh` sulla VM (C1) e aggiornato il motore (D).
+
+**E2.1 Timer del backup e del controllo** (scrive sulla VM).
+Cosa fa: installa (o reinstalla) il timer del backup e il controllo ogni 5 minuti.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command="sudo bash /opt/domhouse/engine-vm.sh timers"
+```
+
+Verifica: il prossimo giro entro 5 minuti; dopo 5 minuti le righe «engine ok dev» e «domhouse-check: 1 motori, 0 muti».
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command="systemctl list-timers domhouse-engine-check.timer --no-pager; sudo journalctl -t domhouse-check -n 5 --no-pager"
+```
+
+**E2.2 Log dei motori a Cloud Logging** (scrive sulla VM: configurazione dell'Ops Agent, i container non si toccano).
+Cosa fa: l'Ops Agent manda anche i log dei motori a Cloud Logging; la configurazione di prima resta come copia.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command="sudo bash /opt/domhouse/engine-vm.sh logs-agent"
+```
+
+Verifica: il comando stampa «active»; dopo 5 minuti, dal PC (sola lettura), deve comparire «engine alive»:
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud logging read 'log_id("domhouse_engine")' --project=domotica-poc-511707 --limit=3 --format="value(jsonPayload.msg)" --account=m.scardovellicrac@gmail.com
+```
+
+**E2.3 Allarmi** (scrive su Cloud Monitoring; DOPO E2.1, altrimenti «VM muta» scatterebbe subito).
+Cosa fa: crea la metrica del controllo e le cinque politiche sul canale «Avvisi BFF»; prima la prova a secco.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com DRY_RUN=1 GCP_PROJECT_ID=domotica-poc-511707 scripts/monitoring/engine-alerts.sh
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 scripts/monitoring/engine-alerts.sh
+```
+
+Verifica (sola lettura): le cinque politiche «Motori: …» con `True`.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud alpha monitoring policies list --project=domotica-poc-511707 --format="value(displayName,enabled)" --account=m.scardovellicrac@gmail.com
+```
+
+---
+
 ## F. Sulla VM (riferimento, se si è collegati con `gcloud compute ssh`)
 
 | Comando | Cosa mostra |

@@ -10,7 +10,7 @@ Si aggiorna a ogni lotto; lo stato di ogni voce è quello del registro. «Da ver
 | Passo 7 del motore: conferma a consumo, collegamenti del catalogo, connector giù/su, parametri per appartamento (D-131, D-133) | fatto, online con il lotto 19 (21 ottobre) | o1 |
 | Passo 8: approvazioni da fonti vere (check-out con presenza, consumo a casa vuota, D-137), con coda e scadenza persistente | fatto, lotto 20 in pubblicazione (21 ottobre) | o1 |
 | Passo 9: assistente vero con Gemini, limiti, tetto di spesa, regole fisse del prompt (D-132) | da fare (3–4 giornate) | o1, o2 per i testi |
-| Passo 10: stato di salute completo e allarmi dai log dei container sulla VM | da fare (1 giornata) | o1, comandi GCP del committente |
+| Passo 10: stato di salute completo e allarmi dai log dei container sulla VM (D-148: VM muta, motore muto, errori, backup mancato, disco) | fatto lato codice (lotto 23, 21 ottobre); comandi a fine piano (`docs/motore-vm.md` E2) | o1, comandi del committente |
 | Passo 11: riassunto settimanale per il gestore con push e pagina (D-133) | da fare, dopo il 9 (2–3 giornate) | o1, o2 |
 | Passo 12: regole configurabili dall'app, prima a mano poi proposte dall'assistente (D-133) | da progettare dopo l'11 | o1, o2 |
 | Etichette, testi e guida per ogni cosa nuova che l'utente vede | continuo | o2, memoria storica |
@@ -23,7 +23,7 @@ Si aggiorna a ogni lotto; lo stato di ogni voce è quello del registro. «Da ver
 | **Ingresso dei dispositivi su GCP** (Cloud Run di ingresso, bilanciatore o cloud Shelly; firewall, certificato, dominio) | dipendenza esterna: la scelta di Youssouf (P-65) | Youssouf progetta, noi realizziamo, comandi del committente |
 | **Un motore per ogni appartamento vero** sulla VM: segreto `langbrain-api-key-<id>` (P-62, punto 2), istanza con `engine-vm.sh install`, appartamento nell'app con ID uguale, verifica di connessione | procedura pronta (`docs/motore-vm.md`); da fare per ogni appartamento | committente con i comandi preparati |
 | **Segreto Italianway**: `italianway-webhook-secret` ha ancora un valore provvisorio, da sostituire con quello concordato con Italianway, e il webhook va provato con loro | da fare | committente con Italianway, o1 per la prova |
-| **Monitoraggio e allarmi**: oggi ci sono i controlli e gli allarmi del BFF (lotto 11); mancano gli allarmi della VM (log dei container, «nessun log da 10 minuti», D-104) | passo 10 | o1 prepara, committente lancia |
+| **Monitoraggio e allarmi**: controlli e allarmi del BFF (lotto 11); allarmi dei motori sulla VM pronti nel codice (passo 10, D-148): si attivano con i tre comandi di `docs/motore-vm.md` E2 | comandi a fine piano | committente lancia |
 | **Avvisi di spesa** su Google Cloud: l'API dei budget non è attiva, nessun avviso di spesa | da fare (comando del committente) | memoria storica prepara |
 | **Una sola istanza del server** (`maxScale 1`) perché i dimostrativi stanno in memoria: va bene per il pilota; per più traffico serve decidere se spostare i dimostrativi su un motore della VM (D-97 lo prevede) e permettere più istanze | decisione | committente |
 | **Ambiente unico**: oggi «staging» e «prod» sono lo stesso servizio Cloud Run e lo stesso Firestore; i dati dei dimostrativi e quelli veri convivono. Per la produzione vera: progetto o ambiente separato, oppure regola scritta che accetta la convivenza | decisione | committente |
