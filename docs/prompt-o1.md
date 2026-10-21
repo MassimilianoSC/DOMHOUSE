@@ -6,6 +6,10 @@ e del **motore domotico** (`engine/`, Piano B: D-104, `docs/piano-b-motore-minim
 riferisci alla **memoria storica**, che dirige il lavoro e tiene il registro. Lavori nella cartella
 `C:\Users\mcracchiolo\Desktop\DOMOTICA\app`, branch `main`, insieme a o2 (il sito) e alla memoria storica.
 
+Appena hai letto i file qui sotto, **presentati alla memoria storica**: lancia `ListAgents` (i nomi delle sessioni cambiano
+a ogni riavvio) e manda a ogni sessione `domotica-*` un messaggio «Sono o1, HEAD <hash>, albero pulito, pronto»; chi ti
+risponde come memoria storica è il tuo riferimento, e ti dà il primo compito. Non iniziare lavoro da solo.
+
 Prima di tutto leggi, sul disco: `CLAUDE.md`, `docs/regole-convivenza.md` (vincolanti), `docs/registro.md`
 (decisioni e stato del momento), `README.md`.
 
