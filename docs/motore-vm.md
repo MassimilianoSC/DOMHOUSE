@@ -84,13 +84,15 @@ Risultato atteso: la riga `serviceAccount:langbrain-vm@domotica-poc-511707.iam.g
 ## B. Dal PC, a ogni nuova versione del motore
 
 **B1. Costruire l'immagine** (scrive su Google Cloud: Cloud Build e Artifact Registry).
-Cosa fa: costruisce `engine/Dockerfile` con Cloud Build e pubblica `engine:<commit>` nel repository `domotica`. La
-copia di lavoro di `engine/` deve essere senza modifiche: l'etichetta dell'immagine è il commit.
+Cosa fa: esporta il commit indicato in una cartella temporanea, costruisce `engine/Dockerfile` da lì con Cloud Build e
+pubblica `engine:<commit>` nel repository `domotica`. La copia di lavoro non conta: si costruisce sempre il commit del
+lotto, anche se nel frattempo il lavoro è andato avanti. Senza commit costruisce HEAD. Con `DRY_RUN=1` davanti dice cosa
+costruirebbe, senza Cloud Build.
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 scripts/deploy-engine.sh
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 scripts/deploy-engine.sh <commit del lotto>
 ```
 
 L'ultima riga stampa l'immagine, per esempio
@@ -107,7 +109,7 @@ gcloud artifacts docker tags list europe-west8-docker.pkg.dev/domotica-poc-51170
   --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
 ```
 
-Risultato atteso: fra le etichette c'è quella stampata da `git rev-parse --short HEAD`.
+Risultato atteso: fra le etichette c'è il commit del lotto (senza argomento, quella stampata da `git rev-parse --short HEAD`).
 
 ---
 
