@@ -279,6 +279,20 @@ Risultato atteso: le impostazioni in vigore, oppure «tutte ai valori predefinit
   misuratore salgono almeno di questo valore rispetto a prima del comando, entro 10 secondi;
 - `CONFIRM_OFF_WATTS` (predefinito 15, da 1 a 5000): lo spegnimento è confermato se i watt scendono sotto questo valore,
   entro 10 secondi.
+- `THERMOSTAT_HYSTERESIS_C` (predefinito 0.5, da 0.1 a 3): la caldaia, regolata dal termostato o dall'antigelo, si accende
+  sotto la temperatura voluta e si spegne sopra la temperatura voluta più questo valore, in gradi;
+- `THERMOSTAT_MIN_SWITCH_MINUTES` (predefinito 5, da 1 a 60): minuti minimi fra due accensioni o spegnimenti della caldaia
+  decisi dal termostato;
+- `COMPRESSOR_MIN_OFF_MINUTES` (predefinito 3, da 1 a 15): pausa minima del compressore dello split dopo uno spegnimento.
+  L'app la mostra nelle regole ma non la fa cambiare;
+- `COMPRESSOR_WAIT_SECONDS` (predefinito 7, da 0 a 60): un'accensione manuale chiesta a meno di questi secondi dalla fine
+  della pausa aspetta la fine invece di essere rifiutata; 0 = rifiutata sempre;
+- `MISSED_AFTER_MINUTES` (predefinito 30, da 5 a 720): al riavvio del motore, un'azione programmata scaduta da più di
+  questi minuti non si esegue più e risulta «mancata»;
+- `APPROVAL_EXPIRES_MINUTES` (predefinito 30, da 5 a 720): un'approvazione senza risposta viene respinta dopo questi
+  minuti (D-119).
+
+I decimali si scrivono con il punto (per esempio `0.5`): la virgola non è accettata.
 
 ---
 
