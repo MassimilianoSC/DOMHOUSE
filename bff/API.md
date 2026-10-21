@@ -467,3 +467,17 @@ c. **Campi inviati ma non letti, da valutare** (misura del 16 ottobre 2026; togl
    - `verify`: `reachable`;
    - `WebhookLog`: `source`, `tenant_id`;
    - il parametro `booking_id` di `list_bookings` non è usato dalla PWA.
+
+## Passaggio verso il modello (P-60 passo 9, D-132, D-143, D-144)
+
+`POST /internal/ai/chat` NON è una route del sito: la chiamano i motori (sulla VM e i dimostrativi dentro il BFF) per
+parlare con il modello. Intestazioni `X-Apartment-Id` e `X-API-Key` (la chiave d'istanza dell'appartamento, la stessa
+che il BFF manda al motore); corpo compatibile OpenAI (`messages`, `tools`, `tool_choice`, `temperature`; il resto si
+ignora, modello e `max_tokens` li sceglie il BFF). Risposte: 200 con la risposta del modello; 401 chiave sbagliata; 404
+appartamento sconosciuto; 422 `bad_request` senza `messages`; 429 `monthly_cap` «Limite mensile raggiunto, riprova dal
+mese prossimo»; 502 `model_unavailable` o `model_error`; 504 `timeout`. Il BFF tiene in Firestore (`ai_usage/{AAAA-MM}`,
+mese UTC) la spesa del progetto, calcolata dai token restituiti, e all'80 % del tetto manda una sola email al mese ai
+gestori della piattaforma. Impostazioni: `AI_MODEL`, `AI_LOCATION`, `AI_MONTHLY_CAP_EUR` (20), `AI_ALERT_PERCENT` (80),
+`AI_PRICE_IN_EUR_PER_M` (0.83), `AI_PRICE_OUT_EUR_PER_M` (4.13), `AI_PRICE_CACHED_EUR_PER_M` (0.08; prezzi da aggiornare
+il 1° gennaio 2027 a 1.65 e 8.25), `AI_MAX_TOKENS` (4096), `AI_TIMEOUT_S` (25), `AI_DEMOS` (i dimostrativi con il modello
+vero). Serve il ruolo `roles/aiplatform.user` sull'account del BFF.
