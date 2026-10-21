@@ -12,7 +12,7 @@ from google.cloud import firestore
 
 from .. import retention
 
-from .base import (WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (EMPTY_AI_USAGE, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email, now_iso)
 
 
@@ -202,6 +202,39 @@ class FirestoreRepository:
                 tx.set(ref, {"count": count + 1, "updated_at": at, retention.FIELD: retention.mail({"updated_at": at})})
             return True
         async with self._lock("mail_limits"):
+            return await txn(self.db.transaction())
+
+    # the assistant's spending (P-60 step 9): ai_usage/{YYYY-MM}, raised in a transaction
+    async def get_ai_usage(self, month):
+        snap = await self._col("ai_usage").document(month).get()
+        return {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
+
+    async def add_ai_usage(self, month, cost_eur, input_tokens, output_tokens):
+        ref = self._col("ai_usage").document(month)
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            u = {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
+            u.update(cost_eur=u["cost_eur"] + cost_eur, calls=u["calls"] + 1, input_tokens=u["input_tokens"] + input_tokens,
+                     output_tokens=u["output_tokens"] + output_tokens, updated_at=now_iso())
+            tx.set(ref, u)
+            return {k: u[k] for k in EMPTY_AI_USAGE}
+        async with self._lock("ai_usage"):
+            return await txn(self.db.transaction())
+
+    async def mark_ai_alert(self, month):
+        ref = self._col("ai_usage").document(month)
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            u = {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
+            if u["alerted"]:
+                return False
+            tx.set(ref, {**u, "alerted": True, "updated_at": now_iso()})
+            return True
+        async with self._lock("ai_usage"):
             return await txn(self.db.transaction())
 
     # pseudonyms towards the engine (P-48): actor_refs/{uid} = {ref}, claimed with create(); actors/{ref} = who

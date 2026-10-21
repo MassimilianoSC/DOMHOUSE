@@ -37,6 +37,18 @@ class Settings:
     smtp_password: str
     mail_from_name: str
     app_public_url: str
+    # P-60 step 9 (D-132, D-143): the assistant's way to the model (POST /internal/ai/chat, bff/ai_gateway.py)
+    ai_model: str = "google/gemini-3.8-flash"
+    ai_location: str = "eu"                   # Agent Platform: the models are not in europe-west8
+    ai_monthly_cap_eur: float = 20.0          # for the whole project: at the cap the assistant stops until next month
+    ai_alert_percent: float = 80.0            # one email to the platform managers, once a month
+    # euro per million tokens (1 $ = 1 € on purpose). Introductory price of the EU endpoint until 31 December 2026: to be
+    # raised on 1 January 2027 to 1.65 (in) and 8.25 (out) (D-143, C-8). Reasoning tokens are paid as output.
+    ai_price_in_eur_per_m: float = 0.83
+    ai_price_out_eur_per_m: float = 4.13
+    ai_price_cached_eur_per_m: float = 0.08
+    ai_max_tokens: int = 4096                 # the most a call may ask (the flash model spends tokens on reasoning)
+    ai_timeout_s: float = 25.0                # inside the contract's 30 s for an answer
 
     @property
     def mail_configured(self) -> bool:
@@ -78,4 +90,13 @@ def get_settings() -> Settings:
         mail_from_name=e("MAIL_FROM_NAME", "DOMHOUSE"),
         # Public URL of the PWA, used in invitation emails and as continue URL of the password setup link.
         app_public_url=e("APP_PUBLIC_URL", "").rstrip("/"),
+        ai_model=e("AI_MODEL", "google/gemini-3.8-flash"),
+        ai_location=e("AI_LOCATION", "eu"),
+        ai_monthly_cap_eur=float(e("AI_MONTHLY_CAP_EUR", "20")),
+        ai_alert_percent=float(e("AI_ALERT_PERCENT", "80")),
+        ai_price_in_eur_per_m=float(e("AI_PRICE_IN_EUR_PER_M", "0.83")),
+        ai_price_out_eur_per_m=float(e("AI_PRICE_OUT_EUR_PER_M", "4.13")),
+        ai_price_cached_eur_per_m=float(e("AI_PRICE_CACHED_EUR_PER_M", "0.08")),
+        ai_max_tokens=int(e("AI_MAX_TOKENS", "4096")),
+        ai_timeout_s=float(e("AI_TIMEOUT_S", "25")),
     )

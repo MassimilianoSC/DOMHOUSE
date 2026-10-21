@@ -12,6 +12,7 @@ from . import push
 from .config import get_settings
 from .logs import setup_logging
 from .routes import account, admin, apartments, platform, webhooks
+from .routes import ai as ai_routes
 from .routes import push as push_routes
 from .sse_hub import hub_manager
 
@@ -83,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(push_routes.router)
     app.include_router(webhooks.router)
     app.include_router(platform.router)
+    app.include_router(ai_routes.router)   # P-60 step 9: engines -> model
 
     # D-97: the built-in mock is mounted in every mode, also in production, for demonstration apartments (mock://).
     # F2 (D-70) and N1 (D-71) keep it the BFF's own: refused from the internet, its random key checked on loopback.

@@ -289,6 +289,20 @@ def test_audit_people_resolved_and_forgotten(repo):
     assert set(run(repo.get_audit_people(["u1", "u2"]))) == {"u2"}
 
 
+def test_ai_usage_adds_up_and_alerts_once(repo):
+    """P-60 step 9: the assistant's spending of a month adds up atomically; the 80 % alert is claimed once."""
+    assert run(repo.get_ai_usage("2026-10")) == {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0,
+                                                "alerted": False}
+    run(repo.add_ai_usage("2026-10", 0.5, 1000, 200))
+    totals = run(repo.add_ai_usage("2026-10", 0.25, 10, 2))
+    assert (totals["calls"], totals["input_tokens"], totals["output_tokens"]) == (2, 1010, 202)
+    assert totals["cost_eur"] == pytest.approx(0.75) and run(repo.get_ai_usage("2026-10"))["cost_eur"] == pytest.approx(0.75)
+    assert run(repo.get_ai_usage("2026-11"))["calls"] == 0                  # another month starts from zero
+    assert run(repo.mark_ai_alert("2026-10")) is True
+    assert run(repo.mark_ai_alert("2026-10")) is False
+    assert run(repo.get_ai_usage("2026-10"))["alerted"] is True and run(repo.mark_ai_alert("2026-11")) is True
+
+
 def test_mail_quota_all_or_nothing(repo):
     """P-49: every bucket below its limit -> all go up by one; one bucket full -> none changes."""
     assert run(repo.take_mail_quota([("a", 2), ("b", 1)])) is True
@@ -379,7 +393,7 @@ def test_removing_a_manager_through_the_route_closes_their_accesses(repo, monkey
     leaving = Identity(uid="u-via", email="via@hqe.it", display_name="", user=None, platform_manager=True)
     staying = Identity(uid="u-resta", email="resta@hqe.it", display_name="", user=None, platform_manager=True)
     aid = run(platform.open_support_access("t-rm", platform.SupportOpen(hours=1, reason="r"), identity=leaving))["access_id"]
-    assert run(platform.remove_manager("via@hqe.it", identity=staying)).status_code == 204
+    assert run(platform.remove_manager({"email": "via@hqe.it"}, identity=staying)).status_code == 204
     assert run(repo.get_support_access(aid)).closed_at is not None
 
 

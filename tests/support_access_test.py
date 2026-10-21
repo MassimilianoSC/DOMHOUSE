@@ -161,7 +161,7 @@ def test_removing_the_manager_closes_their_accesses():
     run(repo.add_platform_member(PlatformMember(email="temporaneo@hqe.it")))
     temp = Identity(uid="dev-temporaneo@hqe.it", email="temporaneo@hqe.it", display_name="", user=None, platform_manager=True)
     aid = run(platform.open_support_access(TID, platform.SupportOpen(hours=2, reason="Temporaneo"), identity=temp))["access_id"]
-    assert run(platform.remove_manager("temporaneo@hqe.it", identity=ME)).status_code == 204
+    assert run(platform.remove_manager({"email": "temporaneo@hqe.it"}, identity=ME)).status_code == 204
     a = run(repo.get_support_access(aid))
     assert a.closed_at is not None
     assert "support_access_closed" in [e.action for e in run(repo.list_audit(TID, 100)) if e.target.id == aid]

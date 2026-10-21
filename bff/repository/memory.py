@@ -1,4 +1,4 @@
-from .base import (WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (EMPTY_AI_USAGE, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
 
 
@@ -16,6 +16,7 @@ class InMemoryRepository:
         self.audit: dict[str | None, dict[str, AuditEntry]] = {}   # tenant_id (None = platform) -> audit_id -> entry
         self.audit_people: dict[str, AuditPerson] = {}
         self.mail_counts: dict[str, int] = {}
+        self.ai_usage: dict[str, dict] = {}            # P-60 step 9: month -> the assistant's spending
         self.support_access: dict[str, SupportAccess] = {}
         self.actor_refs: dict[str, str] = {}             # uid -> pseudonym
         self.actors: dict[str, ActorRecord] = {}         # pseudonym -> who
@@ -134,6 +135,24 @@ class InMemoryRepository:
         return self.audit_people.pop(ref, None) is not None
 
     # invitation email limits (P-49)
+    async def get_ai_usage(self, month):
+        return dict(self.ai_usage.get(month) or EMPTY_AI_USAGE)
+
+    async def add_ai_usage(self, month, cost_eur, input_tokens, output_tokens):
+        u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))
+        u["cost_eur"] += cost_eur
+        u["calls"] += 1
+        u["input_tokens"] += input_tokens
+        u["output_tokens"] += output_tokens
+        return dict(u)
+
+    async def mark_ai_alert(self, month):
+        u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))
+        if u["alerted"]:
+            return False
+        u["alerted"] = True
+        return True
+
     async def take_mail_quota(self, buckets):
         if any(self.mail_counts.get(key, 0) >= limit for key, limit in buckets):
             return False

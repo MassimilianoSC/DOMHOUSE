@@ -155,6 +155,7 @@ class WebhookLog(BaseModel):
 
 
 WEBHOOK_LOG_LIMIT = 100
+EMPTY_AI_USAGE = {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0, "alerted": False}
 
 # P-47: closed set; the PWA has a sentence for each one (a new action is agreed with o2 first)
 AuditAction = Literal[
@@ -287,6 +288,13 @@ class Repository(Protocol):
     # P-49: anti-abuse counters for invitation emails. Atomic: when every bucket is below its limit each one goes up by
     # one and the answer is True; otherwise nothing changes and the answer is False
     async def take_mail_quota(self, buckets: list[tuple[str, int]]) -> bool: ...
+
+    # P-60 step 9 (D-132, D-143): the assistant's spending of a month (UTC, "YYYY-MM") for the whole project:
+    # {cost_eur, calls, input_tokens, output_tokens, alerted}; add is atomic and returns the totals after it;
+    # mark_ai_alert is True only for the first caller of the month (the 80 % email goes once)
+    async def get_ai_usage(self, month: str) -> dict: ...
+    async def add_ai_usage(self, month: str, cost_eur: float, input_tokens: int, output_tokens: int) -> dict: ...
+    async def mark_ai_alert(self, month: str) -> bool: ...
 
     # pseudonyms towards the engine (P-48): claim is atomic (the existing one wins), forget removes both directions
     async def claim_actor_ref(self, uid: str, candidate: str) -> str: ...
