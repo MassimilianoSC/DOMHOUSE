@@ -211,3 +211,44 @@ def test_a_meter_drawing_power_reads_through_changes_on_its_own():
     got = asyncio.run(main())
     assert {c.device_id for c in got} == {"dev-clima-soggiorno", "dev-caldaia"}
     assert all(c.capability == "power_meter" and "energy_total_wh" in c.state for c in got)
+
+
+# -------- the demonstration apartments (step 6c): an invented profile before the engine started --------
+def test_a_demonstration_shows_a_repeatable_profile_from_2026_per_meter(monkeypatch):
+    Clock(monkeypatch, datetime(2026, 10, 20, 15, 30, tzinfo=UTC))
+    a, b = core.ApartmentEngine("apt-rimini-01"), core.ApartmentEngine("apt-rimini-01")   # seeded, in memory
+    march = report(a, datetime(2026, 3, 1, tzinfo=ROME), datetime(2026, 3, 31, tzinfo=ROME), "day")
+    assert march == report(b, datetime(2026, 3, 1, tzinfo=ROME), datetime(2026, 3, 31, tzinfo=ROME), "day")
+    assert all(s["kwh"] > 0 for s in march["series"]) and march["total_kwh"] > 0
+    shares = [d["kwh"] / march["total_kwh"] for d in march["by_device"]]
+    assert [d["device_id"] for d in march["by_device"]] == METERS and shares[0] > shares[1] > shares[2] > 0
+    december = report(a, datetime(2025, 12, 1, tzinfo=ROME), datetime(2026, 1, 1, tzinfo=ROME), "day")
+    assert december["total_kwh"] == 0                                # before the profile: nothing
+    first = report(a, datetime(2025, 12, 31, 22, tzinfo=UTC), datetime(2026, 1, 1, tzinfo=UTC), "hour")
+    assert [s["kwh"] > 0 for s in first["series"]] == [False, True]  # from 00:00 in Rome (23:00 UTC)
+
+
+def test_the_profile_ends_at_the_hour_the_engine_started_and_kwh_today_agrees(monkeypatch):
+    Clock(monkeypatch, datetime(2026, 10, 20, 15, 30, tzinfo=UTC))
+    e = core.ApartmentEngine("apt-rimini-01")
+    hours = report(e, datetime(2026, 10, 20, 13, tzinfo=UTC), datetime(2026, 10, 20, 16, tzinfo=UTC), "hour")
+    assert [s["kwh"] > 0 for s in hours["series"]] == [True, True, False]   # 15:00 on: only what the meters read
+    today = report(e, datetime(2026, 10, 20, tzinfo=ROME), datetime(2026, 10, 20, 15, 30, tzinfo=UTC), "day")
+    kwh_today = sum(d["capabilities"]["power_meter"]["kwh_today"] for d in e.devices.values()
+                    if "power_meter" in d["capabilities"])
+    assert today["total_kwh"] == pytest.approx(kwh_today, abs=0.002) and kwh_today > 0   # the list and the cards agree
+
+
+def test_a_restart_on_sqlite_keeps_the_profile_and_a_plain_engine_has_none(tmp_path, monkeypatch):
+    clock = Clock(monkeypatch, datetime(2026, 10, 20, 15, 30, tzinfo=UTC))
+    db = tmp_path / "engine.db"
+    first = core.ApartmentEngine("apt-dev", SimulatedConnector(), seed=True, store=SqliteStore(db))
+    window = (datetime(2026, 10, 20, 10, tzinfo=UTC), datetime(2026, 10, 20, 15, tzinfo=UTC))
+    before = report(first, *window, "hour")
+    first.store.close()
+    clock.advance(days=2)                                            # restarted two days later: same profile end
+    second = core.ApartmentEngine("apt-dev", SimulatedConnector(), seed=True, store=SqliteStore(db))
+    assert second.restored and report(second, *window, "hour") == before and before["total_kwh"] > 0
+    second.store.close()
+    plain = core.ApartmentEngine("apt-prova-01", NoCounterAtLoad(), seed=False)
+    assert report(plain, datetime(2026, 3, 1, tzinfo=ROME), datetime(2026, 3, 31, tzinfo=ROME), "day")["total_kwh"] == 0

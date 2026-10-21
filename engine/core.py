@@ -8,6 +8,7 @@ it reports through changes()."""
 import asyncio
 import calendar
 import copy
+import random
 import re
 import time
 import uuid
@@ -44,6 +45,11 @@ BUFFER_SECONDS = 3600
 # retention (D-94): the activity log 24 months, bookings 12 months after the check-out (their schedule 12 months after
 # it runs), commands and assistant requests 90 days (the contract asks at least 7), the hourly consumption 24 months
 DECISION_MONTHS, BOOKING_MONTHS, COMMAND_DAYS, TELEMETRY_MONTHS = 24, 12, 90, 24
+# D-130, decision 3: a demonstration apartment (seeded) shows an invented, repeatable consumption, per meter, from the
+# start of 2026 to the hour its engine started; after that only what its (simulated) meters measure. The BFF finds
+# ENERGY_PROFILE_START as the apartment's energy_since, so nothing odd shows. Shares of the meters, in catalog order.
+ENERGY_PROFILE_START = datetime(2026, 1, 1, tzinfo=ZoneInfo("Europe/Rome"))
+ENERGY_PROFILE_SHARES = (0.62, 0.28, 0.10)
 RETENTION_EVERY_S = 3600
 ARREARS_MINUTES = 30      # at a restart, a scheduled action older than this is not run any more: failed, "missed"
 PAUSE_WAITED_S = 7        # R4: a manual start this close to the end of the compressor's pause waits instead of failing
@@ -233,6 +239,7 @@ class ApartmentEngine:
         self.consumer_task: asyncio.Task | None = None
         self.tasks: set[asyncio.Task] = set()
         self.last_housekeeping = self.last_retention = time.monotonic()
+        self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.restored = bool(self.store.get_meta("initialized"))
         if self.restored:
             self._load()
@@ -244,6 +251,7 @@ class ApartmentEngine:
             self._save_apartment()
             if seeded:
                 self._seed_history(variant)
+                self._seed_energy_profile()
             self.store.put_meta("initialized", {"at": iso(utcnow()), "seeded": seeded})
 
     # ---- infrastructure -------------------------------------------------
@@ -299,6 +307,8 @@ class ApartmentEngine:
         self.rules_updated_at = apt.get("rules_updated_at", self.rules_updated_at)
         self.counter = st.get_meta("counter", self.counter)
         self.meters = {k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
+        profile = st.get_meta("energy_profile")
+        self.profile_until = parse_dt(profile["until"]) if profile else None
         stored = dict(st.all("devices"))
         self.devices = {}
         self._read_links_and_relays()
@@ -1567,8 +1577,52 @@ class ApartmentEngine:
                 "avoided_hvac_hours": None, "series": series, "by_device": by_device}
 
     def energy_rows(self, from_hour: str, to_hour: str) -> list[tuple[str, str, float]]:
-        """(device_id, UTC hour, Wh) of the hours from_hour <= hour < to_hour."""
-        return self.store.telemetry_between(from_hour, to_hour)
+        """(device_id, UTC hour, Wh) of the hours from_hour <= hour < to_hour: the telemetry, and for a demonstration
+        apartment the invented profile before its engine started (D-130)."""
+        return self.store.telemetry_between(from_hour, to_hour) + self.profile_rows(from_hour, to_hour)
+
+    def profile_rows(self, from_hour: str, to_hour: str) -> list[tuple[str, str, float]]:
+        """The demonstration's invented consumption, per meter and UTC hour, between ENERGY_PROFILE_START and the
+        engine's start (profile_until): repeatable (the same hour gives the same Wh), more in the morning and evening."""
+        if self.profile_until is None:
+            return []
+        tz = ZoneInfo(self.timezone)
+        cur = max(datetime.strptime(from_hour, "%Y-%m-%dT%H:00Z").replace(tzinfo=UTC), ENERGY_PROFILE_START)
+        cur = cur.astimezone(UTC).replace(minute=0, second=0, microsecond=0)
+        end = min(datetime.strptime(to_hour, "%Y-%m-%dT%H:00Z").replace(tzinfo=UTC), self.profile_until)
+        meters = [d["device_id"] for d in self.devices.values() if "power_meter" in d["capabilities"]]
+        out = []
+        while cur < end:
+            local = cur.astimezone(tz).hour
+            busy = 1.4 if 6 <= local <= 9 or 17 <= local <= 23 else 0.5
+            hour = hour_of(cur)
+            for i, device_id in enumerate(meters):
+                share = ENERGY_PROFILE_SHARES[i] if i < len(ENERGY_PROFILE_SHARES) else 0.05
+                rnd = random.Random(f"{self.apartment_id}|{device_id}|{hour}")
+                out.append((device_id, hour, round((0.15 + rnd.random() * 0.45) * busy * share * 1000, 1)))
+            cur += timedelta(hours=1)
+        return out
+
+    def _seed_energy_profile(self) -> None:
+        """A demonstration apartment: the invented consumption up to the hour the engine starts, saved so that a restart
+        on the same engine.db keeps it; today's part of it is in the meters' kwh_today."""
+        now = utcnow()
+        self.profile_until = now.replace(minute=0, second=0, microsecond=0)
+        self.store.put_meta("energy_profile", {"until": iso(self.profile_until)})
+        local = now.astimezone(ZoneInfo(self.timezone))
+        midnight = datetime(local.year, local.month, local.day, tzinfo=local.tzinfo).astimezone(UTC)
+        today: dict[str, float] = {}
+        for device_id, _, wh in self.profile_rows(hour_of(midnight), hour_of(self.profile_until)):
+            today[device_id] = today.get(device_id, 0.0) + wh
+        for device_id, wh in today.items():
+            meter = self.meters.get(device_id)
+            if meter is None:
+                continue
+            meter.day, meter.today_wh = local.date().isoformat(), meter.today_wh + wh
+            self._save_meter(device_id)
+            device = self.devices[device_id]
+            device["capabilities"]["power_meter"]["kwh_today"] = round(meter.today_wh / 1000, 3)
+            self._save_device(device)
 
     # ---- assistant ---------------------------------------------------------------
     def create_ask(self, body: dict, actor: str, correlation_id: str) -> dict:
