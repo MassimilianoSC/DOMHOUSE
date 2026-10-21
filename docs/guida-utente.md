@@ -511,6 +511,9 @@ L'unico punto in comune è «Verifica connessione», presente in tutte e due le 
   attive in questo ambiente»: gli avvisi (nuove approvazioni, dispositivi offline, istanza non raggiungibile,
   prenotazioni annullate) compaiono in alto nello schermo solo mentre l'app è aperta sulla pagina di un appartamento.
 - **Installa l'app** e **Lingua** (per ora solo italiano). In fondo «Esci».
+- **Ambiente di prova:** nel sito di prova, in alto su ogni pagina, una fascia gialla dice «Ambiente di prova · i dati
+  sono separati da quelli veri». Il sito vero non ce l'ha: se la vedi, quello che fai non tocca gli appartamenti veri.
+  Gli appartamenti dimostrativi stanno solo nel sito di prova.
 
 ### Notifiche sul telefono
 - Premi «Attiva su questo dispositivo» e consenti le notifiche quando il telefono o il browser lo chiede. Se va a buon

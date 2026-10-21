@@ -199,6 +199,15 @@ normale di prova con un **operatore**.
 | J11 | Utente «Sola lettura» | Apri l'Assistente di un appartamento. | Non si possono fare domande e non compaiono quelle dei colleghi. | |
 | J12 | Amministratore | Prenotazioni ricevute > «Dettagli tecnici» di una riga (se ce ne sono). | Ci sono «Codice Italianway» e «Ospiti»; nel corpo grezzo nessun nome, email o telefono degli ospiti. | |
 
+## L. Ambiente di prova (dopo la separazione degli ambienti)
+
+| N. | Ruolo | Passi | Risultato atteso | Esito |
+|---|---|---|---|---|
+| L1 📱 | Qualsiasi | Apri il sito di prova, accedi, scorri più pagine. | Su ogni pagina, in alto, la fascia gialla «Ambiente di prova · i dati sono separati da quelli veri» resta ferma scorrendo (sul telefono sotto il nome DOMHOUSE, sul computer in cima al contenuto). | |
+| L2 📱 | Qualsiasi | Apri il sito vero con lo stesso account. | Nessuna fascia; nessun appartamento dimostrativo in elenco. | |
+| L3 | Amministratore | Nel sito di prova guarda un appartamento dimostrativo. | Etichetta viola «Dimostrativo» e voce «Simulatore» nel menu, come prima. | |
+| L4 | Amministratore | Nel sito vero prova a collegare un appartamento a un indirizzo `mock://` (solo il gestore della piattaforma può farlo: chiedi a lui). | Rifiutato: in produzione i sistemi simulati non sono ammessi. | |
+
 ## K. Rendiconti dei consumi in Excel
 
 | N. | Ruolo | Passi | Risultato atteso | Esito |
