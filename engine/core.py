@@ -49,7 +49,11 @@ RETENTION_EVERY_S = 3600
 ARREARS_MINUTES = 30      # at a restart, a scheduled action older than this is not run any more: failed, "missed"
 PAUSE_WAITED_S = 7        # R4: a manual start this close to the end of the compressor's pause waits instead of failing
 # the engine's own fields of a capability, kept across restarts (the device reports the others again)
-ENGINE_FIELDS = {"heating": ("setpoint",), "contact": ("since",), "motion": ("last_seen",), "power_meter": ("kwh_today",)}
+ENGINE_FIELDS = {"heating": ("on", "setpoint"), "contact": ("since",), "motion": ("last_seen",),
+                 "power_meter": ("kwh_today",)}
+# the boiler's thermostat (R1, R2, D-126, D-128): heating.on is the intention the app sees; the relay is the engine's
+THERMOSTAT_HYSTERESIS = 0.5        # °C: on below the setpoint, off above setpoint + this, unchanged in between
+THERMOSTAT_MIN_SWITCH_MINUTES = 5  # at least this between two switches of the relay made by the thermostat
 
 NAMES = {"apt-rimini-01": "Via Roma 12 – int. 3", "apt-bologna-01": "Corso Italia 5 – int. 7"}
 
@@ -188,6 +192,12 @@ class ApartmentEngine:
         self.deferred: dict[str, str] = {}      # schedule_id -> the hold's end, for mode actions waiting for it (D-122)
         self.compressor_off: dict[str, float] = {}   # climate device -> when it went off (monotonic), R4
         self.offline_watch: dict[str, object] = {}   # device -> the offline episode being watched, R5
+        self.links: dict[str, dict[str, str]] = {}   # device -> its links (connector.md §2.2), never shown to the app
+        self.relay: dict[str, bool] = {}             # boiler -> its relay as the device reports it (R2, D-128)
+        self.relay_switched: dict[str, float] = {}   # boiler -> when the thermostat last switched it (monotonic)
+        self.relay_busy: set[str] = set()            # boilers with a thermostat switch running
+        self.thermostat_issue: dict[str, str] = {}   # boiler -> the sensor problem already reported
+        self.last_regulation = 0.0
         self.decisions: list[dict] = []
         self.asks: dict[str, dict] = {}
         self.events: deque[dict] = deque()
@@ -206,6 +216,7 @@ class ApartmentEngine:
             self.devices = {d.device_id: self._device_from(d) for d in self.connector.devices()}
             for device in self.devices.values():
                 self._save_device(device)
+            self._read_links_and_relays()
             self._save_apartment()
             if seeded:
                 self._seed_history(variant)
@@ -266,6 +277,7 @@ class ApartmentEngine:
         self.meters = {k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
         stored = dict(st.all("devices"))
         self.devices = {}
+        self._read_links_and_relays()
         for info in self.connector.devices():
             device = self._device_from(info)
             old = stored.get(info.device_id)
@@ -434,7 +446,12 @@ class ApartmentEngine:
             logs.warn("change for a capability not in the catalog ignored", apartment_id=self.apartment_id,
                       device_id=change.device_id, capability=cap)
             return
-        part = self._contract_part(change.device_id, cap, change.state or {}, change.ts, state)
+        raw = self._take_relay(change.device_id, cap, change.state or {})
+        if cap == "heating" and not raw and not (running and running[1] == cap):
+            device["last_seen"] = iso(change.ts)              # only the relay moved: nothing changes for the app
+            self._save_device(device)
+            return
+        part = self._contract_part(change.device_id, cap, raw, change.ts, state)
         was_on = state.get("on")
         if running and running[1] == cap:
             state.update({k: copy.deepcopy(v) for k, v in running[3].items() if k in CONTRACT_FIELDS[cap]})
@@ -520,6 +537,126 @@ class ApartmentEngine:
                  f"dell'antimuffa ({fmt_num(threshold)} %) a casa vuota: solo avviso, nessuna azione automatica",
                  "informational", str(uuid.uuid4()))
         self.store.put_meta("mold_notice_day", today)
+
+    # ---- the boiler's thermostat (R1, R2) ---------------------------------------------------------------------------
+    def _read_links_and_relays(self) -> None:
+        for info in self.connector.devices():
+            self.links[info.device_id] = dict(info.links)
+            if "heating" in info.capabilities:
+                self.relay[info.device_id] = bool(info.capabilities["heating"].get("on"))
+
+    def _take_relay(self, device_id: str, cap: str, raw: dict) -> dict:
+        """For a boiler, "on" from the device is its relay: kept by the engine, not shown as heating.on (D-128)."""
+        if cap != "heating" or "on" not in raw:
+            return raw
+        self.relay[device_id] = bool(raw["on"])
+        return {k: v for k, v in raw.items() if k != "on"}
+
+    def connector_target(self, device: dict, cap: str, state: dict) -> dict:
+        """What the connector is asked: the device's fields (D-108); for a boiler the relay the thermostat wants."""
+        if cap == "heating":
+            return {"on": self.thermostat(device, state)[0]}
+        return self.device_target(cap, state)
+
+    def _sensor(self, device: dict) -> tuple[float | None, dict | None, str | None]:
+        """(temperature, sensor, problem) of the sensor linked to a boiler (links.sensor_device_id)."""
+        sensor_id = self.links.get(device["device_id"], {}).get("sensor_device_id")
+        sensor = self.devices.get(sensor_id) if sensor_id else None
+        if sensor is None or "temperature" not in sensor["capabilities"]:
+            return None, None, "nessun sensore di temperatura collegato"
+        celsius = sensor["capabilities"]["temperature"].get("celsius")
+        if not sensor["online"] or not isinstance(celsius, (int, float)):
+            return None, sensor, f"sensore «{sensor['label']}» non disponibile"
+        return float(celsius), sensor, None
+
+    def thermostat(self, device: dict, intention: dict | None = None) -> tuple[bool, float | None, float | None, bool]:
+        """(relay wanted, temperature, setpoint used, frost) for a boiler. Enabled (heating.on) it keeps the setpoint;
+        in an empty apartment the frost protection keeps at least its threshold even when disabled (a safety rule,
+        never suspended). Without a usable sensor the relay follows the intention, as a plain switch."""
+        intention = intention if intention is not None else device["capabilities"]["heating"]
+        enabled = bool(intention.get("on"))
+        frost_rule = self.rule("frost_protection")
+        frost = self.mode == "empty" and frost_rule["enabled"]
+        candidates = ([float(intention["setpoint"])] if enabled and isinstance(intention.get("setpoint"), (int, float))
+                      else [])
+        if frost:
+            candidates.append(float(frost_rule["params"]["celsius"]))
+        if not candidates:
+            return False, None, None, False
+        setpoint = max(candidates)
+        frost_only = frost and (not enabled or setpoint == float(frost_rule["params"]["celsius"]))
+        temperature, _, problem = self._sensor(device)
+        if problem:
+            return enabled, None, setpoint, frost_only
+        current = self.relay.get(device["device_id"], False)
+        if temperature < setpoint:
+            return True, temperature, setpoint, frost_only
+        if temperature > setpoint + THERMOSTAT_HYSTERESIS:
+            return False, temperature, setpoint, frost_only
+        return current, temperature, setpoint, frost_only
+
+    def regulate(self) -> None:
+        """Once a "minute": every boiler's relay where its thermostat wants it, at most one switch every
+        THERMOSTAT_MIN_SWITCH_MINUTES. Decisions: the frost protection's every switch, the sensor's problems."""
+        for device in self.devices.values():
+            if "heating" not in device["capabilities"] or not device["online"]:
+                continue
+            device_id = device["device_id"]
+            _, _, problem = self._sensor(device)
+            if problem != self.thermostat_issue.get(device_id):
+                self._sensor_issue(device, problem)
+            if device_id in self.relay_busy or any(r[0] == device_id for r in self.inflight):
+                continue
+            want, temperature, setpoint, frost = self.thermostat(device)
+            if want == self.relay.get(device_id, False):
+                continue
+            since = time.monotonic() - self.relay_switched.get(device_id, -1e18)
+            if since < THERMOSTAT_MIN_SWITCH_MINUTES * seconds_per_minute():
+                continue
+            self.relay_busy.add(device_id)
+            self.spawn(self._switch_relay(device, want, temperature, setpoint, frost))
+
+    def _sensor_issue(self, device: dict, problem: str | None) -> None:
+        device_id = device["device_id"]
+        if problem:
+            self.thermostat_issue[device_id] = problem
+            reasoning = (f"Termostato di {device['label'].lower()}: {problem}; la caldaia segue l'accensione richiesta "
+                         f"senza regolazione")
+        else:
+            self.thermostat_issue.pop(device_id, None)
+            reasoning = f"Termostato di {device['label'].lower()}: sensore di nuovo disponibile, regolazione ripresa"
+        self.log("system", {"type": "device", "device_id": device_id}, "thermostat_sensor", None,
+                 "problema" if problem else "ok", reasoning, "informational", str(uuid.uuid4()))
+
+    async def _switch_relay(self, device: dict, on: bool, temperature, setpoint, frost: bool) -> None:
+        device_id = device["device_id"]
+        corr = str(uuid.uuid4())
+        try:
+            async with self._device_lock(device_id):
+                deadline = utcnow() + timedelta(seconds=COMMAND_DEADLINE_S)
+                result = await asyncio.wait_for(self.connector.execute(
+                    ConnectorCommand(command_id=f"thermostat-{uuid.uuid4().hex[:8]}", correlation_id=corr,
+                                     device_id=device_id, capability="heating", target={"on": on}, deadline=deadline),
+                    lambda step: None), timeout=COMMAND_DEADLINE_S)
+        except Exception as exc:                          # timeout or connector error: the next minute tries again
+            logs.warn("thermostat switch failed", apartment_id=self.apartment_id, device_id=device_id,
+                      error=type(exc).__name__)
+            return
+        finally:
+            self.relay_busy.discard(device_id)
+        if result.outcome == "failed":
+            logs.warn("thermostat switch failed", apartment_id=self.apartment_id, device_id=device_id,
+                      reason=result.reason)
+            return
+        self.relay[device_id] = on
+        self.relay_switched[device_id] = time.monotonic()
+        if frost:                                          # R1: every switch of the frost protection is a decision
+            what = (f"caldaia accesa: {fmt_num(temperature)} °C, sotto la soglia di {fmt_num(setpoint)} °C" if on else
+                    f"caldaia spenta: {fmt_num(temperature)} °C, sopra la soglia di {fmt_num(setpoint)} °C "
+                    f"+ {fmt_num(THERMOSTAT_HYSTERESIS)}")
+            self.log("rule:frost_protection", {"type": "device", "device_id": device_id},
+                     "frost_heating_on" if on else "frost_heating_off", "off" if on else "on", "on" if on else "off",
+                     f"Antigelo a casa vuota: {what}", "applied", corr)
 
     def _device_lock(self, device_id: str) -> asyncio.Lock:
         lock = self.device_locks.get(device_id)
@@ -828,7 +965,8 @@ class ApartmentEngine:
         state = device["capabilities"][cap]
         merged = dict(state)
         merged.update({k: copy.deepcopy(v) for k, v in requested.items() if k in CONTRACT_FIELDS[cap]})
-        merged.update(self._contract_part(device["device_id"], cap, reported, utcnow(), state))
+        merged.update(self._contract_part(device["device_id"], cap, self._take_relay(device["device_id"], cap, reported),
+                                          utcnow(), state))
         if merged == state:
             return
         was_on = state.get("on")
@@ -878,7 +1016,7 @@ class ApartmentEngine:
                 result = await asyncio.wait_for(self.connector.execute(
                     ConnectorCommand(command_id=cmd["command_id"], correlation_id=cmd["correlation_id"],
                                      device_id=device["device_id"], capability=cap,
-                                     target=self.device_target(cap, new_state), deadline=deadline),
+                                     target=self.connector_target(device, cap, new_state), deadline=deadline),
                     lambda step: self._set_status(cmd, step) if step in ("sent", "verifying") else None),
                     timeout=max((deadline - utcnow()).total_seconds(), 0))
             except TimeoutError:
@@ -907,7 +1045,8 @@ class ApartmentEngine:
         # the simulated connector reports the new state through changes() before the outcome, so it is already here;
         # a connector may also confirm only in its result; "delivered" (no confirmation possible) is decided by
         # engine/confirmation.py, today a placeholder that shows the state requested (confirmation "none")
-        reported = result.state if result.outcome == "confirmed" and result.state else self.device_target(cap, new_state)
+        reported = (result.state if result.outcome == "confirmed" and result.state
+                    else self.connector_target(device, cap, new_state))
         status = "acked" if result.outcome == "confirmed" else delivered_outcome(new_state)
         self._settle(device, cap, new_state, reported, cmd["correlation_id"])
         self._set_status(cmd, status)
@@ -1506,6 +1645,9 @@ class ApartmentEngine:
 
     def tick(self) -> None:
         now = utcnow()
+        if time.monotonic() - self.last_regulation >= seconds_per_minute():
+            self.last_regulation = time.monotonic()
+            self.regulate()
         if time.monotonic() - self.last_housekeeping >= 60:
             self.last_housekeeping = time.monotonic()
             self.housekeeping()
