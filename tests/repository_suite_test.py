@@ -302,6 +302,30 @@ def test_a_named_database_is_another_world():
     assert run(prod.get_tenant("t-solo-staging")) is None and staging.database == "staging" and prod.database == "(default)"
 
 
+def _list_demos(env_extra: dict, timeout: float = 60):
+    import subprocess
+    import sys
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    env = {**os.environ, "REPOSITORY": "firestore", "GCP_PROJECT_ID": os.environ.get("GCP_PROJECT_ID", "demo-test"),
+           **env_extra}
+    return subprocess.run([sys.executable, str(root / "scripts" / "list_demos.py")], cwd=root, env=env,
+                          capture_output=True, text=True, encoding="utf-8", timeout=timeout)
+
+
+def test_list_demos_reads_firestore_and_says_when_it_does_not_answer():
+    """P-67 M1 (D-136): the read-only list of the demonstrations against the emulator; with nothing listening, a clear
+    message within the time limit instead of a silent wait (seen on 21 Oct)."""
+    if "FIRESTORE_EMULATOR_HOST" not in os.environ:
+        pytest.skip("solo con l'emulatore di Firestore")
+    r = _list_demos({"FIRESTORE_DATABASE": f"d{uuid.uuid4().hex[:8]}"})       # an empty database of its own
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines()[0].startswith("Database Firestore d") and "Nessun appartamento dimostrativo" in r.stdout
+    r = _list_demos({"FIRESTORE_EMULATOR_HOST": "127.0.0.1:9", "FIRESTORE_TIMEOUT_S": "3"})   # nobody answers
+    assert r.returncode == 2 and "Firestore non risponde entro 3 secondi" in r.stdout and "quota project" in r.stdout
+    assert r.stdout.splitlines()[0].startswith("Database Firestore")       # the first line came at once
+
+
 def test_ai_usage_adds_up_and_alerts_once(repo):
     """P-60 step 9: the assistant's spending of a month adds up atomically; the 80 % alert is claimed once."""
     assert run(repo.get_ai_usage("2026-10")) == {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0,

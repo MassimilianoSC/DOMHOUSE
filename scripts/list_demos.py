@@ -9,10 +9,19 @@ people who see them (email and role: the list is for the committente, it is not 
 actions recorded on those apartments (who changed what and when: the sign that the client modified something). Nothing
 is written. The rules and the device states of a demonstration live in the BFF's memory (they start again from the
 initial values at every publication): they are seen in the app (Regole), not here.
+Every line is printed at once (also through a pipe), and Firestore has FIRESTORE_TIMEOUT_S (30 s) to answer: otherwise
+the script stops with exit code 2 and says what to check (21 Oct: from a PC with user credentials and no quota project
+it waited without a word until killed).
 """
 import asyncio
+import functools
 import os
 import sys
+
+print = functools.partial(print, flush=True)          # every line at once, also through a pipe
+QUOTA_HINT = ("Firestore non risponde entro {s:g} secondi: controlla le credenziali (gcloud auth application-default "
+              "login, con l'account proprietario del progetto) e il quota project (gcloud auth application-default "
+              "set-quota-project domotica-poc-511707).")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -62,7 +71,16 @@ def main() -> None:
     if s.repository != "firestore":
         raise SystemExit("Lancialo con REPOSITORY=firestore GCP_PROJECT_ID=<progetto> (sola lettura).")
     print(f"Database Firestore {s.firestore_database} del progetto {s.gcp_project_id}, sola lettura")
-    for line in asyncio.run(collect(get_repository())):
+    timeout = float(os.environ.get("FIRESTORE_TIMEOUT_S", "30"))
+
+    async def read():
+        return await asyncio.wait_for(collect(get_repository()), timeout=timeout)
+    try:
+        lines = asyncio.run(read())
+    except TimeoutError:
+        print(QUOTA_HINT.format(s=timeout))
+        sys.exit(2)
+    for line in lines:
         print(line)
 
 
