@@ -81,6 +81,7 @@ SIZE_SUITE = "dimensione"
 LINUX_SUITE = "linux"
 LINUX_SCRIPT = ROOT / "scripts" / "ci-linux.sh"
 LINUX_TIMEOUT_S = 900
+SUITE_TIMEOUT_S = 900          # 15 minutes for one pytest suite (the longest takes about 2)
 SIZE_EXIT = {1: "blocco principale sopra la soglia", 2: "build mancante"}
 # Suites known to be red while a planned piece of work is open: shown as such, never hidden or skipped.
 EXPECTED_RED: dict[str, str] = {}  # e.g. {SIZE_SUITE: "P-20 in corso"} (P-20 closed on 16/10: empty)
@@ -172,9 +173,16 @@ def junit_counts(junit: Path) -> dict:
 
 
 def run_pytest(suite: str, work: Path, extra: list[str], env: dict) -> dict:
+    """One pytest suite in its own process, at most SUITE_TIMEOUT_S: a suite that hangs (seen once on 21 Oct,
+    support_access for 36 minutes, never reproduced) is stopped and counted red with the reason, the run goes on."""
     junit = work / f"{Path(suite).stem}.xml"
     cmd = [sys.executable, "-m", "pytest", suite, "-q", "-rfE", "-p", "no:cacheprovider", f"--junitxml={junit}", *extra]
-    code = subprocess.call(cmd, cwd=ROOT, env=env)
+    proc = subprocess.Popen(cmd, cwd=ROOT, env=env)
+    try:
+        code = proc.wait(timeout=SUITE_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        stop_tree(proc)
+        return result(errors=1, note=f"bloccata: ferma oltre {SUITE_TIMEOUT_S // 60} minuti, fermata dal giro")
     c = junit_counts(junit)
     if c["tests"] == 0:
         if code == 5 and extra:   # lot 11: pytest "no tests collected" because of the user's filter, not a failure

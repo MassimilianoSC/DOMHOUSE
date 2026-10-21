@@ -192,3 +192,14 @@ def test_linux_runs_in_the_full_run_not_with_a_pytest_filter():
     assert rt.LINUX_SUITE not in rt.selected_suites([], ["-k", "webhook"])
     assert rt.selected_suites(["linux"], []) == [rt.LINUX_SUITE]
     assert rt.run_linux_suite(skip=True)["suite_skipped"] is True
+
+
+def test_a_suite_that_hangs_is_stopped_and_counted_red(tmp_path, monkeypatch):
+    """21 Oct: support_access hung for 36 minutes after the repository suite (never reproduced). A suite past
+    SUITE_TIMEOUT_S is stopped and counted as one red with the reason; the run goes on."""
+    rt = _runner()
+    monkeypatch.setattr(rt, "SUITE_TIMEOUT_S", 2)
+    suite = tmp_path / "ferma_test.py"
+    suite.write_text("import time\n\ndef test_ferma():\n    time.sleep(60)\n", encoding="utf-8")
+    c = rt.run_pytest(str(suite), tmp_path, [], {**__import__("os").environ})
+    assert c["errors"] == 1 and "bloccata" in c["note"]
