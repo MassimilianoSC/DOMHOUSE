@@ -276,7 +276,10 @@ appartamenti gli amministratori vedono la voce «Simulatore» («Provoca eventi 
 vedono solo gli amministratori.»); su un appartamento vero la voce non c'è. Il Simulatore serve a provare l'app senza
 dispositivi veri: aprire e chiudere finestre, mettere offline un dispositivo, generare
 un'approvazione, inviare un evento di prenotazione (arrivo, partenza, ospiti) e vedere le azioni programmate che ne
-nascono. La prenotazione di prova fa lo stesso percorso di una prenotazione vera arrivata da Italianway, fino al sistema
+nascono. La sezione «Movimento» ha un pulsante «Simula movimento» per ogni sensore di movimento: un clic fa come se
+una persona passasse davanti al sensore (il sistema registra l'ora, come con un sensore vero) e accanto al nome si
+aggiorna «ultimo movimento»; serve, per esempio, a provare la richiesta «Mettere l'appartamento a vuoto dopo il
+check-out». La prenotazione di prova fa lo stesso percorso di una prenotazione vera arrivata da Italianway, fino al sistema
 domotico dell'appartamento; ripetere lo stesso invio non la duplica.
 
 **Ripristina lo stato iniziale** (in fondo al Simulatore): «Riporta l'appartamento dimostrativo com'era all'inizio, per

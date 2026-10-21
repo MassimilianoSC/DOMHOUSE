@@ -77,7 +77,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D5 | Operatore | Menu ⋮ > «Rinomina o sposta», cambia il nome. | «Dispositivo aggiornato» e il nome nuovo. | |
 | D6 | Operatore | Approvazioni: approva una richiesta con una nota (generala dal Simulatore, prova F3). | «Azione approvata»; in «Tutte» compare «approvata da …» con la nota. | |
 | D6b | Operatore (su un dimostrativo «vuoto», per esempio Bologna) | Accendi il «Climatizzatore soggiorno» e aspetta 15 minuti veri (il climatizzatore deve restare acceso e l'appartamento «vuoto», senza forzatura). | In Approvazioni compare «Spegnere climatizzatore soggiorno» con il motivo «Climatizzatore soggiorno consuma … W da oltre … minuti con l'appartamento vuoto». Respingi: il climatizzatore resta acceso e non arriva una seconda richiesta finché il consumo non scende e risale. | |
-| D6c | Qualsiasi | «Mettere l'appartamento a vuoto dopo il check-out»: oggi non si può provocare dal Simulatore (manca un movimento simulato dopo l'orario di partenza) ed è coperta dalle prove automatiche. | Nessuna prova da fare; se la richiesta compare da sola su un dimostrativo, segnalalo. | |
+| D6c | Operatore e amministratore (su un dimostrativo) | Regole: «Risparmio al check-out» a 0 minuti. Simulatore › Evento prenotazione: check-in già passato e check-out fra 2 minuti. Passato il check-out, nella sezione «Movimento» premi «Simula movimento» su «Sensore soggiorno». | Entro un minuto in Approvazioni compare «Mettere l'appartamento a vuoto dopo il check-out» con il motivo «Movimento rilevato … minuti fa da «Sensore soggiorno», dopo l'orario di partenza delle …: gli ospiti potrebbero essere ancora in casa». Approva: l'appartamento va a vuoto. (Senza risposta, alla scadenza viene approvata da sola.) | |
 | D7 | Qualsiasi | Decisioni: filtra per autore, poi «Carica altri». | L'elenco si filtra e si allunga. | |
 | D7b | Qualsiasi | Decisioni: cerca una parola presente solo in decisioni vecchie. | Il primo blocco dice fin dove è arrivato; «Cerca più indietro» la trova. | |
 | D7c | Qualsiasi | Copia un ID richiesta da un messaggio d'errore o da una decisione e incollalo nella ricerca. | Compare quella decisione con «Ricerca per ID richiesta in tutto lo storico». | |
@@ -114,6 +114,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | F4 | Invia un evento di prenotazione con check-in fra un'ora. | «Evento prenotazione inoltrato» e le azioni programmate; reinviando lo stesso evento, «Evento già elaborato». | |
 | F5 | Metti un dispositivo offline e cambia la modalità; poi in fondo al Simulatore «Ripristina…»: leggi la conferma, prima «Annulla», poi di nuovo e «Ripristina». | Con «Annulla» non cambia nulla; con «Ripristina» compare «Stato iniziale ripristinato», il dispositivo torna online e la modalità iniziale; nel Registro attività la voce del ripristino. | |
 | F6 | Con l'appartamento aperto anche su un secondo dispositivo, ripeti il ripristino dal primo. | Sul secondo la Panoramica si aggiorna da sola entro pochi secondi. | |
+| F7 | Nella sezione «Movimento» premi «Simula movimento» su «Sensore soggiorno». | «Movimento simulato su Sensore soggiorno»; entro pochi secondi accanto al nome «ultimo movimento» con l'ora di adesso; in Panoramica il sensore indica «Movimento rilevato». | |
 
 ## G. Dopo ogni pubblicazione
 
