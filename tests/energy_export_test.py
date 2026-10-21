@@ -18,6 +18,7 @@ from bff.repository import BookingRecord, get_repository
 APT, TID = "apt-bologna-01", "t-flatsharing-demo"
 ADMIN, VIEWER_ONLY_RIMINI = "admin@demo.it", "proprietario@demo.it"
 NS = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+DATA_FROM = datetime(2025, 1, 1, tzinfo=UTC)          # the fake engine measures from here (D-130)
 
 
 def run(coro):
@@ -37,13 +38,20 @@ def engine(monkeypatch):
         p = kw["params"]
         frm, to = parse(p["from"]), parse(p["to"])
         calls.append((frm, to, p["bucket"]))
-        assert p["bucket"] == "hour" and to - frm <= timedelta(days=31)       # the contract's limit, always kept
-        series, cur = [], frm
+        assert p["bucket"] in ("hour", "day") and to - frm <= timedelta(days=31)   # the contract's limit, always kept
+        # 1 kWh an hour from DATA_FROM on, 0 before (an engine counts 0 for an hour without readings, D-130); by day
+        # (energy_since's search) a day counts the hours from DATA_FROM
+        step = timedelta(hours=1) if p["bucket"] == "hour" else timedelta(days=1)
+        series, cur = [], frm.replace(minute=0, second=0, microsecond=0)      # whole hours, as the engine
+        if p["bucket"] == "day":
+            cur = cur.replace(hour=0)                                         # (the engine: local midnight)
         while cur < to:
-            series.append({"ts": cur.isoformat().replace("+00:00", "Z"), "kwh": 1.0})
-            cur += timedelta(hours=1)
-        n = len(series)
-        body = {"from": p["from"], "to": p["to"], "bucket": "hour", "total_kwh": n, "avoided_hvac_hours": None,
+            nxt = cur + step
+            hours = max(0.0, (nxt - max(cur, DATA_FROM)).total_seconds() / 3600)
+            series.append({"ts": cur.isoformat().replace("+00:00", "Z"), "kwh": hours})
+            cur = nxt
+        n = sum(s["kwh"] for s in series)
+        body = {"from": p["from"], "to": p["to"], "bucket": p["bucket"], "total_kwh": n, "avoided_hvac_hours": None,
                 "series": series, "by_device": [{"device_id": "m1", "label": "Clima", "kwh": n * 0.75},
                                                 {"device_id": "m2", "label": "Caldaia", "kwh": n * 0.25}]}
         return httpx.Response(200, json=body, request=httpx.Request("GET", "http://x"))
@@ -104,7 +112,8 @@ def test_month_with_the_end_of_summer_time(engine):
     assert {d[0]: d[1] for d in days}["26/10/2025"] == 25.0
     assert len(book["Orario"]) - 1 == hours
     assert [d[0] for d in book["Dispositivi"][1:]] == ["Clima", "Caldaia"]
-    assert len(engine) >= 3 and all(c[1] - c[0] <= timedelta(days=15) for c in engine)   # asked in pieces
+    hourly = [c for c in engine if c[2] == "hour"]
+    assert len(hourly) >= 3 and all(c[1] - c[0] <= timedelta(days=15) for c in hourly)   # asked in pieces
 
 
 def test_stay_to_the_hour_with_the_apartment_price(engine):
@@ -210,3 +219,76 @@ def test_at_most_three_pieces_at_a_time(monkeypatch):
     start = datetime(2025, 1, 1, tzinfo=UTC)
     run(energy_report.collect(None, "p-x@pseudo.hqe.it", start, start + timedelta(days=200)))
     assert state["calls"] == 14 and state["max"] == energy_report.MAX_PARALLEL == 3
+
+
+# -------- D-130: from when consumption is measured (energy_since) --------
+def set_since(value):
+    from bff import energy_since
+    energy_since._next_try.clear()
+    a = run(get_repository().get_apartment(APT))
+    a.energy_since = value
+    run(get_repository().upsert_apartment(a))
+
+
+def test_the_first_reading_is_found_saved_and_written_in_the_report(engine):
+    set_since(None)
+    r = run(get(f"/app/apartments/{APT}/energy/export", month="2025-10"))
+    assert r.status_code == 200, r.text
+    assert run(get_repository().get_apartment(APT)).energy_since == "2025-01-01T00:00:00.000Z"
+    assert summary(sheets(r.content))["Consumi disponibili dal"] == "01/01/2025 01:00"     # Rome, winter time
+    days = [c for c in engine if c[2] == "day"]
+    assert days and all(to - frm <= timedelta(days=31) for frm, to, _ in days)
+
+
+def test_hours_before_the_first_reading_are_empty_not_zero(engine):
+    set_since("2025-10-15T10:00:00.000Z")                    # 12:00 in Rome (summer time)
+    r = run(get(f"/app/apartments/{APT}/energy/export", month="2025-10"))
+    book = sheets(r.content)
+    s = summary(book)
+    measured = 31 * 24 + 1 - (14 * 24 + 12)                  # from 15/10 12:00 to the end of the month
+    assert s["Consumi disponibili dal"] == "15/10/2025 12:00: ore precedenti vuote"
+    assert s["Totale kWh"] == measured
+    hours = {row[0]: row[1:] for row in book["Orario"][1:]}
+    assert hours["15/10/2025 11:00"] == [] and hours["15/10/2025 12:00"] == [1.0]
+    days = {row[0]: row[1:] for row in book["Giornaliero"][1:]}
+    assert days["14/10/2025"] == [] and days["15/10/2025"][0] == 12.0 and days["16/10/2025"][0] == 24.0
+
+
+def test_a_period_all_before_the_first_reading_and_no_reading_at_all(engine, monkeypatch):
+    set_since("2025-12-01T00:00:00.000Z")
+    s = summary(sheets(run(get(f"/app/apartments/{APT}/energy/export", month="2025-10")).content))
+    assert s["Consumi disponibili dal"] == "01/12/2025 01:00: nessun dato nel periodo" and s["Totale kWh"] is None
+    import sys
+    monkeypatch.setattr(sys.modules[__name__], "DATA_FROM", datetime(2030, 1, 1, tzinfo=UTC))   # nothing measured
+    set_since(None)
+    book = sheets(run(get(f"/app/apartments/{APT}/energy/export", month="2025-10")).content)
+    s = summary(book)
+    assert s["Consumi disponibili dal"] == "Nessun consumo misurato finora" and s["Totale kWh"] is None
+    assert all(len(row) == 1 for row in book["Orario"][1:]) and all(len(row) == 1 for row in book["Dispositivi"][1:])
+    assert run(get_repository().get_apartment(APT)).energy_since is None
+
+
+def test_the_search_stops_at_an_empty_window_refines_by_hour_and_waits_an_hour_to_retry(engine, monkeypatch):
+    import sys
+
+    from bff import energy_since
+    monkeypatch.setattr(sys.modules[__name__], "DATA_FROM", datetime(2026, 9, 3, 5, tzinfo=UTC))
+    set_since(None)
+    apt = run(get_repository().get_apartment(APT))
+    now = datetime(2026, 10, 21, 12, tzinfo=UTC)
+    assert run(energy_since.search_and_save(apt, "actor", now)) == "2026-09-03T05:00:00.000Z"
+    # two windows with consumption, the third empty: stop; then the first day by hour
+    assert [c[2] for c in engine] == ["day", "day", "day", "hour"]
+    engine.clear()
+    set_since(None)
+    monkeypatch.setattr(sys.modules[__name__], "DATA_FROM", datetime(2030, 1, 1, tzinfo=UTC))
+    assert run(energy_since.search_and_save(apt, "actor", now)) is None and len(engine) == 1   # the latest window only
+    assert run(energy_since.search_and_save(apt, "actor", now)) is None and len(engine) == 1   # not again within the hour
+
+
+def test_the_date_only_moves_back(engine):
+    from bff import energy_since
+    set_since("2024-06-01T00:00:00.000Z")                    # older than what the engine shows now
+    apt = run(get_repository().get_apartment(APT))
+    assert run(energy_since.search_and_save(apt, "actor", datetime(2026, 10, 21, tzinfo=UTC))) == "2024-06-01T00:00:00.000Z"
+    assert run(get_repository().get_apartment(APT)).energy_since == "2024-06-01T00:00:00.000Z"

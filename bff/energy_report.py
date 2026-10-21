@@ -4,6 +4,8 @@ Data come from the contract's GET /energy, unchanged: always the HOURLY series, 
 contract allows 31 days per request, and a month of 31 days with the end of summer time lasts 31 days and one hour),
 then added up here in the apartment's time zone. The amount is kWh × the price per kWh set by the organisation's admin
 (the apartment's own price first). No guest data: of a stay only its id, the number of guests and the times.
+D-130: the engine counts 0 for an hour without readings; the report says from when consumption is measured
+(energy_since, bff/energy_since.py) and leaves the earlier hours, days and totals EMPTY, not 0.
 """
 import asyncio
 import io
@@ -89,6 +91,7 @@ class Report:
     title: str                                   # "Rendiconto mensile" / "Rendiconto del soggiorno"
     period: str                                  # e.g. "ottobre 2026" or the stay's local times
     stay: dict | None = None                     # {booking_id, guests, status}
+    energy_since: str | None = None              # D-130: first hour with measured consumption; None = none yet
 
 
 MONTHS = ["gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre",
@@ -117,6 +120,15 @@ def workbook(r: Report, usage: Usage, generated_at: datetime) -> bytes:
     def amount(value: float):
         return round(value * r.price, 2) if r.price is not None else None
 
+    since = parse(r.energy_since) if r.energy_since else None
+    measured = {h: v for h, v in usage.hours.items() if since is not None and h >= since}   # D-130
+    if since is None:
+        available = "Nessun consumo misurato finora"
+    elif since <= r.start:
+        available = local_text(since, tz)
+    else:
+        available = local_text(since, tz) + (": ore precedenti vuote" if since < r.end else ": nessun dato nel periodo")
+
     # --- Riepilogo
     ws = wb.add_worksheet("Riepilogo")
     ws.set_column(0, 0, 26)
@@ -124,7 +136,7 @@ def workbook(r: Report, usage: Usage, generated_at: datetime) -> bytes:
     ws.write(0, 0, f"{r.title} dei consumi", title)
     rows = [("Organizzazione", r.organisation), ("Appartamento", f"{r.apartment} ({r.apartment_id})"),
             ("Periodo", r.period), ("Dal", local_text(r.start, tz)), ("Al", local_text(r.end, tz)),
-            ("Fuso orario", r.timezone)]
+            ("Fuso orario", r.timezone), ("Consumi disponibili dal", available)]
     if r.stay:
         rows += [("Prenotazione", r.stay["booking_id"]),
                  ("Ospiti", r.stay["guests"] if r.stay.get("guests") is not None else "non indicato"),
@@ -139,8 +151,10 @@ def workbook(r: Report, usage: Usage, generated_at: datetime) -> bytes:
         ws.write(line, 1, "Periodo in corso: i dati arrivano fino al momento della generazione")
         line += 1
     line += 1
+    total = sum(measured.values())
     ws.write(line, 0, "Totale kWh", bold)
-    ws.write_number(line, 1, round(usage.total, 2), kwh)
+    if measured:
+        ws.write_number(line, 1, round(total, 2), kwh)
     ws.write(line + 1, 0, "Prezzo €/kWh", bold)
     ws.write(line + 2, 0, "Importo", bold)
     if r.price is None:
@@ -148,19 +162,25 @@ def workbook(r: Report, usage: Usage, generated_at: datetime) -> bytes:
         ws.write(line + 2, 1, "")
     else:
         ws.write_number(line + 1, 1, r.price, price_fmt)
-        ws.write_number(line + 2, 1, amount(usage.total), eur)
+        if measured:
+            ws.write_number(line + 2, 1, amount(total), eur)
 
     # --- Giornaliero (days in the apartment's time zone)
-    days: dict[date, float] = {}
+    days: dict[date, float | None] = {}             # None: a day with no measured hour, left empty
     for hour, value in usage.hours.items():
         d = hour.astimezone(tz).date()
-        days[d] = days.get(d, 0.0) + value
+        if hour in measured:
+            days[d] = (days.get(d) or 0.0) + value
+        else:
+            days.setdefault(d, None)
     ws = wb.add_worksheet("Giornaliero")
     ws.set_column(0, 2, 16)
     for col, h in enumerate(("Giorno", "kWh", "Importo")):
         ws.write(0, col, h, head)
     for i, d in enumerate(sorted(days), start=1):
         ws.write(i, 0, d.strftime("%d/%m/%Y"))
+        if days[d] is None:
+            continue
         ws.write_number(i, 1, round(days[d], 2), kwh)
         if r.price is not None:
             ws.write_number(i, 2, amount(days[d]), eur)
@@ -172,7 +192,8 @@ def workbook(r: Report, usage: Usage, generated_at: datetime) -> bytes:
         ws.write(0, col, h, head)
     for i, hour in enumerate(sorted(usage.hours), start=1):
         ws.write(i, 0, local_text(hour, tz))
-        ws.write_number(i, 1, round(usage.hours[hour], 3), kwh)
+        if hour in measured:
+            ws.write_number(i, 1, round(usage.hours[hour], 3), kwh)
 
     # --- Dispositivi
     ws = wb.add_worksheet("Dispositivi")
@@ -182,6 +203,8 @@ def workbook(r: Report, usage: Usage, generated_at: datetime) -> bytes:
         ws.write(0, col, h, head)
     for i, (label, value) in enumerate(sorted(usage.devices.values(), key=lambda d: -d[1]), start=1):
         ws.write(i, 0, label)
+        if not measured:
+            continue
         ws.write_number(i, 1, round(value, 2), kwh)
         if r.price is not None:
             ws.write_number(i, 2, amount(value), eur)

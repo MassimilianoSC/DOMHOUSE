@@ -80,6 +80,8 @@ class Apartment(BaseModel):
     created_at: str = Field(default_factory=now_iso)
     last_check: LastCheck | None = None
     energy_price_eur_kwh: float | None = None   # P-52: the apartment's own price; None = the organisation's
+    # D-130: start (ISO, UTC) of the first hour with measured consumption, found by bff/energy_since.py; None = none yet
+    energy_since: str | None = None
     # D-97: a demonstration apartment, where admins may use the simulator. Set by the platform; always true on the
     # built-in mock (also for records saved before the field existed); a real engine in simulated mode can be marked too
     simulated: bool = False

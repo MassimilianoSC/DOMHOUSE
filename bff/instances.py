@@ -303,6 +303,7 @@ async def summary(apt: Apartment, actor: str, tz_midnight_utc: str | None = None
         "features": [],
         "pending_approvals": None,
         "kwh_today": None,
+        "energy_since": apt.energy_since,   # D-130: «consumi disponibili dal …» under the chart
     }
     if not apt.enabled:
         return out
@@ -325,6 +326,9 @@ async def summary(apt: Apartment, actor: str, tz_midnight_utc: str | None = None
         tasks["apartment"] = call(apt, "GET", "/apartment", actor=actor, timeout=timeout)
     if "approvals" in feats:
         tasks["approvals"] = call(apt, "GET", "/approvals", actor=actor, timeout=timeout)
+    if "energy" in feats and not apt.energy_since:
+        from . import energy_since           # not at the top: energy_since imports this module
+        await energy_since.known(apt, actor)   # a search in the background; the list never waits for it
     if "energy" in feats and tz_midnight_utc:
         now = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
         tasks["energy"] = call(

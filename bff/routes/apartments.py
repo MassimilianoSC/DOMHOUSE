@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from .. import actors, audit, energy_report, instances, push, support
+from .. import actors, audit, energy_report, energy_since, instances, push, support
 from ..auth import CurrentUser, Identity, get_tenant_apartment, resolve_identity, resolve_user, scope_out, still_sees
 from ..bookings import ForwardError, SimulatorTranslator, TranslationError, forward
 from ..config import get_settings
@@ -270,8 +270,9 @@ async def energy_export(apartment_id: str, month: str | None = None, booking_id:
     end = min(end, now)
     if end - start > energy_report.MAX_SPAN:
         return err(422, "invalid_period", "Periodo troppo lungo: al massimo un anno")
+    actor = await actors.actor_for(user.uid, user.email)
     try:
-        usage = await energy_report.collect(apt, await actors.actor_for(user.uid, user.email), start, end)
+        usage = await energy_report.collect(apt, actor, start, end)
     except energy_report.EnergyUnavailable:
         return err(501, "not_implemented", "Funzione non disponibile su questa istanza")
     except Exception as exc:
@@ -280,7 +281,8 @@ async def energy_export(apartment_id: str, month: str | None = None, booking_id:
     price = apt.energy_price_eur_kwh if apt.energy_price_eur_kwh is not None else (tenant.energy_price_eur_kwh if tenant else None)
     report = energy_report.Report(organisation=tenant.name if tenant else "", apartment=apt.name, apartment_id=apt.apartment_id,
                                   timezone=apt.timezone, start=start, end=end, in_progress=in_progress, price=price,
-                                  title=title, period=period, stay=stay)
+                                  title=title, period=period, stay=stay,
+                                  energy_since=await energy_since.known(apt, actor, wait=True))   # D-130
     content = energy_report.workbook(report, usage, now)
     disposition = f'attachment; filename="{name}"; filename*=UTF-8\'\'{quote(name)}'
     return Response(content=content, media_type=energy_report.XLSX, headers={"Content-Disposition": disposition})

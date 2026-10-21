@@ -72,6 +72,7 @@ def test_apartments_list():
     assert rimini["apartment"]["mode"] == "comfort"
     assert rimini["online"] is True
     assert "kwh_today" in rimini
+    assert "energy_since" in rimini                          # D-130: null until found, then an ISO instant
 
 
 def test_apartment_summary():

@@ -42,7 +42,7 @@ per utente»).
 | 4 | `POST /app/me/revoke-sessions` | `revoke_sessions` | USER | 204 | `AuthProvider` (`logoutEverywhere`) | – |
 | 5 | `DELETE /app/me` | `delete_account` | USER o gestore della piattaforma anche senza organizzazione (409 `last_admin`, 409 `last_manager`) | 204; il controllo «ultimo amministratore» è atomico con la cancellazione del record (P-36 punto 14); un gestore della piattaforma esce anche da `platform_members`, ma se è l'ultimo gestore 409 `last_manager` prima di toccare qualunque cosa, con lo stesso controllo atomico di `DELETE /app/platform/managers/{email}` (D-73); P-48 (D-87): funziona anche per un gestore senza organizzazione (nota 4 di Fable) e con l'organizzazione sospesa; `X-Support-Tenant` ignorato; dopo la cancellazione `bff/erasure.py` toglie ogni traccia della persona (vedi «Pseudonimo verso il motore e cancellazione») | `AuthProvider` (`deleteAccount`) | – |
 | 6 | `GET /app/dev/users` | `dev_users` | ANON; 404 se `AUTH_MODE≠dev` | `[{email, display_name, role}]`; più i gestori della piattaforma senza organizzazione, con `role` null | `LoginPage` | tutti |
-| 7 | `GET /app/apartments` | `list_apartments` (`routes/apartments.py`) → `instances.summary` | USER | `[ApartmentSummary]`, solo gli appartamenti che l'utente vede; D-90: senza `reachable` e `instance_features`; `health` senza `devices`, `uptime_s`, `database`, `checked_at`, `apartment_id`; attori riscritti (P-48); `simulated` (D-97) | `useApartments` (`ApartmentsPage`) | `apartment_id`, `name`, `address`, `timezone`, `enabled`, `online`, `apartment`, `pending_approvals`, `kwh_today` |
+| 7 | `GET /app/apartments` | `list_apartments` (`routes/apartments.py`) → `instances.summary` | USER | `[ApartmentSummary]`, solo gli appartamenti che l'utente vede; D-90: senza `reachable` e `instance_features`; `health` senza `devices`, `uptime_s`, `database`, `checked_at`, `apartment_id`; attori riscritti (P-48); `simulated` (D-97); `energy_since` (D-130, vedi «Consumi disponibili dal») | `useApartments` (`ApartmentsPage`) | `apartment_id`, `name`, `address`, `timezone`, `enabled`, `online`, `apartment`, `pending_approvals`, `kwh_today`, `energy_since` |
 | 8 | `GET /app/apartments/{id}` | `get_apartment_summary` → `instances.summary` | USER | `ApartmentSummary` | `useApartmentSummary` / `useFeatures` (`ApartmentLayout`, `OverviewPage`, `AppShell`) | `name`, `timezone`, `health`, `features`, `contract_version` |
 | 9 | `GET·POST·PUT·PATCH·DELETE /app/apartments/{id}/instance/{path}` | `proxy` | USER; scrittura solo operator/admin; `_test` solo admin con simulatore; D-90: `version` solo admin, `ask` (anche `GET ask/{id}`) solo operator/admin | risposta dell'istanza 1:1; F1 (D-70): solo percorsi puliti sotto i prefissi del contratto (lista bianca), segmenti vuoti/`.`/`..` o `%` → 404 | `instanceApi` (`request`), `simulatorApi.state` | vedi «Proxy» |
 | 10 | `GET /app/apartments/{id}/bookings` | `list_bookings` | USER | `{items: [BookingRecord]}` senza `event_ids`, `last_event_type`, `updated_at`, `source` (D-90) | `useStays` (`useCurrentStay`) | `booking_id`, `checkin_at`, `checkout_at`, `guests`, `status` |
@@ -290,6 +290,25 @@ prenotazione, numero di ospiti e stato, generato il, totale kWh, prezzo €/kWh,
 importo), **Orario** (ora locale, kWh), **Dispositivi** (dispositivo, kWh, importo). Importo = kWh × prezzo
 dell'appartamento, o dell'organizzazione se l'appartamento non ne ha; senza nessun prezzo la colonna resta vuota e il
 riepilogo scrive «prezzo non impostato». Nessun dato degli ospiti.
+D-130: il Riepilogo ha la riga **«Consumi disponibili dal»** con `energy_since` in ora locale (se manca, il BFF la cerca
+prima di comporre il file). Le ore precedenti restano **vuote**, non a zero, e così i giorni senza ore misurate; il
+totale e l'importo contano solo le ore misurate. Testi: «<data ora>» se tutto il periodo è misurato, «<data ora>: ore
+precedenti vuote» se la data cade nel periodo, «<data ora>: nessun dato nel periodo» se cade dopo (totale, importo,
+giorni, ore e dispositivi vuoti), «Nessun consumo misurato finora» se non c'è ancora nessun dato (tutto vuoto).
+
+## Consumi disponibili dal (D-130)
+
+Il motore conta 0 un'ora senza letture: il contratto non ha «sconosciuto». Il BFF tiene per ogni appartamento
+`energy_since` (Firestore, documento dell'appartamento): l'inizio, in UTC e ISO 8601, della **prima ora con consumo
+maggiore di zero**; `null` finché non c'è nessun dato. È nel riepilogo (#7 e #8) per la frase sotto il grafico dei
+Consumi, «consumi disponibili dal <data>» in ora locale dell'appartamento (con `null` nessuna frase), e nel rendiconto
+(#34). Come la trova (`bff/energy_since.py`), senza toccare il contratto: `GET /energy` per giorno, a finestre di 31
+giorni all'indietro da adesso finché una finestra ha consumo (al massimo 24, i mesi di telemetria del motore), poi il
+primo giorno per ora. Una finestra tutta a zero ferma la ricerca. La data si sposta solo indietro. Senza risultato
+riprova al massimo una volta all'ora per appartamento, in background: il riepilogo non aspetta (la prima volta può
+essere `null` e comparire alla lettura dopo); il rendiconto aspetta. Limite: se nei primi giorni tutti i misuratori
+segnano 0 (tutto spento), la data risulta più tarda del collegamento vero. Per gli appartamenti dimostrativi è
+l'inizio del loro profilo inventato.
 
 ## Conservazione dei dati (P-54, D-94)
 
