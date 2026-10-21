@@ -135,3 +135,44 @@ def test_setup_renders_a_valid_log_policy():
     assert 'resource.labels.service_name="domotica-bff"' in f and all(f'jsonPayload.msg="{m}"' in f for m in _messages())
     assert policy["notificationChannels"] == ["projects/prova/notificationChannels/7"]
     assert policy["alertStrategy"]["notificationRateLimit"]["period"] == "3600s"   # mandatory for log-based alerts
+
+
+# -------- the CI job in Linux on the PC (scripts/ci-linux.sh, "linux" suite) --------
+def test_ci_linux_script_exists_is_executable_and_says_what_it_does():
+    script = ROOT / "scripts" / "ci-linux.sh"
+    assert script.is_file()
+    if shutil.which("git"):
+        line = subprocess.run(["git", "ls-files", "-s", "--", "scripts/ci-linux.sh"], cwd=ROOT, capture_output=True,
+                              text=True, check=True).stdout
+        assert line.startswith("100755 "), f"scripts/ci-linux.sh non eseguibile nell'indice: {line!r}"
+    bash = _runner().git_bash()
+    if not bash:
+        pytest.skip("bash non disponibile")
+    out = subprocess.run([bash, str(script), "--help"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+                         timeout=30)
+    assert out.returncode == 0, out.stderr
+    for words in ("contratto-e-mock", "python:3.11-slim", "non-root", "core.autocrlf=false", "C14", "PASSO", "ESITO"):
+        assert words in out.stdout, words
+
+
+def test_ci_linux_verdict_counts_the_steps_and_never_skips():
+    rt = _runner()
+    ok = [f"PASSO {s}: ok" for s in ("contratto", "dipendenze", "prove del motore", "avvio del motore", "conformità",
+                                     "C14 connector fermo")]
+    c = rt.linux_counts(["ci-linux: commit abc", *ok, "ESITO: 0 rossi su 6 passi"], 0)
+    assert (c["tests"], c["failures"], c["errors"], c["suite_skipped"]) == (6, 0, 0, False)
+    one_red = ok[:2] + ["PASSO prove del motore: ROSSO"] + ok[3:]
+    c = rt.linux_counts(one_red, 1)
+    assert (c["tests"], c["failures"], c["errors"]) == (6, 1, 0) and "prove del motore" in c["note"]
+    c = rt.linux_counts(["PASSO preparazione: ROSSO (Docker non risponde: avvia Docker Desktop)"], 3)
+    assert (c["tests"], c["errors"], c["suite_skipped"]) == (1, 1, False) and "avvia Docker Desktop" in c["note"]
+    c = rt.linux_counts(ok[:3], 1)                                               # stopped without a red step
+    assert c["errors"] == 1 and "uscita 1" in c["note"]
+
+
+def test_linux_runs_in_the_full_run_not_with_a_pytest_filter():
+    rt = _runner()
+    assert rt.LINUX_SUITE in rt.selected_suites([], [])
+    assert rt.LINUX_SUITE not in rt.selected_suites([], ["-k", "webhook"])
+    assert rt.selected_suites(["linux"], []) == [rt.LINUX_SUITE]
+    assert rt.run_linux_suite(skip=True)["suite_skipped"] is True

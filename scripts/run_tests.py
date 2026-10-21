@@ -16,7 +16,12 @@ in the index: a commit by path from Windows can drop the executable bit. The "si
 frontend/test-results/vitest.json, a missing report or a non-zero exit code counts as red, and the suite is declared
 skipped while frontend/package.json has no test:ci script. The "dimensione" suite is `yarn --cwd frontend size:check`
 (build included): one check, red on any non-zero exit code. A red listed in EXPECTED_RED is labelled as expected but
-still counted, so the total stays true. Exit code 0 only when there are no failures and no errors.
+still counted, so the total stays true. The "linux" suite is scripts/ci-linux.sh: the CI job "contratto-e-mock" on
+the last commit, in a python:3.11-slim container as a non-root user (about 3 minutes; E-16 and E-17 failed only
+there). One check per step of the job; Docker missing or not running counts one red with the reason, never a skip.
+It runs in the full run and with --suite linux; --no-linux declares it skipped (visible in the totals), and a pytest
+filter (-- -k ...) leaves it out like the other non-pytest suites. It tests the COMMIT, not uncommitted changes.
+Exit code 0 only when there are no failures and no errors.
 """
 import argparse
 import json
@@ -70,6 +75,9 @@ SCRIPT_SUITE = "script_sh"
 SCRIPTS_PATHSPEC = "scripts/*.sh"  # a git pathspec: "*" also crosses "/", so scripts in subfolders are included
 SITE_REPORT = ROOT / "frontend" / "test-results" / "vitest.json"
 SIZE_SUITE = "dimensione"
+LINUX_SUITE = "linux"
+LINUX_SCRIPT = ROOT / "scripts" / "ci-linux.sh"
+LINUX_TIMEOUT_S = 900
 SIZE_EXIT = {1: "blocco principale sopra la soglia", 2: "build mancante"}
 # Suites known to be red while a planned piece of work is open: shown as such, never hidden or skipped.
 EXPECTED_RED: dict[str, str] = {}  # e.g. {SIZE_SUITE: "P-20 in corso"} (P-20 closed on 16/10: empty)
@@ -369,10 +377,65 @@ def run_size_suite() -> dict:
     return result(tests=1, failures=1, note=f"uscita {code}: {SIZE_EXIT.get(code, 'errore')}")
 
 
+def git_bash() -> str | None:
+    """The bash that runs our scripts: on Windows Git Bash (next to git), never WSL's bash in System32."""
+    if os.name != "nt":
+        return shutil.which("bash")
+    git = shutil.which("git")
+    if git:
+        for parent in Path(git).resolve().parents:
+            candidate = parent / "bin" / "bash.exe"
+            if candidate.is_file():
+                return str(candidate)
+    found = shutil.which("bash")
+    return found if found and "system32" not in found.lower() else None
+
+
+def linux_counts(lines: list[str], code: int) -> dict:
+    """The verdict of scripts/ci-linux.sh from its "PASSO <name>: ok|ROSSO" lines and exit code: one check per step.
+    Exit 3 (Docker or git missing, unknown commit) is one error with the script's reason, never a skip; an exit code
+    that disagrees with the steps is one more error."""
+    steps = [line[len("PASSO "):] for line in lines if line.startswith("PASSO ")]
+    red = [s for s in steps if ": ROSSO" in s]
+    if code == 3:
+        return result(tests=1, errors=1, note=red[0] if red else "uscita 3")     # "1 rossa su 1", as Firestore
+    c = result(tests=len(steps), failures=len(red), note="rossi: " + ", ".join(red) if red else "")
+    if (code != 0) != bool(red):
+        c["errors"] += 1
+        c["note"] = f"{c['note']}; uscita {code}".lstrip("; ")
+    return c
+
+
+def run_linux_suite(skip: bool) -> dict:
+    """The CI job on the last commit, in Linux (scripts/ci-linux.sh); its output goes to the console as it comes."""
+    if skip:
+        return result(note="--no-linux", suite_skipped=True)
+    bash = git_bash()
+    if not bash:
+        return result(errors=1, note="bash non trovato (su Windows serve Git Bash)")
+    print(f"\n=== {LINUX_SUITE}: bash scripts/ci-linux.sh (job contratto-e-mock in python:3.11-slim, circa 3 minuti)")
+    lines: list[str] = []
+    try:
+        proc = subprocess.Popen([bash, str(LINUX_SCRIPT)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, encoding="utf-8", errors="replace")
+        assert proc.stdout is not None
+        start = time.monotonic()
+        for line in proc.stdout:
+            print(line, end="")
+            lines.append(line.rstrip("\n"))
+            if time.monotonic() - start > LINUX_TIMEOUT_S:
+                proc.kill()
+                break
+        code = proc.wait(timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return result(errors=1, note=f"scripts/ci-linux.sh non avviato o bloccato: {exc}")
+    return linux_counts(lines, code)
+
+
 def selected_suites(chosen: list[str], extra: list[str]) -> list[str]:
     """--suite picks by name; otherwise a pytest filter (-- -k …) runs only the pytest suites: "sito", "dimensione" and
-    "script_sh" never receive pytest's arguments and would only add a long, unrelated run (lot 11)."""
-    every = [SCRIPT_SUITE] + HTTP_SUITES + LOCAL_SUITES + [CONFORMANCE_SUITE, SITE_SUITE, SIZE_SUITE]
+    "script_sh" never receive pytest's arguments and would only add a long, unrelated run (lot 11); the same for "linux"."""
+    every = [SCRIPT_SUITE] + HTTP_SUITES + LOCAL_SUITES + [CONFORMANCE_SUITE, LINUX_SUITE, SITE_SUITE, SIZE_SUITE]
     if chosen:
         return [s for s in every if any(f in s for f in chosen)]
     return HTTP_SUITES + LOCAL_SUITES if extra else every
@@ -389,6 +452,8 @@ def main() -> int:
         argv, extra = argv[:i], argv[i + 1:]
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--suite", action="append", default=[], help="run only suites whose name contains this text")
+    ap.add_argument("--no-linux", action="store_true",
+                    help="skip the Linux run of the CI job (scripts/ci-linux.sh); shown as skipped in the totals")
     args = ap.parse_args(argv)
 
     vpy = venv_python()
@@ -411,6 +476,8 @@ def main() -> int:
             c = run_http_suite(suite, work, extra)
         elif suite == CONFORMANCE_SUITE:
             c = run_conformance_suite(work)
+        elif suite == LINUX_SUITE:
+            c = run_linux_suite(args.no_linux)
         elif suite == SITE_SUITE:
             c = run_site_suite()
         elif suite == SIZE_SUITE:
