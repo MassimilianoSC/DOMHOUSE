@@ -37,10 +37,14 @@ async def settle(engine, timeout=10.0):
 
 
 def view(engine) -> dict:
-    """Everything the app can read, minus what is "now" by definition."""
+    """Everything the app can read, minus what is "now" by definition: also kwh_today, which grows with an appliance
+    left on while the engine is down (its going on after a restart: test_restart.py)."""
     apartment = {k: v for k, v in engine.apartment().items() if k != "updated_at"}
+    devices = copy.deepcopy(list(engine.devices.values()))
+    for d in devices:
+        d["capabilities"].get("power_meter", {}).pop("kwh_today", None)
     return {
-        "apartment": apartment, "devices": copy.deepcopy(list(engine.devices.values())), "rooms": engine.rooms,
+        "apartment": apartment, "devices": devices, "rooms": engine.rooms,
         "rules": engine.ruleset(), "schedule": engine.list_schedule(), "approvals": engine.list_approvals("all"),
         "decisions": engine.list_decisions({"limit": "200"}), "commands": copy.deepcopy(engine.commands),
         "asks": copy.deepcopy(engine.asks), "queue": copy.deepcopy(engine.approval_queue),

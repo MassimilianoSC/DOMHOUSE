@@ -9,6 +9,10 @@ set_state change the simulated world and return the resulting changes, also sent
 (the engine applies them itself, at once, with the request's correlation_id).
 changes() is a live stream: each call gets the changes pushed while it is being read, in its own event loop.
 DOMOTICA_TEST_CONNECTOR_DOWN=1 makes status() report the connector down (scenario C14 of the conformance suite).
+Power meters (P-60 step 6, D-130) work as connector.md §2.3 says: watts and the raw cumulative counter
+energy_total_wh, which grows with the watts over real time (never the accelerated MOCK_TIME_SCALE); a meter that draws
+power sends a reading every READING_EVERY_S, as a real one does, besides the reading that follows each command. The
+readings are made inside changes(), in the reader's loop: no task of its own. read_meters() makes one at once (tests).
 """
 import asyncio
 import copy
@@ -20,10 +24,11 @@ from .interface import (CONNECTOR_API_VERSION, CommandResult, ConnectorCommand, 
                         DeviceInfo, Room, StateChange)
 
 SENT_AFTER_S, VERIFYING_AFTER_S, OUTCOME_AFTER_S = 0.3, 0.2, 1.0
+READING_EVERY_S = 60.0                 # a power meter that draws power reports every minute of real time
 _STOP = object()
 # what a simulated device reports of each capability (connector.md §2.3: the "device" fields; the catalog's and the
-# engine's stay with the engine). The simulated power meter reports kwh_today itself instead of energy_total_wh.
-DEVICE_FIELDS = {"switch": ("on",), "power_meter": ("watts", "kwh_today"), "climate": ("on", "mode", "setpoint", "fan"),
+# engine's stay with the engine; kwh_today and the hourly consumption are the engine's, from energy_total_wh).
+DEVICE_FIELDS = {"switch": ("on",), "power_meter": ("watts", "energy_total_wh"), "climate": ("on", "mode", "setpoint", "fan"),
                  "heating": ("on",), "temperature": ("celsius",), "humidity": ("percent",), "contact": ("open", "since"),
                  "motion": ("detected", "last_seen")}
 
@@ -47,13 +52,13 @@ def seed_devices(variant: int) -> tuple[list[dict], dict[str, dict]]:
          "last_seen": now, "capabilities": {
              "climate": {"on": warm, "mode": "heat", "setpoint": 21, "fan": "auto", "setpoint_min": 16,
                          "setpoint_max": 24, "confirmation": "power"},
-             "power_meter": {"watts": 870 if warm else 0, "kwh_today": 3.4 if warm else 0.2}}},
+             "power_meter": {"watts": 870 if warm else 0, "energy_total_wh": 812_400.0}}},
         {"device_id": "dev-caldaia", "label": "Caldaia", "room_id": "tecnico", "online": True, "last_seen": now,
          "capabilities": {
              "heating": {"on": warm, "setpoint": 21 if warm else 8, "setpoint_min": 7, "setpoint_max": 23},
-             "power_meter": {"watts": 95 if warm else 0, "kwh_today": 1.1 if warm else 0.3}}},
+             "power_meter": {"watts": 95 if warm else 0, "energy_total_wh": 96_300.0}}},
         {"device_id": "dev-presa-camera", "label": "Presa stufetta camera", "room_id": "camera", "online": True,
-         "last_seen": now, "capabilities": {"switch": {"on": False}, "power_meter": {"watts": 0, "kwh_today": 0.6}}},
+         "last_seen": now, "capabilities": {"switch": {"on": False}, "power_meter": {"watts": 0, "energy_total_wh": 41_700.0}}},
         {"device_id": "dev-finestra-camera", "label": "Finestra camera", "room_id": "camera", "online": True,
          "last_seen": now, "capabilities": {"contact": {"open": False, "since": iso(utcnow() - timedelta(hours=4))}}},
         {"device_id": "dev-ambiente-soggiorno", "label": "Sensore soggiorno", "room_id": "soggiorno", "online": True,
@@ -85,8 +90,19 @@ class SimulatedDevice:
         self.last_seen = data["last_seen"]           # ISO string, as in the contract
         self.capabilities = copy.deepcopy(data["capabilities"])
         self.links = dict(links or {})
+        self.meter_at = utcnow()                     # the instant energy_total_wh was brought up to
+
+    def meter_to(self, now: datetime) -> None:
+        """energy_total_wh up to `now` at the current watts (real time); earlier instants change nothing."""
+        meter = self.capabilities.get("power_meter")
+        if meter is None or now <= self.meter_at:
+            return
+        hours = (now - self.meter_at).total_seconds() / 3600
+        meter["energy_total_wh"] = round(float(meter.get("energy_total_wh", 0.0)) + float(meter.get("watts", 0)) * hours, 3)
+        self.meter_at = now
 
     def info(self) -> DeviceInfo:
+        self.meter_to(utcnow())
         seen = datetime.fromisoformat(self.last_seen.replace("Z", "+00:00")) if self.last_seen else None
         return DeviceInfo(device_id=self.device_id, label=self.label, room_id=self.room_id, online=self.online,
                           last_seen=seen, capabilities=copy.deepcopy(self.capabilities), links=dict(self.links))
@@ -98,8 +114,10 @@ class SimulatedDevice:
 
     def apply(self, capability: str, target: dict, now: datetime | None = None) -> list[tuple[str, dict]]:
         """The device reaches the target; its power meter (if any) follows. Returns (capability, reported state)."""
+        now = now or utcnow()
+        self.meter_to(now)                             # what was used at the old power, before it changes
         self.capabilities[capability].update(copy.deepcopy(target))
-        self.last_seen = iso(now or utcnow())          # the same instant as the change it reports
+        self.last_seen = iso(now)                      # the same instant as the change it reports
         changed = [(capability, self.reported(capability))]
         if "power_meter" in self.capabilities:
             self.capabilities["power_meter"]["watts"] = watts_for(capability, self.capabilities[capability])
@@ -120,6 +138,8 @@ class SimulatedConnector:
         self._readers: set[asyncio.Queue] = set()
         self._stopped = False
         self._last_event_at: datetime | None = None
+        self.reading_every_s = READING_EVERY_S
+        self._last_reading = utcnow()
 
     # ---- interface ----------------------------------------------------------------------------------------------
     async def start(self) -> None:
@@ -148,7 +168,12 @@ class SimulatedConnector:
         self._readers.add(queue)
         try:
             while not self._stopped:
-                change = await queue.get()
+                wait = self.reading_every_s - (utcnow() - self._last_reading).total_seconds()
+                try:
+                    change = await asyncio.wait_for(queue.get(), timeout=max(wait, 0.0))
+                except TimeoutError:
+                    self.read_meters()                 # pushed to every reader, this one included
+                    continue
                 if change is _STOP:
                     return
                 yield change
@@ -173,10 +198,28 @@ class SimulatedConnector:
         return CommandResult("confirmed", state=device.reported(cmd.capability))
 
     # ---- hooks of POST /_test/state and of the tests (simulated only) --------------------------------------------
+    def read_meters(self, notify: bool = True) -> list[StateChange]:
+        """A reading of every online meter that draws power (a meter at 0 W has nothing new to say)."""
+        now = utcnow()
+        self._last_reading = now
+        out = []
+        for device in self._devices.values():
+            meter = device.capabilities.get("power_meter")
+            if meter is None or not device.online or not meter.get("watts"):
+                continue
+            device.meter_to(now)
+            device.last_seen = iso(now)
+            out.append(StateChange(device.device_id, "state", now, capability="power_meter",
+                                   state=device.reported("power_meter")))
+        for c in out:
+            self._push(c, notify)
+        return out
+
     def set_online(self, device_id: str, online: bool, notify: bool = True) -> list[StateChange]:
         """The device goes away or comes back; back online it sends a full snapshot, as a real connector does."""
         device = self._devices[device_id]
         now = utcnow()
+        device.meter_to(now)
         device.online = online
         if online:
             device.last_seen = iso(now)
@@ -193,8 +236,9 @@ class SimulatedConnector:
         device = self._devices[device_id]
         current = device.capabilities[capability]
         was_open = current.get("open")
-        current.update(state)
         now = utcnow()
+        device.meter_to(now)                           # a new power from now on
+        current.update(state)
         if capability == "contact" and current.get("open") != was_open:
             current["since"] = iso(now)
         device.last_seen = iso(now)
