@@ -95,8 +95,9 @@ di oggi.
 
 ## M6. Permessi degli utenti nel formato per ambiente
 
-Cosa fa: chi ha i permessi vecchi («piatti», per esempio il primo amministratore) li riceve come permessi di produzione.
-Nessuna sessione viene chiusa. Prima senza `--apply` (mostra soltanto), poi con.
+Cosa fa: chi ha i permessi vecchi («piatti», per esempio il primo amministratore) riceve ANCHE i permessi di produzione
+nel formato nuovo; quelli vecchi restano, così il server di oggi continua a funzionare. Si può lanciare in qualunque momento,
+anche prima di M12. Nessuna sessione viene chiusa. Prima senza `--apply` (mostra soltanto), poi con.
 
 ```bash
 # Git Bash
