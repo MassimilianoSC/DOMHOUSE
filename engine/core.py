@@ -46,6 +46,10 @@ BUFFER_SECONDS = 3600
 # retention (D-94): the activity log 24 months, bookings 12 months after the check-out (their schedule 12 months after
 # it runs), commands and assistant requests 90 days (the contract asks at least 7), the hourly consumption 24 months
 DECISION_MONTHS, BOOKING_MONTHS, COMMAND_DAYS, TELEMETRY_MONTHS = 24, 12, 90, 24
+# P-60 step 10 (D-104): a log line "engine alive" every HEARTBEAT_S of real time, the beat whose absence for 10 minutes
+# raises the alert (scripts/monitoring/engine-alerts.sh); the inner loop is "stuck" without a tick for LOOP_STALE_S
+HEARTBEAT_S = 300
+LOOP_STALE_S = 30
 # D-130, decision 3: a demonstration apartment (seeded) shows an invented, repeatable consumption, per meter, from the
 # start of 2026 to the hour its engine started; after that only what its (simulated) meters measure. The BFF finds
 # ENERGY_PROFILE_START as the apartment's energy_since, so nothing odd shows. Shares of the meters, in catalog order.
@@ -250,6 +254,8 @@ class ApartmentEngine:
         self.consumer_task: asyncio.Task | None = None
         self.tasks: set[asyncio.Task] = set()
         self.last_housekeeping = self.last_retention = time.monotonic()
+        self.last_tick = time.monotonic()            # P-60 step 10: the inner loop is alive when this moves
+        self.last_heartbeat = 0.0
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode
@@ -857,23 +863,36 @@ class ApartmentEngine:
     def connector_up(self) -> bool:
         return self.connector.status().up
 
+    def loop_alive(self) -> bool:
+        """The inner loop (scheduler, rules, approvals) ticked within LOOP_STALE_S; True before it is started."""
+        if self.loop_task is None:
+            return True
+        return not self.loop_task.done() and time.monotonic() - self.last_tick < LOOP_STALE_S
+
     def health(self) -> tuple[int, dict]:
+        """P-60 step 10: the real state. down (503): the connector down or engine.db not answering; degraded: a device
+        offline or the inner loop stuck; ok otherwise."""
         up = self.connector_up()
+        db_ok = self.store.ping()
         devs = [{"device_id": d["device_id"], "online": d["online"], "last_seen": d["last_seen"]} for d in self.devices.values()]
         online = sum(1 for d in devs if d["online"])
-        status = "down" if not up else ("ok" if online == len(devs) else "degraded")
+        if not up or not db_ok:
+            status = "down"
+        else:
+            status = "ok" if online == len(devs) and self.loop_alive() else "degraded"
         last = self.events[-1]["ts"] if self.events else None
         body = {
             "status": status, "apartment_id": self.apartment_id,
             "implementation": dict(self.implementation),
-            "uptime_s": int(time.monotonic() - self.started_at), "database": {"status": "ok"},
+            "uptime_s": int(time.monotonic() - self.started_at), "database": {"status": "ok" if db_ok else "error"},
             "connector": {"status": "up" if up else "down", "connected_devices": online if up else 0, "last_event_at": last},
-            # /ask answers from keywords in simulated mode only; with a real connector it is off (501) until step 9
-            "model_provider": ({"status": "ok", "provider": "mock-keywords"} if self.simulated
+            # /ask: the real model through the BFF (step 9), keywords in simulated mode, otherwise off (501)
+            "model_provider": ({"status": "ok", "provider": "bff-gateway"} if self.model is not None
+                               else {"status": "ok", "provider": "mock-keywords"} if self.simulated
                                else {"status": "unknown", "provider": "none"}),
             "devices": devs if up else [], "checked_at": iso(utcnow()),
         }
-        return (503 if not up else 200), body
+        return (503 if status == "down" else 200), body
 
     def apartment_changed(self, correlation_id: str | None) -> None:
         self.emit("apartment.changed", self.apartment(), correlation_id)
@@ -1231,6 +1250,14 @@ class ApartmentEngine:
             return True
         except TimeoutError:
             return False
+
+    def _heartbeat(self) -> None:
+        """P-60 step 10 (D-104): one line every HEARTBEAT_S; its absence for 10 minutes is the "silent engine" alert."""
+        online = sum(1 for d in self.devices.values() if d["online"])
+        running = sum(1 for c in self.commands.values() if c["status"] not in FINAL)
+        logs.info("engine alive", apartment_id=self.apartment_id, connector="up" if self.connector_up() else "down",
+                  devices_online=online, devices_total=len(self.devices), commands_running=running,
+                  database="ok" if self.store.ping() else "error")
 
     def _connector_changed(self, up: bool) -> None:
         """D-131: the connector went down or came back: a decision, instance.health (the BFF's push, after the minutes
@@ -2041,6 +2068,10 @@ class ApartmentEngine:
 
     def tick(self) -> None:
         now = utcnow()
+        self.last_tick = time.monotonic()
+        if self.last_tick - self.last_heartbeat >= HEARTBEAT_S:
+            self.last_heartbeat = self.last_tick
+            self._heartbeat()
         up = self.connector_up()
         if up != self.connector_was_up:
             self.connector_was_up = up

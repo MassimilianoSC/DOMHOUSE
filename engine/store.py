@@ -89,6 +89,10 @@ class MemoryStore:
     def prune_events(self, before: float) -> None:
         self._events = [e for e in self._events if e[1] >= before]
 
+    def ping(self) -> bool:
+        """P-60 step 10: the store answers (always, in memory)."""
+        return True
+
     # telemetry
     def add_telemetry(self, device_id: str, hour: str, wh: float) -> None:
         self._telemetry[(device_id, hour)] = self._telemetry.get((device_id, hour), 0.0) + wh
@@ -160,6 +164,13 @@ class SqliteStore(MemoryStore):
 
     def prune_events(self, before: float) -> None:
         self.db.execute("DELETE FROM events WHERE t < ?", (before,))
+
+    def ping(self) -> bool:
+        """P-60 step 10: engine.db answers a read (GET /health says "database": "error" otherwise)."""
+        try:
+            return self.db.execute("SELECT 1").fetchone() == (1,)
+        except Exception:
+            return False
 
     def add_telemetry(self, device_id: str, hour: str, wh: float) -> None:
         self.db.execute("INSERT INTO telemetry (device_id, hour, wh) VALUES (?, ?, ?) "
