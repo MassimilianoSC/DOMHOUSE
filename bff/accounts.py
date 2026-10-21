@@ -73,7 +73,17 @@ def delete_account(uid: str | None = None, email: str | None = None, protect: bo
         record = fb_auth.get_user(uid, app=app) if uid else fb_auth.get_user_by_email(email, app=app)
     except fb_auth.UserNotFoundError:
         return False
-    has_claims = bool((record.custom_claims or {}).get("tenant_id"))
+    if get_settings().app_env == "staging":
+        # P-67 (D-136): the Firebase identity and its sessions belong to production too: staging never deletes the
+        # account nor revokes its sessions, it only forgets its own claims (the app record goes with the caller)
+        claims = dict(record.custom_claims or {})
+        if claims.pop("staging", None) is not None:
+            fb_auth.set_custom_user_claims(record.uid, claims, app=app)
+        info("auth: staging keeps the firebase account", uid=record.uid)
+        return False
+    from .auth import env_claims
+    has_claims = bool(env_claims(record.custom_claims).get("tenant_id")) or bool(
+        (record.custom_claims or {}).get("staging"))
     if not owner and (protect or record.email_verified or has_claims):
         fb_auth.revoke_refresh_tokens(record.uid, app=app)
         _valid_after.pop(record.uid, None)
@@ -95,10 +105,17 @@ def set_role_claim(uid: str, role: str) -> None:
     except fb_auth.UserNotFoundError:
         return
     claims = dict(record.custom_claims or {})
-    if not claims.get("tenant_id"):
+    env = get_settings().app_env
+    if isinstance(claims.get(env), dict):        # P-67: this environment's claims
+        claims[env] = {**claims[env], "role": role}
+    elif env != "staging" and claims.get("tenant_id"):   # the flat claims of before P-67 (production only)
+        claims["role"] = role
+    else:
         return
-    claims["role"] = role
     fb_auth.set_custom_user_claims(uid, claims, app=app)
+    if env == "staging":                         # a revocation would sign the person out of production too
+        info("auth: role claim updated, applies at the next token refresh (staging)", uid=uid, role=role)
+        return
     fb_auth.revoke_refresh_tokens(uid, app=app)  # forces a new ID token carrying the new role
     _valid_after.pop(uid, None)
     info("auth: role claim updated", uid=uid, role=role)

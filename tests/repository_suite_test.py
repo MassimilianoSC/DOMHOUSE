@@ -289,6 +289,19 @@ def test_audit_people_resolved_and_forgotten(repo):
     assert set(run(repo.get_audit_people(["u1", "u2"]))) == {"u2"}
 
 
+def test_a_named_database_is_another_world():
+    """P-67 (D-136): staging writes to its own database of the same project, production never sees it (emulator)."""
+    from bff.repository.firestore import FirestoreRepository
+    if "FIRESTORE_EMULATOR_HOST" not in os.environ:
+        pytest.skip("solo con l'emulatore di Firestore")
+    project, prefix = os.environ.get("GCP_PROJECT_ID", "demo-test"), f"t{uuid.uuid4().hex[:8]}_"
+    staging = FirestoreRepository(project_id=project, prefix=prefix, database="staging")
+    prod = FirestoreRepository(project_id=project, prefix=prefix)
+    run(staging.upsert_tenant(Tenant(tenant_id="t-solo-staging", name="Solo staging")))
+    assert run(staging.get_tenant("t-solo-staging")).name == "Solo staging"
+    assert run(prod.get_tenant("t-solo-staging")) is None and staging.database == "staging" and prod.database == "(default)"
+
+
 def test_ai_usage_adds_up_and_alerts_once(repo):
     """P-60 step 9: the assistant's spending of a month adds up atomically; the 80 % alert is claimed once."""
     assert run(repo.get_ai_usage("2026-10")) == {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0,

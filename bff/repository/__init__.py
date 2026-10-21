@@ -33,7 +33,7 @@ def get_repository() -> Repository:
     if settings.repository == "firestore":
         from .firestore import FirestoreRepository
 
-        return FirestoreRepository(project_id=settings.gcp_project_id)
+        return FirestoreRepository(project_id=settings.gcp_project_id, database=settings.firestore_database)
     repo = InMemoryRepository()
     seed_demo(repo)
     return repo

@@ -17,8 +17,11 @@ from .base import (EMPTY_AI_USAGE, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, Au
 
 
 class FirestoreRepository:
-    def __init__(self, project_id: str | None = None, client: "firestore.AsyncClient | None" = None, prefix: str = ""):
-        self.db = client or firestore.AsyncClient(project=project_id or None)
+    def __init__(self, project_id: str | None = None, client: "firestore.AsyncClient | None" = None, prefix: str = "",
+                 database: str = "(default)"):
+        # P-67 (D-136): one database per environment in the same project, "(default)" for production, "staging"
+        self.db = client or firestore.AsyncClient(project=project_id or None, database=database)
+        self.database = database
         self.prefix = prefix
         self._locks: dict[tuple[int, str], asyncio.Lock] = {}
 

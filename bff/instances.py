@@ -49,6 +49,9 @@ def instance_url_problem(raw: str) -> str | None:
     INSTANCE_MODE=mock only mock:// is reachable (staging has no VPC egress), so anything else is refused (D-28). In real
     mode mock:// is accepted too (D-97: demonstration apartments next to real ones; only the platform links engines)."""
     v = normalize_instance_url(raw)
+    if v.startswith("mock://") and get_settings().app_env == "prod":
+        # P-67 (D-136): the demonstration apartments live in staging; production has real apartments only
+        return "I dimostrativi stanno nell'ambiente di prova: in produzione solo appartamenti veri"
     if v.startswith("mock://"):
         return None
     if get_settings().instance_mode == "mock":

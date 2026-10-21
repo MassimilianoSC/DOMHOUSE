@@ -104,6 +104,22 @@ def _verify_firebase_token(token: str) -> dict:
     return fb_auth.verify_id_token(token, app=firebase_app())
 
 
+def env_claims(claims: dict | None) -> dict:
+    """P-67 (D-136): one Firebase Auth for both environments, so tenant and role are kept per environment in the custom
+    claims, {"prod": {"tenant_id", "role"}, "staging": {...}}, and each BFF reads only its own (APP_ENV). The old flat
+    claims (tenant_id, role at the top, before P-67) still count outside staging, until scripts/set_claims.py rewrites
+    them: a staging-only account is refused in production, a production-only one in staging."""
+    from .config import get_settings
+    claims = claims or {}
+    env = get_settings().app_env
+    own = claims.get(env)
+    if isinstance(own, dict):
+        return own
+    if env != "staging" and claims.get("tenant_id"):
+        return {"tenant_id": claims.get("tenant_id"), "role": claims.get("role")}
+    return {}
+
+
 async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> CurrentUser:
     """Custom claims (tenant_id, role) are the source of truth; an invited user without claims yet is
     recognised by email and its `inv-*` record is migrated to the real uid on first login."""
@@ -119,7 +135,8 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
             stored = invited.model_copy(update={"uid": uid, "former_emails": [invited.email]})   # D-91 (F3)
             await repo.upsert_user(stored)
             await repo.delete_user(invited.uid)
-    tenant_id, role = claims.get("tenant_id"), claims.get("role")
+    own = env_claims(claims)                     # P-67: this environment's tenant and role only
+    tenant_id, role = own.get("tenant_id"), own.get("role")
     if (not tenant_id or role not in ROLES) and stored:
         tenant_id, role = stored.tenant_id, stored.role
     if not tenant_id or role not in ROLES:
@@ -131,7 +148,7 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
         # record so it appears in the admin area and can keep a display name and notification preferences.
         stored = await repo.upsert_user(User(uid=uid, email=email, display_name=claims.get("name", "") or "",
                                              tenant_id=tenant_id, role=role))
-    if (stored.tenant_id != tenant_id or stored.role != role) and claims.get("tenant_id"):
+    if (stored.tenant_id != tenant_id or stored.role != role) and own.get("tenant_id"):
         stored.tenant_id, stored.role = tenant_id, role
         await repo.upsert_user(stored)
     if email and stored.email != email:  # email changed in Firebase (verifyBeforeUpdateEmail)

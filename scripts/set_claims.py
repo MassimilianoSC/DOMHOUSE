@@ -7,6 +7,11 @@ Usage (ADC or GOOGLE_APPLICATION_CREDENTIALS must point at the Firebase project)
   REPOSITORY=firestore GCP_PROJECT_ID=<project> python scripts/set_claims.py --tenant t-flatsharing-demo --tenant-name "Flatsharing"
 
 The BFF reads the claims from the ID token; the user must sign out/in (or refresh the token) to pick them up.
+P-67 (D-136): one Firebase Auth for production and staging, so the claims are per environment, {"prod": {tenant_id,
+role}, "staging": {...}}: --env prod (default) or --env staging writes only that one and keeps the other. In staging no
+session is revoked (it would sign the person out of production too). The flat claims of before P-67 are rewritten:
+  python scripts/set_claims.py --migrate-claims            # says what would change
+  python scripts/set_claims.py --migrate-claims --apply    # flat tenant_id/role -> {"prod": {...}}, no session revoked
 --tenant-name only creates or renames the tenant record in the repository: no claims, no session revoked.
   REPOSITORY=firestore GCP_PROJECT_ID=<project> python scripts/set_claims.py --platform-add persona@esempio.it
   REPOSITORY=firestore GCP_PROJECT_ID=<project> python scripts/set_claims.py --platform-list
@@ -24,6 +29,28 @@ import firebase_admin
 from firebase_admin import auth
 
 ROLES = ("admin", "operator", "viewer")
+ENVS = ("prod", "staging")
+
+
+def env_claims_after(current: dict | None, env: str, tenant_id: str, role: str) -> dict:
+    """The custom claims with this environment's tenant and role, the other environment kept; flat claims of before
+    P-67 become production's."""
+    claims = dict(current or {})
+    flat = {k: claims.pop(k) for k in ("tenant_id", "role") if k in claims}
+    if flat.get("tenant_id") and "prod" not in claims:
+        claims["prod"] = {"tenant_id": flat["tenant_id"], "role": flat.get("role")}
+    claims[env] = {"tenant_id": tenant_id, "role": role}
+    return claims
+
+
+def migrated(current: dict | None) -> dict | None:
+    """The claims rewritten per environment, or None when there is nothing to rewrite."""
+    claims = dict(current or {})
+    if not claims.get("tenant_id"):
+        return None
+    flat = {k: claims.pop(k) for k in ("tenant_id", "role") if k in claims}
+    claims.setdefault("prod", {"tenant_id": flat["tenant_id"], "role": flat.get("role")})
+    return claims
 
 
 def init() -> None:
@@ -31,31 +58,49 @@ def init() -> None:
         firebase_admin.initialize_app(options={"projectId": os.environ.get("FIREBASE_PROJECT_ID") or None})
 
 
-def set_claims(email: str, tenant_id: str, role: str, create: bool, send_reset_link: bool) -> str:
+def set_claims(email: str, tenant_id: str, role: str, create: bool, send_reset_link: bool, env: str = "prod") -> str:
     if role not in ROLES:
         raise SystemExit(f"role must be one of {ROLES}")
+    if env not in ENVS:
+        raise SystemExit(f"env must be one of {ENVS}")
     try:
         user = auth.get_user_by_email(email)
     except auth.UserNotFoundError:
         if not create:
             raise SystemExit(f"{email}: user not found in Firebase Auth (use --create)")
         user = auth.create_user(email=email, email_verified=False)
-    auth.set_custom_user_claims(user.uid, {"tenant_id": tenant_id, "role": role})
-    auth.revoke_refresh_tokens(user.uid)
-    print(f"{email}: uid={user.uid} tenant_id={tenant_id} role={role}")
+    auth.set_custom_user_claims(user.uid, env_claims_after(user.custom_claims, env, tenant_id, role))
+    if env == "prod":
+        auth.revoke_refresh_tokens(user.uid)
+    print(f"{email}: uid={user.uid} env={env} tenant_id={tenant_id} role={role}")
     if send_reset_link:
         print(f"  password setup link: {auth.generate_password_reset_link(email)}")
     return user.uid
 
 
-async def from_repo(create: bool, send_reset_link: bool) -> None:
+def migrate_claims(apply: bool) -> int:
+    """Every account with the flat claims of before P-67 gets them as production's; prints each one."""
+    changed = 0
+    for user in auth.list_users().iterate_all():
+        new = migrated(user.custom_claims)
+        if new is None:
+            continue
+        changed += 1
+        print(f"{user.email or user.uid}: {user.custom_claims} -> {new}" + ("" if apply else "  (prova, niente scritto)"))
+        if apply:
+            auth.set_custom_user_claims(user.uid, new)
+    print(f"{changed} account {'riscritti' if apply else 'da riscrivere (aggiungi --apply)'}")
+    return changed
+
+
+async def from_repo(create: bool, send_reset_link: bool, env: str = "prod") -> None:
     from bff.repository import get_repository
 
     repo = get_repository()
     for tenant in await repo.list_tenants():
         for u in await repo.list_users(tenant.tenant_id):
             if u.uid.startswith("inv-"):
-                set_claims(u.email, u.tenant_id, u.role, create, send_reset_link)
+                set_claims(u.email, u.tenant_id, u.role, create, send_reset_link, env)
 
 
 async def set_tenant_name(repo, tenant_id: str, name: str) -> str:
@@ -141,7 +186,14 @@ def main() -> None:
     p.add_argument("--create", action="store_true", help="create the Firebase user if missing")
     p.add_argument("--send-reset-link", action="store_true", help="print a password setup link")
     p.add_argument("--from-repo", action="store_true", help="process every invited (inv-*) user in the repository")
+    p.add_argument("--env", choices=ENVS, default="prod", help="the environment of the claims (P-67), prod by default")
+    p.add_argument("--migrate-claims", action="store_true", help="rewrite the flat claims per environment (P-67)")
+    p.add_argument("--apply", action="store_true", help="with --migrate-claims: write (without: only show)")
     a = p.parse_args()
+    if a.migrate_claims:
+        init()
+        migrate_claims(a.apply)
+        return
     if a.platform_add or a.platform_list:
         if a.email or a.tenant or a.role or a.from_repo or a.tenant_name is not None:
             p.error("--platform-add e --platform-list vanno usati da soli")
@@ -154,9 +206,9 @@ def main() -> None:
         return
     init()
     if a.from_repo:
-        asyncio.run(from_repo(a.create, a.send_reset_link))
+        asyncio.run(from_repo(a.create, a.send_reset_link, a.env))
     elif a.email and a.tenant and a.role:
-        set_claims(a.email, a.tenant, a.role, a.create, a.send_reset_link)
+        set_claims(a.email, a.tenant, a.role, a.create, a.send_reset_link, a.env)
     else:
         p.error("--email, --tenant and --role are required (or --from-repo)")
 
