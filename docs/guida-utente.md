@@ -200,6 +200,13 @@ quali appartamenti vedi.
 Azioni che il sistema propone e che aspettano un sì o un no. Ogni scheda mostra cosa propone, perché, il tempo
 rimasto (rosso sotto i 5 minuti) e cosa succede alla scadenza. Si può aggiungere una nota e toccare «Approva» o
 «Respingi». Il filtro «In attesa» / «Tutte» mostra anche quelle già decise.
+- Richieste che il sistema fa da solo: **«Mettere l'appartamento a vuoto dopo il check-out»**, quando all'ora del
+  risparmio dopo la partenza il sensore di movimento ha visto qualcuno dopo l'orario di partenza (senza risposta entro
+  il tempo viene approvata e l'appartamento va a vuoto); **«Spegnere …»** con il nome dell'apparecchio, quando
+  l'appartamento è vuoto e quell'apparecchio consuma oltre una soglia da più di tanti minuti (mai la caldaia, mai
+  durante una forzatura; senza risposta viene respinta e l'apparecchio resta acceso, salvo un'impostazione diversa
+  dell'appartamento; dopo un no, nessuna nuova richiesta finché il consumo non scende e risale). Le proposte
+  dell'assistente, senza risposta, vengono respinte. Soglie e tempi li imposta chi gestisce il sistema domotico.
 
 ### Decisioni
 Lo storico di tutto ciò che è stato fatto, da chi (motore automatico, regola, gestore, assistente, sistema) e con quale

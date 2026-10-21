@@ -289,8 +289,20 @@ Risultato atteso: le impostazioni in vigore, oppure «tutte ai valori predefinit
   della pausa aspetta la fine invece di essere rifiutata; 0 = rifiutata sempre;
 - `MISSED_AFTER_MINUTES` (predefinito 30, da 5 a 720): al riavvio del motore, un'azione programmata scaduta da più di
   questi minuti non si esegue più e risulta «mancata»;
-- `APPROVAL_EXPIRES_MINUTES` (predefinito 30, da 5 a 720): un'approvazione senza risposta viene respinta dopo questi
-  minuti (D-119).
+- `APPROVAL_EXPIRES_MINUTES` (predefinito 30, da 5 a 720): un'approvazione senza risposta scade dopo questi minuti:
+  respinta (D-119), tranne «Mettere l'appartamento a vuoto dopo il check-out», che viene approvata, e «Spegnere …» a
+  casa vuota, che segue `EMPTY_POWER_EXPIRED_ACTION` (D-137);
+- `CHECKOUT_PRESENCE_MINUTES` (predefinito 30, da 5 a 180): al passaggio a «vuoto» dopo il check-out, se il sensore di
+  movimento ha visto qualcuno dopo l'orario di partenza ed entro questi minuti, il motore chiede prima di procedere
+  («Mettere l'appartamento a vuoto dopo il check-out»);
+- `EMPTY_POWER_WATTS` (predefinito 300, da 20 a 5000): con l'appartamento vuoto, un misuratore sopra questi watt…
+- `EMPTY_POWER_MINUTES` (predefinito 15, da 5 a 240): …per almeno questi minuti fa chiedere se spegnere l'apparecchio
+  («Spegnere …»; mai la caldaia, mai durante una forzatura; una richiesta per dispositivo finché il consumo non scende
+  e risale);
+- `EMPTY_POWER_EXPIRED_ACTION` (predefinito `reject`, valori `reject` oppure `approve`): cosa succede alla richiesta
+  «Spegnere …» se nessuno risponde entro la scadenza: `reject` = respinta, l'apparecchio resta acceso; `approve` =
+  approvata, l'apparecchio si spegne (D-137: il committente ha scelto `reject` come predefinito perché spegnere un
+  apparecchio a casa senza prenotazione può colpire la lavatrice di chi pulisce o uno scaldabagno).
 
 I decimali si scrivono con il punto (per esempio `0.5`): la virgola non è accettata.
 
