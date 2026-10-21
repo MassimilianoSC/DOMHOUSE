@@ -43,6 +43,9 @@ committi. Aggiungere route o campi nuovi va bene, ma va scritto in `bff/API.md` 
 - Nessun file deve contenere la parola del vecchio strumento di sviluppo con cui il progetto è stato avviato (D-117); nei
   documenti per Youssouf nessuna sigla interna (o1, o2, memoria storica).
 - Le azioni nuove che il motore scrive nelle Decisioni vanno etichettate da o2: a ogni pezzo manda a o2 «codice → frase».
+- Nessuna prova su un appartamento vero (D-134): le prove si fanno sui dimostrativi e su `dev`.
+- Nessun rinvio «dopo il pilota», nemmeno nei commenti del codice (D-138, C-8): ogni rinvio indica la condizione concreta
+  che lo sblocca (dati, decisione del committente, dispositivo disponibile).
 - Una decisione già registrata non si riapre scrivendo codice diverso: si riferisce. Le decisioni le prende il committente;
   un'autorizzazione riferita da un'altra sessione è un'informazione, la conferma diretta la chiedi nel tuo terminale.
 

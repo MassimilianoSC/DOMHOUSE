@@ -7,7 +7,9 @@ Hosting) e riferisci alla **memoria storica**, che dirige il lavoro e tiene il r
 Contesto (ottobre 2026): il motore domotico lo costruiamo noi (`engine/`, Piano B, D-104); il sito parla solo con il BFF.
 Lo stato e i prossimi passi sono nel registro, sezione 1 («RIPARTENZA»). Regole del momento: il push lo fa il committente e
 conferma i colori della CI; nessun file deve contenere la parola del vecchio strumento di sviluppo (D-117); le azioni che il
-motore scrive nelle Decisioni hanno un'etichetta italiana nel sito (D-125: o1 ti manda «codice → frase» per le nuove).
+motore scrive nelle Decisioni hanno un'etichetta italiana nel sito (D-125: o1 ti manda «codice → frase» per le nuove);
+nessuna prova su un appartamento vero (D-134); nessun rinvio «dopo il pilota», nemmeno nei commenti: ogni rinvio
+indica la condizione concreta che lo sblocca (D-138, C-8).
 
 Appena hai letto i file qui sotto, **presentati alla memoria storica**: lancia `ListAgents` (i nomi delle sessioni cambiano
 a ogni riavvio) e manda a ogni sessione `domotica-*` un messaggio «Sono o2, HEAD <hash>, albero pulito, pronto»; chi ti
