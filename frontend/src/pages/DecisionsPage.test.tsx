@@ -8,7 +8,7 @@ import DecisionsPage from "./DecisionsPage";
 type Q = { cursor?: string; correlation_id?: string; from?: string; limit?: number };
 const s = vi.hoisted(() => ({ calls: [] as Q[] }));
 
-const dec = (n: number, reasoning: string) => ({ decision_id: `d-${n}`, ts: new Date(Date.UTC(2026, 9, 16, 12) - n * 60_000).toISOString(), actor: "brain", target: { type: "apartment" }, action: "mode", old_value: null, new_value: null, reasoning, outcome: "applied", correlation_id: n === 1500 ? "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f" : `c-${n}`, command_id: null, approval_id: null });
+const dec = (n: number, reasoning: string) => ({ decision_id: `d-${n}`, ts: new Date(Date.UTC(2026, 9, 16, 12) - n * 60_000).toISOString(), actor: "brain", target: { type: "apartment" }, action: n === 0 ? "booking_cancel_reset" : "mode", old_value: null, new_value: null, reasoning, outcome: "applied", correlation_id: n === 1500 ? "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f" : `c-${n}`, command_id: null, approval_id: null });
 
 vi.mock("@/api/instance", () => ({
   instanceApi: () => ({
@@ -105,5 +105,14 @@ describe("Decisioni: ricerca in tutto lo storico", () => {
     const from = new Date(s.calls.at(-1)!.from!).getTime();
     expect(Math.abs(Date.now() - 7 * 86_400_000 - from)).toBeLessThan(60_000);
     expect(screen.getByTestId("decisions-period-select")).toHaveDisplayValue(t("decisions.period7"));
+  });
+});
+
+describe("Decisioni: il tipo di azione (D-125)", () => {
+  it("azione nota: l'etichetta italiana nel riquadro; azione sconosciuta: il codice", async () => {
+    open();
+    expect(await screen.findByTestId("decision-action-d-0")).toHaveTextContent(/^Disdetta dopo il pre-arrivo$/);
+    expect(screen.getByTestId("decision-action-d-0")).toHaveAttribute("title", "booking_cancel_reset");
+    expect(screen.getByTestId("decision-action-d-1")).toHaveTextContent(/^mode$/);
   });
 });

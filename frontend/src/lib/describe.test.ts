@@ -1,5 +1,5 @@
 import { t } from "@/i18n";
-import { describeActor, personLabel } from "./describe";
+import { actionLabel, DECISION_ACTIONS, describeActor, personLabel } from "./describe";
 
 // Who did something, as the site shows it (P-48, D-87): the email the BFF resolved, or «utente rimosso» for a deleted
 // account; a pseudonym the BFF did not rewrite is never shown raw.
@@ -36,5 +36,38 @@ describe("decisioni: chi ha agito", () => {
   it("gli altri attori non cambiano", () => {
     expect(describeActor("assistant").label).toBe(t("actor.assistant"));
     expect(describeActor("rule:window_open_off", { window_open_off: "Finestra aperta" }).label).toBe(t("actor.rule", { name: "Finestra aperta" }));
+  });
+});
+
+describe("decisioni: il tipo di azione in italiano (D-125)", () => {
+  it.each(DECISION_ACTIONS)("«%s» ha la sua etichetta, mai il codice", (code) => {
+    const label = actionLabel(code);
+    expect(label).not.toBe(code);
+    expect(label).not.toMatch(/_|^decisions\./);
+  });
+
+  it("le etichette concordate", () => {
+    expect(actionLabel("set_mode")).toBe("Modalità");
+    expect(actionLabel("hold")).toBe("Forzatura");
+    expect(actionLabel("hold_cancel")).toBe("Forzatura annullata");
+    expect(actionLabel("hold_expired")).toBe("Forzatura scaduta");
+    expect(actionLabel("expire")).toBe("Approvazione scaduta");
+    expect(actionLabel("schedule_create")).toBe("Programma: aggiunta");
+    expect(actionLabel("schedule_move")).toBe("Programma: spostata");
+    expect(actionLabel("schedule_cancel")).toBe("Programma: annullata");
+    expect(actionLabel("schedule_missed")).toBe("Programma: saltata");
+    expect(actionLabel("schedule_deferred")).toBe("Azione rimandata");
+    expect(actionLabel("booking_cancel_reset")).toBe("Disdetta dopo il pre-arrivo");
+    expect(actionLabel("update_rules")).toBe("Regole aggiornate");
+    expect(actionLabel("update_device")).toBe("Dispositivo modificato");
+    expect(actionLabel("turn_on")).toBe("Accensione");
+    expect(actionLabel("turn_off")).toBe("Spegnimento");
+    expect(actionLabel("set_climate")).toBe("Clima");
+    expect(actionLabel("set_heating")).toBe("Riscaldamento");
+  });
+
+  it("un'azione che il motore aggiungerà e il sito non conosce ancora: il codice, la pagina non si rompe", () => {
+    expect(actionLabel("future_action")).toBe("future_action");
+    expect(actionLabel("")).toBe("");
   });
 });

@@ -62,10 +62,10 @@ export async function runBatch(
 }
 
 /** Case-insensitive match on everything the row shows, ids included (a partial request ID is found here). */
-export function matchesDecision(d: Decision, needle: string, labels: { actor: string; target: string }): boolean {
+export function matchesDecision(d: Decision, needle: string, labels: { actor: string; target: string; action?: string }): boolean {
   const n = needle.trim().toLowerCase();
   if (!n) return true;
-  return [d.reasoning, d.action, d.actor, labels.actor, labels.target, d.old_value, d.new_value, d.correlation_id, d.command_id, d.approval_id]
+  return [d.reasoning, d.action, labels.action, d.actor, labels.actor, labels.target, d.old_value, d.new_value, d.correlation_id, d.command_id, d.approval_id]
     .filter(Boolean)
     .join(" ")
     .toLowerCase()

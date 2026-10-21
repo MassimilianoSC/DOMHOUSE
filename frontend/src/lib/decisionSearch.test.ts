@@ -100,3 +100,12 @@ describe("ricerca nelle decisioni: cosa si cerca", () => {
     expect(periodFrom(7, Date.UTC(2026, 9, 16))).toBe(new Date(Date.UTC(2026, 9, 9)).toISOString());
   });
 });
+
+describe("ricerca: anche il tipo di azione in italiano (D-125)", () => {
+  it("cercando l'etichetta si trova la decisione; anche il codice si trova ancora", () => {
+    const d = { ...dec(1), action: "hold_expired" } as Decision;
+    const labels = { actor: "Sistema", target: "Appartamento", action: "Forzatura scaduta" };
+    expect(matchesDecision(d, "forzatura scaduta", labels)).toBe(true);
+    expect(matchesDecision(d, "hold_expired", labels)).toBe(true);
+  });
+});

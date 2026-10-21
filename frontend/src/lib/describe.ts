@@ -1,5 +1,5 @@
 import type { Device, ScheduledAction } from "@/api/types";
-import { t } from "@/i18n";
+import { t, tOr } from "@/i18n";
 import { fmtNumber } from "./format";
 
 export function deviceLabel(deviceId: string | undefined, devices: Device[]): string {
@@ -51,3 +51,17 @@ export function describeActor(actor: string, ruleLabels: Record<string, string> 
       return { kind: "other", label: actor };
   }
 }
+
+/**
+ * Every action code the engine writes in a decision (engine/core.py, D-125): its own actions, the commands to devices,
+ * the booking events and the answers to approvals. Shown in Italian; a code the site does not know yet shows as it is.
+ */
+export const DECISION_ACTIONS = [
+  "set_mode", "turn_on", "turn_off", "set_climate", "set_heating",
+  "hold", "hold_cancel", "hold_expired", "expire", "approve", "reject", "update_device", "update_rules",
+  "schedule_create", "schedule_move", "schedule_cancel", "schedule_missed", "schedule_deferred",
+  "booking_created", "booking_changed", "booking_cancelled", "checkin", "checkout", "booking_cancel_reset",
+] as const;
+
+/** The kind of action of a decision, in Italian («Forzatura scaduta»); its code for one not translated yet. */
+export const actionLabel = (code: string): string => (code ? tOr(`decisions.actions.${code}`, code) : code);

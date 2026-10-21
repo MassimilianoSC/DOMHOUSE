@@ -70,7 +70,7 @@ const FORMS: Record<string, string[]> = Object.fromEntries([
 
 /** Forms whose values are not a closed set (parameter names chosen by the engine): allowed only through tOr, which
  *  falls back to a readable text when the key is missing. */
-const OPEN_FORMS = new Set(["rules.params.${}"]);
+const OPEN_FORMS = new Set(["rules.params.${}", "decisions.actions.${}"]);
 
 interface Use {
   file: string;

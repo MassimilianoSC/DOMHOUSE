@@ -13,7 +13,7 @@ import { CopyableId } from "@/components/ui/CopyableId";
 import { Badge, Card, Input, NativeSelect, Skeleton } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { MAX_RESULTS, matchesDecision, periodFrom } from "@/lib/decisionSearch";
-import { describeActor, deviceLabel } from "@/lib/describe";
+import { actionLabel, describeActor, deviceLabel } from "@/lib/describe";
 import { DEFAULT_TZ, fmtDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
@@ -52,7 +52,8 @@ function DecisionRow({ d, tz, ruleLabels }: { d: Decision; tz: string; ruleLabel
           <Badge className={cn("ml-auto", OUTCOME_STYLE[d.outcome])} data-testid={`decision-outcome-${d.decision_id}`}>{t(`decisions.outcome.${d.outcome}`)}</Badge>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
-          <span className="font-mono text-xs rounded bg-secondary px-1.5 py-0.5">{d.action}</span>
+          {/* The kind of action in Italian (D-125); the engine's code stays in the tooltip, and shows for a new one. */}
+          <span className="rounded bg-secondary px-1.5 py-0.5 text-xs" title={d.action} data-testid={`decision-action-${d.decision_id}`}>{actionLabel(d.action)}</span>
           {(d.old_value || d.new_value) && (
             <span className="inline-flex items-center gap-1">
               <span className="text-muted-foreground">{d.old_value ?? "—"}</span>
@@ -95,6 +96,7 @@ export default function DecisionsPage() {
     matchesDecision(d, needle, {
       actor: describeActor(d.actor, ruleLabels).label,
       target: d.target.type === "device" ? deviceLabel(d.target.device_id, devices) : t(`decisions.target.${d.target.type}`),
+      action: actionLabel(d.action),
     }),
   );
   const searching = search.status !== "idle";
