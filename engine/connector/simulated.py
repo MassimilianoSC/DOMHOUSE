@@ -51,11 +51,14 @@ def seed_devices(variant: int) -> tuple[list[dict], dict[str, dict]]:
              {"room_id": "tecnico", "name": "Vano tecnico"}]
     warm = variant == 0
     devices = [
+        # D-139: the split behind an infrared blaster and the meter that measures it, two devices as in a real
+        # catalog (connector.md §6): the meter offline lets a tester see «Comando non verificato» from the Simulator
         {"device_id": "dev-clima-soggiorno", "label": "Climatizzatore soggiorno", "room_id": "soggiorno", "online": True,
          "last_seen": now, "capabilities": {
              "climate": {"on": warm, "mode": "heat", "setpoint": 21, "fan": "auto", "setpoint_min": 16,
-                         "setpoint_max": 24, "confirmation": "power"},
-             "power_meter": {"watts": 870 if warm else 0, "energy_total_wh": 812_400.0}}},
+                         "setpoint_max": 24, "confirmation": "power"}}},
+        {"device_id": "dev-misura-clima", "label": "Misuratore clima", "room_id": "soggiorno", "online": True,
+         "last_seen": now, "capabilities": {"power_meter": {"watts": 870 if warm else 0, "energy_total_wh": 812_400.0}}},
         {"device_id": "dev-caldaia", "label": "Caldaia", "room_id": "tecnico", "online": True, "last_seen": now,
          "capabilities": {
              "heating": {"on": warm, "setpoint": 21 if warm else 8, "setpoint_min": 7, "setpoint_max": 23},
@@ -115,12 +118,15 @@ class SimulatedDevice:
         state = self.capabilities[capability]
         return {k: copy.deepcopy(state[k]) for k in DEVICE_FIELDS.get(capability, state) if k in state}
 
-    def apply(self, capability: str, target: dict, now: datetime | None = None) -> list[tuple[str, dict]]:
-        """The device reaches the target; its power meter (if any) follows. Returns (capability, reported state)."""
+    def apply(self, capability: str, target: dict, now: datetime | None = None,
+              heard: bool = True) -> list[tuple[str, dict]]:
+        """The device reaches the target; its power meter (if any) follows. Returns (capability, reported state).
+        heard=False: an infrared split, which never answers, so it is not "seen" by a command."""
         now = now or utcnow()
         self.meter_to(now)                             # what was used at the old power, before it changes
         self.capabilities[capability].update(copy.deepcopy(target))
-        self.last_seen = iso(now)                      # the same instant as the change it reports
+        if heard or "power_meter" in self.capabilities:   # its own meter answers even for an infrared split
+            self.last_seen = iso(now)                  # the same instant as the change it reports
         changed = [(capability, self.reported(capability))]
         if "power_meter" in self.capabilities:
             self.capabilities["power_meter"]["watts"] = watts_for(capability, self.capabilities[capability])
@@ -134,7 +140,7 @@ class SimulatedConnector:
     def __init__(self, variant: int = 0):
         rooms, devices = seed_devices(variant)
         # the split is confirmed by its own meter and the boiler regulated on the living-room sensor (§2.2)
-        links = {"dev-clima-soggiorno": {"confirmation_device_id": "dev-clima-soggiorno"},
+        links = {"dev-clima-soggiorno": {"confirmation_device_id": "dev-misura-clima"},
                  "dev-caldaia": {"sensor_device_id": "dev-ambiente-soggiorno"}}
         self._rooms = [Room(**r) for r in rooms]
         self._devices = {k: SimulatedDevice(d, links.get(k)) for k, d in devices.items()}
@@ -200,9 +206,17 @@ class SimulatedConnector:
         if infrared and cmd.device_id in self._lost_frames:
             self._lost_frames.discard(cmd.device_id)
             return CommandResult("delivered", detail="infrared frame lost (simulated)")
-        for cap, state in device.apply(cmd.capability, cmd.target, now):
+        for cap, state in device.apply(cmd.capability, cmd.target, now, heard=not infrared):
             if not (infrared and cap == "climate"):        # an infrared split says nothing; its meter does
                 self._push(StateChange(device.device_id, "state", now, capability=cap, state=state))
+        meter = self._devices.get(device.links.get("confirmation_device_id", ""))
+        if meter is not None and meter is not device and "power_meter" in meter.capabilities:
+            meter.meter_to(now)                            # the separate meter follows the split it measures
+            meter.capabilities["power_meter"]["watts"] = watts_for(cmd.capability, device.capabilities[cmd.capability])
+            if meter.online:
+                meter.last_seen = iso(now)
+                self._push(StateChange(meter.device_id, "state", now, capability="power_meter",
+                                       state=meter.reported("power_meter")))
         await asyncio.sleep(0)   # let the engine take the changes before it hears the outcome (same order as before)
         if infrared:
             return CommandResult("delivered")

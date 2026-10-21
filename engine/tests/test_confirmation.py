@@ -13,7 +13,7 @@ from engine.connector import simulated
 from engine.connector.simulated import SimulatedConnector
 
 ACTOR, CORR = "prova@hqe.it", "2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10"
-SPLIT = "dev-clima-soggiorno"
+SPLIT, METER = "dev-clima-soggiorno", "dev-misura-clima"   # D-139: the split and its own meter
 
 
 @pytest.fixture(autouse=True)
@@ -45,7 +45,7 @@ def test_a_switch_off_confirmed_by_the_meter():
     cmd = run(e, {"capability": "climate", "action": "turn_off"})
     assert cmd["status"] == "acked"
     assert e.devices[SPLIT]["capabilities"]["climate"]["on"] is False
-    assert e.devices[SPLIT]["capabilities"]["power_meter"]["watts"] == 0
+    assert e.devices[METER]["capabilities"]["power_meter"]["watts"] == 0
 
 
 def test_a_lost_frame_is_not_confirmed_and_the_split_stays_as_it_was():
@@ -56,7 +56,7 @@ def test_a_lost_frame_is_not_confirmed_and_the_split_stays_as_it_was():
     assert (cmd["status"], cmd["reason"]) == ("timeout", "no_confirmation")
     assert e.devices[SPLIT]["capabilities"]["climate"]["on"] is True
     d = last_decision(e)
-    assert d["outcome"] == "failed" and "Nessuna conferma dal misuratore «Climatizzatore soggiorno»" in d["reasoning"]
+    assert d["outcome"] == "failed" and "Nessuna conferma dal misuratore «Misuratore clima»" in d["reasoning"]
 
 
 def test_a_change_with_the_split_on_is_not_verified():
@@ -121,14 +121,14 @@ def test_the_simulated_catalog_has_good_links(monkeypatch):
     seen = warnings(monkeypatch)
     e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
     assert seen == []
-    assert e.links[SPLIT] == {"confirmation_device_id": SPLIT}
+    assert e.links[SPLIT] == {"confirmation_device_id": METER}
     assert e.links["dev-caldaia"] == {"sensor_device_id": "dev-ambiente-soggiorno"}
 
 
 @pytest.mark.parametrize("links, reason", [
     ({SPLIT: {"confirmation_device_id": "dev-che-non-esiste"}}, "target not in the catalog"),
     ({SPLIT: {"confirmation_device_id": "dev-finestra-camera"}}, "target without power_meter"),
-    ({SPLIT: {"confirmation_device_id": SPLIT, "colore": "rosso"}}, "unknown link key"),
+    ({SPLIT: {"confirmation_device_id": METER, "colore": "rosso"}}, "unknown link key"),
     ({"dev-presa-camera": {"confirmation_device_id": "dev-presa-camera"}}, "link only for a device with climate"),
     ({"dev-caldaia": {"sensor_device_id": "dev-presa-camera"}}, "target without temperature"),
 ])
@@ -190,3 +190,16 @@ def test_the_connector_down_and_back_is_an_event_a_decision_and_commands_wait():
         assert [ev for ev in e.events if ev["event"] == "instance.health"][-1]["data"]["status"] == "ok"
         assert e.create_command("dev-presa-camera", {"capability": "switch", "action": "turn_on"}, ACTOR, CORR)
     asyncio.run(main())
+
+
+def test_the_demonstration_recipe_meter_offline_gives_command_not_verified():
+    """D-139, checklist D4d: in the Simulator, «Misuratore clima» offline, then the split switched off."""
+    conn = SimulatedConnector()
+    e = core.ApartmentEngine("apt-prova-01", conn, seed=False)
+    for change in conn.set_online(METER, False, notify=False):
+        e._apply_change(change)
+    assert e.devices[METER]["online"] is False and e.devices[SPLIT]["online"] is True
+    cmd = run(e, {"capability": "climate", "action": "turn_off"})
+    assert cmd["status"] == "acked" and e.devices[SPLIT]["capabilities"]["climate"]["on"] is False
+    d = next(d for d in reversed(e.decisions) if d["action"] == "command_unverified")
+    assert d["reasoning"] == "Comando a climatizzatore soggiorno non verificato: il misuratore «Misuratore clima» è offline"

@@ -17,7 +17,7 @@ from engine.connector.simulated import SimulatedConnector
 from engine.store import SqliteStore
 
 ROME = ZoneInfo("Europe/Rome")
-METERS = ["dev-clima-soggiorno", "dev-caldaia", "dev-presa-camera"]     # the simulated catalog's, in its order
+METERS = ["dev-misura-clima", "dev-caldaia", "dev-presa-camera"]     # the simulated catalog's, in its order (D-139: the split's meter apart)
 
 
 def at(monkeypatch, moment: datetime):
@@ -61,7 +61,7 @@ def test_hours_from_the_telemetry_and_zero_where_nothing_was_read(monkeypatch):
     assert [s["kwh"] for s in r["series"]] == [0.3, 0.0, 0.01, 1.234, 0.0]
     assert r["total_kwh"] == 1.544 and r["avoided_hvac_hours"] is None
     assert [(d["device_id"], d["kwh"]) for d in r["by_device"]] == [
-        ("dev-clima-soggiorno", 0.0), ("dev-caldaia", 1.284), ("dev-presa-camera", 0.25), ("dev-tolto", 0.01)]
+        ("dev-misura-clima", 0.0), ("dev-caldaia", 1.284), ("dev-presa-camera", 0.25), ("dev-tolto", 0.01)]
     assert r["by_device"][-1]["label"] == "dev-tolto"
 
 
@@ -146,8 +146,8 @@ def test_the_simulated_counter_grows_with_the_watts_and_only_meters_drawing_powe
     conn = SimulatedConnector()                          # Rimini: split at 870 W, boiler at 95 W, socket at 0 W
     clock.advance(minutes=30)
     readings = {c.device_id: c.state for c in conn.read_meters(notify=False)}
-    assert set(readings) == {"dev-clima-soggiorno", "dev-caldaia"}
-    assert readings["dev-clima-soggiorno"] == {"watts": 870, "energy_total_wh": 812_400 + 435}
+    assert set(readings) == {"dev-misura-clima", "dev-caldaia"}
+    assert readings["dev-misura-clima"] == {"watts": 870, "energy_total_wh": 812_400 + 435}
     assert readings["dev-caldaia"] == {"watts": 95, "energy_total_wh": 96_300 + 47.5}
     assert all("kwh_today" not in s for s in readings.values())
 
@@ -179,9 +179,9 @@ def test_simulated_readings_reach_the_telemetry_and_a_meter_back_online_brings_i
         clock.advance(minutes=10)
         for change in conn.read_meters(notify=False):
             e._apply_change(change)
-    split = sum(wh for _, _, wh in e.store.telemetry("dev-clima-soggiorno"))
+    split = sum(wh for _, _, wh in e.store.telemetry("dev-misura-clima"))
     assert split == pytest.approx(870 / 2)                          # 30 minutes at 870 W
-    assert e.devices["dev-clima-soggiorno"]["capabilities"]["power_meter"]["kwh_today"] == 0.435
+    assert e.devices["dev-misura-clima"]["capabilities"]["power_meter"]["kwh_today"] == 0.435
     # the boiler's meter goes away for two hours and comes back with the whole gap: spread over its hours
     for change in conn.set_online("dev-caldaia", False, notify=False):
         e._apply_change(change)
@@ -209,7 +209,7 @@ def test_a_meter_drawing_power_reads_through_changes_on_its_own():
         await asyncio.wait_for(read(), timeout=5)
         return got
     got = asyncio.run(main())
-    assert {c.device_id for c in got} == {"dev-clima-soggiorno", "dev-caldaia"}
+    assert {c.device_id for c in got} == {"dev-misura-clima", "dev-caldaia"}
     assert all(c.capability == "power_meter" and "energy_total_wh" in c.state for c in got)
 
 

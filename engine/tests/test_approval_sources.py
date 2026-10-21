@@ -17,6 +17,7 @@ from engine.connector.simulated import SimulatedConnector
 CORR = "2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10"
 ACTOR = "prova@hqe.it"
 CLIMA, CALDAIA, SENSOR = "dev-clima-soggiorno", "dev-caldaia", "dev-ambiente-soggiorno"
+METER = "dev-misura-clima"                                 # the split's own meter (D-139)
 
 
 @pytest.fixture(autouse=True)
@@ -69,7 +70,7 @@ def test_the_assistants_approval_stays_rejected_at_expiry():
 def test_f2_asks_once_per_episode_and_never_for_the_boiler():
     e = engine()                                          # not seeded: the apartment is "empty"
     assert e.mode == "empty"
-    watts(e, CLIMA, 870)
+    watts(e, METER, 870)
     watts(e, CALDAIA, 2000)                               # the boiler: never (the frost protection governs it)
     ticks(e)
     asked = approvals_of(e)
@@ -80,30 +81,30 @@ def test_f2_asks_once_per_episode_and_never_for_the_boiler():
     assert a["proposed_action"]["device_id"] == CLIMA
     ticks(e)
     assert len(approvals_of(e)) == 1                      # the same episode: once
-    watts(e, CLIMA, 0)
+    watts(e, METER, 0)
     ticks(e, n=1)
-    watts(e, CLIMA, 870)
+    watts(e, METER, 870)
     ticks(e)
     assert len(approvals_of(e)) == 2                      # a new episode asks again (queued behind the first)
 
 
 def test_f2_waits_its_minutes_and_stays_quiet_outside_empty_or_during_a_hold():
     e = engine(EMPTY_POWER_MINUTES=240)                   # 240 "minutes" = 0,24 s here
-    watts(e, CLIMA, 870)
+    watts(e, METER, 870)
     ticks(e, n=2, gap=0.01)
     assert approvals_of(e) == []                          # not long enough yet
     e = engine()
     e.mode = "comfort"
-    watts(e, CLIMA, 870)
+    watts(e, METER, 870)
     ticks(e)
     assert approvals_of(e) == []
     e = engine()
     e.hold = {"until": core.iso(core.utcnow() + timedelta(hours=1)), "mode": "comfort"}
-    watts(e, CLIMA, 870)
+    watts(e, METER, 870)
     ticks(e)
     assert approvals_of(e) == []
     e = engine(EMPTY_POWER_WATTS=1000)                    # 870 W is under this apartment's threshold
-    watts(e, CLIMA, 870)
+    watts(e, METER, 870)
     ticks(e)
     assert approvals_of(e) == []
 

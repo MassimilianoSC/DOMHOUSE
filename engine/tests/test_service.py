@@ -137,7 +137,7 @@ def test_simulated_service(tmp_path):
         assert client.get("/api/v1/devices", headers={"X-API-Key": KEY}).status_code == 400
         assert client.get("/apt-prova-01/api/v1/devices", headers=HEADERS).status_code == 404   # no prefix any more
         devices = client.get("/api/v1/devices", headers=HEADERS).json()
-        assert devices["apartment_id"] == "apt-prova-01" and len(devices["devices"]) == 5
+        assert devices["apartment_id"] == "apt-prova-01" and len(devices["devices"]) == 6   # D-139: the split's meter apart
         assert client.post("/api/v1/_test/state", headers=HEADERS,
                            json={"device_id": "dev-finestra-camera", "capability": "contact",
                                  "state": {"open": True}}).status_code == 204
