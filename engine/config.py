@@ -7,6 +7,8 @@
     HOST, PORT     optional   where to listen; 127.0.0.1 and 8100 by default (in the container 0.0.0.0)
     DATA_DIR       optional   the apartment's data, /data/<apartment_id> by default (SQLite from step 3)
     CATALOG_PATH   optional   the devices' catalog, <DATA_DIR>/catalog.yaml by default (read by the connector)
+    MODEL_BASE_URL optional   P-60 step 9: the BFF's address (https://..., its POST /internal/ai/chat): the assistant
+                              answers with the real model; without it /ask is the keyword one (simulated) or 501
 
 The settings of the rules (D-131, D-133), optional, per apartment (on the VM in <apartment_id>.settings.env, written by
 engine-vm.sh set/unset): SETTINGS below, name -> (default, lowest, highest). A value that is not a number or is out of
@@ -45,6 +47,8 @@ SETTINGS: dict[str, tuple[float, float, float]] = {
     # D-137, F1: at the check-out's switch to "empty", motion seen within these minutes and after the departure time
     # asks the manager first
     "CHECKOUT_PRESENCE_MINUTES": (30.0, 5.0, 180.0),
+    # P-60 step 9 (D-132): questions to the assistant a day per apartment, counted before calling the model
+    "ASK_DAILY_LIMIT": (50.0, 1.0, 1000.0),
     # D-137, F2: in an empty apartment, a meter above these watts for these minutes asks to switch the device off
     "EMPTY_POWER_WATTS": (300.0, 20.0, 5000.0),
     "EMPTY_POWER_MINUTES": (15.0, 5.0, 240.0),
@@ -57,7 +61,7 @@ CHOICES: dict[str, tuple[str, tuple[str, ...]]] = {
 }
 DEFAULT_SETTINGS: dict[str, float | str] = {name: spec[0] for name, spec in (SETTINGS | CHOICES).items()}
 ENGINE_VARIABLES = {"APARTMENT_ID", "API_KEY", "CONNECTOR", "HOST", "PORT", "DATA_DIR", "CATALOG_PATH",
-                    "MOCK_TIME_SCALE", "MOCK_PING_S", *SETTINGS, *CHOICES}
+                    "MOCK_TIME_SCALE", "MOCK_PING_S", "MODEL_BASE_URL", *SETTINGS, *CHOICES}
 APARTMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 CONNECTOR_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 MIN_KEY_LENGTH = 16
@@ -79,6 +83,7 @@ class EngineConfig:
     catalog_path: Path
     env: Mapping[str, str] = field(repr=False, default_factory=dict)
     settings: Mapping[str, float | str] = field(default_factory=lambda: dict(DEFAULT_SETTINGS))
+    model_base_url: str | None = None
 
     @property
     def confirm_on_watts(self) -> float:
@@ -147,10 +152,13 @@ def load_config(env: Mapping[str, str] | None = None) -> EngineConfig:
         if value not in allowed:
             problems.append(f"{name} must be one of: {', '.join(allowed)}")
         settings[name] = value
+    model_base_url = env.get("MODEL_BASE_URL", "").strip() or None
+    if model_base_url and not model_base_url.startswith(("https://", "http://")):
+        problems.append("MODEL_BASE_URL must be the BFF's address, https://...")
     if problems:
         raise ConfigError("\n".join(problems))
     data_dir = Path(env.get("DATA_DIR") or f"{DEFAULT_DATA_ROOT}/{apartment_id}")
     return EngineConfig(apartment_id=apartment_id, api_key=api_key, connector=connector,
                         host=env.get("HOST", "127.0.0.1"), port=port, data_dir=data_dir,
                         catalog_path=Path(env.get("CATALOG_PATH") or data_dir / "catalog.yaml"), env=env,
-                        settings=settings)
+                        settings=settings, model_base_url=model_base_url)

@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 
 from . import log
 from .api import create_contract_app
+from .assistant import ModelClient
 from .config import EngineConfig
 from .connector.interface import CONNECTOR_API_VERSION
 from .core import ALL_FEATURES, ApartmentEngine
@@ -71,10 +72,12 @@ def create_engine_app(config: EngineConfig, connector=None):
     @asynccontextmanager
     async def lifespan(app):
         store = SqliteStore(config.data_dir / DB_NAME)
+        model = (ModelClient(config.model_base_url, config.apartment_id, config.api_key) if config.model_base_url
+                 else None)                           # P-60 step 9: the BFF's way to the model
         await connector.start()
         engine = ApartmentEngine(config.apartment_id, connector, simulated=config.simulated, seed=config.simulated,
                                  implementation=IMPLEMENTATION, store=store,
-                                 settings=config.settings)
+                                 settings=config.settings, model=model)
         engine.ensure_started()
         running["engine"] = engine
         log.info("engine started", connector=config.connector, devices=len(engine.devices), port=config.port,
@@ -95,8 +98,8 @@ def create_engine_app(config: EngineConfig, connector=None):
         engine.ensure_started()
         return engine
 
-    # /ask answers from keywords only in simulated mode; with a real connector it is 501 until step 9 (D-104)
-    features = [f for f in ALL_FEATURES if config.simulated or f != "ask"]
+    # /ask: the real model with MODEL_BASE_URL (P-60 step 9); without it keywords in simulated mode, otherwise 501
+    features = [f for f in ALL_FEATURES if config.simulated or config.model_base_url or f != "ask"]
     return create_contract_app(engine_of, config.api_key, features=features, simulated=config.simulated,
                                implementation=IMPLEMENTATION, ping_seconds=float(config.env.get("MOCK_PING_S", "25")),
                                apartment_id=config.apartment_id, lifespan=lifespan)

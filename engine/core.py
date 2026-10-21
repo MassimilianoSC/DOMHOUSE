@@ -194,7 +194,8 @@ class EnergyCounter:
 class ApartmentEngine:
     def __init__(self, apartment_id: str, connector=None, *, simulated: bool = True, seed: bool | None = None,
                  implementation: dict | None = None, store: MemoryStore | None = None,
-                 confirm_watts: tuple[float, float] | None = None, settings: dict[str, float] | None = None):
+                 confirm_watts: tuple[float, float] | None = None, settings: dict[str, float] | None = None,
+                 model=None):
         """Without a connector: the demonstration apartment, a SimulatedConnector chosen by the apartment's id. seed
         (by default: without a connector) adds the demonstration's bookings and decisions; otherwise the history
         starts empty and the apartment in mode "empty". store: where the state lives (engine/store.py), in memory by
@@ -252,6 +253,7 @@ class ApartmentEngine:
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode
+        self.model = model                           # P-60 step 9: engine/assistant.ModelClient, None = keywords
         self.restored = bool(self.store.get_meta("initialized"))
         if self.restored:
             self._load()
@@ -1895,7 +1897,11 @@ class ApartmentEngine:
                "approval_id": None, "reason": None, "correlation_id": correlation_id, "created_at": now, "updated_at": now}
         self.asks[ask["ask_id"]] = ask
         self._save_ask(ask)
-        self.spawn(self._resolve_ask(ask, actor))
+        if self.model is not None:                   # P-60 step 9: the real model (engine/assistant.py)
+            from .assistant import Assistant
+            self.spawn(Assistant(self, self.model).resolve(ask, actor))
+        else:                                        # the simulated keyword assistant (conformance, CI)
+            self.spawn(self._resolve_ask(ask, actor))
         return copy.deepcopy(ask)
 
     def _match_device(self, text: str, cap: str | None = None) -> dict | None:
