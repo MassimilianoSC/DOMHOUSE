@@ -1,0 +1,29 @@
+{
+  "displayName": "Motori: motore muto o giù",
+  "documentation": {
+    "content": "Il controllo della VM ha trovato un motore che non risponde («engine silent») o che risponde 503 («engine down»: connector o database). L'appartamento è nell'etichetta apartment. Al massimo un'email ogni 30 minuti. Istruzioni: scripts/monitoring/README.md, sezione «Motori sulla VM». Accesso alla VM: SSH via IAP (docs/motore-vm.md), poi sudo bash /opt/domhouse/engine-vm.sh status <apartment_id>.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «engine silent» o «engine down» del controllo",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\\\[[0-9]+\\\\])?: engine (silent|down) \"",
+        "labelExtractors": {
+          "apartment": "REGEXP_EXTRACT(jsonPayload.message, \"engine (?:silent|down) ([A-Za-z0-9_-]+)\")"
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "1800s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "ERROR"
+}

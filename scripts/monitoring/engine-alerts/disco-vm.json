@@ -1,0 +1,32 @@
+{
+  "displayName": "Motori: disco della VM oltre l'80 %",
+  "documentation": {
+    "content": "Il disco della VM dei motori è pieno oltre l'80 % da 10 minuti (metrica dell'Ops Agent). Prima di tutto: i backup in /data/<apartment_id>/backup (7 giorni) e i log di Docker. Istruzioni: scripts/monitoring/README.md, sezione «Motori sulla VM». Accesso alla VM: SSH via IAP (docs/motore-vm.md), poi sudo bash /opt/domhouse/engine-vm.sh status <apartment_id>.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Disco usato oltre l'80 % per 10 minuti",
+      "conditionThreshold": {
+        "filter": "resource.type=\"gce_instance\" AND metric.type=\"agent.googleapis.com/disk/percent_used\" AND metric.label.state=\"used\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 80,
+        "duration": "600s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_MEAN"
+          }
+        ]
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "WARNING"
+}

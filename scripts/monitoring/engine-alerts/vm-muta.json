@@ -1,0 +1,31 @@
+{
+  "displayName": "Motori: VM muta",
+  "documentation": {
+    "content": "Da 10 minuti la VM non scrive il controllo dei motori (engine-vm.sh check-all, ogni 5 minuti): la VM è ferma, oppure il suo timer o l'Ops Agent non funzionano. Una sola email per tutti i motori (D-148): quanti erano lo dice l'ultima riga «domhouse-check: N motori» nei log. Istruzioni: scripts/monitoring/README.md, sezione «Motori sulla VM». Accesso alla VM: SSH via IAP (docs/motore-vm.md), poi sudo bash /opt/domhouse/engine-vm.sh status <apartment_id>.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Nessun controllo dei motori da 10 minuti",
+      "conditionAbsent": {
+        "filter": "resource.type=\"gce_instance\" AND metric.type=\"logging.googleapis.com/user/domhouse_check_runs\"",
+        "duration": "600s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ]
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "CRITICAL"
+}

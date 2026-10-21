@@ -84,3 +84,29 @@ gcloud alpha monitoring policies create --project="$P" --policy-from-file=/tmp/p
 gcloud alpha monitoring policies delete --project="$P" "$(gcloud alpha monitoring policies list --project="$P" --filter='displayName="PROVA allarme (da cancellare)"' --format='value(name)')"
 gcloud monitoring uptime delete --project="$P" "$TEST_ID"
 ```
+
+## Motori sulla VM (P-60 passo 10, D-104, D-148)
+
+Ogni 5 minuti il timer `domhouse-engine-check.timer` della VM lancia `engine-vm.sh check-all`, che chiede `/health` a
+ogni motore e guarda l'età del suo backup più recente, e scrive nel syslog della VM (che l'Ops Agent manda già a Cloud
+Logging) righe `engine ok <id>`, `engine down <id>` (risponde 503: connector o database), `engine silent <id>` (non
+risponde), `backup missing <id> age_h=<n>` (più di 26 ore) e alla fine `domhouse-check: <n> motori, <m> muti`. Il
+backup notturno scrive `backup ok <id>`. Con `engine-vm.sh logs-agent` anche le righe JSON dei motori arrivano a Cloud
+Logging, nel log `domhouse_engine` (campi `level`, `msg`, `apartment_id`); ogni motore scrive `engine alive` ogni 5
+minuti.
+
+`scripts/monitoring/engine-alerts.sh` (una volta, idempotente; `DRY_RUN=1` per vedere senza creare) crea la metrica
+`domhouse_check_runs` e cinque politiche sul canale «Avvisi BFF»:
+
+| Politica | Quando | Email |
+|---|---|---|
+| Motori: VM muta | nessuna riga di riepilogo del controllo da 10 minuti | una sola per tutta la VM |
+| Motori: motore muto o giù | riga `engine silent` o `engine down` | al massimo una ogni 30 minuti |
+| Motori: righe di errore | riga di livello `error` di un motore | al massimo una ogni 30 minuti |
+| Motori: backup mancato | riga `backup missing` | al massimo una ogni 12 ore |
+| Motori: disco della VM oltre l'80 % | metrica dell'Ops Agent sopra 80 per 10 minuti | finché non scende |
+
+Primo passo per ognuna: SSH alla VM via IAP (`docs/motore-vm.md`), poi `sudo bash /opt/domhouse/engine-vm.sh status
+<apartment_id>`; per i log di un motore `docker logs --tail 50 engine-<apartment_id>`, oppure Cloud Logging con il filtro
+`log_id("domhouse_engine") AND jsonPayload.apartment_id="<apartment_id>"`. Il controllo scrive solo se la VM è viva:
+con la VM muta arriva solo «VM muta», mai un'email per appartamento.

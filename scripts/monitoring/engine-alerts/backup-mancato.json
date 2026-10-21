@@ -1,0 +1,29 @@
+{
+  "displayName": "Motori: backup mancato",
+  "documentation": {
+    "content": "Il backup più recente di un appartamento ha più di 26 ore (D-148): il timer del backup delle 22:30 UTC non ha funzionato. Si rimette a posto con sudo bash /opt/domhouse/engine-vm.sh backup <apartment_id>; l'avviso smette da solo al primo backup nuovo. Al massimo un'email ogni 12 ore. Istruzioni: scripts/monitoring/README.md, sezione «Motori sulla VM». Accesso alla VM: SSH via IAP (docs/motore-vm.md), poi sudo bash /opt/domhouse/engine-vm.sh status <apartment_id>.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «backup missing» del controllo",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\\\[[0-9]+\\\\])?: backup missing \"",
+        "labelExtractors": {
+          "apartment": "REGEXP_EXTRACT(jsonPayload.message, \"backup missing ([A-Za-z0-9_-]+)\")"
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "43200s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "WARNING"
+}

@@ -1,0 +1,29 @@
+{
+  "displayName": "Motori: righe di errore",
+  "documentation": {
+    "content": "Un motore ha scritto una riga di livello error (log domhouse_engine, dall'Ops Agent: engine-vm.sh logs-agent). Il messaggio è nel campo msg, l'appartamento nell'etichetta apartment. Al massimo un'email ogni 30 minuti. Istruzioni: scripts/monitoring/README.md, sezione «Motori sulla VM». Accesso alla VM: SSH via IAP (docs/motore-vm.md), poi sudo bash /opt/domhouse/engine-vm.sh status <apartment_id>.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga di livello error di un motore",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"domhouse_engine\") AND jsonPayload.level=\"error\"",
+        "labelExtractors": {
+          "apartment": "EXTRACT(jsonPayload.apartment_id)"
+        }
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "1800s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "ERROR"
+}
