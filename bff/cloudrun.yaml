@@ -48,6 +48,8 @@ spec:
               value: "60"
             - name: REPOSITORY
               value: firestore
+            - name: FIRESTORE_DATABASE     # the default database: production (P-67)
+              value: "(default)"
             - name: FCM_ENABLED            # push on, as in staging since D-39 (publish with VITE_FCM_ENABLED=true)
               value: "true"
             - name: AI_DEMOS               # P-60 step 9 (D-132): demonstration apartments with the real assistant;

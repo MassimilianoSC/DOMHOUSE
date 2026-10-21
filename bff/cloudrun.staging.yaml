@@ -1,11 +1,14 @@
-# Cloud Run service for the BFF — STAGING: mock instance built into the BFF, simulator enabled,
-# Firestore + Firebase Auth real. Use this until the real domotica engine is reachable on the VM,
-# then switch to cloudrun.yaml (INSTANCE_MODE=real, VPC egress).
-# Placeholders replaced by scripts/deploy.sh: your-gcp-project-id, europe-west8, image tag.
+# Cloud Run service for the BFF — STAGING (P-67, D-136): a service of its own, domotica-bff-staging, in the same
+# project as production, with its own Firestore database ("staging") and its own Hosting site; the demonstration
+# apartments live here (mock://, built into the BFF, AI_DEMOS) and the VM's engine "dev" is reached through the same
+# Direct VPC egress as production. Firebase Auth is the project's one: tenant and role per environment in the claims.
+# Always on with one instance (D-136: the demonstrations keep their state in memory).
+# Placeholders replaced by scripts/deploy.sh: your-gcp-project-id, europe-west8, image tag, your-vpc-network,
+# your-vpc-subnet, your-staging-site (the Hosting site, <project>-staging by default).
 apiVersion: serving.knative.dev/v1
 kind: Service
 metadata:
-  name: domotica-bff
+  name: domotica-bff-staging
   labels:
     app: domotica-appartamenti
   annotations:
@@ -17,6 +20,9 @@ spec:
         autoscaling.knative.dev/minScale: "1"          # keeps SSE relays warm
         autoscaling.knative.dev/maxScale: "1"          # the mock keeps its state in memory: one instance only
         run.googleapis.com/cpu-throttling: "false"
+        # the VM's engine "dev" belongs to staging (D-136 point 2): Direct VPC egress on the default network
+        run.googleapis.com/network-interfaces: '[{"network":"your-vpc-network","subnetwork":"your-vpc-subnet"}]'
+        run.googleapis.com/vpc-access-egress: private-ranges-only
         run.googleapis.com/startup-cpu-boost: "true"
     spec:
       serviceAccountName: domotica-bff@your-gcp-project-id.iam.gserviceaccount.com
@@ -36,13 +42,15 @@ spec:
             - name: AUTH_MODE
               value: firebase
             - name: INSTANCE_MODE
-              value: mock
+              value: real                              # D-136: the VM's dev engine; mock:// works in every mode
             # no INSTANCE_API_KEY_FALLBACK: the BFF generates a random mock key at startup (F2, D-70); the mock is also
             # refused from the internet (only the BFF's own loopback call reaches it)
             - name: MOCK_TIME_SCALE
               value: "60"                              # real time
             - name: REPOSITORY
               value: firestore
+            - name: FIRESTORE_DATABASE     # its own database (P-67)
+              value: staging
             - name: FCM_ENABLED            # push on in staging (D-39): needed to test checklist section H; FCM is free
               value: "true"
             - name: AI_DEMOS               # P-60 step 9 (D-132): demonstration apartments with the real assistant;
@@ -54,7 +62,7 @@ spec:
             - name: FIREBASE_PROJECT_ID
               value: your-gcp-project-id
             - name: CORS_ORIGINS
-              value: https://your-gcp-project-id.web.app,https://your-gcp-project-id.firebaseapp.com
+              value: https://your-staging-site.web.app,https://your-staging-site.firebaseapp.com
             - name: SECRET_MANAGER_PREFIX
               value: langbrain-api-key-
             - name: INSTANCE_TIMEOUT_S
@@ -67,7 +75,7 @@ spec:
                   name: italianway-webhook-secret
                   key: latest
             - name: APP_PUBLIC_URL
-              value: https://your-gcp-project-id.web.app
+              value: https://your-staging-site.web.app
             - name: SMTP_HOST
               value: smtp.gmail.com
             - name: SMTP_PORT

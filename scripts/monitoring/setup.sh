@@ -10,7 +10,9 @@
 #   DRY_RUN=1 GCP_PROJECT_ID=<project> EMAIL=<recipient> scripts/monitoring/setup.sh   # reads only, changes nothing
 #
 # Optional: HOST=<BFF host without https://> (default: the deterministic URL of the domotica-bff Cloud Run service),
-#           GCP_REGION (default europe-west8).
+#           GCP_REGION (default europe-west8),
+#           SERVICE (default domotica-bff, production: P-67 keeps the alerts on production only; staging,
+#           domotica-bff-staging, has none unless this is run with SERVICE=domotica-bff-staging).
 # Idempotent: what exists is kept, what is missing is created, a wrong check path is corrected. At the end it re-reads
 # the check path and the policy links and stops with FERMO if they are not what they must be: Git Bash once turned
 # --path=/healthz into "/C:/Program Files/Git/healthz" and the alert fired with a healthy server (E-11). Every
@@ -26,7 +28,8 @@ P="${GCP_PROJECT_ID:-}"; [ -n "${P}" ] || stop "Manca GCP_PROJECT_ID: scrivi GCP
 EMAIL="${EMAIL:-}"; [ -n "${EMAIL}" ] || stop "Manca EMAIL: scrivi EMAIL=<destinatario degli avvisi> prima del comando."
 REGION="${GCP_REGION:-europe-west8}"
 DRY_RUN="${DRY_RUN:-}"
-CHECK_NAME="domotica-bff-healthz"
+SERVICE="${SERVICE:-domotica-bff}"
+CHECK_NAME="${SERVICE}-healthz"             # domotica-bff-healthz for production, the existing check
 CHECK_PATH="/health"
 MATCH='"status":"ok"'
 POLICY_NAME="BFF non raggiungibile"
@@ -48,7 +51,7 @@ done < "${LOG_MESSAGES}"
 [ "${#MESSAGES[@]}" -gt 0 ] || stop "${LOG_MESSAGES} è vuoto."
 # The filter as it must appear inside the JSON string of the template (quotes escaped once).
 OR=""; for m in "${MESSAGES[@]}"; do OR="${OR:+${OR} OR }jsonPayload.msg=\\\"${m}\\\""; done
-LOG_FILTER="resource.type=\\\"cloud_run_revision\\\" AND resource.labels.service_name=\\\"domotica-bff\\\" AND (${OR})"
+LOG_FILTER="resource.type=\\\"cloud_run_revision\\\" AND resource.labels.service_name=\\\"${SERVICE}\\\" AND (${OR})"
 render_log_policy() {   # the template filled in, in a temporary file whose path is printed
   local out; out="$(mktemp)"
   # in a sed replacement a backslash is consumed: double them so the JSON keeps its \" escapes
@@ -61,7 +64,7 @@ fi
 act() { if [ -n "${DRY_RUN}" ]; then echo "(prova a secco) farei: $1"; return 1; fi; echo "$1"; }
 
 if [ -z "${HOST:-}" ]; then
-  URLS="$(gcloud run services describe domotica-bff --project "${P}" --region "${REGION}" --format "value(metadata.annotations.'run.googleapis.com/urls')")"
+  URLS="$(gcloud run services describe "${SERVICE}" --project "${P}" --region "${REGION}" --format "value(metadata.annotations.'run.googleapis.com/urls')")"
   HOST="$(printf '%s' "${URLS}" | grep -oE "https://[^\"]+\.${REGION}\.run\.app" | head -1 | sed 's|^https://||' || true)"
   [ -n "${HOST}" ] || stop "Non trovo l'indirizzo del BFF: scrivi HOST=<indirizzo senza https://> prima del comando."
 fi
@@ -167,7 +170,7 @@ MATCH_NOW="$(gcloud monitoring uptime list-configs --project="${P}" --filter="di
 [ "${MATCH_NOW}" = "${MATCH}" ] || stop "Il controllo si aspetta «${MATCH_NOW}» invece di «${MATCH}»."
 reachable  # the same page the uptime regions call answers from here too
 HOST_NOW="$(gcloud monitoring uptime list-configs --project="${P}" --filter="displayName=\"${CHECK_NAME}\"" --format='value(monitoredResource.labels.host)' | head -1)"
-[ "${HOST_NOW}" = "${HOST}" ] || echo "Attenzione: il controllo sorveglia ${HOST_NOW}, non ${HOST} (stesso servizio se sono i due URL di domotica-bff)."
+[ "${HOST_NOW}" = "${HOST}" ] || echo "Attenzione: il controllo sorveglia ${HOST_NOW}, non ${HOST} (stesso servizio se sono i due URL di ${SERVICE})."
 FILTER="$(gcloud alpha monitoring policies describe "${POLICY}" --project="${P}" --format='value(conditions[0].conditionThreshold.filter)')"
 case "${FILTER}" in *"\"${CHECK_ID}\""*) echo "la regola guarda il controllo ${CHECK_ID}" ;;
   *) stop "La regola «${POLICY_NAME}» non guarda il controllo ${CHECK_ID}." ;; esac

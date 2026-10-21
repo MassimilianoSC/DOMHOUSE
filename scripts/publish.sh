@@ -42,9 +42,14 @@ ENV_FILE="${ENV_FILE:-${SRC}/frontend/.env.production}"
 CONTRACT_BLOB="1b5cb31306cff21e2a40ed470f1c91b2cdb30e9e"
 
 case "${TARGET}" in
-  staging) ;;
-  prod) [ -n "${VPC_NETWORK:-}" ] && [ -n "${VPC_SUBNET:-}" ] || stop "Per prod servono anche VPC_NETWORK e VPC_SUBNET." ;;
+  staging|prod) [ -n "${VPC_NETWORK:-}" ] && [ -n "${VPC_SUBNET:-}" ] \
+    || stop "Servono anche VPC_NETWORK e VPC_SUBNET (staging e produzione raggiungono la VM, P-67)." ;;
   *) stop "TARGET deve essere staging oppure prod (hai scritto «${TARGET}»)." ;;
+esac
+# P-67 (D-136): what each TARGET publishes; deploy.sh checks that the commit's manifest says the same
+case "${TARGET}" in
+  staging) echo "ambiente di prova: servizio domotica-bff-staging, database staging, sito ${STAGING_SITE:-${PROJECT}-staging}" ;;
+  prod)    echo "produzione: servizio domotica-bff, database (default), sito ${PROJECT}" ;;
 esac
 
 # --- 0. Cloud Build's own account (P-21): checked first, before anything is spent -----------------------------

@@ -8,7 +8,10 @@ ROOT = Path(__file__).resolve().parent.parent
 STAGING = (ROOT / "bff" / "cloudrun.staging.yaml").read_text(encoding="utf-8")
 PROD = (ROOT / "bff" / "cloudrun.yaml").read_text(encoding="utf-8")
 # the values that must differ, and how (anything else: the same in both)
-WANTED = {"APP_ENV": ("staging", "prod"), "INSTANCE_MODE": ("mock", "real")}
+WANTED = {"APP_ENV": ("staging", "prod"), "FIRESTORE_DATABASE": ("staging", "(default)"),     # P-67 (D-136)
+          "CORS_ORIGINS": ("https://your-staging-site.web.app,https://your-staging-site.firebaseapp.com",
+                           "https://your-gcp-project-id.web.app,https://your-gcp-project-id.firebaseapp.com"),
+          "APP_PUBLIC_URL": ("https://your-staging-site.web.app", "https://your-gcp-project-id.web.app")}
 
 
 def env(manifest: str) -> dict[str, str]:
@@ -36,10 +39,14 @@ def test_same_variables_and_secrets():
             assert staging[name] == prod[name], f"{name}: staging {staging[name]!r}, prod {prod[name]!r}"
 
 
-def test_wanted_differences_of_prod():
-    assert annotation(PROD, "run.googleapis.com/vpc-access-egress") == "private-ranges-only"
-    assert "your-vpc-network" in PROD and "your-vpc-subnet" in PROD          # filled by deploy.sh (VPC_NETWORK, VPC_SUBNET)
-    assert "network-interfaces" not in STAGING                              # staging has no VPC egress (D-28)
+def test_two_services_both_reaching_the_vm():
+    """P-67 (D-136): staging is a service of its own, with the VM's dev engine reached as production reaches it."""
+    assert re.search(r"^  name: domotica-bff$", PROD, re.MULTILINE)
+    assert re.search(r"^  name: domotica-bff-staging$", STAGING, re.MULTILINE)
+    for manifest in (PROD, STAGING):
+        assert annotation(manifest, "run.googleapis.com/vpc-access-egress") == "private-ranges-only"
+        assert "your-vpc-network" in manifest and "your-vpc-subnet" in manifest   # filled by deploy.sh
+        assert env(manifest)["INSTANCE_MODE"] == "real"                     # mock:// works in every mode (D-97)
     for key in ("autoscaling.knative.dev/minScale", "autoscaling.knative.dev/maxScale", "run.googleapis.com/cpu-throttling",
                 "run.googleapis.com/startup-cpu-boost"):
         assert annotation(STAGING, key) == annotation(PROD, key), key
