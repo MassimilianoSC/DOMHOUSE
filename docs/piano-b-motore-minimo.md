@@ -78,6 +78,11 @@ finestra, i limiti di setpoint e la registrazione delle decisioni restano **fuor
 
 ## 4. Ordine di costruzione e stima (giornate di o1)
 
+**Stato al 21 ottobre 2026** (il dettaglio è nel registro, P-60 e decisioni D-104…D-130): passi 0, 1, 2, 3, 3b, 3c, 4 e 5
+**fatti e online** (lotti 15, 16, 17: il motore gira sulla VM come servizio `dev` con il connector simulato, il BFF è in
+`TARGET=prod`); passo 6 **in corso**; passi 7, 8, 9, 10 da fare; la riga I (ingresso dei dispositivi) aspetta la scelta di
+Youssouf. Il backup di SQLite (passo 10) è già fatto con il 3d.
+
 | Passo | Cosa | Stima |
 |---|---|---|
 | 0 | Suite di conformità contro il mock da solo anche nel giro sul PC (in CI c'è già) | 0,5 |
