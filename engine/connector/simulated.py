@@ -96,10 +96,10 @@ class SimulatedDevice:
         state = self.capabilities[capability]
         return {k: copy.deepcopy(state[k]) for k in DEVICE_FIELDS.get(capability, state) if k in state}
 
-    def apply(self, capability: str, target: dict) -> list[tuple[str, dict]]:
+    def apply(self, capability: str, target: dict, now: datetime | None = None) -> list[tuple[str, dict]]:
         """The device reaches the target; its power meter (if any) follows. Returns (capability, reported state)."""
         self.capabilities[capability].update(copy.deepcopy(target))
-        self.last_seen = iso(utcnow())
+        self.last_seen = iso(now or utcnow())          # the same instant as the change it reports
         changed = [(capability, self.reported(capability))]
         if "power_meter" in self.capabilities:
             self.capabilities["power_meter"]["watts"] = watts_for(capability, self.capabilities[capability])
@@ -167,7 +167,7 @@ class SimulatedConnector:
         if not device.online:
             return CommandResult("failed", "device_offline", detail="went offline while verifying")
         now = utcnow()
-        for cap, state in device.apply(cmd.capability, cmd.target):
+        for cap, state in device.apply(cmd.capability, cmd.target, now):
             self._push(StateChange(device.device_id, "state", now, capability=cap, state=state))
         await asyncio.sleep(0)   # let the engine take the changes before it hears the outcome (same order as before)
         return CommandResult("confirmed", state=device.reported(cmd.capability))

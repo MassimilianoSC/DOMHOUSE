@@ -455,8 +455,11 @@ class ApartmentEngine:
         was_on = state.get("on")
         if running and running[1] == cap:
             state.update({k: copy.deepcopy(v) for k, v in running[3].items() if k in CONTRACT_FIELDS[cap]})
+        was_open = state.get("open")
         state.update(part)
         self._note_climate(change.device_id, cap, was_on, state.get("on"))
+        if cap == "contact" and state.get("open") and not was_open:
+            self._window_opened(change.device_id)
         device["last_seen"] = iso(change.ts)
         self._save_device(device)
         self.emit("device.state", {"device_id": device["device_id"], "capability": cap, "state": state}, corr)
@@ -519,7 +522,7 @@ class ApartmentEngine:
         """R3: in an empty apartment (and not during a hold, R7) humidity above the threshold gives one warning a day;
         the action against it is engine/mold.py's, today none."""
         rule = self.rule("mold_protection")
-        if not rule["enabled"] or self.mode != "empty" or self.hold:
+        if not rule["enabled"] or self.mode != "empty":
             return
         threshold = rule["params"]["humidity_percent"]
         high = [(d, d["capabilities"]["humidity"]["percent"]) for d in self.devices.values()
@@ -531,11 +534,14 @@ class ApartmentEngine:
         if self.store.get_meta("mold_notice_day") == today:
             return
         device, percent = max(high, key=lambda x: x[1])
-        mold_action(self.mode, percent, threshold)              # placeholder: no action yet (D-126)
+        if self.hold:                                            # R7/R8: a hold suspends it, and the decision says so
+            reason = "antimuffa sospesa dalla forzatura in corso"
+        else:
+            mold_action(self.mode, percent, threshold)          # placeholder: no action yet (D-126)
+            reason = "solo avviso, nessuna azione automatica"
         self.log("rule:mold_protection", {"type": "device", "device_id": device["device_id"]}, "mold_warning", None,
                  f"{fmt_num(percent)} %", f"Umidità {fmt_num(percent)} % in {device['label'].lower()}, sopra la soglia "
-                 f"dell'antimuffa ({fmt_num(threshold)} %) a casa vuota: solo avviso, nessuna azione automatica",
-                 "informational", str(uuid.uuid4()))
+                 f"dell'antimuffa ({fmt_num(threshold)} %) a casa vuota: {reason}", "informational", str(uuid.uuid4()))
         self.store.put_meta("mold_notice_day", today)
 
     # ---- the boiler's thermostat (R1, R2) ---------------------------------------------------------------------------
@@ -818,6 +824,7 @@ class ApartmentEngine:
             old = self.hold
             self.hold = None
             self._save_apartment()
+            self._window_after_hold()
             self.log(actor_of(actor), {"type": "apartment"}, "hold_cancel", old["mode"] if old else None, None,
                      "Forzatura annullata dall'app", "applied", correlation_id)
             self.apartment_changed(correlation_id)
@@ -1053,20 +1060,57 @@ class ApartmentEngine:
         self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state), reasoning, "applied",
                  cmd["correlation_id"], command_id=cmd["command_id"])
 
-    async def _window_reflex(self, device_id: str) -> None:
+    def _window_opened(self, device_id: str) -> None:
+        """A window opened: the rule's reflex starts; during a hold the rule is suspended until its end (R7, D-127),
+        and a decision says so."""
+        if self.hold and self.rule("window_open_off")["enabled"]:
+            until = parse_dt(self.hold["until"]).astimezone(ZoneInfo(self.timezone)).strftime("%H:%M")
+            self.log("rule:window_open_off", {"type": "device", "device_id": device_id}, "window_rule_suspended",
+                     None, self.hold["until"], f"{self.devices[device_id]['label']} aperta durante la forzatura: la regola "
+                     f"«Finestra aperta spegne il clima» riparte alla sua fine (alle {until})", "informational",
+                     str(uuid.uuid4()))
+        self.spawn(self._window_reflex(device_id))
+
+    async def _window_reflex(self, device_id: str, delay: float | None = None) -> None:
         minutes = self.rule("window_open_off")["params"]["minutes"]
-        await asyncio.sleep(minutes * seconds_per_minute())
+        await asyncio.sleep(minutes * seconds_per_minute() if delay is None else delay)
         contact = self.devices[device_id]["capabilities"]["contact"]
         if not contact["open"] or not self.window_rule_active():
-            return
+            return                       # closed meanwhile, or a hold: the end of the hold looks again (R7)
+        self._window_turn_off(device_id, f"{self.devices[device_id]['label']} aperta da oltre {fmt_num(minutes)} minuti")
+
+    def _window_turn_off(self, window_id: str, why: str) -> None:
         corr = str(uuid.uuid4())
+        frost = self.mode == "empty" and self.rule("frost_protection")["enabled"]
         for d in list(self.devices.values()):
             for cap in ("climate", "heating"):
                 st = d["capabilities"].get(cap)
                 if st and st["on"] and d["online"]:
+                    # R8: safety stays stronger than the window: in an empty apartment the frost protection goes on
+                    extra = "; l'antigelo resta attivo" if cap == "heating" and frost else ""
                     self.create_command(d["device_id"], {"capability": cap, "action": "turn_off"}, "system:engine", corr,
                                         decision_actor="rule:window_open_off",
-                                        reasoning=f"{self.devices[device_id]['label']} aperta da oltre {minutes} minuti con {d['label'].lower()} acceso")
+                                        reasoning=f"{why} con {d['label'].lower()} acceso{extra}")
+
+    def _window_after_hold(self) -> None:
+        """R7 (D-127): at the end of a hold the window rule is active again. A window open for at least the rule's
+        minutes turns climate and heating off now, with both reasons; one opened later waits for its remaining time."""
+        rule = self.rule("window_open_off")
+        if not rule["enabled"]:
+            return
+        minutes = rule["params"]["minutes"]
+        for d in self.devices.values():
+            contact = d["capabilities"].get("contact")
+            if not contact or not contact.get("open"):
+                continue
+            open_s = (utcnow() - parse_dt(contact["since"])).total_seconds() if contact.get("since") else 0.0
+            left = minutes * seconds_per_minute() - open_s
+            if left <= 0:
+                self._window_turn_off(d["device_id"], f"Forzatura finita e {d['label'].lower()} aperta da oltre "
+                                                      f"{fmt_num(minutes)} minuti (regola «Finestra aperta spegne il "
+                                                      f"clima» di nuovo attiva)")
+            else:
+                self.spawn(self._window_reflex(d["device_id"], delay=left))
 
     def test_state(self, body: dict, actor: str, correlation_id: str) -> None:
         if not isinstance(body, dict) or not body:
@@ -1082,9 +1126,9 @@ class ApartmentEngine:
         if "online" in body:
             if not isinstance(body["online"], bool):
                 raise bad_request("online deve essere booleano")
-            self.connector.set_online(device_id, body["online"], notify=False)
+            seen = self.connector.set_online(device_id, body["online"], notify=False)[0].ts   # the device's instant
             device["online"] = body["online"]
-            device["last_seen"] = iso(utcnow()) if body["online"] else device["last_seen"]
+            device["last_seen"] = iso(seen) if body["online"] else device["last_seen"]
             self._save_device(device)
             self._watch_offline(device_id, body["online"])
             self.emit("device.online", {"device_id": device_id, "online": device["online"], "last_seen": device["last_seen"]},
@@ -1095,17 +1139,17 @@ class ApartmentEngine:
         if cap is not None:
             if cap not in device["capabilities"] or not isinstance(body.get("state"), dict):
                 raise MockError(422, "invalid_state", "Capacità inesistente o stato non valido")
-            self.connector.set_state(device_id, cap, body["state"], notify=False)
+            seen = self.connector.set_state(device_id, cap, body["state"], notify=False).ts  # the device's instant
             state = device["capabilities"][cap]
             was_open = state.get("open")
             state.update(body["state"])
             if cap == "contact" and state.get("open") != was_open:
-                state["since"] = iso(utcnow())
-            device["last_seen"] = iso(utcnow())
+                state["since"] = iso(seen)
+            device["last_seen"] = iso(seen)
             self._save_device(device)
             self.emit("device.state", {"device_id": device_id, "capability": cap, "state": state}, correlation_id)
             if cap == "contact" and state.get("open") and not was_open:
-                self.spawn(self._window_reflex(device_id))
+                self._window_opened(device_id)
 
     # ---- rules -------------------------------------------------------------
     def ruleset(self) -> dict:
@@ -1658,6 +1702,7 @@ class ApartmentEngine:
             self.log("system", {"type": "apartment"}, "hold_expired", None, None,
                      "Forzatura scaduta: le regole tornano attive", "informational", corr)
             self.apartment_changed(corr)
+            self._window_after_hold()
         for a in self.approvals:
             if a["status"] == "pending" and a["expires_at"] and parse_dt(a["expires_at"]) <= now:
                 a["status"] = "expired"

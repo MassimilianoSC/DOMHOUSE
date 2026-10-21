@@ -26,11 +26,14 @@ def stop(engine):
 
 
 async def settle(engine, timeout=10.0):
+    """Commands, assistant requests and the thermostat's relay switches (not commands) all done, their changes in."""
     end = asyncio.get_running_loop().time() + timeout
     while any(c["status"] not in core.FINAL for c in engine.commands.values()) or \
-            any(a["status"] == "pending" for a in engine.asks.values()):
+            any(a["status"] == "pending" for a in engine.asks.values()) or engine.relay_busy:
         assert asyncio.get_running_loop().time() < end
         await asyncio.sleep(0.05)
+    engine.last_regulation = float("inf")               # no new switch while the test reads the state
+    await asyncio.sleep(0.1)                            # the last changes reach the engine
 
 
 def view(engine) -> dict:

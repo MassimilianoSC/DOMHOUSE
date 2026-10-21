@@ -129,7 +129,7 @@ def test_assistant_setpoint_within_limits_says_so(monkeypatch):
 
 
 # ---- R3 ------------------------------------------------------------------------------------------------------------
-def test_mold_warning_once_a_day_only_when_empty_and_no_hold(monkeypatch):
+def test_mold_warning_once_a_day_when_empty_suspended_by_a_hold(monkeypatch):
     e = engine("apt-bologna-01")                         # starts empty
     threshold = e.rule("mold_protection")["params"]["humidity_percent"]
     e.devices["dev-ambiente-soggiorno"]["capabilities"]["humidity"]["percent"] = threshold + 5
@@ -144,11 +144,16 @@ def test_mold_warning_once_a_day_only_when_empty_and_no_hold(monkeypatch):
     tomorrow = core.utcnow() + timedelta(days=1)
     monkeypatch.setattr(core, "utcnow", lambda: tomorrow)
     e.hold = {"mode": "empty", "until": core.iso(tomorrow + timedelta(hours=1)), "set_by": ACTOR}
-    e._mold_check()                                                              # a hold suspends it (R7)
-    assert len([d for d in e.decisions if d["action"] == "mold_warning"]) == 1
+    e._mold_check()                                    # a hold suspends it (R7) and the decision says so (R8)
+    warnings = [d for d in e.decisions if d["action"] == "mold_warning"]
+    assert len(warnings) == 2 and "sospesa dalla forzatura" in warnings[-1]["reasoning"]
     e.hold = None
+    e._mold_check()                                    # still the same day: nothing more
+    after = tomorrow + timedelta(days=1)
+    monkeypatch.setattr(core, "utcnow", lambda: after)
     e._mold_check()
-    assert len([d for d in e.decisions if d["action"] == "mold_warning"]) == 2  # the next day, again
+    assert "solo avviso" in [d for d in e.decisions if d["action"] == "mold_warning"][-1]["reasoning"]
+    assert len([d for d in e.decisions if d["action"] == "mold_warning"]) == 3  # the next day, again
 
 
 def test_a_pause_ending_within_the_command_time_is_waited_for(monkeypatch):
