@@ -208,6 +208,10 @@ andare indietro.
 - Ogni decisione mostra il **tipo di azione** in italiano (per esempio «Modalità», «Forzatura scaduta», «Programma:
   spostata», «Prenotazione annullata», «Disdetta dopo il pre-arrivo») e sotto la spiegazione; passando sopra il tipo
   compare il codice tecnico. Un'azione nuova non ancora tradotta mostra il codice. La ricerca trova anche il tipo.
+- Tre tipi da conoscere: «Collegamento ai dispositivi perso» vuol dire che il sistema non riesce più a parlare con i
+  dispositivi dell'appartamento (i comandi vengono rifiutati finché non torna), «Collegamento ai dispositivi ripristinato»
+  che è tornato; «Comando non verificato: misuratore offline» che un comando al climatizzatore è partito, ma il misuratore
+  che di solito conferma l'accensione o lo spegnimento non risponde, quindi il sistema non può sapere se ha funzionato.
 - Il campo di ricerca cerca in tutto lo storico (almeno 90 giorni): nel motivo, nell'azione, in chi ha deciso, nel
   dispositivo, nei valori e nei codici. Procede a blocchi di 1.000 decisioni, dalle più recenti alle più vecchie: leggi
   «Ricerca in corso…» e poi «Risultati: N · cercato fino al <data>». Per andare più indietro premi «Cerca più indietro»;
