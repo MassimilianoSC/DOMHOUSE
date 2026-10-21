@@ -184,7 +184,9 @@ quali appartamenti vedi.
   «Forza comunque». Durante la forzatura la finestra aperta non spegne il clima; alla sua scadenza la regola riparte e, se
   la finestra è ancora aperta, spegne, con una decisione che spiega entrambi i motivi.
 - **Dispositivi** raggruppati per stanza: interruttori Acceso/Spento, temperatura con − e +, modo del climatizzatore,
-  velocità della ventola, letture di potenza, consumi, temperatura, umidità, finestre e movimento.
+  velocità della ventola, letture di potenza, consumi, temperatura, umidità, finestre e movimento. Per la caldaia «Acceso» vuol dire
+  **riscaldamento abilitato**: il termostato del sistema la accende e la spegne da solo intorno alla temperatura voluta (si
+  vede dai consumi e dalle Decisioni), e a casa vuota l'antigelo la accende sotto la soglia anche se è disabilitata.
 - Sotto ogni comando compare l'esito: «in corso», poi «eseguito», oppure l'errore. Un dispositivo offline ha i comandi
   disattivati.
 - Menu ⋮ di un dispositivo > «Rinomina o sposta» per cambiare nome o stanza.
