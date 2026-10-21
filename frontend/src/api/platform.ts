@@ -95,8 +95,9 @@ export const platformApi = {
     bffFetch<void>(`/app/platform/tenants/${enc(tenantId)}/support-access/${enc(accessId)}`, { method: "DELETE", correlationId }),
   managers: () => bffFetch<PlatformManager[]>("/app/platform/managers"),
   addManager: (email: string, correlationId: string) => bffFetch<PlatformManager>("/app/platform/managers", { method: "POST", body: { email }, correlationId }),
-  /** 409 last_manager: the platform always keeps one manager. */
-  removeManager: (email: string, correlationId: string) => bffFetch<void>(`/app/platform/managers/${enc(email)}`, { method: "DELETE", correlationId }),
+  /** 409 last_manager: the platform always keeps one manager. The email travels in the body, never in the path, so it
+   *  stays out of the server's and the browser's logs (P-71 a). */
+  removeManager: (email: string, correlationId: string) => bffFetch<void>("/app/platform/managers/remove", { method: "POST", body: { email }, correlationId }),
   /** Webhook calls not attributed to any organization (no longer visible to organization admins). */
   webhookLogs: () => bffFetch<WebhookLog[]>("/app/platform/webhook-logs"),
   apartments: (tenantId: string) => bffFetch<PlatformApartment[]>(apts(tenantId)),
