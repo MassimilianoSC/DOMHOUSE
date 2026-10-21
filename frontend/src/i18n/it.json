@@ -130,6 +130,31 @@
       "logChange": "{label}, {field} da {from} a {to}",
       "logEnabled": "{label} attivata",
       "logDisabled": "{label} disattivata"
+    },
+    "copy": {
+      "title": "Applica le stesse regole ad altri appartamenti",
+      "hint": "Copia le regole salvate di questo appartamento (attive o spente e valori) sugli appartamenti che scegli. Prima vedi che cosa cambia in ciascuno, poi confermi.",
+      "noOthers": "Nessun altro appartamento nella tua organizzazione",
+      "selectAll": "Seleziona tutti",
+      "preview": "Vedi che cosa cambia",
+      "previewing": "Preparo l'anteprima…",
+      "previewTitle": "Che cosa cambia copiando le regole di «{from}»",
+      "same": "Già uguale, nessuna modifica",
+      "disabled": "Appartamento disattivato: non verrà toccato",
+      "unreachable": "Motore non raggiungibile: non verrà toccato",
+      "refused": "Non applicabile a questo appartamento",
+      "customized": "Ha regole personalizzate che verranno sovrascritte: {list}",
+      "customizedItem": "{label}, {field} {value} (predefinito {default})",
+      "cancel": "Annulla",
+      "confirm": "Copia su {count} appartamenti",
+      "confirmOne": "Copia su 1 appartamento",
+      "copying": "Copia in corso…",
+      "resultsTitle": "Esito della copia",
+      "applied": "Regole copiate",
+      "changedMeanwhile": "Regole cambiate dopo l'anteprima: non toccato",
+      "disabledDone": "Appartamento disattivato: non toccato",
+      "unreachableDone": "Motore non raggiungibile: non toccato",
+      "close": "Chiudi"
     }
   },
   "approvals": {

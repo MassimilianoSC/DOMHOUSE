@@ -7,6 +7,7 @@ import { instanceApi } from "@/api/instance";
 import { useRole } from "@/auth/AuthProvider";
 import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { CopyRulesCard } from "@/components/rules/CopyRulesCard";
 import { RuleProposalCard } from "@/components/rules/RuleProposalCard";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, Input, Skeleton, Switch, Tip } from "@/components/ui/primitives";
@@ -102,7 +103,7 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
 
 export default function RulesPage() {
   const { aptId = "" } = useParams();
-  const { canWrite } = useRole();
+  const { canWrite, isAdmin } = useRole();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["rules", aptId], queryFn: () => instanceApi(aptId).getRules() });
   const [draft, setDraft] = useState<Draft>({});
@@ -164,6 +165,8 @@ export default function RulesPage() {
       )}
       {rangeError && <p className="text-sm font-medium text-destructive" data-testid="rules-range-error">{rangeError}</p>}
       {saveError ? <ErrorNotice error={saveError} testId="rules-save-error" /> : null}
+      {/* D-151 point 6: the same rules on other apartments of the organization, admins only */}
+      {isAdmin && canWrite && q.data && <CopyRulesCard aptId={aptId} hasManualChanges={patches.length > 0} />}
       {patches.length > 0 && (
         <div className="fixed inset-x-0 bottom-20 z-30 mx-auto flex w-[calc(100%-2rem)] max-w-3xl flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card/95 p-3 shadow-lg backdrop-blur md:bottom-6 animate-fade-up" data-testid="rules-save-bar">
           <span className="text-sm font-semibold">{t("rules.dirty", { count: patches.length })}</span>
