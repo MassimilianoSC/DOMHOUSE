@@ -45,7 +45,7 @@ SETTINGS: dict[str, tuple[float, float, float]] = {
     # an approval nobody answers is closed after these minutes (D-119: 30)
     "APPROVAL_EXPIRES_MINUTES": (30.0, 5.0, 720.0),
     # D-137, F1: at the check-out's switch to "empty", motion seen within these minutes and after the departure time
-    # asks the manager first
+    # asks the manager first. D-151: only the first value of checkout_eco's presence_minutes, then set from the app
     "CHECKOUT_PRESENCE_MINUTES": (30.0, 5.0, 180.0),
     # P-60 step 9 (D-132): questions to the assistant a day per apartment, counted before calling the model
     "ASK_DAILY_LIMIT": (50.0, 1.0, 1000.0),

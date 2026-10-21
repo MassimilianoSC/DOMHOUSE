@@ -169,6 +169,45 @@ def test_f1_without_recent_motion_after_the_departure_goes_to_empty_as_before(mo
     assert e.mode == "empty" and e.pending_approval() is None
 
 
+# -------- D-151: the presence minutes are a parameter of checkout_eco, set from the app --------
+def presence(e):
+    return e.rule("checkout_eco")["params"]["presence_minutes"], e.rule("checkout_eco")["limits"]["presence_minutes"]
+
+
+def test_presence_minutes_start_from_the_setting_then_the_app_decides():
+    assert presence(engine()) == (30, {"min": 5, "max": 180})
+    assert presence(engine(CHECKOUT_PRESENCE_MINUTES=60.0)) == (60, {"min": 5, "max": 180})
+    e = engine()
+    e.update_rules({"rules": [{"rule_id": "checkout_eco", "params": {"presence_minutes": 10}}]}, ACTOR, CORR)
+    checkout_due(e, motion_minutes_ago=20)              # after the departure, but beyond the 10 minutes set in the app
+    ticks(e, n=1)
+    assert e.mode == "empty" and e.pending_approval() is None
+    with pytest.raises(core.MockError) as exc:
+        e.update_rules({"rules": [{"rule_id": "checkout_eco", "params": {"presence_minutes": 200}}]}, ACTOR, CORR)
+    assert exc.value.error == "param_out_of_range"
+
+
+def test_presence_minutes_across_a_restart(tmp_path):
+    from engine.store import SqliteStore
+    db = tmp_path / "engine.db"
+    e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False, store=SqliteStore(db))
+    e.update_rules({"rules": [{"rule_id": "checkout_eco", "params": {"presence_minutes": 45}}]}, ACTOR, CORR)
+    e.store.close()
+    e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False, store=SqliteStore(db),
+                             settings={"CHECKOUT_PRESENCE_MINUTES": 90.0})
+    assert presence(e)[0] == 45                          # the app's value wins over the setting
+    saved = e.store.get_meta("apartment")                # a rule saved before the parameter existed
+    for r in saved["rules"]:
+        if r["rule_id"] == "checkout_eco":
+            r["params"].pop("presence_minutes")
+            r["limits"].pop("presence_minutes")
+    e.store.put_meta("apartment", saved)
+    e.store.close()
+    e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False, store=SqliteStore(db),
+                             settings={"CHECKOUT_PRESENCE_MINUTES": 90.0})
+    assert presence(e) == (90, {"min": 5, "max": 180})   # gets the setting as its first value
+
+
 # -------- the settings --------
 def test_the_new_settings():
     base = {"APARTMENT_ID": "apt-prova-01", "API_KEY": "k" * 16, "CONNECTOR": "simulated"}

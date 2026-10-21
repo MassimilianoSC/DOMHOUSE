@@ -19,7 +19,7 @@ from zoneinfo import ZoneInfo
 from . import log as logs
 from .connector.interface import LINKS, CommandResult, ConnectorCommand, DeviceInfo, StateChange
 from . import confirmation as confirm
-from .config import DEFAULT_SETTINGS
+from .config import DEFAULT_SETTINGS, SETTINGS
 from .mold import mold_action
 from .connector.simulated import SimulatedConnector
 from .store import MemoryStore
@@ -76,8 +76,12 @@ DEFAULT_RULES = [
      "params": {"humidity_percent": 65}, "limits": {"humidity_percent": {"min": 50, "max": 80}}},
     {"rule_id": "prearrival", "label": "Pre-arrivo", "enabled": True, "editable": True,
      "params": {"hours_before": 2}, "limits": {"hours_before": {"min": 0, "max": 6}}},
+    # presence_minutes (D-151 points 18-19): the contract's Rule.params admits further numeric parameters
+    # (additionalProperties: number), so a parameter added to a fixed rule is not a change of the contract; it is the
+    # first. Its first value is CHECKOUT_PRESENCE_MINUTES of the apartment's settings, then the app decides.
     {"rule_id": "checkout_eco", "label": "Risparmio al check-out", "enabled": True, "editable": True,
-     "params": {"minutes_after": 30}, "limits": {"minutes_after": {"min": 0, "max": 180}}},
+     "params": {"minutes_after": 30, "presence_minutes": 30},
+     "limits": {"minutes_after": {"min": 0, "max": 180}, "presence_minutes": {"min": 5, "max": 180}}},
     {"rule_id": "compressor_min_off", "label": "Pausa minima del compressore", "enabled": True, "editable": False,
      "params": {"minutes": 3}, "limits": {"minutes": {"min": 3, "max": 3}}},
     {"rule_id": "offline_alert", "label": "Avviso dispositivo offline", "enabled": True, "editable": True,
@@ -222,6 +226,7 @@ class ApartmentEngine:
         self.rooms = [{"room_id": r.room_id, "name": r.name} for r in self.connector.rooms()]
         self.rules = copy.deepcopy(DEFAULT_RULES)
         self._compressor_from_settings()
+        self._presence_from_settings(fresh=True)
         # (device_id, capability, correlation_id, state requested) of the commands running: at most one per device
         self.inflight: list[tuple[str, str, str, dict]] = []
         self.device_locks: dict[str, asyncio.Lock] = {}
@@ -295,6 +300,18 @@ class ApartmentEngine:
                 rule["params"]["minutes"] = minutes
                 rule["limits"]["minutes"] = {"min": minutes, "max": minutes}
 
+    def _presence_from_settings(self, fresh: bool = False) -> None:
+        """D-151: checkout_eco's presence_minutes starts from the setting CHECKOUT_PRESENCE_MINUTES (a rule saved before
+        the parameter existed gets it too); once the rule holds a value, the app's value wins. Limits from the setting's
+        table (engine/config.py)."""
+        _default, low, high = SETTINGS["CHECKOUT_PRESENCE_MINUTES"]
+        for rule in self.rules:
+            if rule["rule_id"] == "checkout_eco":
+                if fresh or "presence_minutes" not in rule["params"]:
+                    value = self.setting("CHECKOUT_PRESENCE_MINUTES")
+                    rule["params"]["presence_minutes"] = int(value) if value == int(value) else value
+                rule["limits"]["presence_minutes"] = {"min": int(low), "max": int(high)}
+
     def next_id(self, prefix: str) -> str:
         self.counter += 1
         self.store.put_meta("counter", self.counter)      # an id is never given twice, also across restarts
@@ -345,6 +362,7 @@ class ApartmentEngine:
         self.hold = apt.get("hold")
         self.rules = apt.get("rules", self.rules)
         self._compressor_from_settings()
+        self._presence_from_settings()
         self.rules_updated_at = apt.get("rules_updated_at", self.rules_updated_at)
         self.counter = st.get_meta("counter", self.counter)
         self.meters = {k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
@@ -1709,11 +1727,11 @@ class ApartmentEngine:
 
     def _presence_after_checkout(self, item: dict) -> tuple[dict, datetime] | None:
         """F1: the motion sensor that saw someone after the booking's departure time and within
-        CHECKOUT_PRESENCE_MINUTES, with when; None without a motion sensor or without such a movement."""
+        checkout_eco's presence_minutes (D-151), with when; None without a motion sensor or without such a movement."""
         booking = self.bookings.get(item.get("booking_id") or "")
         if booking is None:
             return None
-        now, window = utcnow(), timedelta(minutes=self.setting("CHECKOUT_PRESENCE_MINUTES"))
+        now, window = utcnow(), timedelta(minutes=self.rule("checkout_eco")["params"]["presence_minutes"])
         seen = []
         for d in self.devices.values():
             last = d["capabilities"].get("motion", {}).get("last_seen")
