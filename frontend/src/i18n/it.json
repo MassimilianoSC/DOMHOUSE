@@ -239,7 +239,8 @@
     "guests": "{count} ospiti",
     "previousStay": "Soggiorno precedente",
     "vsPrevious": "rispetto al precedente",
-    "empty": "Nessun dato nel periodo"
+    "empty": "Nessun dato nel periodo",
+    "since": "Consumi disponibili dal {date}"
   },
   "assistant": {
     "title": "Assistente",

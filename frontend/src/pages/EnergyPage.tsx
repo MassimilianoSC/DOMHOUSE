@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Download, Leaf, TrendingDown, TrendingUp, Zap } from "lucide-react";
 import { instanceApi } from "@/api/instance";
+import { useApartmentSummary } from "@/hooks/useFeatures";
 import { useCurrentStay, usePreviousStayEnergy, type BookingRecord } from "@/hooks/useStays";
 import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { PageHeader, SegmentedControl } from "@/components/layout/PageHeader";
@@ -12,7 +13,7 @@ import { Card, NativeSelect, Skeleton, Tip } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { downloadEnergyReport, monthLabel, recentMonths, type EnergyReport } from "@/lib/energyExport";
-import { DEFAULT_TZ, fmtDateTime, fmtNumber, fmtShortDateTime } from "@/lib/format";
+import { DEFAULT_TZ, fmtDateTime, fmtDayMonth, fmtNumber, fmtShortDateTime } from "@/lib/format";
 import { useApartmentStore } from "@/store/apartmentStore";
 
 type Period = "today" | "week" | "month" | "stay";
@@ -130,6 +131,8 @@ export default function EnergyPage() {
   const params = useMemo(() => range(effectivePeriod, tz, stayFrom), [effectivePeriod, tz, stayFrom]);
   const q = useQuery({ queryKey: ["energy", aptId, effectivePeriod, effectivePeriod === "stay" ? stayFrom : null], queryFn: () => instanceApi(aptId).getEnergy(params), refetchInterval: 60_000 });
   const prevQ = usePreviousStayEnergy(aptId, effectivePeriod === "stay" ? previous : undefined);
+  // D-130: since when the server has measured consumption (the same summary the apartment layout already reads).
+  const since = fmtDayMonth(useApartmentSummary(aptId).data?.energy_since, tz);
   const r = q.data;
   const fmtTick = (ts: string) =>
     params.bucket === "hour"
@@ -183,6 +186,7 @@ export default function EnergyPage() {
                 </ResponsiveContainer>
               </div>
             )}
+            {since && <p className="mt-3 text-xs text-muted-foreground" data-testid="energy-since">{t("energy.since", { date: since })}</p>}
           </Card>
           <Card className="space-y-3 p-5" data-testid="energy-by-device">
             <h2 className="text-base font-bold md:text-lg">{t("energy.byDevice")}</h2>

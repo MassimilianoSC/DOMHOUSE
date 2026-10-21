@@ -67,6 +67,9 @@ export interface ApartmentSummary {
   features: AppFeature[];
   pending_approvals: number | null;
   kwh_today: number | null;
+  /** Start (ISO, UTC) of the first hour with measured consumption; null while there is none yet (D-130). Optional:
+   *  a server before the step 6 does not send it, and the site then treats it as null. */
+  energy_since?: string | null;
 }
 
 export type Role = "admin" | "operator" | "viewer";

@@ -20,6 +20,16 @@ export function fmtDate(iso: string | null | undefined, tz = DEFAULT_TZ): string
   return new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "short", year: "numeric", timeZone: tz }).format(d);
 }
 
+/** Day and month in the apartment's time zone ("1 gennaio"), with the year when it is not the current one there
+ *  ("1 gennaio 2025"); "" for a missing or unreadable date. */
+export function fmtDayMonth(iso: string | null | undefined, tz = DEFAULT_TZ, now = new Date()): string {
+  const d = iso ? new Date(iso) : null;
+  if (!d || Number.isNaN(d.getTime())) return "";
+  const year = (x: Date) => new Intl.DateTimeFormat("en-US", { year: "numeric", timeZone: tz }).format(x);
+  const withYear = year(d) !== year(now);
+  return new Intl.DateTimeFormat(LOCALE, { day: "numeric", month: "long", ...(withYear ? { year: "numeric" } : {}), timeZone: tz }).format(d);
+}
+
 export function fmtShortDateTime(iso: string | null | undefined, tz = DEFAULT_TZ): string {
   if (!iso) return "—";
   return new Intl.DateTimeFormat(LOCALE, {

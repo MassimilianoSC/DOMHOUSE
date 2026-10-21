@@ -14,6 +14,8 @@ const s = vi.hoisted(() => ({ download: vi.fn(async (..._args: unknown[]) => "co
 
 vi.mock("@/lib/energyExport", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/energyExport")>()), downloadEnergyReport: s.download }));
 vi.mock("@/api/instance", () => ({ instanceApi: () => ({ getEnergy: async () => ({ total_kwh: 5, avoided_hvac_hours: null, series: [], by_device: [] }) }) }));
+// The apartment summary (energy_since, D-130): none here, so no «Consumi disponibili dal».
+vi.mock("@/hooks/useFeatures", () => ({ useApartmentSummary: () => ({ data: undefined }) }));
 vi.mock("@/hooks/useStays", () => ({
   useCurrentStay: () => ({
     current: { apartment_id: "apt-001", booking_id: "RES-2", checkin_at: "2026-10-14T15:00:00Z", checkout_at: "2026-10-18T10:00:00Z", guests: 2, status: "checked_in" },
