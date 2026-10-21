@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Loader2, Timer, X } from "lucide-react";
-import type { Apartment, ApartmentMode, Occupancy } from "@/api/types";
+import type { Apartment, ApartmentMode, Device, Occupancy, Room } from "@/api/types";
 import { instanceApi } from "@/api/instance";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/primitives";
+import { Badge, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { fmtRemaining, fmtTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useApartmentStore } from "@/store/apartmentStore";
 
 const OCCUPANCY_STYLE: Record<Occupancy, string> = {
   vacant: "border-stone-300 bg-stone-100 text-stone-700 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300",
@@ -72,9 +73,25 @@ const HOLDS = [
   { minutes: 360, key: "h6" },
 ];
 
+/** Rooms with a window open (contact open), each once, in the order of the devices; a device without room by its name. */
+export function openWindowRooms(devices: Device[], rooms: Room[]): string[] {
+  const names = devices
+    .filter((d) => d.capabilities.contact?.open === true)
+    .map((d) => rooms.find((r) => r.room_id === d.room_id)?.name ?? d.label);
+  return [...new Set(names)];
+}
+
+const listIt = (items: string[]) => new Intl.ListFormat("it", { style: "long", type: "conjunction" }).format(items);
+
 export function HoldControl({ aptId, apartment, canWrite }: { aptId: string; apartment: Apartment; canWrite: boolean }) {
   const [now, setNow] = useState(Date.now());
   const [busy, setBusy] = useState(false);
+  // D-127: during a hold the rules (window open → climate off) are suspended. With a window open the person is told
+  // first, with the rooms, and may confirm anyway; without one the hold starts at once, as before.
+  const devices = useApartmentStore((s) => s.devices);
+  const rooms = useApartmentStore((s) => s.rooms);
+  const [asking, setAsking] = useState<number | null>(null);
+  const openRooms = openWindowRooms(devices, rooms);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(id);
@@ -87,6 +104,11 @@ export function HoldControl({ aptId, apartment, canWrite }: { aptId: string; apa
     setBusy(true);
     const res = await runAction((c) => instanceApi(aptId).setHold({ minutes }, c));
     if (res === undefined) setBusy(false);
+  };
+
+  const choose = (minutes: number) => {
+    if (openRooms.length) setAsking(minutes);
+    else void hold(minutes);
   };
 
   const h = apartment.hold;
@@ -111,11 +133,34 @@ export function HoldControl({ aptId, apartment, canWrite }: { aptId: string; apa
       ) : (
         <div className="flex gap-2">
           {HOLDS.map((o) => (
-            <Button key={o.key} size="sm" variant="outline" disabled={!canWrite || busy} onClick={() => hold(o.minutes)} data-testid={`hold-btn-${o.minutes}`}>
+            <Button key={o.key} size="sm" variant="outline" disabled={!canWrite || busy} onClick={() => choose(o.minutes)} data-testid={`hold-btn-${o.minutes}`}>
               {t(`hold.${o.key}`)}
             </Button>
           ))}
         </div>
+      )}
+      {asking !== null && (
+        <Dialog open onOpenChange={(open) => !open && setAsking(null)}>
+          <DialogContent data-testid="hold-window-warning">
+            <DialogTitle>{t("hold.windowTitle")}</DialogTitle>
+            <DialogDescription>
+              {openRooms.length > 1 ? t("hold.windowsOpen", { rooms: listIt(openRooms) }) : t("hold.windowOpen", { rooms: openRooms[0] ?? "" })}
+            </DialogDescription>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setAsking(null)} data-testid="hold-window-cancel">{t("common.cancel")}</Button>
+              <Button
+                onClick={() => {
+                  const minutes = asking;
+                  setAsking(null);
+                  void hold(minutes);
+                }}
+                data-testid="hold-window-confirm"
+              >
+                {t("hold.windowConfirm")}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   );

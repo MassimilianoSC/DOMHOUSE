@@ -370,7 +370,11 @@
     "cancel": "Annulla forzatura",
     "m30": "30 min",
     "h2": "2 h",
-    "h6": "6 h"
+    "h6": "6 h",
+    "windowTitle": "Finestra aperta",
+    "windowOpen": "Finestra aperta in {rooms}: durante la forzatura il clima resta acceso.",
+    "windowsOpen": "Finestre aperte in {rooms}: durante la forzatura il clima resta acceso.",
+    "windowConfirm": "Forza comunque"
   },
   "apartments": {
     "title": "Appartamenti",
