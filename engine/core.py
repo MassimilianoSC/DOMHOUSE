@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 from . import log as logs
 from .connector.interface import CommandResult, ConnectorCommand, DeviceInfo, StateChange
 from .confirmation import delivered_outcome
+from .mold import mold_action
 from .connector.simulated import SimulatedConnector
 from .store import MemoryStore
 
@@ -46,6 +47,7 @@ BUFFER_SECONDS = 3600
 DECISION_MONTHS, BOOKING_MONTHS, COMMAND_DAYS, TELEMETRY_MONTHS = 24, 12, 90, 24
 RETENTION_EVERY_S = 3600
 ARREARS_MINUTES = 30      # at a restart, a scheduled action older than this is not run any more: failed, "missed"
+PAUSE_WAITED_S = 7        # R4: a manual start this close to the end of the compressor's pause waits instead of failing
 # the engine's own fields of a capability, kept across restarts (the device reports the others again)
 ENGINE_FIELDS = {"heating": ("setpoint",), "contact": ("since",), "motion": ("last_seen",), "power_meter": ("kwh_today",)}
 
@@ -184,6 +186,8 @@ class ApartmentEngine:
         self.approvals: list[dict] = []
         self.approval_queue: list[dict] = []
         self.deferred: dict[str, str] = {}      # schedule_id -> the hold's end, for mode actions waiting for it (D-122)
+        self.compressor_off: dict[str, float] = {}   # climate device -> when it went off (monotonic), R4
+        self.offline_watch: dict[str, object] = {}   # device -> the offline episode being watched, R5
         self.decisions: list[dict] = []
         self.asks: dict[str, dict] = {}
         self.events: deque[dict] = deque()
@@ -418,6 +422,7 @@ class ApartmentEngine:
             if change.online:
                 device["last_seen"] = iso(change.ts)
             self._save_device(device)
+            self._watch_offline(device["device_id"], change.online)
             self.emit("device.online", {"device_id": device["device_id"], "online": device["online"],
                                         "last_seen": device["last_seen"]}, corr)
             self.emit("instance.health", self.health()[1], corr)
@@ -430,12 +435,91 @@ class ApartmentEngine:
                       device_id=change.device_id, capability=cap)
             return
         part = self._contract_part(change.device_id, cap, change.state or {}, change.ts, state)
+        was_on = state.get("on")
         if running and running[1] == cap:
             state.update({k: copy.deepcopy(v) for k, v in running[3].items() if k in CONTRACT_FIELDS[cap]})
         state.update(part)
+        self._note_climate(change.device_id, cap, was_on, state.get("on"))
         device["last_seen"] = iso(change.ts)
         self._save_device(device)
         self.emit("device.state", {"device_id": device["device_id"], "capability": cap, "state": state}, corr)
+
+    # ---- rules of P-60 step 5 (D-126) ----------------------------------------------------------------------------
+    def _note_climate(self, device_id: str, cap: str, was_on, is_on) -> None:
+        """R4: when a split's compressor stops, its minimum pause starts."""
+        if cap == "climate" and was_on and not is_on:
+            self.compressor_off[device_id] = time.monotonic()
+
+    def compressor_wait(self, device_id: str) -> float:
+        """R4: seconds left of the compressor's minimum pause (rule compressor_min_off), 0 when it may start."""
+        rule = self.rule("compressor_min_off")
+        off = self.compressor_off.get(device_id)
+        if not rule["enabled"] or off is None:
+            return 0.0
+        return max(0.0, rule["params"]["minutes"] * seconds_per_minute() - (time.monotonic() - off))
+
+    def _within_limits(self, device: dict, body: dict) -> tuple[dict, str | None]:
+        """R6: a setpoint asked by an automatic path (mode, schedule, assistant, rule) is brought inside the device's
+        limits, with a note for the decision; a manual command out of limits stays a 422."""
+        params = body.get("params") if isinstance(body, dict) else None
+        cap = body.get("capability") if isinstance(body, dict) else None
+        state = device["capabilities"].get(cap) if isinstance(cap, str) else None
+        if not isinstance(params, dict) or not state or "setpoint" not in params or "setpoint_min" not in state:
+            return body, None
+        sp, lo, hi = params["setpoint"], state["setpoint_min"], state["setpoint_max"]
+        if not isinstance(sp, (int, float)) or isinstance(sp, bool) or lo <= sp <= hi:
+            return body, None
+        fixed = min(max(sp, lo), hi)
+        note = f"setpoint {fmt_num(sp)} °C riportato a {fmt_num(fixed)} °C (limiti {fmt_num(lo)}–{fmt_num(hi)})"
+        return {**body, "params": {**params, "setpoint": fixed}}, note
+
+    def _watch_offline(self, device_id: str, online: bool) -> None:
+        """R5: a device still offline after the minutes of offline_alert gets one decision for the episode (the push
+        is the BFF's)."""
+        if online:
+            self.offline_watch.pop(device_id, None)
+            return
+        rule = self.rule("offline_alert")
+        if not rule["enabled"] or device_id in self.offline_watch:
+            return
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        episode = self.offline_watch[device_id] = object()
+        minutes = rule["params"]["minutes"]
+
+        async def later():
+            await asyncio.sleep(minutes * seconds_per_minute())
+            device = self.devices.get(device_id)
+            if self.offline_watch.get(device_id) is episode and device and not device["online"]:
+                self.log("rule:offline_alert", {"type": "device", "device_id": device_id}, "offline_alert", "online",
+                         "offline", f"{device['label']} offline da oltre {fmt_num(minutes)} minuti", "informational",
+                         str(uuid.uuid4()))
+        self.spawn(later())
+
+    def _mold_check(self) -> None:
+        """R3: in an empty apartment (and not during a hold, R7) humidity above the threshold gives one warning a day;
+        the action against it is engine/mold.py's, today none."""
+        rule = self.rule("mold_protection")
+        if not rule["enabled"] or self.mode != "empty" or self.hold:
+            return
+        threshold = rule["params"]["humidity_percent"]
+        high = [(d, d["capabilities"]["humidity"]["percent"]) for d in self.devices.values()
+                if "humidity" in d["capabilities"] and isinstance(d["capabilities"]["humidity"].get("percent"), (int, float))
+                and d["capabilities"]["humidity"]["percent"] > threshold]
+        if not high:
+            return
+        today = utcnow().astimezone(ZoneInfo(self.timezone)).date().isoformat()
+        if self.store.get_meta("mold_notice_day") == today:
+            return
+        device, percent = max(high, key=lambda x: x[1])
+        mold_action(self.mode, percent, threshold)              # placeholder: no action yet (D-126)
+        self.log("rule:mold_protection", {"type": "device", "device_id": device["device_id"]}, "mold_warning", None,
+                 f"{fmt_num(percent)} %", f"Umidità {fmt_num(percent)} % in {device['label'].lower()}, sopra la soglia "
+                 f"dell'antimuffa ({fmt_num(threshold)} %) a casa vuota: solo avviso, nessuna azione automatica",
+                 "informational", str(uuid.uuid4()))
+        self.store.put_meta("mold_notice_day", today)
 
     def _device_lock(self, device_id: str) -> asyncio.Lock:
         lock = self.device_locks.get(device_id)
@@ -576,7 +660,8 @@ class ApartmentEngine:
             try:
                 cmd = self.create_command(device_id, body, actor, correlation_id, decision_actor=decision_actor,
                                           reasoning=f"Modalità {mode}")
-                command_ids.append(cmd["command_id"])
+                if cmd:
+                    command_ids.append(cmd["command_id"])
             except MockError:
                 continue
         old = self.mode
@@ -689,11 +774,35 @@ class ApartmentEngine:
         return self.rule("window_open_off")["enabled"] and self.hold is None
 
     def create_command(self, device_id: str, body: dict, actor: str, correlation_id: str,
-                       decision_actor: str | None = None, reasoning: str | None = None) -> dict:
+                       decision_actor: str | None = None, reasoning: str | None = None) -> dict | None:
+        """A command, or None when an automatic one waits for the compressor's pause (R4) and starts after it."""
         device = self.get_device(device_id)
         if not device["online"]:
             raise MockError(409, "device_offline", "Il dispositivo non è raggiungibile; riprova quando torna online")
+        who = decision_actor or actor_of(actor)
+        manual = who.startswith("user:")
+        if not manual:                                       # R6: automatic paths stay within the limits
+            body, note = self._within_limits(device, body)
+            if note:
+                reasoning = f"{reasoning or 'Comando automatico'}; {note}"
         cap, action, params = self.validate_command(device, body)
+        if cap == "climate" and not manual and who != "assistant" \
+                and self.target_state(device, cap, action, params)["on"] and not device["capabilities"][cap]["on"]:
+            wait = self.compressor_wait(device_id)
+            if wait > 0:                                     # R4: an automatic start waits for the pause
+                self.log("rule:compressor_min_off", {"type": "device", "device_id": device_id}, action, "off", "on",
+                         f"{reasoning or 'Accensione automatica'}: rimandata di {int(wait) + 1} s per la pausa minima "
+                         f"del compressore", "informational", correlation_id)
+
+                async def later():
+                    await asyncio.sleep(wait)
+                    try:
+                        self.create_command(device_id, body, actor, correlation_id, decision_actor, reasoning)
+                    except MockError as exc:
+                        logs.warn("deferred command not created", apartment_id=self.apartment_id, device_id=device_id,
+                                  error=exc.error)
+                self.spawn(later())
+                return None
         now = iso(utcnow())
         cmd = {"command_id": self.next_id("cmd"), "device_id": device_id, "status": "pending", "capability": cap,
                "action": action, "params": params, "correlation_id": correlation_id, "created_at": now,
@@ -722,7 +831,9 @@ class ApartmentEngine:
         merged.update(self._contract_part(device["device_id"], cap, reported, utcnow(), state))
         if merged == state:
             return
+        was_on = state.get("on")
         state.update(merged)
+        self._note_climate(device["device_id"], cap, was_on, state.get("on"))
         device["last_seen"] = iso(utcnow())
         self._save_device(device)
         self.emit("device.state", {"device_id": device["device_id"], "capability": cap, "state": state}, correlation_id)
@@ -742,6 +853,20 @@ class ApartmentEngine:
             self._set_status(cmd, "failed", "blocked_by_rule")
             self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state),
                      f"Comando bloccato dalla regola «Finestra aperta spegne il clima»: {window['label'].lower()} aperta",
+                     "rejected", cmd["correlation_id"], command_id=cmd["command_id"])
+            return
+        pause = self.compressor_wait(device["device_id"]) if cap == "climate" else 0.0
+        if 0 < pause <= PAUSE_WAITED_S and new_state["on"] and not device["capabilities"][cap]["on"]:
+            await asyncio.sleep(pause)          # R4: the pause ends within the command's time: wait for it, then go
+            pause = 0.0
+        if pause > 0 and new_state["on"] and not device["capabilities"][cap]["on"]:
+            # R4: a manual start during the compressor's pause is refused, saying when to try again
+            await asyncio.sleep(0.3)
+            self._set_status(cmd, "sent")
+            await asyncio.sleep(0.2)
+            self._set_status(cmd, "failed", "blocked_by_rule")
+            self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state),
+                     f"Comando bloccato dalla regola «Pausa minima del compressore»: riprova tra {int(pause) + 1} secondi",
                      "rejected", cmd["correlation_id"], command_id=cmd["command_id"])
             return
         ids = {"correlation_id": cmd["correlation_id"], "command_id": cmd["command_id"], "device_id": device["device_id"]}
@@ -822,6 +947,7 @@ class ApartmentEngine:
             device["online"] = body["online"]
             device["last_seen"] = iso(utcnow()) if body["online"] else device["last_seen"]
             self._save_device(device)
+            self._watch_offline(device_id, body["online"])
             self.emit("device.online", {"device_id": device_id, "online": device["online"], "last_seen": device["last_seen"]},
                       correlation_id)
             self.emit("instance.health", self.health()[1], correlation_id)
@@ -1284,9 +1410,10 @@ class ApartmentEngine:
                     run += timedelta(days=1)
                 climate = self._match_device(text, "climate")
                 if setpoint is not None and climate:
-                    action = {"type": "device_command", "device_id": climate["device_id"], "capability": "climate",
-                              "action": "set_climate", "params": {"on": True, "setpoint": setpoint}}
-                    what = f"{climate['label']} a {fmt_num(setpoint)} °C"
+                    action, _ = self._within_limits(climate, {   # R6: within the limits, as a command would be
+                        "type": "device_command", "device_id": climate["device_id"], "capability": "climate",
+                        "action": "set_climate", "params": {"on": True, "setpoint": setpoint}})
+                    what = f"{climate['label']} a {fmt_num(action['params']['setpoint'])} °C"
                 elif "spegni" in text and climate:
                     action = {"type": "device_command", "device_id": climate["device_id"], "capability": "climate",
                               "action": "turn_off"}
@@ -1313,8 +1440,10 @@ class ApartmentEngine:
                     cmd = self.create_command(d["device_id"], {"capability": "climate", "action": "set_climate",
                                                                "params": {"on": True, "setpoint": setpoint}}, actor, corr,
                                               decision_actor="assistant", reasoning=f"Richiesta all'assistente: «{ask['text']}»")
+                    done = cmd["params"]["setpoint"]          # R6: maybe brought within the limits
+                    extra = "" if done == setpoint else f", nei limiti consentiti (avevi chiesto {fmt_num(setpoint)} °C)"
                     ask.update(status="answered", actions=[{"type": "command", "command_id": cmd["command_id"]}],
-                               answer=f"Ho impostato {d['label'].lower()} a {fmt_num(setpoint)} °C.")
+                               answer=f"Ho impostato {d['label'].lower()} a {fmt_num(done)} °C{extra}.")
             else:
                 ask.update(status="answered",
                            answer="Non ho capito. Posso spegnere, impostare una temperatura o programmare un'azione.")
@@ -1362,6 +1491,7 @@ class ApartmentEngine:
         retention clean-up."""
         if time.monotonic() - self.last_retention >= RETENTION_EVERY_S:
             self._purge_retention()
+        self._mold_check()
         stale = [k for k in self.deferred if self.schedule.get(k, {}).get("status") != "planned"]
         if stale:                                        # deferred actions cancelled or gone meanwhile (D-122)
             for k in stale:
@@ -1428,7 +1558,7 @@ class ApartmentEngine:
                 else:
                     cmd = self.create_command(act["device_id"], act, "system:engine", corr, decision_actor="system",
                                               reasoning=reasoning)
-                    item["command_ids"] = [cmd["command_id"]]
+                    item["command_ids"] = [cmd["command_id"]] if cmd else []
                 item["status"] = "done"
             except MockError:
                 item["status"] = "failed"
