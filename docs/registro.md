@@ -54,6 +54,16 @@ che avevano solo in memoria (sezione 7, 16 ottobre sera).
 Unico elenco. Nessun altro documento ne tiene uno.
 
 - **21 ottobre, pagina Decisioni: il tipo di azione compare come codice tecnico** (`set_mode`, `expire`, `hold_expired`, `schedule_create`, ora anche `booking_cancel_reset`, `schedule_deferred`) in un riquadro grigio, con sotto la frase in italiano scritta dal motore; non esiste un elenco di etichette. Verifica di o2 del 21 ott. Opzioni: A) etichette italiane per tutte le 14 azioni a nome fisso più i comandi, con il codice come riserva per le azioni non ancora tradotte (circa 1 ora, una riga nella guida); B) solo le due nuove (15 minuti, pagina mista); C) lasciare com'è. Raccomandazione di o2 e della memoria storica: A.
+- **21 ottobre, passo 5 (regole complete): otto decisioni, con le proposte di o1** (le 8 regole e i limiti di `/rules` restano quelli di oggi, la PWA non cambia):
+  - **R1 antigelo** (`frost_protection`, 8 °C, 5–12) a casa vuota: caldaia regolata sul sensore collegato, accesa sotto la soglia; proposta: isteresi 0,5 °C, controllo ogni minuto, decisione a ogni accensione e spegnimento; senza sensore nessuna regolazione e un avviso una volta.
+  - **R2 termostato vero** in comfort ed eco (oggi assente): stessa regola di R1 con il setpoint della modalità (comfort 21, eco 18, empty = antigelo), isteresi 0,5 °C, almeno 5 minuti fra accensione e spegnimento. Da decidere se entra nel passo 5 (+0,5–1 giornata) o va in un passo a sé.
+  - **R3 antimuffa** (`mold_protection`, 65 %, 50–80) a casa vuota: sopra la soglia clima in «dry» fino a 5 punti sotto, al massimo 2 ore e una volta ogni 6 ore, mai con finestra aperta; senza clima solo un avviso al giorno. Alternativa: solo avviso.
+  - **R4 pausa del compressore** (3 minuti, fissa): un comando manuale entro i 3 minuti è rifiutato (`failed` `blocked_by_rule`) con la decisione che dice fra quanti secondi riprovare; un'azione automatica è rimandata alla fine della pausa.
+  - **R5 avviso dispositivo offline** (`offline_alert`, 15 minuti, 5–120): il push lo manda già il BFF; il motore registra una decisione informativa «Dispositivo X offline da N minuti», una per episodio.
+  - **R6 limiti del setpoint ovunque**: per modalità, programmazioni, `/ask` e regole il valore si riporta dentro i limiti con la nota nella decisione; il 422 resta solo per i comandi manuali.
+  - **R7 forzatura**: sospende le regole di comfort (finestra aperta, antimuffa, programmazioni di modalità, D-122) e mai quelle di sicurezza (antigelo, pausa del compressore).
+  - **R8 priorità fra regole**, dalla più forte: sicurezza (antigelo, compressore), finestra aperta, forzatura, antimuffa, programmazioni; la regola scavalcata scrive nella decisione da quale.
+  Stima del passo 5: circa 2,5–3 giornate con R2, circa 2 senza.
 
 ---
 
