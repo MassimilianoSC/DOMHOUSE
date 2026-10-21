@@ -74,7 +74,7 @@ def create_engine_app(config: EngineConfig, connector=None):
         await connector.start()
         engine = ApartmentEngine(config.apartment_id, connector, simulated=config.simulated, seed=config.simulated,
                                  implementation=IMPLEMENTATION, store=store,
-                                 confirm_watts=(config.confirm_on_watts, config.confirm_off_watts))
+                                 settings=config.settings)
         engine.ensure_started()
         running["engine"] = engine
         log.info("engine started", connector=config.connector, devices=len(engine.devices), port=config.port,

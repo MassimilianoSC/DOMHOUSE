@@ -10,6 +10,7 @@ import asyncio
 import pytest
 
 from engine import core
+from engine.config import DEFAULT_SETTINGS
 from engine.connector.simulated import SimulatedConnector
 
 ACTOR, CORR = "prova@hqe.it", "2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10"
@@ -45,7 +46,7 @@ async def regulate_and_wait(e):
 
 
 async def wait_min_switch():
-    await asyncio.sleep(core.THERMOSTAT_MIN_SWITCH_MINUTES * MINUTE + 0.05)
+    await asyncio.sleep(DEFAULT_SETTINGS["THERMOSTAT_MIN_SWITCH_MINUTES"] * MINUTE + 0.05)
 
 
 def test_comfort_regulation_with_hysteresis_and_minimum_time():

@@ -106,7 +106,7 @@ def test_the_thresholds_are_settings_of_the_engine():
     assert (c.confirm_on_watts, c.confirm_off_watts) == (60, 8.5)
     assert "CONFIRM_ON_WATTS" not in c.for_connector().env
     for bad in ("zero", "0", "6000"):
-        with pytest.raises(ConfigError, match="CONFIRM_OFF_WATTS must be a number of watts between 1 and 5000"):
+        with pytest.raises(ConfigError, match="CONFIRM_OFF_WATTS must be a number between 1 and 5000"):
             load_config({**base, "CONFIRM_OFF_WATTS": bad})
 
 

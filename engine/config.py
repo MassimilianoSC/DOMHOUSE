@@ -7,10 +7,10 @@
     HOST, PORT     optional   where to listen; 127.0.0.1 and 8100 by default (in the container 0.0.0.0)
     DATA_DIR       optional   the apartment's data, /data/<apartment_id> by default (SQLite from step 3)
     CATALOG_PATH   optional   the devices' catalog, <DATA_DIR>/catalog.yaml by default (read by the connector)
-    CONFIRM_ON_WATTS   optional   D-131: an infrared split's switch-on is confirmed when its linked meter's watts rise
-                                  by at least this much over what they were before the command; 20 by default
-    CONFIRM_OFF_WATTS  optional   D-131: its switch-off is confirmed when they drop under this; 15 by default
-                                  (both within 10 s of the command, engine/confirmation.py; numbers from 1 to 5000)
+
+The settings of the rules (D-131, D-133), optional, per apartment (on the VM in <apartment_id>.settings.env, written by
+engine-vm.sh set/unset): SETTINGS below, name -> (default, lowest, highest). A value that is not a number or is out of
+its range stops the engine at start, as a missing key does. The thresholds the app can change stay in /rules.
 
 With CONNECTOR=simulated also: MOCK_TIME_SCALE (real seconds per simulated minute: 60 = real time, the default here)
 and DOMOTICA_TEST_CONNECTOR_DOWN=1 (the connector reported down: conformance scenario C14). A connector receives a
@@ -25,9 +25,27 @@ from pathlib import Path
 from .connector.interface import ConnectorConfig
 
 # the engine's own variables: never passed to a connector, whatever its name
+SETTINGS: dict[str, tuple[float, float, float]] = {
+    # D-131: an infrared split's switch-on is confirmed when its linked meter's watts rise by at least this much over
+    # what they were before the command, its switch-off when they drop under the second; within 10 s
+    "CONFIRM_ON_WATTS": (20.0, 1.0, 5000.0),
+    "CONFIRM_OFF_WATTS": (15.0, 1.0, 5000.0),
+    # D-133: the boiler's thermostat and the frost protection: on below the setpoint, off above setpoint + this (°C)
+    "THERMOSTAT_HYSTERESIS_C": (0.5, 0.1, 3.0),
+    # at least these minutes between two switches of the relay made by the thermostat
+    "THERMOSTAT_MIN_SWITCH_MINUTES": (5.0, 1.0, 60.0),
+    # the split's compressor pause (rule compressor_min_off, not editable from the app: value and limits from here)
+    "COMPRESSOR_MIN_OFF_MINUTES": (3.0, 1.0, 15.0),
+    # a manual start this many seconds before the pause ends waits for it instead of being refused
+    "COMPRESSOR_WAIT_SECONDS": (7.0, 0.0, 60.0),
+    # at a restart, a scheduled action due more than these minutes ago is not run any more (failed, "missed")
+    "MISSED_AFTER_MINUTES": (30.0, 5.0, 720.0),
+    # an approval nobody answers is rejected after these minutes (D-119: 30)
+    "APPROVAL_EXPIRES_MINUTES": (30.0, 5.0, 720.0),
+}
+DEFAULT_SETTINGS = {name: spec[0] for name, spec in SETTINGS.items()}
 ENGINE_VARIABLES = {"APARTMENT_ID", "API_KEY", "CONNECTOR", "HOST", "PORT", "DATA_DIR", "CATALOG_PATH",
-                    "MOCK_TIME_SCALE", "MOCK_PING_S", "CONFIRM_ON_WATTS", "CONFIRM_OFF_WATTS"}
-CONFIRM_DEFAULTS = {"CONFIRM_ON_WATTS": 20.0, "CONFIRM_OFF_WATTS": 15.0}   # engine/confirmation.py's
+                    "MOCK_TIME_SCALE", "MOCK_PING_S", *SETTINGS}
 APARTMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 CONNECTOR_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 MIN_KEY_LENGTH = 16
@@ -48,8 +66,15 @@ class EngineConfig:
     data_dir: Path
     catalog_path: Path
     env: Mapping[str, str] = field(repr=False, default_factory=dict)
-    confirm_on_watts: float = CONFIRM_DEFAULTS["CONFIRM_ON_WATTS"]
-    confirm_off_watts: float = CONFIRM_DEFAULTS["CONFIRM_OFF_WATTS"]
+    settings: Mapping[str, float] = field(default_factory=lambda: dict(DEFAULT_SETTINGS))
+
+    @property
+    def confirm_on_watts(self) -> float:
+        return self.settings["CONFIRM_ON_WATTS"]
+
+    @property
+    def confirm_off_watts(self) -> float:
+        return self.settings["CONFIRM_OFF_WATTS"]
 
     @property
     def simulated(self) -> bool:
@@ -96,19 +121,19 @@ def load_config(env: Mapping[str, str] | None = None) -> EngineConfig:
     except ValueError:
         problems.append("PORT must be a number between 1 and 65535")
         port = 0
-    watts = {}
-    for name, default in CONFIRM_DEFAULTS.items():
+    settings = {}
+    for name, (default, low, high) in SETTINGS.items():
         raw = env.get(name, "").strip()
         try:
-            watts[name] = float(raw) if raw else default
-            if not 1 <= watts[name] <= 5000:
+            settings[name] = float(raw) if raw else default
+            if not low <= settings[name] <= high:
                 raise ValueError
         except ValueError:
-            problems.append(f"{name} must be a number of watts between 1 and 5000")
+            problems.append(f"{name} must be a number between {low:g} and {high:g}")
     if problems:
         raise ConfigError("\n".join(problems))
     data_dir = Path(env.get("DATA_DIR") or f"{DEFAULT_DATA_ROOT}/{apartment_id}")
     return EngineConfig(apartment_id=apartment_id, api_key=api_key, connector=connector,
                         host=env.get("HOST", "127.0.0.1"), port=port, data_dir=data_dir,
                         catalog_path=Path(env.get("CATALOG_PATH") or data_dir / "catalog.yaml"), env=env,
-                        confirm_on_watts=watts["CONFIRM_ON_WATTS"], confirm_off_watts=watts["CONFIRM_OFF_WATTS"])
+                        settings=settings)

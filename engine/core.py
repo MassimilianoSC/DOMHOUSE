@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 from . import log as logs
 from .connector.interface import LINKS, CommandResult, ConnectorCommand, DeviceInfo, StateChange
 from . import confirmation as confirm
+from .config import DEFAULT_SETTINGS
 from .mold import mold_action
 from .connector.simulated import SimulatedConnector
 from .store import MemoryStore
@@ -51,14 +52,12 @@ DECISION_MONTHS, BOOKING_MONTHS, COMMAND_DAYS, TELEMETRY_MONTHS = 24, 12, 90, 24
 ENERGY_PROFILE_START = datetime(2026, 1, 1, tzinfo=ZoneInfo("Europe/Rome"))
 ENERGY_PROFILE_SHARES = (0.62, 0.28, 0.10)
 RETENTION_EVERY_S = 3600
-ARREARS_MINUTES = 30      # at a restart, a scheduled action older than this is not run any more: failed, "missed"
-PAUSE_WAITED_S = 7        # R4: a manual start this close to the end of the compressor's pause waits instead of failing
 # the engine's own fields of a capability, kept across restarts (the device reports the others again)
 ENGINE_FIELDS = {"heating": ("on", "setpoint"), "contact": ("since",), "motion": ("last_seen",),
                  "power_meter": ("kwh_today",)}
 # the boiler's thermostat (R1, R2, D-126, D-128): heating.on is the intention the app sees; the relay is the engine's
-THERMOSTAT_HYSTERESIS = 0.5        # °C: on below the setpoint, off above setpoint + this, unchanged in between
-THERMOSTAT_MIN_SWITCH_MINUTES = 5  # at least this between two switches of the relay made by the thermostat
+# D-133: the rules' thresholds that the app does not change are settings of the engine per apartment, with defaults
+# and limits in engine/config.py (SETTINGS); the engine reads them with self.setting(name)
 
 NAMES = {"apt-rimini-01": "Via Roma 12 – int. 3", "apt-bologna-01": "Corso Italia 5 – int. 7"}
 
@@ -191,7 +190,7 @@ class EnergyCounter:
 class ApartmentEngine:
     def __init__(self, apartment_id: str, connector=None, *, simulated: bool = True, seed: bool | None = None,
                  implementation: dict | None = None, store: MemoryStore | None = None,
-                 confirm_watts: tuple[float, float] | None = None):
+                 confirm_watts: tuple[float, float] | None = None, settings: dict[str, float] | None = None):
         """Without a connector: the demonstration apartment, a SimulatedConnector chosen by the apartment's id. seed
         (by default: without a connector) adds the demonstration's bookings and decisions; otherwise the history
         starts empty and the apartment in mode "empty". store: where the state lives (engine/store.py), in memory by
@@ -206,11 +205,14 @@ class ApartmentEngine:
         self.simulated = simulated
         self.implementation = implementation or {"name": "bff-mock-instance", "version": "0.1.0"}
         self.meters: dict[str, EnergyCounter] = {}
-        # D-131: the power confirmation's thresholds (engine/confirmation.py), the apartment's settings when given
-        self.confirm_on_watts, self.confirm_off_watts = confirm_watts or (confirm.CONFIRM_ON_WATTS, confirm.CONFIRM_OFF_WATTS)
+        # D-131, D-133: the apartment's settings (engine/config.py), the defaults when not given
+        self.settings = {**DEFAULT_SETTINGS, **(settings or {})}
+        if confirm_watts:
+            self.settings["CONFIRM_ON_WATTS"], self.settings["CONFIRM_OFF_WATTS"] = confirm_watts
         self.power_waiters: dict[str, list[tuple[str, float, asyncio.Future]]] = {}   # meter -> commands watching it
         self.rooms = [{"room_id": r.room_id, "name": r.name} for r in self.connector.rooms()]
         self.rules = copy.deepcopy(DEFAULT_RULES)
+        self._compressor_from_settings()
         # (device_id, capability, correlation_id, state requested) of the commands running: at most one per device
         self.inflight: list[tuple[str, str, str, dict]] = []
         self.device_locks: dict[str, asyncio.Lock] = {}
@@ -260,6 +262,26 @@ class ApartmentEngine:
             self.store.put_meta("initialized", {"at": iso(utcnow()), "seeded": seeded})
 
     # ---- infrastructure -------------------------------------------------
+    def setting(self, name: str) -> float:
+        return self.settings[name]
+
+    @property
+    def confirm_on_watts(self) -> float:
+        return self.settings["CONFIRM_ON_WATTS"]
+
+    @property
+    def confirm_off_watts(self) -> float:
+        return self.settings["CONFIRM_OFF_WATTS"]
+
+    def _compressor_from_settings(self) -> None:
+        """D-133: compressor_min_off is not editable from the app; its value and limits are the apartment's setting."""
+        minutes = self.setting("COMPRESSOR_MIN_OFF_MINUTES")
+        minutes = int(minutes) if minutes == int(minutes) else minutes     # 3, not 3.0, as /rules always said
+        for rule in self.rules:
+            if rule["rule_id"] == "compressor_min_off":
+                rule["params"]["minutes"] = minutes
+                rule["limits"]["minutes"] = {"min": minutes, "max": minutes}
+
     def next_id(self, prefix: str) -> str:
         self.counter += 1
         self.store.put_meta("counter", self.counter)      # an id is never given twice, also across restarts
@@ -309,6 +331,7 @@ class ApartmentEngine:
         self.mode = apt.get("mode", self.mode)
         self.hold = apt.get("hold")
         self.rules = apt.get("rules", self.rules)
+        self._compressor_from_settings()
         self.rules_updated_at = apt.get("rules_updated_at", self.rules_updated_at)
         self.counter = st.get_meta("counter", self.counter)
         self.meters = {k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
@@ -360,7 +383,7 @@ class ApartmentEngine:
     def _after_restart(self) -> None:
         """What the restart interrupted (P-60 step 3): a command half way is failed with its decision (the contract has
         no reason "restart": internal_error, and the decision says why); a pending assistant request is failed; an
-        action scheduled more than ARREARS_MINUTES ago, that could not run while the engine was down, is failed as
+        action scheduled more than MISSED_AFTER_MINUTES (a setting) ago, that could not run while the engine was down, is failed as
         missed with its decision. The younger ones run at the first tick, as usual."""
         for cmd in self.commands.values():
             if cmd["status"] in FINAL:
@@ -377,13 +400,13 @@ class ApartmentEngine:
         now = utcnow()
         for item in sorted(self.schedule.values(), key=lambda s: s["run_at"]):
             late = now - parse_dt(item["run_at"])
-            if item["status"] != "planned" or late <= timedelta(minutes=ARREARS_MINUTES) or item["schedule_id"] in self.deferred:
+            if item["status"] != "planned" or late <= timedelta(minutes=self.setting("MISSED_AFTER_MINUTES")) or item["schedule_id"] in self.deferred:
                 continue
             item["status"], item["executed_at"] = "failed", iso(now)
             self._save_schedule(item)
             self.log("system", {"type": "schedule"}, "schedule_missed", item["run_at"], None,
                      f"Azione programmata non eseguita: il motore era fermo all'orario previsto ({item['run_at']}), "
-                     f"oltre {ARREARS_MINUTES} minuti fa", "failed", str(uuid.uuid4()))
+                     f"oltre {fmt_num(self.setting('MISSED_AFTER_MINUTES'))} minuti fa", "failed", str(uuid.uuid4()))
 
     def spawn(self, coro) -> None:
         task = asyncio.get_running_loop().create_task(coro)
@@ -670,7 +693,7 @@ class ApartmentEngine:
         current = self.relay.get(device["device_id"], False)
         if temperature < setpoint:
             return True, temperature, setpoint, frost_only
-        if temperature > setpoint + THERMOSTAT_HYSTERESIS:
+        if temperature > setpoint + self.setting("THERMOSTAT_HYSTERESIS_C"):
             return False, temperature, setpoint, frost_only
         return current, temperature, setpoint, frost_only
 
@@ -693,7 +716,7 @@ class ApartmentEngine:
             if want == self.relay.get(device_id, False):
                 continue
             since = time.monotonic() - self.relay_switched.get(device_id, -1e18)
-            if since < THERMOSTAT_MIN_SWITCH_MINUTES * seconds_per_minute():
+            if since < self.setting("THERMOSTAT_MIN_SWITCH_MINUTES") * seconds_per_minute():
                 continue
             self.relay_busy.add(device_id)
             self.spawn(self._switch_relay(device, want, temperature, setpoint, frost))
@@ -735,7 +758,7 @@ class ApartmentEngine:
         if frost:                                          # R1: every switch of the frost protection is a decision
             what = (f"caldaia accesa: {fmt_num(temperature)} °C, sotto la soglia di {fmt_num(setpoint)} °C" if on else
                     f"caldaia spenta: {fmt_num(temperature)} °C, sopra la soglia di {fmt_num(setpoint)} °C "
-                    f"+ {fmt_num(THERMOSTAT_HYSTERESIS)}")
+                    f"+ {fmt_num(self.setting('THERMOSTAT_HYSTERESIS_C'))}")
             self.log("rule:frost_protection", {"type": "device", "device_id": device_id},
                      "frost_heating_on" if on else "frost_heating_off", "off" if on else "on", "on" if on else "off",
                      f"Antigelo a casa vuota: {what}", "applied", corr)
@@ -1082,7 +1105,7 @@ class ApartmentEngine:
                      "rejected", cmd["correlation_id"], command_id=cmd["command_id"])
             return
         pause = self.compressor_wait(device["device_id"]) if cap == "climate" else 0.0
-        if 0 < pause <= PAUSE_WAITED_S and new_state["on"] and not device["capabilities"][cap]["on"]:
+        if 0 < pause <= self.setting("COMPRESSOR_WAIT_SECONDS") and new_state["on"] and not device["capabilities"][cap]["on"]:
             await asyncio.sleep(pause)          # R4: the pause ends within the command's time: wait for it, then go
             pause = 0.0
         if pause > 0 and new_state["on"] and not device["capabilities"][cap]["on"]:
@@ -1542,7 +1565,7 @@ class ApartmentEngine:
         now = utcnow()
         approval = {
             "approval_id": self.next_id("apr"), "status": "pending", "created_at": iso(now),
-            "expires_at": iso(now + timedelta(minutes=30)), "expires_action": "reject", "source": source,
+            "expires_at": iso(now + timedelta(minutes=self.setting("APPROVAL_EXPIRES_MINUTES"))), "expires_action": "reject", "source": source,
             "description": "Spegnere la caldaia mentre l'appartamento risulta occupato",
             "reason": reason or default_reason,
             "proposed_action": {"type": "device_command", "device_id": heating["device_id"], "capability": "heating",
@@ -1558,7 +1581,8 @@ class ApartmentEngine:
 
     def _open_approval(self, approval: dict) -> None:
         now = utcnow()
-        approval["created_at"], approval["expires_at"] = iso(now), iso(now + timedelta(minutes=30))
+        approval["created_at"] = iso(now)
+        approval["expires_at"] = iso(now + timedelta(minutes=self.setting("APPROVAL_EXPIRES_MINUTES")))
         self.approvals.append(approval)
         self._save_approval(approval)
         self.emit("approval.pending", approval, approval["correlation_id"])
@@ -1930,7 +1954,7 @@ class ApartmentEngine:
                 self._dequeue_approval()
         # by time, and by creation for the same time (a stable sort on the creation order, which engine.db keeps too).
         # An action is closed (done/failed) and saved in this same pass, so a later pass never runs it again. After a
-        # crash between its commands and that save it runs again at the restart (within ARREARS_MINUTES): harmless,
+        # crash between its commands and that save it runs again at the restart (within MISSED_AFTER_MINUTES): harmless,
         # commands are states to reach (P-60 step 4).
         for item in sorted(self.schedule.values(), key=lambda s: s["run_at"]):
             if item["status"] != "planned" or parse_dt(item["run_at"]) > now:

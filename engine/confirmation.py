@@ -11,8 +11,7 @@ none`): a change that neither switches the split on nor off (setpoint, mode, fan
 decision says so). The two thresholds are the engine's settings CONFIRM_ON_WATTS and CONFIRM_OFF_WATTS
 (engine/config.py), per apartment.
 """
-CONFIRM_ON_WATTS = 20.0
-CONFIRM_OFF_WATTS = 15.0
+# CONFIRM_ON_WATTS and CONFIRM_OFF_WATTS: settings of the engine (engine/config.py, SETTINGS: 20 and 15 by default)
 CONFIRM_UNTIL_S = 9.5          # from the command's creation: its final status within the contract's 10 s
 
 

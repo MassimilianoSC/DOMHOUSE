@@ -19,11 +19,12 @@ CLIMA, CALDAIA, PRESA = "dev-clima-soggiorno", "dev-caldaia", "dev-presa-camera"
 @pytest.fixture(autouse=True)
 def fast_minutes(monkeypatch):
     monkeypatch.setenv("MOCK_TIME_SCALE", "0.02")         # a "minute" of the rules = 20 ms
-    monkeypatch.setattr(core, "PAUSE_WAITED_S", 0.0)      # never wait for the pause here: refuse, as in real time
 
 
-def engine(variant_apartment="apt-prova-01"):
-    return core.ApartmentEngine(variant_apartment, SimulatedConnector(), seed=False)
+def engine(variant_apartment="apt-prova-01", wait=0.0):
+    """wait: COMPRESSOR_WAIT_SECONDS (D-133); 0 here, never wait for the pause: refuse, as in real time."""
+    return core.ApartmentEngine(variant_apartment, SimulatedConnector(), seed=False,
+                                settings={"COMPRESSOR_WAIT_SECONDS": wait})
 
 
 async def settle(e, timeout=10.0):
@@ -159,10 +160,8 @@ def test_mold_warning_once_a_day_when_empty_suspended_by_a_hold(monkeypatch):
 def test_a_pause_ending_within_the_command_time_is_waited_for(monkeypatch):
     """With the conformance suite's time scale (1 s per minute) the pause lasts 3 s: a manual start waits for it and
     is acked (scenario C11 turns the split on right after the previous one turned it off)."""
-    monkeypatch.setattr(core, "PAUSE_WAITED_S", 7.0)
-
     async def main():
-        e = engine()
+        e = engine(wait=7.0)
         e.ensure_started()
         e.create_command(CLIMA, {"capability": "climate", "action": "turn_off"}, ACTOR, CORR)
         await settle(e)
