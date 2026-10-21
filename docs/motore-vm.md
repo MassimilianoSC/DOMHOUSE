@@ -341,7 +341,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
   --command="sudo ls -ln /data/dev/backup; systemctl list-timers domhouse-engine-backup.timer --no-pager; sudo journalctl -u domhouse-engine-backup.service -n 5 --no-pager"
 ```
 
-Risultato atteso: al massimo 7 file `engine-<data>.db` (più gli eventuali `before-restore-…`), il timer con la
+Risultato atteso: al massimo 7 file `engine-<data>.db` (gli eventuali `before-restore-…` seguono la stessa regola dei 7 giorni, P-71), il timer con la
 prossima esecuzione alle 22:30 UTC e, dopo la prima notte, le righe `backup dev: …` dell'ultima esecuzione.
 
 **E3. Ripristinare una copia** (scrive sulla VM: il motore si ferma per qualche secondo).
