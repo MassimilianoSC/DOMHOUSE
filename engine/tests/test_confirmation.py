@@ -108,3 +108,48 @@ def test_the_thresholds_are_settings_of_the_engine():
     for bad in ("zero", "0", "6000"):
         with pytest.raises(ConfigError, match="CONFIRM_OFF_WATTS must be a number of watts between 1 and 5000"):
             load_config({**base, "CONFIRM_OFF_WATTS": bad})
+
+
+# -------- the links checked at start (step 7b, connector.md §2.2) --------
+def warnings(monkeypatch) -> list[tuple[str, dict]]:
+    seen = []
+    monkeypatch.setattr(core.logs, "warn", lambda msg, **fields: seen.append((msg, fields)))
+    return seen
+
+
+def test_the_simulated_catalog_has_good_links(monkeypatch):
+    seen = warnings(monkeypatch)
+    e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
+    assert seen == []
+    assert e.links[SPLIT] == {"confirmation_device_id": SPLIT}
+    assert e.links["dev-caldaia"] == {"sensor_device_id": "dev-ambiente-soggiorno"}
+
+
+@pytest.mark.parametrize("links, reason", [
+    ({SPLIT: {"confirmation_device_id": "dev-che-non-esiste"}}, "target not in the catalog"),
+    ({SPLIT: {"confirmation_device_id": "dev-finestra-camera"}}, "target without power_meter"),
+    ({SPLIT: {"confirmation_device_id": SPLIT, "colore": "rosso"}}, "unknown link key"),
+    ({"dev-presa-camera": {"confirmation_device_id": "dev-presa-camera"}}, "link only for a device with climate"),
+    ({"dev-caldaia": {"sensor_device_id": "dev-presa-camera"}}, "target without temperature"),
+])
+def test_a_wrong_link_is_left_out_with_a_log_line(monkeypatch, links, reason):
+    conn = SimulatedConnector()
+    for device_id, value in links.items():
+        conn._devices[device_id].links = value
+    seen = warnings(monkeypatch)
+    core.ApartmentEngine("apt-prova-01", conn, seed=False)
+    assert any(msg == "link ignored" and f["reason"] == reason for msg, f in seen), seen
+
+
+def test_a_split_without_meter_is_none_and_a_boiler_without_sensor_is_not_regulated(monkeypatch):
+    conn = SimulatedConnector()
+    conn._devices[SPLIT].links = {"confirmation_device_id": "dev-finestra-camera"}    # wrong: no power_meter
+    conn._devices["dev-caldaia"].links = {}
+    seen = warnings(monkeypatch)
+    e = core.ApartmentEngine("apt-prova-01", conn, seed=False)
+    msgs = [(m, f.get("device_id"), f.get("treated_as")) for m, f in seen]
+    assert ("split without confirmation meter", SPLIT, "confirmation none") in msgs
+    assert ("boiler without sensor", "dev-caldaia", "not regulated") in msgs
+    assert e.links[SPLIT] == {} and e.confirmation_meter(SPLIT) is None
+    conn.lose_infrared(SPLIT)                                     # none: a lost frame is not noticed
+    assert run(e, {"capability": "climate", "action": "turn_off"})["status"] == "acked"

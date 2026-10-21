@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from . import log as logs
-from .connector.interface import CommandResult, ConnectorCommand, DeviceInfo, StateChange
+from .connector.interface import LINKS, CommandResult, ConnectorCommand, DeviceInfo, StateChange
 from . import confirmation as confirm
 from .mold import mold_action
 from .connector.simulated import SimulatedConnector
@@ -587,10 +587,41 @@ class ApartmentEngine:
 
     # ---- the boiler's thermostat (R1, R2) ---------------------------------------------------------------------------
     def _read_links_and_relays(self) -> None:
-        for info in self.connector.devices():
-            self.links[info.device_id] = dict(info.links)
+        """The catalog's links, checked at start (connector.md §2.2, P-60 step 7b): a link with an unknown key, to a
+        device that is not in the catalog or to one without the capability it needs, from a device without the
+        capability it is for, is left out with a log line. Then a split with `confirmation: power` and no meter is
+        treated as `confirmation: none`, a boiler without a sensor is not regulated (it follows the switch it is asked,
+        with its decision, step 5b): each with a log line."""
+        infos = self.connector.devices()
+        caps = {i.device_id: i.capabilities for i in infos}
+        self.links = {}
+        for info in infos:
+            kept = {}
+            for key, target in dict(info.links).items():
+                problem = None
+                if key not in LINKS:
+                    problem = "unknown link key"
+                elif LINKS[key][0] not in info.capabilities:
+                    problem = f"link only for a device with {LINKS[key][0]}"
+                elif target not in caps:
+                    problem = "target not in the catalog"
+                elif LINKS[key][1] not in caps[target]:
+                    problem = f"target without {LINKS[key][1]}"
+                if problem:
+                    logs.warn("link ignored", apartment_id=self.apartment_id, device_id=info.device_id, link=key,
+                              target=str(target), reason=problem)
+                else:
+                    kept[key] = target
+            self.links[info.device_id] = kept
+            climate = info.capabilities.get("climate")
+            if climate and climate.get("confirmation") == "power" and "confirmation_device_id" not in kept:
+                logs.warn("split without confirmation meter", apartment_id=self.apartment_id, device_id=info.device_id,
+                          treated_as="confirmation none")
             if "heating" in info.capabilities:
                 self.relay[info.device_id] = bool(info.capabilities["heating"].get("on"))
+                if "sensor_device_id" not in kept:
+                    logs.warn("boiler without sensor", apartment_id=self.apartment_id, device_id=info.device_id,
+                              treated_as="not regulated")
 
     def _take_relay(self, device_id: str, cap: str, raw: dict) -> dict:
         """For a boiler, "on" from the device is its relay: kept by the engine, not shown as heating.on (D-128)."""
