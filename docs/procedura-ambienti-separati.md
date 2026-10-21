@@ -72,15 +72,34 @@ ciclo).
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-for c in bookings audit platform_audit support_access webhook_logs mail_limits audit_people actors actor_refs; do gcloud firestore fields ttls update expire_at --collection-group=$c --enable-ttl --database=staging --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --quiet; done
+for c in bookings audit platform_audit support_access webhook_logs mail_limits audit_people actors actor_refs summaries; do gcloud firestore fields ttls update expire_at --collection-group=$c --enable-ttl --database=staging --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --quiet; done
 ```
 
-Verifica (sola lettura): deve elencare le nove collezioni con `expire_at`.
+Verifica (sola lettura): deve elencare le dieci collezioni con `expire_at` (`summaries` è dei riepiloghi settimanali, passo 11).
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 gcloud firestore fields ttls list --database=staging --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+```
+
+## M3b. Regola di scadenza dei riepiloghi settimanali anche in produzione (passo 11, D-150)
+
+Cosa fa: attiva la cancellazione automatica dei riepiloghi scaduti (campo `expire_at`, 12 mesi) nei due database. Non
+scrive documenti: si può dare anche prima della pubblicazione.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+for db in "(default)" staging; do gcloud firestore fields ttls update expire_at --collection-group=summaries --enable-ttl --database="$db" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --quiet; done
+```
+
+Verifica (sola lettura): due righe con `summaries` e stato `ACTIVE` (`CREATING` per qualche minuto subito dopo).
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+for db in "(default)" staging; do gcloud firestore fields ttls list --database="$db" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="value(name,ttlConfig.state)" | grep summaries; done
 ```
 
 ## M4. Sito Hosting dello staging
