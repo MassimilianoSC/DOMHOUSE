@@ -173,7 +173,9 @@
       "booking_cancelled": "Prenotazione annullata",
       "checkin": "Check-in",
       "checkout": "Check-out",
-      "booking_cancel_reset": "Disdetta dopo il pre-arrivo"
+      "booking_cancel_reset": "Disdetta dopo il pre-arrivo",
+      "offline_alert": "Dispositivo offline",
+      "mold_warning": "Avviso antimuffa"
     },
     "title": "Decisioni",
     "subtitle": "Tutto ciò che il motore e i gestori hanno fatto, e perché",

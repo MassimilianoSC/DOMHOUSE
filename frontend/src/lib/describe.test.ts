@@ -64,6 +64,9 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     expect(actionLabel("turn_off")).toBe("Spegnimento");
     expect(actionLabel("set_climate")).toBe("Clima");
     expect(actionLabel("set_heating")).toBe("Riscaldamento");
+    // regole del motore, passo 5a (cde9881)
+    expect(actionLabel("offline_alert")).toBe("Dispositivo offline");
+    expect(actionLabel("mold_warning")).toBe("Avviso antimuffa");
   });
 
   it("un'azione che il motore aggiungerà e il sito non conosce ancora: il codice, la pagina non si rompe", () => {

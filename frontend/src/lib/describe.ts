@@ -61,6 +61,7 @@ export const DECISION_ACTIONS = [
   "hold", "hold_cancel", "hold_expired", "expire", "approve", "reject", "update_device", "update_rules",
   "schedule_create", "schedule_move", "schedule_cancel", "schedule_missed", "schedule_deferred",
   "booking_created", "booking_changed", "booking_cancelled", "checkin", "checkout", "booking_cancel_reset",
+  "offline_alert", "mold_warning",
 ] as const;
 
 /** The kind of action of a decision, in Italian («Forzatura scaduta»); its code for one not translated yet. */
