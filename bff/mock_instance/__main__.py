@@ -11,7 +11,7 @@ from .app import create_mock_app
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Mock domotic instance (contract 1.0.4)")
+    parser = argparse.ArgumentParser(description="Mock domotic instance (contract 1.0.5)")
     parser.add_argument("--port", type=int, default=8100)
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--api-key", default=os.environ.get("INSTANCE_API_KEY_FALLBACK", ""))

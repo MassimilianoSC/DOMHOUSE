@@ -377,7 +377,7 @@ def test_c09_modifica_e_cancellazione_prenotazione(client: Client):
 # ---------------------------------------------------------------------------
 
 def test_c12_approvazione(client: Client):
-    """C12 · Provocare un'azione che richiede HITL (/_test/state trigger approval) → approval.pending su /stream e voce
+    """C12 · Provocare un'azione che richiede il consenso del gestore (/_test/state trigger approval) → approval.pending su /stream e voce
     in GET /approvals; decisione approve → 200, Decision con actor = X-Actor, comandi a stato finale; seconda decisione → 409."""
     client.richiede("approvals", "decisions", "stream")
     client.richiede_stato("approvazione")
@@ -422,7 +422,7 @@ def test_c16_assistente(client: Client):
     r = client.post("/ask", {"text": "Spegni il climatizzatore del soggiorno"})
     assert r.status_code == 202, r.text
     ask_id = r.json()["ask_id"]
-    client.richiede_stato("risposta del Brain")
+    client.richiede_stato("risposta dell'assistente")
     scadenza = time.monotonic() + TIMEOUT_ASK_S
     stato = None
     while time.monotonic() < scadenza:

@@ -1,4 +1,4 @@
-"""The contract's HTTP API (1.0.4) over the apartment engine (engine/core.py), in two shapes:
+"""The contract's HTTP API (1.0.5) over the apartment engine (engine/core.py), in two shapes:
 - one apartment, at /api/v1: the engine as a service of its own (python -m engine, P-60 step 2);
 - many apartments, at /{apartment_id}/api/v1: the BFF's demonstration apartments (mounted at /mock) and
   python -m bff.mock_instance."""
@@ -29,7 +29,7 @@ def error(status: int, code: str, message: str, details=None) -> JSONResponse:
 
 def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: str, *, features: list[str],
                         simulated: bool, implementation: dict, ping_seconds: float, apartment_id: str | None = None,
-                        title: str = "DOMHOUSE engine (contract 1.0.4)", lifespan=None) -> FastAPI:
+                        title: str = "DOMHOUSE engine (contract 1.0.5)", lifespan=None) -> FastAPI:
     """engine_of(apartment_id) gives the apartment's engine, started. With apartment_id the app serves that apartment
     only, at /api/v1; without, any apartment at /{apartment_id}/api/v1."""
     enabled = list(features)

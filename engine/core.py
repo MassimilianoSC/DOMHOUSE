@@ -1,4 +1,4 @@
-"""The engine of one apartment (contract 1.0.4): rules, modes, bookings, schedule, approvals, decisions, assistant,
+"""The engine of one apartment (contract 1.0.5): rules, modes, bookings, schedule, approvals, decisions, assistant,
 the commands' life and the event stream. In memory until step 3 of the plan (SQLite).
 
 Moved here from the BFF's simulated engine (bff/mock_instance/state.py) at P-60 step 2: one program for the engine
@@ -22,7 +22,7 @@ from .confirmation import delivered_outcome
 from .connector.simulated import SimulatedConnector
 from .store import MemoryStore
 
-CONTRACT_VERSION = "1.0.4"
+CONTRACT_VERSION = "1.0.5"
 COMMAND_DEADLINE_S = 9           # the connector's deadline, inside the contract's 10 s (connector.md §2.2)
 # what a command asks the device: only the device's fields of the capability (connector.md §2.4, D-108)
 TARGET_FIELDS = {"switch": ("on",), "climate": ("on", "mode", "setpoint", "fan"), "heating": ("on",)}

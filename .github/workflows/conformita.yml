@@ -1,5 +1,5 @@
 # Guardia del contratto: a ogni commit verifica che
-#  1. contract/openapi.yaml sia ancora la versione 1.0.4 condivisa con il team del motore (hash);
+#  1. contract/openapi.yaml sia ancora la versione 1.0.5 (hash; 1.0.5 = 1.0.4 con la sola documentazione, D-107/D-124);
 #  2. il motore (python -m engine, connector simulato) rispetti il contratto (suite di conformità, 16 scenari +
 #     connector fermo) e passi le sue prove, con quelle comuni a ogni connector (engine/); lo stesso per l'immagine
 #     del motore (engine/Dockerfile), che senza chiave non deve partire;
@@ -13,7 +13,7 @@ on:
   pull_request:
 
 env:
-  CONTRACT_SHA256: 8b297c97535bd11144b61687db744933244ab7940c9e2ff1d451fb7e450b3967
+  CONTRACT_SHA256: e6ed29457163707b9e43eabb428225f0a6983ea05de2a43d240d03acae001527
   # l'ambiente del motore per la conformità sta in ci/engine.vars, lo stesso file del giro sul PC (run_tests.py)
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Il contratto è invariato (v1.0.4)
+      - name: Il contratto è invariato (v1.0.5)
         run: |
           echo "${CONTRACT_SHA256}  contract/openapi.yaml" | sha256sum -c -
 

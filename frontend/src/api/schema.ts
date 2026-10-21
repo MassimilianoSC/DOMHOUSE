@@ -730,7 +730,10 @@ export interface components {
              * @enum {string}
              */
             expires_action: "reject" | "approve" | "wait";
-            /** @enum {string} */
+            /**
+             * @description `brain` e `organ` riservati: il motore DOMHOUSE usa `rule` e `assistant`
+             * @enum {string}
+             */
             source: "brain" | "organ" | "rule" | "assistant";
             /** @description In italiano, una frase */
             description: string;
@@ -748,7 +751,7 @@ export interface components {
             decision_id: string;
             /** Format: date-time */
             ts: string;
-            /** @description `rule:<rule_id>` · `organ:<nome>` · `brain` · `user:<email>` (da X-Actor email) · `assistant` · `system` (da X-Actor `system:<nome>` o fatti interni) */
+            /** @description `rule:<rule_id>` · `user:<email>` (da X-Actor email) · `assistant` · `system` (da X-Actor `system:<nome>` o fatti interni) · riservati, non usati dal motore DOMHOUSE: `organ:<nome>`, `brain` */
             actor: string;
             target: {
                 /** @enum {string} */
@@ -890,7 +893,7 @@ export interface components {
             checked_at: string;
         };
         Version: {
-            /** @example 1.0.4 */
+            /** @example 1.0.5 */
             contract_version: string;
             implementation: components["schemas"]["Implementation"];
             features: ("apartment" | "devices" | "commands" | "energy" | "schedule" | "rules" | "approvals" | "decisions" | "ask" | "bookings" | "stream")[];
@@ -1945,7 +1948,7 @@ export interface operations {
                      *           "created_at": "2026-10-14T13:05:00.000Z",
                      *           "expires_at": "2026-10-14T13:35:00.000Z",
                      *           "expires_action": "reject",
-                     *           "source": "brain",
+                     *           "source": "rule",
                      *           "description": "Spegnere la caldaia mentre l'appartamento risulta occupato",
                      *           "reason": "La finestra della camera è aperta da 12 minuti e la caldaia è accesa a 21 °C",
                      *           "proposed_action": {
@@ -2337,7 +2340,7 @@ export interface operations {
                      *       "status": "ok",
                      *       "apartment_id": "apt-rimini-01",
                      *       "implementation": {
-                     *         "name": "langbrain-domotica",
+                     *         "name": "domhouse-engine",
                      *         "version": "0.3.0"
                      *       },
                      *       "uptime_s": 86112,
@@ -2382,7 +2385,7 @@ export interface operations {
                      *       "status": "down",
                      *       "apartment_id": "apt-rimini-01",
                      *       "implementation": {
-                     *         "name": "langbrain-domotica",
+                     *         "name": "domhouse-engine",
                      *         "version": "0.3.0"
                      *       },
                      *       "uptime_s": 12,
@@ -2483,9 +2486,9 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "contract_version": "1.0.4",
+                     *       "contract_version": "1.0.5",
                      *       "implementation": {
-                     *         "name": "langbrain-domotica",
+                     *         "name": "domhouse-engine",
                      *         "version": "0.3.0"
                      *       },
                      *       "features": [

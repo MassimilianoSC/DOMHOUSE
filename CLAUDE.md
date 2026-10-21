@@ -72,7 +72,7 @@ documento «Infrastruttura Domotica PoC – riepilogo e configurazione.docx» ne
 1. **`contract/openapi.yaml` non si modifica mai, per nessun motivo**, con un'unica eccezione decisa dal committente: la
    versione 1.0.5 **solo documentazione** (D-107, P-63: descrizioni, esempi e chiavi `x-*`; struttura identica, provata da
    uno script che confronta gli alberi senza quei campi; `CONTRACT_SHA256` nella CI e `CONTRACT_BLOB` in `scripts/publish.sh`
-   aggiornati nello stesso commit). È il contratto fra app e motore (il nostro, `engine/`) e confrontato in CI. Se una funzionalità sembra richiedere un campo in più, si risolve nel BFF o nel
+   aggiornati nello stesso commit). È il contratto v1.0.5 fra app e motore (il nostro, `engine/`) e confrontato in CI. Se una funzionalità sembra richiedere un campo in più, si risolve nel BFF o nel
    frontend (come già fatto per «Soggiorno in corso»), non nel contratto. Prima di ogni commit `git diff --stat contract/`
    deve essere vuoto. I tipi TypeScript si rigenerano con `make gen-api`, mai a mano.
 2. **Nessun segreto né file `.env*` in Git.** Niente chiavi API, HMAC, token, chiavi JSON di service account, né `bff/.env`,

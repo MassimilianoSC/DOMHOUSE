@@ -2,18 +2,19 @@ openapi: 3.0.3
 
 # =============================================================================
 #  CONTRATTO DELL'APP – API DELL'ISTANZA DI APPARTAMENTO
-#  Versione 1.0.4 · 14 ottobre 2026 · proprietario: Massimiliano (HQ)
+#  Versione 1.0.5 · 21 ottobre 2026 · proprietario: Massimiliano (HQ)
+#  (1.0.5 = 1.0.4 con la sola documentazione aggiornata: struttura identica, D-107)
 #
 #  Questo file è l'unico punto di contatto tecnico tra l'app (PWA + BFF su
-#  GCP/Firebase, Massimiliano) e il motore domotico (LangBrain + nodo
-#  domotica, Youssouf). L'app usa SOLO ciò che è scritto qui. Il motore è
-#  conforme quando la suite di test di conformità (vedi x-conformita in
-#  fondo) passa contro la sua istanza.
+#  GCP/Firebase) e il motore domotico DOMHOUSE (engine/, un processo per
+#  appartamento; i dispositivi passano dal connector). L'app usa SOLO ciò che
+#  è scritto qui. Il motore è conforme quando la suite di test di conformità
+#  (vedi x-conformita in fondo) passa contro la sua istanza.
 #
 #  Come leggerlo:
-#    - info.description        → guida per Youssouf: cosa deve fare, in ordine
+#    - info.description        → guida per chi implementa il motore, in ordine
 #    - paths                   → 20 percorsi, 23 operazioni, ognuna con esempi e con una
-#                                nota "x-youssouf" su cosa implementare
+#                                nota "x-motore" su cosa implementare
 #    - components.schemas      → modello del dominio e capacità
 #    - x-stream-events         → i 7 eventi SSE con i loro schemi
 #    - x-conformita            → scenari che i test verificano
@@ -29,19 +30,19 @@ openapi: 3.0.3
 
 info:
   title: Domotica appartamenti – API dell'istanza
-  version: 1.0.4
+  version: 1.0.5
   description: |
     API esposta da **ogni istanza di appartamento** del motore domotico.
     L'app (BFF su Cloud Run) chiama un'istanza alla volta, sulla rete interna,
     con la chiave API dell'istanza e due header di contesto (`X-Actor`,
     `X-Correlation-Id`).
 
-    ## Guida per Youssouf: cosa devi fare per essere conforme
+    ## Guida per chi implementa il motore: cosa serve per essere conforme
 
     1. **Esponi tutti gli endpoint di questo file** sotto il prefisso `/api/v1`
        del nodo domotica, con gli stessi percorsi, campi, codici di risposta
-       ed errori. Gli endpoint nativi di LangBrain possono restare: l'app non
-       li usa.
+       ed errori. Altri endpoint interni del motore possono esistere: l'app
+       non li usa.
     2. **Dichiara le capacità di ogni dispositivo reale** usando solo le otto
        capacità di `components.schemas.Capabilities`. La mappa Shelly →
        capacità è tua (es. relè con misura sulla caldaia = `heating` +
@@ -58,9 +59,8 @@ info:
     5. **Limiti dal motore**: ogni capacità con un setpoint espone
        `setpoint_min`/`setpoint_max`; `PUT /rules` rifiuta con `422` valori
        fuori dai `limits`. L'app non ha numeri cablati: usa i tuoi.
-    6. **Approvazioni (HITL)** esposte come `approvals` con descrizione in
-       italiano e scadenza; decisione `approve`/`reject`. L'`OVERRIDE` di
-       LangBrain resta spento nel PoC.
+    6. **Approvazioni (consenso del gestore)** esposte come `approvals` con descrizione in
+       italiano e scadenza; decisione `approve`/`reject`.
     7. **Log delle decisioni** nel formato `Decision`. Sulle chiamate API
        `X-Correlation-Id` è obbligatorio (manca → `400`): lo usi così com'è.
        Lo generi tu solo per i fatti che nascono nel motore (riflessi, timer,
@@ -100,16 +100,14 @@ info:
   contact:
     name: Massimiliano (HQ) – proprietario del contratto
   x-owner: Massimiliano
-  x-implementer: Youssouf
+  x-implementer: DOMHOUSE (motore engine/; connector Shelly di Youssouf)
   x-contract-policy: |
     Modifica compatibile (campo o endpoint in più): versione minore, nessun
     preavviso. Modifica non compatibile: versione maggiore, due giorni di
     preavviso, approvazione di entrambi. La CI dell'app confronta questo file
     con GET /api/v1/openapi.json dell'istanza di sviluppo, che espone lo
-    schema del solo adattatore (non le rotte native di LangBrain: o il nodo
-    serve questo file così com'è, o è montato come sotto-applicazione con il
-    proprio schema). La CI del nodo domotica esegue la suite di conformità a
-    ogni push.
+    schema delle sole rotte del contratto (non eventuali rotte interne del
+    motore). La CI esegue la suite di conformità contro il motore a ogni push.
 
 servers:
   - url: http://{instance_host}:{port}/api/v1
@@ -135,11 +133,11 @@ tags:
     description: Azioni programmate da prenotazioni o manuali
   - name: Regole
   - name: Approvazioni
-    description: Human-in-the-loop
+    description: Consenso del gestore alle azioni proposte dal motore
   - name: Decisioni
     description: Log di ciò che il motore ha deciso e perché
   - name: Assistente
-    description: Richieste in linguaggio naturale al Brain
+    description: Richieste in linguaggio naturale all'assistente del motore
   - name: Prenotazioni
     description: Eventi inoltrati dal BFF (mai dalla PWA)
   - name: Tempo reale
@@ -159,7 +157,7 @@ paths:
       description: |
         Occupazione, modalità attiva, eventuale forzatura, prossimi check-in e
         check-out, salute sintetica. L'app lo rilegge a ogni riconnessione SSE.
-      x-youssouf: |
+      x-motore: |
         `occupancy` è la tua stima (prenotazioni + presenza + consumi).
         `mode` è la modalità applicata ora dalle regole; `hold` è valorizzato
         solo durante una forzatura. `next_checkin`/`next_checkout` vengono
@@ -201,7 +199,7 @@ paths:
         dispositivi secondo le regole dell'appartamento; l'app non conosce la
         traduzione. Asincrona: l'esito arriva come eventi `command.updated` e
         `apartment.changed`.
-      x-youssouf: |
+      x-motore: |
         Traduci la modalità nei comandi ai dispositivi (es. `empty` = clima
         OFF, caldaia a setpoint antigelo). Restituisci i `command_id` generati
         così l'app può seguirli. Se una regola o un limite impedisce la
@@ -249,7 +247,7 @@ paths:
         torna alle regole. `minutes: 0` annulla una forzatura in corso.
         I limiti hard (setpoint min/max, antigelo) restano attivi anche durante
         la forzatura.
-      x-youssouf: |
+      x-motore: |
         Durante il hold le regole "di comfort" (finestra aperta, eco al
         check-out) sono sospese; i limiti hard no. Emetti `apartment.changed`
         all'inizio e alla fine. Registra una Decision con actor = X-Actor.
@@ -302,8 +300,8 @@ paths:
         capacità presente. Un dispositivo nuovo o una capacità nuova compaiono
         qui e l'app li mostra senza rilascio. Capacità sconosciute all'app
         vengono ignorate.
-      x-youssouf: |
-        Leggi il file dell'appartamento, non il registro di LangBrain. I nomi
+      x-motore: |
+        Leggi il catalogo dell'appartamento, non un registro interno. I nomi
         tecnici degli Shelly non arrivano all'app: `device_id` opaco, `label`
         in italiano, `room_id` obbligatorio. `last_seen` è l'ultimo messaggio
         ricevuto dal dispositivo (WebSocket o BLU via gateway).
@@ -403,7 +401,7 @@ paths:
       operationId: updateDevice
       summary: Rinomina un dispositivo o cambia stanza
       description: Solo anagrafica visibile al gestore; non tocca la configurazione Shelly.
-      x-youssouf: |
+      x-motore: |
         Aggiorna `label` e `room_id` nel file dell'appartamento e rispondi con
         il dispositivo aggiornato. `room_id` deve esistere, altrimenti 422.
       parameters:
@@ -448,10 +446,10 @@ paths:
         - `switch`  → `turn_on`, `turn_off` → nessun parametro
         - `climate` → `set_climate` → `on`, `mode`, `setpoint`, `fan` (almeno uno); `turn_off`
         - `heating` → `set_heating` → `on`, `setpoint` (almeno uno); `turn_off`
-      x-youssouf: |
+      x-motore: |
         Valida capacità/azione/params contro il dispositivo e i limiti del file
-        dell'appartamento (422 se fuori). Passa dal motore di priorità/blocchi
-        di LangBrain: un blocco attivo di un attore con priorità maggiore →
+        dell'appartamento (422 se fuori). Passa dalle priorità e dai blocchi
+        del motore: un blocco attivo di un attore con priorità maggiore →
         `failed` con `reason: blocked_by_rule`, non 4xx. Per `climate` via IR
         invia il comando al blaster e passa a `verifying`: `acked` quando la
         potenza misurata cambia coerentemente entro il timeout, altrimenti
@@ -513,7 +511,7 @@ paths:
       tags: [Dispositivi]
       operationId: getCommand
       summary: Esito di un comando
-      x-youssouf: |
+      x-motore: |
         Conserva i comandi almeno 7 giorni. `reason` valorizzato solo per
         `failed` e `timeout`, con un codice tra quelli di CommandReason.
       parameters:
@@ -558,7 +556,7 @@ paths:
         Serie dei kWh per intervallo (`bucket` = `hour` o `day`) sommando tutti
         i `power_meter`, più il dettaglio per dispositivo e, se il motore lo
         calcola, le ore di clima evitate grazie alle regole.
-      x-youssouf: |
+      x-motore: |
         Aggrega dalla telemetria dei power_meter. `avoided_hvac_hours` è
         opzionale (null se non calcolato): conta le ore in cui una regola ha
         spento clima o caldaia a casa vuota. Massimo 31 giorni per richiesta.
@@ -609,7 +607,7 @@ paths:
       operationId: listSchedule
       summary: Azioni programmate
       description: Da prenotazioni (pre-arrivo, check-out, vuoto) e manuali, in ordine di esecuzione.
-      x-youssouf: |
+      x-motore: |
         Ogni evento di prenotazione genera voci con `source: booking` e
         `booking_id`. Le voci eseguite restano visibili 7 giorni con
         `status: done`.
@@ -657,7 +655,7 @@ paths:
       tags: [Programmazione]
       operationId: createScheduleItem
       summary: Aggiunge un'azione programmata manuale
-      x-youssouf: |
+      x-motore: |
         `run_at` nel futuro, altrimenti 422. L'azione è una modalità di
         appartamento o un comando a un dispositivo, validato come
         POST /devices/{id}/commands.
@@ -694,7 +692,7 @@ paths:
       operationId: updateScheduleItem
       summary: Anticipa o posticipa un'azione programmata
       description: Vale anche per le voci generate dalle prenotazioni (l'ospite arriva prima).
-      x-youssouf: |
+      x-motore: |
         Una voce `done` o `cancelled` non si modifica (409). Se la voce viene
         da una prenotazione, un successivo `booking_changed` la ricalcola e
         sovrascrive la modifica manuale: documentalo nella Decision.
@@ -754,9 +752,9 @@ paths:
         Otto regole fisse. Ogni regola ha `enabled`, `params` modificabili dal
         gestore e `limits` non superabili. L'app disegna i controlli dai
         `limits`; non ha numeri cablati.
-      x-youssouf: |
-        Le stesse soglie alimentano i riflessi di LangBrain e gli script locali
-        sugli Shelly: un solo file per appartamento. `editable: false` per le
+      x-motore: |
+        Le stesse soglie alimentano le regole del motore: un solo insieme per
+        appartamento. `editable: false` per le
         regole che il gestore può solo vedere (es. `compressor_min_off`).
       parameters:
         - $ref: '#/components/parameters/XActor'
@@ -826,7 +824,7 @@ paths:
       operationId: updateRules
       summary: Modifica soglie o attiva/disattiva regole
       description: Invia solo le regole da cambiare; le altre restano. Valori fuori dai `limits` → 422.
-      x-youssouf: |
+      x-motore: |
         Valida contro `limits`; una regola con `editable: false` → 422
         `rule_not_editable`. Applica a caldo (nessun riavvio), aggiorna gli
         script locali se la soglia li riguarda, registra una Decision con
@@ -862,7 +860,7 @@ paths:
         '501': { $ref: '#/components/responses/NotImplemented' }
 
   # ---------------------------------------------------------------------------
-  # APPROVAZIONI (HITL)
+  # APPROVAZIONI (consenso del gestore)
   # ---------------------------------------------------------------------------
 
   /approvals:
@@ -875,12 +873,12 @@ paths:
         ultimi 7 giorni. **Nel PoC un'istanza ha al massimo una approvazione
         `pending` alla volta** (un interrupt per thread di appartamento):
         l'app mostra una coda, che può essere lunga uno.
-      x-youssouf: |
-        Mappa gli interrupt HITL di LangBrain (flusso "brain" e wrapper sui
-        nodi) in Approval. Una sola pending per istanza: una seconda richiesta
+      x-motore: |
+        Le richieste di consenso del motore (regole, assistente) diventano
+        Approval. Una sola pending per istanza: una seconda richiesta
         di approvazione mentre una è aperta va accodata nel motore e esposta
         quando la prima si chiude. `description` e `reason` in italiano, già pronti
-        per il gestore. `expires_at` dal timer HITL dell'appartamento;
+        per il gestore. `expires_at` dalla scadenza decisa dal motore;
         `expires_action` dice cosa succede alla scadenza.
       parameters:
         - name: status
@@ -907,7 +905,7 @@ paths:
                     created_at: '2026-10-14T13:05:00.000Z'
                     expires_at: '2026-10-14T13:35:00.000Z'
                     expires_action: reject
-                    source: brain
+                    source: rule
                     description: Spegnere la caldaia mentre l'appartamento risulta occupato
                     reason: La finestra della camera è aperta da 12 minuti e la caldaia è accesa a 21 °C
                     proposed_action:
@@ -925,7 +923,7 @@ paths:
       tags: [Approvazioni]
       operationId: decideApproval
       summary: Approva o respinge
-      x-youssouf: |
+      x-motore: |
         Riprendi il grafo con APPROVA/RESPINGI; mai OVERRIDE. Dopo la
         decisione emetti `decision.logged` con actor = X-Actor; se approvata,
         i comandi generati seguono il ciclo normale (`command.updated`).
@@ -970,10 +968,10 @@ paths:
       operationId: listDecisions
       summary: Log delle decisioni
       description: Chi ha deciso cosa, perché e con quale esito; ordinato dal più recente.
-      x-youssouf: |
-        Sorgente: il sistema nervoso di LangBrain. `actor` con prefisso:
-        `rule:<rule_id>`, `organ:<nome>`, `brain`, `user:<email>`, `assistant`,
-        `system`.
+      x-motore: |
+        Sorgente: il motore. `actor` con prefisso: `rule:<rule_id>`,
+        `user:<email>`, `assistant`, `system`. `organ:<nome>` e `brain` sono
+        riservati: validi nel formato, il motore DOMHOUSE non li usa.
         `reasoning` in italiano. Conserva almeno 90 giorni.
       parameters:
         - name: from
@@ -1057,8 +1055,8 @@ paths:
         18"). Asincrona: la risposta e le eventuali azioni proposte arrivano
         con `GET /ask/{ask_id}`. Se l'azione richiede approvazione, nasce un
         Approval e `needs_approval` ne porta l'identificatore.
-      x-youssouf: |
-        Passa dal Brain. Il modello propone, i Tool validano contro limiti e
+      x-motore: |
+        Passa dall'assistente del motore. Il modello propone, gli strumenti validano contro limiti e
         regole, nessuna esecuzione diretta: ogni azione eseguita è un comando
         normale (ciclo pending → acked) o un Approval. Rispondi entro 30 s;
         oltre, `status: failed` con `reason: timeout`.
@@ -1145,7 +1143,7 @@ paths:
         Italianway (o un iCal, o il simulatore di staging) in questo evento.
         Idempotente su `event_id`: un evento già elaborato risponde `200` con
         lo stesso esito, senza ricalcolare.
-      x-youssouf: |
+      x-motore: |
         Da ogni evento genera o ricalcola le voci di schedule (pre-arrivo,
         check-out, vuoto) secondo le regole `prearrival` e `checkout_eco`.
         Evento in ritardo (check-in già passato): applica subito. Emetti
@@ -1213,11 +1211,11 @@ paths:
         Il BFF apre una connessione per istanza e la rilancia alla PWA. Dopo
         una riconnessione l'app rilegge `GET /devices` e `GET /apartment`
         prima di applicare i nuovi eventi.
-      x-youssouf: |
+      x-motore: |
         Buffer circolare degli ultimi eventi (≥ 1 ora) per servire
         Last-Event-ID. `id` monotono per istanza, mai riusato dopo un riavvio
-        (salvalo). Un evento entro 1 s dal fatto. Nessun evento di LangBrain
-        "interno" (node_runs, ecc.): solo i sette tipi del contratto.
+        (salvalo). Un evento entro 1 s dal fatto. Nessun evento interno del
+        motore: solo i sette tipi del contratto.
       parameters:
         - name: Last-Event-ID
           in: header
@@ -1259,7 +1257,7 @@ paths:
       summary: Salute dell'istanza
       description: Senza chiave API. `503` se il connector Shelly è fermo o il database non risponde.
       security: []
-      x-youssouf: |
+      x-motore: |
         `connector.status` = `up` se il servizio che riceve le connessioni
         WebSocket degli Shelly è attivo; `connected_devices` quanti dispositivi
         hanno una connessione aperta; `model_provider.status` dall'ultima
@@ -1280,7 +1278,7 @@ paths:
               example:
                 status: ok
                 apartment_id: apt-rimini-01
-                implementation: { name: langbrain-domotica, version: 0.3.0 }
+                implementation: { name: domhouse-engine, version: 0.3.0 }
                 uptime_s: 86112
                 database: { status: ok }
                 connector: { status: up, connected_devices: 5, last_event_at: '2026-10-14T13:02:14.980Z' }
@@ -1297,7 +1295,7 @@ paths:
               example:
                 status: down
                 apartment_id: apt-rimini-01
-                implementation: { name: langbrain-domotica, version: 0.3.0 }
+                implementation: { name: domhouse-engine, version: 0.3.0 }
                 uptime_s: 12
                 database: { status: ok }
                 connector: { status: down, connected_devices: 0, last_event_at: null }
@@ -1317,10 +1315,10 @@ paths:
         offline), C05 e C11 (finestra aperta), C12 (azione che richiede
         approvazione) senza hardware. Non appartiene a nessuna feature e non è
         usato dall'app.
-      x-youssouf: |
+      x-motore: |
         Agisce direttamente sugli effettori simulati e sul loro stato
         `online`; `trigger: approval` deve far nascere un Approval reale
-        (es. simulando la condizione che il Brain valuta con HITL), non un
+        (es. simulando la condizione che il motore valuta con un consenso), non un
         Approval finto. Ogni cambio di stato emette gli eventi SSE normali
         (`device.state`, `device.online`), così i test vedono ciò che vedrebbe
         l'app.
@@ -1372,7 +1370,7 @@ paths:
         maggiore diverso dal proprio e nasconde le sezioni assenti da
         `features`. Un endpoint non in `features` risponde `501`.
       security: []
-      x-youssouf: |
+      x-motore: |
         `features` elenca solo ciò che passa i test di conformità. Valori
         ammessi: apartment, devices, commands, energy, schedule, rules,
         approvals, decisions, ask, bookings, stream.
@@ -1383,8 +1381,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Version' }
               example:
-                contract_version: 1.0.4
-                implementation: { name: langbrain-domotica, version: 0.3.0 }
+                contract_version: 1.0.5
+                implementation: { name: domhouse-engine, version: 0.3.0 }
                 features: [apartment, devices, commands, decisions, energy, rules, stream]
 
 # =============================================================================
@@ -1398,7 +1396,7 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
-      description: Chiave dell'istanza, letta dal BFF da Secret Manager (`langbrain-api-key-<apartment_id>`). Mai nella PWA.
+      description: Chiave dell'istanza, letta dal BFF da Secret Manager (segreto `<SECRET_MANAGER_PREFIX><apartment_id>`, prefisso nella configurazione del BFF). Mai nella PWA.
 
   parameters:
     XActor:
@@ -1797,7 +1795,7 @@ components:
           type: string
           enum: [reject, approve, wait]
           description: Cosa fa il motore alla scadenza senza risposta
-        source: { type: string, enum: [brain, organ, rule, assistant] }
+        source: { type: string, enum: [brain, organ, rule, assistant], description: "`brain` e `organ` riservati: il motore DOMHOUSE usa `rule` e `assistant`" }
         description: { type: string, description: "In italiano, una frase" }
         reason: { type: string, description: "In italiano, il perché" }
         proposed_action: { $ref: '#/components/schemas/ScheduledAction' }
@@ -1816,7 +1814,7 @@ components:
         ts: { type: string, format: date-time }
         actor:
           type: string
-          description: "`rule:<rule_id>` · `organ:<nome>` · `brain` · `user:<email>` (da X-Actor email) · `assistant` · `system` (da X-Actor `system:<nome>` o fatti interni)"
+          description: "`rule:<rule_id>` · `user:<email>` (da X-Actor email) · `assistant` · `system` (da X-Actor `system:<nome>` o fatti interni) · riservati, non usati dal motore DOMHOUSE: `organ:<nome>`, `brain`"
         target:
           type: object
           required: [type]
@@ -1987,7 +1985,7 @@ components:
       type: object
       required: [contract_version, implementation, features]
       properties:
-        contract_version: { type: string, example: 1.0.4 }
+        contract_version: { type: string, example: 1.0.5 }
         implementation: { $ref: '#/components/schemas/Implementation' }
         features:
           type: array
@@ -2041,7 +2039,7 @@ x-stream-events:
       when: Un comando cambia stato (ogni transizione, inclusa la finale)
       data: '#/components/schemas/EventCommandUpdated'
     decision.logged:
-      when: Il motore registra una decisione (regola, organo, Brain, gestore)
+      when: Il motore registra una decisione (regola, assistente, gestore, sistema)
       data: '#/components/schemas/Decision'
     approval.pending:
       when: Nasce una richiesta di approvazione; il BFF invia una notifica push
@@ -2100,7 +2098,7 @@ x-conformita:
       passi: POST /apartment/hold 5 minuti → GET /apartment.hold valorizzato; durante il hold una finestra aperta (via POST /_test/state) non spegne il clima; alla scadenza hold = null e la regola torna attiva.
     - id: C12
       nome: Approvazione
-      passi: Provocare un'azione che richiede HITL (POST /_test/state con trigger approval, in simulato) → approval.pending su /stream e voce in GET /approvals; POST decision approve → 200, Decision con actor = X-Actor, comandi generati arrivano a stato finale; seconda decisione → 409.
+      passi: Provocare un'azione che richiede il consenso del gestore (POST /_test/state con trigger approval, in simulato) → approval.pending su /stream e voce in GET /approvals; POST decision approve → 200, Decision con actor = X-Actor, comandi generati arrivano a stato finale; seconda decisione → 409.
     - id: C13
       nome: Funzione non implementata
       passi: "Per ogni feature della mappa x-features: se assente da GET /version.features, ogni suo endpoint → 501 not_implemented (anche con body non valido); se presente → mai 501."
@@ -2140,9 +2138,9 @@ x-informazioni-mancanti:
 
   - tema: Regione e modelli su Agent Platform
     a_chi: Massimiliano (verifica), poi comunicati a Youssouf
-    serve_per: Il provider agent_platform nel MAO.
+    serve_per: Il provider agent_platform dell'assistente (/ask).
     domande:
-      - In quale regione UE sono disponibili i modelli scelti (uno piccolo per gli Organi, uno grande per il Brain)?
+      - In quale regione UE sono disponibili i modelli scelti per l'assistente (/ask)?
       - Quote per minuto e budget mensile da impostare.
 
   - tema: Occupazione e presenza
