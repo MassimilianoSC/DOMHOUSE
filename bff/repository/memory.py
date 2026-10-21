@@ -17,6 +17,7 @@ class InMemoryRepository:
         self.audit_people: dict[str, AuditPerson] = {}
         self.mail_counts: dict[str, int] = {}
         self.ai_usage: dict[str, dict] = {}            # P-60 step 9: month -> the assistant's spending
+        self.summaries: dict[str, dict] = {}           # P-60 step 11: "<apartment>__<week>" -> summary
         self.support_access: dict[str, SupportAccess] = {}
         self.actor_refs: dict[str, str] = {}             # uid -> pseudonym
         self.actors: dict[str, ActorRecord] = {}         # pseudonym -> who
@@ -135,6 +136,18 @@ class InMemoryRepository:
         return self.audit_people.pop(ref, None) is not None
 
     # invitation email limits (P-49)
+    async def get_summary(self, apartment_id, week):
+        s = self.summaries.get(f"{apartment_id}__{week}")
+        return dict(s) if s else None
+
+    async def put_summary(self, summary):
+        self.summaries[f"{summary['apartment_id']}__{summary['week']}"] = dict(summary)
+        return summary
+
+    async def list_summaries(self, apartment_id, limit=20):
+        mine = [s for s in self.summaries.values() if s["apartment_id"] == apartment_id]
+        return [dict(s) for s in sorted(mine, key=lambda s: s["week"], reverse=True)[:limit]]
+
     async def get_ai_usage(self, month):
         return dict(self.ai_usage.get(month) or EMPTY_AI_USAGE)
 

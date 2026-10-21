@@ -36,6 +36,8 @@ class NotificationPrefs(BaseModel):
     # D-123 «Prenotazioni»: bookings that change the apartment's schedule (today: cancelled after the prearrival). On by
     # default, also for preferences saved before it existed: a stored record without the key reads True.
     bookings: bool = True
+    # P-60 step 11 (D-150) «Riepilogo»: the weekly summary, pushed only when it has something to say; on by default
+    summary: bool = True
 
 
 class User(BaseModel):
@@ -292,6 +294,11 @@ class Repository(Protocol):
     # P-60 step 9 (D-132, D-143): the assistant's spending of a month (UTC, "YYYY-MM") for the whole project:
     # {cost_eur, calls, input_tokens, output_tokens, alerted}; add is atomic and returns the totals after it;
     # mark_ai_alert is True only for the first caller of the month (the 80 % email goes once)
+    # P-60 step 11 (D-150): the weekly summaries, plain dicts (bff/weekly_summary.py), 12 months
+    async def get_summary(self, apartment_id: str, week: str) -> dict | None: ...
+    async def put_summary(self, summary: dict) -> dict: ...
+    async def list_summaries(self, apartment_id: str, limit: int = 20) -> list[dict]: ...
+
     async def get_ai_usage(self, month: str) -> dict: ...
     async def add_ai_usage(self, month: str, cost_eur: float, input_tokens: int, output_tokens: int) -> dict: ...
     async def mark_ai_alert(self, month: str) -> bool: ...

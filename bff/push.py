@@ -14,7 +14,8 @@ from .repository import Apartment, get_repository
 from .sse_hub import SseEvent, envelope, hub_manager
 
 BODY_MAX = 200
-TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400, "booking": 86400}
+TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400, "booking": 86400,
+               "summary": 7 * 86400}   # P-60 step 11: the weekly summary stays a week
 
 _offline_timers: dict[tuple[str, str], asyncio.Task] = {}
 _health_down: set[str] = set()
@@ -32,7 +33,8 @@ def build_push(kind: str, apt: Apartment, title: str, body: str, link: str, tag:
     data.update({k: str(v) for k, v in ids.items() if v})
     if ts:
         data["ts"] = ts
-    return data, {"Urgency": "high", "TTL": str(TTL_SECONDS[kind])}
+    # the weekly summary is news, not an alarm: "normal" lets a phone in battery saving deliver it later
+    return data, {"Urgency": "normal" if kind == "summary" else "high", "TTL": str(TTL_SECONDS[kind])}
 
 
 def approval_push(apt: Apartment, approval_id: str, description: str | None, ts: str | None):

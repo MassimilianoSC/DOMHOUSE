@@ -52,6 +52,7 @@ class Settings:
     ai_demos: bool = False                    # the demonstration apartments with the real model (AI_DEMOS=true)
     # P-67 (D-136): the Firestore database of this environment, "(default)" in production, "staging" in staging
     firestore_database: str = "(default)"
+    summary_job: bool = True                  # P-60 step 11: the weekly summary's hourly round (off in the test runs)
 
     @property
     def mail_configured(self) -> bool:
@@ -104,4 +105,5 @@ def get_settings() -> Settings:
         ai_timeout_s=float(e("AI_TIMEOUT_S", "25")),
         ai_demos=_bool("AI_DEMOS"),
         firestore_database=e("FIRESTORE_DATABASE", "(default)").strip() or "(default)",
+        summary_job=_bool("SUMMARY_JOB", "true"),
     )

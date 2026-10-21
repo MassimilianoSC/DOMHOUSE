@@ -48,6 +48,8 @@ def create_app() -> FastAPI:
     async def lifespan(_app: FastAPI):
         await webhooks.report_demo_codes()   # D-99 F1: a demonstration apartment with an Italianway code, in production
         await push.start_background_hubs()
+        from . import summary_job
+        summary_job.start()                   # P-60 step 11: the weekly summary's hourly round
         yield
         await hub_manager.stop_all()
 

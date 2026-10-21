@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 
 FIELD = "expire_at"
 BOOKING_MONTHS = 12        # after the check-out (D-94)
+SUMMARY_MONTHS = 12        # the weekly summaries (D-150)
 AUDIT_MONTHS = 24          # the administrative log
 SUPPORT_MONTHS = 24        # closed support accesses: from the end of the window (at most 24 h after opening)
 WEBHOOK_DAYS = 90          # received Italianway calls, besides the 100 per organisation
@@ -62,6 +63,11 @@ def person(_doc: dict | None = None) -> datetime:
     return add_months(now(), PEOPLE_MONTHS)
 
 
+def summary(doc: dict) -> datetime:
+    """P-60 step 11 (D-150): a weekly summary is kept 12 months after it was made."""
+    return add_months(parse(doc["generated_at"]), SUMMARY_MONTHS)
+
+
 def pseudonym(_doc: dict | None = None) -> datetime:
     return add_months(now(), ACTOR_MONTHS)
 
@@ -77,4 +83,5 @@ COLLECTIONS = {
     "audit_people": person,
     "actors": pseudonym,
     "actor_refs": pseudonym,
+    "summaries": summary,
 }

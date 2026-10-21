@@ -207,6 +207,29 @@ class FirestoreRepository:
         async with self._lock("mail_limits"):
             return await txn(self.db.transaction())
 
+    # the weekly summaries (P-60 step 11): summaries/{apartment}__{week}, expire 12 months after they are made
+    async def get_summary(self, apartment_id, week):
+        snap = await self._col("summaries").document(f"{apartment_id}__{week}").get()
+        if not snap.exists:
+            return None
+        data = snap.to_dict()
+        data.pop(retention.FIELD, None)
+        return data
+
+    async def put_summary(self, summary):
+        await self._col("summaries").document(f"{summary['apartment_id']}__{summary['week']}").set(
+            {**summary, retention.FIELD: retention.summary(summary)})
+        return summary
+
+    async def list_summaries(self, apartment_id, limit=20):
+        out = []
+        q = self._col("summaries").where(filter=firestore.FieldFilter("apartment_id", "==", apartment_id))
+        async for snap in q.stream():
+            data = snap.to_dict()
+            data.pop(retention.FIELD, None)
+            out.append(data)
+        return sorted(out, key=lambda s: s["week"], reverse=True)[:limit]
+
     # the assistant's spending (P-60 step 9): ai_usage/{YYYY-MM}, raised in a transaction
     async def get_ai_usage(self, month):
         snap = await self._col("ai_usage").document(month).get()

@@ -47,7 +47,7 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "tests/invite_limits_test.py", "tests/support_access_test.py",
                 "tests/actors_test.py", "tests/erasure_test.py", "tests/fields_by_role_test.py",
                 "tests/lot9_review_test.py", "tests/energy_export_test.py",
-                "tests/simulated_apartments_test.py", "tests/cloudrun_manifests_test.py", "tests/engine_vm_settings_test.py", "tests/deploy_engine_test.py", "tests/ai_gateway_test.py", "tests/environments_test.py", "tests/deploy_targets_test.py", "tests/list_demos_test.py", "tests/engine_alerts_test.py", "tests/weekly_summary_test.py",
+                "tests/simulated_apartments_test.py", "tests/cloudrun_manifests_test.py", "tests/engine_vm_settings_test.py", "tests/deploy_engine_test.py", "tests/ai_gateway_test.py", "tests/environments_test.py", "tests/deploy_targets_test.py", "tests/list_demos_test.py", "tests/engine_alerts_test.py", "tests/weekly_summary_test.py", "tests/summary_job_test.py",
                 "engine/connector/tests/test_interface.py",
                 "engine/tests/test_service.py", "engine/tests/test_store.py",
                 "engine/tests/test_restart.py", "engine/tests/test_approvals.py",
@@ -104,6 +104,7 @@ BFF_ENV = {
     "SMTP_USER": "",  # invitations are only recorded: no email leaves the machine
     "SMTP_PASSWORD": "",
     "APP_PUBLIC_URL": "http://localhost:5173",
+    "SUMMARY_JOB": "false",  # the weekly summary's hourly round is tried by tests/summary_job_test.py, not here
 }
 
 

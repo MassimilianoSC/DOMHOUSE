@@ -71,6 +71,8 @@ per utente»).
 | 33 | `DELETE /app/admin/support-access/{id}` | `close_support_access` | ADMIN | 204 («Chiudi accesso»; 204 anche se era già chiuso o scaduto); 404 se l'accesso è di un'altra organizzazione | «Chiudi accesso» | – |
 | 34 | `GET /app/apartments/{id}/energy/export?month=AAAA-MM` oppure `?booking_id=…` | `energy_export` (`routes/apartments.py` → `bff/energy_report.py`) | USER, sugli appartamenti che vede (404 fuori lista) | il file `.xlsx` (vedi «Rendiconto dei consumi»); 422 `bad_request` (né o entrambi i parametri), `invalid_month`, `invalid_period`; 404 soggiorno inesistente o annullato; 409 `apartment_disabled`; 501 `not_implemented`; 502 `instance_unreachable` | pulsanti di esportazione (o2) | – |
 | 35 | `POST /app/apartments/{id}/simulator/reset` | `simulator_reset` | USER + controllo interno: admin e appartamento `simulated` (403 `forbidden` / `not_simulated`) | 204; 409 `reset_not_available` se l'appartamento è segnato simulato ma non usa il motore integrato `mock://builtin`; vedi «Appartamenti dimostrativi» | pulsante di ripristino (o2) | – |
+| 36 | `GET /app/apartments/{id}/summaries` | `list_summaries` (`routes/apartments.py`) | USER, sugli appartamenti che vede (404 fuori lista) | `[{week, from, to, notable, items}]` dal più recente, al massimo 20; `items` è il numero di voci (vedi «Riepilogo settimanale») | elenco dei riepiloghi (o2) | tutti |
+| 37 | `GET /app/apartments/{id}/summaries/{week}` | `get_summary` | USER, sugli appartamenti che vede (404 fuori lista) | il riepilogo intero (vedi «Riepilogo settimanale»); 404 `not_found` «Riepilogo inesistente» | pagina del riepilogo, link del push (o2) | tutti |
 
 ## Piattaforma (P-36, D-61a / D-62 / D-64 / D-65)
 
@@ -326,6 +328,7 @@ scheduler. Regole in `bff/retention.py`:
 | `mail_limits` | 3 giorni dall'ultimo aggiornamento |
 | `audit_people` | 24 mesi dall'ultima voce che cita la persona |
 | `actors`, `actor_refs` | 24 mesi dall'ultimo uso (rinnovo al più settimanale) |
+| `summaries` | 12 mesi da quando il riepilogo settimanale è stato fatto (D-150) |
 
 Utenti, organizzazioni, appartamenti, gestori e indici di unicità non scadono. Per i documenti salvati prima del lotto
 11: `scripts/backfill_expire_at.py` (senza opzioni legge e conta, con `--apply` scrive solo dove manca). I consumi li
@@ -377,22 +380,23 @@ La notifica la mostra il service worker della PWA, che ignora le chiavi in più.
 
 | Chiave di `data` (tutte stringhe) | Quando | Valore |
 |---|---|---|
-| `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: istanza non raggiungibile» / «…: prenotazione annullata, appartamento rimesso a vuoto» |
+| `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: istanza non raggiungibile» / «…: prenotazione annullata, appartamento rimesso a vuoto» / «…: riepilogo della settimana» |
 | `body` | sempre | testo breve, tagliato a 200 caratteri con «…» |
-| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking) |
-| `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>`, `booking:<decision_id>` |
-| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` |
+| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking), `/a/<apartment_id>/riepiloghi/<week>` (summary) |
+| `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>`, `booking:<decision_id>`, `summary:<apartment_id>:<week>` |
+| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` \| `summary` |
 | `apartment_id` | sempre | |
 | `approval_id` | solo `approval` | |
 | `device_id` | solo `device_offline` | |
 | `ts` | se l'evento del motore lo porta | `ts` dell'evento, ISO 8601 UTC |
 
-`webpush.headers`: `Urgency: high`; `TTL` (secondi, stringa) `3600` per `approval`, `86400` per `device_offline`,
-`instance_down` e `booking`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
+`webpush.headers`: `Urgency: high` (`normal` per `summary`, che non è un allarme); `TTL` (secondi, stringa) `3600` per
+`approval`, `86400` per `device_offline`, `instance_down` e `booking`, `604800` (una settimana) per `summary`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
 
 Preferenze: `approval` ← `notification_prefs.approvals`; `device_offline` e `instance_down` ← `notification_prefs.offline`;
 `booking` ← `notification_prefs.bookings` («Prenotazioni», D-123, attiva di default anche per chi aveva già salvato le
-preferenze). `booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
+preferenze); `summary` ← `notification_prefs.summary` («Riepilogo», D-150, attiva di default allo stesso modo).
+`booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
 annullata dopo il pre-arrivo, con l'appartamento rimesso a vuoto dal motore (D-121); il `body` è il testo della decisione.
 `device_offline` parte se il dispositivo è ancora offline dopo i minuti della regola `offline_alert` (15 se non
 leggibile); `instance_down` (evento `instance.health` con `status` `down`: istanza irraggiungibile o connector del
@@ -467,6 +471,55 @@ c. **Campi inviati ma non letti, da valutare** (misura del 16 ottobre 2026; togl
    - `verify`: `reachable`;
    - `WebhookLog`: `source`, `tenant_id`;
    - il parametro `booking_id` di `list_bookings` non è usato dalla PWA.
+
+## Riepilogo settimanale (P-60 passo 11, D-150)
+
+Ogni lunedì alle 08:00 (ora dell'appartamento) è pronto il riepilogo della settimana appena finita, da lunedì a
+domenica. Lo fa il BFF con un giro ogni ora (`bff/summary_job.py`, il primo 5 minuti dopo l'avvio): per ogni
+appartamento attivo, se il riepilogo manca lo calcola (`bff/weekly_summary.py`), lo salva in `summaries/{apartment_id}__{week}`
+(12 mesi) e, solo se ha qualcosa da dire (`notable`), manda il push `summary` agli utenti che vedono l'appartamento e
+hanno la preferenza «Riepilogo». Un motore che non risponde non fa perdere niente: il giro dopo riprova. I dati arrivano
+dal contratto (`/energy` un giorno alla volta per 35 giorni, `/decisions`, `/approvals`, `/devices`) e dalle prenotazioni
+che il BFF conserva. `SUMMARY_JOB=false` spegne il giro (le prove automatiche).
+
+Esempio di `GET /app/apartments/apt-bologna-01/summaries/2026-W42`:
+
+```json
+{
+  "apartment_id": "apt-bologna-01", "week": "2026-W42",
+  "from": "2026-10-11T22:00:00.000Z", "to": "2026-10-18T22:00:00.000Z", "generated_at": "2026-10-19T06:05:00.000Z",
+  "energy": {
+    "available": true,
+    "occupied": {"nights": 3, "kwh_per_night": 16.0, "median_before": 10.0, "status": "anomalous"},
+    "vacant": {"nights": 4, "kwh_per_night": 2.0, "median_before": 2.0, "status": "normal"},
+    "devices": [{"device_id": "m1", "label": "Misuratore clima",
+                 "occupied": {"nights": 3, "kwh_per_night": 8.0, "median_before": 5.0, "status": "anomalous"},
+                 "vacant": {"nights": 4, "kwh_per_night": 1.0, "median_before": 1.0, "status": "normal"}}]
+  },
+  "offline": {"now": [{"device_id": "d1", "label": "Presa camera", "last_seen": "2026-10-18T01:00:00.000Z"}],
+              "episodes": [{"device_id": "d1", "label": "Presa camera", "times": 1}]},
+  "approvals_expired": [{"approval_id": "apr-1", "description": "Spegnere la caldaia", "created_at": "2026-10-14T10:00:00.000Z"}],
+  "windows": [{"window": "Finestra camera", "times": 3}],
+  "items": ["Consumi alti per notte con ospiti: 16 kWh contro una mediana di 10 kWh nelle 4 settimane prima.",
+            "Misuratore clima: consumi alti per notte con ospiti, 8 kWh contro 5 kWh.",
+            "Presa camera è offline da più di 24 ore.",
+            "Approvazione scaduta senza risposta: Spegnere la caldaia.",
+            "Finestra camera aperta 3 volte con il clima spento dalla regola."],
+  "notable": true
+}
+```
+
+- `energy`: notti con ospiti (`occupied`) e senza (`vacant`) confrontate a parità di occupazione con la mediana delle
+  stesse notti nelle 4 settimane prima, in totale e per dispositivo. Una notte è il giorno locale della sera: occupata
+  se una prenotazione non annullata ha giorno di check-in ≤ giorno < giorno di check-out. `status`: `normal`,
+  `anomalous` (almeno +30 % sulla mediana E almeno +5 kWh in più nella settimana), `not_comparable` (nessuna notte di
+  quel tipo prima: «confronto non disponibile», mai un allarme), `no_nights` (nessuna notte di quel tipo nella
+  settimana, `kwh_per_night` null). Prima di 5 settimane di consumi veri (vedi «Consumi disponibili dal»):
+  `{"available": false, "since": …, "reason": "dati insufficienti: servono 5 settimane di consumi veri, disponibili dal 01/10/2026"}`.
+- `offline.now`: dispositivi offline da più di 24 ore adesso; `offline.episodes`: avvisi offline della settimana.
+- `approvals_expired`: approvazioni create nella settimana e scadute senza risposta.
+- `windows`: finestre che hanno spento il clima almeno 3 volte nella settimana.
+- `items`: le frasi da mostrare, già scritte (vuoto = settimana senza novità); `notable` = `items` non vuoto.
 
 ## Passaggio verso il modello (P-60 passo 9, D-132, D-143, D-144)
 

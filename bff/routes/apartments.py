@@ -229,6 +229,22 @@ async def _event(ev: SseEvent, tenant_id: str) -> str:
 MONTH_RE = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])$")
 
 
+@router.get("/apartments/{apartment_id}/summaries")
+async def list_summaries(apartment_id: str, user: CurrentUser = Depends(resolve_user)):
+    """P-60 step 11 (D-150): the weekly summaries of an apartment, newest first (at most 20): week, period, how many
+    items. Every role, on the apartments it sees."""
+    apt = await get_tenant_apartment(user, apartment_id)
+    return [{"week": s["week"], "from": s["from"], "to": s["to"], "notable": s["notable"], "items": len(s["items"])}
+            for s in await get_repository().list_summaries(apt.apartment_id)]
+
+
+@router.get("/apartments/{apartment_id}/summaries/{week}")
+async def get_summary(apartment_id: str, week: str, user: CurrentUser = Depends(resolve_user)):
+    apt = await get_tenant_apartment(user, apartment_id)
+    summary = await get_repository().get_summary(apt.apartment_id, week)
+    return summary if summary else err(404, "not_found", "Riepilogo inesistente")
+
+
 @router.get("/apartments/{apartment_id}/energy/export")
 async def energy_export(apartment_id: str, month: str | None = None, booking_id: str | None = None,
                         user: CurrentUser = Depends(resolve_user)):

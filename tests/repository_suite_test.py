@@ -507,3 +507,22 @@ def test_backfill_counts_then_writes_only_where_missing(repo):
     assert _expire(repo._col("bookings").document("a__b")) == datetime(2027, 1, 31, 10, tzinfo=UTC)
     assert _expire(repo._col("webhook_logs").document("w-new")) == kept                       # an existing one stays
     assert sum(v[0] for v in run(bf.backfill(repo, apply=False)).values()) == 0              # idempotent
+
+
+def test_weekly_summaries(repo):
+    """P-60 step 11 (D-150): one summary per apartment and week, newest first; on Firestore it expires 12 months after
+    it was made and the expiry never comes back to the caller."""
+    def summary(apt, week, made):
+        return {"apartment_id": apt, "week": week, "from": "x", "to": "y", "generated_at": made, "items": [], "notable": False}
+    assert run(repo.get_summary("a1", "2026-W42")) is None and run(repo.list_summaries("a1")) == []
+    run(repo.put_summary(summary("a1", "2026-W41", "2026-10-12T06:00:00.000Z")))
+    run(repo.put_summary(summary("a1", "2026-W42", "2026-10-19T06:00:00.000Z")))
+    run(repo.put_summary(summary("a2", "2026-W42", "2026-10-19T06:00:00.000Z")))
+    assert run(repo.get_summary("a1", "2026-W42")) == summary("a1", "2026-W42", "2026-10-19T06:00:00.000Z")
+    assert [s["week"] for s in run(repo.list_summaries("a1"))] == ["2026-W42", "2026-W41"]
+    assert [s["week"] for s in run(repo.list_summaries("a1", limit=1))] == ["2026-W42"]
+    assert "expire_at" not in run(repo.list_summaries("a2"))[0]
+    from bff.repository.firestore import FirestoreRepository
+    if isinstance(repo, FirestoreRepository):
+        from datetime import UTC, datetime
+        assert _expire(repo._col("summaries").document("a1__2026-W42")) == datetime(2027, 10, 19, 6, 0, tzinfo=UTC)
