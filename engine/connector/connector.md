@@ -1,6 +1,6 @@
 # Il connector dei dispositivi — specifica per il motore DOMHOUSE
 
-*21 ottobre 2026, approvata da Massimiliano (revisione: solo il numero di versione del contratto, 1.0.5). Nel repository: `engine/connector/connector.md`. Dove si legge
+*21 ottobre 2026, approvata da Massimiliano (revisione: numero di versione del contratto 1.0.5; `heating.on` del dispositivo = relè, verso l'app = riscaldamento abilitato, §2.3 e §2.4). Nel repository: `engine/connector/connector.md`. Dove si legge
 «decide il catalogo» o «da concordare», non è una decisione già presa.*
 
 ## 0. In breve
@@ -166,7 +166,7 @@ campo del contratto**: è il dato grezzo che passi al motore, da cui il motore c
 | `switch` (`CapSwitch`) | dispositivo: `on` |
 | `power_meter` (`CapPowerMeter`) | dispositivo: `watts`, `energy_total_wh` (il contatore cumulativo grezzo; se riparte da zero dopo un riavvio, il motore lo riconosce dal calo) · motore: `kwh_today` (dalla mezzanotte LOCALE dell'appartamento) e i consumi orari che l'app mostra |
 | `climate` (`CapClimate`, split a infrarossi) | catalogo: `setpoint_min`, `setpoint_max`, `confirmation` (`power` \| `device` \| `none`) · motore: `on`, `mode`, `setpoint`, `fan` (l'ultimo stato richiesto: l'infrarosso non ha ritorno) · dispositivo: niente, salvo conferma vera (`confirmation: device`). Con `confirmation: power` il misuratore è quello indicato da `links.confirmation_device_id` (§2.2), non il `power_meter` dello stesso dispositivo (lo split a infrarossi di solito non ne ha uno) |
-| `heating` (`CapHeating`, caldaia con contatto del termostato oggi; pompa di calore Modbus domani) | dispositivo: `on` (il relè) · catalogo: `setpoint_min`, `setpoint_max` · motore: `setpoint` e la regolazione, con la temperatura del dispositivo indicato da `links.sensor_device_id` (§2.2) |
+| `heating` (`CapHeating`, caldaia con contatto del termostato oggi; pompa di calore Modbus domani) | dispositivo: `on` = **lo stato del relè** (acceso/spento in questo momento) · catalogo: `setpoint_min`, `setpoint_max` · motore: `setpoint` e la regolazione (termostato), con la temperatura del dispositivo indicato da `links.sensor_device_id` (§2.2). **Verso l'app il motore espone `on` = riscaldamento abilitato** (l'intenzione del gestore o della modalità), non il relè: il relè resta interno al motore, che lo comanda intorno al setpoint e lo rende visibile dai consumi e dalle decisioni |
 | `temperature` (`CapTemperature`) | dispositivo: `celsius` |
 | `humidity` (`CapHumidity`) | dispositivo: `percent` |
 | `contact` (`CapContact`) | dispositivo: `open` · motore: `since` |
@@ -182,7 +182,7 @@ Nel contratto l'app manda un comando con un'azione (`turn_on`, `turn_off`, `set_
 parametri parziali (`on`, `mode`, `setpoint`, `fan`). Il motore lo valida, applica regole e limiti, e ti passa
 sempre lo **stato completo da raggiungere**:
 - `switch`: `{"on": true|false}`
-- `heating`: `{"on": true|false}`. Il setpoint non ti arriva mai: la regolazione è del motore.
+- `heating`: `{"on": true|false}` è lo stato che il **relè** deve raggiungere, deciso dal termostato del motore (non l'interruttore «riscaldamento abilitato» dell'app: quello resta nel motore). Il setpoint non ti arriva mai: la regolazione è del motore.
 - `climate`: `{"on", "mode", "setpoint", "fan"}` tutti presenti (il motore completa quelli mancanti con lo stato
   attuale); con `on=false` gli altri campi sono indicativi.
 
