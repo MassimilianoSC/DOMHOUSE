@@ -181,3 +181,34 @@ def test_the_new_settings():
     for name, bad in (("CHECKOUT_PRESENCE_MINUTES", "200"), ("EMPTY_POWER_WATTS", "10"), ("EMPTY_POWER_MINUTES", "1")):
         with pytest.raises(ConfigError, match=name):
             load_config({**base, name: bad})
+
+
+# -------- D-140: «Simula movimento» (POST /_test/state, capability motion) --------
+def test_a_simulated_movement_is_recorded_and_gives_f1_as_in_the_checklist(monkeypatch):
+    """The checklist's recipe: «Risparmio al check-out» at 3 minutes, a booking whose check-out comes in 2 minutes,
+    «Simula movimento» on the sensor once the check-out has passed, the request when the 3 minutes are over. (At 0
+    minutes the switch to "empty" runs right at the check-out, before anyone can simulate a movement.)"""
+    clock = {"now": core.utcnow()}
+    monkeypatch.setattr(core, "utcnow", lambda: clock["now"])
+    from engine.connector import simulated
+    monkeypatch.setattr(simulated, "utcnow", lambda: clock["now"])           # one clock for engine and connector
+    conn = SimulatedConnector()
+    e = core.ApartmentEngine("apt-prova-01", conn, seed=False)
+    e.mode = "comfort"
+    e.update_rules({"rules": [{"rule_id": "checkout_eco", "params": {"minutes_after": 3}}]}, ACTOR, CORR)
+    start = clock["now"]
+    e.ingest_booking({"event_id": "evt-d140", "type": "booking_created", "booking_id": "bk-d140",
+                      "checkin_at": core.iso(start - timedelta(days=1)), "checkout_at": core.iso(start + timedelta(minutes=2)),
+                      "source": "simulator", "ts": core.iso(start)}, CORR)
+    clock["now"] = start + timedelta(minutes=2, seconds=30)          # the check-out has passed
+    ticks(e, n=1)
+    assert e.pending_approval() is None and e.mode == "comfort"     # the 3 minutes are not over yet
+    e.test_state({"device_id": SENSOR, "capability": "motion", "state": {"detected": True}}, ACTOR, CORR)
+    motion = e.devices[SENSOR]["capabilities"]["motion"]
+    assert motion["detected"] is True
+    assert conn._devices[SENSOR].capabilities["motion"]["last_seen"] == motion["last_seen"]   # the same instant
+    clock["now"] = start + timedelta(minutes=5, seconds=1)          # check-out + 3 minutes
+    ticks(e, n=1)
+    a = e.pending_approval()
+    assert a and a["description"] == "Mettere l'appartamento a vuoto dopo il check-out"
+    assert a["reason"].startswith("Movimento rilevato ") and "«Sensore soggiorno»" in a["reason"] and e.mode == "comfort"

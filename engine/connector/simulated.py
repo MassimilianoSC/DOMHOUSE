@@ -270,6 +270,8 @@ class SimulatedConnector:
         current.update(state)
         if capability == "contact" and current.get("open") != was_open:
             current["since"] = iso(now)
+        if capability == "motion" and current.get("detected") and "last_seen" not in state:
+            current["last_seen"] = iso(now)            # D-140: when it saw someone, as a real sensor reports
         device.last_seen = iso(now)
         change = StateChange(device_id, "state", now, capability=capability, state=device.reported(capability))
         self._push(change, notify)

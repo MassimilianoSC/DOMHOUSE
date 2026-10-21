@@ -1326,6 +1326,8 @@ class ApartmentEngine:
             state.update(body["state"])
             if cap == "contact" and state.get("open") != was_open:
                 state["since"] = iso(seen)
+            if cap == "motion" and state.get("detected") and "last_seen" not in body["state"]:
+                state["last_seen"] = iso(seen)          # D-140: a simulated movement is recorded as a real sensor's
             device["last_seen"] = iso(seen)
             self._save_device(device)
             self.emit("device.state", {"device_id": device_id, "capability": cap, "state": state}, correlation_id)
