@@ -203,6 +203,7 @@
 <li><a href="#approvazioni-a8023e2e">Approvazioni</a></li>
 <li><a href="#decisioni-58902ea6">Decisioni</a></li>
 <li><a href="#consumi-c49f62dc">Consumi</a></li>
+<li><a href="#riepiloghi-22a9ddd1">Riepiloghi</a></li>
 <li><a href="#programmazione-52b21ee8">Programmazione</a></li>
 <li><a href="#regole-2a4a6478">Regole</a></li>
 <li><a href="#assistente-6b623668">Assistente</a></li>
@@ -335,6 +336,20 @@ le ore prima di quella data restano vuote.</p>
 <li>
 <p><strong>Simulatore</strong>: nei dimostrativi c&#x27;è il «Misuratore clima» separato dal climatizzatore, e la sezione «Movimento» con il
 pulsante «Simula movimento».</p>
+</li>
+<li>
+<p><strong>Riepilogo settimanale</strong>: ogni lunedì mattina l&#x27;app prepara per ogni appartamento il riepilogo della settimana appena
+finita: consumi confrontati con le settimane prima, dispositivi spenti da più di un giorno, approvazioni scadute senza
+risposta, finestre aperte spesso con il clima acceso. Se c&#x27;è qualcosa da segnalare arriva l&#x27;avviso «Riepilogo»
+(pagina «Riepiloghi» dell&#x27;appartamento).</p>
+</li>
+<li>
+<p><strong>Assistente vero</strong> (dopo la pubblicazione): risponde leggendo stati, consumi e Decisioni e agisce con le stesse regole
+di un operatore (sezione 5, Assistente).</p>
+</li>
+<li>
+<p><strong>Ambiente di prova</strong> (dopo la separazione degli ambienti): i dimostrativi passano nel sito di prova, con la fascia
+gialla in alto; il sito vero resta per gli appartamenti veri (sezione 7).</p>
 </li>
 </ul>
 <hr>
@@ -636,6 +651,33 @@ file dice «prezzo non impostato» e riporta solo i kWh. In testa c&#x27;è «Co
 precedenti restano vuote, non a zero; se tutto il periodo cade prima di quella data il file lo dice e i totali
 restano vuoti; senza nessun dato misurato compare «Nessun consumo misurato finora». Se il file non si può preparare (funzione non attiva, sistema
 domotico non raggiungibile, soggiorno non ancora iniziato), compare il motivo.</p>
+<h3 id="riepiloghi-22a9ddd1">Riepiloghi</h3>
+<p>Ogni lunedì dalle 8 del mattino (ora dell&#x27;appartamento) trovi il riepilogo della settimana appena finita, da lunedì a
+domenica: voce «Riepiloghi» nel menu dell&#x27;appartamento, elenco delle settimane dalla più recente («Settimana dal … al …»
+con «N segnalazioni» oppure «Nessuna novità»); finché non c&#x27;è nessun riepilogo compare «Nessun riepilogo ancora: il
+primo arriva il lunedì dopo una settimana completa». I riepiloghi restano consultabili per 12 mesi. Ogni riepilogo dice,
+con frasi già pronte:</p>
+<ul>
+<li>
+<p>se i consumi sono stati alti. Le notti con ospiti si confrontano con le notti con ospiti delle 4 settimane prima, quelle
+senza ospiti con quelle senza ospiti, sia in totale sia per ogni misuratore (riquadro «Consumi a parità di occupazione»,
+con gli stati «Nella norma», «Alto», «Confronto non disponibile», «Nessuna notte»). «Alto» vuol dire almeno il 30 % sopra
+il valore tipico delle settimane prima e almeno 5 kWh in più nella settimana, così una piccola differenza non fa scattare
+l&#x27;avviso. Se nelle settimane prima non c&#x27;erano notti di quel tipo il riepilogo scrive «confronto non disponibile», mai un
+allarme. Nelle prime 5 settimane dopo che l&#x27;appartamento ha iniziato a misurare i consumi veri scrive «dati
+insufficienti» con la data da cui i consumi sono disponibili;</p>
+</li>
+<li>
+<p>quali dispositivi sono spenti o non rispondono da più di 24 ore;</p>
+</li>
+<li>
+<p>quali approvazioni sono scadute senza che nessuno rispondesse;</p>
+</li>
+<li>
+<p>quali finestre sono rimaste aperte almeno 3 volte con il clima spento dalla regola.</p>
+</li>
+</ul>
+<p>Una settimana senza niente da segnalare ha il riepilogo «Settimana senza novità» e non manda avvisi.</p>
 <h3 id="programmazione-52b21ee8">Programmazione</h3>
 <p>Azioni programmate («In programma») e storico degli ultimi 7 giorni. «Nuova azione» per programmare un cambio di
 modalità o un comando a un dispositivo a un orario (ora dell&#x27;appartamento). «Sposta» per cambiare orario, «Annulla
@@ -940,7 +982,8 @@ amministratori; per far cancellare nome ed email prima, elimina tu stesso l&#x27
 <li>
 <p><strong>Notifiche:</strong> quali avvisi ricevere, per categoria: «Approvazioni richieste», «Dispositivi e istanza offline» e
 «Prenotazioni» (avvisi sulle prenotazioni che cambiano il programma dell&#x27;appartamento, per esempio una disdetta dopo
-che l&#x27;appartamento è stato preparato per l&#x27;arrivo), tutte attive dall&#x27;inizio; «Decisioni del motore» (riepilogo delle
+che l&#x27;appartamento è stato preparato per l&#x27;arrivo) e «Riepilogo» (il riepilogo settimanale, ogni lunedì, solo se la
+settimana ha qualcosa da segnalare), tutte attive dall&#x27;inizio; «Decisioni del motore» (riepilogo delle
 azioni automatiche, solo in app) è spenta finché non la attivi. Le notifiche sul telefono sono attive anche
 nell&#x27;ambiente di prova (vedi sotto). Se in un ambiente non lo fossero, la scheda direbbe «Notifiche sul telefono non
 attive in questo ambiente»: gli avvisi (nuove approvazioni, dispositivi offline, istanza non raggiungibile,
@@ -1010,6 +1053,7 @@ Le conversazioni con l&#x27;Assistente si cancellano quando esci.</p>
 <tbody>
 <tr><td class="align-left">Prenotazioni e presenze degli ospiti</td><td class="align-left">12 mesi dopo il check-out</td></tr>
 <tr><td class="align-left">Consumi</td><td class="align-left">24 mesi (li conserva il sistema domotico dell&#x27;appartamento)</td></tr>
+<tr><td class="align-left">Riepiloghi settimanali</td><td class="align-left">12 mesi</td></tr>
 <tr><td class="align-left">Registro attività e storico degli accessi di assistenza</td><td class="align-left">24 mesi</td></tr>
 <tr><td class="align-left">Prenotazioni ricevute da Italianway (senza dati personali degli ospiti)</td><td class="align-left">90 giorni, e al massimo le ultime 100</td></tr>
 </tbody></table></div>

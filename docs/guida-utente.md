@@ -71,6 +71,14 @@ un sistema che non è il suo, né ricevere le prenotazioni di una struttura altr
   le ore prima di quella data restano vuote.
 - **Simulatore**: nei dimostrativi c'è il «Misuratore clima» separato dal climatizzatore, e la sezione «Movimento» con il
   pulsante «Simula movimento».
+- **Riepilogo settimanale**: ogni lunedì mattina l'app prepara per ogni appartamento il riepilogo della settimana appena
+  finita: consumi confrontati con le settimane prima, dispositivi spenti da più di un giorno, approvazioni scadute senza
+  risposta, finestre aperte spesso con il clima acceso. Se c'è qualcosa da segnalare arriva l'avviso «Riepilogo»
+  (pagina «Riepiloghi» dell'appartamento).
+- **Assistente vero** (dopo la pubblicazione): risponde leggendo stati, consumi e Decisioni e agisce con le stesse regole
+  di un operatore (sezione 5, Assistente).
+- **Ambiente di prova** (dopo la separazione degli ambienti): i dimostrativi passano nel sito di prova, con la fascia
+  gialla in alto; il sito vero resta per gli appartamenti veri (sezione 7).
 
 ---
 
@@ -277,6 +285,24 @@ file dice «prezzo non impostato» e riporta solo i kWh. In testa c'è «Consumi
 precedenti restano vuote, non a zero; se tutto il periodo cade prima di quella data il file lo dice e i totali
 restano vuoti; senza nessun dato misurato compare «Nessun consumo misurato finora». Se il file non si può preparare (funzione non attiva, sistema
 domotico non raggiungibile, soggiorno non ancora iniziato), compare il motivo.
+
+### Riepiloghi
+Ogni lunedì dalle 8 del mattino (ora dell'appartamento) trovi il riepilogo della settimana appena finita, da lunedì a
+domenica: voce «Riepiloghi» nel menu dell'appartamento, elenco delle settimane dalla più recente («Settimana dal … al …»
+con «N segnalazioni» oppure «Nessuna novità»); finché non c'è nessun riepilogo compare «Nessun riepilogo ancora: il
+primo arriva il lunedì dopo una settimana completa». I riepiloghi restano consultabili per 12 mesi. Ogni riepilogo dice,
+con frasi già pronte:
+- se i consumi sono stati alti. Le notti con ospiti si confrontano con le notti con ospiti delle 4 settimane prima, quelle
+  senza ospiti con quelle senza ospiti, sia in totale sia per ogni misuratore (riquadro «Consumi a parità di occupazione»,
+  con gli stati «Nella norma», «Alto», «Confronto non disponibile», «Nessuna notte»). «Alto» vuol dire almeno il 30 % sopra
+  il valore tipico delle settimane prima e almeno 5 kWh in più nella settimana, così una piccola differenza non fa scattare
+  l'avviso. Se nelle settimane prima non c'erano notti di quel tipo il riepilogo scrive «confronto non disponibile», mai un
+  allarme. Nelle prime 5 settimane dopo che l'appartamento ha iniziato a misurare i consumi veri scrive «dati
+  insufficienti» con la data da cui i consumi sono disponibili;
+- quali dispositivi sono spenti o non rispondono da più di 24 ore;
+- quali approvazioni sono scadute senza che nessuno rispondesse;
+- quali finestre sono rimaste aperte almeno 3 volte con il clima spento dalla regola.
+Una settimana senza niente da segnalare ha il riepilogo «Settimana senza novità» e non manda avvisi.
 
 ### Programmazione
 Azioni programmate («In programma») e storico degli ultimi 7 giorni. «Nuova azione» per programmare un cambio di
@@ -505,7 +531,8 @@ L'unico punto in comune è «Verifica connessione», presente in tutte e due le 
   amministratori; per far cancellare nome ed email prima, elimina tu stesso l'account o chiedilo al gestore.
 - **Notifiche:** quali avvisi ricevere, per categoria: «Approvazioni richieste», «Dispositivi e istanza offline» e
   «Prenotazioni» (avvisi sulle prenotazioni che cambiano il programma dell'appartamento, per esempio una disdetta dopo
-  che l'appartamento è stato preparato per l'arrivo), tutte attive dall'inizio; «Decisioni del motore» (riepilogo delle
+  che l'appartamento è stato preparato per l'arrivo) e «Riepilogo» (il riepilogo settimanale, ogni lunedì, solo se la
+  settimana ha qualcosa da segnalare), tutte attive dall'inizio; «Decisioni del motore» (riepilogo delle
   azioni automatiche, solo in app) è spenta finché non la attivi. Le notifiche sul telefono sono attive anche
   nell'ambiente di prova (vedi sotto). Se in un ambiente non lo fossero, la scheda direbbe «Notifiche sul telefono non
   attive in questo ambiente»: gli avvisi (nuove approvazioni, dispositivi offline, istanza non raggiungibile,
@@ -549,6 +576,7 @@ L'unico punto in comune è «Verifica connessione», presente in tutte e due le 
 |---|---|
 | Prenotazioni e presenze degli ospiti | 12 mesi dopo il check-out |
 | Consumi | 24 mesi (li conserva il sistema domotico dell'appartamento) |
+| Riepiloghi settimanali | 12 mesi |
 | Registro attività e storico degli accessi di assistenza | 24 mesi |
 | Prenotazioni ricevute da Italianway (senza dati personali degli ospiti) | 90 giorni, e al massimo le ultime 100 |
 
