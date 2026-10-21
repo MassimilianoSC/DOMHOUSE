@@ -53,7 +53,7 @@ che avevano solo in memoria (sezione 7, 16 ottobre sera).
 
 Unico elenco. Nessun altro documento ne tiene uno.
 
-Nessuna decisione aperta (21 ottobre: passo 6 deciso con D-130).
+- **21 ottobre, passo 7 («il motore pronto per un connector vero», provato con il simulato; il finto server WebSocket Gen2 è tolto, D-106): quattro decisioni con le proposte di o1.** Stato: la conferma a consumo è un segnaposto (ogni «delivered» → acked; il simulato risponde sempre «confirmed»); i `links` non sono controllati; con il connector giù la salute risponde 503 ma il motore non emette `instance.health` alla caduta e i comandi partono lo stesso. Perimetro: 7a conferma a consumo (0,5), 7b controllo dei links all'avvio (0,25), 7c connector giù/su con `instance.health`, `apartment.changed` e comandi rifiutati (0,25); circa una giornata. (1) Soglie: accensione confermata se i watt salgono di almeno 20 W, spegnimento se scendono sotto 15 W, entro i 10 s del contratto, costanti da rivedere con le prove di Youssouf; rischio: uno split che impiega più di 10 s ad assorbire risulta «non confermato» (da dire a Youssouf: il misuratore manda i watt subito). (2) Cambi di temperatura, modalità o ventola a split acceso: accettati senza verifica, come oggi. (3) Misuratore collegato offline al momento del comando: accettato senza verifica con una riga di log. (4) Connector giù: a) comandi rifiutati con 409 `device_offline`; b) decisioni `connector_down` e `connector_up` (etichette per o2); c) il push «istanza non raggiungibile» non subito alla prima caduta ma solo se resta giù quanto i minuti della regola «Avviso dispositivo offline» (modifica in `bff/push.py`).
 
 ---
 
