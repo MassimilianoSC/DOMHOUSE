@@ -450,7 +450,9 @@ L'unico punto in comune è «Verifica connessione», presente in tutte e due le 
   altro gestore toglie anche il ruolo di gestore e chiude i suoi accessi di assistenza. La conferma spiega: «Vengono
   cancellati il tuo accesso, il tuo nome, la tua email e le tue preferenze di notifica. Resta quello che hai fatto
   (decisioni, approvazioni, registro attività), ma al posto del tuo nome comparirà «utente rimosso». Per rientrare
-  servirà un nuovo invito.»
+  servirà un nuovo invito.» Se invece è un amministratore a toglierti dall'organizzazione, il tuo accesso si chiude
+  subito e quello che hai fatto resta nel registro attività per 24 mesi con il tuo nome visibile ai colleghi
+  amministratori; per far cancellare nome ed email prima, elimina tu stesso l'account o chiedilo al gestore.
 - **Notifiche:** quali avvisi ricevere, per categoria: «Approvazioni richieste», «Dispositivi e istanza offline» e
   «Prenotazioni» (avvisi sulle prenotazioni che cambiano il programma dell'appartamento, per esempio una disdetta dopo
   che l'appartamento è stato preparato per l'arrivo), tutte attive dall'inizio; «Decisioni del motore» (riepilogo delle
