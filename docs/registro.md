@@ -323,6 +323,8 @@ Registrati con la loro forma, perché non si ripetano.
 
 Idee non scartate. Ognuna con la data e da dove viene.
 
+- 21 ott, committente: **riassunto settimanale per il gestore con push** (consumi anomali rispetto alla mediana delle ultime 4 settimane, dispositivi offline da più giorni, approvazioni scadute senza risposta, finestre aperte ricorrenti): tutto leggibile dal contratto (`/energy`, `/decisions`), lavoro settimanale nel BFF, categoria di notifica «Riepilogo», pagina nell'app; stima 2–3 giornate, prosa di Gemini +0,5 dopo il passo 9; utile dopo almeno 4 settimane di dati veri; sostituisce l'idea del riepilogo giornaliero (P-55).
+- 21 ott, committente: **regole per appartamento in linguaggio naturale, confermate dal gestore, eseguite dal motore**: funzione grossa (motore di regole generico, priorità e conflitti con le regole di sicurezza, modifica di sostanza al contratto e all'app, schermata di conferma con la regola interpretata in parole chiare); stima 6–10 giornate più revisione del contratto; **non nel pilota**. Via sensata dopo il passo 9: l'assistente modifica i parametri delle 8 regole esistenti in linguaggio naturale, con conferma del gestore (0,5–1 giornata).
 - 15 ott, documento dei requisiti: reset del simulatore (P-56); esportazione CSV dei consumi di un soggiorno (fatto,
   lotto 10, in Excel); riepilogo giornaliero per i gestori (P-55); suddividere il motore del mock (`state.py`).
 - 15 ott, riepilogo infrastruttura: far passare `/app/**` e `/webhooks/**` da Firebase Hosting a Cloud Run invece di
