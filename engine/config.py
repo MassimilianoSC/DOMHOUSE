@@ -7,6 +7,10 @@
     HOST, PORT     optional   where to listen; 127.0.0.1 and 8100 by default (in the container 0.0.0.0)
     DATA_DIR       optional   the apartment's data, /data/<apartment_id> by default (SQLite from step 3)
     CATALOG_PATH   optional   the devices' catalog, <DATA_DIR>/catalog.yaml by default (read by the connector)
+    CONFIRM_ON_WATTS   optional   D-131: an infrared split's switch-on is confirmed when its linked meter's watts rise
+                                  by at least this much over what they were before the command; 20 by default
+    CONFIRM_OFF_WATTS  optional   D-131: its switch-off is confirmed when they drop under this; 15 by default
+                                  (both within 10 s of the command, engine/confirmation.py; numbers from 1 to 5000)
 
 With CONNECTOR=simulated also: MOCK_TIME_SCALE (real seconds per simulated minute: 60 = real time, the default here)
 and DOMOTICA_TEST_CONNECTOR_DOWN=1 (the connector reported down: conformance scenario C14). A connector receives a
@@ -22,7 +26,8 @@ from .connector.interface import ConnectorConfig
 
 # the engine's own variables: never passed to a connector, whatever its name
 ENGINE_VARIABLES = {"APARTMENT_ID", "API_KEY", "CONNECTOR", "HOST", "PORT", "DATA_DIR", "CATALOG_PATH",
-                    "MOCK_TIME_SCALE", "MOCK_PING_S"}
+                    "MOCK_TIME_SCALE", "MOCK_PING_S", "CONFIRM_ON_WATTS", "CONFIRM_OFF_WATTS"}
+CONFIRM_DEFAULTS = {"CONFIRM_ON_WATTS": 20.0, "CONFIRM_OFF_WATTS": 15.0}   # engine/confirmation.py's
 APARTMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 CONNECTOR_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 MIN_KEY_LENGTH = 16
@@ -43,6 +48,8 @@ class EngineConfig:
     data_dir: Path
     catalog_path: Path
     env: Mapping[str, str] = field(repr=False, default_factory=dict)
+    confirm_on_watts: float = CONFIRM_DEFAULTS["CONFIRM_ON_WATTS"]
+    confirm_off_watts: float = CONFIRM_DEFAULTS["CONFIRM_OFF_WATTS"]
 
     @property
     def simulated(self) -> bool:
@@ -89,9 +96,19 @@ def load_config(env: Mapping[str, str] | None = None) -> EngineConfig:
     except ValueError:
         problems.append("PORT must be a number between 1 and 65535")
         port = 0
+    watts = {}
+    for name, default in CONFIRM_DEFAULTS.items():
+        raw = env.get(name, "").strip()
+        try:
+            watts[name] = float(raw) if raw else default
+            if not 1 <= watts[name] <= 5000:
+                raise ValueError
+        except ValueError:
+            problems.append(f"{name} must be a number of watts between 1 and 5000")
     if problems:
         raise ConfigError("\n".join(problems))
     data_dir = Path(env.get("DATA_DIR") or f"{DEFAULT_DATA_ROOT}/{apartment_id}")
     return EngineConfig(apartment_id=apartment_id, api_key=api_key, connector=connector,
                         host=env.get("HOST", "127.0.0.1"), port=port, data_dir=data_dir,
-                        catalog_path=Path(env.get("CATALOG_PATH") or data_dir / "catalog.yaml"), env=env)
+                        catalog_path=Path(env.get("CATALOG_PATH") or data_dir / "catalog.yaml"), env=env,
+                        confirm_on_watts=watts["CONFIRM_ON_WATTS"], confirm_off_watts=watts["CONFIRM_OFF_WATTS"])

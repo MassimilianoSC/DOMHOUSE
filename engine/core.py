@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo
 
 from . import log as logs
 from .connector.interface import CommandResult, ConnectorCommand, DeviceInfo, StateChange
-from .confirmation import delivered_outcome
+from . import confirmation as confirm
 from .mold import mold_action
 from .connector.simulated import SimulatedConnector
 from .store import MemoryStore
@@ -190,7 +190,8 @@ class EnergyCounter:
 
 class ApartmentEngine:
     def __init__(self, apartment_id: str, connector=None, *, simulated: bool = True, seed: bool | None = None,
-                 implementation: dict | None = None, store: MemoryStore | None = None):
+                 implementation: dict | None = None, store: MemoryStore | None = None,
+                 confirm_watts: tuple[float, float] | None = None):
         """Without a connector: the demonstration apartment, a SimulatedConnector chosen by the apartment's id. seed
         (by default: without a connector) adds the demonstration's bookings and decisions; otherwise the history
         starts empty and the apartment in mode "empty". store: where the state lives (engine/store.py), in memory by
@@ -205,6 +206,9 @@ class ApartmentEngine:
         self.simulated = simulated
         self.implementation = implementation or {"name": "bff-mock-instance", "version": "0.1.0"}
         self.meters: dict[str, EnergyCounter] = {}
+        # D-131: the power confirmation's thresholds (engine/confirmation.py), the apartment's settings when given
+        self.confirm_on_watts, self.confirm_off_watts = confirm_watts or (confirm.CONFIRM_ON_WATTS, confirm.CONFIRM_OFF_WATTS)
+        self.power_waiters: dict[str, list[tuple[str, float, asyncio.Future]]] = {}   # meter -> commands watching it
         self.rooms = [{"room_id": r.room_id, "name": r.name} for r in self.connector.rooms()]
         self.rules = copy.deepcopy(DEFAULT_RULES)
         # (device_id, capability, correlation_id, state requested) of the commands running: at most one per device
@@ -492,6 +496,8 @@ class ApartmentEngine:
             state.update({k: copy.deepcopy(v) for k, v in running[3].items() if k in CONTRACT_FIELDS[cap]})
         was_open = state.get("open")
         state.update(part)
+        if cap == "power_meter":
+            self._power_seen(change.device_id, state)
         self._note_climate(change.device_id, cap, was_on, state.get("on"))
         if cap == "contact" and state.get("open") and not was_open:
             self._window_opened(change.device_id)
@@ -1001,9 +1007,11 @@ class ApartmentEngine:
         self._save_command(cmd)
         self.emit("command.updated", self._cmd_event(cmd), cmd["correlation_id"])
 
-    def _settle(self, device: dict, cap: str, requested: dict, reported: dict, correlation_id: str) -> None:
+    def _settle(self, device: dict, cap: str, requested: dict, reported: dict, correlation_id: str,
+                heard: bool = True) -> None:
         """After a successful command: the engine's fields of the request and the device's reported ones; an event
-        only if something changed (nothing, when changes() already brought it)."""
+        only if something changed (nothing, when changes() already brought it). heard=False ("delivered": an infrared
+        split says nothing) leaves last_seen alone: it is when the device was last heard, by the connector's clock."""
         state = device["capabilities"][cap]
         merged = dict(state)
         merged.update({k: copy.deepcopy(v) for k, v in requested.items() if k in CONTRACT_FIELDS[cap]})
@@ -1014,7 +1022,8 @@ class ApartmentEngine:
         was_on = state.get("on")
         state.update(merged)
         self._note_climate(device["device_id"], cap, was_on, state.get("on"))
-        device["last_seen"] = iso(utcnow())
+        if heard:
+            device["last_seen"] = iso(utcnow())
         self._save_device(device)
         self.emit("device.state", {"device_id": device["device_id"], "capability": cap, "state": state}, correlation_id)
 
@@ -1051,6 +1060,9 @@ class ApartmentEngine:
             return
         ids = {"correlation_id": cmd["correlation_id"], "command_id": cmd["command_id"], "device_id": device["device_id"]}
         deadline = parse_dt(cmd["created_at"]) + timedelta(seconds=COMMAND_DEADLINE_S)
+        check = self._power_check(device, cap, new_state)        # D-131: (meter, direction, watts before) or None
+        waiter = self._watch_power(check) if check and check[0]["online"] else None
+        no_confirmation = "Nessuna conferma dal dispositivo entro il tempo massimo"
         async with self._device_lock(device["device_id"]):       # at most one command per device (connector.md §2.5)
             running = (device["device_id"], cap, cmd["correlation_id"], new_state)
             self.inflight.append(running)
@@ -1061,6 +1073,10 @@ class ApartmentEngine:
                                      target=self.connector_target(device, cap, new_state), deadline=deadline),
                     lambda step: self._set_status(cmd, step) if step in ("sent", "verifying") else None),
                     timeout=max((deadline - utcnow()).total_seconds(), 0))
+                if result.outcome == "delivered" and waiter is not None and not await self._power_confirmed(waiter, cmd):
+                    result = None                                 # the meter did not move: not confirmed (D-131)
+                    no_confirmation = (f"Nessuna conferma dal misuratore «{check[0]['label']}» entro 10 secondi: "
+                                       f"{device['label'].lower()} potrebbe non aver ricevuto il comando")
             except TimeoutError:
                 result = None
             except Exception as exc:
@@ -1068,12 +1084,13 @@ class ApartmentEngine:
                 result = CommandResult("failed", "internal_error", detail="connector raised")
             finally:
                 self.inflight.remove(running)
+                if waiter is not None:
+                    self._unwatch_power(check[0]["device_id"], waiter)
         if result is None:
             logs.warn("command timeout", apartment_id=self.apartment_id, **ids)
             self._set_status(cmd, "timeout", "no_confirmation")
-            self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state),
-                     "Nessuna conferma dal dispositivo entro il tempo massimo", "failed", cmd["correlation_id"],
-                     command_id=cmd["command_id"])
+            self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state), no_confirmation, "failed",
+                     cmd["correlation_id"], command_id=cmd["command_id"])
             return
         if result.outcome == "failed":
             logs.warn("command failed", apartment_id=self.apartment_id, reason=result.reason, detail=result.detail, **ids)
@@ -1085,15 +1102,68 @@ class ApartmentEngine:
                      cmd["correlation_id"], command_id=cmd["command_id"])
             return
         # the simulated connector reports the new state through changes() before the outcome, so it is already here;
-        # a connector may also confirm only in its result; "delivered" (no confirmation possible) is decided by
-        # engine/confirmation.py, today a placeholder that shows the state requested (confirmation "none")
+        # a connector may also confirm only in its result. "delivered" got here confirmed by the meter, or not to be
+        # verified (engine/confirmation.py): the state requested
         reported = (result.state if result.outcome == "confirmed" and result.state
                     else self.connector_target(device, cap, new_state))
-        status = "acked" if result.outcome == "confirmed" else delivered_outcome(new_state)
-        self._settle(device, cap, new_state, reported, cmd["correlation_id"])
-        self._set_status(cmd, status)
+        if result.outcome == "delivered" and check and waiter is None:
+            meter = check[0]
+            self.log("system", target, "command_unverified", None, None,
+                     f"Comando a {device['label'].lower()} non verificato: il misuratore «{meter['label']}» è offline",
+                     "informational", cmd["correlation_id"], command_id=cmd["command_id"])
+        self._settle(device, cap, new_state, reported, cmd["correlation_id"], heard=result.outcome == "confirmed")
+        self._set_status(cmd, "acked")
         self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state), reasoning, "applied",
                  cmd["correlation_id"], command_id=cmd["command_id"])
+
+    # ---- power confirmation of an infrared split (P-60 step 7, D-131; engine/confirmation.py) ---------------------
+    def confirmation_meter(self, device_id: str) -> dict | None:
+        """The meter linked to a split (links.confirmation_device_id), when it exists and has a power_meter."""
+        meter_id = self.links.get(device_id, {}).get("confirmation_device_id")
+        meter = self.devices.get(meter_id) if meter_id else None
+        return meter if meter is not None and "power_meter" in meter["capabilities"] else None
+
+    def _power_check(self, device: dict, cap: str, new_state: dict) -> tuple[dict, str, float] | None:
+        """(meter, "on"|"off", watts before) for a command to verify; None when it is not to be verified."""
+        if cap != "climate" or device["capabilities"]["climate"].get("confirmation") != "power":
+            return None
+        direction = confirm.switch_direction(device["capabilities"]["climate"], new_state)
+        meter = self.confirmation_meter(device["device_id"]) if direction else None
+        if meter is None:
+            return None
+        return meter, direction, float(meter["capabilities"]["power_meter"].get("watts") or 0)
+
+    def _watch_power(self, check: tuple[dict, str, float]) -> asyncio.Future:
+        meter, direction, baseline = check
+        waiter = asyncio.get_running_loop().create_future()
+        self.power_waiters.setdefault(meter["device_id"], []).append((direction, baseline, waiter))
+        return waiter
+
+    def _unwatch_power(self, meter_id: str, waiter: asyncio.Future) -> None:
+        left = [w for w in self.power_waiters.get(meter_id, []) if w[2] is not waiter]
+        if left:
+            self.power_waiters[meter_id] = left
+        else:
+            self.power_waiters.pop(meter_id, None)
+
+    def _power_seen(self, meter_id: str, state: dict) -> None:
+        """A meter's new watts: the commands watching it that they confirm are confirmed."""
+        watts = float(state.get("watts") or 0)
+        for direction, baseline, waiter in self.power_waiters.get(meter_id, []):
+            if not waiter.done() and confirm.power_confirms(direction, baseline, watts, self.confirm_on_watts,
+                                                            self.confirm_off_watts):
+                waiter.set_result(True)
+
+    async def _power_confirmed(self, waiter: asyncio.Future, cmd: dict) -> bool:
+        """Wait for the meter until CONFIRM_UNTIL_S after the command's creation."""
+        if waiter.done():
+            return True
+        left = (parse_dt(cmd["created_at"]) + timedelta(seconds=confirm.CONFIRM_UNTIL_S) - utcnow()).total_seconds()
+        try:
+            await asyncio.wait_for(waiter, timeout=max(left, 0))
+            return True
+        except TimeoutError:
+            return False
 
     def _window_opened(self, device_id: str) -> None:
         """A window opened: the rule's reflex starts; during a hold the rule is suspended until its end (R7, D-127),

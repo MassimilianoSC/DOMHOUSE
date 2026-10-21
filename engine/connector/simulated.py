@@ -13,6 +13,9 @@ Power meters (P-60 step 6, D-130) work as connector.md §2.3 says: watts and the
 energy_total_wh, which grows with the watts over real time (never the accelerated MOCK_TIME_SCALE); a meter that draws
 power sends a reading every READING_EVERY_S, as a real one does, besides the reading that follows each command. The
 readings are made inside changes(), in the reader's loop: no task of its own. read_meters() makes one at once (tests).
+A split with `confirmation: power` behaves as one behind an infrared blaster (P-60 step 7, D-131): its commands end
+"delivered", it reports nothing of its climate state, only its meter moves; lose_infrared(device_id) makes the next
+frame get lost (nothing changes, still "delivered"), so the engine's "no confirmation" can be tried.
 """
 import asyncio
 import copy
@@ -140,6 +143,7 @@ class SimulatedConnector:
         self._last_event_at: datetime | None = None
         self.reading_every_s = READING_EVERY_S
         self._last_reading = utcnow()
+        self._lost_frames: set[str] = set()
 
     # ---- interface ----------------------------------------------------------------------------------------------
     async def start(self) -> None:
@@ -192,12 +196,23 @@ class SimulatedConnector:
         if not device.online:
             return CommandResult("failed", "device_offline", detail="went offline while verifying")
         now = utcnow()
+        infrared = cmd.capability == "climate" and device.capabilities["climate"].get("confirmation") == "power"
+        if infrared and cmd.device_id in self._lost_frames:
+            self._lost_frames.discard(cmd.device_id)
+            return CommandResult("delivered", detail="infrared frame lost (simulated)")
         for cap, state in device.apply(cmd.capability, cmd.target, now):
-            self._push(StateChange(device.device_id, "state", now, capability=cap, state=state))
+            if not (infrared and cap == "climate"):        # an infrared split says nothing; its meter does
+                self._push(StateChange(device.device_id, "state", now, capability=cap, state=state))
         await asyncio.sleep(0)   # let the engine take the changes before it hears the outcome (same order as before)
+        if infrared:
+            return CommandResult("delivered")
         return CommandResult("confirmed", state=device.reported(cmd.capability))
 
     # ---- hooks of POST /_test/state and of the tests (simulated only) --------------------------------------------
+    def lose_infrared(self, device_id: str) -> None:
+        """The next infrared frame to this split gets lost: the command ends "delivered" and nothing moves."""
+        self._lost_frames.add(device_id)
+
     def read_meters(self, notify: bool = True) -> list[StateChange]:
         """A reading of every online meter that draws power (a meter at 0 W has nothing new to say)."""
         now = utcnow()
