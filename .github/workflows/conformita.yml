@@ -7,10 +7,20 @@
 # Se 1 o 2 falliscono, l'app sta usando qualcosa che il motore reale non avrà: fermarsi e correggere.
 name: conformita
 
+# Un push (o una PR) che tocca SOLO documenti non fa partire la CI: docs/** e i .md della radice (README.md,
+# CLAUDE.md), che nessun passo legge. "*.md" senza "/" vale solo per la radice: engine/connector/connector.md,
+# contract/conformance/README.md e bff/API.md restano inclusi. Basta un file fuori da questi percorsi e i tre
+# controlli girano tutti.
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
   pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
 
 env:
   CONTRACT_SHA256: e6ed29457163707b9e43eabb428225f0a6983ea05de2a43d240d03acae001527
