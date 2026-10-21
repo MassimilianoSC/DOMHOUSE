@@ -395,7 +395,9 @@ Preferenze: `approval` ← `notification_prefs.approvals`; `device_offline` e `i
 preferenze). `booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
 annullata dopo il pre-arrivo, con l'appartamento rimesso a vuoto dal motore (D-121); il `body` è il testo della decisione.
 `device_offline` parte se il dispositivo è ancora offline dopo i minuti della regola `offline_alert` (15 se non
-leggibile); `instance_down` una volta sola finché l'istanza non torna su.
+leggibile); `instance_down` (evento `instance.health` con `status` `down`: istanza irraggiungibile o connector del
+motore giù, D-131) parte se resta giù per gli stessi minuti della regola `offline_alert`, mai con la regola spenta, una
+volta sola finché l'istanza non torna su: una caduta seguita da un ritorno prima dei minuti non manda niente.
 
 Destinatari: solo gli utenti che vedono l'appartamento del messaggio (`apartment_id`, vedi «Appartamenti per
 utente»).

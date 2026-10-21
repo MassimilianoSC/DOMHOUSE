@@ -244,6 +244,7 @@ class ApartmentEngine:
         self.tasks: set[asyncio.Task] = set()
         self.last_housekeeping = self.last_retention = time.monotonic()
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
+        self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.restored = bool(self.store.get_meta("initialized"))
         if self.restored:
             self._load()
@@ -675,7 +676,10 @@ class ApartmentEngine:
 
     def regulate(self) -> None:
         """Once a "minute": every boiler's relay where its thermostat wants it, at most one switch every
-        THERMOSTAT_MIN_SWITCH_MINUTES. Decisions: the frost protection's every switch, the sensor's problems."""
+        THERMOSTAT_MIN_SWITCH_MINUTES. Decisions: the frost protection's every switch, the sensor's problems. With the
+        connector down nothing can be switched: it waits for it (D-131)."""
+        if not self.connector_was_up:
+            return
         for device in self.devices.values():
             if "heating" not in device["capabilities"] or not device["online"]:
                 continue
@@ -993,6 +997,8 @@ class ApartmentEngine:
                        decision_actor: str | None = None, reasoning: str | None = None) -> dict | None:
         """A command, or None when an automatic one waits for the compressor's pause (R4) and starts after it."""
         device = self.get_device(device_id)
+        if not self.connector_up():                          # D-131: nothing can reach the devices
+            raise MockError(409, "device_offline", "Collegamento ai dispositivi non disponibile; riprova quando torna")
         if not device["online"]:
             raise MockError(409, "device_offline", "Il dispositivo non è raggiungibile; riprova quando torna online")
         who = decision_actor or actor_of(actor)
@@ -1195,6 +1201,21 @@ class ApartmentEngine:
             return True
         except TimeoutError:
             return False
+
+    def _connector_changed(self, up: bool) -> None:
+        """D-131: the connector went down or came back: a decision, instance.health (the BFF's push, after the minutes
+        of the offline_alert rule) and apartment.changed (its "online" follows the connector)."""
+        corr = str(uuid.uuid4())
+        if up:
+            logs.info("connector up", apartment_id=self.apartment_id)
+            self.log("system", {"type": "apartment"}, "connector_up", "down", "up",
+                     "Collegamento ai dispositivi ripristinato", "informational", corr)
+        else:
+            logs.warn("connector down", apartment_id=self.apartment_id)
+            self.log("system", {"type": "apartment"}, "connector_down", "up", "down",
+                     "Collegamento ai dispositivi perso: i comandi non partono finché non torna", "informational", corr)
+        self.emit("instance.health", self.health()[1], corr)
+        self.apartment_changed(corr)
 
     def _window_opened(self, device_id: str) -> None:
         """A window opened: the rule's reflex starts; during a hold the rule is suspended until its end (R7, D-127),
@@ -1877,6 +1898,10 @@ class ApartmentEngine:
 
     def tick(self) -> None:
         now = utcnow()
+        up = self.connector_up()
+        if up != self.connector_was_up:
+            self.connector_was_up = up
+            self._connector_changed(up)
         if time.monotonic() - self.last_regulation >= seconds_per_minute():
             self.last_regulation = time.monotonic()
             self.regulate()

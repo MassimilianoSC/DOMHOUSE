@@ -18,6 +18,7 @@ TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400
 
 _offline_timers: dict[tuple[str, str], asyncio.Task] = {}
 _health_down: set[str] = set()
+_down_timers: dict[str, asyncio.Task] = {}      # D-131: the "instance down" push waits for the offline_alert minutes
 _tasks: set[asyncio.Task] = set()  # strong references: the loop keeps only weak ones to running tasks
 
 
@@ -132,6 +133,8 @@ def forget_apartment(apartment_id: str) -> None:
             task.cancel()
             _offline_timers.pop(key, None)
     _health_down.discard(apartment_id)
+    if (task := _down_timers.pop(apartment_id, None)) and not task.done():
+        task.cancel()
 
 
 async def _offline_alert_minutes(apt: Apartment) -> float | None:
@@ -161,6 +164,19 @@ async def _offline_watch(apt: Apartment, device_id: str, ts: str | None) -> None
         await send_to_tenant(apt.tenant_id, "offline", *device_offline_push(apt, device_id, dev.get("label") or device_id, minutes, ts))
 
 
+async def _instance_down_watch(apt: Apartment, ts: str | None) -> None:
+    """D-131: the "instance down" push only when it stays down as long as the offline_alert rule's minutes (the same
+    wait as a device's); never with the rule off. A connector that drops and reconnects at once sends nothing."""
+    minutes = await _offline_alert_minutes(apt)
+    if minutes is None:
+        return
+    from engine.core import seconds_per_minute
+
+    await asyncio.sleep(minutes * (seconds_per_minute() if get_settings().instance_mode == "mock" else 60.0))
+    if apt.apartment_id in _health_down:
+        await send_to_tenant(apt.tenant_id, "offline", *instance_down_push(apt, ts))
+
+
 async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
     """Hook of every instance hub: decides whether an event deserves a push and starts the sending in a task."""
     env = envelope(ev)
@@ -184,9 +200,11 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
         down = data.get("status") == "down"
         if down and apt.apartment_id not in _health_down:
             _health_down.add(apt.apartment_id)
-            _spawn(send_to_tenant(apt.tenant_id, "offline", *instance_down_push(apt, ts)), "instance_down", apt.apartment_id)
+            _down_timers[apt.apartment_id] = _spawn(_instance_down_watch(apt, ts), "instance_down", apt.apartment_id)
         elif not down:
             _health_down.discard(apt.apartment_id)
+            if (task := _down_timers.pop(apt.apartment_id, None)) and not task.done():
+                task.cancel()
 
 
 async def start_background_hubs() -> None:

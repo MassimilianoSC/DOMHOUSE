@@ -214,13 +214,41 @@ def test_hook_failure_is_logged_not_raised(users, fcm, monkeypatch):
     assert logged and logged[0][0] == "push task failed" and "fcm down" in logged[0][1]["error"]
 
 
-def test_instance_down_once_until_back_up(users, fcm):
+def alert_minutes(monkeypatch, minutes):
+    """The offline_alert rule's minutes as the engine would answer them (None: the rule is off)."""
+    async def fake(apt):
+        return minutes
+    monkeypatch.setattr(push, "_offline_alert_minutes", fake)
+
+
+def test_instance_down_once_until_back_up(users, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
     async def scenario():
         for status in ("down", "down", "ok", "down"):
             await push.on_stream_event(APT, event("instance.health", {"status": status}))
             await drain()
     run(scenario())
     assert [m.data["kind"] for m in fcm.sent] == ["instance_down", "instance_down"]
+
+
+def test_instance_down_waits_for_the_offline_alert_minutes(users, fcm, monkeypatch):
+    """D-131: a connector that drops and comes back before the rule's minutes sends nothing; with the rule off, never."""
+    alert_minutes(monkeypatch, 1000)                     # still waiting when it comes back
+
+    async def back_up_in_time():
+        await push.on_stream_event(APT, event("instance.health", {"status": "down"}))
+        await asyncio.sleep(0.05)
+        await push.on_stream_event(APT, event("instance.health", {"status": "ok"}))
+        await drain()
+    run(back_up_in_time())
+    assert fcm.sent == [] and APT.apartment_id not in push._down_timers
+    alert_minutes(monkeypatch, None)
+
+    async def rule_off():
+        await push.on_stream_event(APT, event("instance.health", {"status": "down"}))
+        await drain()
+    run(rule_off())
+    assert fcm.sent == []
 
 
 def test_unsubscribe_removes_the_token_from_every_holder(users):

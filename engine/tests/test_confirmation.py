@@ -153,3 +153,40 @@ def test_a_split_without_meter_is_none_and_a_boiler_without_sensor_is_not_regula
     assert e.links[SPLIT] == {} and e.confirmation_meter(SPLIT) is None
     conn.lose_infrared(SPLIT)                                     # none: a lost frame is not noticed
     assert run(e, {"capability": "climate", "action": "turn_off"})["status"] == "acked"
+
+
+# -------- the connector down and back (step 7c, D-131) --------
+class Switchable(SimulatedConnector):
+    """A simulated connector whose status() can be put down and up."""
+    up = True
+
+    def status(self):
+        import dataclasses
+        return dataclasses.replace(super().status(), up=self.up)
+
+
+def test_the_connector_down_and_back_is_an_event_a_decision_and_commands_wait():
+    conn = Switchable()
+    e = core.ApartmentEngine("apt-prova-01", conn, seed=False)
+
+    async def main():
+        e.tick()
+        assert not [d for d in e.decisions if d["action"].startswith("connector_")]     # nothing changed
+        conn.up = False
+        e.tick()
+        e.tick()                                                                          # once, not at every tick
+        down = [d for d in e.decisions if d["action"] == "connector_down"]
+        assert len(down) == 1 and down[0]["reasoning"].startswith("Collegamento ai dispositivi perso")
+        health = [ev for ev in e.events if ev["event"] == "instance.health"]
+        assert health[-1]["data"]["status"] == "down" and e.health()[0] == 503
+        assert any(ev["event"] == "apartment.changed" for ev in e.events) and e.apartment()["online"] is False
+        with pytest.raises(core.MockError) as refused:
+            e.create_command("dev-presa-camera", {"capability": "switch", "action": "turn_on"}, ACTOR, CORR)
+        assert refused.value.args[:2] == (409, "device_offline")
+        assert "Collegamento ai dispositivi non disponibile" in refused.value.args[2]
+        conn.up = True
+        e.tick()
+        assert e.decisions[-1]["action"] == "connector_up" and e.decisions[-1]["outcome"] == "informational"
+        assert [ev for ev in e.events if ev["event"] == "instance.health"][-1]["data"]["status"] == "ok"
+        assert e.create_command("dev-presa-camera", {"capability": "switch", "action": "turn_on"}, ACTOR, CORR)
+    asyncio.run(main())
