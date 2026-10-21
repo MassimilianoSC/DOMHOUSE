@@ -132,8 +132,10 @@ Verifica: un secondo lancio senza `--apply` deve dire Â«0 account da riscrivereÂ
 
 ## M7. Primo amministratore e gestori della piattaforma nello staging
 
-Email reali da decidere con il committente (la memoria storica scrive i comandi completi quando sono decise).
-Cosa fa: l'accesso allo staging per chi lo usa; la produzione non cambia. Forma dei comandi (da completare):
+Deciso (D-149): entra il committente, come gestore della piattaforma e primo amministratore dell'organizzazione di
+prova; poi invita dall'app chi vuole. Cosa fa: l'accesso allo staging per chi lo usa; la produzione non cambia. La
+memoria storica scrive i due comandi completi al momento (con l'email del committente e il nome dell'organizzazione di
+prova scelto in M9). Forma:
 
 ```bash
 # Git Bash
