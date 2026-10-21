@@ -247,6 +247,7 @@ class ApartmentEngine:
         self.last_housekeeping = self.last_retention = time.monotonic()
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
+        self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode
         self.restored = bool(self.store.get_meta("initialized"))
         if self.restored:
             self._load()
@@ -262,7 +263,7 @@ class ApartmentEngine:
             self.store.put_meta("initialized", {"at": iso(utcnow()), "seeded": seeded})
 
     # ---- infrastructure -------------------------------------------------
-    def setting(self, name: str) -> float:
+    def setting(self, name: str):
         return self.settings[name]
 
     @property
@@ -1554,23 +1555,35 @@ class ApartmentEngine:
     def pending_approval(self) -> dict | None:
         return next((a for a in self.approvals if a["status"] == "pending"), None)
 
-    def trigger_approval(self, correlation_id: str, source: str = "brain", reason: str | None = None) -> dict | None:
-        heating = next((d for d in self.devices.values() if "heating" in d["capabilities"]), None)
-        if heating is None:
-            raise MockError(422, "no_heating", "Nessuna caldaia nell'appartamento")
-        sp = heating["capabilities"]["heating"]["setpoint"]
-        window = self.window_open()
-        default_reason = (f"{window['label']} aperta e la caldaia è accesa a {fmt_num(sp)} °C" if window
-                          else f"La caldaia è accesa a {fmt_num(sp)} °C con consumi superiori alla media del periodo")
+    def trigger_approval(self, correlation_id: str, source: str = "rule", reason: str | None = None) -> dict | None:
+        """The assistant's proposal (source "assistant": the boiler off with guests in, D-119: rejected at expiry), or
+        the simulator's test trigger (POST /_test/state, conformance C12): an example of F2 on the first device a
+        meter could ask to switch off (D-137). Never source "brain": reserved by the contract."""
+        if source == "assistant":
+            heating = next((d for d in self.devices.values() if "heating" in d["capabilities"]), None)
+            if heating is None:
+                raise MockError(422, "no_heating", "Nessuna caldaia nell'appartamento")
+            sp = heating["capabilities"]["heating"]["setpoint"]
+            return self._new_approval("assistant", "Spegnere la caldaia mentre l'appartamento risulta occupato",
+                                      reason or f"La caldaia è accesa a {fmt_num(sp)} °C",
+                                      {"type": "device_command", "device_id": heating["device_id"], "capability": "heating",
+                                       "action": "turn_off"}, "reject", correlation_id)
+        found = next(((m, t) for m in self.devices.values() if (t := self._power_target(m))), None)
+        if found is None:
+            raise MockError(422, "no_device", "Nessun apparecchio con misuratore da proporre nell'appartamento")
+        meter, target = found
+        return self._propose_switch_off(target, meter, None, correlation_id)
+
+    def _new_approval(self, source: str, description: str, reason: str, proposed: dict, expires_action: str,
+                      correlation_id: str) -> dict | None:
+        """An approval: opened at once, or queued behind the open one (None)."""
         now = utcnow()
         approval = {
             "approval_id": self.next_id("apr"), "status": "pending", "created_at": iso(now),
-            "expires_at": iso(now + timedelta(minutes=self.setting("APPROVAL_EXPIRES_MINUTES"))), "expires_action": "reject", "source": source,
-            "description": "Spegnere la caldaia mentre l'appartamento risulta occupato",
-            "reason": reason or default_reason,
-            "proposed_action": {"type": "device_command", "device_id": heating["device_id"], "capability": "heating",
-                                "action": "turn_off"},
-            "decided_by": None, "decided_at": None, "note": None, "correlation_id": correlation_id,
+            "expires_at": iso(now + timedelta(minutes=self.setting("APPROVAL_EXPIRES_MINUTES"))),
+            "expires_action": expires_action, "source": source, "description": description, "reason": reason,
+            "proposed_action": proposed, "decided_by": None, "decided_at": None, "note": None,
+            "correlation_id": correlation_id,
         }
         if self.pending_approval():
             self.approval_queue.append(approval)
@@ -1586,9 +1599,102 @@ class ApartmentEngine:
         self.approvals.append(approval)
         self._save_approval(approval)
         self.emit("approval.pending", approval, approval["correlation_id"])
-        actor = "assistant" if approval["source"] == "assistant" else "brain"
-        self.log(actor, {"type": "device", "device_id": approval["proposed_action"]["device_id"]}, "turn_off", "on", "off",
-                 approval["reason"], "pending_approval", approval["correlation_id"], approval_id=approval["approval_id"])
+        pa = approval["proposed_action"]
+        if pa["type"] == "apartment_mode":
+            action, old, new = "set_mode", self.mode, pa["mode"]
+        else:
+            state = self.devices.get(pa["device_id"], {}).get("capabilities", {}).get(pa["capability"], {})
+            action, old, new = pa["action"], ("on" if state.get("on") else "off"), "off"
+        self.log(self._approval_actor(approval), self._approval_target(approval), action, old, new, approval["reason"],
+                 "pending_approval", approval["correlation_id"], approval_id=approval["approval_id"])
+
+    @staticmethod
+    def _approval_target(approval: dict) -> dict:
+        pa = approval["proposed_action"]
+        return {"type": "apartment"} if pa["type"] == "apartment_mode" else {"type": "device", "device_id": pa["device_id"]}
+
+    @staticmethod
+    def _approval_actor(approval: dict) -> str:
+        """Who asks, in the Decisions: the assistant, the check-out rule (F1), the engine (F2, no rule of its own)."""
+        if approval["source"] == "assistant":
+            return "assistant"
+        return "rule:checkout_eco" if approval["proposed_action"]["type"] == "apartment_mode" else "system"
+
+    # ---- approvals from real sources (P-60 step 8, D-137) ------------------------------------------------------
+    def _power_target(self, meter: dict) -> dict | None:
+        """The device a meter's consumption belongs to and that can be switched off: the meter's own (switch or
+        climate), or the split it confirms (links.confirmation_device_id). Never a boiler: the frost protection
+        governs it."""
+        caps = meter["capabilities"]
+        if "power_meter" not in caps or "heating" in caps:
+            return None
+        if "switch" in caps or "climate" in caps:
+            return meter
+        return next((d for d in self.devices.values() if "climate" in d["capabilities"] and "heating" not in d["capabilities"]
+                     and self.links.get(d["device_id"], {}).get("confirmation_device_id") == meter["device_id"]), None)
+
+    def _propose_switch_off(self, target: dict, meter: dict, watts: float | None, correlation_id: str) -> dict | None:
+        """F2: switch off a device that draws power in an empty apartment; watts None = the simulator's example."""
+        label = target["label"]
+        if watts is None:
+            reason = f"Prova dal simulatore: esempio di richiesta per {label.lower()}, come quando consuma a casa vuota"
+        else:
+            reason = (f"{label} consuma {fmt_num(round(watts))} W da oltre "
+                      f"{fmt_num(self.setting('EMPTY_POWER_MINUTES'))} minuti con l'appartamento vuoto")
+        cap = "climate" if "climate" in target["capabilities"] else "switch"
+        return self._new_approval("rule", f"Spegnere {label.lower()}", reason,
+                                  {"type": "device_command", "device_id": target["device_id"], "capability": cap,
+                                   "action": "turn_off"}, self.setting("EMPTY_POWER_EXPIRED_ACTION"), correlation_id)
+
+    def _watch_empty_power(self) -> None:
+        """F2, at every tick: in an empty apartment and outside a hold, a meter above EMPTY_POWER_WATTS for
+        EMPTY_POWER_MINUTES asks once for its episode (until the watts drop back under the threshold)."""
+        if self.mode != "empty" or self.hold:
+            self.empty_power.clear()
+            return
+        limit, wait = self.setting("EMPTY_POWER_WATTS"), self.setting("EMPTY_POWER_MINUTES") * seconds_per_minute()
+        for meter in self.devices.values():
+            pm = meter["capabilities"].get("power_meter")
+            if pm is None:
+                continue
+            watts = float(pm.get("watts") or 0)
+            if not meter["online"] or watts <= limit:
+                self.empty_power.pop(meter["device_id"], None)
+                continue
+            seen = self.empty_power.setdefault(meter["device_id"], {"since": time.monotonic(), "asked": False})
+            if seen["asked"] or time.monotonic() - seen["since"] < wait:
+                continue
+            seen["asked"] = True
+            target = self._power_target(meter)
+            if target is None:
+                logs.info("empty power without a device to switch off", apartment_id=self.apartment_id,
+                          device_id=meter["device_id"], watts=watts)
+                continue
+            self._propose_switch_off(target, meter, watts, str(uuid.uuid4()))
+
+    def _presence_after_checkout(self, item: dict) -> tuple[dict, datetime] | None:
+        """F1: the motion sensor that saw someone after the booking's departure time and within
+        CHECKOUT_PRESENCE_MINUTES, with when; None without a motion sensor or without such a movement."""
+        booking = self.bookings.get(item.get("booking_id") or "")
+        if booking is None:
+            return None
+        now, window = utcnow(), timedelta(minutes=self.setting("CHECKOUT_PRESENCE_MINUTES"))
+        seen = []
+        for d in self.devices.values():
+            last = d["capabilities"].get("motion", {}).get("last_seen")
+            if last and booking["checkout"] <= parse_dt(last) and now - parse_dt(last) <= window:
+                seen.append((d, parse_dt(last)))
+        return max(seen, key=lambda s: s[1]) if seen else None
+
+    def _propose_checkout(self, item: dict, seen: tuple[dict, datetime], correlation_id: str) -> None:
+        sensor, last = seen
+        booking = self.bookings[item["booking_id"]]
+        departure = booking["checkout"].astimezone(ZoneInfo(self.timezone)).strftime("%H:%M")
+        minutes = max(int((utcnow() - last).total_seconds() // 60), 0)
+        self._new_approval("rule", "Mettere l'appartamento a vuoto dopo il check-out",
+                           f"Movimento rilevato {minutes} minuti fa da «{sensor['label']}», dopo l'orario di partenza "
+                           f"delle {departure}: gli ospiti potrebbero essere ancora in casa",
+                           dict(item["action"]), "approve", correlation_id)
 
     def list_approvals(self, status: str) -> dict:
         if status not in ("pending", "all"):
@@ -1625,7 +1731,7 @@ class ApartmentEngine:
         self._save_approval(approval)
         who = actor_of(actor)
         reasoning = ("Approvata dal gestore" if approve else "Respinta dal gestore") + (f": {note}" if note else "")
-        self.log(who, {"type": "device", "device_id": approval["proposed_action"].get("device_id")}, body["decision"],
+        self.log(who, self._approval_target(approval), body["decision"],
                  None, approval["status"], reasoning, "applied" if approve else "rejected", correlation_id,
                  approval_id=approval_id)
         if approve:
@@ -1694,7 +1800,8 @@ class ApartmentEngine:
             start = local_midnight(frm.astimezone(tz).date())
         # P-60 step 6 (D-130): the hourly telemetry of the power meters (Wh per device and UTC hour). Every bucket up to
         # now is in the series; an hour without readings counts 0 (the contract has no "unknown"). Whole hours: an
-        # hour starting before `to` counts entirely. avoided_hvac_hours is not computed yet: null, as the contract allows.
+        # hour starting before `to` counts entirely. avoided_hvac_hours: null, as the contract allows, until the apartment
+        # has at least 4 weeks of real consumption recorded (D-139, registro section 7), when it is computed for real.
         starts, cur, now = [], start, utcnow()
         end = min(to, now)
         while cur < end:
@@ -1926,6 +2033,8 @@ class ApartmentEngine:
         if up != self.connector_was_up:
             self.connector_was_up = up
             self._connector_changed(up)
+        if up:
+            self._watch_empty_power()
         if time.monotonic() - self.last_regulation >= seconds_per_minute():
             self.last_regulation = time.monotonic()
             self.regulate()
@@ -1946,7 +2055,7 @@ class ApartmentEngine:
                 self._save_approval(a)
                 corr = str(uuid.uuid4())
                 outcome = {"reject": "respinta", "approve": "approvata", "wait": "in attesa"}[a["expires_action"]]
-                self.log("system", {"type": "device", "device_id": a["proposed_action"].get("device_id")}, "expire",
+                self.log("system", self._approval_target(a), "expire",
                          "pending", "expired", f"Approvazione scaduta senza risposta: {outcome}", "informational", corr,
                          approval_id=a["approval_id"])
                 if a["expires_action"] == "approve":
@@ -1976,6 +2085,12 @@ class ApartmentEngine:
             if self.deferred.pop(item["schedule_id"], None) is not None:
                 self.store.put_meta("deferred", self.deferred)
                 reasoning += " (rimandata per la forzatura)"
+            if item["kind"] == "checkout" and act["type"] == "apartment_mode" and (seen := self._presence_after_checkout(item)):
+                self._propose_checkout(item, seen, corr)      # F1 (D-137): the manager decides; approved at expiry
+                item.update(status="done", command_ids=[], executed_at=iso(now))
+                self._save_schedule(item)
+                self.apartment_changed(corr)
+                continue
             try:
                 if act["type"] == "apartment_mode":
                     item["command_ids"] = self.set_mode(act["mode"], "system:engine", corr, reasoning, "system")

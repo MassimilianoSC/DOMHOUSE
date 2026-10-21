@@ -40,12 +40,24 @@ SETTINGS: dict[str, tuple[float, float, float]] = {
     "COMPRESSOR_WAIT_SECONDS": (7.0, 0.0, 60.0),
     # at a restart, a scheduled action due more than these minutes ago is not run any more (failed, "missed")
     "MISSED_AFTER_MINUTES": (30.0, 5.0, 720.0),
-    # an approval nobody answers is rejected after these minutes (D-119: 30)
+    # an approval nobody answers is closed after these minutes (D-119: 30)
     "APPROVAL_EXPIRES_MINUTES": (30.0, 5.0, 720.0),
+    # D-137, F1: at the check-out's switch to "empty", motion seen within these minutes and after the departure time
+    # asks the manager first
+    "CHECKOUT_PRESENCE_MINUTES": (30.0, 5.0, 180.0),
+    # D-137, F2: in an empty apartment, a meter above these watts for these minutes asks to switch the device off
+    "EMPTY_POWER_WATTS": (300.0, 20.0, 5000.0),
+    "EMPTY_POWER_MINUTES": (15.0, 5.0, 240.0),
 }
-DEFAULT_SETTINGS = {name: spec[0] for name, spec in SETTINGS.items()}
+# settings that are a choice, name -> (default, allowed values)
+CHOICES: dict[str, tuple[str, tuple[str, ...]]] = {
+    # D-137, F2: what an unanswered "switch off in an empty apartment" does when it expires: rejected by default (it
+    # could be the cleaners' washing machine or a water heater)
+    "EMPTY_POWER_EXPIRED_ACTION": ("reject", ("reject", "approve")),
+}
+DEFAULT_SETTINGS: dict[str, float | str] = {name: spec[0] for name, spec in (SETTINGS | CHOICES).items()}
 ENGINE_VARIABLES = {"APARTMENT_ID", "API_KEY", "CONNECTOR", "HOST", "PORT", "DATA_DIR", "CATALOG_PATH",
-                    "MOCK_TIME_SCALE", "MOCK_PING_S", *SETTINGS}
+                    "MOCK_TIME_SCALE", "MOCK_PING_S", *SETTINGS, *CHOICES}
 APARTMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 CONNECTOR_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 MIN_KEY_LENGTH = 16
@@ -66,7 +78,7 @@ class EngineConfig:
     data_dir: Path
     catalog_path: Path
     env: Mapping[str, str] = field(repr=False, default_factory=dict)
-    settings: Mapping[str, float] = field(default_factory=lambda: dict(DEFAULT_SETTINGS))
+    settings: Mapping[str, float | str] = field(default_factory=lambda: dict(DEFAULT_SETTINGS))
 
     @property
     def confirm_on_watts(self) -> float:
@@ -130,6 +142,11 @@ def load_config(env: Mapping[str, str] | None = None) -> EngineConfig:
                 raise ValueError
         except ValueError:
             problems.append(f"{name} must be a number between {low:g} and {high:g}")
+    for name, (default, allowed) in CHOICES.items():
+        value = env.get(name, "").strip().lower() or default
+        if value not in allowed:
+            problems.append(f"{name} must be one of: {', '.join(allowed)}")
+        settings[name] = value
     if problems:
         raise ConfigError("\n".join(problems))
     data_dir = Path(env.get("DATA_DIR") or f"{DEFAULT_DATA_ROOT}/{apartment_id}")
