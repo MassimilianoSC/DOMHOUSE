@@ -11,6 +11,14 @@
 #   sudo bash /opt/domhouse/engine-vm.sh backup-all                             # every apartment (the daily timer)
 #   sudo bash /opt/domhouse/engine-vm.sh restore <apartment_id> <file>          # put a copy back, restart
 #   sudo bash /opt/domhouse/engine-vm.sh api <apartment_id> <METHOD> <path> [json]  # call the local engine
+#   sudo bash /opt/domhouse/engine-vm.sh set <apartment_id> NOME=VALORE          # an engine setting, restart
+#   sudo bash /opt/domhouse/engine-vm.sh unset <apartment_id> NOME               # back to its default, restart
+#
+# Settings (D-131, P-60 step 7d): the engine's own settings of one apartment (e.g. CONFIRM_ON_WATTS) live in
+# /etc/domhouse/<apartment_id>.settings.env, no secrets, a second env_file of compose.yaml, optional. set and unset
+# change only that file (the key's file is never touched, and "key" never touches this one), recreate the container
+# and wait for health 200: if the engine does not come back (a value it refuses stops it), the previous file is put
+# back and the container recreated again. status shows the file.
 #
 # install copies this script and compose.yaml (found next to it) to /opt/domhouse, prepares /data/<apartment_id>
 # (owner uid 10001, the container's user), writes /etc/domhouse/<apartment_id>.env with API_KEY from the Secret
@@ -25,8 +33,8 @@
 set -euo pipefail
 set +x                                   # never trace: a traced line could show the key
 
-OPT=/opt/domhouse
-ETC=/etc/domhouse
+OPT="${DOMHOUSE_OPT:-/opt/domhouse}"     # the two folders can be moved only by the tests
+ETC="${DOMHOUSE_ETC:-/etc/domhouse}"
 ENGINE_UID=10001
 METADATA=http://metadata.google.internal/computeMetadata/v1
 SECRET_PREFIX="${SECRET_PREFIX:-langbrain-api-key-}"
@@ -77,6 +85,51 @@ registry_login() {
 }
 
 settings_file() { echo "${OPT}/$1.settings"; }
+engine_settings_file() { echo "${ETC}/$1.settings.env"; }
+
+# names set and unset refuse: the key, and what install and update already write
+RESERVED="API_KEY APARTMENT_ID CONNECTOR PORT HOST DATA_DIR ENGINE_IMAGE"
+
+valid_setting_name() {
+  [[ "$1" =~ ^[A-Z][A-Z0-9_]{0,63}$ ]] || die "nome di impostazione non valido: $1 (lettere maiuscole, cifre, _)"
+  [[ " ${RESERVED} " != *" $1 "* ]] || die "$1 non si cambia con set/unset"
+}
+
+put_setting() {
+  # put_setting <file> <name> [value]: the line NAME=value in the file, or no line for the name without a value
+  local file="$1" name="$2" value="${3-}" tmp="$1.new"
+  [ -d "$(dirname "${file}")" ] || install -d -m 700 "$(dirname "${file}")"   # made by install; 700 if missing
+  touch "${file}"
+  grep -v "^${name}=" "${file}" > "${tmp}" || true
+  if [ -n "${value}" ]; then
+    printf '%s=%s\n' "${name}" "${value}" >> "${tmp}"
+  fi
+  chmod 644 "${tmp}"
+  mv -f "${tmp}" "${file}"
+}
+
+change_setting() {
+  # change_setting <apartment_id> <name> [value]: the file changed, the container recreated, health 200 or back
+  local apt="$1" name="$2" value="${3-}" file previous
+  file="$(engine_settings_file "${apt}")"
+  [ -f "$(settings_file "${apt}")" ] || die "${apt} non è installato (manca $(settings_file "${apt}"))"
+  previous="$(mktemp)"
+  if [ -f "${file}" ]; then cp -p "${file}" "${previous}"; fi
+  put_setting "${file}" "${name}" "${value}"
+  step "Impostazioni di ${apt} (${file})"
+  cat "${file}"
+  compose "${apt}" up -d --force-recreate
+  if ( wait_healthy "${apt}" ); then
+    rm -f "${previous}"
+    return 0
+  fi
+  echo "il motore non è tornato su: rimetto le impostazioni di prima" >&2
+  if [ -s "${previous}" ]; then cp -p "${previous}" "${file}"; else rm -f "${file}"; fi
+  rm -f "${previous}"
+  compose "${apt}" up -d --force-recreate
+  ( wait_healthy "${apt}" ) || true
+  die "impostazione ${name} non applicata"
+}
 
 compose() {
   local apt="$1"; shift
@@ -87,7 +140,7 @@ wait_healthy() {
   local apt="$1" port code
   port="$(sed -n 's/^PORT=//p' "$(settings_file "${apt}")")"
   step "Attesa di http://127.0.0.1:${port}/api/v1/health"
-  for _ in $(seq 1 30); do
+  for _ in $(seq 1 "${DOMHOUSE_HEALTH_TRIES:-30}"); do      # 30 tries, 2 s apart (fewer only in the tests)
     code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}/api/v1/health" || true)"
     if [ "${code}" = "200" ]; then
       curl -s "http://127.0.0.1:${port}/api/v1/health" | python3 -c \
@@ -241,14 +294,31 @@ case "${cmd}" in
       -H "X-Actor: system:vm-admin" -H "X-Correlation-Id: ${corr}" -H "Content-Type: application/json" \
       ${body:+--data "${body}"} "http://127.0.0.1:${port}/api/v1${path}"
     ;;
+  set)
+    [ $# -eq 2 ] && [[ "$2" == *=* ]] || die "uso: set <apartment_id> NOME=VALORE"
+    apt="$1"; name="${2%%=*}"; value="${2#*=}"; valid_id "${apt}"; valid_setting_name "${name}"
+    [[ "${value}" =~ ^[A-Za-z0-9._:/-]{1,128}$ ]] || die "valore non valido per ${name}: lettere, cifre e . _ : / -"
+    change_setting "${apt}" "${name}" "${value}"
+    ;;
+  unset)
+    [ $# -eq 2 ] || die "uso: unset <apartment_id> NOME"
+    apt="$1"; name="$2"; valid_id "${apt}"; valid_setting_name "${name}"
+    change_setting "${apt}" "${name}"
+    ;;
   status)
     [ $# -eq 1 ] || die "uso: status <apartment_id>"
     apt="$1"; valid_id "${apt}"
     cat "$(settings_file "${apt}")"
+    if [ -s "$(engine_settings_file "${apt}")" ]; then
+      echo "impostazioni del motore ($(engine_settings_file "${apt}")):"
+      cat "$(engine_settings_file "${apt}")"
+    else
+      echo "impostazioni del motore: tutte ai valori predefiniti"
+    fi
     docker ps --filter "name=engine-${apt}" --format '{{.Names}}  {{.Image}}  {{.Status}}'
     wait_healthy "${apt}"
     ;;
   *)
-    die "uso: install | update | key | status | backup | backup-all | restore | api (vedi l'intestazione)"
+    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api (vedi l'intestazione)"
     ;;
 esac

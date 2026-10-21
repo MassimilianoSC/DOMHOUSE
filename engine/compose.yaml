@@ -2,6 +2,8 @@
 # scripts/engine-vm.sh (procedura in docs/motore-vm.md), che per ogni appartamento scrive due file fuori dal repository:
 #   /opt/domhouse/<apartment_id>.settings   APARTMENT_ID, PORT, CONNECTOR, ENGINE_IMAGE (niente segreti)
 #   /etc/domhouse/<apartment_id>.env        API_KEY=<segreto langbrain-api-key-<apartment_id>>, permessi 600
+# e, solo se si cambia un'impostazione del motore (engine-vm.sh set/unset, D-131), un terzo file senza segreti:
+#   /etc/domhouse/<apartment_id>.settings.env   per esempio CONFIRM_ON_WATTS=30; facoltativo
 # e poi lancia, per quell'appartamento:
 #   docker compose --env-file /opt/domhouse/<apartment_id>.settings -f /opt/domhouse/compose.yaml up -d
 # Porta 81xx sull'IP interno della VM (quella dell'indirizzo dell'istanza nell'app), dati in /data/<apartment_id>
@@ -23,6 +25,8 @@ services:
     env_file:
       - path: /etc/domhouse/${APARTMENT_ID}.env
         required: true
+      - path: /etc/domhouse/${APARTMENT_ID}.settings.env
+        required: false
     ports:
       - "${PORT}:${PORT}"
     volumes:
