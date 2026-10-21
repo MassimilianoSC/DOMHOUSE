@@ -126,12 +126,18 @@ def _set_claims():
     return mod
 
 
-def test_set_claims_writes_one_environment_and_migrates_the_flat_ones():
+def test_set_claims_writes_one_environment_and_keeps_the_flat_ones_for_the_old_bff():
+    """The flat claims stay (the production BFF of before P-67 reads only those): the commands run in any order."""
     sc = _set_claims()
-    after = sc.env_claims_after({"tenant_id": TENANT, "role": "admin"}, "staging", "t-prova", "viewer")
-    assert after == {"prod": {"tenant_id": TENANT, "role": "admin"}, "staging": {"tenant_id": "t-prova", "role": "viewer"}}
-    assert sc.env_claims_after(after, "prod", TENANT, "operator")["staging"] == {"tenant_id": "t-prova", "role": "viewer"}
-    assert sc.migrated({"tenant_id": TENANT, "role": "admin", "altro": 1}) == {"altro": 1, "prod": {"tenant_id": TENANT,
-                                                                                                    "role": "admin"}}
-    assert sc.migrated({"prod": {"tenant_id": TENANT, "role": "admin"}}) is None     # already per environment
+    flat = {"tenant_id": TENANT, "role": "admin"}
+    after = sc.env_claims_after(flat, "staging", "t-prova", "viewer")
+    assert after == {**flat, "prod": {"tenant_id": TENANT, "role": "admin"}, "staging": {"tenant_id": "t-prova", "role": "viewer"}}
+    again = sc.env_claims_after(after, "prod", TENANT, "operator")
+    assert again["prod"] == {"tenant_id": TENANT, "role": "operator"} and (again["tenant_id"], again["role"]) == (TENANT, "operator")
+    assert again["staging"] == {"tenant_id": "t-prova", "role": "viewer"}
+    assert sc.migrated({**flat, "altro": 1}) == {**flat, "altro": 1, "prod": {"tenant_id": TENANT, "role": "admin"}}
+    assert sc.migrated({**flat, "prod": {"tenant_id": TENANT, "role": "admin"}}) is None   # already done
     assert sc.migrated(None) is None
+    # what each BFF reads after the migration: the old one the flat claims, the new one its own environment's
+    migrated = sc.migrated(flat)
+    assert (migrated["tenant_id"], migrated["role"]) == (TENANT, "admin") and migrated["prod"]["role"] == "admin"

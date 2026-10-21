@@ -11,7 +11,9 @@ P-67 (D-136): one Firebase Auth for production and staging, so the claims are pe
 role}, "staging": {...}}: --env prod (default) or --env staging writes only that one and keeps the other. In staging no
 session is revoked (it would sign the person out of production too). The flat claims of before P-67 are rewritten:
   python scripts/set_claims.py --migrate-claims            # says what would change
-  python scripts/set_claims.py --migrate-claims --apply    # flat tenant_id/role -> {"prod": {...}}, no session revoked
+  python scripts/set_claims.py --migrate-claims --apply    # adds {"prod": {...}} next to the flat tenant_id/role
+The flat claims are never removed: the production BFF of before P-67 reads only those, so the commands can run in any
+order, also before the new BFF is published (which reads the per-environment ones first, and staging never the flat).
 --tenant-name only creates or renames the tenant record in the repository: no claims, no session revoked.
   REPOSITORY=firestore GCP_PROJECT_ID=<project> python scripts/set_claims.py --platform-add persona@esempio.it
   REPOSITORY=firestore GCP_PROJECT_ID=<project> python scripts/set_claims.py --platform-list
@@ -33,23 +35,25 @@ ENVS = ("prod", "staging")
 
 
 def env_claims_after(current: dict | None, env: str, tenant_id: str, role: str) -> dict:
-    """The custom claims with this environment's tenant and role, the other environment kept; flat claims of before
-    P-67 become production's."""
+    """The custom claims with this environment's tenant and role, the other environment kept. The flat claims of before
+    P-67 are KEPT (the production BFF of before P-67 reads only those: no one loses access whatever the order of the
+    commands) and copied as production's when there is none."""
     claims = dict(current or {})
-    flat = {k: claims.pop(k) for k in ("tenant_id", "role") if k in claims}
-    if flat.get("tenant_id") and "prod" not in claims:
-        claims["prod"] = {"tenant_id": flat["tenant_id"], "role": flat.get("role")}
+    if claims.get("tenant_id") and "prod" not in claims:
+        claims["prod"] = {"tenant_id": claims["tenant_id"], "role": claims.get("role")}
     claims[env] = {"tenant_id": tenant_id, "role": role}
+    if env == "prod" and claims.get("tenant_id"):        # the old BFF keeps reading the same production role
+        claims["tenant_id"], claims["role"] = tenant_id, role
     return claims
 
 
 def migrated(current: dict | None) -> dict | None:
-    """The claims rewritten per environment, or None when there is nothing to rewrite."""
+    """The claims with production's copy of the flat ones next to them (the flat ones stay, for the BFF of before
+    P-67), or None when there is nothing to add."""
     claims = dict(current or {})
-    if not claims.get("tenant_id"):
+    if not claims.get("tenant_id") or isinstance(claims.get("prod"), dict):
         return None
-    flat = {k: claims.pop(k) for k in ("tenant_id", "role") if k in claims}
-    claims.setdefault("prod", {"tenant_id": flat["tenant_id"], "role": flat.get("role")})
+    claims["prod"] = {"tenant_id": claims["tenant_id"], "role": claims.get("role")}
     return claims
 
 
