@@ -212,9 +212,10 @@ normale di prova con un **operatore**.
 
 | N. | Ruolo | Passi | Risultato atteso | Esito |
 |---|---|---|---|---|
-| M1 📱 | Qualsiasi | Menu dell'appartamento > «Riepiloghi» (dopo «Consumi»). | L'elenco delle settimane dalla più recente, ciascuna con «Settimana dal … al …» e «N segnalazioni» oppure «Nessuna novità»; su un appartamento appena creato «Nessun riepilogo ancora: il primo arriva il lunedì dopo una settimana completa». | |
+| M1 📱 | Qualsiasi | Menu dell'appartamento > «Riepiloghi» (dopo «Consumi»). | L'elenco delle settimane dalla più recente, ciascuna con «Settimana dal … al …» e «N segnalazioni» oppure «Nessuna novità»; su un appartamento appena creato «Nessun riepilogo ancora. Ogni lunedì mattina arriva quello della settimana appena finita.» | |
 | M2 | Qualsiasi (su un dimostrativo) | Apri la settimana più recente. | Le frasi del riepilogo (o «Settimana senza novità») e il riquadro «Consumi a parità di occupazione» con notti, kWh per notte, mediana delle 4 settimane prima e stato («Nella norma», «Alto», «Confronto non disponibile», «Nessuna notte»). | |
-| M3 | Qualsiasi | Impostazioni > Notifiche. | La voce «Riepilogo» è attiva dall'inizio, con «Ogni lunedì, solo se la settimana ha qualcosa da segnalare»; si spegne e si salva con le altre. | |
+| M3 | Qualsiasi | Impostazioni > Notifiche. | La voce «Riepilogo» (ultima delle cinque) è attiva dall'inizio, con «Ogni lunedì, solo se la settimana ha qualcosa da segnalare»; spegnerla e riaccenderla dà «Preferenze salvate». | |
+| M5 | Qualsiasi (su un dimostrativo, entro pochi minuti dalla pubblicazione) | Apri «Riepiloghi». | C'è la settimana appena finita; nel riquadro dei consumi compare «dati insufficienti …» con la data (i dimostrativi non hanno ancora 5 settimane di dati veri). | |
 | M4 | Telefono con notifiche attive | Il lunedì mattina dopo le 8, su un appartamento con qualcosa da segnalare. | Arriva UNA notifica «Riepilogo»; toccandola si apre la pagina di quella settimana. Nessuna notifica per una settimana senza novità. | |
 
 ## K. Rendiconti dei consumi in Excel

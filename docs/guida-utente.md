@@ -289,8 +289,9 @@ domotico non raggiungibile, soggiorno non ancora iniziato), compare il motivo.
 ### Riepiloghi
 Ogni lunedì dalle 8 del mattino (ora dell'appartamento) trovi il riepilogo della settimana appena finita, da lunedì a
 domenica: voce «Riepiloghi» nel menu dell'appartamento, elenco delle settimane dalla più recente («Settimana dal … al …»
-con «N segnalazioni» oppure «Nessuna novità»); finché non c'è nessun riepilogo compare «Nessun riepilogo ancora: il
-primo arriva il lunedì dopo una settimana completa». I riepiloghi restano consultabili per 12 mesi. Ogni riepilogo dice,
+con «N segnalazioni» oppure «Nessuna novità»); finché non c'è nessun riepilogo compare «Nessun riepilogo ancora. Ogni
+lunedì mattina arriva quello della settimana appena finita.» I riepiloghi restano consultabili per 12 mesi; in alto nella
+pagina di una settimana c'è «calcolato il …» con data e ora. Ogni riepilogo dice,
 con frasi già pronte:
 - se i consumi sono stati alti. Le notti con ospiti si confrontano con le notti con ospiti delle 4 settimane prima, quelle
   senza ospiti con quelle senza ospiti, sia in totale sia per ogni misuratore (riquadro «Consumi a parità di occupazione»,
