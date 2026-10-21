@@ -99,7 +99,8 @@
       "celsius": "Temperatura (°C)",
       "humidity_percent": "Umidità (%)",
       "hours_before": "Ore prima del check-in",
-      "minutes_after": "Minuti dopo il check-out"
+      "minutes_after": "Minuti dopo il check-out",
+      "presence_minutes": "Minuti di presenza dopo il check-out"
     },
     "desc": {
       "window_open_off": "Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.",
@@ -107,9 +108,28 @@
       "frost_protection": "Con la casa vuota mantiene almeno questa temperatura.",
       "mold_protection": "Con la casa vuota deumidifica sopra questa soglia.",
       "prearrival": "Porta la casa in comfort prima dell'arrivo degli ospiti.",
-      "checkout_eco": "Passa a casa vuota dopo il check-out.",
+      "checkout_eco": "Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.",
       "compressor_min_off": "Pausa minima tra spegnimento e riaccensione del compressore.",
       "offline_alert": "Avvisa quando un dispositivo resta offline oltre i minuti indicati."
+    },
+    "proposal": {
+      "title": "Chiedi all'assistente",
+      "hint": "Scrivi che cosa vuoi cambiare: l'assistente prepara la modifica, tu la controlli e la applichi. Niente cambia finché non premi «Applica».",
+      "placeholder": "Es. «la finestra aperta spegne dopo 10 minuti»",
+      "counter": "{count}/{max} caratteri",
+      "ask": "Proponi",
+      "asking": "Preparo la proposta…",
+      "changesTitle": "Modifiche proposte",
+      "state": "Stato",
+      "on": "attiva",
+      "off": "spenta",
+      "unsaved": "Salva o annulla prima le modifiche fatte a mano",
+      "apply": "Applica",
+      "discard": "Scarta",
+      "applied": "Regole aggiornate come proposto",
+      "logChange": "{label}, {field} da {from} a {to}",
+      "logEnabled": "{label} attivata",
+      "logDisabled": "{label} disattivata"
     }
   },
   "approvals": {
@@ -932,6 +952,9 @@
     "priceChanged": "{actor} ha cambiato il prezzo dell'energia {where} da {from} a {to} €/kWh",
     "priceRemoved": "{actor} ha tolto il prezzo dell'energia {where}",
     "priceAptRemoved": "{actor} ha tolto il prezzo dell'energia dell'appartamento {target}: vale quello dell'organizzazione",
+    "rulesByAssistant": "{actor} ha modificato le regole dell'appartamento {target} su proposta dell'assistente",
+    "rulesCopied": "{actor} ha copiato le regole da «{from}» all'appartamento {target}",
+    "rulesChanges": "{sentence}: {changes}",
     "actions": {
       "invite_sent": "{actor} ha invitato {target} come {role}",
       "invite_resent": "{actor} ha inviato di nuovo l'invito a {target}",
@@ -960,7 +983,8 @@
       "account_deleted": "{actor} ha eliminato il proprio account",
       "energy_price_changed": "{actor} ha cambiato il prezzo dell'energia di {target}",
       "apartment_simulated_changed": "{actor} ha cambiato il tipo di istanza dell'appartamento {target}",
-      "simulator_reset": "{actor} ha ripristinato lo stato iniziale dell'appartamento simulato {target}"
+      "simulator_reset": "{actor} ha ripristinato lo stato iniziale dell'appartamento simulato {target}",
+      "rules_changed": "{actor} ha modificato le regole dell'appartamento {target}"
     }
   },
   "errors": {

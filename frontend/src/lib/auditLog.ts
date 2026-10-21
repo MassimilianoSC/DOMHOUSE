@@ -2,6 +2,7 @@ import { t } from "@/i18n";
 import { isPseudonym } from "@/lib/describe";
 import { fmtDateTime } from "@/lib/format";
 import { fmtPrice } from "@/lib/price";
+import { describeChange } from "@/lib/ruleChanges";
 
 // «Registro attività» (P-47): who did what on what, as one Italian sentence. Names come resolved by the BFF at read
 // time; a person who no longer exists arrives with removed: true and no email or name (P-48).
@@ -12,7 +13,7 @@ export const AUDIT_ACTIONS = [
   "tenant_created", "tenant_renamed", "tenant_suspended", "tenant_reactivated",
   "support_access_requested", "support_access_opened", "support_access_approved", "support_access_rejected", "support_access_closed", "support_access_expired",
   "manager_added", "manager_removed", "account_deleted",
-  "energy_price_changed", "apartment_simulated_changed", "simulator_reset",
+  "energy_price_changed", "apartment_simulated_changed", "simulator_reset", "rules_changed",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -130,6 +131,17 @@ export function describeEntry(e: AuditEntry): { sentence: string; note: string |
       if (to === null) return { sentence: e.target.type === "apartment" ? t("audit.priceAptRemoved", v) : t("audit.priceRemoved", { ...v, where }), note };
       if (from === null) return { sentence: t("audit.priceSet", { ...v, where, to }), note };
       return { sentence: t("audit.priceChanged", { ...v, where, from, to }), note };
+    }
+    case "rules_changed": {
+      // Rules changed on the assistant's proposal or copied from another apartment (D-151), with the values that
+      // changed; the text the manager wrote is never saved. An unknown or missing source: the plain sentence.
+      const from = d.from_apartment && typeof d.from_apartment === "object" ? (d.from_apartment as Record<string, unknown>) : null;
+      const base =
+        d.source === "assistant" ? t("audit.rulesByAssistant", v)
+        : d.source === "copy" ? t("audit.rulesCopied", { ...v, from: text(from?.name) ?? text(from?.id) ?? "—" })
+        : t("audit.actions.rules_changed", v);
+      const changes = Array.isArray(d.changes) ? d.changes.filter((c) => c && typeof c === "object").map((c) => describeChange(c as Record<string, unknown>)) : [];
+      return { sentence: changes.length ? t("audit.rulesChanges", { sentence: base, changes: changes.join("; ") }) : base, note };
     }
     case "support_access_opened":
       return { sentence: t("audit.actions.support_access_opened", { ...v, until: fmtDateTime(text(d.expires_at)) }), note };

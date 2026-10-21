@@ -7,6 +7,7 @@ import { instanceApi } from "@/api/instance";
 import { useRole } from "@/auth/AuthProvider";
 import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { RuleProposalCard } from "@/components/rules/RuleProposalCard";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, Input, Skeleton, Switch, Tip } from "@/components/ui/primitives";
 import { t, tOr } from "@/i18n";
@@ -142,6 +143,15 @@ export default function RulesPage() {
     <div className="mx-auto max-w-4xl space-y-8 pb-24">
       <PageHeader title={t("rules.title")} subtitle={t("rules.subtitle")} testId="rules-header" />
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="rules-error" />}
+      {/* D-151: the assistant proposes, the manager applies; whoever only reads does not see it */}
+      {canWrite && q.data && (
+        <RuleProposalCard
+          aptId={aptId}
+          hasManualChanges={patches.length > 0}
+          onApplied={(res) => qc.setQueryData(["rules", aptId], res)}
+          onRulesChanged={() => void q.refetch()}
+        />
+      )}
       {q.data && <p className="text-xs text-muted-foreground" data-testid="rules-updated-at">{t("rules.updatedAt", { when: fmtDateTime(q.data.updated_at) })}</p>}
       {q.isLoading ? (
         <div className="grid gap-4 md:grid-cols-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}</div>

@@ -164,3 +164,35 @@ describe("istanza simulata e ripristino nel registro (D-97)", () => {
     expect(sentence({ action: "simulator_reset", target: apt })).toBe("Anna Rossi ha ripristinato lo stato iniziale dell'appartamento simulato «Milano Centro»");
   });
 });
+
+describe("regole modificate nel registro (D-151)", () => {
+  const apt = { type: "apartment" as const, id: "apt-001", label: "Milano Centro" };
+  const WINDOW = { rule_id: "window_open_off", label: "Finestra aperta spegne il clima", field: "minutes", old: 5, new: 10 };
+
+  it("su proposta dell'assistente, con i valori che cambiano", () => {
+    expect(sentence({ action: "rules_changed", target: apt, details: { source: "assistant", changes: [WINDOW] } }))
+      .toBe("Anna Rossi ha modificato le regole dell'appartamento «Milano Centro» su proposta dell'assistente: Finestra aperta spegne il clima, minuti da 5 a 10");
+  });
+
+  it("più valori separati da «;», una regola attivata o disattivata, un parametro con la sua etichetta", () => {
+    const changes = [
+      WINDOW,
+      { rule_id: "mold_protection", label: "Antimuffa", field: "enabled", old: true, new: false },
+      { rule_id: "checkout_eco", label: "Risparmio al check-out", field: "presence_minutes", old: 30, new: 45 },
+    ];
+    expect(sentence({ action: "rules_changed", target: apt, details: { source: "assistant", changes } }))
+      .toBe("Anna Rossi ha modificato le regole dell'appartamento «Milano Centro» su proposta dell'assistente: Finestra aperta spegne il clima, minuti da 5 a 10; Antimuffa disattivata; Risparmio al check-out, minuti di presenza dopo il check-out da 30 a 45");
+  });
+
+  it("copiate da un altro appartamento, con i valori che cambiano", () => {
+    expect(sentence({ action: "rules_changed", target: apt, details: { source: "copy", from_apartment: { id: "apt-bo", name: "Bologna" }, changes: [WINDOW] } }))
+      .toBe("Anna Rossi ha copiato le regole da «Bologna» all'appartamento «Milano Centro»: Finestra aperta spegne il clima, minuti da 5 a 10");
+    expect(sentence({ action: "rules_changed", target: apt, details: { source: "copy", from_apartment: { id: "apt-bo", name: "Bologna" } } }))
+      .toBe("Anna Rossi ha copiato le regole da «Bologna» all'appartamento «Milano Centro»");
+  });
+
+  it("fonte sconosciuta o mancante: la frase semplice", () => {
+    expect(sentence({ action: "rules_changed", target: apt, details: {} })).toBe("Anna Rossi ha modificato le regole dell'appartamento «Milano Centro»");
+    expect(sentence({ action: "rules_changed", target: apt, details: { source: "futuro" } })).toBe("Anna Rossi ha modificato le regole dell'appartamento «Milano Centro»");
+  });
+});
