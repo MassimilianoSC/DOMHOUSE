@@ -13,6 +13,19 @@
 #   sudo bash /opt/domhouse/engine-vm.sh api <apartment_id> <METHOD> <path> [json]  # call the local engine
 #   sudo bash /opt/domhouse/engine-vm.sh set <apartment_id> NOME=VALORE          # an engine setting, restart
 #   sudo bash /opt/domhouse/engine-vm.sh unset <apartment_id> NOME               # back to its default, restart
+#   sudo bash /opt/domhouse/engine-vm.sh check-all                               # the 5-minute watch (timer)
+#   sudo bash /opt/domhouse/engine-vm.sh timers                                  # (re)install the two timers
+#   sudo bash /opt/domhouse/engine-vm.sh logs-agent                              # engines' logs to Cloud Logging
+#
+# Watch (P-60 step 10, D-104, D-148): every 5 minutes the timer domhouse-engine-check.timer runs check-all, which asks
+# every installed engine for its /health and looks at the age of its newest backup, and writes to the VM's syslog (that
+# the Ops Agent already sends to Cloud Logging) one line per apartment, "engine ok <id>", "engine down <id>" (answers 503)
+# or "engine silent <id>" (does not answer), "backup missing <id> age_h=<n>" (newest backup older than BACKUP_ALERT_H),
+# then "domhouse-check: <n> motori, <m> muti". The alerts read those lines (scripts/monitoring/engine-alerts.sh): the
+# watch writes only while the VM is alive, so a silent VM gives one email, never one per apartment. The daily backup
+# writes "backup ok <id>". logs-agent adds to the Ops Agent a receiver for the engines' container logs (docker json-file,
+# parsed: level, msg, apartment_id) as the log "domhouse_engine", keeping the previous configuration as a copy; the
+# containers are never touched.
 #
 # Settings (D-131, P-60 step 7d): the engine's own settings of one apartment (e.g. CONFIRM_ON_WATTS) live in
 # /etc/domhouse/<apartment_id>.settings.env, no secrets, a second env_file of compose.yaml, optional. set and unset
@@ -33,8 +46,12 @@
 set -euo pipefail
 set +x                                   # never trace: a traced line could show the key
 
-OPT="${DOMHOUSE_OPT:-/opt/domhouse}"     # the two folders can be moved only by the tests
+OPT="${DOMHOUSE_OPT:-/opt/domhouse}"     # these folders can be moved only by the tests
 ETC="${DOMHOUSE_ETC:-/etc/domhouse}"
+DATA="${DOMHOUSE_DATA:-/data}"
+SYSTEMD="${DOMHOUSE_SYSTEMD:-/etc/systemd/system}"
+OPS_CONFIG="${DOMHOUSE_OPS_CONFIG:-/etc/google-cloud-ops-agent/config.yaml}"
+BACKUP_ALERT_H=26                        # D-148 (c): no backup for longer than this -> "backup missing"
 ENGINE_UID=10001
 METADATA=http://metadata.google.internal/computeMetadata/v1
 SECRET_PREFIX="${SECRET_PREFIX:-langbrain-api-key-}"
@@ -154,10 +171,10 @@ wait_healthy() {
   exit 1
 }
 
-db_of() { echo "/data/$1/engine.db"; }
+db_of() { echo "${DATA}/$1/engine.db"; }
 
 backup() {
-  local apt="$1" dir="/data/$1/backup" day file
+  local apt="$1" dir="${DATA}/$1/backup" day file
   [ -f "$(db_of "${apt}")" ] || die "$(db_of "${apt}") non esiste (motore mai avviato?)"
   install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${dir}"
   day="$(date -u +%Y-%m-%d)"
@@ -177,11 +194,12 @@ PY
   # the daily copies and, P-71 (D-142), the databases set aside by restore (before-restore-*.db and their -wal, -shm)
   find "${dir}" -maxdepth 1 \( -name 'engine-*.db' -o -name 'before-restore-*.db*' \) -mtime "+$((BACKUP_DAYS - 1))"     -print -delete | sed 's/^/tolto (oltre 7 giorni): /'
   echo "backup ${apt}: ${file} ($(stat -c %s "${file}") byte, integrity_check ok)"
+  logger -t domhouse-backup "backup ok ${apt} ${file}" 2>/dev/null || true   # D-148 (c): the trace in the syslog
 }
 
 install_timer() {
   step "Backup quotidiano (${BACKUP_AT}): domhouse-engine-backup.timer"
-  cat > /etc/systemd/system/domhouse-engine-backup.service <<UNIT
+  cat > "${SYSTEMD}/domhouse-engine-backup.service" <<UNIT
 [Unit]
 Description=DOMHOUSE engine: daily SQLite backup of every apartment (scripts/engine-vm.sh backup-all)
 
@@ -189,7 +207,7 @@ Description=DOMHOUSE engine: daily SQLite backup of every apartment (scripts/eng
 Type=oneshot
 ExecStart=/bin/bash ${OPT}/engine-vm.sh backup-all
 UNIT
-  cat > /etc/systemd/system/domhouse-engine-backup.timer <<UNIT
+  cat > "${SYSTEMD}/domhouse-engine-backup.timer" <<UNIT
 [Unit]
 Description=DOMHOUSE engine: daily SQLite backup, before the disk snapshot of 23:00 UTC
 
@@ -200,9 +218,94 @@ Persistent=true
 [Install]
 WantedBy=timers.target
 UNIT
+  step "Controllo ogni 5 minuti: domhouse-engine-check.timer (P-60 passo 10)"
+  cat > "${SYSTEMD}/domhouse-engine-check.service" <<UNIT
+[Unit]
+Description=DOMHOUSE engine: health of every engine and age of its backups, to the syslog (engine-vm.sh check-all)
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash ${OPT}/engine-vm.sh check-all
+UNIT
+  cat > "${SYSTEMD}/domhouse-engine-check.timer" <<UNIT
+[Unit]
+Description=DOMHOUSE engine: the 5-minute watch read by the alerts (scripts/monitoring/engine-alerts.sh)
+
+[Timer]
+OnBootSec=2min
+OnCalendar=*:0/5
+
+[Install]
+WantedBy=timers.target
+UNIT
   systemctl daemon-reload
-  systemctl enable --now domhouse-engine-backup.timer > /dev/null
-  systemctl list-timers domhouse-engine-backup.timer --no-pager | sed -n 1,2p
+  systemctl enable --now domhouse-engine-backup.timer domhouse-engine-check.timer > /dev/null
+  systemctl list-timers domhouse-engine-backup.timer domhouse-engine-check.timer --no-pager | sed -n 1,3p
+}
+
+watch_line() {
+  # one line to the syslog (tag domhouse-check, read by the alerts) and on screen
+  logger -t domhouse-check "$*" 2>/dev/null || true
+  echo "$*"
+}
+
+check_all() {
+  local total=0 silent=0 settings apt port code newest age_h
+  shopt -s nullglob
+  for settings in "${OPT}"/*.settings; do
+    apt="$(basename "${settings}" .settings)"
+    total=$((total + 1))
+    port="$(sed -n 's/^PORT=//p' "${settings}")"
+    code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://127.0.0.1:${port}/api/v1/health" 2>/dev/null || true)"
+    case "${code}" in
+      200) watch_line "engine ok ${apt}" ;;
+      503) watch_line "engine down ${apt} (risponde 503: connector o database)"; silent=$((silent + 1)) ;;
+      *)   watch_line "engine silent ${apt} (nessuna risposta, codice ${code:-nessuno})"; silent=$((silent + 1)) ;;
+    esac
+    newest="$(ls -1t "${DATA}/${apt}/backup"/engine-*.db 2>/dev/null | head -1 || true)"
+    if [ -n "${newest}" ]; then
+      age_h=$(( ( $(date +%s) - $(stat -c %Y "${newest}") ) / 3600 ))
+    elif [ -f "$(db_of "${apt}")" ]; then           # never backed up: count from the database's age
+      age_h=$(( ( $(date +%s) - $(stat -c %Y "$(db_of "${apt}")") ) / 3600 ))
+    else
+      age_h=0
+    fi
+    if [ "${age_h}" -gt "${BACKUP_ALERT_H}" ]; then
+      watch_line "backup missing ${apt} age_h=${age_h}"
+    fi
+  done
+  watch_line "domhouse-check: ${total} motori, ${silent} muti"
+}
+
+logs_agent() {
+  # the engines' container logs to Cloud Logging through the Ops Agent already installed; the previous configuration is
+  # kept once as config.yaml.before-domhouse
+  [ -f "${OPS_CONFIG}.before-domhouse" ] || { [ -f "${OPS_CONFIG}" ] && cp -p "${OPS_CONFIG}" "${OPS_CONFIG}.before-domhouse"; } || true
+  install -d -m 755 "$(dirname "${OPS_CONFIG}")"
+  cat > "${OPS_CONFIG}" <<'YAML'
+# DOMHOUSE (P-60 step 10, D-148), written by engine-vm.sh logs-agent: the engines' container logs (docker json-file,
+# one JSON line per event: ts, level, msg, apartment_id) to Cloud Logging as the log "domhouse_engine". The agent's
+# defaults (syslog, host metrics) stay as they are. The previous file is config.yaml.before-domhouse.
+logging:
+  receivers:
+    domhouse_engine:
+      type: files
+      include_paths:
+        - /var/lib/docker/containers/*/*-json.log
+  processors:
+    domhouse_docker:
+      type: parse_json
+    domhouse_line:
+      type: parse_json
+      field: log
+  service:
+    pipelines:
+      domhouse_engine:
+        receivers: [domhouse_engine]
+        processors: [domhouse_docker, domhouse_line]
+YAML
+  systemctl restart google-cloud-ops-agent
+  systemctl is-active google-cloud-ops-agent
 }
 
 start() {
@@ -229,9 +332,9 @@ case "${cmd}" in
     printf 'APARTMENT_ID=%s\nPORT=%s\nCONNECTOR=%s\nENGINE_IMAGE=%s\n' "${apt}" "${port}" "${connector}" "${image}" \
       > "$(settings_file "${apt}")"
     cat "$(settings_file "${apt}")"
-    step "Dati in /data/${apt} (proprietario ${ENGINE_UID})"
-    install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "/data/${apt}" "/data/${apt}/backup"
-    ls -ld "/data/${apt}"
+    step "Dati in ${DATA}/${apt} (proprietario ${ENGINE_UID})"
+    install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${DATA}/${apt}" "${DATA}/${apt}/backup"
+    ls -ld "${DATA}/${apt}"
     write_key "${apt}"
     install_timer
     start "${apt}" "${image}"
@@ -270,13 +373,13 @@ case "${cmd}" in
     [ $# -eq 2 ] || die "uso: restore <apartment_id> <file di backup>"
     apt="$1"; src="$2"; valid_id "${apt}"
     [ -f "$(settings_file "${apt}")" ] || die "${apt} non è installato"
-    [ -f "${src}" ] || src="/data/${apt}/backup/${src}"
+    [ -f "${src}" ] || src="${DATA}/${apt}/backup/${src}"
     [ -f "${src}" ] || die "file di backup non trovato: $2"
     python3 -c 'import sqlite3, sys; c = sqlite3.connect(sys.argv[1]); r = c.execute("PRAGMA integrity_check").fetchone()[0]; sys.exit(0 if r == "ok" else r)' "${src}" ||
       die "il file di backup non è integro"
     step "Ripristino di ${apt} da ${src}"
     compose "${apt}" stop
-    db="$(db_of "${apt}")"; keep="/data/${apt}/backup/before-restore-$(date -u +%Y%m%dT%H%M%SZ).db"
+    db="$(db_of "${apt}")"; keep="${DATA}/${apt}/backup/before-restore-$(date -u +%Y%m%dT%H%M%SZ).db"
     for ext in "" -wal -shm; do
       [ -f "${db}${ext}" ] && mv -f "${db}${ext}" "${keep}${ext}"
     done
@@ -306,6 +409,15 @@ case "${cmd}" in
     apt="$1"; name="$2"; valid_id "${apt}"; valid_setting_name "${name}"
     change_setting "${apt}" "${name}"
     ;;
+  check-all)
+    check_all
+    ;;
+  timers)
+    install_timer
+    ;;
+  logs-agent)
+    logs_agent
+    ;;
   status)
     [ $# -eq 1 ] || die "uso: status <apartment_id>"
     apt="$1"; valid_id "${apt}"
@@ -320,6 +432,6 @@ case "${cmd}" in
     wait_healthy "${apt}"
     ;;
   *)
-    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api (vedi l'intestazione)"
+    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | timers | logs-agent (vedi l'intestazione)"
     ;;
 esac
