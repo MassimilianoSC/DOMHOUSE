@@ -11,6 +11,7 @@ import { AdminSupportNotice, SupportBar, useOrgContextKey } from "@/components/s
 import { usePushBridge } from "@/hooks/usePushBridge";
 import { t } from "@/i18n";
 import { cn, env } from "@/lib/utils";
+import { EnvBanner } from "./EnvBanner";
 import { apartmentNav, globalNav, type NavItem } from "./navItems";
 
 function useNav() {
@@ -142,6 +143,8 @@ function MobileMenu() {
           <img src="/favicon.svg" alt="" className="h-7 w-7" />
           <span className="font-heading text-base font-extrabold leading-tight">{env.appName}</span>
         </div>
+        {/* P-67: inside the sticky header, so it stays in sight while scrolling, below the notch */}
+        <EnvBanner testId="env-banner-mobile" />
       </header>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 md:hidden" />
@@ -170,6 +173,8 @@ export function AppShell() {
     <div className="flex min-h-screen">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* P-67: the computer's band, on top of the content and sticky; the phone has its own in the header */}
+        <EnvBanner className="sticky top-0 z-30 hidden md:flex" testId="env-banner" />
         <MobileMenu />
         <main className="main-safe min-w-0 flex-1 px-4 pt-5 sm:px-6 lg:px-10 lg:pt-8">
           <SupportBar />

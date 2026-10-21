@@ -341,6 +341,10 @@
     "viewer": "Sola lettura",
     "platform": "Gestore della piattaforma"
   },
+  "envBanner": {
+    "staging": "Ambiente di prova",
+    "stagingHint": "i dati sono separati da quelli veri"
+  },
   "nav": {
     "apartments": "Appartamenti",
     "overview": "Panoramica",

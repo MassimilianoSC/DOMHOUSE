@@ -159,3 +159,20 @@ describe("telefono: niente barra in basso, menu a scomparsa (D-103)", () => {
     expect(within(screen.getByRole("complementary")).getByTestId("sidebar-logout-btn")).toBeInTheDocument();
   });
 });
+
+describe("ambiente di prova (P-67)", () => {
+  it("staging: la fascia «Ambiente di prova» nell'intestazione del telefono e sopra il contenuto del computer", async () => {
+    open("/a/apt-001");
+    await screen.findByTestId("mobile-menu-btn");
+    expect(within(screen.getByRole("banner")).getByTestId("env-banner-mobile")).toHaveTextContent(t("envBanner.staging"));
+    expect(screen.getByTestId("env-banner")).toHaveTextContent(t("envBanner.staging"));
+  });
+
+  it("produzione: nessuna fascia", async () => {
+    s.me = { ...me("admin"), env: { app_env: "prod", auth_mode: "firebase", fcm_enabled: false, instance_mode: "real" } };
+    open("/a/apt-001");
+    await screen.findByTestId("mobile-menu-btn");
+    expect(screen.queryByTestId("env-banner-mobile")).toBeNull();
+    expect(screen.queryByTestId("env-banner")).toBeNull();
+  });
+});
