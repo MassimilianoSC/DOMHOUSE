@@ -141,10 +141,14 @@ def spread(wh: float, start: datetime, end: datetime) -> list[tuple[str, float]]
     if end <= start:
         return [(hour_of(end), wh)]
     total = (end - start).total_seconds()
-    out, cur = [], start
+    out, cur, given = [], start, 0.0
     while cur < end:
         nxt = min(cur.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1), end)
-        out.append((hour_of(cur), wh * (nxt - cur).total_seconds() / total))
+        # the last hour takes what is left: the pieces add up to exactly wh (wh * s / total is not exact in floating
+        # point, e.g. 499.99999999999994 for 500 with timestamps to the microsecond, as on Linux)
+        piece = wh - given if nxt == end else wh * ((nxt - cur).total_seconds() / total)
+        out.append((hour_of(cur), piece))
+        given += piece
         cur = nxt
     return out
 

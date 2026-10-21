@@ -252,3 +252,14 @@ def test_a_restart_on_sqlite_keeps_the_profile_and_a_plain_engine_has_none(tmp_p
     second.store.close()
     plain = core.ApartmentEngine("apt-prova-01", NoCounterAtLoad(), seed=False)
     assert report(plain, datetime(2026, 3, 1, tzinfo=ROME), datetime(2026, 3, 31, tzinfo=ROME), "day")["total_kwh"] == 0
+
+
+def test_spread_pieces_add_up_exactly_also_with_microseconds():
+    """Linux timestamps have microseconds: 500 Wh in one hour must be stored as 500, not 499.99999999999994 (the red of
+    the lot 20 run in the Linux container)."""
+    start = datetime(2026, 10, 21, 11, 16, 2, 497_000, tzinfo=UTC)       # the last reading, saved to the millisecond
+    for us in (1, 8, 36):                     # wh * s / total gave 499.99999999999994 for these (measured on 21 Oct)
+        assert core.spread(500.0, start, start + timedelta(microseconds=us)) == [("2026-10-21T11:00Z", 500.0)]
+    end = start + timedelta(hours=2, minutes=13, microseconds=7)            # across three hours
+    for wh in (500.0, 100.0, 0.1, 1234.5678):
+        assert sum(w for _, w in core.spread(wh, start, end)) == wh
