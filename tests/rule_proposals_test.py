@@ -27,16 +27,22 @@ def run(coro):
     return asyncio.run(coro)
 
 
+def name(apartment_id):
+    return run(get_repository().get_apartment(apartment_id)).name
+
+
 @pytest.fixture
 def engines(monkeypatch):
     """One real engine per apartment behind GET/PUT /rules; `state.puts` = (apartment, actor, body) of every PUT."""
     state = type("S", (), {})()
-    state.engines, state.puts = {}, []
+    state.engines, state.puts, state.down = {}, [], set()
 
     async def fake(apt, method, path, **kw):
         e = state.engines.setdefault(apt.apartment_id,
                                      core.ApartmentEngine(apt.apartment_id, SimulatedConnector(), seed=False))
         assert path == "/rules"
+        if apt.apartment_id in state.down:
+            raise httpx.ConnectError("down")
         if method == "GET":
             return httpx.Response(200, json=e.ruleset(), request=httpx.Request("GET", "http://x"))
         state.puts.append((apt.apartment_id, kw["actor"], kw["json"]))
@@ -162,3 +168,79 @@ def test_customized_values():
                               {"rule_id": "prearrival", "enabled": False}]}, "prova@hqe.it", "c")
     assert [(c["rule_id"], c["field"]) for c in rp.customized(e.ruleset())] == [("prearrival", "enabled"),
                                                                                 ("offline_alert", "minutes")]
+
+
+# -------- 12d: copy the rules to other apartments (D-151 point 22) --------
+@pytest.fixture
+def more_apartments(engines):
+    """Two more apartments of the demo organisation: one disabled, one whose instance does not answer."""
+    repo = get_repository()
+    rimini = run(repo.get_apartment(RIMINI))
+    extra = {"apt-spenta-01": rimini.model_copy(update={"apartment_id": "apt-spenta-01", "name": "Spenta", "enabled": False}),
+             "apt-giu-01": rimini.model_copy(update={"apartment_id": "apt-giu-01", "name": "Giù"})}
+    for a in extra.values():
+        run(repo.upsert_apartment(a))
+    yield engines
+    for apt_id in extra:
+        run(repo.delete_apartment(apt_id))
+
+
+def copy(path, body, who=ADMIN, apt=BOLOGNA):
+    return run(post(f"/app/apartments/{apt}/rules/copy{path}", body, who))
+
+
+def test_copy_preview_then_one_decision_per_apartment(engines, monkeypatch):
+    rimini = core.ApartmentEngine(RIMINI, SimulatedConnector(), seed=False)
+    engines.engines[RIMINI] = rimini
+    rimini.update_rules({"rules": [{"rule_id": "offline_alert", "params": {"minutes": 60}}]}, "x@hqe.it", "c")
+    src = core.ApartmentEngine(BOLOGNA, SimulatedConnector(), seed=False)
+    engines.engines[BOLOGNA] = src
+    src.update_rules({"rules": [{"rule_id": "window_open_off", "params": {"minutes": 12}},
+                                {"rule_id": "prearrival", "enabled": False}]}, "x@hqe.it", "c")
+    p = copy("/preview", {"to": [RIMINI]})
+    assert p.status_code == 200
+    p = p.json()
+    t = p["targets"][0]
+    assert t["status"] == "changes" and t["name"] == name(RIMINI)
+    assert [(c["rule_id"], c["field"], c["old"], c["new"]) for c in t["changes"]] == [
+        ("window_open_off", "minutes", 5, 12), ("prearrival", "enabled", True, False), ("offline_alert", "minutes", 60, 15)]
+    assert t["customized"] == [{"rule_id": "offline_alert", "label": "Avviso dispositivo offline", "field": "minutes",
+                                "value": 60, "default": 15}]          # (d): the warning, before the confirmation
+    assert engines.puts == []                                         # the preview changes nothing
+    r = copy("", {"to": [RIMINI], "from_based_on": p["from"]["based_on"],
+                  "based_on": {x["apartment_id"]: x["based_on"] for x in p["targets"]}})
+    assert r.status_code == 200 and r.json()["results"][0]["outcome"] == "applied"
+    assert rimini.rule("window_open_off")["params"]["minutes"] == 12 and rimini.rule("prearrival")["enabled"] is False
+    d = rimini.decisions[-1]
+    assert d["action"] == "update_rules" and actors.is_pseudonym(d["actor"][5:])
+    entry = run(get_repository().list_audit("t-flatsharing-demo", 5, None))[0]
+    assert entry.action == "rules_changed" and entry.target.id == RIMINI
+    assert entry.details["source"] == "copy" and entry.details["from_apartment"] == {"id": BOLOGNA, "name": name(BOLOGNA)}
+    assert len(entry.details["changes"]) == 3
+    # the same copy again: the destination changed since that preview
+    r = copy("", {"to": [RIMINI], "from_based_on": p["from"]["based_on"],
+                  "based_on": {x["apartment_id"]: x["based_on"] for x in p["targets"]}})
+    assert r.json()["results"][0]["outcome"] == "changed_meanwhile"
+    p = copy("/preview", {"to": [RIMINI]}).json()
+    assert p["targets"][0]["status"] == "same" and p["targets"][0]["customized"] == []
+
+
+def test_copy_outcomes_per_apartment_and_who_can(more_apartments):
+    engines = more_apartments
+    engines.down = {"apt-giu-01"}
+    p = copy("/preview", {"to": [RIMINI, "apt-spenta-01", "apt-giu-01"]}).json()
+    assert [(t["apartment_id"], t["status"]) for t in p["targets"]] == [
+        (RIMINI, "same"), ("apt-spenta-01", "disabled"), ("apt-giu-01", "unreachable")]
+    body = {"to": [RIMINI, "apt-spenta-01", "apt-giu-01"], "from_based_on": p["from"]["based_on"],
+            "based_on": {t["apartment_id"]: t["based_on"] for t in p["targets"]}}
+    assert [r["outcome"] for r in copy("", body).json()["results"]] == ["same", "disabled", "unreachable"]
+    assert engines.puts == []
+    engines.engines[BOLOGNA].update_rules({"rules": [{"rule_id": "frost_protection", "params": {"celsius": 9}}]}, "x@hqe.it", "c")
+    r = copy("", body)                                                  # the source changed since the preview
+    assert r.status_code == 409 and r.json()["error"] == "rules_changed"
+    assert copy("/preview", {"to": [RIMINI]}, who=OPERATOR).status_code == 403          # (a) admins only
+    assert copy("", body, who=OPERATOR).status_code == 403
+    assert copy("/preview", {"to": [BOLOGNA]}).status_code == 422                       # not onto itself
+    assert copy("/preview", {"to": []}).status_code == 422
+    assert copy("/preview", {"to": ["apt-altra-01"]}).status_code == 404               # another organisation's
+    assert copy("", {"to": [RIMINI]}).status_code == 422                                # without the preview

@@ -75,6 +75,8 @@ per utente»).
 | 37 | `GET /app/apartments/{id}/summaries/{week}` | `get_summary` | USER, sugli appartamenti che vede (404 fuori lista) | il riepilogo intero (vedi «Riepilogo settimanale»); 404 `not_found` «Riepilogo inesistente» | pagina del riepilogo, link del push (o2) | tutti |
 | 38 | `POST /app/apartments/{id}/rules/proposal` | `propose` (`routes/rules.py` → `bff/rule_proposals.py`) | operator o admin, sugli appartamenti che vede (404 fuori lista, 403 a chi legge soltanto) | `{based_on, rules, changes, explanation}` (vedi «Regole proposte dall'assistente»); 422 `bad_request` (testo vuoto), `text_too_long` (oltre 500 caratteri); 429 `daily_limit`, `monthly_cap`; 409 `apartment_disabled`; 502 `instance_unreachable`, `model_unavailable`, `model_error`; 504 `timeout` | riquadro «Chiedi all'assistente» della pagina Regole (o2) | tutti |
 | 39 | `POST /app/apartments/{id}/rules/proposal/apply` | `apply` | come #38 | il `RuleSet` del motore dopo la modifica; 409 `rules_changed` «Le regole sono cambiate nel frattempo: rifai la richiesta»; 422 `bad_request`, `nothing_to_change`, `unknown_rule`, `rule_not_editable`, `unknown_param`, `param_out_of_range`, `invalid_range`; 502 `instance_unreachable` | «Applica» della proposta (o2) | – |
+| 40 | `POST /app/apartments/{id}/rules/copy/preview` | `copy_preview` (`routes/rules.py`) | admin, sugli appartamenti che vede (404 se uno qualsiasi è fuori lista o di un'altra organizzazione) | `{from, rules, targets}` (vedi «Copia delle regole»); 403 a chi non è admin; 422 `bad_request` (nessuna destinazione), `same_apartment`, `too_many` (oltre 100); 409 `apartment_disabled` (partenza); 502 `instance_unreachable` (partenza) | anteprima della copia (o2) | tutti |
+| 41 | `POST /app/apartments/{id}/rules/copy` | `copy_rules` | come #40 | `{from, results}`: l'esito per appartamento; 409 `rules_changed` se le regole di partenza sono cambiate dopo l'anteprima; 422 `bad_request` senza `based_on` e `from_based_on` | conferma della copia (o2) | tutti |
 
 ## Piattaforma (P-36, D-61a / D-62 / D-64 / D-65)
 
@@ -155,7 +157,7 @@ dell'azione; email risolta per `user` e `manager`.
 | `energy_price_changed` | #20, #25 (P-52) | `apartment` \| `tenant` | `{from, to}` (€/kWh o null) |
 | `apartment_simulated_changed` | piattaforma, anche quando ricollega l'appartamento (D-97) | `apartment` | `{from, to}` |
 | `simulator_reset` | #35 | `apartment` | `{}` |
-| `rules_changed` | #39 | `apartment` | `{source: "assistant", changes: [{rule_id, label, field, old, new}]}` |
+| `rules_changed` | #39, #41 (una voce per appartamento di destinazione) | `apartment` | `{source: "assistant", changes: [{rule_id, label, field, old, new}]}`; dalla copia `{source: "copy", from_apartment: {id, name}, changes: […]}` |
 
 | `tenant_suspended`, `tenant_reactivated` | piattaforma | `tenant` | `{reason}` / `{}` |
 | `support_access_opened` | il gestore (attore `support`, persona visibile anche all'admin), PRIMA dell'apertura | `support_access` (label = organizzazione) | `{hours, expires_at, reason}` |
@@ -563,6 +565,42 @@ Esempio di risposta di #38 a «la finestra aperta spegne dopo 10 minuti e la pre
   numerici in più in una regola fissa; non è una modifica del contratto. Il primo è `presence_minutes` di
   `checkout_eco` (minuti di presenza dopo il check-out, da 5 a 180): il primo valore viene da
   `CHECKOUT_PRESENCE_MINUTES` del motore, poi si cambia dall'app.
+
+## Copia delle regole (P-60 passo 12, D-151 punto 22)
+
+Solo gli amministratori. Si copiano tutte le regole modificabili dell'appartamento di partenza (attiva o spenta e
+parametri) sugli appartamenti scelti, sempre in due tempi.
+
+1. **Anteprima (#40)**, corpo `{"to": ["apt-rimini-01", …]}`. Non cambia niente. Esempio di risposta:
+
+```json
+{
+  "from": {"apartment_id": "apt-bologna-01", "name": "Bologna", "based_on": "2026-10-21T14:00:00.000Z"},
+  "rules": [{"rule_id": "window_open_off", "enabled": true, "params": {"minutes": 12}}, "…"],
+  "targets": [
+    {"apartment_id": "apt-rimini-01", "name": "Rimini", "based_on": "2026-10-20T09:00:00.000Z", "status": "changes",
+     "changes": [{"rule_id": "window_open_off", "label": "Finestra aperta spegne il clima", "field": "minutes", "old": 5, "new": 12},
+                 {"rule_id": "offline_alert", "label": "Avviso dispositivo offline", "field": "minutes", "old": 60, "new": 15}],
+     "customized": [{"rule_id": "offline_alert", "label": "Avviso dispositivo offline", "field": "minutes", "value": 60, "default": 15}]}
+  ]
+}
+```
+
+   `status` per destinazione: `changes` (con `changes`, i valori che cambiano), `same` («Già uguale, nessuna
+   modifica»), `disabled`, `unreachable`, `refused` (un valore fuori dai limiti di quella destinazione, con `message`).
+   `customized` non vuoto vuol dire che la destinazione ha regole personalizzate, cioè valori diversi da quelli
+   predefiniti, che verranno sovrascritte: l'avviso va mostrato prima della conferma. I valori predefiniti sono quelli
+   dell'esempio di `GET /rules` del contratto, più `presence_minutes` 30.
+
+2. **Conferma (#41)**, corpo `{"to": […], "from_based_on": from.based_on, "based_on": {"<apartment_id>":
+   targets[i].based_on, …}}` presi dall'anteprima. Per ogni destinazione una `PUT /rules` con lo pseudonimo
+   dell'amministratore e un identificativo di correlazione suo, quindi una decisione nel motore per appartamento, e una
+   voce `rules_changed` nel registro attività. Risposta `{"from": {…}, "results": [{apartment_id, name, outcome,
+   message, changes}]}` con `outcome`: `applied`, `same`, `changed_meanwhile` (regole della destinazione cambiate dopo
+   l'anteprima: non toccata), `disabled`, `unreachable`, `refused` (con il `message` del motore). Se sono cambiate le
+   regole di partenza risponde 409 `rules_changed` e non tocca niente.
+
+Una destinazione con un motore che non ha ancora un parametro (per esempio `presence_minutes`) riceve gli altri.
 
 ## Passaggio verso il modello (P-60 passo 9, D-132, D-143, D-144)
 
