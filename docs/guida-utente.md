@@ -79,6 +79,12 @@ un sistema che non è il suo, né ricevere le prenotazioni di una struttura altr
   di un operatore (sezione 5, Assistente).
 - **Ambiente di prova** (dopo la separazione degli ambienti): i dimostrativi passano nel sito di prova, con la fascia
   gialla in alto; il sito vero resta per gli appartamenti veri (sezione 7).
+- **Regole proposte dall'assistente**: nella pagina Regole puoi scrivere che cosa vuoi cambiare, per esempio «la
+  finestra aperta spegne dopo 10 minuti». L'assistente propone la modifica con il valore di prima e quello nuovo, e
+  cambia solo quando premi «Applica».
+- **Copia delle regole** (solo amministratori): le regole di un appartamento si possono copiare su altri appartamenti
+  dell'organizzazione, dopo un'anteprima.
+- **Minuti di presenza dopo il check-out**: nuovo valore nella regola «Risparmio al check-out».
 
 ---
 
@@ -320,9 +326,28 @@ Le otto regole (valori di partenza e limiti):
 - **Antigelo a casa vuota**: accende la caldaia sotto 8 °C (da 5 a 12), anche se è disabilitata.
 - **Antimuffa a casa vuota**: avviso sopra il 65 % di umidità (da 50 a 80), una volta al giorno.
 - **Pre-arrivo**: prepara l'appartamento 2 ore prima del check-in (da 0 a 6).
-- **Risparmio al check-out**: mette l'appartamento a vuoto 30 minuti dopo il check-out (da 0 a 180).
+- **Risparmio al check-out**: mette l'appartamento a vuoto 30 minuti dopo il check-out (da 0 a 180); «Minuti di presenza
+  dopo il check-out» (da 5 a 180, iniziale 30): se il sensore di movimento ha visto qualcuno in questi ultimi minuti dopo
+  l'orario di partenza, l'app ti chiede prima di mettere l'appartamento a vuoto.
 - **Pausa minima del compressore**: 3 minuti fra uno spegnimento e la riaccensione del clima (non modificabile).
 - **Avviso dispositivo offline**: avviso dopo 15 minuti senza contatto (da 5 a 120).
+
+**Chiedi all'assistente** (operatori e amministratori), in alto nella pagina Regole: scrivi in italiano che cosa vuoi
+cambiare (al massimo 500 caratteri) e premi «Proponi». Compare «Modifiche proposte»: quale regola, quale valore, prima
+e dopo (per esempio «Finestra aperta spegne il clima · Minuti: 5 → 10»), con la frase dell'assistente e i pulsanti
+«Applica» e «Scarta». Niente cambia finché non premi «Applica». Se la richiesta è fuori dai limiti della regola o non
+riguarda le regole, lo dice e non propone niente. Se nel frattempo qualcuno ha cambiato le regole, l'app chiede di
+rifare la richiesta; se hai modifiche fatte a mano non salvate, «Applica» resta disattivato finché non le salvi o le
+annulli. Al massimo 20 richieste al giorno per appartamento. La modifica compare nelle Decisioni con il tuo nome e nel
+registro attività («regole modificate»); quello che scrivi non viene conservato. Sui dimostrativi l'assistente delle
+regole capisce frasi semplici come «finestra 10 minuti», «antigelo 10 gradi», «spegni la regola dell'antimuffa»,
+«presenza al check-out 45 minuti», «setpoint da 18 a 25».
+
+**Copia su altri appartamenti** (solo amministratori): scegli gli appartamenti di destinazione. L'anteprima mostra per
+ciascuno che cosa cambierà, oppure «già uguale». Se un appartamento ha regole personalizzate lo dice in modo esplicito,
+perché verranno sovrascritte. Alla conferma ogni appartamento riceve le regole e la modifica è registrata per ciascuno
+(Decisioni e registro attività). Un appartamento le cui regole sono cambiate dopo l'anteprima non viene toccato.
+L'esito si vede appartamento per appartamento.
 Modificando compare in basso «N regole modificate» con «Salva le modifiche» o «Annulla le modifiche». Un valore fuori
 dai limiti viene segnalato sotto il campo.
 

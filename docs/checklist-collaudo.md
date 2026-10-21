@@ -218,6 +218,20 @@ normale di prova con un **operatore**.
 | M5 | Qualsiasi (su un dimostrativo, entro pochi minuti dalla pubblicazione) | Apri «Riepiloghi». | C'è la settimana appena finita; nel riquadro dei consumi compare «dati insufficienti …» con la data (i dimostrativi non hanno ancora 5 settimane di dati veri). | |
 | M4 | Telefono con notifiche attive | Il lunedì mattina dopo le 8, su un appartamento con qualcosa da segnalare. | Arriva UNA notifica «Riepilogo»; toccandola si apre la pagina di quella settimana. Nessuna notifica per una settimana senza novità. | |
 
+## N. Regole proposte dall'assistente e copia delle regole (passo 12)
+
+| N. | Ruolo | Passi | Risultato atteso | Esito |
+|---|---|---|---|---|
+| N1 | Operatore (su un dimostrativo) | Regole › «Chiedi all'assistente»: scrivi «finestra 10 minuti» e premi «Proponi». | «Modifiche proposte» con «Finestra aperta spegne il clima · Minuti: 5 → 10» e i pulsanti «Applica» e «Scarta»; nulla è cambiato finché non premi «Applica». | |
+| N2 | Operatore | Premi «Applica». | Le regole mostrano 10 minuti; nelle Decisioni compare la modifica con il tuo nome; nel registro attività (amministratore) «ha modificato le regole … su proposta dell'assistente». | |
+| N3 | Operatore | Scrivi «finestra 60 minuti» e premi «Proponi». | Nessuna proposta: il messaggio dice che il massimo per questa regola è 30 minuti. | |
+| N4 | Operatore | Cambia a mano un valore senza salvare, poi chiedi una proposta. | «Applica» è disattivato con «Salva o annulla prima le modifiche fatte a mano». | |
+| N5 | Sola lettura | Apri Regole. | Il riquadro «Chiedi all'assistente» non c'è. | |
+| N6 | Operatore | Regole › «Risparmio al check-out». | C'è il campo «Minuti di presenza dopo il check-out» (da 5 a 180, 30 all'inizio); fuori limite viene segnalato sotto il campo. | |
+| N7 | Amministratore (su un dimostrativo con due altri dimostrativi) | Regole › copia su altri appartamenti: scegli le destinazioni e guarda l'anteprima. | Per ogni destinazione i valori che cambieranno oppure «già uguale»; per chi ha regole personalizzate l'avviso che verranno sovrascritte. | |
+| N8 | Amministratore | Conferma la copia. | Esito per ogni appartamento; nelle Decisioni di ciascuno la modifica con il tuo nome; nel registro attività «ha copiato le regole da … all'appartamento …». | |
+| N9 | Operatore | Prova la copia. | Non disponibile: solo gli amministratori. | |
+
 ## K. Rendiconti dei consumi in Excel
 
 | N. | Ruolo | Passi | Risultato atteso | Esito |
