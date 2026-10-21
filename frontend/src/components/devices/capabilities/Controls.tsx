@@ -8,23 +8,52 @@ import { tid, type CapProps, type ClimateState, type HeatingState, type SwitchSt
 const CLIMATE_MODES = ["heat", "cool", "dry", "fan"] as const;
 const FANS = ["auto", "low", "mid", "high"] as const;
 
-function OnOff({ on, label, disabled, onToggle, testId }: { on: boolean; label: string; disabled: boolean; onToggle: (v: boolean) => void; testId: string }) {
+/** The state shown and the switch's accessible name when on (it turns off) and when off, for a device named `name`. */
+interface OnOffTexts {
+  on: () => string;
+  off: () => string;
+  toOff: (name: string) => string;
+  toOn: (name: string) => string;
+}
+
+const ON_OFF: OnOffTexts = {
+  on: () => t("cap.on"),
+  off: () => t("cap.off"),
+  toOff: (name) => t("cap.turnOff", { name }),
+  toOn: (name) => t("cap.turnOn", { name }),
+};
+
+function OnOff({ on, label, disabled, onToggle, testId, texts = ON_OFF, statusTestId, extra }: { on: boolean; label: string; disabled: boolean; onToggle: (v: boolean) => void; testId: string; texts?: OnOffTexts; statusTestId?: string; extra?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className={cn("flex items-center gap-2 text-sm font-semibold", on ? "text-accent" : "text-muted-foreground")}>
+      <span className={cn("flex flex-wrap items-center gap-2 text-sm font-semibold", on ? "text-accent" : "text-muted-foreground")}>
         <span className={cn("h-2 w-2 rounded-full", on ? "bg-accent shadow-[0_0_8px_hsl(var(--accent))]" : "bg-muted-foreground/40")} />
-        {on ? t("cap.on") : t("cap.off")}
+        <span data-testid={statusTestId}>{on ? texts.on() : texts.off()}</span>
+        {extra}
       </span>
       <Switch
         checked={on}
         disabled={disabled}
         onCheckedChange={onToggle}
-        aria-label={on ? t("cap.turnOff", { name: label }) : t("cap.turnOn", { name: label })}
+        aria-label={on ? texts.toOff(label) : texts.toOn(label)}
         data-testid={testId}
       />
     </div>
   );
 }
+
+/**
+ * Boiler (D-128, D-129): heating.on is "heating enabled", the engine's thermostat drives the relay, so the card says
+ * abilitato / disabilitato and the switch Attiva / Disattiva. Whether it is heating right now shows only from its own
+ * power meter: above HEATING_NOW_W the burner and pump are running (below, the electronics on stand-by).
+ */
+const HEATING_TEXTS: OnOffTexts = {
+  on: () => t("cap.heatingOn"),
+  off: () => t("cap.heatingOff"),
+  toOff: (name) => t("cap.heatingDisable", { name }),
+  toOn: (name) => t("cap.heatingEnable", { name }),
+};
+export const HEATING_NOW_W = 30;
 
 export function SwitchControl({ device, state, disabled, send }: CapProps<SwitchState>) {
   return (
@@ -46,6 +75,11 @@ export function HeatingControl({ device, state, disabled, send }: CapProps<Heati
         label={device.label}
         disabled={disabled}
         testId={tid(device, "heating-toggle")}
+        texts={HEATING_TEXTS}
+        statusTestId={tid(device, "heating-status")}
+        extra={state.on && (device.capabilities.power_meter?.watts ?? 0) > HEATING_NOW_W && (
+          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold" data-testid={tid(device, "heating-now")}>{t("cap.heatingNow")}</span>
+        )}
         onToggle={(v) => send(v ? { capability: "heating", action: "set_heating", params: { on: true } } : { capability: "heating", action: "turn_off" })}
       />
       <div className="flex items-center justify-between">
