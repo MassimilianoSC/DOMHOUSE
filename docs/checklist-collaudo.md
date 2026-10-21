@@ -70,6 +70,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D3c | Operatore (su un dimostrativo) | Dal Simulatore apri una finestra; poi «Forza per…» 30 minuti. | Finestra di conferma «Finestra aperta» con il testo «Finestra aperta in Soggiorno: durante la forzatura il clima resta acceso.» (con il nome della stanza) e i pulsanti «Annulla» e «Forza comunque»; con «Forza comunque» la forzatura parte e il clima resta acceso. | |
 | D3 | Operatore | «Forza per…» 30 minuti, poi «Annulla forzatura». | «Forzatura … attiva fino alle …», poi la forzatura sparisce. | |
 | D4 | Operatore | Accendi e spegni un interruttore; alza la temperatura con +. | Sotto il dispositivo «in corso» e poi «eseguito». | |
+| D4b | Operatore | Sulla caldaia: «Attiva», poi «Disattiva». | Stato «Riscaldamento abilitato» e poi «Riscaldamento disabilitato»; con un misuratore collegato sopra 30 W compare «sta scaldando ora». Il clima resta «Acceso / Spento», «Accendi / Spegni». | |
 | D5 | Operatore | Menu ⋮ > «Rinomina o sposta», cambia il nome. | «Dispositivo aggiornato» e il nome nuovo. | |
 | D6 | Operatore | Approvazioni: approva una richiesta con una nota (generala dal Simulatore, prova F3). | «Azione approvata»; in «Tutte» compare «approvata da …» con la nota. | |
 | D7 | Qualsiasi | Decisioni: filtra per autore, poi «Carica altri». | L'elenco si filtra e si allunga. | |
