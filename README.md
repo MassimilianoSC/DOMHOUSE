@@ -36,7 +36,9 @@ minuto simulato (default 1; 60 = tempo reale).
 
 Test: `python scripts/run_tests.py` (oppure `make test`) è il giro completo; richiede l'emulatore Firestore (JDK 11+ e
 `npx firebase-tools setup:emulators:firestore`): senza, il giro è rosso (P-42). Su Windows il JDK si installa da
-PowerShell con `winget install EclipseAdoptium.Temurin.21.JDK`. Prove singole:
+PowerShell con `winget install EclipseAdoptium.Temurin.21.JDK`. Il giro completo comprende la suite `linux`: il job
+`contratto-e-mock` della CI in un container Linux sull'ultimo commit (`scripts/ci-linux.sh`, circa 3 minuti, serve Docker
+Desktop acceso; `--no-linux` per saltarla). Prove singole:
 
 ```bash
 pytest tests/repository_suite_test.py                # memory sempre; firestore se FIRESTORE_EMULATOR_HOST è impostato
