@@ -335,7 +335,7 @@ Le otto regole (valori di partenza e limiti):
 **Chiedi all'assistente** (operatori e amministratori), in alto nella pagina Regole: scrivi in italiano che cosa vuoi
 cambiare (al massimo 500 caratteri) e premi «Proponi». Compare «Modifiche proposte»: quale regola, quale valore, prima
 e dopo (per esempio «Finestra aperta spegne il clima · Minuti: 5 → 10»), con la frase dell'assistente e i pulsanti
-«Applica» e «Scarta». Niente cambia finché non premi «Applica». Se la richiesta è fuori dai limiti della regola o non
+«Applica» e «Scarta». Niente cambia finché non premi «Applica»; dopo compare «Regole aggiornate come proposto». Se la richiesta è fuori dai limiti della regola o non
 riguarda le regole, lo dice e non propone niente. Se nel frattempo qualcuno ha cambiato le regole, l'app chiede di
 rifare la richiesta; se hai modifiche fatte a mano non salvate, «Applica» resta disattivato finché non le salvi o le
 annulli. Al massimo 20 richieste al giorno per appartamento. La modifica compare nelle Decisioni con il tuo nome e nel
@@ -343,10 +343,12 @@ registro attività («regole modificate»); quello che scrivi non viene conserva
 regole capisce frasi semplici come «finestra 10 minuti», «antigelo 10 gradi», «spegni la regola dell'antimuffa»,
 «presenza al check-out 45 minuti», «setpoint da 18 a 25».
 
-**Copia su altri appartamenti** (solo amministratori): scegli gli appartamenti di destinazione. L'anteprima mostra per
-ciascuno che cosa cambierà, oppure «già uguale». Se un appartamento ha regole personalizzate lo dice in modo esplicito,
-perché verranno sovrascritte. Alla conferma ogni appartamento riceve le regole e la modifica è registrata per ciascuno
-(Decisioni e registro attività). Un appartamento le cui regole sono cambiate dopo l'anteprima non viene toccato.
+**Applica le stesse regole ad altri appartamenti** (riquadro in fondo alla pagina Regole, solo amministratori): scegli
+gli appartamenti di destinazione (o «Seleziona tutti») e premi «Vedi che cosa cambia». L'anteprima mostra per ciascuno
+i valori che cambieranno, oppure «Già uguale, nessuna modifica» (o il motivo per cui non verrà toccato: disattivato, motore
+non raggiungibile). Se un appartamento ha regole personalizzate lo dice in modo esplicito,
+perché verranno sovrascritte. Alla conferma («Copia su N appartamenti») ogni appartamento riceve le regole e la modifica è registrata per
+ciascuno (Decisioni e registro attività: «ha copiato le regole da … all'appartamento …»). Un appartamento le cui regole sono cambiate dopo l'anteprima non viene toccato.
 L'esito si vede appartamento per appartamento.
 Modificando compare in basso «N regole modificate» con «Salva le modifiche» o «Annulla le modifiche». Un valore fuori
 dai limiti viene segnalato sotto il campo.
