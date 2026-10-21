@@ -67,6 +67,10 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     // regole del motore, passo 5a (cde9881)
     expect(actionLabel("offline_alert")).toBe("Dispositivo offline");
     expect(actionLabel("mold_warning")).toBe("Avviso antimuffa");
+    // termostato e antigelo, passo 5b (5f9db5c)
+    expect(actionLabel("frost_heating_on")).toBe("Antigelo: caldaia accesa");
+    expect(actionLabel("frost_heating_off")).toBe("Antigelo: caldaia spenta");
+    expect(actionLabel("thermostat_sensor")).toBe("Termostato: sensore");
   });
 
   it("un'azione che il motore aggiungerà e il sito non conosce ancora: il codice, la pagina non si rompe", () => {

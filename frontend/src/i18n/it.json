@@ -175,7 +175,10 @@
       "checkout": "Check-out",
       "booking_cancel_reset": "Disdetta dopo il pre-arrivo",
       "offline_alert": "Dispositivo offline",
-      "mold_warning": "Avviso antimuffa"
+      "mold_warning": "Avviso antimuffa",
+      "frost_heating_on": "Antigelo: caldaia accesa",
+      "frost_heating_off": "Antigelo: caldaia spenta",
+      "thermostat_sensor": "Termostato: sensore"
     },
     "title": "Decisioni",
     "subtitle": "Tutto ciò che il motore e i gestori hanno fatto, e perché",
