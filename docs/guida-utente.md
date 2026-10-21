@@ -197,6 +197,9 @@ rimasto (rosso sotto i 5 minuti) e cosa succede alla scadenza. Si può aggiunger
 Lo storico di tutto ciò che è stato fatto, da chi (motore automatico, regola, gestore, assistente, sistema) e con quale
 esito. Filtri per autore, dispositivo e **Periodo** (tutto lo storico, ultimi 7, 30 o 90 giorni); «Carica altri» per
 andare indietro.
+- Ogni decisione mostra il **tipo di azione** in italiano (per esempio «Modalità», «Forzatura scaduta», «Programma:
+  spostata», «Prenotazione annullata», «Disdetta dopo il pre-arrivo») e sotto la spiegazione; passando sopra il tipo
+  compare il codice tecnico. Un'azione nuova non ancora tradotta mostra il codice. La ricerca trova anche il tipo.
 - Il campo di ricerca cerca in tutto lo storico (almeno 90 giorni): nel motivo, nell'azione, in chi ha deciso, nel
   dispositivo, nei valori e nei codici. Procede a blocchi di 1.000 decisioni, dalle più recenti alle più vecchie: leggi
   «Ricerca in corso…» e poi «Risultati: N · cercato fino al <data>». Per andare più indietro premi «Cerca più indietro»;
