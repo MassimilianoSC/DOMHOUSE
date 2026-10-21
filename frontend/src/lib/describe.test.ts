@@ -73,6 +73,10 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     expect(actionLabel("thermostat_sensor")).toBe("Termostato: sensore");
     // forzatura e finestra aperta, passo 5c (6923d83): la regola della finestra riparte alla fine della forzatura
     expect(actionLabel("window_rule_suspended")).toBe("Finestra: regola sospesa");
+    // il motore pronto per un connector vero, passo 7 (2ebf83b, 820762d)
+    expect(actionLabel("command_unverified")).toBe("Comando non verificato: misuratore offline");
+    expect(actionLabel("connector_down")).toBe("Collegamento ai dispositivi perso");
+    expect(actionLabel("connector_up")).toBe("Collegamento ai dispositivi ripristinato");
   });
 
   it("un'azione che il motore aggiungerà e il sito non conosce ancora: il codice, la pagina non si rompe", () => {
