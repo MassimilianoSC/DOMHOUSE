@@ -97,8 +97,10 @@ Youssouf. Il backup di SQLite (passo 10) è già fatto con il 3d.
 | 6 | Telemetria e consumi reali | 1,5 |
 | 7 | Lato nostro del connector Shelly: prove con un finto server WebSocket Gen2, configurazione, collegamento al motore | 1,5–2 |
 | 8 | Approvazioni con fonti reali e persistenza | 1 |
-| 9 | `/ask` con Gemini e funzioni, dietro la feature (D-132: letture comprese le Decisioni, approvazioni per le azioni rischiose, limiti giornalieri e tetto mensile, due regole fisse nel prompt) **più il riassunto settimanale per il gestore con push e la modifica in linguaggio naturale dei parametri delle 8 regole, con conferma** | 5–6 |
-| 10 | Gestione (health vero, backup, log) | 1 |
+| 9 | `/ask` con Gemini e funzioni, dietro la feature (D-132: letture comprese le Decisioni, approvazioni per le azioni rischiose, limiti giornalieri e tetto mensile, due regole fisse nel prompt) | 3–4 |
+| 10 | Gestione (health vero, allarmi dai log dei container; il backup è fatto con il 3d) | 1 |
+| 11 | **Riassunto settimanale per il gestore** con push e pagina nell'app: consumi anomali rispetto alle settimane precedenti, dispositivi offline da più di un giorno, approvazioni scadute senza risposta, finestre aperte ricorrenti; costruito e provato con i dimostrativi (D-133) | 2–3 |
+| 12 | **Regole configurabili dall'app**, prima a mano poi proposte dall'assistente in linguaggio naturale e confermate dal gestore; dipende dai parametri per appartamento del passo 7 (D-133); da progettare dopo l'11 | da stimare |
 | | **Totale** (più il connector di Youssouf) | **circa 19–23** |
 | | di cui primo traguardo (passi 0–3) | circa 8–9 |
 
