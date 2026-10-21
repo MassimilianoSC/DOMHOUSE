@@ -13,6 +13,7 @@ import sys
 import types
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from starlette.testclient import TestClient
@@ -224,8 +225,12 @@ def test_catalog_and_energy_as_the_contract_wants():
     tomorrow = t0 + timedelta(days=1)
     engine._apply_change(StateChange("dev-presa", "state", tomorrow, capability="power_meter",
                                      state={"watts": 50, "energy_total_wh": 300}))
-    # a new day: only what was used since the last reading (300 - 200 Wh)
-    assert engine.devices["dev-presa"]["capabilities"]["power_meter"]["kwh_today"] == 0.1
+    # a new day: of the 100 Wh used since the last reading (300 - 200), spread evenly over the 24 hours in between
+    # (D-130), only the part after the local midnight is today's
+    local = tomorrow.astimezone(ZoneInfo("Europe/Rome"))
+    midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    expected = round(100 * (local - midnight).total_seconds() / 86400 / 1000, 3)
+    assert engine.devices["dev-presa"]["capabilities"]["power_meter"]["kwh_today"] == pytest.approx(expected, abs=0.002)
 
 
 def run_commands(connector, *bodies, timeout=12.0):

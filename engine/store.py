@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT, t REAL 
 CREATE INDEX IF NOT EXISTS events_t ON events (t);
 CREATE TABLE IF NOT EXISTS telemetry (
     device_id TEXT NOT NULL, hour TEXT NOT NULL, wh REAL NOT NULL, PRIMARY KEY (device_id, hour));
+CREATE INDEX IF NOT EXISTS telemetry_hour ON telemetry (hour);
 """
 
 
@@ -94,6 +95,10 @@ class MemoryStore:
 
     def telemetry(self, device_id: str | None = None) -> list[tuple[str, str, float]]:
         return sorted((d, h, wh) for (d, h), wh in self._telemetry.items() if device_id in (None, d))
+
+    def telemetry_between(self, from_hour: str, to_hour: str) -> list[tuple[str, str, float]]:
+        """The hours from_hour <= hour < to_hour (GET /energy, P-60 step 6)."""
+        return sorted((d, h, wh) for (d, h), wh in self._telemetry.items() if from_hour <= h < to_hour)
 
     def purge_telemetry(self, before_hour: str) -> None:
         self._telemetry = {k: v for k, v in self._telemetry.items() if k[1] >= before_hour}
@@ -166,6 +171,11 @@ class SqliteStore(MemoryStore):
         else:
             rows = self.db.execute("SELECT device_id, hour, wh FROM telemetry WHERE device_id = ? ORDER BY hour",
                                    (device_id,))
+        return [tuple(r) for r in rows]
+
+    def telemetry_between(self, from_hour: str, to_hour: str) -> list[tuple[str, str, float]]:
+        rows = self.db.execute("SELECT device_id, hour, wh FROM telemetry WHERE hour >= ? AND hour < ? "
+                               "ORDER BY device_id, hour", (from_hour, to_hour))
         return [tuple(r) for r in rows]
 
     def purge_telemetry(self, before_hour: str) -> None:

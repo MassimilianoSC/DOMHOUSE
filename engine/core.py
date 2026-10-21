@@ -8,7 +8,6 @@ it reports through changes()."""
 import asyncio
 import calendar
 import copy
-import random
 import re
 import time
 import uuid
@@ -130,32 +129,57 @@ def describe(cap: str, state: dict) -> str:
     return "on"
 
 
+def spread(wh: float, start: datetime, end: datetime) -> list[tuple[str, float]]:
+    """wh used between two readings, split over the UTC hours in proportion to the time in each (D-130: a meter away
+    for a few hours brings back the whole gap at once; it goes to the hours it belongs to, also across midnight or the
+    end of a month). Readings out of order or at the same instant: all in the reading's hour."""
+    if end <= start:
+        return [(hour_of(end), wh)]
+    total = (end - start).total_seconds()
+    out, cur = [], start
+    while cur < end:
+        nxt = min(cur.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1), end)
+        out.append((hour_of(cur), wh * (nxt - cur).total_seconds() / total))
+        cur = nxt
+    return out
+
+
 class EnergyCounter:
     """kwh_today of one power meter, from the connector's raw cumulative counter (energy_total_wh, connector.md §2.3)
-    since the apartment's local midnight. A counter that drops (the device restarted) counts again from zero. Its
-    state is saved with the engine's, so neither kwh_today nor the hourly telemetry start again after a restart."""
+    since the apartment's local midnight, and the Wh of each reading spread over the hours since the previous one
+    (D-130). A counter that drops (the device restarted) counts again from zero: what was used between the last reading
+    and the restart is not measurable. Its state is saved with the engine's, so neither kwh_today nor the hourly
+    telemetry start again after a restart."""
 
     def __init__(self, timezone: str, state: dict | None = None):
         self.tz = ZoneInfo(timezone)
         state = state or {}
-        self.day = state.get("day")                    # ISO date, local
+        self.day = state.get("day")                    # ISO date, local, of the last reading
         self.last_wh: float | None = state.get("last_wh")
+        self.last_ts: str | None = state.get("last_ts")  # ISO instant of the last reading
         self.today_wh = float(state.get("today_wh", 0.0))
 
     def state(self) -> dict:
-        return {"day": self.day, "last_wh": self.last_wh, "today_wh": self.today_wh}
+        return {"day": self.day, "last_wh": self.last_wh, "last_ts": self.last_ts, "today_wh": self.today_wh}
 
-    def update(self, total_wh: float, ts: datetime) -> tuple[float, float]:
-        """(kwh_today, Wh used since the previous reading)."""
-        day = ts.astimezone(self.tz).date().isoformat()
-        if day != self.day:
-            self.day, self.today_wh = day, 0.0
+    def update(self, total_wh: float, ts: datetime) -> tuple[float, list[tuple[str, float]]]:
+        """(kwh_today, [(UTC hour, Wh)] used since the previous reading, spread over the hours in between)."""
         used = 0.0
         if self.last_wh is not None:
             used = total_wh - self.last_wh if total_wh >= self.last_wh else total_wh
-        self.today_wh += used
+        prev = parse_dt(self.last_ts) if self.last_ts else ts
+        pieces = spread(used, prev, ts) if used > 0 else []
+        local = ts.astimezone(self.tz)
+        day = local.date().isoformat()
+        if day != self.day:                            # only the part of the gap after local midnight is today's
+            midnight = hour_of(datetime(local.year, local.month, local.day, tzinfo=self.tz))
+            self.day, self.today_wh = day, sum(wh for hour, wh in pieces if hour >= midnight)
+        else:
+            self.today_wh += used
         self.last_wh = total_wh
-        return round(self.today_wh / 1000, 3), used
+        if ts >= prev:
+            self.last_ts = iso(ts)
+        return round(self.today_wh / 1000, 3), pieces
 
 
 class ApartmentEngine:
@@ -405,10 +429,11 @@ class ApartmentEngine:
         out = {k: copy.deepcopy(v) for k, v in raw.items() if k in CONTRACT_FIELDS[cap]}
         if cap == "power_meter" and isinstance(raw.get("energy_total_wh"), (int, float)):
             meter = self.meters.setdefault(device_id, EnergyCounter(self.timezone))
-            out["kwh_today"], used = meter.update(float(raw["energy_total_wh"]), ts)
+            out["kwh_today"], pieces = meter.update(float(raw["energy_total_wh"]), ts)
             self._save_meter(device_id)
-            if used > 0:
-                self.store.add_telemetry(device_id, hour_of(ts), used)
+            for hour, wh in pieces:
+                if wh > 0:
+                    self.store.add_telemetry(device_id, hour, wh)
         if cap == "contact" and "since" not in raw and "open" in raw and raw["open"] != current.get("open"):
             out["since"] = iso(ts)
         if cap == "motion" and "last_seen" not in raw and raw.get("detected"):
@@ -1497,7 +1522,6 @@ class ApartmentEngine:
         if to <= frm or to - frm > timedelta(days=31):
             raise bad_request("Periodo non valido: massimo 31 giorni per richiesta")
         tz = ZoneInfo(self.timezone)
-        series, avoided = [], 0.0
 
         def local_midnight(day) -> datetime:
             return datetime(day.year, day.month, day.day, tzinfo=tz).astimezone(UTC)
@@ -1512,30 +1536,39 @@ class ApartmentEngine:
             start = frm.replace(minute=0, second=0, microsecond=0)
         else:
             start = local_midnight(frm.astimezone(tz).date())
-        cur = start
-        now = utcnow()
-        while cur < to and cur < now:
-            step = next_start(cur) - cur
-            rnd = random.Random(f"{self.apartment_id}|{bucket}|{iso(cur)}")
-            if bucket == "hour":
-                hour = cur.astimezone(tz).hour
-                profile = 1.4 if 6 <= hour <= 9 or 17 <= hour <= 23 else 0.5
-                kwh = (0.15 + rnd.random() * 0.45) * profile
-            else:
-                kwh = 3.5 + rnd.random() * 4.5
-                avoided += round(rnd.random() * 3, 1)
-            frac = min(1.0, (min(to, now) - cur) / step)
-            series.append({"ts": iso(cur), "kwh": round(kwh * frac, 2)})
+        # P-60 step 6 (D-130): the hourly telemetry of the power meters (Wh per device and UTC hour). Every bucket up to
+        # now is in the series; an hour without readings counts 0 (the contract has no "unknown"). Whole hours: an
+        # hour starting before `to` counts entirely. avoided_hvac_hours is not computed yet: null, as the contract allows.
+        starts, cur, now = [], start, utcnow()
+        end = min(to, now)
+        while cur < end:
+            starts.append(cur)
             cur = next_start(cur)
-        total = round(sum(s["kwh"] for s in series), 2)
+        sums = {iso(s): 0.0 for s in starts}
+        per_device: dict[str, float] = {}
+        if starts:
+            upper = end.replace(minute=0, second=0, microsecond=0)
+            if upper < end:
+                upper += timedelta(hours=1)
+            for device_id, hour, wh in self.energy_rows(hour_of(start), hour_of(upper)):
+                h = datetime.strptime(hour, "%Y-%m-%dT%H:00Z").replace(tzinfo=UTC)
+                key = iso(h) if bucket == "hour" else iso(local_midnight(h.astimezone(tz).date()))
+                if key in sums:
+                    sums[key] += wh
+                    per_device[device_id] = per_device.get(device_id, 0.0) + wh
+        series = [{"ts": key, "kwh": round(wh / 1000, 3)} for key, wh in sums.items()]
         meters = [d for d in self.devices.values() if "power_meter" in d["capabilities"]]
-        weights = [0.62, 0.28, 0.10][: len(meters)]
-        wsum = sum(weights) or 1
-        by_device = [{"device_id": d["device_id"], "label": d["label"], "kwh": round(total * w / wsum, 2)}
-                     for d, w in zip(meters, weights)]
-        return {"from": iso(frm), "to": iso(to), "bucket": bucket, "total_kwh": total,
-                "avoided_hvac_hours": round(avoided, 1) if bucket == "day" else None,
-                "series": series, "by_device": by_device}
+        known = {d["device_id"] for d in meters}
+        by_device = [{"device_id": d["device_id"], "label": d["label"], "kwh": round(per_device.get(d["device_id"], 0.0) / 1000, 3)}
+                     for d in meters]
+        by_device += [{"device_id": device_id, "label": device_id, "kwh": round(wh / 1000, 3)}   # no longer in the catalog
+                      for device_id, wh in sorted(per_device.items()) if device_id not in known]
+        return {"from": iso(frm), "to": iso(to), "bucket": bucket, "total_kwh": round(sum(sums.values()) / 1000, 3),
+                "avoided_hvac_hours": None, "series": series, "by_device": by_device}
+
+    def energy_rows(self, from_hour: str, to_hour: str) -> list[tuple[str, str, float]]:
+        """(device_id, UTC hour, Wh) of the hours from_hour <= hour < to_hour."""
+        return self.store.telemetry_between(from_hour, to_hour)
 
     # ---- assistant ---------------------------------------------------------------
     def create_ask(self, body: dict, actor: str, correlation_id: str) -> dict:
