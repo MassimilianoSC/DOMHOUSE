@@ -6,8 +6,9 @@ from engine.api import create_contract_app
 from engine.core import ALL_FEATURES, Registry
 
 
-def create_mock_app(api_key: str, features: list[str] | None = None, ping_seconds: float | None = None):
-    registry = Registry()
+def create_mock_app(api_key: str, features: list[str] | None = None, ping_seconds: float | None = None,
+                    model_for=None):
+    registry = Registry(model_for)
     env_features = os.environ.get("MOCK_FEATURES")
     enabled = features or ([f.strip() for f in env_features.split(",") if f.strip()] if env_features else ALL_FEATURES)
     app = create_contract_app(registry.get, api_key, features=enabled,

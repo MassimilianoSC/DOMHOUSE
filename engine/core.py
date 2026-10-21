@@ -2175,8 +2175,11 @@ def actor_of(x_actor: str) -> str:
 
 
 class Registry:
-    def __init__(self) -> None:
+    def __init__(self, model_for=None) -> None:
+        """model_for(apartment_id): the model client of a demonstration apartment (P-60 step 9, D-132 point 5: the BFF's
+        demonstrations with the real assistant, within the cap); None keeps the keyword assistant."""
         self.sims: dict[str, ApartmentEngine] = {}
+        self.model_for = model_for
 
     def reset(self, apartment_id: str) -> bool:
         """D-97: forget the apartment's simulated engine and stop its tasks; the next call builds it from the seed."""
@@ -2191,6 +2194,7 @@ class Registry:
     def get(self, apartment_id: str) -> ApartmentEngine:
         sim = self.sims.get(apartment_id)
         if sim is None:
-            sim = self.sims[apartment_id] = ApartmentEngine(apartment_id)
+            sim = self.sims[apartment_id] = ApartmentEngine(
+                apartment_id, model=self.model_for(apartment_id) if self.model_for else None)
         sim.ensure_started()
         return sim

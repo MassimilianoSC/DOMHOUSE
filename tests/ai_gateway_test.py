@@ -113,3 +113,12 @@ def test_the_models_failures(model):
 def ai_gateway_empty():
     from bff.repository.base import EMPTY_AI_USAGE
     return dict(EMPTY_AI_USAGE)
+
+
+def test_a_demonstration_engines_client_is_accepted(model):
+    """What bff/main.py builds with AI_DEMOS: the demonstration's id and the simulator's key, on the BFF's loopback."""
+    from engine.assistant import ModelClient
+    client = ModelClient("http://127.0.0.1:1", APT, get_settings().instance_api_key_fallback)
+    assert client.url == "http://127.0.0.1:1/internal/ai/chat"
+    r = run(post(BODY, apartment=client.apartment_id, key=client.api_key))
+    assert r.status_code == 200

@@ -196,3 +196,19 @@ def test_settings_of_the_assistant():
     assert "MODEL_BASE_URL" not in c.for_connector().env
     with pytest.raises(ConfigError, match="MODEL_BASE_URL"):
         load_config({**base, "MODEL_BASE_URL": "domotica-bff"})
+
+
+def test_the_demonstrations_get_the_model_from_the_registry():
+    """D-132 point 5: the BFF's demonstration apartments with the real assistant (AI_DEMOS), the keywords without."""
+    script = Script(says("Ciao dal modello."))
+    registry = core.Registry(model_for=lambda apartment_id: script if apartment_id == "apt-rimini-01" else None)
+
+    async def main():
+        with_model, without = registry.get("apt-rimini-01"), registry.get("apt-bologna-01")
+        assert with_model.model is script and without.model is None
+        a = with_model.create_ask({"text": "ciao"}, ACTOR, CORR)
+        while with_model.asks[a["ask_id"]]["status"] == "pending":
+            await asyncio.sleep(0.02)
+        return with_model.asks[a["ask_id"]]
+    assert asyncio.run(main())["answer"] == "Ciao dal modello."
+    assert core.Registry().model_for is None                                  # the default: keywords

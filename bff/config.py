@@ -49,6 +49,7 @@ class Settings:
     ai_price_cached_eur_per_m: float = 0.08
     ai_max_tokens: int = 4096                 # the most a call may ask (the flash model spends tokens on reasoning)
     ai_timeout_s: float = 25.0                # inside the contract's 30 s for an answer
+    ai_demos: bool = False                    # the demonstration apartments with the real model (AI_DEMOS=true)
 
     @property
     def mail_configured(self) -> bool:
@@ -99,4 +100,5 @@ def get_settings() -> Settings:
         ai_price_cached_eur_per_m=float(e("AI_PRICE_CACHED_EUR_PER_M", "0.08")),
         ai_max_tokens=int(e("AI_MAX_TOKENS", "4096")),
         ai_timeout_s=float(e("AI_TIMEOUT_S", "25")),
+        ai_demos=_bool("AI_DEMOS"),
     )

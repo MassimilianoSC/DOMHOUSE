@@ -100,7 +100,13 @@ def create_app() -> FastAPI:
             return JSONResponse(status_code=404, content={"error": "not_found", "message": "Endpoint inesistente"})
         return await call_next(request)
 
-    mock_app = create_mock_app(api_key=settings.instance_api_key_fallback)
+    model_for = None
+    if settings.ai_demos:     # P-60 step 9 (D-132 point 5): the demonstrations ask the real model, on loopback
+        from engine.assistant import ModelClient
+
+        def model_for(apartment_id: str) -> ModelClient:
+            return ModelClient(f"http://127.0.0.1:{settings.port}", apartment_id, settings.instance_api_key_fallback)
+    mock_app = create_mock_app(api_key=settings.instance_api_key_fallback, model_for=model_for)
     app.state.mock_registry = mock_app.state.registry   # the reset of a demonstration apartment (D-97)
     app.mount("/mock", mock_app)
     return app
