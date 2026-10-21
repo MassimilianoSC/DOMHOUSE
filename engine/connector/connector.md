@@ -1,6 +1,6 @@
 # Il connector dei dispositivi — specifica per il motore DOMHOUSE
 
-*21 ottobre 2026, approvata da Massimiliano (revisione: numero di versione del contratto 1.0.5; `heating.on` del dispositivo = relè, verso l'app = riscaldamento abilitato, §2.3 e §2.4). Nel repository: `engine/connector/connector.md`. Dove si legge
+*21 ottobre 2026, approvata da Massimiliano (revisione: numero di versione del contratto 1.0.5; `heating.on` del dispositivo = relè, verso l'app = riscaldamento abilitato, §2.3 e §2.4; tempi e soglie della conferma a consumo, §2.5). Nel repository: `engine/connector/connector.md`. Dove si legge
 «decide il catalogo» o «da concordare», non è una decisione già presa.*
 
 ## 0. In breve
@@ -203,9 +203,15 @@ Nel contratto un comando passa per `pending → sent → verifying → acked | f
     `confirmation`: `power` → guarda i `watts` del dispositivo indicato da `links.confirmation_device_id`: se
     cambiano in modo coerente con il comando entro i 10 s (in su per un'accensione, verso zero per uno spegnimento),
     `acked`; altrimenti `timeout` con reason `no_confirmation`. Senza quel collegamento il motore tratta il caso come
-    `none` e lo scrive nel log. `none` → `acked` con lo stato richiesto. Per questo è importante che il misuratore
-    collegato mandi i suoi cambi di `watts` in `changes()` senza ritardi (entro pochi secondi): è da lì che arriva la
-    conferma;
+    `none` e lo scrive nel log. `none` → `acked` con lo stato richiesto. **Il misuratore indicato da
+    `links.confirmation_device_id` deve mandare in `changes()` ogni variazione di `watts` entro 2 secondi da quando
+    avviene** (notifica di stato del dispositivo, non la lettura periodica al minuto): è da lì che arriva la conferma.
+    Il motore conferma un'accensione se i `watts` salgono di almeno 20 W rispetto a prima del comando, e uno
+    spegnimento se scendono sotto 15 W, entro 10 secondi dalla creazione del comando, cioè circa 8 secondi dopo che
+    hai restituito `delivered`. Se lo split assorbe più tardi, il comando risulta non confermato (`timeout`,
+    `no_confirmation`) anche se lo split si è acceso. Le due soglie si cambiano per appartamento nella configurazione
+    del motore: se nelle tue prove uno split impiega di più, dillo con i tempi misurati. Se il misuratore collegato è
+    offline nel momento del comando, il motore accetta il comando senza verifica e lo scrive nelle decisioni;
   - `"failed"` + `reason`: `device_offline` (offline, o lo diventa durante il comando), `device_rejected` (il
     dispositivo ha risposto con un errore RPC), `internal_error` (errore del trasporto o tuo). Il `detail` va nei log.
 - **La scadenza**: restituisci l'esito ENTRO `cmd.deadline`. Se non ce la fai, il motore annulla la tua coroutine
