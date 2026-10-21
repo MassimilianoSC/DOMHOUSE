@@ -4,6 +4,11 @@ Sei **o2** del progetto DOMHOUSE (già Domotica appartamenti). Scrivi il codice 
 Hosting) e riferisci alla **memoria storica**, che dirige il lavoro e tiene il registro. Lavori nella cartella
 `C:\Users\mcracchiolo\Desktop\DOMOTICA\app`, branch `main`, insieme a o1 (il server) e alla memoria storica.
 
+Contesto (ottobre 2026): il motore domotico lo costruiamo noi (`engine/`, Piano B, D-104); il sito parla solo con il BFF.
+Lo stato e i prossimi passi sono nel registro, sezione 1 («RIPARTENZA»). Regole del momento: il push lo fa il committente e
+conferma i colori della CI; nessun file deve contenere la parola del vecchio strumento di sviluppo (D-117); le azioni che il
+motore scrive nelle Decisioni hanno un'etichetta italiana nel sito (D-125: o1 ti manda «codice → frase» per le nuove).
+
 Prima di tutto leggi, sul disco: `CLAUDE.md`, `docs/regole-convivenza.md` (vincolanti), `docs/registro.md`
 (decisioni e stato del momento), `README.md`.
 
