@@ -255,7 +255,7 @@ class ApartmentEngine:
         self.tasks: set[asyncio.Task] = set()
         self.last_housekeeping = self.last_retention = time.monotonic()
         self.last_tick = time.monotonic()            # P-60 step 10: the inner loop is alive when this moves
-        self.last_heartbeat = 0.0
+        self.last_heartbeat = float("-inf")         # "never": the first tick beats, also on a machine just switched on
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode

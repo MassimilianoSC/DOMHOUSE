@@ -47,15 +47,20 @@ def test_the_assistant_as_it_is():
 
 
 def test_one_heartbeat_every_five_minutes(monkeypatch):
+    """The clock is the engine's own (time.monotonic, counted from the machine's start): the CI's runner, just switched
+    on, had it under 300 s and the first beat did not come (red of the lot 23 push). Here it starts at 120 s."""
     seen = []
     monkeypatch.setattr(core.logs, "info", lambda msg, **fields: seen.append((msg, fields)))
+    clock = {"now": 120.0}                                              # a machine switched on two minutes ago
+    monkeypatch.setattr(core.time, "monotonic", lambda: clock["now"])
     e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
 
     async def main():
-        e.tick()
+        e.tick()                                                        # the first tick beats at once
+        clock["now"] += 1
         e.tick()                                                        # a second later: no new beat
-        e.last_heartbeat = time.monotonic() - core.HEARTBEAT_S - 1
-        e.tick()
+        clock["now"] += core.HEARTBEAT_S
+        e.tick()                                                        # five minutes later: the second beat
     asyncio.run(main())
     beats = [f for msg, f in seen if msg == "engine alive"]
     assert len(beats) == 2
