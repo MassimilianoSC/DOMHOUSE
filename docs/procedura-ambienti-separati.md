@@ -17,6 +17,21 @@ libero su Firebase Hosting; lo si scopre in M4: se il comando dice che l'id è g
 
 ---
 
+## M0. Una volta sola: credenziali applicative sul PC (scrive solo file locali)
+
+Gli script Python che leggono o scrivono Firestore (M1, M6, M7) usano le «credenziali applicative» di Google sul
+PC, diverse dal login di `gcloud`. Cosa fa: apre il browser per l'accesso con l'account proprietario e salva il
+file delle credenziali sul PC; poi indica il progetto da addebitare per le chiamate.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud auth application-default login
+gcloud auth application-default set-quota-project domotica-poc-511707
+```
+
+Verifica: M1 stampa l'elenco invece di «Firestore non risponde entro 30 secondi».
+
 ## M1. Elenco dei dimostrativi di oggi (sola lettura; condizione D-136, prima di tutto il resto)
 
 Cosa fa: per ogni organizzazione con dimostrativi stampa gli appartamenti, le persone che li vedono e le modifiche
@@ -29,7 +44,7 @@ REPOSITORY=firestore GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python -u 
 ```
 
 Verifica: l'elenco a schermo; incollarlo alla memoria storica. Il committente decide se il cliente ha cambiato qualcosa da
-conservare. (Il 21 ottobre, lanciato dalla memoria storica, lo script è rimasto fermo senza output: in verifica da o1.)
+conservare. Se dice «Firestore non risponde entro 30 secondi», fare M0.
 
 ## M2. Database Firestore dello staging
 
