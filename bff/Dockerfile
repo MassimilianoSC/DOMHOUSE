@@ -18,4 +18,5 @@ USER app
 # Cloud Run injects PORT; everything else comes from env vars / Secret Manager (see cloudrun.yaml).
 ENV PORT=8080 APP_ENV=prod AUTH_MODE=firebase INSTANCE_MODE=real REPOSITORY=firestore
 EXPOSE 8080
-CMD ["sh", "-c", "uvicorn bff.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*'"]
+# P-71 (D-142): no access log of uvicorn (paths can carry personal data; Cloud Run logs every request already)
+CMD ["sh", "-c", "uvicorn bff.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --forwarded-allow-ips='*' --no-access-log"]

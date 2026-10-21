@@ -186,10 +186,15 @@ class TestManagers:
         r = P("POST", "/managers", json={"email": new})
         assert r.status_code == 201 and r.json() == {"email": new.lower(), "display_name": "", "active": False}
         assert P("POST", "/managers", json={"email": new.upper()}).status_code == 409
-        assert P("DELETE", f"/managers/{new}").status_code == 204
-        assert P("DELETE", "/managers/nessuno@esempio.it").status_code == 404
-        assert P("DELETE", f"/managers/{PLATFORM_ADMIN}").status_code == 204
-        r = P("DELETE", f"/managers/{PLATFORM_ONLY}")
+        # P-71 (D-142): the email in the body, never in the path; the old DELETE /managers/{email} is gone
+        assert P("DELETE", f"/managers/{new}").status_code in (404, 405)
+        for bad in ({}, {"email": ""}, {"email": 3}):
+            r = P("POST", "/managers/remove", json=bad)
+            assert r.status_code == 422 and r.json()["error"] == "bad_request", bad
+        assert P("POST", "/managers/remove", json={"email": new}).status_code == 204
+        assert P("POST", "/managers/remove", json={"email": "nessuno@esempio.it"}).status_code == 404
+        assert P("POST", "/managers/remove", json={"email": PLATFORM_ADMIN}).status_code == 204
+        r = P("POST", "/managers/remove", json={"email": PLATFORM_ONLY})
         assert r.status_code == 409 and r.json()["error"] == "last_manager"
         assert requests.get(f"{API}/app/me", headers=hdr(PLATFORM_ADMIN)).json()["user"]["platform_manager"] is False
 

@@ -9,7 +9,7 @@ import secrets
 import string
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, EmailStr, Field
 
@@ -283,8 +283,14 @@ async def add_manager(body: ManagerAdd, identity: Identity = Depends(require_pla
     return manager_row(added)
 
 
-@router.delete("/managers/{email}", status_code=204)
-async def remove_manager(email: str, identity: Identity = Depends(require_platform)):
+@router.post("/managers/remove", status_code=204)
+async def remove_manager(body: dict = Body(...), identity: Identity = Depends(require_platform)):
+    """P-71 (D-142): the email in the body, never in the path (paths end up in access logs). Was DELETE
+    /managers/{email}, gone in the same lot."""
+    email = body.get("email") if isinstance(body, dict) else None
+    if not isinstance(email, str) or not email.strip():
+        return err(422, "bad_request", "Indica l'email del gestore da rimuovere")
+    email = email.strip().lower()
     outcome = await get_repository().remove_platform_member_keeping_one(email)   # atomic (P-36 point 14c)
     if outcome == "not_found":
         return err(404, "not_found", "Non è un gestore della piattaforma")

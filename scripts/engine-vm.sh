@@ -174,7 +174,8 @@ PY
   mv -f "${file}.tmp" "${file}"
   chown "${ENGINE_UID}:${ENGINE_UID}" "${file}"
   chmod 640 "${file}"
-  find "${dir}" -maxdepth 1 -name 'engine-*.db' -mtime "+$((BACKUP_DAYS - 1))" -print -delete | sed 's/^/tolto (oltre 7 giorni): /'
+  # the daily copies and, P-71 (D-142), the databases set aside by restore (before-restore-*.db and their -wal, -shm)
+  find "${dir}" -maxdepth 1 \( -name 'engine-*.db' -o -name 'before-restore-*.db*' \) -mtime "+$((BACKUP_DAYS - 1))"     -print -delete | sed 's/^/tolto (oltre 7 giorni): /'
   echo "backup ${apt}: ${file} ($(stat -c %s "${file}") byte, integrity_check ok)"
 }
 

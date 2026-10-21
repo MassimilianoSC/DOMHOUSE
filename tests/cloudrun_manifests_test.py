@@ -45,3 +45,11 @@ def test_wanted_differences_of_prod():
         assert annotation(STAGING, key) == annotation(PROD, key), key
     # one instance: the demonstration apartments keep their state in the BFF's memory (D-97), pushes not doubled (D-35)
     assert annotation(PROD, "autoscaling.knative.dev/maxScale") == "1"
+
+
+def test_the_bff_writes_no_access_log_of_its_own():
+    """P-71 (D-142): uvicorn's access log off; Cloud Run already logs each request, and paths may carry personal data."""
+    from pathlib import Path
+    dockerfile = (Path(__file__).resolve().parent.parent / "bff" / "Dockerfile").read_text(encoding="utf-8")
+    cmd = next(line for line in dockerfile.splitlines() if line.startswith("CMD"))
+    assert "uvicorn" in cmd and "--no-access-log" in cmd

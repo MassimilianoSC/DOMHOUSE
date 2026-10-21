@@ -117,3 +117,23 @@ def test_compose_reads_the_settings_file_as_optional():
     entries = re.findall(r"- path: (\S+)\n\s+required: (\w+)", block.group(1))
     assert entries == [("/etc/domhouse/${APARTMENT_ID}.env", "true"),
                        ("/etc/domhouse/${APARTMENT_ID}.settings.env", "false")]
+
+
+def test_the_daily_cleanup_also_removes_old_databases_set_aside_by_restore(tmp_path):
+    """P-71 (D-142): the 7-day clean-up of the backups takes before-restore-*.db (and -wal, -shm) too. The script's own
+    find line, run by bash on a folder of old and recent files."""
+    bash = _bash()
+    if not bash:
+        pytest.skip("bash non disponibile")
+    line = next(l for l in SCRIPT.read_text(encoding="utf-8").splitlines() if l.strip().startswith('find "${dir}"'))
+    folder = tmp_path / "backup"
+    folder.mkdir()
+    old = ["engine-2026-10-01.db", "before-restore-20261001T100000Z.db", "before-restore-20261001T100000Z.db-wal"]
+    recent = ["engine-2026-10-20.db", "before-restore-20261020T100000Z.db", "altro-file.db"]
+    for name in old + recent:
+        (folder / name).write_text("x", encoding="utf-8")
+    touch_old = " ".join(f"'{posix(folder / n)}'" for n in old)
+    cmd = f'touch -d "10 days ago" {touch_old}; BACKUP_DAYS=7; dir="{posix(folder)}"; {line.strip()}'
+    r = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=30)
+    assert r.returncode == 0, r.stderr
+    assert sorted(p.name for p in folder.iterdir()) == sorted(recent)    # "altro-file.db" is not ours: untouched
