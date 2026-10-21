@@ -73,6 +73,8 @@ per utente»).
 | 35 | `POST /app/apartments/{id}/simulator/reset` | `simulator_reset` | USER + controllo interno: admin e appartamento `simulated` (403 `forbidden` / `not_simulated`) | 204; 409 `reset_not_available` se l'appartamento è segnato simulato ma non usa il motore integrato `mock://builtin`; vedi «Appartamenti dimostrativi» | pulsante di ripristino (o2) | – |
 | 36 | `GET /app/apartments/{id}/summaries` | `list_summaries` (`routes/apartments.py`) | USER, sugli appartamenti che vede (404 fuori lista) | `[{week, from, to, notable, items}]` dal più recente, al massimo 20; `items` è il numero di voci (vedi «Riepilogo settimanale») | elenco dei riepiloghi (o2) | tutti |
 | 37 | `GET /app/apartments/{id}/summaries/{week}` | `get_summary` | USER, sugli appartamenti che vede (404 fuori lista) | il riepilogo intero (vedi «Riepilogo settimanale»); 404 `not_found` «Riepilogo inesistente» | pagina del riepilogo, link del push (o2) | tutti |
+| 38 | `POST /app/apartments/{id}/rules/proposal` | `propose` (`routes/rules.py` → `bff/rule_proposals.py`) | operator o admin, sugli appartamenti che vede (404 fuori lista, 403 a chi legge soltanto) | `{based_on, rules, changes, explanation}` (vedi «Regole proposte dall'assistente»); 422 `bad_request` (testo vuoto), `text_too_long` (oltre 500 caratteri); 429 `daily_limit`, `monthly_cap`; 409 `apartment_disabled`; 502 `instance_unreachable`, `model_unavailable`, `model_error`; 504 `timeout` | riquadro «Chiedi all'assistente» della pagina Regole (o2) | tutti |
+| 39 | `POST /app/apartments/{id}/rules/proposal/apply` | `apply` | come #38 | il `RuleSet` del motore dopo la modifica; 409 `rules_changed` «Le regole sono cambiate nel frattempo: rifai la richiesta»; 422 `bad_request`, `nothing_to_change`, `unknown_rule`, `rule_not_editable`, `unknown_param`, `param_out_of_range`, `invalid_range`; 502 `instance_unreachable` | «Applica» della proposta (o2) | – |
 
 ## Piattaforma (P-36, D-61a / D-62 / D-64 / D-65)
 
@@ -153,6 +155,7 @@ dell'azione; email risolta per `user` e `manager`.
 | `energy_price_changed` | #20, #25 (P-52) | `apartment` \| `tenant` | `{from, to}` (€/kWh o null) |
 | `apartment_simulated_changed` | piattaforma, anche quando ricollega l'appartamento (D-97) | `apartment` | `{from, to}` |
 | `simulator_reset` | #35 | `apartment` | `{}` |
+| `rules_changed` | #39 | `apartment` | `{source: "assistant", changes: [{rule_id, label, field, old, new}]}` |
 
 | `tenant_suspended`, `tenant_reactivated` | piattaforma | `tenant` | `{reason}` / `{}` |
 | `support_access_opened` | il gestore (attore `support`, persona visibile anche all'admin), PRIMA dell'apertura | `support_access` (label = organizzazione) | `{hours, expires_at, reason}` |
@@ -520,6 +523,46 @@ Esempio di `GET /app/apartments/apt-bologna-01/summaries/2026-W42`:
 - `approvals_expired`: approvazioni create nella settimana e scadute senza risposta.
 - `windows`: finestre che hanno spento il clima almeno 3 volte nella settimana.
 - `items`: le frasi da mostrare, già scritte (vuoto = settimana senza novità); `notable` = `items` non vuoto.
+
+## Regole proposte dall'assistente (P-60 passo 12, D-151)
+
+Nella pagina Regole il gestore scrive che cosa vuole cambiare. Il BFF legge `GET /rules` dell'istanza e chiede al
+modello una proposta strutturata (strumento `proponi_modifiche`, attraverso il passaggio verso il modello: stesso tetto
+mensile). Poi controlla ogni valore con i limiti e con `editable`, come fa il motore. **Non cambia niente**: la
+proposta non si salva e la tiene il sito fino ad «Applica». Sugli appartamenti dimostrativi senza `AI_DEMOS` risponde
+un riconoscitore semplice di frasi («finestra 10 minuti», «antigelo 9 gradi», «umidità 70», «pre-arrivo 3 ore»,
+«check-out 45 minuti», «presenza al check-out 60 minuti», «offline 30 minuti», «setpoint da 17 a 25», «spegni la
+regola dell'antimuffa»). Al massimo 20 proposte al giorno per appartamento (giorno dell'appartamento), contate prima di
+chiamare il modello.
+
+Esempio di risposta di #38 a «la finestra aperta spegne dopo 10 minuti e la presenza al check-out guarda l'ultima ora»:
+
+```json
+{
+  "based_on": "2026-10-21T14:00:00.000Z",
+  "rules": [{"rule_id": "window_open_off", "params": {"minutes": 10}},
+            {"rule_id": "checkout_eco", "params": {"presence_minutes": 60}}],
+  "changes": [
+    {"rule_id": "window_open_off", "label": "Finestra aperta spegne il clima", "field": "minutes", "old": 5, "new": 10},
+    {"rule_id": "checkout_eco", "label": "Risparmio al check-out", "field": "presence_minutes", "old": 30, "new": 60}
+  ],
+  "explanation": "Finestra a 10 minuti e presenza al check-out a 60."
+}
+```
+
+- `changes`: una riga per valore che cambia. `field` è `enabled` (attiva o spenta, `old` e `new` booleani) oppure il
+  nome del parametro, da mostrare con la stessa etichetta della pagina Regole.
+- `changes` vuoto: nessuna proposta, e `explanation` dice perché («… il valore deve essere tra 1 e 30», «Le regole
+  sono già così…», oppure la frase del modello quando la richiesta non riguarda le regole). Da mostrare così com'è.
+- «Applica» manda a #39 `{"based_on": …, "rules": …}` come ricevuti. Il BFF rifà i controlli e confronta `based_on` con
+  `updated_at` delle regole: se sono cambiate risponde 409 `rules_changed`. Altrimenti chiama `PUT /rules` con lo
+  pseudonimo della persona (la decisione nel motore porta il suo nome) e scrive nel registro attività
+  `rules_changed` con `details.source` `assistant` e `details.changes` (le righe di `changes`). Il testo scritto dal
+  gestore non si salva da nessuna parte.
+- Parametri delle regole: lo schema del contratto (`Rule.params`, `additionalProperties: number`) ammette parametri
+  numerici in più in una regola fissa; non è una modifica del contratto. Il primo è `presence_minutes` di
+  `checkout_eco` (minuti di presenza dopo il check-out, da 5 a 180): il primo valore viene da
+  `CHECKOUT_PRESENCE_MINUTES` del motore, poi si cambia dall'app.
 
 ## Passaggio verso il modello (P-60 passo 9, D-132, D-143, D-144)
 

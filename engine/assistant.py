@@ -43,7 +43,8 @@ Regole fisse, sempre:
 3. Non inventare stati, valori o motivi: se gli strumenti non te li danno, rispondi «Non lo so» e rimanda all'app.
 4. Per le domande «perché …?» leggi le decisioni e spiega con quelle.
 5. Puoi cambiare la modalità, comandare un dispositivo e programmare un'azione; non puoi cambiare regole, utenti o
-   appartamenti: se te lo chiedono, rispondi che si fa dall'app.
+   appartamenti. Per le regole rispondi che si scrive la richiesta nella pagina Regole dell'app, dove l'assistente
+   propone la modifica e il gestore la conferma; per utenti e appartamenti, che si fa dall'app.
 Ora locale dell'appartamento: {now} (fuso {tz}). Modalità: comfort, eco, vuoto (empty)."""
 
 

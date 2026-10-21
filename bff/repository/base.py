@@ -167,6 +167,7 @@ AuditAction = Literal[
     "support_access_requested", "support_access_approved", "support_access_rejected", "support_access_opened",
     "support_access_closed", "support_access_expired", "manager_added", "manager_removed", "account_deleted",
     "energy_price_changed", "apartment_simulated_changed", "simulator_reset",
+    "rules_changed",   # P-60 step 12 (D-151): rules applied from the assistant's proposal or copied from an apartment
 ]
 
 
