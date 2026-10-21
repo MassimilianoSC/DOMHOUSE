@@ -240,6 +240,48 @@ Verifica: in fondo `health 200: ok …`.
 
 ---
 
+## D2. Impostazioni di un appartamento (D-131, D-133)
+
+Le impostazioni del motore di un appartamento stanno in `/etc/domhouse/<apartment_id>.settings.env`, un file senza segreti,
+separato da quello della chiave: gli aggiornamenti (`update`, `key`) non lo toccano. **Non si modifica a mano.** Un valore fuori
+intervallo ferma il motore all'avvio con il messaggio nel log; per questo lo script rimette le impostazioni di prima se il
+motore non torna su.
+
+**Impostare o togliere un valore** (scrive sulla VM; il motore si ferma per qualche secondo).
+Cosa fa: scrive o toglie la riga nel file delle impostazioni, ricrea il container e aspetta `health 200`. Se il motore non
+torna su (per esempio per un valore fuori intervallo), rimette le impostazioni di prima, ricrea di nuovo il container e
+scrive «impostazione NOME non applicata».
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+  --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --command="sudo bash /opt/domhouse/engine-vm.sh set dev CONFIRM_ON_WATTS=30"
+```
+
+Per tornare al valore predefinito: lo stesso comando con `unset dev CONFIRM_ON_WATTS`.
+
+Verifica (sola lettura):
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap \
+  --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --command="sudo bash /opt/domhouse/engine-vm.sh status dev"
+```
+
+Risultato atteso: le impostazioni in vigore, oppure «tutte ai valori predefiniti», e in fondo `health 200: ok …`.
+
+**Impostazioni disponibili** (le soglie che l'app può cambiare da sola stanno invece nella pagina Regole dell'appartamento):
+- `CONFIRM_ON_WATTS` (predefinito 20, da 1 a 5000): l'accensione di uno split a infrarosso è confermata se i watt del suo
+  misuratore salgono almeno di questo valore rispetto a prima del comando, entro 10 secondi;
+- `CONFIRM_OFF_WATTS` (predefinito 15, da 1 a 5000): lo spegnimento è confermato se i watt scendono sotto questo valore,
+  entro 10 secondi.
+
+---
+
 ## E. Backup e ripristino
 
 Ogni giorno alle 22:30 UTC il timer `domhouse-engine-backup.timer` lancia `engine-vm.sh backup-all`: per ogni
