@@ -88,7 +88,7 @@ D-28).
 
 - Quante decisioni al giorno produce in media un appartamento, e se `GET /decisions` regge `limit=200` con tempi
   ragionevoli sulla VM (serve a tarare la ricerca nelle Decisioni dell'app, P-32).
-- L'assistente (`/ask`) capisce richieste in inglese? (serve per la lingua inglese, dopo il pilota, D-30)
+- L'assistente (`/ask`) capisce richieste in inglese? (serve per la lingua inglese, D-30, che si sblocca con una decisione del committente)
 - **Consumi** (per l'esportazione in Excel, P-52): con quale dettaglio `GET /energy` restituisce i consumi (ora,
   giorno?) e per quanto tempo indietro? Serve un rendiconto per soggiorno e uno mensile per appartamento.
 - **Conservazione dei dati** (P-54, prima della produzione): quali dati tiene l'istanza nel volume
