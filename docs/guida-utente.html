@@ -185,6 +185,8 @@
 </li>
 <li><a href="#parole-usate-in-questa-guida-de914081">Parole usate in questa guida</a>
 </li>
+<li><a href="#novita-del-20-e-21-ottobre-2026-e52faeae">Novità del 20 e 21 ottobre 2026</a>
+</li>
 <li><a href="#novita-del-16-ottobre-2026-e630f88f">Novità del 16 ottobre 2026</a>
 </li>
 <li><a href="#1-entrare-nell-app-dedaa219">1. Entrare nell&#x27;app</a>
@@ -291,6 +293,51 @@ Nell&#x27;ambiente di prova è <code>mock://builtin</code>, cioè un sistema sim
 <p><strong>Gestore della piattaforma</strong>: chi gestisce il servizio per tutte le organizzazioni (oggi HQE).</p>
 </li>
 </ul>
+</section>
+<section aria-labelledby="novita-del-20-e-21-ottobre-2026-e52faeae">
+<h2 id="novita-del-20-e-21-ottobre-2026-e52faeae">Novità del 20 e 21 ottobre 2026</h2>
+<p><em>Attive dal 21 ottobre 2026. Le sezioni 5 e 7 le descrivono per esteso.</em></p>
+<ul>
+<li>
+<p><strong>Regole complete</strong> (sezione 5, Regole): otto regole automatiche con interruttore e valori modificabili, dall&#x27;antigelo
+all&#x27;antimuffa a casa vuota, fino all&#x27;avviso di dispositivo offline.</p>
+</li>
+<li>
+<p><strong>Caldaia</strong>: lo stato è «Riscaldamento abilitato» / «Riscaldamento disabilitato», il pulsante «Attiva» / «Disattiva»;
+«sta scaldando ora» quando il misuratore segna più di 30 W. Il termostato la regola da solo intorno alla temperatura
+voluta; a casa vuota l&#x27;antigelo la accende sotto la soglia.</p>
+</li>
+<li>
+<p><strong>Forzature</strong>: prima di forzare con una finestra aperta l&#x27;app avvisa; durante la forzatura la finestra aperta non spegne
+il clima e la regola riparte alla scadenza.</p>
+</li>
+<li>
+<p><strong>Decisioni</strong>: ogni decisione mostra il tipo di azione in italiano. Tre tipi nuovi: «Collegamento ai dispositivi
+perso», «Collegamento ai dispositivi ripristinato», «Comando non verificato: misuratore offline».</p>
+</li>
+<li>
+<p><strong>Comandi confermati dal consumo</strong>: l&#x27;accensione o lo spegnimento di un climatizzatore comandato a infrarosso è
+confermata dal suo misuratore entro una decina di secondi; se il misuratore non risponde, il comando risulta «non
+verificato».</p>
+</li>
+<li>
+<p><strong>Approvazioni che il sistema fa da solo</strong>: «Mettere l&#x27;appartamento a vuoto dopo il check-out» (se c&#x27;è stato movimento
+dopo l&#x27;orario di partenza) e «Spegnere …» di un apparecchio che consuma a casa vuota (sezione 5, Approvazioni).</p>
+</li>
+<li>
+<p><strong>Notifiche «Prenotazioni»</strong>: nuova categoria di avvisi, per le prenotazioni che cambiano il programma
+dell&#x27;appartamento (per esempio una disdetta dopo il pre-arrivo).</p>
+</li>
+<li>
+<p><strong>Consumi veri</strong>: i numeri vengono dai misuratori, ora per ora; sotto il grafico «Consumi disponibili dal …»; nell&#x27;Excel
+le ore prima di quella data restano vuote.</p>
+</li>
+<li>
+<p><strong>Simulatore</strong>: nei dimostrativi c&#x27;è il «Misuratore clima» separato dal climatizzatore, e la sezione «Movimento» con il
+pulsante «Simula movimento».</p>
+</li>
+</ul>
+<hr>
 </section>
 <section aria-labelledby="novita-del-16-ottobre-2026-e630f88f">
 <h2 id="novita-del-16-ottobre-2026-e630f88f">Novità del 16 ottobre 2026</h2>
@@ -597,7 +644,34 @@ prenotazione viene annullata dopo che l&#x27;appartamento è già stato preparat
 «vuoto» (salvo un&#x27;altra prenotazione per lo stesso giorno), lo scrive nelle Decisioni e manda l&#x27;avviso «Prenotazioni».</p>
 <h3 id="regole-2a4a6478">Regole</h3>
 <p>Le regole automatiche dell&#x27;appartamento, con interruttore e valori. Quelle con «Non modificabile» non si cambiano.
-Modificando compare in basso «N regole modificate» con «Salva le modifiche» o «Annulla le modifiche». Un valore fuori
+Le otto regole (valori di partenza e limiti):</p>
+<ul>
+<li>
+<p><strong>Finestra aperta spegne il clima</strong>: dopo 5 minuti di finestra aperta (da 1 a 30).</p>
+</li>
+<li>
+<p><strong>Limiti del setpoint</strong>: la temperatura chiesta resta fra 16 e 24 °C.</p>
+</li>
+<li>
+<p><strong>Antigelo a casa vuota</strong>: accende la caldaia sotto 8 °C (da 5 a 12), anche se è disabilitata.</p>
+</li>
+<li>
+<p><strong>Antimuffa a casa vuota</strong>: avviso sopra il 65 % di umidità (da 50 a 80), una volta al giorno.</p>
+</li>
+<li>
+<p><strong>Pre-arrivo</strong>: prepara l&#x27;appartamento 2 ore prima del check-in (da 0 a 6).</p>
+</li>
+<li>
+<p><strong>Risparmio al check-out</strong>: mette l&#x27;appartamento a vuoto 30 minuti dopo il check-out (da 0 a 180).</p>
+</li>
+<li>
+<p><strong>Pausa minima del compressore</strong>: 3 minuti fra uno spegnimento e la riaccensione del clima (non modificabile).</p>
+</li>
+<li>
+<p><strong>Avviso dispositivo offline</strong>: avviso dopo 15 minuti senza contatto (da 5 a 120).</p>
+</li>
+</ul>
+<p>Modificando compare in basso «N regole modificate» con «Salva le modifiche» o «Annulla le modifiche». Un valore fuori
 dai limiti viene segnalato sotto il campo.</p>
 <h3 id="assistente-6b623668">Assistente</h3>
 <p>Si scrive una richiesta in italiano (per esempio «Spegni il clima del soggiorno») e si tocca Invia. L&#x27;assistente risponde,

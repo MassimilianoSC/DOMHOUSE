@@ -47,6 +47,33 @@ un sistema che non è il suo, né ricevere le prenotazioni di una struttura altr
 - **Organizzazione**: un'azienda che usa l'app, con i suoi utenti e i suoi appartamenti (oggi Flatsharing).
 - **Gestore della piattaforma**: chi gestisce il servizio per tutte le organizzazioni (oggi HQE).
 
+## Novità del 20 e 21 ottobre 2026
+
+*Attive dal 21 ottobre 2026. Le sezioni 5 e 7 le descrivono per esteso.*
+
+- **Regole complete** (sezione 5, Regole): otto regole automatiche con interruttore e valori modificabili, dall'antigelo
+  all'antimuffa a casa vuota, fino all'avviso di dispositivo offline.
+- **Caldaia**: lo stato è «Riscaldamento abilitato» / «Riscaldamento disabilitato», il pulsante «Attiva» / «Disattiva»;
+  «sta scaldando ora» quando il misuratore segna più di 30 W. Il termostato la regola da solo intorno alla temperatura
+  voluta; a casa vuota l'antigelo la accende sotto la soglia.
+- **Forzature**: prima di forzare con una finestra aperta l'app avvisa; durante la forzatura la finestra aperta non spegne
+  il clima e la regola riparte alla scadenza.
+- **Decisioni**: ogni decisione mostra il tipo di azione in italiano. Tre tipi nuovi: «Collegamento ai dispositivi
+  perso», «Collegamento ai dispositivi ripristinato», «Comando non verificato: misuratore offline».
+- **Comandi confermati dal consumo**: l'accensione o lo spegnimento di un climatizzatore comandato a infrarosso è
+  confermata dal suo misuratore entro una decina di secondi; se il misuratore non risponde, il comando risulta «non
+  verificato».
+- **Approvazioni che il sistema fa da solo**: «Mettere l'appartamento a vuoto dopo il check-out» (se c'è stato movimento
+  dopo l'orario di partenza) e «Spegnere …» di un apparecchio che consuma a casa vuota (sezione 5, Approvazioni).
+- **Notifiche «Prenotazioni»**: nuova categoria di avvisi, per le prenotazioni che cambiano il programma
+  dell'appartamento (per esempio una disdetta dopo il pre-arrivo).
+- **Consumi veri**: i numeri vengono dai misuratori, ora per ora; sotto il grafico «Consumi disponibili dal …»; nell'Excel
+  le ore prima di quella data restano vuote.
+- **Simulatore**: nei dimostrativi c'è il «Misuratore clima» separato dal climatizzatore, e la sezione «Movimento» con il
+  pulsante «Simula movimento».
+
+---
+
 ## Novità del 16 ottobre 2026
 
 *Novità controllate da una revisione di sicurezza indipendente e attive dal 16 ottobre 2026.*
@@ -260,6 +287,15 @@ prenotazione viene annullata dopo che l'appartamento è già stato preparato per
 
 ### Regole
 Le regole automatiche dell'appartamento, con interruttore e valori. Quelle con «Non modificabile» non si cambiano.
+Le otto regole (valori di partenza e limiti):
+- **Finestra aperta spegne il clima**: dopo 5 minuti di finestra aperta (da 1 a 30).
+- **Limiti del setpoint**: la temperatura chiesta resta fra 16 e 24 °C.
+- **Antigelo a casa vuota**: accende la caldaia sotto 8 °C (da 5 a 12), anche se è disabilitata.
+- **Antimuffa a casa vuota**: avviso sopra il 65 % di umidità (da 50 a 80), una volta al giorno.
+- **Pre-arrivo**: prepara l'appartamento 2 ore prima del check-in (da 0 a 6).
+- **Risparmio al check-out**: mette l'appartamento a vuoto 30 minuti dopo il check-out (da 0 a 180).
+- **Pausa minima del compressore**: 3 minuti fra uno spegnimento e la riaccensione del clima (non modificabile).
+- **Avviso dispositivo offline**: avviso dopo 15 minuti senza contatto (da 5 a 120).
 Modificando compare in basso «N regole modificate» con «Salva le modifiche» o «Annulla le modifiche». Un valore fuori
 dai limiti viene segnalato sotto il campo.
 
