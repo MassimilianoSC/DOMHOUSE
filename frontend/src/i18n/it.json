@@ -178,7 +178,8 @@
       "mold_warning": "Avviso antimuffa",
       "frost_heating_on": "Antigelo: caldaia accesa",
       "frost_heating_off": "Antigelo: caldaia spenta",
-      "thermostat_sensor": "Termostato: sensore"
+      "thermostat_sensor": "Termostato: sensore",
+      "window_rule_suspended": "Finestra: regola sospesa"
     },
     "title": "Decisioni",
     "subtitle": "Tutto ciò che il motore e i gestori hanno fatto, e perché",

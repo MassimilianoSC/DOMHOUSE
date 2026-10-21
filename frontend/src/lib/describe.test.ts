@@ -71,6 +71,8 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     expect(actionLabel("frost_heating_on")).toBe("Antigelo: caldaia accesa");
     expect(actionLabel("frost_heating_off")).toBe("Antigelo: caldaia spenta");
     expect(actionLabel("thermostat_sensor")).toBe("Termostato: sensore");
+    // forzatura e finestra aperta, passo 5c (6923d83): la regola della finestra riparte alla fine della forzatura
+    expect(actionLabel("window_rule_suspended")).toBe("Finestra: regola sospesa");
   });
 
   it("un'azione che il motore aggiungerà e il sito non conosce ancora: il codice, la pagina non si rompe", () => {
