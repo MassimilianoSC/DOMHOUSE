@@ -53,7 +53,7 @@ che avevano solo in memoria (sezione 7, 16 ottobre sera).
 
 Unico elenco. Nessun altro documento ne tiene uno.
 
-Nessuna decisione aperta (20 ottobre, sera: categoria di notifica decisa con D-123).
+- **21 ottobre, pagina Decisioni: il tipo di azione compare come codice tecnico** (`set_mode`, `expire`, `hold_expired`, `schedule_create`, ora anche `booking_cancel_reset`, `schedule_deferred`) in un riquadro grigio, con sotto la frase in italiano scritta dal motore; non esiste un elenco di etichette. Verifica di o2 del 21 ott. Opzioni: A) etichette italiane per tutte le 14 azioni a nome fisso più i comandi, con il codice come riserva per le azioni non ancora tradotte (circa 1 ora, una riga nella guida); B) solo le due nuove (15 minuti, pagina mista); C) lasciare com'è. Raccomandazione di o2 e della memoria storica: A.
 
 ---
 
