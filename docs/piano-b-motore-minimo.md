@@ -78,10 +78,13 @@ finestra, i limiti di setpoint e la registrazione delle decisioni restano **fuor
 
 ## 4. Ordine di costruzione e stima (giornate di o1)
 
-**Stato al 21 ottobre 2026** (il dettaglio è nel registro, P-60 e decisioni D-104…D-130): passi 0, 1, 2, 3, 3b, 3c, 4 e 5
-**fatti e online** (lotti 15, 16, 17: il motore gira sulla VM come servizio `dev` con il connector simulato, il BFF è in
-`TARGET=prod`); passo 6 **in corso**; passi 7, 8, 9, 10 da fare; la riga I (ingresso dei dispositivi) aspetta la scelta di
-Youssouf. Il backup di SQLite (passo 10) è già fatto con il 3d.
+**Stato al 21 ottobre 2026, sera** (il dettaglio è nel registro, P-60 e decisioni D-104…D-144): passi 0–8 **fatti e
+online** (lotti 15–20: il motore gira sulla VM come servizio `dev` con il connector simulato, il BFF è in `TARGET=prod`;
+passo 6 consumi veri con il lotto 18, passo 7 con il lotto 19, passo 8 con il lotto 20); passo 9 **in corso** (D-132,
+D-143, D-144: 9a passaggio verso il modello nel BFF quasi pronto, poi 9b, 9c, 9d); poi P-67 ambienti separati (D-136,
+entro il 31 ottobre, 3,5–4 giornate), passo 10, 11, 12; P-69 verifica in due passaggi dopo P-67 e prima del primo
+appartamento vero (D-141). La riga I (ingresso dei dispositivi) aspetta la scelta di Youssouf. Il backup di SQLite
+(passo 10) è già fatto con il 3d.
 
 | Passo | Cosa | Stima |
 |---|---|---|
