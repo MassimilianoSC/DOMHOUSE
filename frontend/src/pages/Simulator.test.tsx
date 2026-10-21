@@ -2,12 +2,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { toast } from "sonner";
+import type { Device } from "@/api/types";
 import { t } from "@/i18n";
+import { fmtDateTime } from "@/lib/format";
+import { useApartmentStore } from "@/store/apartmentStore";
 import App from "@/App";
 
 // Simulatore (D-97): it follows the apartment, not the environment: admins only, on a simulated apartment, in
 // production too. The reset needs the built-in engine; after it everything of the apartment is read again.
-const s = vi.hoisted(() => ({ me: null as unknown, simulated: true, url: "mock://builtin", calls: [] as string[], resetStatus: 204, resync: vi.fn(async () => {}) }));
+const s = vi.hoisted(() => ({ me: null as unknown, simulated: true, url: "mock://builtin", calls: [] as string[], bodies: {} as Record<string, unknown>, resetStatus: 204, resync: vi.fn(async () => {}) }));
 
 vi.mock("@/auth/AuthProvider", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/auth/AuthProvider")>();
@@ -32,10 +35,12 @@ function bff() {
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const path = new URL(url).pathname;
     s.calls.push(`${init?.method ?? "GET"} ${path}`);
+    if (init?.body) s.bodies[path] = JSON.parse(String(init.body));
     const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
     if (path === "/app/apartments/apt-001") return json(SUMMARY());
     if (path === "/app/apartments") return json([SUMMARY()]);
     if (path === "/app/admin/apartments") return json([{ apartment_id: "apt-001", name: "Milano Centro", address: "", timezone: "Europe/Rome", instance_url: s.url, port: null, enabled: true, italianway_id: null, enabled_features: null, simulated: s.simulated }]);
+    if (path === "/app/apartments/apt-001/instance/_test/state") return new Response(null, { status: 204 });
     if (path === "/app/apartments/apt-001/simulator/reset") return s.resetStatus === 204 ? new Response(null, { status: 204 }) : json({ error: "reset_not_available", message: "Ripristino non disponibile" }, s.resetStatus);
     return json([]);
   }));
@@ -60,6 +65,7 @@ beforeEach(() => {
   s.simulated = true;
   s.url = "mock://builtin";
   s.calls = [];
+  s.bodies = {};
   s.resetStatus = 204;
   Element.prototype.scrollIntoView = vi.fn();
 });
@@ -138,5 +144,43 @@ describe("Simulatore: ripristino dello stato iniziale", () => {
     });
     expect(toast.error).toHaveBeenCalledWith("Ripristino non disponibile", expect.anything());
     expect(s.resync).not.toHaveBeenCalled();
+  });
+});
+
+describe("Simulatore: «Simula movimento» (D-140)", () => {
+  const sensor = (last_seen: string | null) =>
+    ({ device_id: "dev-ambiente-soggiorno", label: "Sensore soggiorno", room_id: "soggiorno", online: true, capabilities: { motion: { detected: false, last_seen } } }) as unknown as Device;
+
+  async function openWith(devices: Device[]) {
+    open("/a/apt-001/simulatore");
+    await screen.findByTestId("simulator-header");
+    act(() => {
+      useApartmentStore.getState().setSnapshot({ devices });
+    });
+    return screen.getByTestId("simulator-motion");
+  }
+
+  it("un pulsante per sensore: manda il movimento al motore e conferma «Movimento simulato su <sensore>»", async () => {
+    await openWith([sensor(null)]);
+    expect(screen.getByTestId("sim-motion-last-dev-ambiente-soggiorno")).toHaveTextContent(t("simulator.noMotionYet"));
+    const btn = screen.getByTestId("sim-motion-dev-ambiente-soggiorno");
+    expect(btn).toHaveTextContent("Simula movimento");
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    expect(s.calls).toContain("POST /app/apartments/apt-001/instance/_test/state");
+    expect(s.bodies["/app/apartments/apt-001/instance/_test/state"]).toEqual({ device_id: "dev-ambiente-soggiorno", capability: "motion", state: { detected: true } });
+    expect(toast.success).toHaveBeenCalledWith("Movimento simulato su Sensore soggiorno");
+  });
+
+  it("l'ora dell'ultimo movimento registrata dal motore, nel fuso dell'appartamento", async () => {
+    await openWith([sensor("2026-10-21T12:05:00Z")]);
+    expect(screen.getByTestId("sim-motion-last-dev-ambiente-soggiorno")).toHaveTextContent(t("simulator.lastMotion", { when: fmtDateTime("2026-10-21T12:05:00Z", "Europe/Rome") }));
+  });
+
+  it("nessun sensore di movimento: lo dice, nessun pulsante", async () => {
+    const card = await openWith([]);
+    expect(card).toHaveTextContent(t("simulator.noMotion"));
+    expect(within(card).queryByRole("button")).toBeNull();
   });
 });

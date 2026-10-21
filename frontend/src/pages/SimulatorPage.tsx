@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CalendarPlus, DoorOpen, RotateCcw, ShieldQuestion, WifiOff } from "lucide-react";
+import { CalendarPlus, DoorOpen, Footprints, RotateCcw, ShieldQuestion, WifiOff } from "lucide-react";
 import { adminApi, simulatorApi, type SimBookingInput } from "@/api/admin";
 import { useAuth } from "@/auth/AuthProvider";
 import { DemoBadge, isBuiltinMock } from "@/components/admin/apartmentForm";
@@ -12,6 +12,7 @@ import { useFeatures } from "@/hooks/useFeatures";
 import { resync } from "@/hooks/useApartmentStream";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
+import { DEFAULT_TZ, fmtDateTime } from "@/lib/format";
 import { useApartmentStore } from "@/store/apartmentStore";
 
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -92,6 +93,8 @@ export default function SimulatorPage() {
   const api = useMemo(() => simulatorApi(aptId), [aptId]);
   const { summary } = useFeatures(aptId);
   const windows = devices.filter((d) => d.capabilities.contact);
+  const motionSensors = devices.filter((d) => d.capabilities.motion);
+  const tz = useApartmentStore((s) => s.apartment?.timezone) ?? DEFAULT_TZ;
   const [busy, setBusy] = useState<string | null>(null);
   const [booking, setBooking] = useState<{ type: SimBookingInput["type"]; booking_id: string; checkin: string; checkout: string; guests: string }>({
     type: "booking_created",
@@ -148,6 +151,30 @@ export default function SimulatorPage() {
               />
             </div>
           ))}
+        </Section>
+        {/* D-140: a movement is an instant, so one button per sensor; the engine records its time (motion.last_seen). */}
+        <Section icon={<Footprints className="h-5 w-5" />} title={t("simulator.motion")} hint={t("simulator.motionHint")} testId="simulator-motion">
+          {motionSensors.length === 0 && <p className="text-sm text-muted-foreground">{t("simulator.noMotion")}</p>}
+          {motionSensors.map((d) => {
+            const last = d.capabilities.motion?.last_seen;
+            return (
+              <div key={d.device_id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-secondary/50 px-3 py-2">
+                <span className="text-sm font-semibold">
+                  {d.label} <span className="text-xs text-muted-foreground" data-testid={`sim-motion-last-${d.device_id}`}>· {last ? t("simulator.lastMotion", { when: fmtDateTime(last, tz) }) : t("simulator.noMotionYet")}</span>
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={busy !== null}
+                  aria-label={`${t("simulator.simulateMotion")}: ${d.label}`}
+                  onClick={() => act(`motion-${d.device_id}`, (c) => api.state({ device_id: d.device_id, capability: "motion", state: { detected: true } }, c), t("simulator.motionSimulated", { name: d.label }))}
+                  data-testid={`sim-motion-${d.device_id}`}
+                >
+                  <Footprints /> {t("simulator.simulateMotion")}
+                </Button>
+              </div>
+            );
+          })}
         </Section>
         <Section icon={<WifiOff className="h-5 w-5" />} title={t("simulator.online")} hint={t("simulator.onlineHint")} testId="simulator-online">
           {devices.map((d) => (
