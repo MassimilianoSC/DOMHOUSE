@@ -296,7 +296,8 @@ Risultato atteso: le impostazioni in vigore, oppure «tutte ai valori predefinit
   casa vuota, che segue `EMPTY_POWER_EXPIRED_ACTION` (D-137);
 - `CHECKOUT_PRESENCE_MINUTES` (predefinito 30, da 5 a 180): al passaggio a «vuoto» dopo il check-out, se il sensore di
   movimento ha visto qualcuno dopo l'orario di partenza ed entro questi minuti, il motore chiede prima di procedere
-  («Mettere l'appartamento a vuoto dopo il check-out»);
+  («Mettere l'appartamento a vuoto dopo il check-out»). Dal passo 12 (D-151) è solo il valore iniziale: poi il parametro
+  «minuti di presenza» della regola «Risparmio al check-out» si cambia dall'app, nella pagina Regole;
 - `EMPTY_POWER_WATTS` (predefinito 300, da 20 a 5000): con l'appartamento vuoto, un misuratore sopra questi watt…
 - `EMPTY_POWER_MINUTES` (predefinito 15, da 5 a 240): …per almeno questi minuti fa chiedere se spegnere l'apparecchio
   («Spegnere …»; mai la caldaia, mai durante una forzatura; una richiesta per dispositivo finché il consumo non scende
