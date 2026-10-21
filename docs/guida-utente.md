@@ -181,8 +181,9 @@ quali appartamenti vedi.
   forzatura è attiva, un cambio di modalità programmato (per esempio il check-out) non la interrompe: aspetta la sua fine e
   si esegue allora, e nelle Decisioni compare «rimandata per la forzatura». Se nell'appartamento c'è una finestra aperta,
   prima di partire l'app avvisa: «Finestra aperta in Soggiorno: durante la forzatura il clima resta acceso.» (con il nome della stanza), con «Annulla» e
-  «Forza comunque». Durante la forzatura la finestra aperta non spegne il clima; alla sua scadenza la regola riparte e, se
-  la finestra è ancora aperta, spegne, con una decisione che spiega entrambi i motivi.
+  «Forza comunque». Durante la forzatura la finestra aperta non spegne il clima (nelle Decisioni compare «Finestra: regola
+  sospesa», con l'ora in cui la regola riparte); alla sua scadenza la regola riparte e, se la finestra è ancora aperta,
+  spegne, con una decisione che spiega entrambi i motivi.
 - **Dispositivi** raggruppati per stanza: interruttori Acceso/Spento, temperatura con − e +, modo del climatizzatore,
   velocità della ventola, letture di potenza, consumi, temperatura, umidità, finestre e movimento. Per la caldaia lo stato è
   **«Riscaldamento abilitato» / «Riscaldamento disabilitato»** e il pulsante «Attiva» / «Disattiva»: il termostato del
