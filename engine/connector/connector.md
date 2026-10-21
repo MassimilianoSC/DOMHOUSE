@@ -1,12 +1,12 @@
 # Il connector dei dispositivi — specifica per il motore DOMHOUSE
 
-*20 ottobre 2026, approvata da Massimiliano. Nel repository: `engine/connector/connector.md`. Dove si legge
+*21 ottobre 2026, approvata da Massimiliano (revisione: solo il numero di versione del contratto, 1.0.5). Nel repository: `engine/connector/connector.md`. Dove si legge
 «decide il catalogo» o «da concordare», non è una decisione già presa.*
 
 ## 0. In breve
 
 Il motore domotico di DOMHOUSE lo scriviamo noi. È un programma Python (asyncio), uno per appartamento, sulla VM, che
-espone all'app l'API del contratto fra app e motore (versione 1.0.4, che non cambia). Il contratto non ti serve:
+espone all'app l'API del contratto fra app e motore (versione 1.0.5, che non cambia). Il contratto non ti serve:
 quello che ti riguarda, cioè le otto capacità dei dispositivi, è nella tabella del §2.3.
 
 Il connector è la parte che parla con i dispositivi reali: dice al motore quali dispositivi ci sono e in che stato
@@ -139,7 +139,7 @@ come non regolabile. Chiavi diverse da queste due: solo se concordate.
 ### 2.3 Le otto capacità del contratto
 
 Le otto capacità sono il modo in cui l'app vede ogni dispositivo: un dispositivo ne ha una o più, ciascuna con i suoi
-campi. Questa tabella è **derivata da openapi.yaml v1.0.4, components.schemas.Cap\*** (il contratto fra l'app e il
+campi. Questa tabella è **derivata da openapi.yaml v1.0.5, components.schemas.Cap\*** (il contratto fra l'app e il
 motore): i nomi dei campi sono esattamente quelli del contratto. Non ti serve altro del contratto.
 
 | Capacità | Schema | Campi (tipo) | Obbligatori |
