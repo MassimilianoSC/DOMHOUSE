@@ -92,7 +92,7 @@ describe("telefono: niente barra in basso, menu a scomparsa (D-103)", () => {
     expect(within(menu).getByTestId("mobile-menu-logo")).toBeInTheDocument();
     expect(drawerKeys()).toEqual([
       "drawer-nav-apartments",
-      "drawer-nav-overview", "drawer-nav-approvals", "drawer-nav-decisions", "drawer-nav-energy", "drawer-nav-schedule", "drawer-nav-rules", "drawer-nav-assistant",
+      "drawer-nav-overview", "drawer-nav-approvals", "drawer-nav-decisions", "drawer-nav-energy", "drawer-nav-summaries", "drawer-nav-schedule", "drawer-nav-rules", "drawer-nav-assistant",
       "drawer-nav-admin", "drawer-nav-settings",
     ]);
     expect(within(menu).getByTestId("drawer-user-role")).toHaveTextContent(/^Amministratore · Demo$/);

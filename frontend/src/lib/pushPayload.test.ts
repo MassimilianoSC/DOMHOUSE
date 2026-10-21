@@ -89,3 +89,16 @@ describe("push: prenotazioni (D-123)", () => {
     });
   });
 });
+
+describe("push: riepilogo settimanale (D-150)", () => {
+  it("kind «summary»: apre la pagina di quella settimana, raggruppata per appartamento e settimana", () => {
+    const summary = { data: { kind: "summary", title: "Milano Centro: riepilogo della settimana", body: "Consumi alti per notte con ospiti", link: "/a/apt-001/riepiloghi/2026-W42", tag: "summary:apt-001:2026-W42", apartment_id: "apt-001" } };
+    expect(toNotice(summary, "DOMHOUSE")).toEqual({
+      title: "Milano Centro: riepilogo della settimana",
+      body: "Consumi alti per notte con ospiti",
+      link: "/a/apt-001/riepiloghi/2026-W42",
+      tag: "summary:apt-001:2026-W42",
+      apartmentId: "apt-001",
+    });
+  });
+});

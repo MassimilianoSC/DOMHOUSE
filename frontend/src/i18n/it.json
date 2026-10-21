@@ -245,6 +245,36 @@
     "empty": "Nessun dato nel periodo",
     "since": "Consumi disponibili dal {date}"
   },
+  "summaries": {
+    "title": "Riepiloghi",
+    "subtitle": "Il riepilogo di ogni settimana, pronto il lunedì mattina",
+    "empty": "Nessun riepilogo ancora. Ogni lunedì mattina arriva quello della settimana appena finita.",
+    "week": "Settimana {range}",
+    "range": "dal {from} al {to}",
+    "items": "{count} segnalazioni",
+    "itemsOne": "1 segnalazione",
+    "nothing": "Nessuna novità",
+    "back": "Tutti i riepiloghi",
+    "weekTitle": "Riepilogo della settimana",
+    "generated": "calcolato il {when}",
+    "noNews": "Settimana senza novità",
+    "energyTitle": "Consumi a parità di occupazione",
+    "energyHint": "kWh per notte confrontati con la mediana delle stesse notti nelle 4 settimane prima",
+    "occupied": "Notti con ospiti",
+    "vacant": "Notti vuote",
+    "byDevice": "Per dispositivo",
+    "nights": "{count} notti",
+    "nightsOne": "1 notte",
+    "perNight": "{kwh} per notte",
+    "before": "mediana prima {kwh}",
+    "noNightsDetail": "nessuna notte di questo tipo nella settimana",
+    "status": {
+      "normal": "Nella norma",
+      "anomalous": "Alto",
+      "not_comparable": "Confronto non disponibile",
+      "no_nights": "Nessuna notte"
+    }
+  },
   "assistant": {
     "title": "Assistente",
     "subtitle": "Chiedi in italiano: spegnere, impostare una temperatura, programmare un'azione",
@@ -355,6 +385,7 @@
     "approvals": "Approvazioni",
     "decisions": "Decisioni",
     "energy": "Consumi",
+    "summaries": "Riepiloghi",
     "assistant": "Assistente",
     "admin": "Amministrazione",
     "organizations": "Organizzazioni",
@@ -565,7 +596,9 @@
       "decisions": "Decisioni del motore",
       "decisionsHint": "Riepilogo delle azioni automatiche (solo in app)",
       "bookings": "Prenotazioni",
-      "bookingsHint": "Avvisi sulle prenotazioni che cambiano il programma dell'appartamento"
+      "bookingsHint": "Avvisi sulle prenotazioni che cambiano il programma dell'appartamento",
+      "summary": "Riepilogo",
+      "summaryHint": "Ogni lunedì, solo se la settimana ha qualcosa da segnalare"
     }
   },
   "notify": {

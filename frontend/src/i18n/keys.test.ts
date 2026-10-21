@@ -5,6 +5,7 @@ import type { ClimateState } from "@/components/devices/capabilities/types";
 import { apartmentNav, globalNav } from "@/components/layout/navItems";
 import { AUDIT_ACTIONS } from "@/lib/auditLog";
 import { BOOKING_TYPES, type OutcomeKind } from "@/lib/bookingLog";
+import type { SummaryStatus } from "@/api/summaries";
 import * as ts from "typescript";
 import italian from "./it.json";
 
@@ -29,7 +30,7 @@ const form = (tpl: string, values: readonly string[]): [string, string[]] => [tp
 const MODES = all<ApartmentMode>({ comfort: true, eco: true, empty: true });
 const NAV_KEYS = [...apartmentNav("x", true), ...globalNav(true, { platform: true })].map((i) => i.key);
 const FEATURE_NAV = APP_FEATURES.map((f) => (f === "ask" ? "assistant" : f === "apartment" ? "overview" : f));
-const NOTIFY = all<keyof NotificationPrefs>({ approvals: true, offline: true, decisions: true, bookings: true });
+const NOTIFY = all<keyof NotificationPrefs>({ approvals: true, offline: true, decisions: true, bookings: true, summary: true });
 
 /** Runtime-built forms (placeholders written as ${}) → every key they can produce. */
 const FORMS: Record<string, string[]> = Object.fromEntries([
@@ -65,6 +66,7 @@ const FORMS: Record<string, string[]> = Object.fromEntries([
   form("schedule.status.${}", all<ScheduleItem["status"]>({ planned: true, done: true, cancelled: true, failed: true })),
   form("settings.notifications.${}", NOTIFY),
   form("settings.notifications.${}Hint", NOTIFY),
+  form("summaries.status.${}", all<SummaryStatus>({ normal: true, anomalous: true, not_comparable: true, no_nights: true })),
   form("simulator.types.${}", all<SimBookingInput["type"]>({ booking_created: true, booking_changed: true, booking_cancelled: true, checkin: true, checkout: true })),
 ]);
 

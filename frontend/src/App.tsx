@@ -21,6 +21,7 @@ const DecisionsPage = lazyPage(() => import("@/pages/DecisionsPage"));
 const EnergyPage = lazyPage(() => import("@/pages/EnergyPage"));
 const AssistantPage = lazyPage(() => import("@/pages/AssistantPage"));
 const SimulatorPage = lazyPage(() => import("@/pages/SimulatorPage"));
+const SummariesPage = lazyPage(() => import("@/pages/SummariesPage"));
 const AdminPage = lazyPage(() => import("@/pages/AdminPage"));
 const SettingsPage = lazyPage(() => import("@/pages/SettingsPage"));
 const OrganizationsPage = lazyPage(() => import("@/pages/OrganizationsPage"));
@@ -98,6 +99,9 @@ export default function App() {
             <Route key={p.path} path={p.path} element={<FeatureGate feature={p.feature}>{p.element}</FeatureGate>} />
           ))}
           <Route path="simulatore" element={<SimulatorOnly><Lazy page={SimulatorPage} /></SimulatorOnly>} />
+          {/* D-150: made by the BFF, not by the engine, so no feature gate; every role */}
+          <Route path="riepiloghi" element={<Lazy page={SummariesPage} />} />
+          <Route path="riepiloghi/:week" element={<Lazy page={SummariesPage} />} />
         </Route>
         <Route path="admin" element={<AdminOnly><Lazy page={AdminPage} /></AdminOnly>} />
         <Route path="organizzazioni" element={<PlatformOnly><Lazy page={OrganizationsPage} /></PlatformOnly>} />

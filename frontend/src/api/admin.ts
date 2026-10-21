@@ -148,6 +148,8 @@ export interface NotificationPrefs {
   decisions: boolean;
   /** Bookings that change the apartment's programme (D-121, D-123); on by default. Always sent with the others. */
   bookings: boolean;
+  /** Weekly summary (D-150), pushed only when the week has something to report; on by default. Always sent too. */
+  summary: boolean;
 }
 
 export const pushApi = {

@@ -176,14 +176,14 @@ describe("Impostazioni > Notifiche: «Prenotazioni» (D-123)", () => {
     expect(card).toHaveTextContent(t("settings.notifications.bookingsHint"));
   });
 
-  it("spenta: si salva, e il salvataggio manda SEMPRE tutte e quattro le voci", async () => {
+  it("spenta: si salva, e il salvataggio manda SEMPRE tutte le voci", async () => {
     renderCard();
     const sw = await screen.findByTestId("settings-pref-bookings");
     await waitFor(() => expect(sw).toBeChecked());
     await act(async () => {
       fireEvent.click(sw);
     });
-    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: true, decisions: false, bookings: false });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: true, decisions: false, bookings: false, summary: true });
     expect(screen.getByTestId("settings-pref-bookings")).not.toBeChecked();
   });
 
@@ -194,7 +194,7 @@ describe("Impostazioni > Notifiche: «Prenotazioni» (D-123)", () => {
     await act(async () => {
       fireEvent.click(sw);
     });
-    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: true, decisions: true, bookings: true });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: true, decisions: true, bookings: true, summary: true });
   });
 
   it("server precedente, senza la voce: si mostra attiva (il predefinito) e si manda attiva", async () => {
@@ -204,6 +204,43 @@ describe("Impostazioni > Notifiche: «Prenotazioni» (D-123)", () => {
     await act(async () => {
       fireEvent.click(screen.getByTestId("settings-pref-offline"));
     });
-    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: false, decisions: false, bookings: true });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: false, decisions: false, bookings: true, summary: true });
+  });
+});
+
+describe("Impostazioni > Notifiche: «Riepilogo» (D-150)", () => {
+  beforeEach(() => {
+    state.prefs = { approvals: true, offline: true, decisions: false, bookings: true, summary: true };
+  });
+
+  it("la voce c'è, ultima, con la sua descrizione, e parte attiva come dice il server", async () => {
+    const card = renderCard();
+    const sw = await screen.findByTestId("settings-pref-summary");
+    await waitFor(() => expect(sw).toBeChecked());
+    expect(card).toHaveTextContent("Riepilogo");
+    expect(card).toHaveTextContent("Ogni lunedì, solo se la settimana ha qualcosa da segnalare");
+    const order = screen.getAllByRole("switch").map((el) => el.getAttribute("data-testid"));
+    expect(order).toEqual(["settings-pref-approvals", "settings-pref-offline", "settings-pref-decisions", "settings-pref-bookings", "settings-pref-summary"]);
+  });
+
+  it("spenta: si salva con tutte le altre voci", async () => {
+    renderCard();
+    const sw = await screen.findByTestId("settings-pref-summary");
+    await waitFor(() => expect(sw).toBeChecked());
+    await act(async () => {
+      fireEvent.click(sw);
+    });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: true, decisions: false, bookings: true, summary: false });
+    expect(screen.getByTestId("settings-pref-summary")).not.toBeChecked();
+  });
+
+  it("server precedente, senza la voce: si mostra attiva (il predefinito) e si manda attiva", async () => {
+    state.prefs = { approvals: true, offline: true, decisions: false, bookings: true };
+    renderCard();
+    await waitFor(() => expect(screen.getByTestId("settings-pref-summary")).toBeChecked());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("settings-pref-offline"));
+    });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: false, decisions: false, bookings: true, summary: true });
   });
 });

@@ -1,4 +1,4 @@
-import { BarChart3, Bot, Building2, CalendarClock, ClipboardCheck, FlaskConical, History, LayoutDashboard, Network, Settings, Shield, SlidersHorizontal } from "lucide-react";
+import { BarChart3, Bot, Building2, CalendarClock, CalendarRange, ClipboardCheck, FlaskConical, History, LayoutDashboard, Network, Settings, Shield, SlidersHorizontal } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AppFeature } from "@/api/types";
 
@@ -17,6 +17,7 @@ export function apartmentNav(aptId: string, simulator = false): NavItem[] {
     { to: `${base}/approvazioni`, key: "approvals", icon: <ClipboardCheck />, feature: "approvals" },
     { to: `${base}/decisioni`, key: "decisions", icon: <History />, feature: "decisions" },
     { to: `${base}/consumi`, key: "energy", icon: <BarChart3 />, feature: "energy" },
+    { to: `${base}/riepiloghi`, key: "summaries", icon: <CalendarRange /> }, // D-150: from the BFF, every role
     { to: `${base}/programmazione`, key: "schedule", icon: <CalendarClock />, feature: "schedule" },
     { to: `${base}/regole`, key: "rules", icon: <SlidersHorizontal />, feature: "rules" },
     { to: `${base}/assistente`, key: "assistant", icon: <Bot />, feature: "ask" },
