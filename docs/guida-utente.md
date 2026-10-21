@@ -303,6 +303,17 @@ dai limiti viene segnalato sotto il campo.
 Si scrive una richiesta in italiano (per esempio «Spegni il clima del soggiorno») e si tocca Invia. L'assistente risponde,
 oppure chiede un'approvazione con il link «Vai alle approvazioni». Se dopo 30 secondi non risponde compare «Nessuna
 risposta dall'assistente: riprova». La conversazione resta solo in quella scheda del browser.
+- L'assistente legge stati, consumi, programmazioni e Decisioni dell'appartamento (sa rispondere a «perché si è spento
+  il clima?») e può fare solo ciò che un operatore fa dall'app: modalità, comandi ai dispositivi, programmazioni. Non
+  tocca regole, utenti e appartamenti, e non riceve mai dati personali degli ospiti.
+- Con ospiti presenti, spegnere il clima o la caldaia o cambiare modalità passa da un'approvazione; più azioni in una
+  richiesta («spegni clima e caldaia») diventano un'approvazione ciascuna, in coda.
+- L'esito lo scrive il sistema, non il modello: «Fatto: …» solo quando il dispositivo ha confermato; altrimenti
+  «Comando inviato: …, l'esito arriva nell'app», «Serve la tua approvazione: …» oppure «Programmato: …». Se non sa una
+  cosa lo dice e rimanda all'app.
+- Limiti: 50 domande al giorno per appartamento («Limite di 50 domande al giorno raggiunto per questo appartamento:
+  riprova domani»); un tetto di spesa mensile per tutto il servizio, raggiunto il quale compare «Limite mensile
+  raggiunto, riprova dal mese prossimo». Anche gli appartamenti dimostrativi usano l'assistente vero.
 Chi ha il ruolo «Sola lettura» non fa domande all'Assistente e non vede quelle dei colleghi.
 
 ### Simulatore (solo amministratori, solo sugli appartamenti «Dimostrativo»)

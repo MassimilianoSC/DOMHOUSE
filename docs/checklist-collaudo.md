@@ -86,7 +86,10 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D8 | Qualsiasi | Consumi: Oggi, 7 giorni, 30 giorni. | Totale e grafico per ogni periodo, oppure «Nessun dato nel periodo». | |
 | D9 | Operatore | Programmazione: «Nuova azione» fra 10 minuti, poi «Sposta», poi «Annulla azione». | «Azione programmata», «Orario aggiornato», «Azione annullata». | |
 | D10 | Operatore | Regole: cambia un valore fuori dai limiti, poi uno valido e salva. | Prima l'errore sotto il campo, poi «Regole aggiornate». | |
-| D11 | Operatore | Assistente: «Spegni il clima del soggiorno». | Una risposta, oppure la richiesta di approvazione con «Vai alle approvazioni». | |
+| D11 | Operatore (su un dimostrativo «vuoto», per esempio Bologna) | Assistente: «accendi la stufetta in camera». | Entro 30 secondi: «Fatto: accendere presa stufetta camera.»; in Panoramica la presa risulta accesa; nelle Decisioni l'autore è l'assistente. | |
+| D11b | Operatore (su un dimostrativo con ospiti presenti, per esempio Rimini) | Assistente: «spegni il clima». | «Serve la tua approvazione: …» con il link «Vai alle approvazioni»; la richiesta compare in Approvazioni e il clima resta acceso finché non approvi. | |
+| D11c | Operatore (su un dimostrativo) | Dal Simulatore apri una finestra e aspetta che il clima si spenga (5 minuti); poi Assistente: «perché si è spento il clima?». | Una risposta che cita la finestra aperta, presa dalle Decisioni. | |
+| D11d | Sola lettura | Apri la pagina Assistente. | Nessun campo per scrivere: il ruolo non fa domande. | |
 
 ## E. Amministrazione
 

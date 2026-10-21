@@ -304,7 +304,17 @@ Risultato atteso: le impostazioni in vigore, oppure «tutte ai valori predefinit
 - `EMPTY_POWER_EXPIRED_ACTION` (predefinito `reject`, valori `reject` oppure `approve`): cosa succede alla richiesta
   «Spegnere …» se nessuno risponde entro la scadenza: `reject` = respinta, l'apparecchio resta acceso; `approve` =
   approvata, l'apparecchio si spegne (D-137: il committente ha scelto `reject` come predefinito perché spegnere un
-  apparecchio a casa senza prenotazione può colpire la lavatrice di chi pulisce o uno scaldabagno).
+  apparecchio a casa senza prenotazione può colpire la lavatrice di chi pulisce o uno scaldabagno);
+- `MODEL_BASE_URL` (facoltativa, nessun predefinito): l'indirizzo del server pubblicato (`https://…`). Con questa
+  l'assistente dell'appartamento risponde con il modello vero, attraverso il server, dentro il tetto mensile del
+  progetto (passo 9, D-143). Senza: assistente a parole chiave se il connector è simulato, altrimenti assistente spento;
+- `ASK_DAILY_LIMIT` (predefinito 50, da 1 a 1000): domande all'assistente al giorno per appartamento; oltre, «Limite di
+  50 domande al giorno raggiunto per questo appartamento: riprova domani».
+
+Le impostazioni del server (nei manifesti, non sulla VM): `AI_MONTHLY_CAP_EUR` 20, `AI_ALERT_PERCENT` 80, i prezzi per
+milione di token 0.83, 4.13 e 0.08 € (da aggiornare il 1° gennaio 2027), `AI_DEMOS` per i dimostrativi; tutto in
+`bff/API.md`, sezione «Passaggio verso il modello». Il server deve avere il ruolo `roles/aiplatform.user` (comando
+del committente, registro P-60 passo 9).
 
 I decimali si scrivono con il punto (per esempio `0.5`): la virgola non è accettata.
 
