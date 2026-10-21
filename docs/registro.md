@@ -53,7 +53,7 @@ che avevano solo in memoria (sezione 7, 16 ottobre sera).
 
 Unico elenco. Nessun altro documento ne tiene uno.
 
-Nessuna decisione aperta (21 ottobre: testi della caldaia decisi con D-129).
+- **21 ottobre, passo 6 (consumi veri): tre decisioni e una conferma, con le proposte di o1.** Stato: `GET /energy` oggi è inventato (serie casuale ripetibile, `by_device` a percentuali fisse); la telemetria oraria in SQLite c'è dal 3b ma si riempie solo con `energy_total_wh` dal connector, che il simulato non manda. (1) Ore senza dati: proposta 0 kWh e serie sempre completa (il contratto vuole un numero per ora); alternativa togliere le ore (buchi nel grafico, verifica di o2). (2) Misuratore spento qualche ore: al ritorno il contatore dice il totale del buco; proposta distribuirlo in parti uguali sulle ore del buco (giusto a cavallo di mezzanotte e fine mese); alternativa tutto nell'ora del ritorno. Contatore che riparte da zero: il consumo fra ultima lettura e riavvio si perde, come oggi. (3) Dimostrativi: proposta profilo inventato e ripetibile per misuratore PRIMA dell'avvio del motore, letture vere dei misuratori simulati DOPO (contatore dai watt, una lettura al minuto); alternative: tutto inventato come oggi, o solo letture (grafici vuoti prima dell'avvio). (4) Conferma: «ore di clima evitate» = «Non calcolato» ovunque, anche nei dimostrativi (oggi numero inventato); se le si vuole vere, voce a parte da mezza giornata. Effetti su o2: nessuno (forma di `/energy` invariata, il sito mostra già «Non calcolato»). Suddivisione 6a motore (0,5), 6b connector simulato (0,5), 6c dimostrativi e BFF (0,25); rischio: letture al minuto nello stream, limitate ai cambi di valore.
 
 ---
 
