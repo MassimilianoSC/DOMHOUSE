@@ -50,6 +50,22 @@ def test_a_lost_executable_bit_or_crlf_is_red_also_in_subfolders(repo):
     assert "scripts/sub/setup.sh: fine riga i/crlf nel repository invece di i/lf" in c["note"]
 
 
+def test_executable_in_the_index_but_100644_in_the_commit_is_red(repo):
+    """b284268: a commit by path from Windows recorded 100644 while the index said 100755; the index alone was green."""
+    who = ("-c", "user.name=prova", "-c", "user.email=prova@example.com")
+    _git(repo, "config", "core.fileMode", "false")
+    (repo / "scripts" / "ci-linux.sh").write_bytes(b"#!/usr/bin/env bash\necho ok\n")
+    _git(repo, "add", "scripts/ci-linux.sh")
+    _git(repo, *who, "commit", "-q", "-m", "senza bit")                      # HEAD: 100644
+    _git(repo, "update-index", "--chmod=+x", "scripts/ci-linux.sh")         # index: 100755
+    c = _runner().check_shell_scripts(repo)
+    assert (c["tests"], c["failures"]) == (1, 1), c
+    assert "scripts/ci-linux.sh: mode 100644 nel commit HEAD invece di 100755" in c["note"]
+    _git(repo, *who, "commit", "-q", "-m", "bit")                           # the index as it is: 100755 in HEAD
+    c = _runner().check_shell_scripts(repo)
+    assert (c["tests"], c["failures"], c["errors"]) == (1, 0, 0), c
+
+
 def test_no_script_at_all_is_an_error(repo):
     c = _runner().check_shell_scripts(repo)
     assert c["errors"] == 1 and "nessuno script" in c["note"]

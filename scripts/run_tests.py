@@ -284,26 +284,43 @@ def frontend_scripts() -> dict:
 
 def check_shell_scripts(root: Path = ROOT) -> dict:
     """P-41: every shell script must run after a checkout on Linux or Cloud Shell: LF line endings in the repository
-    and the executable bit (100755) in the index. One check per script; the problems go in the note."""
+    and the executable bit (100755) in the index AND in the commit HEAD. The second because a commit by path from
+    Windows (core.fileMode=false) records 100644 even when the index says 100755 (b284268, fixed in 374e4a5): the
+    index alone stayed green. One check per script; the problems go in the note."""
     git = shutil.which("git")
     if not git:
         return result(errors=1, note="git non trovato nel PATH")
 
+    def run(*args: str) -> str:
+        return subprocess.run([git, *args], cwd=root, capture_output=True, text=True, encoding="utf-8",
+                              check=True).stdout
+
     def listing(*args: str) -> dict[str, str]:
-        out = subprocess.run([git, "ls-files", *args, "--", SCRIPTS_PATHSPEC], cwd=root, capture_output=True,
-                             text=True, encoding="utf-8", check=True).stdout
+        out = run("ls-files", *args, "--", SCRIPTS_PATHSPEC)
         return {line.split("\t", 1)[1]: line.split()[0] for line in out.splitlines() if "\t" in line}
 
+    def committed() -> dict[str, str]:
+        """The scripts' modes in HEAD; none before the first commit."""
+        if subprocess.run([git, "rev-parse", "--verify", "-q", "HEAD"], cwd=root, capture_output=True).returncode:
+            return {}
+        out = run("ls-tree", "-r", "--full-tree", "HEAD", "--", "scripts")
+        return {line.split("\t", 1)[1]: line.split()[0] for line in out.splitlines()
+                if "\t" in line and line.split("\t", 1)[1].endswith(".sh")}
+
     try:
-        modes, eols = listing("-s"), listing("--eol")
+        modes, eols, head = listing("-s"), listing("--eol"), committed()
     except (OSError, subprocess.CalledProcessError) as exc:
-        return result(errors=1, note=f"git ls-files non riuscito: {exc}")
+        return result(errors=1, note=f"git ls-files o ls-tree non riuscito: {exc}")
     if not modes:
         return result(errors=1, note=f"nessuno script trovato con {SCRIPTS_PATHSPEC}")
     problems: dict[str, list[str]] = {}
     for path, mode in sorted(modes.items()):
         if mode != "100755":
             problems.setdefault(path, []).append(f"mode {mode} invece di 100755 (git update-index --chmod=+x {path})")
+        if path in head and head[path] != "100755":
+            problems.setdefault(path, []).append(
+                f"mode {head[path]} nel commit HEAD invece di 100755 (commit del solo modo con un GIT_INDEX_FILE "
+                f"temporaneo: read-tree HEAD, update-index --chmod=+x, write-tree, commit-tree, update-ref)")
         if eols.get(path) != "i/lf":
             problems.setdefault(path, []).append(f"fine riga {eols.get(path)} nel repository invece di i/lf")
     note = "; ".join(f"{path}: {', '.join(p)}" for path, p in problems.items())
