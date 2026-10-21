@@ -227,7 +227,8 @@ Periodo: Oggi, 7 giorni, 30 giorni o «Soggiorno in corso» (solo se c'è un osp
 dispositivo e, durante un soggiorno, il confronto con il soggiorno precedente.
 - I numeri vengono dai misuratori dell'appartamento, ora per ora. Le ore in cui un misuratore non ha mandato dati contano
   zero; se un misuratore resta scollegato per qualche ora, il consumo di quel periodo viene ripartito in parti uguali
-  sulle ore mancanti. Le «ore di clima evitate» non sono ancora calcolate e compaiono come «non calcolate».
+  sulle ore mancanti. Le «ore di clima evitate» non sono ancora calcolate e compaiono come «non calcolate»: il calcolo
+  vero arriverà quando l'appartamento avrà almeno quattro settimane di consumi registrati.
 - Sotto il grafico, «Consumi disponibili dal …» (giorno e mese) dice da quando ci sono dati misurati: è la prima ora con un
   consumo maggiore di zero, quindi se nei primi giorni tutto è rimasto spento la data può essere un po' più tarda del
   collegamento. Senza nessun dato la riga non compare. Negli appartamenti dimostrativi i consumi prima dell'avvio del
