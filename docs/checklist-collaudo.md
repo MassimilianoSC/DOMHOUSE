@@ -67,6 +67,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D1 📱 | Qualsiasi | Apri l'elenco Appartamenti. | Schede con nome, stato, occupazione, kWh di oggi. | |
 | D2 | Operatore | Panoramica: cambia modalità in eco. | Rotellina, poi «eco» selezionata. | |
 | D3b | Operatore | «Forza per…» 2 ore, poi in Programmazione «Nuova azione»: modalità eco tra 2 minuti. | Allo scadere dei 2 minuti la modalità NON cambia; nelle Decisioni compare «rimandata per la forzatura, si esegue alla sua fine»; con «Annulla forzatura» l'azione si esegue e la modalità passa a eco. | |
+| D3c | Operatore (su un dimostrativo) | Dal Simulatore apri una finestra; poi «Forza per…» 30 minuti. | Finestra di conferma «Finestra aperta» con il testo «Finestra aperta in Soggiorno: durante la forzatura il clima resta acceso.» (con il nome della stanza) e i pulsanti «Annulla» e «Forza comunque»; con «Forza comunque» la forzatura parte e il clima resta acceso. | |
 | D3 | Operatore | «Forza per…» 30 minuti, poi «Annulla forzatura». | «Forzatura … attiva fino alle …», poi la forzatura sparisce. | |
 | D4 | Operatore | Accendi e spegni un interruttore; alza la temperatura con +. | Sotto il dispositivo «in corso» e poi «eseguito». | |
 | D5 | Operatore | Menu ⋮ > «Rinomina o sposta», cambia il nome. | «Dispositivo aggiornato» e il nome nuovo. | |
