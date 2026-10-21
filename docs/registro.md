@@ -53,7 +53,10 @@ che avevano solo in memoria (sezione 7, 16 ottobre sera).
 
 Unico elenco. Nessun altro documento ne tiene uno.
 
-Nessuna decisione aperta (21 ottobre, mattina: etichette delle Decisioni con D-125, passo 5 con D-126).
+- **21 ottobre, passo 5, due punti sollevati da o1:**
+  - **(1) R7 contro il contratto.** Lo scenario C11 della conformità (nel contratto, `x-conformita`, e nel docstring di `test_c11_forzatura`) dice: «durante il hold una finestra aperta non spegne il clima; alla scadenza hold = null e la regola torna attiva». R7 corretto (D-126: la forzatura non sospende la finestra aperta) e la prova «forzatura + finestra aperta → clima spento» dicono l'opposto. Strade: a) R7 come proposto all'inizio (la forzatura sospende anche la finestra aperta; prova: clima acceso, decisione «regola sospesa per la forzatura»); b) R7 corretto, scostandosi da C11: richiede di cambiare la frase di C11 nel contratto e nella suite, oltre la 1.0.5 solo documentazione; c) via di mezzo: durante la forzatura la finestra non spegne, alla scadenza la regola riparte e spegne se la finestra è ancora aperta, con una decisione che nomina entrambi i motivi (è ciò che C11 già dice). Raccomandazione di o1: c), oppure a).
+  - **(2) Caldaia con il termostato vero (R1, R2): cosa mostra `heating.on`.** Proposta: `heating.on` = riscaldamento abilitato (l'intenzione del gestore o della modalità), il relè lo comanda il termostato del motore; che stia scaldando si vede dai watts e dalle decisioni; `set_heating` risponde `acked` quando l'intenzione è applicata. Decisioni: per R2 solo i cambi di setpoint e le anomalie (sensore assente o fermo), non ogni accensione (decine al giorno); per R1 antigelo ogni accensione, come deciso.
+  Intanto o1 fa 5a (R4, R5, R6, R3 avviso); 5b (termostato) e 5c (R7, R8) dopo le risposte.
 
 ---
 
