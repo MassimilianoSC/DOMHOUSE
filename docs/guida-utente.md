@@ -221,13 +221,22 @@ andare indietro.
 ### Consumi
 Periodo: Oggi, 7 giorni, 30 giorni o «Soggiorno in corso» (solo se c'è un ospite). Totale in kWh, grafico, consumi per
 dispositivo e, durante un soggiorno, il confronto con il soggiorno precedente.
+- I numeri vengono dai misuratori dell'appartamento, ora per ora. Le ore in cui un misuratore non ha mandato dati contano
+  zero; se un misuratore resta scollegato per qualche ora, il consumo di quel periodo viene ripartito in parti uguali
+  sulle ore mancanti. Le «ore di clima evitate» non sono ancora calcolate e compaiono come «non calcolate».
+- Sotto il grafico, «Consumi disponibili dal …» (giorno e mese) dice da quando ci sono dati misurati: è la prima ora con un
+  consumo maggiore di zero, quindi se nei primi giorni tutto è rimasto spento la data può essere un po' più tarda del
+  collegamento. Senza nessun dato la riga non compare. Negli appartamenti dimostrativi i consumi prima dell'avvio del
+  sistema sono un profilo di esempio, uguale a ogni riavvio, dal 1° gennaio 2026.
 
 **Rendiconto in Excel** (in fondo alla pagina, per tutti, sugli appartamenti che vedi): scegli il mese (gli ultimi 12) e
 premi «Scarica Excel». Il file (per esempio `consumi-apt-001-2026-10.xlsx`) ha quattro fogli: Riepilogo (totale kWh,
 prezzo e importo in euro), Giornaliero, Orario e Dispositivi. Con il periodo «Soggiorno», «Excel del soggiorno» scarica
 il rendiconto dall'ora esatta di arrivo a quella di partenza, del soggiorno in corso o del precedente: serve per
 riaddebitare l'energia all'ospite. Il file non contiene dati personali degli ospiti. Se manca il prezzo per kWh, il
-file dice «prezzo non impostato» e riporta solo i kWh. Se il file non si può preparare (funzione non attiva, sistema
+file dice «prezzo non impostato» e riporta solo i kWh. In testa c'è «Consumi disponibili dal …» (data e ora) e le ore
+precedenti restano vuote, non a zero; se tutto il periodo cade prima di quella data il file lo dice e i totali
+restano vuoti; senza nessun dato misurato compare «Nessun consumo misurato finora». Se il file non si può preparare (funzione non attiva, sistema
 domotico non raggiungibile, soggiorno non ancora iniziato), compare il motivo.
 
 ### Programmazione
