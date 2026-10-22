@@ -100,11 +100,14 @@
       "humidity_percent": "Umidità (%)",
       "hours_before": "Ore prima del check-in",
       "minutes_after": "Minuti dopo il check-out",
-      "presence_minutes": "Minuti di presenza dopo il check-out"
+      "presence_minutes": "Minuti di presenza dopo il check-out",
+      "comfort_celsius": "Temperatura in comfort (°C)",
+      "eco_celsius": "Temperatura in eco (°C)",
+      "comfort_cool_celsius": "Raffrescamento in comfort (°C)"
     },
     "desc": {
       "window_open_off": "Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.",
-      "setpoint_limits": "Limita la temperatura impostabile da ospiti e app.",
+      "setpoint_limits": "Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c'è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.",
       "frost_protection": "Con la casa vuota mantiene almeno questa temperatura.",
       "mold_protection": "Con la casa vuota deumidifica sopra questa soglia.",
       "prearrival": "Porta la casa in comfort prima dell'arrivo degli ospiti.",
@@ -227,7 +230,9 @@
       "window_rule_suspended": "Finestra: regola sospesa",
       "command_unverified": "Comando non verificato: misuratore offline",
       "connector_down": "Collegamento ai dispositivi perso",
-      "connector_up": "Collegamento ai dispositivi ripristinato"
+      "connector_up": "Collegamento ai dispositivi ripristinato",
+      "auto_regulation_off": "Regolazione automatica disattivata",
+      "frost_inactive": "Antigelo non attivo"
     },
     "title": "Decisioni",
     "subtitle": "Tutto ciò che il motore e i gestori hanno fatto, e perché",
@@ -663,7 +668,7 @@
       "approvals": "Approvazioni richieste",
       "approvalsHint": "Quando il motore chiede il tuo consenso",
       "offline": "Dispositivi e istanza offline",
-      "offlineHint": "Dispositivo offline oltre la soglia della regola, istanza non raggiungibile",
+      "offlineHint": "Dispositivo offline oltre la soglia della regola, istanza non raggiungibile, antigelo non attivo",
       "decisions": "Decisioni del motore",
       "decisionsHint": "Riepilogo delle azioni automatiche (solo in app)",
       "bookings": "Prenotazioni",

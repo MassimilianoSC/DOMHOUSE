@@ -78,6 +78,9 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     expect(actionLabel("command_unverified")).toBe("Comando non verificato: misuratore offline");
     expect(actionLabel("connector_down")).toBe("Collegamento ai dispositivi perso");
     expect(actionLabel("connector_up")).toBe("Collegamento ai dispositivi ripristinato");
+    // senza sensore di temperatura, lotto 30 (91bc015, ea9cf71)
+    expect(actionLabel("auto_regulation_off")).toBe("Regolazione automatica disattivata");
+    expect(actionLabel("frost_inactive")).toBe("Antigelo non attivo");
   });
 
   it("un'azione che il motore aggiungerà e il sito non conosce ancora: il codice, la pagina non si rompe", () => {

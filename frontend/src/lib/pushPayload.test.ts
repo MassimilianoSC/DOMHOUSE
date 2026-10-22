@@ -102,3 +102,16 @@ describe("push: riepilogo settimanale (D-150)", () => {
     });
   });
 });
+
+describe("push: antigelo non attivo (lotto 30)", () => {
+  it("kind «frost_inactive»: apre le Decisioni dell'appartamento, raggruppata per caldaia", () => {
+    const frost = { data: { kind: "frost_inactive", title: "Milano Centro: antigelo non attivo", body: "Caldaia: sensore di temperatura mancante, antigelo non attivo (nessun sensore di temperatura collegato)", link: "/a/apt-001/decisioni", tag: "frost:apt-001:dev-caldaia", apartment_id: "apt-001", device_id: "dev-caldaia" } };
+    expect(toNotice(frost, "DOMHOUSE")).toEqual({
+      title: "Milano Centro: antigelo non attivo",
+      body: "Caldaia: sensore di temperatura mancante, antigelo non attivo (nessun sensore di temperatura collegato)",
+      link: "/a/apt-001/decisioni",
+      tag: "frost:apt-001:dev-caldaia",
+      apartmentId: "apt-001",
+    });
+  });
+});

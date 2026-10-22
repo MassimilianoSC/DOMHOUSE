@@ -7,7 +7,8 @@
 //   tag               grouping key: a notification with the same tag replaces the previous one
 //                     ("approval:<approval_id>", "offline:<apartment_id>:<device_id>", "instance:<apartment_id>",
 //                     "booking:<decision_id>", "summary:<apartment_id>:<week>")
-//   kind              "approval" | "device_offline" | "instance_down" | "booking" (D-123) | "summary" (D-150);
+//   kind              "approval" | "device_offline" | "instance_down" | "booking" (D-123) | "summary" (D-150) |
+//                     "frost_inactive" (lotto 30, tag "frost:<apartment_id>:<device_id>");
 //                     not used to filter
 //   apartment_id      always; approval_id / device_id / ts when relevant
 // Extra keys are ignored. A push is never silent: a missing title/body/link gives a generic notification opening "/".
