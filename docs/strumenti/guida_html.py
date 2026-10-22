@@ -351,8 +351,11 @@ def rendi(blocco: Blocco) -> str:
         for i, valori in enumerate(blocco.righe):
             tag = "th" if i == 0 else "td"
             celle_html = []
-            for valore, allineamento in zip(valori, blocco.allineamenti):
-                attributi = ' scope="col"' if i == 0 else ""
+            for colonna, (valore, allineamento) in enumerate(zip(valori, blocco.allineamenti)):
+                # Sul telefono ogni cella ripete la propria intestazione (data-label): la tabella si impila in
+                # schede senza scorrimento orizzontale. L'intestazione è ripetuta come testo, senza Markdown.
+                attributi = (' scope="col"' if i == 0
+                             else f' data-label="{html.escape(blocco.righe[0][colonna], quote=True)}"')
                 celle_html.append(f'<{tag}{attributi} class="align-{allineamento}">'
                                   f'{inline(valore, blocco.riga + i + (i > 0))}</{tag}>')
             righe.append("<tr>" + "".join(celle_html) + "</tr>")

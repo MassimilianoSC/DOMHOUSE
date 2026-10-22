@@ -14,8 +14,8 @@ Tutto quello che l'app sa fare, spiegato passo per passo e diviso per ruolo. Non
 - Dove dentro le virgolette trovi tre puntini «…», l'app mette un nome, una data, un numero o un indirizzo email.
 - «Tocca» e «premi» vogliono dire la stessa cosa: sul telefono tocchi, sul computer fai clic.
 - La guida è divisa per ruolo. Chi ha **sola lettura** legge la parte 4. L'**operatore** legge le parti 4 e 5.
-  L'**amministratore** legge le parti 4, 5 e 6. Il **gestore della piattaforma** (HQE) legge la parte 7. Le parti 1, 2,
-  9, 10, 11 e 12 valgono per tutti.
+  L'**amministratore** legge le parti 4, 5 e 6. Il **gestore della piattaforma** (HQE) legge la parte 7. Le parti 1 e 2
+  e tutte quelle dalla 9 in poi valgono per tutti.
 - Alcune pagine dell'appartamento («Approvazioni», «Decisioni», «Consumi», «Programmazione», «Regole», «Assistente»)
   compaiono solo se la funzione è attiva per quell'appartamento (lo decide l'amministratore nella scheda «Funzioni»).
   «Riepiloghi» c'è sempre.

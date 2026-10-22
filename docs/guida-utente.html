@@ -7,177 +7,232 @@
   <title>Guida all'app DOMHOUSE</title>
   <style>
     :root {
-      color-scheme:light dark; --page:#f2f3ef; --paper:#fff; --ink:#23372f; --muted:#5b6c63;
-      --accent:#17644e; --accent-soft:#edf4ee; --line:#dde4dc; --sidebar:#f9faf7;
-      --warning:#79510b; --warning-bg:#fff5df; --coming:#67458c; --coming-bg:#f3edf9;
-      --code-bg:#edf1eb; --focus:#006dcc; --sidebar-width:284px; --hero:#153e31;
-      --hero-ink:#f5f7ef; --gold:#ddc58e; --shadow:0 8px 30px #23372f06;
+      color-scheme:light dark;
+      --page:#f4f2ec; --paper:#ffffff; --ink:#1f2a26; --muted:#5d6a64; --accent:#1a6a4f; --accent-ink:#135239;
+      --accent-soft:#e9f3ed; --line:#dfdcd3; --line-strong:#c9c5ba; --sidebar:#f9f8f4; --code-bg:#edf1ec;
+      --warning:#6d4a08; --warning-bg:#fff4dc; --warning-line:#e8c97a; --coming:#5d3f85; --coming-bg:#f1ebf8;
+      --hero:#16382d; --hero-ink:#f3f6f0; --hero-muted:#cfdccf; --gold:#d9c27f; --focus:#0b63c7;
+      --shadow:0 10px 34px rgba(31,42,38,.06); --sidebar-width:300px; --header-h:68px;
+      --serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,"Times New Roman",serif;
+      --sans:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+      --mono:ui-monospace,"Cascadia Code",Consolas,"SF Mono",Menlo,monospace;
     }
-    @media(prefers-color-scheme:dark) {
-      :root { --page:#111b16; --paper:#1a2720; --ink:#e4ede5; --muted:#b3c3b7;
-        --accent:#9bd9b8; --accent-soft:#233d2f; --line:#354b3d; --sidebar:#15221b;
-        --warning:#f2ce82; --warning-bg:#362c19; --coming:#d6bdf6; --coming-bg:#30273f;
-        --code-bg:#2b3b30; --focus:#8bbdff; --hero:#1b4434; --hero-ink:#f5f7ef; --shadow:none; }
+    @media (prefers-color-scheme:dark) {
+      :root {
+        --page:#121a16; --paper:#1a2420; --ink:#e7ede8; --muted:#aab8b1; --accent:#8fd3b1; --accent-ink:#b9e6cf;
+        --accent-soft:#22362c; --line:#2f3e36; --line-strong:#43554b; --sidebar:#161f1b; --code-bg:#263530;
+        --warning:#f0cf84; --warning-bg:#33291a; --warning-line:#6a5425; --coming:#d4bdf4; --coming-bg:#2f2740;
+        --hero:#1c4536; --hero-ink:#f3f6f0; --hero-muted:#c9d9cb; --shadow:none; --focus:#8bbdff;
+      }
     }
-    *,*::before,*::after { box-sizing:border-box; }
-    html { scroll-padding-top:108px; scroll-behavior:smooth; }
-    body { margin:0; background:var(--page); color:var(--ink); font:1rem/1.8 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; overflow-wrap:break-word; -webkit-text-size-adjust:100%; }
-    a { color:var(--accent); text-underline-offset:.22em; }
+    *, *::before, *::after { box-sizing:border-box; }
+    html { scroll-padding-top:calc(var(--header-h) + 20px); scroll-behavior:smooth; }
+    body {
+      margin:0; background:var(--page); color:var(--ink); font:1.02rem/1.75 var(--sans);
+      overflow-wrap:break-word; -webkit-text-size-adjust:100%; min-width:0;
+    }
+    a { color:var(--accent-ink); text-decoration-thickness:1px; text-underline-offset:.2em; overflow-wrap:anywhere; }
     a:hover { text-decoration-thickness:2px; }
-    button,summary { font:inherit; }
+    button, summary { font:inherit; }
     button { cursor:pointer; }
-    :focus-visible { outline:3px solid var(--focus); outline-offset:4px; border-radius:4px; }
-    .skip-link { position:fixed; top:8px; left:16px; z-index:20; background:var(--paper); padding:10px 16px; transform:translateY(-180%); }
+    :focus-visible { outline:3px solid var(--focus); outline-offset:3px; border-radius:4px; }
+    .skip-link { position:fixed; top:8px; left:16px; z-index:30; background:var(--paper); color:var(--ink); padding:10px 16px; border-radius:8px; transform:translateY(-200%); }
     .skip-link:focus { transform:none; }
-    .site-header { height:76px; position:fixed; inset:0 0 auto; z-index:10; display:flex; align-items:center; gap:32px; padding:0 32px; background:var(--paper); border-bottom:1px solid var(--line); }
-    .brand { display:flex; align-items:center; gap:11px; color:var(--ink); text-decoration:none; font-size:15px; font-weight:800; letter-spacing:.13em; }
-    .brand-mark { display:grid; place-items:center; width:34px; height:38px; background:var(--hero); color:var(--gold); border-radius:10px 10px 4px 4px; }
-    .brand-mark svg { width:21px; height:21px; }
-    .document-nav { display:flex; gap:6px; margin-left:auto; }
-    .document-nav a { padding:8px 15px; border-radius:8px; color:var(--muted); font-size:.85rem; font-weight:600; text-decoration:none; }
-    .document-nav a[aria-current=page] { color:var(--accent); background:var(--accent-soft); }
-    .header-print { padding:8px 14px; border:1px solid var(--line); border-radius:8px; background:var(--paper); color:var(--ink); font-size:.82rem; }
-    .reading-track { height:3px; position:absolute; bottom:-1px; left:0; right:0; background:transparent; }
+
+    /* ---- barra in alto ---- */
+    .site-header {
+      position:fixed; inset:0 0 auto; z-index:20; height:var(--header-h); display:flex; align-items:center; gap:18px;
+      padding:0 28px; background:var(--paper); border-bottom:1px solid var(--line);
+    }
+    .brand { display:flex; align-items:center; gap:10px; color:var(--ink); text-decoration:none; font-size:14px; font-weight:800; letter-spacing:.14em; }
+    .brand-mark { display:grid; place-items:center; width:32px; height:36px; background:var(--hero); color:var(--gold); border-radius:9px 9px 4px 4px; }
+    .brand-mark svg { width:20px; height:20px; }
+    .brand small { font-weight:600; letter-spacing:.02em; color:var(--muted); font-size:12px; }
+    .document-nav { display:flex; gap:4px; margin-left:auto; }
+    .document-nav a { padding:8px 14px; border-radius:8px; color:var(--muted); font-size:.86rem; font-weight:650; text-decoration:none; }
+    .document-nav a[aria-current=page] { color:var(--accent-ink); background:var(--accent-soft); }
+    .header-print { padding:8px 14px; border:1px solid var(--line-strong); border-radius:8px; background:var(--paper); color:var(--ink); font-size:.82rem; }
+    .reading-track { position:absolute; left:0; right:0; bottom:-1px; height:3px; }
     .reading-track span { display:block; height:100%; width:0; background:var(--accent); }
-    .document { margin-left:var(--sidebar-width); padding:112px clamp(24px,4.3vw,76px) 72px; }
-    .cover,article { max-width:960px; margin-inline:auto; min-width:0; }
-    .cover { position:relative; isolation:isolate; overflow:hidden; border-radius:18px; background:var(--hero); color:var(--hero-ink); padding:42px 44px; margin-bottom:32px; }
-    .cover::after { content:""; position:absolute; z-index:-1; width:290px; height:290px; right:-85px; top:-80px; border:1px solid #f5f7ef20; border-radius:50%; box-shadow:0 0 0 40px #f5f7ef06,0 0 0 80px #f5f7ef04; }
-    .eyebrow { color:var(--gold); font-size:.69rem; font-weight:750; letter-spacing:.17em; text-transform:uppercase; margin:0 0 18px; }
-    h1,h2,h3 { line-height:1.25; font-weight:680; text-wrap:pretty; }
-    h1 { max-width:18ch; font-size:clamp(2.2rem,3.5vw,3.2rem); letter-spacing:-.045em; margin:0 0 18px; }
-    .subtitle { max-width:58ch; font-size:1rem; color:#e0e9df; margin:0 0 22px; }
-    .version { display:inline-block; color:#e0e9df; font-size:.74rem; padding:6px 11px; border:1px solid #f5f7ef30; border-radius:6px; margin:0; }
+
+    /* ---- impaginazione ---- */
+    .document { margin-left:var(--sidebar-width); padding:calc(var(--header-h) + 36px) clamp(20px,4vw,64px) 72px; min-width:0; }
+    .cover, article, .document-footer { max-width:880px; margin-inline:auto; min-width:0; }
+
+    /* ---- copertina ---- */
+    .cover { position:relative; isolation:isolate; overflow:hidden; border-radius:20px; background:var(--hero); color:var(--hero-ink); padding:44px 48px 40px; margin-bottom:28px; }
+    .cover::after { content:""; position:absolute; z-index:-1; width:320px; height:320px; right:-110px; top:-120px; border:1px solid rgba(243,246,240,.14); border-radius:50%; box-shadow:0 0 0 44px rgba(243,246,240,.04), 0 0 0 88px rgba(243,246,240,.03); }
+    .eyebrow { color:var(--gold); font-size:.7rem; font-weight:750; letter-spacing:.18em; text-transform:uppercase; margin:0 0 16px; }
+    h1 { font-family:var(--serif); font-weight:600; max-width:20ch; font-size:clamp(2.1rem,4vw,3.1rem); line-height:1.12; letter-spacing:-.02em; margin:0 0 16px; text-wrap:balance; }
+    .subtitle { max-width:60ch; font-size:1.05rem; line-height:1.6; color:var(--hero-muted); margin:0 0 20px; }
+    .version { display:inline-block; color:var(--hero-muted); font-size:.76rem; padding:6px 12px; border:1px solid rgba(243,246,240,.28); border-radius:999px; margin:0; }
     .version em { font-style:normal; }
-    .toc { position:fixed; inset:76px auto 0 0; width:var(--sidebar-width); padding:30px 17px 30px 24px; background:var(--sidebar); border-right:1px solid var(--line); overflow-y:auto; scrollbar-width:thin; }
-    .toc summary { list-style:none; cursor:pointer; padding:0 10px 17px; color:var(--muted); font-size:.67rem; font-weight:750; letter-spacing:.14em; text-transform:uppercase; }
+
+    /* ---- indice ---- */
+    .toc { position:fixed; top:var(--header-h); bottom:0; left:0; width:var(--sidebar-width); padding:28px 16px 40px 22px; background:var(--sidebar); border-right:1px solid var(--line); overflow-y:auto; scrollbar-width:thin; }
+    .toc summary { list-style:none; cursor:pointer; padding:0 10px 14px; color:var(--muted); font-size:.68rem; font-weight:750; letter-spacing:.15em; text-transform:uppercase; }
     .toc summary::-webkit-details-marker { display:none; }
-    .toc summary::after { content:"−"; float:right; font-size:16px; line-height:1; }
-    .toc details:not([open]) summary::after { content:"+"; }
+    .toc summary::after { content:"+"; float:right; font-size:16px; line-height:1; }
+    .toc details[open] summary::after { content:"−"; }
     .toc ol { list-style:none; margin:0; padding:0; }
-    .toc>details>ol>li { margin-bottom:5px; padding:0; }
-    .toc a { display:block; padding:9px 11px; border-radius:7px; color:var(--muted); text-decoration:none; font-size:.79rem; line-height:1.5; transition:background .15s; }
-    .toc a:hover { color:var(--accent); background:var(--accent-soft); }
-    .toc a[aria-current=location] { color:var(--accent); font-weight:700; background:var(--accent-soft); box-shadow:inset 3px 0 var(--accent); }
-    .toc li ol { margin:4px 0 10px 12px; padding-left:10px; border-left:1px solid var(--line); }
-    .toc li ol a { font-size:.74rem; padding:5px 9px; }
-    article>p,article>blockquote { margin-inline:8px; }
-    article>p:first-child { font-size:1.1rem; line-height:1.8; }
-    p { margin:0 0 1.1em; }
-    strong { font-weight:680; }
-    section { background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:32px 36px; margin:24px 0; box-shadow:var(--shadow); }
-    section>:last-child { margin-bottom:0; }
-    h2 { font-size:1.6rem; letter-spacing:-.03em; margin:0 0 24px; padding-bottom:18px; border-bottom:1px solid var(--line); }
-    h3 { font-size:1.13rem; letter-spacing:-.015em; margin:32px 0 14px; color:var(--accent); }
-    .featured-section { border-top:3px solid var(--accent); }
-    .featured-section h2 { color:var(--accent); }
-    ul,ol { margin:.8rem 0 1.5rem; padding-left:1.45rem; }
-    li { padding-left:.2rem; margin-bottom:.65rem; }
-    li>p { margin-bottom:.5rem; }
-    li>:last-child { margin-bottom:0; }
-    li ul,li ol { margin-top:.6rem; }
-    li::marker { color:var(--accent); font-weight:600; }
-    code { padding:.15em .4em; background:var(--code-bg); border-radius:4px; font:.86em ui-monospace,"Cascadia Code",Consolas,monospace; overflow-wrap:anywhere; }
-    blockquote { padding:18px 22px; margin:24px 0; border-left:3px solid var(--accent); border-radius:0 10px 10px 0; background:var(--accent-soft); }
+    .toc > details > ol > li { margin-bottom:3px; }
+    .toc a { display:block; padding:7px 10px; border-radius:7px; color:var(--muted); text-decoration:none; font-size:.8rem; line-height:1.45; }
+    .toc > details > ol > li > a { font-weight:650; color:var(--ink); }
+    .toc a:hover { color:var(--accent-ink); background:var(--accent-soft); }
+    .toc a[aria-current=location] { color:var(--accent-ink); font-weight:700; background:var(--accent-soft); box-shadow:inset 3px 0 var(--accent); }
+    .toc li ol { display:none; margin:2px 0 10px 10px; padding-left:10px; border-left:1px solid var(--line-strong); }
+    .toc li.is-active > ol, .toc li:focus-within > ol { display:block; }
+    .toc li ol a { font-size:.76rem; padding:5px 9px; font-weight:500; }
+    .toc-hint { margin:14px 10px 0; font-size:.72rem; color:var(--muted); line-height:1.5; }
+
+    /* ---- testo ---- */
+    article > p, article > blockquote { margin-inline:4px; }
+    p { margin:0 0 1.05em; }
+    strong { font-weight:700; }
+    section { background:var(--paper); border:1px solid var(--line); border-radius:16px; padding:30px 36px 28px; margin:22px 0; box-shadow:var(--shadow); }
+    section > :last-child { margin-bottom:0; }
+    article > section:first-of-type { border-top:4px solid var(--accent); }
+    h2 { font-family:var(--serif); font-weight:600; font-size:1.75rem; line-height:1.2; letter-spacing:-.015em; margin:0 0 20px; padding-bottom:14px; border-bottom:1px solid var(--line); text-wrap:balance; }
+    h3 { font-size:1.12rem; font-weight:700; line-height:1.3; margin:30px 0 12px; padding-left:12px; border-left:4px solid var(--accent); color:var(--ink); text-wrap:balance; }
+    h3:first-of-type { margin-top:22px; }
+    ul, ol { margin:.6rem 0 1.3rem; padding-left:1.5rem; }
+    li { padding-left:.25rem; margin-bottom:.55rem; }
+    li > p { margin-bottom:.45rem; }
+    li > :last-child { margin-bottom:0; }
+    li ul, li ol { margin-top:.5rem; }
+    li::marker { color:var(--accent-ink); font-weight:700; }
+    ol > li::marker { font-variant-numeric:tabular-nums; }
+    code { padding:.12em .4em; background:var(--code-bg); border-radius:5px; font:.86em var(--mono); overflow-wrap:anywhere; }
+    blockquote { padding:16px 20px; margin:22px 0; border-left:4px solid var(--accent); border-radius:0 12px 12px 0; background:var(--accent-soft); }
     blockquote p:last-child { margin-bottom:0; }
-    .test-notice { border-color:var(--warning); background:var(--warning-bg); color:var(--warning); }
-    .role-label,.upcoming-label { display:inline; padding:.1em .4em; border:1px solid var(--line); border-radius:4px; font-size:.84em; font-weight:650; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
-    .role-label { color:var(--accent); background:var(--accent-soft); }
-    .upcoming-label,.upcoming-note { color:var(--coming); background:var(--coming-bg); border-radius:4px; padding:.1em .3em; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+    .test-notice { border-color:var(--warning-line); background:var(--warning-bg); color:var(--warning); }
+    .role-label, .upcoming-label { display:inline; padding:.08em .4em; border:1px solid var(--line-strong); border-radius:6px; font-size:.82em; font-weight:650; font-family:var(--sans); box-decoration-break:clone; -webkit-box-decoration-break:clone; }
+    .role-label { color:var(--accent-ink); background:var(--accent-soft); }
+    .upcoming-label, .upcoming-note { color:var(--coming); background:var(--coming-bg); border-radius:5px; padding:.08em .3em; box-decoration-break:clone; -webkit-box-decoration-break:clone; }
     .upcoming-note { font-style:normal; border-bottom:1px solid var(--coming); }
-    .table-scroll { overflow-x:auto; max-width:100%; border:1px solid var(--line); border-radius:10px; margin:20px 0 26px; scrollbar-width:thin; }
-    table { width:100%; border-collapse:collapse; font-size:.86rem; line-height:1.65; }
-    th,td { padding:13px 16px; min-width:9rem; vertical-align:top; border-bottom:1px solid var(--line); }
-    th { background:var(--accent-soft); color:var(--accent); font-size:.77rem; font-weight:750; }
+    hr { border:0; border-top:1px solid var(--line); margin:26px 0; }
+
+    /* ---- tabelle ---- */
+    .table-scroll { max-width:100%; border:1px solid var(--line); border-radius:12px; margin:18px 0 24px; overflow:hidden; }
+    table { width:100%; border-collapse:collapse; font-size:.9rem; line-height:1.6; }
+    th, td { padding:12px 14px; vertical-align:top; border-bottom:1px solid var(--line); }
+    th { background:var(--accent-soft); color:var(--accent-ink); font-size:.76rem; font-weight:750; letter-spacing:.04em; text-transform:uppercase; }
+    td:first-child { font-weight:600; }
     tbody tr:last-child td { border-bottom:0; }
     tbody tr:nth-child(even) { background:var(--sidebar); }
     .align-left { text-align:left; } .align-center { text-align:center; } .align-right { text-align:right; }
-    hr { border:0; border-top:1px solid var(--line); margin:28px 0; }
-    .document-footer { max-width:960px; margin:40px auto 0; display:flex; justify-content:space-between; gap:16px; font-size:.76rem; color:var(--muted); }
-    @media(min-width:1101px) { .toc summary { pointer-events:none; } .toc summary::after { display:none; } }
-    @media(max-width:1100px) {
-      .document { margin-left:0; padding:100px 24px 48px; }
-      .toc { position:static; width:auto; max-width:960px; margin:0 auto 24px; padding:18px 20px; border:1px solid var(--line); border-radius:12px; }
-      .toc summary { padding:0; font-size:.75rem; }
-      .toc details[open] summary { padding-bottom:16px; }
-      .toc>details>ol { columns:2; column-gap:20px; }
-      .toc>details>ol>li { break-inside:avoid; }
+
+    /* ---- piede ---- */
+    .document-footer { margin-top:36px; display:flex; justify-content:space-between; gap:16px; font-size:.78rem; color:var(--muted); }
+    .to-index { position:fixed; right:14px; bottom:14px; z-index:15; display:none; padding:10px 14px; border:1px solid var(--line-strong); border-radius:999px; background:var(--paper); color:var(--ink); font-size:.8rem; font-weight:650; text-decoration:none; box-shadow:0 6px 20px rgba(0,0,0,.12); }
+
+    @media (min-width:1101px) { .toc summary { pointer-events:none; } .toc summary::after { display:none; } }
+    @media (max-width:1100px) {
+      .document { margin-left:0; padding:calc(var(--header-h) + 24px) 24px 56px; }
+      .toc { position:static; width:auto; max-width:880px; margin:0 auto 22px; padding:16px 18px; border:1px solid var(--line); border-radius:14px; }
+      .toc summary { padding:0; font-size:.74rem; }
+      .toc details[open] summary { padding-bottom:14px; }
+      .toc > details > ol { columns:2; column-gap:22px; }
+      .toc > details > ol > li { break-inside:avoid; }
+      .toc li ol { display:block; }
+      .toc-hint { display:none; }
+      .to-index { display:inline-block; }
     }
-    @media(max-width:560px) {
-      .site-header { height:64px; padding:0 16px; gap:10px; }
+    @media (max-width:560px) {
+      :root { --header-h:58px; }
+      .site-header { padding:0 14px; gap:8px; }
       .brand { font-size:11px; gap:7px; letter-spacing:.08em; }
-      .brand-mark { width:27px; height:31px; border-radius:8px 8px 3px 3px; }
+      .brand small { display:none; }
+      .brand-mark { width:26px; height:30px; border-radius:7px 7px 3px 3px; }
       .document-nav { gap:2px; }
-      .document-nav a { font-size:.72rem; padding:7px 9px; }
+      .document-nav a { font-size:.74rem; padding:7px 9px; }
       .header-print { display:none; }
-      .document { padding:84px 14px 36px; }
-      .cover { padding:28px 24px; border-radius:14px; margin-bottom:20px; }
-      h1 { font-size:2.25rem; }
-      .eyebrow { font-size:.61rem; margin-bottom:14px; }
-      .subtitle { font-size:.92rem; }
-      .version { font-size:.67rem; }
-      .toc { padding:16px 18px; margin-bottom:20px; }
-      .toc>details>ol { columns:1; }
-      section { padding:24px 20px; border-radius:12px; margin:18px 0; }
-      h2 { font-size:1.38rem; padding-bottom:15px; margin-bottom:20px; }
-      h3 { font-size:1.08rem; }
-      body { font-size:.96rem; line-height:1.75; }
-      blockquote { padding:16px; }
-      th,td { padding:11px 12px; }
-      .document-footer { margin-inline:4px; }
+      .document { padding:calc(var(--header-h) + 16px) 16px 64px; }
+      .cover { padding:26px 22px 24px; border-radius:14px; margin-bottom:18px; }
+      h1 { font-size:2rem; }
+      .eyebrow { font-size:.62rem; margin-bottom:12px; }
+      .subtitle { font-size:.95rem; }
+      .version { font-size:.7rem; }
+      .toc { padding:14px 16px; margin-bottom:18px; }
+      .toc > details > ol { columns:1; }
+      .toc li ol { display:none; }
+      .toc li.is-active > ol { display:block; }
+      body { font-size:.97rem; line-height:1.7; }
+      section { padding:20px 16px 18px; border-radius:12px; margin:16px 0; }
+      h2 { font-size:1.45rem; padding-bottom:12px; margin-bottom:16px; }
+      h3 { font-size:1.05rem; margin-top:24px; }
+      ul, ol { padding-left:1.25rem; }
+      blockquote { padding:14px 16px; }
+      /* tabelle impilate: ogni riga è una scheda, ogni cella ripete la sua intestazione */
+      .table-scroll { border:0; border-radius:0; }
+      table, tbody, tr, td { display:block; width:100%; }
+      thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
+      tr { border:1px solid var(--line); border-radius:12px; margin-bottom:12px; background:var(--paper); overflow:hidden; }
+      tbody tr:nth-child(even) { background:var(--paper); }
+      td { padding:10px 14px; border-bottom:1px solid var(--line); text-align:left; }
+      td:first-child { background:var(--accent-soft); color:var(--accent-ink); font-weight:700; }
+      tr td:last-child { border-bottom:0; }
+      td::before { content:attr(data-label); display:block; margin-bottom:2px; font-size:.68rem; font-weight:750; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); }
+      td:first-child::before { color:var(--accent-ink); opacity:.8; }
+      .document-footer { flex-direction:column; gap:6px; }
     }
-    @media(prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } .toc a { transition:none; } }
-    @page { size:A4; margin:18mm 16mm 20mm; }
+    @media (prefers-reduced-motion:reduce) { html { scroll-behavior:auto; } }
+
+    /* ---- stampa ---- */
+    @page { size:A4; margin:16mm 15mm 18mm; }
     @media print {
-      :root { color-scheme:light; --page:#fff; --paper:#fff; --ink:#111; --muted:#333; --accent:#174c3b; --accent-soft:#fff; --line:#aaa; --sidebar:#fff; --warning:#493000; --warning-bg:#fff; --coming:#45315d; --coming-bg:#fff; --code-bg:#fff; }
+      :root { color-scheme:light; --page:#fff; --paper:#fff; --ink:#111; --muted:#333; --accent:#174c3b; --accent-ink:#174c3b; --accent-soft:#fff; --line:#aaa; --line-strong:#888; --sidebar:#fff; --warning:#493000; --warning-bg:#fff; --warning-line:#888; --coming:#45315d; --coming-bg:#fff; --code-bg:#fff; }
       html { scroll-padding-top:0; scroll-behavior:auto; }
       body { font-size:10pt; line-height:1.5; }
-      .site-header,.skip-link,.document-footer { display:none; }
+      .site-header, .skip-link, .document-footer, .to-index, .toc-hint { display:none; }
       .document { margin:0; padding:0; }
-      .cover,article { max-width:none; }
-      .cover { background:#fff; color:#111; border-radius:0; padding:0 0 20px; margin-bottom:20px; border-bottom:2px solid #174c3b; break-inside:avoid; }
+      .cover, article { max-width:none; }
+      .cover { background:#fff; color:#111; border-radius:0; padding:0 0 18px; margin-bottom:18px; border-bottom:2px solid #174c3b; break-inside:avoid; }
       .cover::after { display:none; }
-      .eyebrow,.subtitle,.version { color:#333; }
-      .version { border-color:#aaa; }
-      h1 { font-size:28pt; }
-      .toc { position:static; width:auto; max-width:none; height:auto; overflow:visible; padding:0; margin:0 0 24px; border:0; background:#fff; break-after:page; }
+      .eyebrow, .subtitle, .version { color:#333; }
+      .version { border-color:#888; }
+      h1 { font-size:26pt; }
+      .toc { position:static; width:auto; max-width:none; height:auto; overflow:visible; padding:0; margin:0 0 22px; border:0; background:#fff; break-after:page; }
       .toc summary { padding:0 0 10px; }
       .toc summary::after { display:none; }
-      .toc>details>ol { columns:2; column-gap:20px; }
-      .toc a { font-size:8pt; padding:3px 0; color:#111; }
+      .toc > details > ol { columns:2; column-gap:20px; }
+      .toc li ol { display:block; }
+      .toc a { font-size:8.5pt; padding:2px 0; color:#111; }
+      .toc > details > ol > li > a { font-weight:700; }
       .toc a[aria-current=location] { box-shadow:none; background:transparent; }
-      .toc li ol a { font-size:7.5pt; padding:2px 0; }
-      section { padding:0; border:0; border-radius:0; margin:24px 0; box-shadow:none; }
-      h2 { font-size:17pt; padding-bottom:10px; }
-      h3 { font-size:12pt; margin-top:20px; }
-      h1,h2,h3 { break-after:avoid-page; }
+      .toc li ol a { font-size:7.8pt; padding:1px 0; }
+      section { padding:0; border:0; border-radius:0; margin:22px 0; box-shadow:none; }
+      article > section:first-of-type { border-top:0; }
+      h2 { font-size:16pt; padding-bottom:8px; }
+      h3 { font-size:11.5pt; margin-top:18px; border-left-width:3px; }
+      h1, h2, h3 { break-after:avoid-page; }
       p { orphans:3; widows:3; }
       blockquote { background:transparent; break-inside:avoid; }
-      .table-scroll { overflow:visible; border-radius:0; }
+      .table-scroll { border-radius:0; overflow:visible; }
       table { table-layout:fixed; font-size:8.5pt; }
-      th,td { min-width:0; padding:7px; overflow-wrap:anywhere; }
+      th, td { padding:6px; overflow-wrap:anywhere; }
       thead { display:table-header-group; }
       tr { break-inside:avoid; }
-      a { color:inherit; }
+      a { color:inherit; text-decoration:none; }
     }
   </style>
 </head>
 <body>
   <a class="skip-link" href="#contenuto">Vai alla guida</a>
   <header class="site-header">
-    <a class="brand" href="#guida" aria-label="DOMHOUSE, inizio della guida"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m3 10 9-7 9 7v11H3Z"/><path d="M9 21v-8h6v8"/></svg></span>DOMHOUSE</a>
+    <a class="brand" href="#guida" aria-label="DOMHOUSE, inizio della guida"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m3 10 9-7 9 7v11H3Z"/><path d="M9 21v-8h6v8"/></svg></span>DOMHOUSE <small>· Guida utente</small></a>
     <nav class="document-nav" aria-label="Documenti"><a href="guida-utente.html" aria-current="page">Guida utente</a><a href="checklist-collaudo.html">Checklist</a></nav>
     <button class="header-print" id="print-guide" type="button">Stampa / PDF</button>
     <div class="reading-track" aria-hidden="true"><span id="reading-progress"></span></div>
   </header>
   <main class="document" id="guida">
     <header class="cover">
-      <p class="eyebrow">DOMHOUSE · Manuale operativo</p>
+      <p class="eyebrow">DOMHOUSE · Guida utente</p>
 <h1 id="guida-all-app-domhouse-bf67de07">Guida all&#x27;app DOMHOUSE</h1>
 <p class="subtitle">Tutto quello che l&#x27;app sa fare, spiegato passo per passo e diviso per ruolo. Non servono conoscenze tecniche.</p>
 <p class="version"><em>Versione del 22 ottobre 2026 (lotto 30), ambiente di prova.</em></p>
     </header>
-    <nav class="toc" aria-label="Indice della guida">
+    <nav class="toc" id="indice" aria-label="Indice della guida">
       <details open id="guide-index">
       <summary>In questa guida</summary>
       <ol>
@@ -292,6 +347,7 @@
 </ol></li>
       </ol>
       </details>
+      <p class="toc-hint">Le voci della parte che stai leggendo si aprono da sole.</p>
     </nav>
     <article id="contenuto" tabindex="-1">
 <blockquote class="test-notice">
@@ -314,8 +370,8 @@ aggiornamento.</p>
 </li>
 <li>
 <p>La guida è divisa per ruolo. Chi ha <strong>sola lettura</strong> legge la parte 4. L&#x27;<strong>operatore</strong> legge le parti 4 e 5.
-L&#x27;<strong>amministratore</strong> legge le parti 4, 5 e 6. Il <strong>gestore della piattaforma</strong> (HQE) legge la parte 7. Le parti 1, 2,
-9, 10, 11 e 12 valgono per tutti.</p>
+L&#x27;<strong>amministratore</strong> legge le parti 4, 5 e 6. Il <strong>gestore della piattaforma</strong> (HQE) legge la parte 7. Le parti 1 e 2
+e tutte quelle dalla 9 in poi valgono per tutti.</p>
 </li>
 <li>
 <p>Alcune pagine dell&#x27;appartamento («Approvazioni», «Decisioni», «Consumi», «Programmazione», «Regole», «Assistente»)
@@ -599,12 +655,12 @@ dallo stesso telefono non riceve le tue notifiche e non vede nulla della tua ses
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Categoria</th><th scope="col" class="align-left">Notifica</th><th scope="col" class="align-left">Quando arriva</th><th scope="col" class="align-left">Dove porta</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«Approvazioni richieste»</td><td class="align-left">«…: approvazione richiesta», con la proposta oppure «Il motore chiede il tuo consenso»</td><td class="align-left">Quando il motore apre una richiesta (non per quelle in coda dietro un&#x27;altra)</td><td class="align-left">«Approvazioni»</td></tr>
-<tr><td class="align-left">«Dispositivi e istanza offline»</td><td class="align-left">«…: dispositivo offline», «… non risponde da oltre … minuti»</td><td class="align-left">Dopo i minuti della regola «Avviso dispositivo offline» (15 all&#x27;inizio); regola spenta, niente avviso</td><td class="align-left">«Panoramica»</td></tr>
-<tr><td class="align-left">«Dispositivi e istanza offline»</td><td class="align-left">«…: istanza non raggiungibile», «Il connettore domotico risulta fermo»</td><td class="align-left">Sistema domotico fermo oltre la stessa soglia; una volta per episodio</td><td class="align-left">«Panoramica»</td></tr>
-<tr><td class="align-left">«Dispositivi e istanza offline»</td><td class="align-left">«…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo»</td><td class="align-left">A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio</td><td class="align-left">«Decisioni»</td></tr>
-<tr><td class="align-left">«Prenotazioni»</td><td class="align-left">«…: prenotazione annullata, appartamento rimesso a vuoto»</td><td class="align-left">Disdetta dopo che l&#x27;appartamento era già stato preparato per l&#x27;arrivo</td><td class="align-left">«Decisioni»</td></tr>
-<tr><td class="align-left">«Riepilogo»</td><td class="align-left">«…: riepilogo della settimana», con la prima segnalazione e «E altre … voci.»</td><td class="align-left">Il lunedì mattina, solo se la settimana ha qualcosa da segnalare</td><td class="align-left">Il riepilogo di quella settimana</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Approvazioni richieste»</td><td data-label="Notifica" class="align-left">«…: approvazione richiesta», con la proposta oppure «Il motore chiede il tuo consenso»</td><td data-label="Quando arriva" class="align-left">Quando il motore apre una richiesta (non per quelle in coda dietro un&#x27;altra)</td><td data-label="Dove porta" class="align-left">«Approvazioni»</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Dispositivi e istanza offline»</td><td data-label="Notifica" class="align-left">«…: dispositivo offline», «… non risponde da oltre … minuti»</td><td data-label="Quando arriva" class="align-left">Dopo i minuti della regola «Avviso dispositivo offline» (15 all&#x27;inizio); regola spenta, niente avviso</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Dispositivi e istanza offline»</td><td data-label="Notifica" class="align-left">«…: istanza non raggiungibile», «Il connettore domotico risulta fermo»</td><td data-label="Quando arriva" class="align-left">Sistema domotico fermo oltre la stessa soglia; una volta per episodio</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Dispositivi e istanza offline»</td><td data-label="Notifica" class="align-left">«…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo»</td><td data-label="Quando arriva" class="align-left">A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio</td><td data-label="Dove porta" class="align-left">«Decisioni»</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Prenotazioni»</td><td data-label="Notifica" class="align-left">«…: prenotazione annullata, appartamento rimesso a vuoto»</td><td data-label="Quando arriva" class="align-left">Disdetta dopo che l&#x27;appartamento era già stato preparato per l&#x27;arrivo</td><td data-label="Dove porta" class="align-left">«Decisioni»</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Riepilogo»</td><td data-label="Notifica" class="align-left">«…: riepilogo della settimana», con la prima segnalazione e «E altre … voci.»</td><td data-label="Quando arriva" class="align-left">Il lunedì mattina, solo se la settimana ha qualcosa da segnalare</td><td data-label="Dove porta" class="align-left">Il riepilogo di quella settimana</td></tr>
 </tbody></table></div>
 <p>Le notifiche arrivano solo per gli appartamenti che vedi. Un gestore della piattaforma in accesso di assistenza non
 riceve quelle dell&#x27;organizzazione assistita.</p>
@@ -618,11 +674,11 @@ lo chiude. Per chiudere tutte le sessioni usa «Esci da tutti i dispositivi» ne
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Ruolo</th><th scope="col" class="align-left">Pagine che vede</th><th scope="col" class="align-left">Che cosa può fare</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«Sola lettura»</td><td class="align-left">«Appartamenti», «Impostazioni», tutte le pagine dell&#x27;appartamento tranne «Simulatore»</td><td class="align-left">Guardare tutto, scaricare i rendiconti Excel, gestire il proprio account e le proprie notifiche. Non comanda, non approva, non scrive all&#x27;assistente.</td></tr>
-<tr><td class="align-left">«Operatore»</td><td class="align-left">Come sola lettura</td><td class="align-left">In più: cambiare modalità, forzare, comandare i dispositivi, approvare, programmare, cambiare le regole, usare l&#x27;assistente.</td></tr>
-<tr><td class="align-left">«Amministratore»</td><td class="align-left">Come l&#x27;operatore, più «Amministrazione» e «Simulatore» sui dimostrativi</td><td class="align-left">In più: invitare e gestire gli utenti, nome e indirizzo degli appartamenti, funzioni, prezzi, copia delle regole, Simulatore. Vede tutti gli appartamenti dell&#x27;organizzazione.</td></tr>
-<tr><td class="align-left">«Gestore della piattaforma» (HQE)</td><td class="align-left">«Organizzazioni», «Impostazioni» e, se fa parte anche di un&#x27;organizzazione, le pagine del suo ruolo lì</td><td class="align-left">Crea le organizzazioni e i loro primi amministratori, nomina altri gestori, crea e collega gli appartamenti, sospende e riattiva, apre accessi di assistenza. Da solo non vede dispositivi, consumi, decisioni né utenti.</td></tr>
-<tr><td class="align-left">Accesso di assistenza</td><td class="align-left">«Appartamenti», «Organizzazioni», «Impostazioni» e tutte le pagine dell&#x27;appartamento</td><td class="align-left">Un gestore della piattaforma dentro un&#x27;organizzazione per 1–24 ore, con i permessi di un operatore, su tutti i suoi appartamenti.</td></tr>
+<tr><td data-label="Ruolo" class="align-left">«Sola lettura»</td><td data-label="Pagine che vede" class="align-left">«Appartamenti», «Impostazioni», tutte le pagine dell&#x27;appartamento tranne «Simulatore»</td><td data-label="Che cosa può fare" class="align-left">Guardare tutto, scaricare i rendiconti Excel, gestire il proprio account e le proprie notifiche. Non comanda, non approva, non scrive all&#x27;assistente.</td></tr>
+<tr><td data-label="Ruolo" class="align-left">«Operatore»</td><td data-label="Pagine che vede" class="align-left">Come sola lettura</td><td data-label="Che cosa può fare" class="align-left">In più: cambiare modalità, forzare, comandare i dispositivi, approvare, programmare, cambiare le regole, usare l&#x27;assistente.</td></tr>
+<tr><td data-label="Ruolo" class="align-left">«Amministratore»</td><td data-label="Pagine che vede" class="align-left">Come l&#x27;operatore, più «Amministrazione» e «Simulatore» sui dimostrativi</td><td data-label="Che cosa può fare" class="align-left">In più: invitare e gestire gli utenti, nome e indirizzo degli appartamenti, funzioni, prezzi, copia delle regole, Simulatore. Vede tutti gli appartamenti dell&#x27;organizzazione.</td></tr>
+<tr><td data-label="Ruolo" class="align-left">«Gestore della piattaforma» (HQE)</td><td data-label="Pagine che vede" class="align-left">«Organizzazioni», «Impostazioni» e, se fa parte anche di un&#x27;organizzazione, le pagine del suo ruolo lì</td><td data-label="Che cosa può fare" class="align-left">Crea le organizzazioni e i loro primi amministratori, nomina altri gestori, crea e collega gli appartamenti, sospende e riattiva, apre accessi di assistenza. Da solo non vede dispositivi, consumi, decisioni né utenti.</td></tr>
+<tr><td data-label="Ruolo" class="align-left">Accesso di assistenza</td><td data-label="Pagine che vede" class="align-left">«Appartamenti», «Organizzazioni», «Impostazioni» e tutte le pagine dell&#x27;appartamento</td><td data-label="Che cosa può fare" class="align-left">Un gestore della piattaforma dentro un&#x27;organizzazione per 1–24 ore, con i permessi di un operatore, su tutti i suoi appartamenti.</td></tr>
 </tbody></table></div>
 <p>Gli operatori e chi ha sola lettura vedono solo gli appartamenti che l&#x27;amministratore ha assegnato loro (oppure tutti,
 se così impostato). Gli amministratori vedono sempre tutti.</p>
@@ -1167,12 +1223,12 @@ ritrasmettere.</p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Esito</th><th scope="col" class="align-left">Che cosa vuol dire</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«Ricevuta e trasmessa al motore»</td><td class="align-left">Tutto a posto: il sistema domotico l&#x27;ha ricevuta, anche se l&#x27;aveva già.</td></tr>
-<tr><td class="align-left">«Ricevuta ma il motore non l&#x27;ha accettata», «… (riprovato 1 volta)», «… (riprovato … volte)»</td><td class="align-left">Il sistema domotico non ha risposto o ha dato errore, anche dopo i tentativi. Avvisa l&#x27;assistenza.</td></tr>
-<tr><td class="align-left">«Ricevuta ma non trasmessa: appartamento disattivato»</td><td class="align-left">L&#x27;appartamento è spento con l&#x27;interruttore «Attivo».</td></tr>
-<tr><td class="align-left">«Ricevuta ma non trasmessa: formato non riconosciuto»</td><td class="align-left">Il messaggio di Italianway non si è potuto leggere. Avvisa l&#x27;assistenza.</td></tr>
-<tr><td class="align-left">«Ricevuta ma rifiutata: firma non valida», «Ricevuta: appartamento non riconosciuto»</td><td class="align-left">Qui quasi mai: queste comunicazioni non si possono attribuire a nessuna organizzazione e le vede HQE in «Prenotazioni non attribuite».</td></tr>
-<tr><td class="align-left">«Ricevuta ma non trasmessa»</td><td class="align-left">Qualsiasi altro caso. Avvisa l&#x27;assistenza.</td></tr>
+<tr><td data-label="Esito" class="align-left">«Ricevuta e trasmessa al motore»</td><td data-label="Che cosa vuol dire" class="align-left">Tutto a posto: il sistema domotico l&#x27;ha ricevuta, anche se l&#x27;aveva già.</td></tr>
+<tr><td data-label="Esito" class="align-left">«Ricevuta ma il motore non l&#x27;ha accettata», «… (riprovato 1 volta)», «… (riprovato … volte)»</td><td data-label="Che cosa vuol dire" class="align-left">Il sistema domotico non ha risposto o ha dato errore, anche dopo i tentativi. Avvisa l&#x27;assistenza.</td></tr>
+<tr><td data-label="Esito" class="align-left">«Ricevuta ma non trasmessa: appartamento disattivato»</td><td data-label="Che cosa vuol dire" class="align-left">L&#x27;appartamento è spento con l&#x27;interruttore «Attivo».</td></tr>
+<tr><td data-label="Esito" class="align-left">«Ricevuta ma non trasmessa: formato non riconosciuto»</td><td data-label="Che cosa vuol dire" class="align-left">Il messaggio di Italianway non si è potuto leggere. Avvisa l&#x27;assistenza.</td></tr>
+<tr><td data-label="Esito" class="align-left">«Ricevuta ma rifiutata: firma non valida», «Ricevuta: appartamento non riconosciuto»</td><td data-label="Che cosa vuol dire" class="align-left">Qui quasi mai: queste comunicazioni non si possono attribuire a nessuna organizzazione e le vede HQE in «Prenotazioni non attribuite».</td></tr>
+<tr><td data-label="Esito" class="align-left">«Ricevuta ma non trasmessa»</td><td data-label="Che cosa vuol dire" class="align-left">Qualsiasi altro caso. Avvisa l&#x27;assistenza.</td></tr>
 </tbody></table></div>
 <h3 id="registro-dell-organizzazione-0698e175">Registro dell&#x27;organizzazione</h3>
 <p>«Chi ha fatto cosa nella tua organizzazione: inviti, ruoli, appartamenti, funzioni e accessi di assistenza.» Ogni voce
@@ -1413,13 +1469,13 @@ l&#x27;80 %». Non si impostano dalle preferenze personali.</p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Amministrazione (l&#x27;amministratore, per la sua organizzazione)</th><th scope="col" class="align-left">Organizzazioni (il gestore della piattaforma, per tutte)</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«Appartamenti»: l&#x27;uso di ogni giorno: nome, indirizzo, attivo o no, prezzo, «Verifica connessione».</td><td class="align-left">«Appartamenti» dentro ogni organizzazione: la parte tecnica: creare, collegare al sistema domotico, codice Italianway, eliminare, «Verifica connessione».</td></tr>
-<tr><td class="align-left">«Utenti»: le persone della propria organizzazione, con ruolo e appartamenti visibili.</td><td class="align-left">«Gestori della piattaforma»: le persone di HQE. Della singola organizzazione il gestore vede solo il primo amministratore («Reinvia invito»).</td></tr>
-<tr><td class="align-left">«Funzioni»: quali schermate sono attive.</td><td class="align-left">Nessuna scheda corrispondente.</td></tr>
-<tr><td class="align-left">«Prenotazioni ricevute»: le prenotazioni arrivate ai propri appartamenti.</td><td class="align-left">«Prenotazioni non attribuite»: quelle che non corrispondono a nessun appartamento. Le due schede non si sovrappongono.</td></tr>
-<tr><td class="align-left">«Registro dell&#x27;organizzazione»: chi ha fatto cosa, con i nomi.</td><td class="align-left">«Registro della piattaforma»: cosa è successo in un&#x27;organizzazione, con i soli ruoli; più le azioni della piattaforma.</td></tr>
-<tr><td class="align-left">L&#x27;avviso dell&#x27;accesso di assistenza, con «Chiudi accesso».</td><td class="align-left">«Accesso di assistenza» in «Elenco organizzazioni»: aprirlo, entrare, chiuderlo.</td></tr>
-<tr><td class="align-left">Nessuna scheda corrispondente.</td><td class="align-left">«Elenco organizzazioni»: creare, rinominare, sospendere, riattivare, invitare il primo amministratore.</td></tr>
+<tr><td data-label="Amministrazione (l&#x27;amministratore, per la sua organizzazione)" class="align-left">«Appartamenti»: l&#x27;uso di ogni giorno: nome, indirizzo, attivo o no, prezzo, «Verifica connessione».</td><td data-label="Organizzazioni (il gestore della piattaforma, per tutte)" class="align-left">«Appartamenti» dentro ogni organizzazione: la parte tecnica: creare, collegare al sistema domotico, codice Italianway, eliminare, «Verifica connessione».</td></tr>
+<tr><td data-label="Amministrazione (l&#x27;amministratore, per la sua organizzazione)" class="align-left">«Utenti»: le persone della propria organizzazione, con ruolo e appartamenti visibili.</td><td data-label="Organizzazioni (il gestore della piattaforma, per tutte)" class="align-left">«Gestori della piattaforma»: le persone di HQE. Della singola organizzazione il gestore vede solo il primo amministratore («Reinvia invito»).</td></tr>
+<tr><td data-label="Amministrazione (l&#x27;amministratore, per la sua organizzazione)" class="align-left">«Funzioni»: quali schermate sono attive.</td><td data-label="Organizzazioni (il gestore della piattaforma, per tutte)" class="align-left">Nessuna scheda corrispondente.</td></tr>
+<tr><td data-label="Amministrazione (l&#x27;amministratore, per la sua organizzazione)" class="align-left">«Prenotazioni ricevute»: le prenotazioni arrivate ai propri appartamenti.</td><td data-label="Organizzazioni (il gestore della piattaforma, per tutte)" class="align-left">«Prenotazioni non attribuite»: quelle che non corrispondono a nessun appartamento. Le due schede non si sovrappongono.</td></tr>
+<tr><td data-label="Amministrazione (l&#x27;amministratore, per la sua organizzazione)" class="align-left">«Registro dell&#x27;organizzazione»: chi ha fatto cosa, con i nomi.</td><td data-label="Organizzazioni (il gestore della piattaforma, per tutte)" class="align-left">«Registro della piattaforma»: cosa è successo in un&#x27;organizzazione, con i soli ruoli; più le azioni della piattaforma.</td></tr>
+<tr><td data-label="Amministrazione (l&#x27;amministratore, per la sua organizzazione)" class="align-left">L&#x27;avviso dell&#x27;accesso di assistenza, con «Chiudi accesso».</td><td data-label="Organizzazioni (il gestore della piattaforma, per tutte)" class="align-left">«Accesso di assistenza» in «Elenco organizzazioni»: aprirlo, entrare, chiuderlo.</td></tr>
+<tr><td data-label="Amministrazione (l&#x27;amministratore, per la sua organizzazione)" class="align-left">Nessuna scheda corrispondente.</td><td data-label="Organizzazioni (il gestore della piattaforma, per tutte)" class="align-left">«Elenco organizzazioni»: creare, rinominare, sospendere, riattivare, invitare il primo amministratore.</td></tr>
 </tbody></table></div>
 </section>
 <section aria-labelledby="8-accesso-di-assistenza-11282512">
@@ -1720,9 +1776,9 @@ aspettano la fine della forzatura.</p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Modalità</th><th scope="col" class="align-left">Caldaia</th><th scope="col" class="align-left">Climatizzatore</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«comfort»</td><td class="align-left">Abilitata alla «Temperatura in comfort (°C)» (21 all&#x27;inizio); il termostato la accende e spegne intorno a quel valore.</td><td class="align-left">Con un sensore di temperatura nella stessa stanza: scalda alla temperatura di comfort quando la stanza è sotto, raffresca alla «Raffrescamento in comfort (°C)» (25 all&#x27;inizio) quando è sopra, fra le due lo lascia com&#x27;è; al cambio di modalità e poi ogni minuto. Senza sensore nella stanza non lo tocca e scrive una volta «Regolazione automatica disattivata».</td></tr>
-<tr><td class="align-left">«eco»</td><td class="align-left">Abilitata alla «Temperatura in eco (°C)» (18 all&#x27;inizio).</td><td class="align-left">Spento.</td></tr>
-<tr><td class="align-left">«casa vuota»</td><td class="align-left">Abilitata alla temperatura dell&#x27;«Antigelo a casa vuota» (8 °C all&#x27;inizio).</td><td class="align-left">Spento.</td></tr>
+<tr><td data-label="Modalità" class="align-left">«comfort»</td><td data-label="Caldaia" class="align-left">Abilitata alla «Temperatura in comfort (°C)» (21 all&#x27;inizio); il termostato la accende e spegne intorno a quel valore.</td><td data-label="Climatizzatore" class="align-left">Con un sensore di temperatura nella stessa stanza: scalda alla temperatura di comfort quando la stanza è sotto, raffresca alla «Raffrescamento in comfort (°C)» (25 all&#x27;inizio) quando è sopra, fra le due lo lascia com&#x27;è; al cambio di modalità e poi ogni minuto. Senza sensore nella stanza non lo tocca e scrive una volta «Regolazione automatica disattivata».</td></tr>
+<tr><td data-label="Modalità" class="align-left">«eco»</td><td data-label="Caldaia" class="align-left">Abilitata alla «Temperatura in eco (°C)» (18 all&#x27;inizio).</td><td data-label="Climatizzatore" class="align-left">Spento.</td></tr>
+<tr><td data-label="Modalità" class="align-left">«casa vuota»</td><td data-label="Caldaia" class="align-left">Abilitata alla temperatura dell&#x27;«Antigelo a casa vuota» (8 °C all&#x27;inizio).</td><td data-label="Climatizzatore" class="align-left">Spento.</td></tr>
 </tbody></table></div>
 <p>Le tre temperature si regolano per appartamento nella regola «Limiti del setpoint» (parte 9). I valori chiesti restano
 sempre entro i limiti del dispositivo. La regolazione automatica del clima ogni minuto rispetta l&#x27;isteresi (0,5 °C) e
@@ -1735,14 +1791,14 @@ cambio di modalità. Ogni cambio automatico è una decisione con la temperatura 
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Regola</th><th scope="col" class="align-left">Descrizione nell&#x27;app</th><th scope="col" class="align-left">Valori di partenza e limiti</th><th scope="col" class="align-left">Che cosa fa davvero</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«Finestra aperta spegne il clima»</td><td class="align-left">«Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.»</td><td class="align-left">«Minuti»: 5, da 1 a 30</td><td class="align-left">Spegne clima e riscaldamento di tutto l&#x27;appartamento, non solo della stanza. Sospesa durante una forzatura; alla fine riparte. L&#x27;antigelo è più forte.</td></tr>
-<tr><td class="align-left">«Limiti del setpoint»</td><td class="align-left">«Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c&#x27;è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.»</td><td class="align-left">«Minimo (°C)»: 16, da 7 a 20; «Massimo (°C)»: 24, da 20 a 28; «Temperatura in comfort (°C)»: 21, da 16 a 26; «Temperatura in eco (°C)»: 18, da 10 a 22; «Raffrescamento in comfort (°C)»: 25, da 22 a 28</td><td class="align-left">Minimo e massimo valgono per i climatizzatori: un comando fuori intervallo è rifiutato, i comandi automatici vengono riportati dentro. La caldaia usa i limiti del suo dispositivo. Spegnere l&#x27;interruttore di questa regola oggi non toglie i limiti. Le tre temperature guidano le modalità.</td></tr>
-<tr><td class="align-left">«Antigelo a casa vuota»</td><td class="align-left">«Con la casa vuota mantiene almeno questa temperatura.»</td><td class="align-left">«Temperatura (°C)»: 8, da 5 a 12</td><td class="align-left">A casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più 0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve un sensore: senza, «Antigelo non attivo».</td></tr>
-<tr><td class="align-left">«Antimuffa a casa vuota»</td><td class="align-left">«Con la casa vuota deumidifica sopra questa soglia.»</td><td class="align-left">«Umidità (%)»: 65, da 50 a 80</td><td class="align-left">Oggi scrive solo «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione, anche se la descrizione lo dice.</td></tr>
-<tr><td class="align-left">«Pre-arrivo»</td><td class="align-left">«Porta la casa in comfort prima dell&#x27;arrivo degli ospiti.»</td><td class="align-left">«Ore prima del check-in»: 2, da 0 a 6</td><td class="align-left">Ogni prenotazione creata o modificata programma il comfort. Cambiare le ore vale per le prenotazioni che arrivano o cambiano dopo: le azioni già in programma non vengono ricalcolate.</td></tr>
-<tr><td class="align-left">«Risparmio al check-out»</td><td class="align-left">«Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.»</td><td class="align-left">«Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180</td><td class="align-left">Programma casa vuota dopo la partenza. Con movimento recente apre la richiesta «Mettere l&#x27;appartamento a vuoto dopo il check-out»; senza risposta la approva.</td></tr>
-<tr><td class="align-left">«Pausa minima del compressore»</td><td class="align-left">«Pausa minima tra spegnimento e riaccensione del compressore.»</td><td class="align-left">«Minuti»: 3; «Non modificabile» (chi gestisce il sistema può impostare da 1 a 15)</td><td class="align-left">Dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico viene rimandato, uno di una persona o dell&#x27;assistente può essere rifiutato se manca più di qualche secondo.</td></tr>
-<tr><td class="align-left">«Avviso dispositivo offline»</td><td class="align-left">«Avvisa quando un dispositivo resta offline oltre i minuti indicati.»</td><td class="align-left">«Minuti»: 15, da 5 a 120</td><td class="align-left">Dopo la soglia scrive «Dispositivo offline» nelle Decisioni e manda la notifica; la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto.</td></tr>
+<tr><td data-label="Regola" class="align-left">«Finestra aperta spegne il clima»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 5, da 1 a 30</td><td data-label="Che cosa fa davvero" class="align-left">Spegne clima e riscaldamento di tutto l&#x27;appartamento, non solo della stanza. Sospesa durante una forzatura; alla fine riparte. L&#x27;antigelo è più forte.</td></tr>
+<tr><td data-label="Regola" class="align-left">«Limiti del setpoint»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c&#x27;è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minimo (°C)»: 16, da 7 a 20; «Massimo (°C)»: 24, da 20 a 28; «Temperatura in comfort (°C)»: 21, da 16 a 26; «Temperatura in eco (°C)»: 18, da 10 a 22; «Raffrescamento in comfort (°C)»: 25, da 22 a 28</td><td data-label="Che cosa fa davvero" class="align-left">Minimo e massimo valgono per i climatizzatori: un comando fuori intervallo è rifiutato, i comandi automatici vengono riportati dentro. La caldaia usa i limiti del suo dispositivo. Spegnere l&#x27;interruttore di questa regola oggi non toglie i limiti. Le tre temperature guidano le modalità.</td></tr>
+<tr><td data-label="Regola" class="align-left">«Antigelo a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota mantiene almeno questa temperatura.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Temperatura (°C)»: 8, da 5 a 12</td><td data-label="Che cosa fa davvero" class="align-left">A casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più 0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve un sensore: senza, «Antigelo non attivo».</td></tr>
+<tr><td data-label="Regola" class="align-left">«Antimuffa a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota deumidifica sopra questa soglia.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Umidità (%)»: 65, da 50 a 80</td><td data-label="Che cosa fa davvero" class="align-left">Oggi scrive solo «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione, anche se la descrizione lo dice.</td></tr>
+<tr><td data-label="Regola" class="align-left">«Pre-arrivo»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Porta la casa in comfort prima dell&#x27;arrivo degli ospiti.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Ore prima del check-in»: 2, da 0 a 6</td><td data-label="Che cosa fa davvero" class="align-left">Ogni prenotazione creata o modificata programma il comfort. Cambiare le ore vale per le prenotazioni che arrivano o cambiano dopo: le azioni già in programma non vengono ricalcolate.</td></tr>
+<tr><td data-label="Regola" class="align-left">«Risparmio al check-out»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180</td><td data-label="Che cosa fa davvero" class="align-left">Programma casa vuota dopo la partenza. Con movimento recente apre la richiesta «Mettere l&#x27;appartamento a vuoto dopo il check-out»; senza risposta la approva.</td></tr>
+<tr><td data-label="Regola" class="align-left">«Pausa minima del compressore»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Pausa minima tra spegnimento e riaccensione del compressore.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 3; «Non modificabile» (chi gestisce il sistema può impostare da 1 a 15)</td><td data-label="Che cosa fa davvero" class="align-left">Dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico viene rimandato, uno di una persona o dell&#x27;assistente può essere rifiutato se manca più di qualche secondo.</td></tr>
+<tr><td data-label="Regola" class="align-left">«Avviso dispositivo offline»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Avvisa quando un dispositivo resta offline oltre i minuti indicati.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 15, da 5 a 120</td><td data-label="Che cosa fa davvero" class="align-left">Dopo la soglia scrive «Dispositivo offline» nelle Decisioni e manda la notifica; la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto.</td></tr>
 </tbody></table></div>
 <h3 id="caldaia-e-clima-con-e-senza-sensore-4b201c1b">Caldaia e clima, con e senza sensore</h3>
 <ul>
@@ -1831,13 +1887,13 @@ domande al giorno all&#x27;assistente (50) e il tetto mensile di spesa (20 €).
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Dati</th><th scope="col" class="align-left">Per quanto tempo</th></tr></thead>
 <tbody>
-<tr><td class="align-left">Prenotazioni e presenze degli ospiti</td><td class="align-left">12 mesi dopo il check-out</td></tr>
-<tr><td class="align-left">Decisioni dell&#x27;appartamento</td><td class="align-left">24 mesi</td></tr>
-<tr><td class="align-left">Consumi</td><td class="align-left">24 mesi (li conserva il sistema domotico dell&#x27;appartamento)</td></tr>
-<tr><td class="align-left">Richieste all&#x27;assistente</td><td class="align-left">90 giorni</td></tr>
-<tr><td class="align-left">Riepiloghi settimanali</td><td class="align-left">12 mesi</td></tr>
-<tr><td class="align-left">Registro dell&#x27;organizzazione, registro della piattaforma e accessi di assistenza</td><td class="align-left">24 mesi</td></tr>
-<tr><td class="align-left">Prenotazioni ricevute da Italianway (senza dati personali degli ospiti)</td><td class="align-left">90 giorni, e al massimo le ultime 100</td></tr>
+<tr><td data-label="Dati" class="align-left">Prenotazioni e presenze degli ospiti</td><td data-label="Per quanto tempo" class="align-left">12 mesi dopo il check-out</td></tr>
+<tr><td data-label="Dati" class="align-left">Decisioni dell&#x27;appartamento</td><td data-label="Per quanto tempo" class="align-left">24 mesi</td></tr>
+<tr><td data-label="Dati" class="align-left">Consumi</td><td data-label="Per quanto tempo" class="align-left">24 mesi (li conserva il sistema domotico dell&#x27;appartamento)</td></tr>
+<tr><td data-label="Dati" class="align-left">Richieste all&#x27;assistente</td><td data-label="Per quanto tempo" class="align-left">90 giorni</td></tr>
+<tr><td data-label="Dati" class="align-left">Riepiloghi settimanali</td><td data-label="Per quanto tempo" class="align-left">12 mesi</td></tr>
+<tr><td data-label="Dati" class="align-left">Registro dell&#x27;organizzazione, registro della piattaforma e accessi di assistenza</td><td data-label="Per quanto tempo" class="align-left">24 mesi</td></tr>
+<tr><td data-label="Dati" class="align-left">Prenotazioni ricevute da Italianway (senza dati personali degli ospiti)</td><td data-label="Per quanto tempo" class="align-left">90 giorni, e al massimo le ultime 100</td></tr>
 </tbody></table></div>
 <p>Utenti, organizzazioni e appartamenti restano finché non vengono tolti. Chi elimina il proprio account viene cancellato
 subito. I dati personali degli ospiti non vengono salvati; il sistema domotico riceve un codice anonimo al posto
@@ -1849,113 +1905,113 @@ dell&#x27;email di chi comanda.</p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«Accesso non riuscito: controlla email e password»</td><td class="align-left">Email o password sbagliate</td><td class="align-left">Riprova o usa «Password dimenticata?»</td></tr>
-<tr><td class="align-left">«Troppi tentativi: riprova tra qualche minuto»</td><td class="align-left">Troppi tentativi in poco tempo</td><td class="align-left">Aspetta qualche minuto</td></tr>
-<tr><td class="align-left">«Connessione assente: riprova»</td><td class="align-left">Il telefono o il computer non ha rete</td><td class="align-left">Controlla la connessione</td></tr>
-<tr><td class="align-left">«Il browser ha bloccato la finestra di Google: consenti le finestre pop-up per questo sito e riprova»</td><td class="align-left">Il browser ha bloccato la finestra di accesso di Google</td><td class="align-left">Consenti le finestre pop-up e riprova</td></tr>
-<tr><td class="align-left">«Accesso con Google non attivo: avvisa l&#x27;assistenza HQE», «Accesso con Google non riuscito»</td><td class="align-left">L&#x27;accesso con Google non è disponibile o è fallito</td><td class="align-left">Riprova; se continua, avvisa l&#x27;assistenza con il «Codice»</td></tr>
-<tr><td class="align-left">«Questo indirizzo del sito non è autorizzato per l&#x27;accesso: avvisa l&#x27;assistenza HQE»</td><td class="align-left">Il sito è aperto da un indirizzo non previsto</td><td class="align-left">Avvisa l&#x27;assistenza</td></tr>
-<tr><td class="align-left">«Firebase non è ancora configurato su questo ambiente»</td><td class="align-left">L&#x27;ambiente non è pronto per l&#x27;accesso</td><td class="align-left">Avvisa l&#x27;assistenza</td></tr>
-<tr><td class="align-left">«Non hai i permessi per accedere. Chiedi un invito.»</td><td class="align-left">L&#x27;account esiste ma nessuno ti ha invitato in questo ambiente (un invito nell&#x27;ambiente di prova non vale nel sito vero)</td><td class="align-left">Chiedi un invito a un amministratore</td></tr>
-<tr><td class="align-left">«Conferma il tuo indirizzo: abbiamo inviato un link a …. Aprilo e poi accedi di nuovo.»</td><td class="align-left">Il tuo indirizzo non è ancora confermato</td><td class="align-left">Apri il link nell&#x27;email, poi accedi di nuovo</td></tr>
-<tr><td class="align-left">«Devi confermare il tuo indirizzo email, ma l&#x27;invio del link non è riuscito. Riprova tra qualche minuto.»</td><td class="align-left">L&#x27;email di conferma non è partita</td><td class="align-left">Riprova tra qualche minuto</td></tr>
-<tr><td class="align-left">«Impossibile caricare il profilo, riprova tra poco»</td><td class="align-left">Il server non risponde</td><td class="align-left">Riprova dopo qualche minuto</td></tr>
-<tr><td class="align-left">«La tua organizzazione non è attiva: contatta HQE.»</td><td class="align-left">L&#x27;organizzazione non è ancora pronta</td><td class="align-left">Contatta HQE</td></tr>
-<tr><td class="align-left">«La tua organizzazione è sospesa: l&#x27;app non è disponibile. Per informazioni contatta l&#x27;assistenza HQE.»</td><td class="align-left">HQE ha sospeso la tua organizzazione</td><td class="align-left">Contatta l&#x27;assistenza HQE</td></tr>
-<tr><td class="align-left">«Indirizzo email non valido»</td><td class="align-left">L&#x27;email scritta non è un indirizzo</td><td class="align-left">Correggi l&#x27;indirizzo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Accesso non riuscito: controlla email e password»</td><td data-label="Cosa significa" class="align-left">Email o password sbagliate</td><td data-label="Cosa fare" class="align-left">Riprova o usa «Password dimenticata?»</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Troppi tentativi: riprova tra qualche minuto»</td><td data-label="Cosa significa" class="align-left">Troppi tentativi in poco tempo</td><td data-label="Cosa fare" class="align-left">Aspetta qualche minuto</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Connessione assente: riprova»</td><td data-label="Cosa significa" class="align-left">Il telefono o il computer non ha rete</td><td data-label="Cosa fare" class="align-left">Controlla la connessione</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il browser ha bloccato la finestra di Google: consenti le finestre pop-up per questo sito e riprova»</td><td data-label="Cosa significa" class="align-left">Il browser ha bloccato la finestra di accesso di Google</td><td data-label="Cosa fare" class="align-left">Consenti le finestre pop-up e riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Accesso con Google non attivo: avvisa l&#x27;assistenza HQE», «Accesso con Google non riuscito»</td><td data-label="Cosa significa" class="align-left">L&#x27;accesso con Google non è disponibile o è fallito</td><td data-label="Cosa fare" class="align-left">Riprova; se continua, avvisa l&#x27;assistenza con il «Codice»</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Questo indirizzo del sito non è autorizzato per l&#x27;accesso: avvisa l&#x27;assistenza HQE»</td><td data-label="Cosa significa" class="align-left">Il sito è aperto da un indirizzo non previsto</td><td data-label="Cosa fare" class="align-left">Avvisa l&#x27;assistenza</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Firebase non è ancora configurato su questo ambiente»</td><td data-label="Cosa significa" class="align-left">L&#x27;ambiente non è pronto per l&#x27;accesso</td><td data-label="Cosa fare" class="align-left">Avvisa l&#x27;assistenza</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Non hai i permessi per accedere. Chiedi un invito.»</td><td data-label="Cosa significa" class="align-left">L&#x27;account esiste ma nessuno ti ha invitato in questo ambiente (un invito nell&#x27;ambiente di prova non vale nel sito vero)</td><td data-label="Cosa fare" class="align-left">Chiedi un invito a un amministratore</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Conferma il tuo indirizzo: abbiamo inviato un link a …. Aprilo e poi accedi di nuovo.»</td><td data-label="Cosa significa" class="align-left">Il tuo indirizzo non è ancora confermato</td><td data-label="Cosa fare" class="align-left">Apri il link nell&#x27;email, poi accedi di nuovo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Devi confermare il tuo indirizzo email, ma l&#x27;invio del link non è riuscito. Riprova tra qualche minuto.»</td><td data-label="Cosa significa" class="align-left">L&#x27;email di conferma non è partita</td><td data-label="Cosa fare" class="align-left">Riprova tra qualche minuto</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Impossibile caricare il profilo, riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Il server non risponde</td><td data-label="Cosa fare" class="align-left">Riprova dopo qualche minuto</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«La tua organizzazione non è attiva: contatta HQE.»</td><td data-label="Cosa significa" class="align-left">L&#x27;organizzazione non è ancora pronta</td><td data-label="Cosa fare" class="align-left">Contatta HQE</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«La tua organizzazione è sospesa: l&#x27;app non è disponibile. Per informazioni contatta l&#x27;assistenza HQE.»</td><td data-label="Cosa significa" class="align-left">HQE ha sospeso la tua organizzazione</td><td data-label="Cosa fare" class="align-left">Contatta l&#x27;assistenza HQE</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Indirizzo email non valido»</td><td data-label="Cosa significa" class="align-left">L&#x27;email scritta non è un indirizzo</td><td data-label="Cosa fare" class="align-left">Correggi l&#x27;indirizzo</td></tr>
 </tbody></table></div>
 <h3 id="in-tutte-le-pagine-d7aed8ac">In tutte le pagine</h3>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«Server non raggiungibile»</td><td class="align-left">L&#x27;app non raggiunge il server</td><td class="align-left">Controlla la rete e premi «Riprova»</td></tr>
-<tr><td class="align-left">«Operazione non riuscita», «Errore …»</td><td class="align-left">Il server ha risposto con un errore senza spiegazione</td><td class="align-left">Riprova; se continua, copia l&#x27;«ID richiesta» e segnala</td></tr>
-<tr><td class="align-left">«Richiesta non accettata dal server: ricarica la pagina e riprova.»</td><td class="align-left">La pagina è vecchia rispetto al server</td><td class="align-left">Ricarica la pagina</td></tr>
-<tr><td class="align-left">«Accesso richiesto», «Sessione non valida o scaduta»</td><td class="align-left">La sessione è finita</td><td class="align-left">Accedi di nuovo</td></tr>
-<tr><td class="align-left">«Organizzazione non attiva», «Organizzazione sospesa: contatta l&#x27;assistenza HQE»</td><td class="align-left">La tua organizzazione non è disponibile</td><td class="align-left">Contatta HQE</td></tr>
-<tr><td class="align-left">«L&#x27;accesso di assistenza è scaduto o è stato chiuso»</td><td class="align-left">L&#x27;accesso di assistenza è finito</td><td class="align-left">Torni alla tua area; se serve, aprine uno nuovo</td></tr>
-<tr><td class="align-left">«Il tuo ruolo consente solo la lettura»</td><td class="align-left">Hai il ruolo sola lettura</td><td class="align-left">Chiedi a un operatore o a un amministratore</td></tr>
-<tr><td class="align-left">«Operazione riservata agli amministratori», «Operazione riservata ai gestori della piattaforma»</td><td class="align-left">Serve un ruolo più alto</td><td class="align-left">Chiedi a chi ha quel ruolo</td></tr>
-<tr><td class="align-left">«Appartamento inesistente», «Appartamento non disponibile»</td><td class="align-left">L&#x27;appartamento non esiste o non è fra i tuoi</td><td class="align-left">«Torna agli appartamenti»; chiedi l&#x27;assegnazione a un amministratore</td></tr>
-<tr><td class="align-left">«Appartamento disattivato»</td><td class="align-left">L&#x27;amministratore ha spento «Attivo»</td><td class="align-left">Chiedi all&#x27;amministratore</td></tr>
-<tr><td class="align-left">«Funzione non disponibile su questa istanza»</td><td class="align-left">La funzione è spenta o il sistema domotico non la ha</td><td class="align-left">Chiedi all&#x27;amministratore (scheda «Funzioni»)</td></tr>
-<tr><td class="align-left">«Istanza non raggiungibile»</td><td class="align-left">Il sistema domotico dell&#x27;appartamento non risponde</td><td class="align-left">Aspetta; se continua, «Verifica connessione» e assistenza</td></tr>
-<tr><td class="align-left">«Versione del contratto non compatibile»</td><td class="align-left">Il sistema domotico è di una versione non supportata</td><td class="align-left">Contatta il supporto tecnico</td></tr>
-<tr><td class="align-left">«Pagina non trovata»</td><td class="align-left">L&#x27;indirizzo non esiste, oppure non hai il ruolo per quella pagina</td><td class="align-left">Torna al menu</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Server non raggiungibile»</td><td data-label="Cosa significa" class="align-left">L&#x27;app non raggiunge il server</td><td data-label="Cosa fare" class="align-left">Controlla la rete e premi «Riprova»</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Operazione non riuscita», «Errore …»</td><td data-label="Cosa significa" class="align-left">Il server ha risposto con un errore senza spiegazione</td><td data-label="Cosa fare" class="align-left">Riprova; se continua, copia l&#x27;«ID richiesta» e segnala</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Richiesta non accettata dal server: ricarica la pagina e riprova.»</td><td data-label="Cosa significa" class="align-left">La pagina è vecchia rispetto al server</td><td data-label="Cosa fare" class="align-left">Ricarica la pagina</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Accesso richiesto», «Sessione non valida o scaduta»</td><td data-label="Cosa significa" class="align-left">La sessione è finita</td><td data-label="Cosa fare" class="align-left">Accedi di nuovo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Organizzazione non attiva», «Organizzazione sospesa: contatta l&#x27;assistenza HQE»</td><td data-label="Cosa significa" class="align-left">La tua organizzazione non è disponibile</td><td data-label="Cosa fare" class="align-left">Contatta HQE</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«L&#x27;accesso di assistenza è scaduto o è stato chiuso»</td><td data-label="Cosa significa" class="align-left">L&#x27;accesso di assistenza è finito</td><td data-label="Cosa fare" class="align-left">Torni alla tua area; se serve, aprine uno nuovo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il tuo ruolo consente solo la lettura»</td><td data-label="Cosa significa" class="align-left">Hai il ruolo sola lettura</td><td data-label="Cosa fare" class="align-left">Chiedi a un operatore o a un amministratore</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Operazione riservata agli amministratori», «Operazione riservata ai gestori della piattaforma»</td><td data-label="Cosa significa" class="align-left">Serve un ruolo più alto</td><td data-label="Cosa fare" class="align-left">Chiedi a chi ha quel ruolo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Appartamento inesistente», «Appartamento non disponibile»</td><td data-label="Cosa significa" class="align-left">L&#x27;appartamento non esiste o non è fra i tuoi</td><td data-label="Cosa fare" class="align-left">«Torna agli appartamenti»; chiedi l&#x27;assegnazione a un amministratore</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Appartamento disattivato»</td><td data-label="Cosa significa" class="align-left">L&#x27;amministratore ha spento «Attivo»</td><td data-label="Cosa fare" class="align-left">Chiedi all&#x27;amministratore</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Funzione non disponibile su questa istanza»</td><td data-label="Cosa significa" class="align-left">La funzione è spenta o il sistema domotico non la ha</td><td data-label="Cosa fare" class="align-left">Chiedi all&#x27;amministratore (scheda «Funzioni»)</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Istanza non raggiungibile»</td><td data-label="Cosa significa" class="align-left">Il sistema domotico dell&#x27;appartamento non risponde</td><td data-label="Cosa fare" class="align-left">Aspetta; se continua, «Verifica connessione» e assistenza</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Versione del contratto non compatibile»</td><td data-label="Cosa significa" class="align-left">Il sistema domotico è di una versione non supportata</td><td data-label="Cosa fare" class="align-left">Contatta il supporto tecnico</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Pagina non trovata»</td><td data-label="Cosa significa" class="align-left">L&#x27;indirizzo non esiste, oppure non hai il ruolo per quella pagina</td><td data-label="Cosa fare" class="align-left">Torna al menu</td></tr>
 </tbody></table></div>
 <h3 id="sui-comandi-e-in-panoramica-6ccb6446">Sui comandi e in Panoramica</h3>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«Il dispositivo non è raggiungibile; riprova quando torna online», «dispositivo offline»</td><td class="align-left">Il dispositivo è offline</td><td class="align-left">Aspetta che torni online</td></tr>
-<tr><td class="align-left">«Collegamento ai dispositivi non disponibile; riprova quando torna»</td><td class="align-left">Il sistema non parla con i dispositivi</td><td class="align-left">Aspetta «Collegamento ai dispositivi ripristinato» nelle Decisioni</td></tr>
-<tr><td class="align-left">«Il setpoint deve essere tra … e …», «fuori dai limiti»</td><td class="align-left">Temperatura fuori dai limiti</td><td class="align-left">Scegli un valore nell&#x27;intervallo «da … a … °C»</td></tr>
-<tr><td class="align-left">«rifiutato dal dispositivo»</td><td class="align-left">Il dispositivo non ha accettato il comando</td><td class="align-left">Riprova; controlla il dispositivo</td></tr>
-<tr><td class="align-left">«bloccato da una regola», «bloccato da un&#x27;azione prioritaria»</td><td class="align-left">Una regola (per esempio finestra aperta o pausa del compressore) o un&#x27;azione più importante ha bloccato il comando</td><td class="align-left">Leggi il motivo nelle Decisioni; riprova dopo</td></tr>
-<tr><td class="align-left">«nessuna conferma», «non verificato», «nessuna risposta»</td><td class="align-left">Il comando è partito ma non è stato confermato</td><td class="align-left">Controlla le letture del dispositivo</td></tr>
-<tr><td class="align-left">«errore interno»</td><td class="align-left">Un errore del sistema domotico</td><td class="align-left">Copia l&#x27;«ID richiesta» e segnala</td></tr>
-<tr><td class="align-left">«Modalità non valida»</td><td class="align-left">Modalità non riconosciuta</td><td class="align-left">Scegli «comfort», «eco» o «casa vuota»</td></tr>
-<tr><td class="align-left">«Il nome deve avere da 1 a 60 caratteri», «Stanza inesistente», «Dispositivo inesistente»</td><td class="align-left">Dati della rinomina non validi</td><td class="align-left">Correggi nome o stanza</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il dispositivo non è raggiungibile; riprova quando torna online», «dispositivo offline»</td><td data-label="Cosa significa" class="align-left">Il dispositivo è offline</td><td data-label="Cosa fare" class="align-left">Aspetta che torni online</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Collegamento ai dispositivi non disponibile; riprova quando torna»</td><td data-label="Cosa significa" class="align-left">Il sistema non parla con i dispositivi</td><td data-label="Cosa fare" class="align-left">Aspetta «Collegamento ai dispositivi ripristinato» nelle Decisioni</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il setpoint deve essere tra … e …», «fuori dai limiti»</td><td data-label="Cosa significa" class="align-left">Temperatura fuori dai limiti</td><td data-label="Cosa fare" class="align-left">Scegli un valore nell&#x27;intervallo «da … a … °C»</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«rifiutato dal dispositivo»</td><td data-label="Cosa significa" class="align-left">Il dispositivo non ha accettato il comando</td><td data-label="Cosa fare" class="align-left">Riprova; controlla il dispositivo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«bloccato da una regola», «bloccato da un&#x27;azione prioritaria»</td><td data-label="Cosa significa" class="align-left">Una regola (per esempio finestra aperta o pausa del compressore) o un&#x27;azione più importante ha bloccato il comando</td><td data-label="Cosa fare" class="align-left">Leggi il motivo nelle Decisioni; riprova dopo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«nessuna conferma», «non verificato», «nessuna risposta»</td><td data-label="Cosa significa" class="align-left">Il comando è partito ma non è stato confermato</td><td data-label="Cosa fare" class="align-left">Controlla le letture del dispositivo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«errore interno»</td><td data-label="Cosa significa" class="align-left">Un errore del sistema domotico</td><td data-label="Cosa fare" class="align-left">Copia l&#x27;«ID richiesta» e segnala</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Modalità non valida»</td><td data-label="Cosa significa" class="align-left">Modalità non riconosciuta</td><td data-label="Cosa fare" class="align-left">Scegli «comfort», «eco» o «casa vuota»</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il nome deve avere da 1 a 60 caratteri», «Stanza inesistente», «Dispositivo inesistente»</td><td data-label="Cosa significa" class="align-left">Dati della rinomina non validi</td><td data-label="Cosa fare" class="align-left">Correggi nome o stanza</td></tr>
 </tbody></table></div>
 <h3 id="in-approvazioni-programmazione-regole-assistente-e-simulatore-3fa34b3c">In Approvazioni, Programmazione, Regole, Assistente e Simulatore</h3>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«L&#x27;approvazione è già stata decisa», «Approvazione inesistente»</td><td class="align-left">Un collega ha già deciso, o la richiesta non c&#x27;è più</td><td class="align-left">Rileggi l&#x27;elenco</td></tr>
-<tr><td class="align-left">«note troppo lunga»</td><td class="align-left">La nota supera 500 caratteri</td><td class="align-left">Accorcia la nota</td></tr>
-<tr><td class="align-left">«L&#x27;orario deve essere nel futuro»</td><td class="align-left">L&#x27;orario scelto è passato</td><td class="align-left">Scegli un orario futuro</td></tr>
-<tr><td class="align-left">«Azione programmata inesistente», «L&#x27;azione è già stata eseguita o annullata»</td><td class="align-left">La voce non è più in programma</td><td class="align-left">Rileggi l&#x27;elenco</td></tr>
-<tr><td class="align-left">«Valore fuori dai limiti (…–…)», ««…»: … deve essere tra … e …»</td><td class="align-left">Un valore della regola è fuori dai limiti</td><td class="align-left">Correggi il valore</td></tr>
-<tr><td class="align-left">«Il minimo non può superare il massimo», «La temperatura eco non può superare quella comfort», «La temperatura di raffrescamento deve essere più alta di quella comfort»</td><td class="align-left">Le temperature non sono coerenti</td><td class="align-left">Correggi i valori</td></tr>
-<tr><td class="align-left">«La regola «…» non è modificabile»</td><td class="align-left">Regola fissata dal sistema</td><td class="align-left">Non si cambia dall&#x27;app</td></tr>
-<tr><td class="align-left">«Salva o annulla prima le modifiche fatte a mano»</td><td class="align-left">Hai modifiche non salvate nella pagina Regole</td><td class="align-left">«Salva le modifiche» o «Annulla le modifiche», poi «Applica»</td></tr>
-<tr><td class="align-left">«Le regole sono cambiate nel frattempo: rifai la richiesta», «Le regole dell&#x27;appartamento di partenza sono cambiate: rifai l&#x27;anteprima»</td><td class="align-left">Qualcuno ha cambiato le regole</td><td class="align-left">Rifai la proposta o l&#x27;anteprima</td></tr>
-<tr><td class="align-left">«Le regole sono già così: non c&#x27;è niente da cambiare»</td><td class="align-left">La proposta non cambia nulla</td><td class="align-left">Niente da fare</td></tr>
-<tr><td class="align-left">«Al massimo 500 caratteri», «Scrivi che cosa vuoi cambiare», «Scrivi una richiesta», «text obbligatorio, massimo 500 caratteri»</td><td class="align-left">Testo vuoto o troppo lungo</td><td class="align-left">Scrivi una frase più corta</td></tr>
-<tr><td class="align-left">«Hai già chiesto 20 proposte oggi per questo appartamento: riprova domani o cambia le regole a mano»</td><td class="align-left">Limite giornaliero delle proposte</td><td class="align-left">Cambia la regola a mano o riprova domani</td></tr>
-<tr><td class="align-left">«L&#x27;assistente non ha risposto in tempo: riprova con una frase più breve, oppure cambia la regola a mano qui sotto.»</td><td class="align-left">Il modello non ha risposto in tempo</td><td class="align-left">Riprova con una frase più breve</td></tr>
-<tr><td class="align-left">«Nessuna risposta dall&#x27;assistente: riprova», «Non sono riuscito a rispondere in tempo: riprova, oppure fai dall&#x27;app.», «L&#x27;assistente non è disponibile ora, riprova più tardi», «Non sono riuscito a rispondere: riprova.»</td><td class="align-left">L&#x27;assistente non ha risposto</td><td class="align-left">Riprova o usa i comandi dell&#x27;app</td></tr>
-<tr><td class="align-left">«Limite di … domande al giorno raggiunto per questo appartamento: riprova domani.»</td><td class="align-left">Limite giornaliero dell&#x27;assistente</td><td class="align-left">Usa i comandi dell&#x27;app</td></tr>
-<tr><td class="align-left">«Limite mensile raggiunto, riprova dal mese prossimo»</td><td class="align-left">Tetto di spesa del servizio raggiunto</td><td class="align-left">Usa i comandi dell&#x27;app; HQE riceve un&#x27;email</td></tr>
-<tr><td class="align-left">«Nessun altro appartamento nella tua organizzazione», «Scegli almeno un appartamento di destinazione», «Al massimo 100 appartamenti alla volta», «Solo gli amministratori possono copiare le regole»</td><td class="align-left">Condizioni della copia delle regole</td><td class="align-left">Correggi la scelta</td></tr>
-<tr><td class="align-left">«Il simulatore è riservato agli amministratori», «Questo appartamento non è un&#x27;istanza simulata»</td><td class="align-left">Il Simulatore non è disponibile qui</td><td class="align-left">Solo amministratori, solo dimostrativi</td></tr>
-<tr><td class="align-left">«Il check-out deve essere successivo al check-in»</td><td class="align-left">Date della prenotazione di prova invertite</td><td class="align-left">Correggi le date</td></tr>
-<tr><td class="align-left">«Nessun apparecchio con misuratore da proporre nell&#x27;appartamento»</td><td class="align-left">Nessun apparecchio adatto alla prova</td><td class="align-left">Usa un altro dimostrativo</td></tr>
-<tr><td class="align-left">«Il ripristino è disponibile solo con il motore simulato integrato.»</td><td class="align-left">Il ripristino non è possibile su un sistema vero</td><td class="align-left">Nessuna azione</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«L&#x27;approvazione è già stata decisa», «Approvazione inesistente»</td><td data-label="Cosa significa" class="align-left">Un collega ha già deciso, o la richiesta non c&#x27;è più</td><td data-label="Cosa fare" class="align-left">Rileggi l&#x27;elenco</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«note troppo lunga»</td><td data-label="Cosa significa" class="align-left">La nota supera 500 caratteri</td><td data-label="Cosa fare" class="align-left">Accorcia la nota</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«L&#x27;orario deve essere nel futuro»</td><td data-label="Cosa significa" class="align-left">L&#x27;orario scelto è passato</td><td data-label="Cosa fare" class="align-left">Scegli un orario futuro</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Azione programmata inesistente», «L&#x27;azione è già stata eseguita o annullata»</td><td data-label="Cosa significa" class="align-left">La voce non è più in programma</td><td data-label="Cosa fare" class="align-left">Rileggi l&#x27;elenco</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Valore fuori dai limiti (…–…)», ««…»: … deve essere tra … e …»</td><td data-label="Cosa significa" class="align-left">Un valore della regola è fuori dai limiti</td><td data-label="Cosa fare" class="align-left">Correggi il valore</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il minimo non può superare il massimo», «La temperatura eco non può superare quella comfort», «La temperatura di raffrescamento deve essere più alta di quella comfort»</td><td data-label="Cosa significa" class="align-left">Le temperature non sono coerenti</td><td data-label="Cosa fare" class="align-left">Correggi i valori</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«La regola «…» non è modificabile»</td><td data-label="Cosa significa" class="align-left">Regola fissata dal sistema</td><td data-label="Cosa fare" class="align-left">Non si cambia dall&#x27;app</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Salva o annulla prima le modifiche fatte a mano»</td><td data-label="Cosa significa" class="align-left">Hai modifiche non salvate nella pagina Regole</td><td data-label="Cosa fare" class="align-left">«Salva le modifiche» o «Annulla le modifiche», poi «Applica»</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Le regole sono cambiate nel frattempo: rifai la richiesta», «Le regole dell&#x27;appartamento di partenza sono cambiate: rifai l&#x27;anteprima»</td><td data-label="Cosa significa" class="align-left">Qualcuno ha cambiato le regole</td><td data-label="Cosa fare" class="align-left">Rifai la proposta o l&#x27;anteprima</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Le regole sono già così: non c&#x27;è niente da cambiare»</td><td data-label="Cosa significa" class="align-left">La proposta non cambia nulla</td><td data-label="Cosa fare" class="align-left">Niente da fare</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Al massimo 500 caratteri», «Scrivi che cosa vuoi cambiare», «Scrivi una richiesta», «text obbligatorio, massimo 500 caratteri»</td><td data-label="Cosa significa" class="align-left">Testo vuoto o troppo lungo</td><td data-label="Cosa fare" class="align-left">Scrivi una frase più corta</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Hai già chiesto 20 proposte oggi per questo appartamento: riprova domani o cambia le regole a mano»</td><td data-label="Cosa significa" class="align-left">Limite giornaliero delle proposte</td><td data-label="Cosa fare" class="align-left">Cambia la regola a mano o riprova domani</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«L&#x27;assistente non ha risposto in tempo: riprova con una frase più breve, oppure cambia la regola a mano qui sotto.»</td><td data-label="Cosa significa" class="align-left">Il modello non ha risposto in tempo</td><td data-label="Cosa fare" class="align-left">Riprova con una frase più breve</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Nessuna risposta dall&#x27;assistente: riprova», «Non sono riuscito a rispondere in tempo: riprova, oppure fai dall&#x27;app.», «L&#x27;assistente non è disponibile ora, riprova più tardi», «Non sono riuscito a rispondere: riprova.»</td><td data-label="Cosa significa" class="align-left">L&#x27;assistente non ha risposto</td><td data-label="Cosa fare" class="align-left">Riprova o usa i comandi dell&#x27;app</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Limite di … domande al giorno raggiunto per questo appartamento: riprova domani.»</td><td data-label="Cosa significa" class="align-left">Limite giornaliero dell&#x27;assistente</td><td data-label="Cosa fare" class="align-left">Usa i comandi dell&#x27;app</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Limite mensile raggiunto, riprova dal mese prossimo»</td><td data-label="Cosa significa" class="align-left">Tetto di spesa del servizio raggiunto</td><td data-label="Cosa fare" class="align-left">Usa i comandi dell&#x27;app; HQE riceve un&#x27;email</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Nessun altro appartamento nella tua organizzazione», «Scegli almeno un appartamento di destinazione», «Al massimo 100 appartamenti alla volta», «Solo gli amministratori possono copiare le regole»</td><td data-label="Cosa significa" class="align-left">Condizioni della copia delle regole</td><td data-label="Cosa fare" class="align-left">Correggi la scelta</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il simulatore è riservato agli amministratori», «Questo appartamento non è un&#x27;istanza simulata»</td><td data-label="Cosa significa" class="align-left">Il Simulatore non è disponibile qui</td><td data-label="Cosa fare" class="align-left">Solo amministratori, solo dimostrativi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il check-out deve essere successivo al check-in»</td><td data-label="Cosa significa" class="align-left">Date della prenotazione di prova invertite</td><td data-label="Cosa fare" class="align-left">Correggi le date</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Nessun apparecchio con misuratore da proporre nell&#x27;appartamento»</td><td data-label="Cosa significa" class="align-left">Nessun apparecchio adatto alla prova</td><td data-label="Cosa fare" class="align-left">Usa un altro dimostrativo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il ripristino è disponibile solo con il motore simulato integrato.»</td><td data-label="Cosa significa" class="align-left">Il ripristino non è possibile su un sistema vero</td><td data-label="Cosa fare" class="align-left">Nessuna azione</td></tr>
 </tbody></table></div>
 <h3 id="in-amministrazione-e-organizzazioni-bcc2c37a">In Amministrazione e Organizzazioni</h3>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«È già un utente della tua organizzazione», «Questa email non può essere invitata»</td><td class="align-left">La persona è già dentro, oppure è di HQE</td><td class="align-left">Non invitare; per HQE serve la procedura tecnica</td></tr>
-<tr><td class="align-left">«Gli amministratori vedono sempre tutti gli appartamenti»</td><td class="align-left">Non si limitano gli appartamenti di un amministratore</td><td class="align-left">Cambia ruolo se serve</td></tr>
-<tr><td class="align-left">«Utente inesistente», «L&#x27;utente ha già effettuato l&#x27;accesso»</td><td class="align-left">Il reinvio non è possibile</td><td class="align-left">Rileggi l&#x27;elenco</td></tr>
-<tr><td class="align-left">«Non puoi togliere a te stesso il ruolo di amministratore», «Non puoi eliminare il tuo stesso account», «Deve restare almeno un amministratore nell&#x27;organizzazione»</td><td class="align-left">Protezioni sul proprio ruolo e sull&#x27;ultimo amministratore</td><td class="align-left">Chiedi a un altro amministratore</td></tr>
-<tr><td class="align-left">«Ruolo non aggiornato, riprova tra poco», «Rimozione non riuscita, riprova tra poco», «Eliminazione non riuscita, riprova tra poco»</td><td class="align-left">Errore passeggero</td><td class="align-left">Riprova</td></tr>
-<tr><td class="align-left">«Fuso orario non valido», «Funzione sconosciuta», «Appartamento inesistente: …»</td><td class="align-left">Dati non validi</td><td class="align-left">Correggi</td></tr>
-<tr><td class="align-left">«Prezzo non valido: da 0 a 10 € al kWh, al massimo 4 decimali»</td><td class="align-left">Prezzo fuori formato</td><td class="align-left">Scrivi per esempio 0,25</td></tr>
-<tr><td class="align-left">«Chiave dell&#x27;istanza non configurata: contatta l&#x27;assistenza HQE»</td><td class="align-left">Manca la chiave del sistema domotico</td><td class="align-left">Avvisa l&#x27;assistenza</td></tr>
-<tr><td class="align-left">«Scrivi il nome dell&#x27;organizzazione», «Esiste già un&#x27;organizzazione con questo nome», «Organizzazione inesistente»</td><td class="align-left">Nome mancante, duplicato o organizzazione non trovata</td><td class="align-left">Correggi</td></tr>
-<tr><td class="align-left">«L&#x27;organizzazione è già sospesa», «L&#x27;organizzazione non è sospesa», «Scrivi il motivo della sospensione»</td><td class="align-left">Stato o motivo non coerenti</td><td class="align-left">Rileggi la scheda</td></tr>
-<tr><td class="align-left">«La durata va da 1 a 24 ore», «Scrivi il motivo dell&#x27;accesso di assistenza», «L&#x27;organizzazione è sospesa», «Hai già un accesso di assistenza aperto in questa organizzazione», «Accesso non aperto: riprova tra poco»</td><td class="align-left">Condizioni dell&#x27;accesso di assistenza</td><td class="align-left">Correggi o riprova</td></tr>
-<tr><td class="align-left">«Accesso di assistenza inesistente»</td><td class="align-left">L&#x27;accesso è già chiuso</td><td class="align-left">Niente da fare</td></tr>
-<tr><td class="align-left">«Identificativo non disponibile», «Collegamento già usato da un altro appartamento», «Codice Italianway già in uso»</td><td class="align-left">Valori già usati o non riusabili</td><td class="align-left">Scegli valori diversi</td></tr>
-<tr><td class="align-left">«Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi mock://builtin nel campo URL istanza», «I dimostrativi stanno nell&#x27;ambiente di prova: in produzione solo appartamenti veri»</td><td class="align-left">Collegamento non ammesso in questo ambiente</td><td class="align-left">Correggi il collegamento</td></tr>
-<tr><td class="align-left">«Ha già il ruolo di gestore della piattaforma», «Non è un gestore della piattaforma», «È l&#x27;ultimo gestore della piattaforma: nomina prima qualcun altro»</td><td class="align-left">Condizioni sui gestori</td><td class="align-left">Rileggi l&#x27;elenco</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«È già un utente della tua organizzazione», «Questa email non può essere invitata»</td><td data-label="Cosa significa" class="align-left">La persona è già dentro, oppure è di HQE</td><td data-label="Cosa fare" class="align-left">Non invitare; per HQE serve la procedura tecnica</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Gli amministratori vedono sempre tutti gli appartamenti»</td><td data-label="Cosa significa" class="align-left">Non si limitano gli appartamenti di un amministratore</td><td data-label="Cosa fare" class="align-left">Cambia ruolo se serve</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Utente inesistente», «L&#x27;utente ha già effettuato l&#x27;accesso»</td><td data-label="Cosa significa" class="align-left">Il reinvio non è possibile</td><td data-label="Cosa fare" class="align-left">Rileggi l&#x27;elenco</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Non puoi togliere a te stesso il ruolo di amministratore», «Non puoi eliminare il tuo stesso account», «Deve restare almeno un amministratore nell&#x27;organizzazione»</td><td data-label="Cosa significa" class="align-left">Protezioni sul proprio ruolo e sull&#x27;ultimo amministratore</td><td data-label="Cosa fare" class="align-left">Chiedi a un altro amministratore</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Ruolo non aggiornato, riprova tra poco», «Rimozione non riuscita, riprova tra poco», «Eliminazione non riuscita, riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Errore passeggero</td><td data-label="Cosa fare" class="align-left">Riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Fuso orario non valido», «Funzione sconosciuta», «Appartamento inesistente: …»</td><td data-label="Cosa significa" class="align-left">Dati non validi</td><td data-label="Cosa fare" class="align-left">Correggi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Prezzo non valido: da 0 a 10 € al kWh, al massimo 4 decimali»</td><td data-label="Cosa significa" class="align-left">Prezzo fuori formato</td><td data-label="Cosa fare" class="align-left">Scrivi per esempio 0,25</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Chiave dell&#x27;istanza non configurata: contatta l&#x27;assistenza HQE»</td><td data-label="Cosa significa" class="align-left">Manca la chiave del sistema domotico</td><td data-label="Cosa fare" class="align-left">Avvisa l&#x27;assistenza</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Scrivi il nome dell&#x27;organizzazione», «Esiste già un&#x27;organizzazione con questo nome», «Organizzazione inesistente»</td><td data-label="Cosa significa" class="align-left">Nome mancante, duplicato o organizzazione non trovata</td><td data-label="Cosa fare" class="align-left">Correggi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«L&#x27;organizzazione è già sospesa», «L&#x27;organizzazione non è sospesa», «Scrivi il motivo della sospensione»</td><td data-label="Cosa significa" class="align-left">Stato o motivo non coerenti</td><td data-label="Cosa fare" class="align-left">Rileggi la scheda</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«La durata va da 1 a 24 ore», «Scrivi il motivo dell&#x27;accesso di assistenza», «L&#x27;organizzazione è sospesa», «Hai già un accesso di assistenza aperto in questa organizzazione», «Accesso non aperto: riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Condizioni dell&#x27;accesso di assistenza</td><td data-label="Cosa fare" class="align-left">Correggi o riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Accesso di assistenza inesistente»</td><td data-label="Cosa significa" class="align-left">L&#x27;accesso è già chiuso</td><td data-label="Cosa fare" class="align-left">Niente da fare</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Identificativo non disponibile», «Collegamento già usato da un altro appartamento», «Codice Italianway già in uso»</td><td data-label="Cosa significa" class="align-left">Valori già usati o non riusabili</td><td data-label="Cosa fare" class="align-left">Scegli valori diversi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi mock://builtin nel campo URL istanza», «I dimostrativi stanno nell&#x27;ambiente di prova: in produzione solo appartamenti veri»</td><td data-label="Cosa significa" class="align-left">Collegamento non ammesso in questo ambiente</td><td data-label="Cosa fare" class="align-left">Correggi il collegamento</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Ha già il ruolo di gestore della piattaforma», «Non è un gestore della piattaforma», «È l&#x27;ultimo gestore della piattaforma: nomina prima qualcun altro»</td><td data-label="Cosa significa" class="align-left">Condizioni sui gestori</td><td data-label="Cosa fare" class="align-left">Rileggi l&#x27;elenco</td></tr>
 </tbody></table></div>
 <h3 id="nelle-impostazioni-e-nelle-notifiche-306f090d">Nelle Impostazioni e nelle notifiche</h3>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
-<tr><td class="align-left">«La password deve avere almeno … caratteri», «Le due password non coincidono», «Password troppo debole: usa almeno 8 caratteri»</td><td class="align-left">La nuova password non va bene</td><td class="align-left">Scegline una più lunga e ripetila uguale</td></tr>
-<tr><td class="align-left">«Password attuale non corretta»</td><td class="align-left">Hai sbagliato la password attuale</td><td class="align-left">Riprova</td></tr>
-<tr><td class="align-left">«Questa email è già usata da un altro account»</td><td class="align-left">Il nuovo indirizzo è di un altro account</td><td class="align-left">Usa un altro indirizzo</td></tr>
-<tr><td class="align-left">«Per sicurezza esci e accedi di nuovo, poi riprova»</td><td class="align-left">L&#x27;operazione richiede un accesso recente</td><td class="align-left">«Esci», accedi e riprova</td></tr>
-<tr><td class="align-left">«Operazione non riuscita, riprova»</td><td class="align-left">Errore passeggero</td><td class="align-left">Riprova</td></tr>
-<tr><td class="align-left">«Sei l&#x27;unico amministratore: nomina un altro amministratore prima di eliminare il tuo account», «Sei l&#x27;ultimo gestore della piattaforma: nomina un altro gestore prima di eliminare il tuo account»</td><td class="align-left">Non puoi lasciare l&#x27;organizzazione o la piattaforma senza nessuno</td><td class="align-left">Nomina prima un altro</td></tr>
-<tr><td class="align-left">«Account non abilitato: mancano tenant o ruolo»</td><td class="align-left">Il tuo account non appartiene a nessuna organizzazione in questo ambiente</td><td class="align-left">Chiedi un invito; un gestore senza organizzazione non può salvare nome e preferenze</td></tr>
-<tr><td class="align-left">«Permesso non concesso: su questo dispositivo le notifiche restano spente.», «Attivazione delle notifiche non riuscita: riprova tra poco.»</td><td class="align-left">Le notifiche non si sono attivate</td><td class="align-left">Consenti il permesso e riprova</td></tr>
-<tr><td class="align-left">«Notifiche non riattivate: il browser non ne dà più il permesso. Puoi riattivarle da Impostazioni › Notifiche.»</td><td class="align-left">Al rientro il browser non permette più le notifiche</td><td class="align-left">Consenti le notifiche e premi «Attiva su questo dispositivo»</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«La password deve avere almeno … caratteri», «Le due password non coincidono», «Password troppo debole: usa almeno 8 caratteri»</td><td data-label="Cosa significa" class="align-left">La nuova password non va bene</td><td data-label="Cosa fare" class="align-left">Scegline una più lunga e ripetila uguale</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Password attuale non corretta»</td><td data-label="Cosa significa" class="align-left">Hai sbagliato la password attuale</td><td data-label="Cosa fare" class="align-left">Riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Questa email è già usata da un altro account»</td><td data-label="Cosa significa" class="align-left">Il nuovo indirizzo è di un altro account</td><td data-label="Cosa fare" class="align-left">Usa un altro indirizzo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Per sicurezza esci e accedi di nuovo, poi riprova»</td><td data-label="Cosa significa" class="align-left">L&#x27;operazione richiede un accesso recente</td><td data-label="Cosa fare" class="align-left">«Esci», accedi e riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Operazione non riuscita, riprova»</td><td data-label="Cosa significa" class="align-left">Errore passeggero</td><td data-label="Cosa fare" class="align-left">Riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Sei l&#x27;unico amministratore: nomina un altro amministratore prima di eliminare il tuo account», «Sei l&#x27;ultimo gestore della piattaforma: nomina un altro gestore prima di eliminare il tuo account»</td><td data-label="Cosa significa" class="align-left">Non puoi lasciare l&#x27;organizzazione o la piattaforma senza nessuno</td><td data-label="Cosa fare" class="align-left">Nomina prima un altro</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Account non abilitato: mancano tenant o ruolo»</td><td data-label="Cosa significa" class="align-left">Il tuo account non appartiene a nessuna organizzazione in questo ambiente</td><td data-label="Cosa fare" class="align-left">Chiedi un invito; un gestore senza organizzazione non può salvare nome e preferenze</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Permesso non concesso: su questo dispositivo le notifiche restano spente.», «Attivazione delle notifiche non riuscita: riprova tra poco.»</td><td data-label="Cosa significa" class="align-left">Le notifiche non si sono attivate</td><td data-label="Cosa fare" class="align-left">Consenti il permesso e riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Notifiche non riattivate: il browser non ne dà più il permesso. Puoi riattivarle da Impostazioni › Notifiche.»</td><td data-label="Cosa significa" class="align-left">Al rientro il browser non permette più le notifiche</td><td data-label="Cosa fare" class="align-left">Consenti le notifiche e premi «Attiva su questo dispositivo»</td></tr>
 </tbody></table></div>
 </section>
 <section aria-labelledby="12-parole-usate-in-questa-guida-444da206">
@@ -1963,49 +2019,49 @@ dell&#x27;email di chi comanda.</p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Parola</th><th scope="col" class="align-left">Che cosa vuol dire</th></tr></thead>
 <tbody>
-<tr><td class="align-left">Accesso di assistenza</td><td class="align-left">Ingresso temporaneo (da 1 a 24 ore) di un gestore della piattaforma in un&#x27;organizzazione, con i permessi di un operatore, motivo visibile all&#x27;amministratore.</td></tr>
-<tr><td class="align-left">Ambiente di prova</td><td class="align-left">Il sito con dati separati da quelli veri, con la fascia gialla «Ambiente di prova». Non è un ruolo.</td></tr>
-<tr><td class="align-left">Antigelo</td><td class="align-left">Protezione a casa vuota: la caldaia si accende sotto la soglia, se c&#x27;è un sensore.</td></tr>
-<tr><td class="align-left">Antimuffa</td><td class="align-left">Oggi solo un avviso di umidità sopra soglia a casa vuota; non deumidifica.</td></tr>
-<tr><td class="align-left">Approvazione</td><td class="align-left">Una richiesta che aspetta il sì o il no di una persona prima di un&#x27;azione; alla scadenza segue quanto scritto nella scheda.</td></tr>
-<tr><td class="align-left">Avviso nell&#x27;app</td><td class="align-left">Messaggio temporaneo in alto nella pagina aperta; non è una notifica sul telefono.</td></tr>
-<tr><td class="align-left">Capacità</td><td class="align-left">Una cosa che un dispositivo sa fare o misurare: interruttore, clima, riscaldamento, temperatura, umidità, contatto, movimento, potenza.</td></tr>
-<tr><td class="align-left">Casa vuota</td><td class="align-left">La modalità per l&#x27;appartamento senza ospiti: clima spento, caldaia sull&#x27;antigelo. Nella scheda, «vuoto» indica invece l&#x27;occupazione.</td></tr>
-<tr><td class="align-left">Check-in, check-out</td><td class="align-left">Arrivo e partenza previsti dalla prenotazione; l&#x27;arrivo e la partenza effettivi sono comunicazioni a parte di Italianway.</td></tr>
-<tr><td class="align-left">Codice Italianway</td><td class="align-left">Il codice con cui il sistema di prenotazioni Italianway riconosce una struttura: decide a quale appartamento arrivano le prenotazioni. Lo inserisce solo HQE.</td></tr>
-<tr><td class="align-left">Collegamento al sistema domotico</td><td class="align-left">L&#x27;indirizzo («URL istanza») del sistema che comanda davvero i dispositivi; nell&#x27;ambiente di prova <code>mock://builtin</code>.</td></tr>
-<tr><td class="align-left">Comfort</td><td class="align-left">La modalità con gli ospiti: caldaia e clima alla temperatura di comfort; raffrescamento sopra la temperatura di raffrescamento.</td></tr>
-<tr><td class="align-left">Connettore</td><td class="align-left">Il collegamento con cui il sistema domotico legge e comanda i dispositivi; «Connettore» «attivo» o «fermo» nella striscia di salute.</td></tr>
-<tr><td class="align-left">Decisione</td><td class="align-left">Una riga dello storico: chi ha fatto o proposto cosa, su cosa, perché, con quale esito.</td></tr>
-<tr><td class="align-left">Dimostrativo</td><td class="align-left">Appartamento finto per prove e dimostrazioni, con l&#x27;etichetta «Dimostrativo» e il Simulatore.</td></tr>
-<tr><td class="align-left">Eccezione per appartamento</td><td class="align-left">Una scelta del singolo appartamento che sostituisce quella dell&#x27;organizzazione (funzioni o prezzo).</td></tr>
-<tr><td class="align-left">Eco</td><td class="align-left">La modalità di risparmio: clima spento, caldaia alla temperatura di eco.</td></tr>
-<tr><td class="align-left">Forzatura</td><td class="align-left">Un periodo (30 minuti, 2 ore, 6 ore) in cui la modalità resta e gli automatismi del comfort sono sospesi; l&#x27;antigelo resta.</td></tr>
-<tr><td class="align-left">Gestore della piattaforma</td><td class="align-left">Chi gestisce il servizio per tutte le organizzazioni (HQE): crea organizzazioni e collega gli appartamenti.</td></tr>
-<tr><td class="align-left">ID richiesta</td><td class="align-left">L&#x27;identificativo copiabile di un&#x27;operazione, per cercarla nelle Decisioni o aiutare l&#x27;assistenza.</td></tr>
-<tr><td class="align-left">Isteresi</td><td class="align-left">La piccola differenza di temperatura (0,5 °C) che evita accensioni e spegnimenti continui intorno alla soglia.</td></tr>
-<tr><td class="align-left">Istanza</td><td class="align-left">Il sistema domotico che gestisce un appartamento, vero o simulato.</td></tr>
-<tr><td class="align-left">kWh</td><td class="align-left">L&#x27;energia consumata in un periodo; l&#x27;importo dipende dal prezzo per kWh.</td></tr>
-<tr><td class="align-left">Mediana</td><td class="align-left">Il valore centrale dei consumi delle stesse notti nelle settimane prima, usato dal riepilogo.</td></tr>
-<tr><td class="align-left">Modalità</td><td class="align-left">La scelta complessiva dell&#x27;appartamento: «comfort», «eco», «casa vuota».</td></tr>
-<tr><td class="align-left">Motore</td><td class="align-left">La parte automatica del sistema domotico: applica regole, modalità, programmi e comandi.</td></tr>
-<tr><td class="align-left">Non verificato</td><td class="align-left">Lo stato mostrato è quello richiesto, senza una conferma del misuratore.</td></tr>
-<tr><td class="align-left">Notifica push</td><td class="align-left">Avviso del telefono o del browser che arriva anche ad app chiusa.</td></tr>
-<tr><td class="align-left">Occupazione</td><td class="align-left">Lo stato della prenotazione: «vuoto», «occupato», «prenotato».</td></tr>
-<tr><td class="align-left">Offline</td><td class="align-left">Dispositivo o collegamento non raggiungibile; non vuol dire spento.</td></tr>
-<tr><td class="align-left">Organizzazione</td><td class="align-left">Un&#x27;azienda che usa l&#x27;app, con i suoi utenti e i suoi appartamenti (oggi Flatsharing).</td></tr>
-<tr><td class="align-left">Pausa del compressore</td><td class="align-left">L&#x27;attesa di protezione (3 minuti) prima di riaccendere il climatizzatore.</td></tr>
-<tr><td class="align-left">Pre-arrivo</td><td class="align-left">La preparazione automatica in comfort prima del check-in.</td></tr>
-<tr><td class="align-left">Proposta di regole</td><td class="align-left">L&#x27;anteprima delle modifiche suggerita dall&#x27;assistente nella pagina Regole; cambia solo con «Applica».</td></tr>
-<tr><td class="align-left">Raffrescamento in comfort</td><td class="align-left">La temperatura sopra la quale, in comfort, il climatizzatore raffresca (25 °C all&#x27;inizio).</td></tr>
-<tr><td class="align-left">Regola</td><td class="align-left">Un automatismo già previsto dal motore, con interruttore e valori; dall&#x27;app non se ne creano di nuovi.</td></tr>
-<tr><td class="align-left">Regolazione automatica del clima</td><td class="align-left">In comfort, il controllo ogni minuto dei climatizzatori secondo il sensore della stanza.</td></tr>
-<tr><td class="align-left">Rendiconto Excel</td><td class="align-left">Il file scaricabile con riepilogo, consumi per giorno, ora e dispositivo e importi.</td></tr>
-<tr><td class="align-left">Riscaldamento abilitato</td><td class="align-left">La caldaia può scaldare secondo il termostato; non vuol dire che stia scaldando adesso.</td></tr>
-<tr><td class="align-left">Setpoint</td><td class="align-left">La temperatura desiderata, diversa da quella misurata.</td></tr>
-<tr><td class="align-left">Simulatore</td><td class="align-left">La pagina, solo per amministratori, per provocare eventi sugli appartamenti dimostrativi.</td></tr>
-<tr><td class="align-left">Soggiorno</td><td class="align-left">Il periodo fra arrivo e partenza di una prenotazione conosciuta dall&#x27;app.</td></tr>
-<tr><td class="align-left">W</td><td class="align-left">La potenza in questo istante; non è il consumo del giorno.</td></tr>
+<tr><td data-label="Parola" class="align-left">Accesso di assistenza</td><td data-label="Che cosa vuol dire" class="align-left">Ingresso temporaneo (da 1 a 24 ore) di un gestore della piattaforma in un&#x27;organizzazione, con i permessi di un operatore, motivo visibile all&#x27;amministratore.</td></tr>
+<tr><td data-label="Parola" class="align-left">Ambiente di prova</td><td data-label="Che cosa vuol dire" class="align-left">Il sito con dati separati da quelli veri, con la fascia gialla «Ambiente di prova». Non è un ruolo.</td></tr>
+<tr><td data-label="Parola" class="align-left">Antigelo</td><td data-label="Che cosa vuol dire" class="align-left">Protezione a casa vuota: la caldaia si accende sotto la soglia, se c&#x27;è un sensore.</td></tr>
+<tr><td data-label="Parola" class="align-left">Antimuffa</td><td data-label="Che cosa vuol dire" class="align-left">Oggi solo un avviso di umidità sopra soglia a casa vuota; non deumidifica.</td></tr>
+<tr><td data-label="Parola" class="align-left">Approvazione</td><td data-label="Che cosa vuol dire" class="align-left">Una richiesta che aspetta il sì o il no di una persona prima di un&#x27;azione; alla scadenza segue quanto scritto nella scheda.</td></tr>
+<tr><td data-label="Parola" class="align-left">Avviso nell&#x27;app</td><td data-label="Che cosa vuol dire" class="align-left">Messaggio temporaneo in alto nella pagina aperta; non è una notifica sul telefono.</td></tr>
+<tr><td data-label="Parola" class="align-left">Capacità</td><td data-label="Che cosa vuol dire" class="align-left">Una cosa che un dispositivo sa fare o misurare: interruttore, clima, riscaldamento, temperatura, umidità, contatto, movimento, potenza.</td></tr>
+<tr><td data-label="Parola" class="align-left">Casa vuota</td><td data-label="Che cosa vuol dire" class="align-left">La modalità per l&#x27;appartamento senza ospiti: clima spento, caldaia sull&#x27;antigelo. Nella scheda, «vuoto» indica invece l&#x27;occupazione.</td></tr>
+<tr><td data-label="Parola" class="align-left">Check-in, check-out</td><td data-label="Che cosa vuol dire" class="align-left">Arrivo e partenza previsti dalla prenotazione; l&#x27;arrivo e la partenza effettivi sono comunicazioni a parte di Italianway.</td></tr>
+<tr><td data-label="Parola" class="align-left">Codice Italianway</td><td data-label="Che cosa vuol dire" class="align-left">Il codice con cui il sistema di prenotazioni Italianway riconosce una struttura: decide a quale appartamento arrivano le prenotazioni. Lo inserisce solo HQE.</td></tr>
+<tr><td data-label="Parola" class="align-left">Collegamento al sistema domotico</td><td data-label="Che cosa vuol dire" class="align-left">L&#x27;indirizzo («URL istanza») del sistema che comanda davvero i dispositivi; nell&#x27;ambiente di prova <code>mock://builtin</code>.</td></tr>
+<tr><td data-label="Parola" class="align-left">Comfort</td><td data-label="Che cosa vuol dire" class="align-left">La modalità con gli ospiti: caldaia e clima alla temperatura di comfort; raffrescamento sopra la temperatura di raffrescamento.</td></tr>
+<tr><td data-label="Parola" class="align-left">Connettore</td><td data-label="Che cosa vuol dire" class="align-left">Il collegamento con cui il sistema domotico legge e comanda i dispositivi; «Connettore» «attivo» o «fermo» nella striscia di salute.</td></tr>
+<tr><td data-label="Parola" class="align-left">Decisione</td><td data-label="Che cosa vuol dire" class="align-left">Una riga dello storico: chi ha fatto o proposto cosa, su cosa, perché, con quale esito.</td></tr>
+<tr><td data-label="Parola" class="align-left">Dimostrativo</td><td data-label="Che cosa vuol dire" class="align-left">Appartamento finto per prove e dimostrazioni, con l&#x27;etichetta «Dimostrativo» e il Simulatore.</td></tr>
+<tr><td data-label="Parola" class="align-left">Eccezione per appartamento</td><td data-label="Che cosa vuol dire" class="align-left">Una scelta del singolo appartamento che sostituisce quella dell&#x27;organizzazione (funzioni o prezzo).</td></tr>
+<tr><td data-label="Parola" class="align-left">Eco</td><td data-label="Che cosa vuol dire" class="align-left">La modalità di risparmio: clima spento, caldaia alla temperatura di eco.</td></tr>
+<tr><td data-label="Parola" class="align-left">Forzatura</td><td data-label="Che cosa vuol dire" class="align-left">Un periodo (30 minuti, 2 ore, 6 ore) in cui la modalità resta e gli automatismi del comfort sono sospesi; l&#x27;antigelo resta.</td></tr>
+<tr><td data-label="Parola" class="align-left">Gestore della piattaforma</td><td data-label="Che cosa vuol dire" class="align-left">Chi gestisce il servizio per tutte le organizzazioni (HQE): crea organizzazioni e collega gli appartamenti.</td></tr>
+<tr><td data-label="Parola" class="align-left">ID richiesta</td><td data-label="Che cosa vuol dire" class="align-left">L&#x27;identificativo copiabile di un&#x27;operazione, per cercarla nelle Decisioni o aiutare l&#x27;assistenza.</td></tr>
+<tr><td data-label="Parola" class="align-left">Isteresi</td><td data-label="Che cosa vuol dire" class="align-left">La piccola differenza di temperatura (0,5 °C) che evita accensioni e spegnimenti continui intorno alla soglia.</td></tr>
+<tr><td data-label="Parola" class="align-left">Istanza</td><td data-label="Che cosa vuol dire" class="align-left">Il sistema domotico che gestisce un appartamento, vero o simulato.</td></tr>
+<tr><td data-label="Parola" class="align-left">kWh</td><td data-label="Che cosa vuol dire" class="align-left">L&#x27;energia consumata in un periodo; l&#x27;importo dipende dal prezzo per kWh.</td></tr>
+<tr><td data-label="Parola" class="align-left">Mediana</td><td data-label="Che cosa vuol dire" class="align-left">Il valore centrale dei consumi delle stesse notti nelle settimane prima, usato dal riepilogo.</td></tr>
+<tr><td data-label="Parola" class="align-left">Modalità</td><td data-label="Che cosa vuol dire" class="align-left">La scelta complessiva dell&#x27;appartamento: «comfort», «eco», «casa vuota».</td></tr>
+<tr><td data-label="Parola" class="align-left">Motore</td><td data-label="Che cosa vuol dire" class="align-left">La parte automatica del sistema domotico: applica regole, modalità, programmi e comandi.</td></tr>
+<tr><td data-label="Parola" class="align-left">Non verificato</td><td data-label="Che cosa vuol dire" class="align-left">Lo stato mostrato è quello richiesto, senza una conferma del misuratore.</td></tr>
+<tr><td data-label="Parola" class="align-left">Notifica push</td><td data-label="Che cosa vuol dire" class="align-left">Avviso del telefono o del browser che arriva anche ad app chiusa.</td></tr>
+<tr><td data-label="Parola" class="align-left">Occupazione</td><td data-label="Che cosa vuol dire" class="align-left">Lo stato della prenotazione: «vuoto», «occupato», «prenotato».</td></tr>
+<tr><td data-label="Parola" class="align-left">Offline</td><td data-label="Che cosa vuol dire" class="align-left">Dispositivo o collegamento non raggiungibile; non vuol dire spento.</td></tr>
+<tr><td data-label="Parola" class="align-left">Organizzazione</td><td data-label="Che cosa vuol dire" class="align-left">Un&#x27;azienda che usa l&#x27;app, con i suoi utenti e i suoi appartamenti (oggi Flatsharing).</td></tr>
+<tr><td data-label="Parola" class="align-left">Pausa del compressore</td><td data-label="Che cosa vuol dire" class="align-left">L&#x27;attesa di protezione (3 minuti) prima di riaccendere il climatizzatore.</td></tr>
+<tr><td data-label="Parola" class="align-left">Pre-arrivo</td><td data-label="Che cosa vuol dire" class="align-left">La preparazione automatica in comfort prima del check-in.</td></tr>
+<tr><td data-label="Parola" class="align-left">Proposta di regole</td><td data-label="Che cosa vuol dire" class="align-left">L&#x27;anteprima delle modifiche suggerita dall&#x27;assistente nella pagina Regole; cambia solo con «Applica».</td></tr>
+<tr><td data-label="Parola" class="align-left">Raffrescamento in comfort</td><td data-label="Che cosa vuol dire" class="align-left">La temperatura sopra la quale, in comfort, il climatizzatore raffresca (25 °C all&#x27;inizio).</td></tr>
+<tr><td data-label="Parola" class="align-left">Regola</td><td data-label="Che cosa vuol dire" class="align-left">Un automatismo già previsto dal motore, con interruttore e valori; dall&#x27;app non se ne creano di nuovi.</td></tr>
+<tr><td data-label="Parola" class="align-left">Regolazione automatica del clima</td><td data-label="Che cosa vuol dire" class="align-left">In comfort, il controllo ogni minuto dei climatizzatori secondo il sensore della stanza.</td></tr>
+<tr><td data-label="Parola" class="align-left">Rendiconto Excel</td><td data-label="Che cosa vuol dire" class="align-left">Il file scaricabile con riepilogo, consumi per giorno, ora e dispositivo e importi.</td></tr>
+<tr><td data-label="Parola" class="align-left">Riscaldamento abilitato</td><td data-label="Che cosa vuol dire" class="align-left">La caldaia può scaldare secondo il termostato; non vuol dire che stia scaldando adesso.</td></tr>
+<tr><td data-label="Parola" class="align-left">Setpoint</td><td data-label="Che cosa vuol dire" class="align-left">La temperatura desiderata, diversa da quella misurata.</td></tr>
+<tr><td data-label="Parola" class="align-left">Simulatore</td><td data-label="Che cosa vuol dire" class="align-left">La pagina, solo per amministratori, per provocare eventi sugli appartamenti dimostrativi.</td></tr>
+<tr><td data-label="Parola" class="align-left">Soggiorno</td><td data-label="Che cosa vuol dire" class="align-left">Il periodo fra arrivo e partenza di una prenotazione conosciuta dall&#x27;app.</td></tr>
+<tr><td data-label="Parola" class="align-left">W</td><td data-label="Che cosa vuol dire" class="align-left">La potenza in questo istante; non è il consumo del giorno.</td></tr>
 </tbody></table></div>
 </section>
 <section aria-labelledby="13-segnalare-un-problema-c20ae451">
@@ -2133,7 +2189,8 @@ dati a termine.</p>
 </ul>
 </section>
     </article>
-    <footer class="document-footer"><span>DOMHOUSE · Guida utente</span><a href="#guida">Torna all’inizio ↑</a></footer>
+    <footer class="document-footer"><span>DOMHOUSE · Guida utente</span><a href="#guida">Torna all'inizio ↑</a></footer>
+    <a class="to-index" href="#indice">Indice ↑</a>
   </main>
   <script>
   (() => {
@@ -2144,6 +2201,7 @@ dati a termine.</p>
     document.getElementById('print-guide').addEventListener('click', () => window.print());
     const links = [...document.querySelectorAll('.toc a')];
     const headings = links.map(a => document.getElementById(a.hash.slice(1))).filter(Boolean);
+    const topItems = [...document.querySelectorAll('.toc > details > ol > li')];
     let scheduled = false;
     const update = () => {
       scheduled = false;
@@ -2152,6 +2210,13 @@ dati a termine.</p>
       for (const a of links) {
         if (current && a.hash === '#' + current.id) a.setAttribute('aria-current', 'location');
         else a.removeAttribute('aria-current');
+      }
+      for (const li of topItems) li.classList.toggle('is-active', Boolean(li.querySelector('a[aria-current=location]')));
+      const active = document.querySelector('.toc a[aria-current=location]');
+      if (active && !compact.matches) {
+        const box = document.querySelector('.toc').getBoundingClientRect();
+        const r = active.getBoundingClientRect();
+        if (r.top < box.top + 40 || r.bottom > box.bottom - 40) active.scrollIntoView({ block: 'center' });
       }
       const max = document.documentElement.scrollHeight - innerHeight;
       document.getElementById('reading-progress').style.width = (max > 0 ? Math.min(100, Math.max(0, scrollY / max * 100)) : 100) + '%';
