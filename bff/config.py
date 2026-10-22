@@ -66,6 +66,13 @@ class Settings:
         return self.app_env == "dev"
 
 
+def european_location(location: str) -> bool:
+    """D-180: the model runs in the European Union: the multi-region eu or a European region (europe-…); never global
+    nor us, for any model and any environment."""
+    v = (location or "").strip().lower()
+    return v == "eu" or v.startswith("europe-")
+
+
 @lru_cache
 def get_settings() -> Settings:
     e = os.environ.get

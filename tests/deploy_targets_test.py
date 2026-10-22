@@ -96,3 +96,17 @@ def test_a_manifest_that_is_not_the_targets_stops_before_publishing(repo):
     out, calls, _ = repo("staging")
     assert out.returncode != 0 and "does not use the database staging" in out.stderr
     assert "gcloud" not in calls                                          # nothing published
+
+
+def test_a_model_outside_europe_stops_before_publishing(repo):
+    """D-180: deploy.sh reads AI_LOCATION in the TARGET's manifest and stops on global, us or anything not European."""
+    prod = repo.root / "bff" / "cloudrun.yaml"
+    original = prod.read_text(encoding="utf-8")
+    for bad in ("global", "us"):
+        prod.write_text(original.replace('value: "eu"', f'value: "{bad}"', 1), encoding="utf-8")
+        out, calls, _ = repo("prod")
+        assert out.returncode != 0 and f"AI_LOCATION {bad} is not European" in out.stderr
+        assert "gcloud" not in calls                                      # nothing published
+    prod.write_text(original.replace('value: "eu"', 'value: "europe-west1"', 1), encoding="utf-8")
+    out, _, _ = repo("prod")
+    assert out.returncode == 0, out.stderr

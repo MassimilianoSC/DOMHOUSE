@@ -53,6 +53,8 @@ spec:
               value: staging
             - name: FCM_ENABLED            # push on in staging (D-39): needed to test checklist section H; FCM is free
               value: "true"
+            - name: AI_LOCATION            # D-180: the model in the EU, eu or europe-… (deploy.sh and the BFF check)
+              value: "eu"
             - name: AI_DEMOS               # P-60 step 9 (D-132): demonstration apartments with the real assistant;
               value: "true"             # needs roles/aiplatform.user on the BFF's account
             - name: GCP_PROJECT_ID

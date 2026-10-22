@@ -37,6 +37,12 @@ esac
 grep -q "^  name: ${SERVICE}\$" "${MANIFEST}" || { echo "${MANIFEST} is not the service ${SERVICE}" >&2; exit 1; }
 grep -A1 "name: FIRESTORE_DATABASE" "${MANIFEST}" | grep -qF "${DATABASE}" \
   || { echo "${MANIFEST} does not use the database ${DATABASE}" >&2; exit 1; }
+# D-180: the model's location is eu or a European region, never global nor us (the BFF refuses to start otherwise)
+AI_LOC="$(grep -A1 "name: AI_LOCATION" "${MANIFEST}" | sed -n 's/^ *value: *"\{0,1\}\([^" ]*\)"\{0,1\}.*/\1/p' | head -1)"
+case "${AI_LOC:-eu}" in
+  eu|europe-*) ;;
+  *) echo "${MANIFEST}: AI_LOCATION ${AI_LOC} is not European (D-180: eu or europe-…, never global nor us)" >&2; exit 1 ;;
+esac
 echo "ambiente ${TARGET}: servizio ${SERVICE}, database ${DATABASE}, sito ${SITE}"
 
 step() { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }

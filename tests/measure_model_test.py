@@ -161,3 +161,18 @@ def test_claude_on_vertex_and_the_final_table(monkeypatch, capsys):
     assert "| claude-haiku-5-5 | anthropic europe-west1 | sì | 1 | " in out and "| 0.00150 € | – |" in out
     monkeypatch.setattr("sys.argv", ["measure_model.py", "--endpoint", "anthropic"])            # a model is needed
     assert mm.main() == 2
+
+
+def test_a_location_outside_europe_is_said_diagnosis_only(monkeypatch, capsys):
+    mm = _script()
+    from bff import net_phase
+
+    async def fake_post(url, json=None, headers=None, connect_s=None, read_s=None, network=None):
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}], "usage": {}})
+    monkeypatch.setattr(net_phase, "post_traced", fake_post)
+    monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
+    monkeypatch.setenv("GCP_PROJECT_ID", "p")
+    monkeypatch.setattr("sys.argv", ["measure_model.py", "-n", "1", "--location", "global"])
+    assert mm.main() == 0
+    out = capsys.readouterr().out
+    assert "global è escluso dagli ambienti (D-180" in out and "(global: escluso dagli ambienti, D-180; solo diagnosi)" in out

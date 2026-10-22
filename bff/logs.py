@@ -47,3 +47,7 @@ def info(msg: str, **fields) -> None:
 
 def warn(msg: str, **fields) -> None:
     log.warning(msg, extra={"fields": fields})
+
+
+def error(msg: str, **fields) -> None:
+    log.error(msg, extra={"fields": fields})

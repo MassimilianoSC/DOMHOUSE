@@ -141,3 +141,28 @@ def test_set_claims_writes_one_environment_and_keeps_the_flat_ones_for_the_old_b
     # what each BFF reads after the migration: the old one the flat claims, the new one its own environment's
     migrated = sc.migrated(flat)
     assert (migrated["tenant_id"], migrated["role"]) == (TENANT, "admin") and migrated["prod"]["role"] == "admin"
+
+
+# -------- D-180: the model in the European Union, for every model and environment --------
+def test_the_model_location_must_be_european():
+    import dataclasses
+
+    import pytest
+
+    from bff import main
+    from bff.config import european_location, get_settings
+    assert european_location("eu") and european_location("europe-west1") and european_location(" Europe-west8 ")
+    for bad in ("global", "us", "us-central1", "asia-east1", ""):
+        assert not european_location(bad)
+        with pytest.raises(SystemExit, match="is not European"):
+            main.check_ai_location(dataclasses.replace(get_settings(), ai_location=bad))
+    main.check_ai_location(dataclasses.replace(get_settings(), ai_location="eu"))          # starts
+
+
+def test_both_manifests_say_eu():
+    from pathlib import Path
+    import re
+    root = Path(__file__).resolve().parent.parent
+    for name in ("cloudrun.yaml", "cloudrun.staging.yaml"):
+        text = (root / "bff" / name).read_text(encoding="utf-8")
+        assert re.search(r"name: AI_LOCATION[^\n]*\n\s*value: \"eu\"", text), name

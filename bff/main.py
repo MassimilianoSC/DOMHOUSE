@@ -39,10 +39,22 @@ class NoStoreMiddleware:
         await self.app(scope, receive, send_with_header)
 
 
+def check_ai_location(settings) -> None:
+    """D-180: the BFF does not start with a model outside the European Union (AI_LOCATION not eu nor europe-…)."""
+    from .config import european_location
+    if not european_location(settings.ai_location):
+        from .logs import error
+        message = (f"AI_LOCATION «{settings.ai_location}» is not European (D-180: eu or europe-…, never global nor us): "
+                   f"the BFF does not start")
+        error("model location refused", ai_location=settings.ai_location)
+        raise SystemExit(message)
+
+
 def create_app() -> FastAPI:
     setup_logging()
     setup_engine_logging(None)    # the demonstration apartments' engine logs too, with apartment_id in each line
     settings = get_settings()
+    check_ai_location(settings)
     push.register()
 
     @asynccontextmanager

@@ -322,10 +322,15 @@ def main() -> int:
         print(f"Credenziali non disponibili ({type(exc).__name__}): gcloud auth application-default login, poi "
               f"gcloud auth application-default set-quota-project {project}")
         return 2
+    european = a.location == "eu" or a.location.startswith("europe-")
+    excluded = "" if european else f" ({a.location}: escluso dagli ambienti, D-180; solo diagnosi)"
+    if excluded:
+        print(f"Attenzione: {a.location} è escluso dagli ambienti (D-180: eu o europe-…); questa misura serve solo "
+              f"alla diagnosi.")
     rows, total_cost = [], 0.0
     for model in models:
         for reasoning in reasonings:
-            label = f"{model} · reasoning {reasoning} · {kind} {a.location}"
+            label = f"{model} · reasoning {reasoning} · {kind} {a.location}{excluded}"
             if kind == "nativo":
                 url = native_url(project, a.location, model)
             elif kind == "anthropic":
@@ -385,7 +390,7 @@ def main() -> int:
         top = f"{p95(times):.1f} s" if times else "–"
         per = f"{cost / len(times):.5f} €" if times else "–"
         js = f"{valid} su {len(times)}" if a.no_tools else "–"
-        print(f"| {model} | {kind} {a.location} | {tools_label} | {timeouts} | {med} | {top} | {per} | {js} |")
+        print(f"| {model} | {kind} {a.location}{excluded} | {tools_label} | {timeouts} | {med} | {top} | {per} | {js} |")
     return 0
 
 

@@ -668,6 +668,11 @@ proposte vale solo quando ce ne sono: prima, il modello ha fino a circa 26 s; l'
 oltre i 27 s della domanda, e un comando non ancora confermato si annuncia con «Comando inviato: …, l'esito arriva
 nell'app».
 
+Località del modello (D-180): sempre nell'Unione europea, `AI_LOCATION` `eu` o una regione `europe-…`, per qualunque
+modello e ambiente; `global` e `us` sono esclusi. Il BFF non parte con un altro valore (riga «model location refused»
+nel log, livello ERROR) e `scripts/deploy.sh` si ferma prima di pubblicare se il manifesto dell'ambiente ne ha un
+altro. I due manifesti dicono `eu`.
+
 Fasi di un fallimento (lotto 30): le chiamate del BFF ad Agent Platform hanno un tempo di connessione separato
 (`AI_CONNECT_TIMEOUT_S`, 5 s per DNS, TCP e TLS) da quello della risposta (`AI_TIMEOUT_S`, 25 s), e ogni
 «assistant model call failed» ha `phase`: `DNS`, `connessione`, `TLS`, `invio della richiesta`, `attesa della risposta`

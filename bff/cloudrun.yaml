@@ -52,6 +52,8 @@ spec:
               value: "(default)"
             - name: FCM_ENABLED            # push on, as in staging since D-39 (publish with VITE_FCM_ENABLED=true)
               value: "true"
+            - name: AI_LOCATION            # D-180: the model in the EU, eu or europe-… (deploy.sh and the BFF check)
+              value: "eu"
             - name: AI_DEMOS               # P-60 step 9 (D-132): demonstration apartments with the real assistant;
               value: "true"             # needs roles/aiplatform.user on the BFF's account
             - name: GCP_PROJECT_ID
