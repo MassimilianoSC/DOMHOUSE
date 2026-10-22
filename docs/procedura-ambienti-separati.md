@@ -270,14 +270,26 @@ ripetere il comando del punto 1.
 
 3. Abilitazione dei modelli Claude (console, committente): Vertex AI › Model Garden › cerca «Claude Haiku 5.5» › apri
 la scheda › «Abilita» (accettazione delle condizioni); lo stesso per «Claude Sonnet 5.5». Verifica: la misura
-`scripts/measure_model.py --endpoint anthropic --location europe-west1 --model claude-haiku-5-5` non risponde più
+`scripts/measure_model.py --endpoint anthropic --location eu --model claude-haiku-5-5` non risponde più
 «endpoint HTTP 403» né «404».
 
-4. Quota (console, committente): IAM e amministrazione › Quote e limiti di sistema › filtro «aiplatform.googleapis.com»
-e «anthropic» (oppure la regione `europe-west1`): le quote di richieste al minuto per i modelli Claude nella regione
-scelta non devono essere 0; se lo sono, chiedere l'aumento dalla stessa pagina.
+4. Località e quota. Secondo la documentazione di Google (letta il 22 ottobre 2026), Claude Haiku 5.5 e Claude Sonnet
+5.5 esistono solo nella multi-regione europea `eu` (elaborazione nell'Unione europea), nella multi-regione `us` e
+sull'endpoint `global`: nessuna regione singola europea (`europe-west1` ha solo le generazioni precedenti). Le quote
+predefinite di progetto sono per famiglia di modelli e località: Haiku 5.5 in `eu` 1.500 richieste al minuto, 15
+milioni di token in ingresso e 1,5 milioni in uscita al minuto; Sonnet 5.5 in `eu` 1.250 richieste al minuto. Lettura
+dal PC (sola lettura; memoria storica, 22 ottobre 16:55):
+
+```
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud alpha services quota list --service=aiplatform.googleapis.com --consumer=projects/domotica-poc-511707 --format=json
+```
+
+Verifica: nell'elenco compaiono le metriche «EU multi-region online prediction requests per base model» con i
+bucket `anthropic-claude-haiku` e `anthropic-claude-sonnet`, senza limite esplicito (valgono le quote di famiglia
+sopra). Nella console: IAM e amministrazione › Quote e limiti di sistema › filtro «aiplatform» e «anthropic».
 
 5. Impostazioni del server per usare Claude, quando deciso: `AI_API=anthropic`, `AI_MODEL=claude-haiku-5-5` (o
-`claude-sonnet-5-5`), `AI_LOCATION=europe-west1` (o la multi-regione `eu`), prezzi `AI_PRICE_*` confermati sul
+`claude-sonnet-5-5`), `AI_LOCATION=eu` (host `aiplatform.eu.rep.googleapis.com`), prezzi `AI_PRICE_*` confermati sul
 listino ufficiale di Google prima della pubblicazione (D-143). Vanno nei manifesti della pubblicazione (M8 per lo
 staging, M12 per la produzione). Nessuna chiave da creare né da conservare.
