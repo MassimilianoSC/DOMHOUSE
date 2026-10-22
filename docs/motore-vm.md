@@ -313,7 +313,11 @@ Risultato atteso: le impostazioni in vigore, oppure «tutte ai valori predefinit
   50 domande al giorno raggiunto per questo appartamento: riprova domani»;
 - `DEMO_VARIANT` (`auto`, `vuoto`, `occupato`; predefinito `auto`; solo con `CONNECTOR=simulated`): variante del
   dimostrativo al primo avvio dell'appartamento (`vuoto` = nessun ospite, casa fredda; `occupato` = soggiorno in corso;
-  `auto` = la regola di prima, «bologna» nell'identificativo); conta solo al primo avvio, poi i dati restano (P-72).
+  `auto` = la regola di prima, «bologna» nell'identificativo); conta solo al primo avvio, poi i dati restano (P-72);
+- `ASSISTANT_CONFIRM` (`ospiti`, `sempre`, `multiple`; predefinito `ospiti`): quando l'assistente chiede conferma prima
+  di agire: `ospiti` = con ospiti presenti per spegnere clima o caldaia o cambiare modalità, e per due o più azioni
+  insieme (D-154, D-162); `sempre` = per ogni azione, programmazioni escluse; `multiple` = solo per due o più azioni
+  insieme, anche con ospiti. Non esiste «mai».
 
 Le impostazioni del server (nei manifesti, non sulla VM): `AI_MONTHLY_CAP_EUR` 20, `AI_ALERT_PERCENT` 80, i prezzi per
 milione di token 0.83, 4.13 e 0.08 € (da aggiornare il 1° gennaio 2027), `AI_DEMOS` per i dimostrativi; tutto in

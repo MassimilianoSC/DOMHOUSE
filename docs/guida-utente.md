@@ -91,6 +91,9 @@ un sistema che non è il suo, né ricevere le prenotazioni di una struttura altr
 - **Minuti di presenza dopo il check-out**: nuovo valore nella regola «Risparmio al check-out».
 - **Sul telefono** le schede degli appartamenti stanno tutte nello schermo: non serve più restringere la pagina con le
   dita (dal lotto 26).
+- **Temperature delle modalità regolabili** (sezione 5, Regole): comfort, eco e raffrescamento per appartamento;
+  con il sensore della stanza, in comfort il climatizzatore scalda o raffresca da solo.
+- **Caldaia senza sensore**: non si accende più da sola; a casa vuota l'antigelo non è attivo e arriva una notifica.
 - **Due registri con nomi diversi**: in Amministrazione «Registro dell'organizzazione» (chi ha fatto cosa nella tua
   organizzazione), in Organizzazioni «Registro della piattaforma» (solo per i gestori della piattaforma). Prima si
   chiamavano entrambi «Registro attività».
@@ -250,7 +253,10 @@ quali appartamenti vedi.
   **«Riscaldamento abilitato» / «Riscaldamento disabilitato»** e il pulsante «Attiva» / «Disattiva»: il termostato del
   sistema la accende e la spegne da solo intorno alla temperatura voluta (si vede dalle Decisioni), e se ha un misuratore
   che segna più di 30 W compare «sta scaldando ora». A casa vuota l'antigelo la accende sotto la soglia anche se è
-  disabilitata.
+  disabilitata. Senza un sensore di temperatura collegato la caldaia segue solo i comandi manuali: in comfort ed eco
+  non si accende da sola, e a casa vuota l'antigelo non è attivo: nelle Decisioni compare «sensore di temperatura
+  mancante: antigelo non attivo» e arriva la notifica «<appartamento>: antigelo non attivo» (categoria «Dispositivi e
+  istanza offline»).
 - Sotto ogni comando compare l'esito: «in corso», poi «eseguito», oppure l'errore. Un dispositivo offline ha i comandi
   disattivati.
 - Menu ⋮ di un dispositivo > «Rinomina o sposta» per cambiare nome o stanza.
@@ -342,7 +348,13 @@ prenotazione viene annullata dopo che l'appartamento è già stato preparato per
 Le regole automatiche dell'appartamento, con interruttore e valori. Quelle con «Non modificabile» non si cambiano.
 Le otto regole (valori di partenza e limiti):
 - **Finestra aperta spegne il clima**: dopo 5 minuti di finestra aperta (da 1 a 30).
-- **Limiti del setpoint**: la temperatura chiesta resta fra 16 e 24 °C.
+- **Limiti del setpoint**: la temperatura chiesta resta fra 16 e 24 °C. Qui stanno anche le temperature delle tre
+  modalità, regolabili per appartamento (dal lotto 30): comfort 21 °C (da 16 a 26), eco 18 °C (da 10 a 22, non sopra
+  comfort), raffrescamento 25 °C (da 22 a 28). In comfort il climatizzatore scalda quando la stanza è sotto la
+  temperatura di comfort e raffresca quando è sopra quella di raffrescamento, usando il sensore della stessa stanza;
+  senza sensore nella stanza il sistema non lo comanda da solo (solo i comandi manuali) e lo scrive nelle Decisioni
+  una volta («sensore di temperatura mancante: regolazione automatica disattivata»). In eco il climatizzatore è spento
+  e la caldaia tiene la temperatura di eco; in casa vuota la caldaia tiene la temperatura dell'antigelo.
 - **Antigelo a casa vuota**: accende la caldaia sotto 8 °C (da 5 a 12), anche se è disabilitata.
 - **Antimuffa a casa vuota**: avviso sopra il 65 % di umidità (da 50 a 80), una volta al giorno.
 - **Pre-arrivo**: prepara l'appartamento 2 ore prima del check-in (da 0 a 6).
