@@ -1,29 +1,28 @@
-"""The assistant with a real model (P-60 step 9, D-132, D-143, D-144): POST /ask answered by a model that proposes and
-the engine's tools that validate and act, through the same rules and limits as the app.
+"""The assistant with a real model (P-60 step 9, D-132, D-143, D-144, D-182): POST /ask answered by a model that
+proposes, and the engine that validates and acts, through the same rules and limits as the app.
 
-The model (OpenAI-compatible chat with tools) is reached through the BFF's POST /internal/ai/chat (bff/ai_gateway.py:
-monthly cap of the project, 80 % alert, prices), never directly: ModelClient below, configured by MODEL_BASE_URL. Without
-it the engine keeps the simulated keyword assistant (core.ApartmentEngine._resolve_ask), as the conformance suite and the
-CI run it.
+The model is reached through the BFF's POST /internal/ai/chat (bff/ai_gateway.py: gemini-3.8-flash on Vertex's native
+endpoint in the EU, reasoning off, monthly cap, prices, the twin request after 6 s), never directly: ModelClient below,
+configured by MODEL_BASE_URL, which refuses an answer without a European X-AI-Location (D-181). Without it the engine
+keeps the simulated keyword assistant (core.ApartmentEngine._resolve_ask), as the conformance suite and the CI run it.
 
-How one question goes:
+How one question goes (D-182: no tools, one call):
 1. ASK_DAILY_LIMIT (50) questions a day per apartment (the apartment's local day), counted before calling the model.
-2. The request already carries the apartment's state (mode, occupancy, devices and their state: lot 28 a), so a
-   command needs no reading turn; the model can still read with tools (consumption, decisions, schedule, the state
-   again) and PROPOSES actions with tools (mode, a device command, a scheduled action): each proposal is validated at
-   once and answered to the model, but nothing is executed while the model talks. A turn made only of valid
-   proposals ends the conversation (lot 28 b): the engine writes the outcome itself, no final call to the model.
-3. When the model has finished, the engine decides (D-132 point 2, D-144): with guests in, switching off a climate or
-   a boiler or changing the mode needs the manager's approval; two or more actions together need it too, one approval
-   per action, queued. Otherwise the commands run as automatic ones (actor "assistant", within the limits, R6).
+2. The request carries the apartment's state, the devices with their state, the recent decisions and the planned
+   actions, and asks a JSON object in the text: {"risposta": …, "azioni": […]} with three forms of action (a mode, a
+   device command, a scheduled action). parse_answer checks its shape; a JSON not valid runs nothing and the answer is
+   the apartment's state.
+3. Each action goes through the engine's own checks (the former tools: devices, capabilities, limits, time); a wrong one
+   is said in the answer («Non fatto: …»). Then the engine decides (D-132 point 2, D-144, D-162 ASSISTANT_CONFIRM,
+   D-170): with guests in, switching off a climate or a boiler or changing the mode needs the manager's approval; two
+   or more actions together need it too, one approval per action, queued; a scheduled one asks when guests are in at
+   its time. Otherwise the commands run as automatic ones (actor "assistant", within the limits, R6).
 4. The engine writes the outcome itself after the model's text (fixed rule 2: "done" only with acked): "Fatto: …" for
-   an acked command, "Comando inviato: …, l'esito arriva nell'app" when it is not final within ACK_WAIT_S, "Serve la tua
-   approvazione: …" for each approval, "Programmato: …" for a scheduled action.
-5. The whole answer within ASK_TIMEOUT_S (inside the contract's 30 s). Lot 28 c: the model's calls must end by
-   ASK_TIMEOUT_S - APPLY_RESERVE_S (the reserve is for running the proposals and waiting for their outcome); a call
-   that would go beyond is cut there, no new call starts with less than MIN_CALL_S left, and what was proposed so far
-   is applied and answered; with nothing proposed, status failed, reason timeout, at once rather than at 28 s.
-Fixed rule 1: no guest data reaches the model: the tools give states, consumption, schedule and decisions, never the
+   an acked command, "Comando inviato: …, l'esito arriva nell'app" when it is not final in time, a question for each
+   approval, "Programmato: …" for a scheduled action.
+5. The whole answer within ASK_TIMEOUT_S (inside the contract's 30 s): the model has all of it but
+   NO_PROPOSAL_RESERVE_S; beyond, status failed, reason timeout, at once.
+Fixed rule 1: no guest data reaches the model: the state has devices, consumption, schedule and decisions, never the
 bookings' people (the engine has none of them anyway: names, emails and phones stay with the BFF).
 """
 import asyncio
@@ -31,12 +30,9 @@ import json
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-MAX_TURNS = 6                 # model calls for one question (reads, then the answer)
 ASK_TIMEOUT_S = 28.0          # the contract's 30 s, with a margin for saving and the app's polling
 ACK_WAIT_S = 10.0             # a command's outcome is final within 10 s (contract)
-APPLY_RESERVE_S = ACK_WAIT_S + 1.0    # lot 28 c: kept for running the proposals and waiting for their outcome
 NO_PROPOSAL_RESERVE_S = 2.0   # C-10 layer 2: with nothing proposed yet, only this is kept (the model gets ~25 s)
-MIN_CALL_S = 4.0              # lot 28 c: no new model call with less than this left in the model's budget
 CONNECT_TIMEOUT_S = 5.0       # lot 30: DNS, TCP and TLS towards the BFF, apart from waiting for the answer
 
 
@@ -45,9 +41,12 @@ def european_location(location: str | None) -> bool:
     one counts as not European."""
     v = (location or "").strip().lower()
     return v == "eu" or v.startswith("europe-")
-PROPOSALS = {"cambia_modalita", "comanda_dispositivo", "programma"}
 TIMEOUT_ANSWER = "Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app."
 TEMPERATURE = 0.2
+
+
+def fmt_c(value) -> str:
+    return f"{value:g} °C".replace(".", ",")
 # D-154, decision 55: the modes in the manager's sentences by their Italian names: «casa vuota», not the contract's
 # «empty» nor «vuoto», which is the occupancy (vuoto / occupato / prenotato)
 MODE_NAMES = {"comfort": "comfort", "eco": "eco", "empty": "casa vuota"}
@@ -59,14 +58,59 @@ Regole fisse, sempre:
    consumi, programmazioni e decisioni.
 2. Non dire mai che un'azione è stata fatta o eseguita: dopo la tua risposta il sistema scrive da solo l'esito di ogni
    azione. Di' solo che cosa hai chiesto di fare.
-3. Non inventare stati, valori o motivi: se gli strumenti non te li danno, rispondi «Non lo so» e rimanda all'app.
-4. Per le domande «perché …?» leggi le decisioni e spiega con quelle.
+3. Non inventare stati, valori o motivi: se lo stato qui sotto non li dice, rispondi «Non lo so» e rimanda all'app.
+4. Per le domande «perché …?» usa le decisioni recenti qui sotto e spiega con quelle.
 5. Puoi cambiare la modalità, comandare un dispositivo e programmare un'azione; non puoi cambiare regole, utenti o
    appartamenti. Per le regole rispondi che si scrive la richiesta nella pagina Regole dell'app, dove l'assistente
    propone la modifica e il gestore la conferma; per utenti e appartamenti, che si fa dall'app.
 Ora locale dell'appartamento: {now} (fuso {tz}). Modalità: comfort, eco, casa vuota (empty).
-Stato attuale dell'appartamento e dei dispositivi (letto adesso, non serve rileggerlo per un comando):
-{state}"""
+Stato attuale dell'appartamento, dei dispositivi, decisioni recenti e programmazioni (letti adesso):
+{state}
+Rispondi SOLO con un oggetto JSON, senza altro testo e senza blocchi di codice:
+{{"risposta": "<al massimo tre frasi per il gestore>", "azioni": [<zero o più azioni>]}}
+Ogni azione ha una di queste forme:
+{{"tipo": "modalita", "modalita": "comfort" | "eco" | "empty"}}
+{{"tipo": "comando", "device_id": "<id>", "capability": "switch" | "climate" | "heating",
+ "action": "turn_on" | "turn_off" | "set_climate" | "set_heating",
+ "params": {{"on": true | false, "mode": "cool" | "heat" | "dry" | "fan", "setpoint": <numero>, "fan": "auto" | "low" | "mid" | "high"}}}}
+{{"tipo": "programma", "quando": "<data e ora locale AAAA-MM-GGTHH:MM:SS>", "modalita": "comfort" | "eco" | "empty"}}
+{{"tipo": "programma", "quando": "<data e ora locale>", "device_id": "<id>", "capability": "...", "action": "...", "params": {{...}}}}
+Per una domanda senza azioni, «azioni» è vuoto."""
+
+
+_ACTION_KEYS = {"modalita": {"tipo", "modalita"},
+                "comando": {"tipo", "device_id", "capability", "action", "params"},
+                "programma": {"tipo", "quando", "modalita", "device_id", "capability", "action", "params"}}
+
+
+def parse_answer(text: str | None) -> dict | None:
+    """D-182: the model's JSON object (also inside a ```json block), checked in its shape: «risposta» a text, «azioni»
+    a list of the three forms with no other keys. None = not valid: nothing of it is run."""
+    raw = (text or "").strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1] if "\n" in raw else ""
+        raw = raw.rsplit("```", 1)[0].strip()
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("risposta"), str):
+        return None
+    actions = data.get("azioni", [])
+    if not isinstance(actions, list):
+        return None
+    for a in actions:
+        if not isinstance(a, dict) or a.get("tipo") not in _ACTION_KEYS or not set(a) <= _ACTION_KEYS[a["tipo"]]:
+            return None
+        if "params" in a and not isinstance(a["params"], dict):
+            return None
+    return {"risposta": data["risposta"], "azioni": actions}
+
+
+def as_tool(action: dict) -> tuple[str, dict]:
+    """An action of the JSON -> the engine's own validator that used to be a tool (the same checks as before)."""
+    args = {k: v for k, v in action.items() if k != "tipo"}
+    return {"modalita": "cambia_modalita", "comando": "comanda_dispositivo", "programma": "programma"}[action["tipo"]], args
 
 
 def _fn(name: str, description: str, properties: dict | None = None, required: list[str] | None = None) -> dict:
@@ -169,7 +213,10 @@ class ModelClient:
             raise ModelRefused("model_unavailable", "L'assistente non è disponibile ora, riprova più tardi") from None
 
     async def chat(self, messages: list[dict], tools: list[dict]) -> dict:
-        return await asyncio.to_thread(self._post, {"messages": messages, "tools": tools, "temperature": TEMPERATURE})
+        body = {"messages": messages, "temperature": TEMPERATURE}
+        if tools:
+            body["tools"] = tools
+        return await asyncio.to_thread(self._post, body)
 
 
 class Assistant:
@@ -207,53 +254,66 @@ class Assistant:
             ask.update(status="failed", reason="daily_limit",
                        answer=f"Limite di {limit} domande al giorno raggiunto per questo appartamento: riprova domani.")
             return
-        tz = ZoneInfo(self.e.timezone)
-        now = utcnow().astimezone(tz).strftime("%Y-%m-%d %H:%M")
-        state = json.dumps({"appartamento": self.tool("leggi_appartamento", {}, []),
-                            **self.tool("leggi_dispositivi", {}, [])}, ensure_ascii=False, default=str)
-        messages = [{"role": "system", "content": SYSTEM_PROMPT.format(now=now, tz=self.e.timezone, state=state)},
-                    {"role": "user", "content": ask["text"]}]
-        proposals: list[dict] = []
-        text = ""
+        messages = self.messages(ask["text"])
         loop = asyncio.get_running_loop()
         end = loop.time() + ASK_TIMEOUT_S
-        for _ in range(MAX_TURNS):
-            # lot 28 c, C-10 layer 2: the reserve for running proposals only once there are some
-            left = end - (APPLY_RESERVE_S if proposals else NO_PROPOSAL_RESERVE_S) - loop.time()
-            if left < MIN_CALL_S:
-                break
-            try:
-                answer = await asyncio.wait_for(self.client.chat(messages, TOOLS), timeout=left)
-            except TimeoutError:
-                break
-            msg = (answer.get("choices") or [{}])[0].get("message") or {}
-            calls = msg.get("tool_calls") or []
-            if not calls:
-                text = (msg.get("content") or "").strip()
-                break
-            messages.append({"role": "assistant", "content": msg.get("content"), "tool_calls": calls})
-            valid_proposals_only = True
-            for call in calls:
-                fn = call.get("function") or {}
-                try:
-                    args = json.loads(fn.get("arguments") or "{}")
-                except ValueError:
-                    args = {}
-                result = self.tool(fn.get("name", ""), args if isinstance(args, dict) else {}, proposals)
-                if fn.get("name") not in PROPOSALS or "errore" in result:
-                    valid_proposals_only = False
-                messages.append({"role": "tool", "tool_call_id": call.get("id", ""),
-                                 "content": json.dumps(result, ensure_ascii=False, default=str)})
-            if valid_proposals_only:                 # lot 28 b: the engine writes the outcome, no final call
-                text = (msg.get("content") or "").strip()
-                break
-        if not proposals and not text:               # lot 28 c: out of time with nothing to do or say
-            ask.update(status="failed", reason="timeout", answer=TIMEOUT_ANSWER)
+        # D-182: one call, no tools; C-10 layer 2: the model gets all but NO_PROPOSAL_RESERVE_S (the BFF's twin after 6 s)
+        answer = await asyncio.wait_for(self.client.chat(messages, []),
+                                        timeout=max(end - NO_PROPOSAL_RESERVE_S - loop.time(), 0.01))
+        msg = (answer.get("choices") or [{}])[0].get("message") or {}
+        data = parse_answer(msg.get("content"))
+        if data is None:                             # D-182: not the JSON asked: the state, nothing run
+            from . import log
+            log.warn("assistant fallback", apartment_id=self.e.apartment_id, cause="json_invalid")
+            ask["answer"] = "Non ho capito la risposta dell'assistente: non ho eseguito niente. " + self.state_text()
+            if ask["status"] == "pending":
+                ask["status"] = "answered"
             return
-        lines = await self.apply(proposals, ask, actor, until=end - 1.0)
+        text = data["risposta"].strip()
+        proposals: list[dict] = []
+        errors: list[str] = []
+        for action in data["azioni"]:
+            name, args = as_tool(action)
+            result = self.tool(name, args, proposals)     # the same checks as before (limits, devices, time)
+            if "errore" in result:
+                errors.append(f"Non fatto: {result['errore']}.")
+        lines = errors + await self.apply(proposals, ask, actor, until=end - 1.0)
         ask["answer"] = "\n".join([t for t in [text, *lines] if t]) or "Non lo so: guarda nell'app."
         if ask["status"] == "pending":
             ask["status"] = "answered"
+
+    def messages(self, text: str) -> list[dict]:
+        """The request (D-182): the system prompt with the state, the recent decisions and the planned actions, then the
+        question. The same function feeds scripts/measure_model.py."""
+        from .core import utcnow
+        now = utcnow().astimezone(ZoneInfo(self.e.timezone)).strftime("%Y-%m-%d %H:%M")
+        state = json.dumps({"appartamento": self.tool("leggi_appartamento", {}, []),
+                            **self.tool("leggi_dispositivi", {}, []),
+                            "decisioni_recenti": self.tool("leggi_decisioni", {"quante": 10}, []).get("decisioni", []),
+                            "programmazioni": self.tool("leggi_programmazioni", {}, []).get("programmazioni", [])},
+                           ensure_ascii=False, default=str)
+        return [{"role": "system", "content": SYSTEM_PROMPT.format(now=now, tz=self.e.timezone, state=state)},
+                {"role": "user", "content": text}]
+
+    def state_text(self) -> str:
+        """The apartment in plain words: mode, occupancy, what is on, the temperatures."""
+        apt = self.e.apartment()
+        on, temps = [], []
+        for d in self.e.devices.values():
+            caps = d["capabilities"]
+            for cap in ("climate", "heating", "switch"):
+                if caps.get(cap, {}).get("on"):
+                    sp = caps[cap].get("setpoint")
+                    on.append(d["label"] + (f" ({fmt_c(sp)})" if cap != "switch" and sp is not None else ""))
+            if isinstance(caps.get("temperature", {}).get("celsius"), (int, float)):
+                temps.append(f"{d['label']} {fmt_c(caps['temperature']['celsius'])}")
+        occupancy = {"occupied": "occupato", "reserved": "prenotato", "vacant": "vuoto"}.get(apt.get("occupancy"),
+                                                                                             apt.get("occupancy"))
+        parts = [f"Modalità {MODE_NAMES.get(apt.get('mode'), apt.get('mode'))}, appartamento {occupancy}."]
+        parts.append(f"Accesi: {', '.join(on)}." if on else "Nessun dispositivo acceso.")
+        if temps:
+            parts.append(f"Temperature: {', '.join(temps)}.")
+        return " ".join(parts)
 
     # ---- tools ----------------------------------------------------------------------------------------------------
     def tool(self, name: str, args: dict, proposals: list[dict]) -> dict:

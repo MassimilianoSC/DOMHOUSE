@@ -1,6 +1,8 @@
-"""The assistant with a model (P-60 step 9, D-132, D-143, D-144), the model replaced by a script of answers: reads,
-proposals validated by the engine, approvals with guests in or for actions together (one each, queued), the outcome
-written by the engine ("Fatto" only when acked), the daily limit, the monthly cap, the time limit, no guest data.
+"""The assistant with a model (P-60 step 9, D-132, D-143, D-144; D-182: no tools, the answer and the actions as a JSON
+object in the text, validated by the engine), the model replaced by a script of answers: the state, the recent decisions
+and the planned actions in the request; actions checked by the engine's own rules; approvals with guests in or for
+actions together (one each, queued); the outcome written by the engine ("Fatto" only when acked); an invalid JSON =
+the state, nothing run; the daily limit, the monthly cap, the time limit; no guest data.
 
 Run: python -m pytest engine/tests -q
 """
@@ -25,16 +27,25 @@ def quick(monkeypatch):
         monkeypatch.setattr(simulated, name, 0)
 
 
-def call(name, **args):
-    return {"id": f"call-{name}", "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}
-
-
-def tools(*calls):
-    return {"choices": [{"message": {"role": "assistant", "content": None, "tool_calls": list(calls)}}]}
-
-
 def says(text):
     return {"choices": [{"message": {"role": "assistant", "content": text}}]}
+
+
+def js(risposta, *azioni):
+    """The model's answer as D-182 asks it: a JSON object in the text."""
+    return says(json.dumps({"risposta": risposta, "azioni": list(azioni)}, ensure_ascii=False))
+
+
+def cmd(device_id, capability, action, **params):
+    return {"tipo": "comando", "device_id": device_id, "capability": capability, "action": action, "params": params}
+
+
+def mode(m):
+    return {"tipo": "modalita", "modalita": m}
+
+
+def plan(quando, m):
+    return {"tipo": "programma", "quando": quando, "modalita": m}
 
 
 class Script:
@@ -70,29 +81,40 @@ def ask(e, text):
     return asyncio.run(main())
 
 
-def test_a_read_and_a_command_done_says_fatto_only_when_acked():
-    script = Script(tools(call("leggi_dispositivi")),
-                    tools(call("comanda_dispositivo", device_id=PRESA, capability="switch", action="turn_on")),
-                    says("mai chiesta"))
+def test_one_call_without_tools_and_fatto_only_when_acked():
+    script = Script(js("Accendo la stufetta.", cmd(PRESA, "switch", "turn_on")))
     e = engine(script)
     a = ask(e, "accendi la stufetta in camera")
     assert a["status"] == "answered" and a["approval_id"] is None
-    assert a["answer"] == "Fatto: accendere presa stufetta camera."            # lot 28 b: no final call
-    assert len(script.sent) == 2
-    cmd = e.commands[a["actions"][0]["command_id"]]
-    assert cmd["status"] == "acked" and e.devices[PRESA]["capabilities"]["switch"]["on"] is True
+    assert a["answer"] == "Accendo la stufetta.\nFatto: accendere presa stufetta camera."
+    assert len(script.sent) == 1 and script.sent[0]["tools"] == []                # D-182: no tools
+    cmd_ = e.commands[a["actions"][0]["command_id"]]
+    assert cmd_["status"] == "acked" and e.devices[PRESA]["capabilities"]["switch"]["on"] is True
     assert e.decisions[-1]["actor"] == "assistant" and "Richiesta all'assistente" in e.decisions[-1]["reasoning"]
-    first = script.sent[0]
-    system = first["messages"][0]["content"]
+    system = script.sent[0]["messages"][0]["content"]
     assert "Non conosci e non chiedi dati degli ospiti" in system and "Non dire mai che un'azione è stata fatta" in system
-    assert {t["function"]["name"] for t in first["tools"]} >= {"leggi_decisioni", "comanda_dispositivo", "programma"}
-    devices = json.loads(script.sent[1]["messages"][-1]["content"])["dispositivi"]
-    assert {d["device_id"] for d in devices} >= {CLIMA, PRESA}
+    assert "Rispondi SOLO con un oggetto JSON" in system and '"tipo": "comando"' in system
+    assert "Stato attuale dell'appartamento" in system and PRESA in system and CLIMA in system and '"occupancy"' in system
+
+
+def test_d182_an_invalid_json_runs_nothing_and_says_the_state(monkeypatch):
+    from engine import log
+    logged = []
+    monkeypatch.setattr(log, "warn", lambda msg, **kw: logged.append((msg, kw)))
+    for bad in ("Spengo il clima.",                                              # prose
+                '{"risposta": "x", "azioni": [{"tipo": "esplodi"}]}',            # an unknown form
+                '{"risposta": "x", "azioni": [{"tipo": "comando", "device_id": "d", "rm": "-rf"}]}'):   # an unknown key
+        e = engine(Script(says(bad)))
+        a = ask(e, "spegni il clima")
+        assert a["status"] == "answered" and e.commands == {}
+        assert a["answer"].startswith("Non ho capito la risposta dell'assistente: non ho eseguito niente. Modalità ")
+    assert logged[-1] == ("assistant fallback", {"apartment_id": "apt-prova-01", "cause": "json_invalid"})
+    assert assistant.parse_answer("```json\n" + json.dumps({"risposta": "ok", "azioni": []}) + "\n```") == {
+        "risposta": "ok", "azioni": []}
 
 
 def test_with_guests_in_switching_off_the_climate_needs_an_approval():
-    script = Script(tools(call("comanda_dispositivo", device_id=CLIMA, capability="climate", action="turn_off")),
-                    says("Chiedo di spegnere il clima."))
+    script = Script(js("Chiedo di spegnere il clima.", cmd(CLIMA, "climate", "turn_off")))
     e = engine(script, occupied=True)
     a = ask(e, "spegni il clima")
     assert a["status"] == "needs_approval" and a["actions"] == []
@@ -102,7 +124,7 @@ def test_with_guests_in_switching_off_the_climate_needs_an_approval():
     assert a["answer"].endswith("Spengo climatizzatore soggiorno con ospiti presenti? Rispondi Sì o No qui sotto, "
                                 "oppure dalla pagina Approvazioni.")                 # D-154: a question in the chat
     assert e.devices[CLIMA]["capabilities"]["climate"]["on"] is True          # nothing done
-    # «Sì» in the chat is the Approvals page's own call: the same record, author and outcome
+
     async def yes():
         return e.decide(a["approval_id"], {"decision": "approve"}, "prova@hqe.it", "22222222-2222-2222-2222-222222222222")
     done = asyncio.run(yes())
@@ -111,19 +133,15 @@ def test_with_guests_in_switching_off_the_climate_needs_an_approval():
 
 
 def test_the_modes_by_their_italian_names():
-    """D-154, decision 55: «casa vuota», not the contract's «empty», in the manager's sentences."""
-    script = Script(tools(call("cambia_modalita", modalita="empty")), says("Chiedo la casa vuota."))
-    e = engine(script, occupied=True)
+    """D-154, D-158: «casa vuota», not the contract's «empty», in the manager's sentences."""
+    e = engine(Script(js("Chiedo la casa vuota.", mode("empty"))), occupied=True)
     a = ask(e, "metti la casa a vuoto")
     assert "Passo alla modalità casa vuota con ospiti presenti?" in a["answer"] and "empty" not in a["answer"]
 
 
 def test_two_actions_together_need_one_approval_each_queued():
-    script = Script(tools(call("comanda_dispositivo", device_id=PRESA, capability="switch", action="turn_on"),
-                          call("comanda_dispositivo", device_id=CLIMA, capability="climate", action="set_climate",
-                               params={"setpoint": 22})),
-                    says("Propongo due azioni."))
-    e = engine(script)                                                          # empty apartment: still two together
+    e = engine(Script(js("Propongo due azioni.", cmd(PRESA, "switch", "turn_on"),
+                         cmd(CLIMA, "climate", "set_climate", setpoint=22))))   # empty apartment: still two together
     a = ask(e, "accendi la stufetta e porta il clima a 22")
     assert a["status"] == "needs_approval" and len(e.approval_queue) == 1
     assert a["approval_id"] == e.pending_approval()["approval_id"]
@@ -131,37 +149,34 @@ def test_two_actions_together_need_one_approval_each_queued():
     assert "Confermi: climatizzatore soggiorno a 22 °C?" in a["answer"] and "Confermi: accendere " in a["answer"]
 
 
-def test_a_scheduled_action_and_a_wrong_proposal_corrected_by_the_model():
+def test_a_scheduled_action_and_a_wrong_one_said_not_done():
+    """The engine checks every action as before; with no second turn, a wrong one is said in the answer."""
     when = (core.utcnow() + timedelta(days=1)).astimezone(assistant.ZoneInfo("Europe/Rome")).strftime("%Y-%m-%dT18:00:00")
-    script = Script(tools(call("comanda_dispositivo", device_id="dev-che-non-esiste", capability="switch",
-                               action="turn_on")),
-                    tools(call("programma", quando=when, modalita="eco")),
-                    says("Metto eco domani alle 18."))
-    e = engine(script)
+    e = engine(Script(js("Metto eco domani alle 18.", cmd("dev-che-non-esiste", "switch", "turn_on"), plan(when, "eco"))))
     a = ask(e, "domani alle 18 metti eco")
-    assert "errore" in json.loads(script.sent[1]["messages"][-1]["content"])    # told the model, which corrected it
     assert a["status"] == "answered" and a["actions"][0]["type"] == "schedule"
     item = e.schedule[a["actions"][0]["schedule_id"]]
     assert item["action"] == {"type": "apartment_mode", "mode": "eco"} and item["source"] == "assistant"
+    assert "Non fatto: " in a["answer"] and e.commands == {}
     assert a["answer"].endswith(f"Programmato: modalità eco alle 18:00 del {when[8:10]}/{when[5:7]}.")
 
 
-def test_why_questions_read_the_decisions_and_no_guest_data_reaches_the_model():
-    script = Script(tools(call("leggi_appartamento"), call("leggi_decisioni", quante=5)), says("Perché la finestra era aperta."))
+def test_why_questions_use_the_recent_decisions_and_no_guest_data_reaches_the_model():
+    script = Script(js("Perché la finestra era aperta."))
     e = engine(script)
     e.log("rule:window_open_off", {"type": "device", "device_id": CLIMA}, "turn_off", "on", "off",
           "Finestra camera aperta da oltre 5 minuti", "applied", CORR)
     a = ask(e, "perché si è spento il clima?")
     assert a["answer"] == "Perché la finestra era aperta."
-    replies = [json.loads(m["content"]) for m in script.sent[1]["messages"] if m["role"] == "tool"]
-    assert set(replies[0]) == {"name", "mode", "occupancy", "hold", "next_checkin", "next_checkout", "online"}
-    assert any(d["reasoning"] == "Finestra camera aperta da oltre 5 minuti" for d in replies[1]["decisioni"])
+    system = script.sent[0]["messages"][0]["content"]
+    assert "Finestra camera aperta da oltre 5 minuti" in system and '"decisioni_recenti"' in system
+    assert '"programmazioni"' in system
     text = json.dumps(script.sent, ensure_ascii=False)
     assert "guest" not in text and "@" not in text.replace(ACTOR, "")             # no names, emails, phones
 
 
 def test_the_daily_limit_the_monthly_cap_and_the_time_limit(monkeypatch):
-    e = engine(Script(says("Uno.")), ASK_DAILY_LIMIT=1)
+    e = engine(Script(js("Uno.")), ASK_DAILY_LIMIT=1)
     assert ask(e, "prima domanda")["status"] == "answered"
     second = ask(e, "seconda domanda")
     assert (second["status"], second["reason"]) == ("failed", "daily_limit") and "Limite di 1 domande" in second["answer"]
@@ -170,8 +185,33 @@ def test_the_daily_limit_the_monthly_cap_and_the_time_limit(monkeypatch):
     assert (capped["status"], capped["reason"], capped["answer"]) == (
         "failed", "monthly_cap", "Limite mensile raggiunto, riprova dal mese prossimo")
     monkeypatch.setattr(assistant, "ASK_TIMEOUT_S", 0.2)
-    slow = ask(engine(Script(says("tardi"), delay=1.0)), "lento")
+    slow = ask(engine(Script(js("tardi"), delay=1.0)), "lento")
     assert (slow["status"], slow["reason"]) == ("failed", "timeout")
+
+
+def _budget(monkeypatch, total=3.0, no_proposal_reserve=2.0):
+    monkeypatch.setattr(assistant, "ASK_TIMEOUT_S", total)
+    monkeypatch.setattr(assistant, "NO_PROPOSAL_RESERVE_S", no_proposal_reserve)
+
+
+def test_the_model_gets_all_but_the_reserve_and_a_late_answer_ends_early(monkeypatch):
+    """C-10 layer 2 with one call: the model has ASK_TIMEOUT_S - NO_PROPOSAL_RESERVE_S; beyond it the question ends
+    then, not at the end of the whole time."""
+    _budget(monkeypatch, no_proposal_reserve=0.5)
+    assert ask(engine(Script(js("Il clima è acceso."), delay=1.5)), "il clima è acceso?")["answer"] == "Il clima è acceso."
+    _budget(monkeypatch)                                                       # 1 s for the model, 3 in all
+
+    async def main():
+        e = engine(Script(js("tardi"), delay=1.5))
+        e.ensure_started()
+        loop = asyncio.get_running_loop()
+        start = loop.time()
+        a = e.create_ask({"text": "perché?"}, ACTOR, CORR)
+        while e.asks[a["ask_id"]]["status"] == "pending":
+            await asyncio.sleep(0.02)
+        return e.asks[a["ask_id"]], loop.time() - start
+    a, took = asyncio.run(main())
+    assert (a["status"], a["reason"]) == ("failed", "timeout") and took < 2.0
 
 
 def _bff(status: int, body: dict | None, delay: float = 0.0, location: str | None = "eu"):
@@ -208,6 +248,7 @@ def test_the_model_client_maps_the_bffs_answers(monkeypatch):
     assert asyncio.run(client.chat([{"role": "user", "content": "x"}], [])) == says("ciao")
     assert seen[0]["path"] == "/internal/ai/chat" and seen[0]["headers"]["X-Apartment-Id"] == "apt-prova-01"
     assert seen[0]["headers"]["X-API-Key"] == "k" * 16 and seen[0]["body"]["temperature"] == assistant.TEMPERATURE
+    assert "tools" not in seen[0]["body"]                                  # D-182: none sent
     server.shutdown()
     server, url, _ = _bff(429, {"error": "monthly_cap", "message": "Limite mensile raggiunto, riprova dal mese prossimo"})
     with pytest.raises(assistant.ModelRefused) as refused:
@@ -256,7 +297,7 @@ def test_settings_of_the_assistant():
 
 def test_the_demonstrations_get_the_model_from_the_registry():
     """D-132 point 5: the BFF's demonstration apartments with the real assistant (AI_DEMOS), the keywords without."""
-    script = Script(says("Ciao dal modello."))
+    script = Script(js("Ciao dal modello."))
     registry = core.Registry(model_for=lambda apartment_id: script if apartment_id == "apt-rimini-01" else None)
 
     async def main():
@@ -268,76 +309,6 @@ def test_the_demonstrations_get_the_model_from_the_registry():
         return with_model.asks[a["ask_id"]]
     assert asyncio.run(main())["answer"] == "Ciao dal modello."
     assert core.Registry().model_for is None                                  # the default: keywords
-
-
-# -------- lot 28: within the time --------
-def test_the_state_is_in_the_request_and_a_command_needs_one_call():
-    """a) the apartment and the devices with their state are already in the request; b) a turn of valid proposals only
-    ends the conversation: the engine writes the outcome, the model's words of that turn first."""
-    script = Script({"choices": [{"message": {"role": "assistant", "content": "Accendo la stufetta.", "tool_calls": [
-        call("comanda_dispositivo", device_id=PRESA, capability="switch", action="turn_on")]}}]})
-    e = engine(script)
-    a = ask(e, "accendi la stufetta in camera")
-    assert len(script.sent) == 1
-    assert a["answer"] == "Accendo la stufetta.\nFatto: accendere presa stufetta camera."
-    system = script.sent[0]["messages"][0]["content"]
-    assert "Stato attuale dell'appartamento" in system and PRESA in system and CLIMA in system
-    assert '"occupancy"' in system and "guest" not in system
-
-
-def test_a_wrong_proposal_still_goes_back_to_the_model():
-    script = Script(tools(call("comanda_dispositivo", device_id="dev-che-non-esiste", capability="switch",
-                               action="turn_on")),
-                    says("Quel dispositivo non c'è."))
-    a = ask(engine(script), "accendi il frigo")
-    assert len(script.sent) == 2 and a["answer"] == "Quel dispositivo non c'è."
-
-
-def _budget(monkeypatch, total=3.0, reserve=1.0, min_call=0.5, no_proposal_reserve=2.0):
-    monkeypatch.setattr(assistant, "ASK_TIMEOUT_S", total)
-    monkeypatch.setattr(assistant, "APPLY_RESERVE_S", reserve)
-    monkeypatch.setattr(assistant, "MIN_CALL_S", min_call)
-    monkeypatch.setattr(assistant, "NO_PROPOSAL_RESERVE_S", no_proposal_reserve)
-
-
-def test_out_of_the_models_time_what_was_proposed_is_applied(monkeypatch):
-    """c) the first call (1.2 s) fits, nothing being proposed yet (C-10); then the reserve for running counts and the
-    second call is cut at 2 s: the proposal of the first is applied."""
-    _budget(monkeypatch, no_proposal_reserve=0.5)
-    script = Script(tools(call("leggi_decisioni"), call("comanda_dispositivo", device_id=PRESA, capability="switch",
-                                                        action="turn_on")),
-                    says("troppo tardi"), delay=1.2)
-    a = ask(engine(script), "accendi la stufetta e dimmi perché era spenta")
-    assert a["status"] == "answered" and a["answer"] in (       # C-10: no time left to wait for the outcome
-        "Comando inviato: accendere presa stufetta camera, l'esito arriva nell'app.",
-        "Fatto: accendere presa stufetta camera.")
-
-
-def test_out_of_the_models_time_with_nothing_proposed_the_answer_comes_early(monkeypatch):
-    _budget(monkeypatch)
-    script = Script(tools(call("leggi_decisioni")), says("troppo tardi"), delay=1.2)
-
-    async def main():
-        e = engine(script)
-        e.ensure_started()
-        loop = asyncio.get_running_loop()
-        start = loop.time()
-        a = e.create_ask({"text": "perché?"}, ACTOR, CORR)
-        while e.asks[a["ask_id"]]["status"] == "pending":
-            await asyncio.sleep(0.02)
-        return e.asks[a["ask_id"]], loop.time() - start
-    a, took = asyncio.run(main())
-    assert (a["status"], a["reason"], a["answer"]) == ("failed", "timeout", assistant.TIMEOUT_ANSWER)
-    assert took < 2.6                                       # at the model's budget (2 s), not at the 3 s limit
-
-
-def test_with_nothing_proposed_yet_the_model_gets_almost_all_the_time(monkeypatch):
-    """C-10 layer 2: the reserve for running proposals counts only once there are some; a slow first answer (1.5 s
-    out of 3) still arrives."""
-    _budget(monkeypatch, no_proposal_reserve=0.5)
-    script = Script(says("Il clima è acceso."), delay=1.5)
-    a = ask(engine(script), "il clima è acceso?")
-    assert (a["status"], a["answer"]) == ("answered", "Il clima è acceso.")
 
 
 # -------- D-170: a scheduled action with guests in at its time --------
@@ -355,8 +326,7 @@ def _at_18_tomorrow():
 
 def test_d170_scheduled_with_guests_at_its_time_asks_then_schedules():
     local, when = _at_18_tomorrow()
-    script = Script(tools(call("programma", quando=when, modalita="eco")))
-    e = engine(script)                                                          # empty now
+    e = engine(Script(js("Programmo eco.", plan(when, "eco"))))                  # empty now
     _booked(e, local - timedelta(hours=3), local + timedelta(days=2))           # guests in at 18:00 tomorrow
     a = ask(e, "domani alle 18 metti eco")
     assert a["status"] == "needs_approval"
@@ -377,10 +347,10 @@ def test_d170_scheduled_with_guests_at_its_time_asks_then_schedules():
 
 def test_d170_without_guests_at_its_time_it_is_scheduled_at_once_and_a_no_schedules_nothing():
     local, when = _at_18_tomorrow()
-    e = engine(Script(tools(call("programma", quando=when, modalita="eco"))))
+    e = engine(Script(js("Programmo eco.", plan(when, "eco"))))
     a = ask(e, "domani alle 18 metti eco")                                      # no booking then
     assert a["status"] == "answered" and a["actions"][0]["type"] == "schedule"
-    e = engine(Script(tools(call("programma", quando=when, modalita="eco"))))
+    e = engine(Script(js("Programmo eco.", plan(when, "eco"))))
     _booked(e, local - timedelta(hours=3), local + timedelta(days=2))
     a = ask(e, "domani alle 18 metti eco")
 
@@ -396,8 +366,7 @@ def test_d181_an_answer_without_a_european_location_runs_nothing(monkeypatch, lo
     from engine import log
     refused = []
     monkeypatch.setattr(log, "error", lambda msg, **kw: refused.append((msg, kw)))
-    server, url, seen = _bff(200, tools(call("comanda_dispositivo", device_id=PRESA, capability="switch",
-                                             action="turn_on")), location=location)
+    server, url, seen = _bff(200, js("Accendo.", cmd(PRESA, "switch", "turn_on")), location=location)
     e = engine(assistant.ModelClient(url, "apt-prova-01", "k" * 16))
     a = ask(e, "accendi la stufetta in camera")
     server.shutdown()
@@ -409,10 +378,8 @@ def test_d181_an_answer_without_a_european_location_runs_nothing(monkeypatch, lo
 
 
 def test_d181_a_european_answer_is_used():
-    server, url, _ = _bff(200, tools(call("comanda_dispositivo", device_id=PRESA, capability="switch",
-                                          action="turn_on")), location="eu")
+    server, url, _ = _bff(200, js("Accendo.", cmd(PRESA, "switch", "turn_on")), location="eu")
     e = engine(assistant.ModelClient(url, "apt-prova-01", "k" * 16))
     a = ask(e, "accendi la stufetta in camera")
     server.shutdown()
     assert a["status"] == "answered" and e.devices[PRESA]["capabilities"]["switch"]["on"] is True
-

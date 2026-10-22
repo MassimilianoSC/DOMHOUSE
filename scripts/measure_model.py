@@ -53,9 +53,7 @@ import os
 import statistics
 import sys
 import time
-from datetime import datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -69,12 +67,7 @@ def request_messages(question: str) -> tuple[list[dict], list[dict]]:
     from engine.connector.simulated import SimulatedConnector
 
     e = core.ApartmentEngine("apt-misura-01", SimulatedConnector(), seed=False)
-    helper = assistant.Assistant(e, None)
-    state = json.dumps({"appartamento": helper.tool("leggi_appartamento", {}, []),
-                        **helper.tool("leggi_dispositivi", {}, [])}, ensure_ascii=False, default=str)
-    now = datetime.now(ZoneInfo(e.timezone)).strftime("%Y-%m-%d %H:%M")
-    system = assistant.SYSTEM_PROMPT.format(now=now, tz=e.timezone, state=state)
-    return [{"role": "system", "content": system}, {"role": "user", "content": question}], assistant.TOOLS
+    return assistant.Assistant(e, None).messages(question), assistant.TOOLS     # the engine's own request (D-182)
 
 
 PARAMS_FIELDS = {"type": "object", "properties": {
@@ -163,7 +156,7 @@ Ogni azione è una di queste tre forme:
 {"tipo": "programma", "quando": "<data e ora ISO 8601>", "modalita": "comfort" | "eco" | "empty"}"""
 
 _ACTION_KEYS = {"modalita": {"tipo", "modalita"}, "comando": {"tipo", "device_id", "capability", "action", "params"},
-                "programma": {"tipo", "quando", "modalita"}}
+                "programma": {"tipo", "quando", "modalita", "device_id", "capability", "action", "params"}}
 
 
 def json_answer_valid(text: str | None) -> bool:
@@ -181,7 +174,7 @@ def json_answer_valid(text: str | None) -> bool:
     for a in data["azioni"]:
         if not isinstance(a, dict) or a.get("tipo") not in _ACTION_KEYS or not set(a) <= _ACTION_KEYS[a["tipo"]]:
             return False
-        if a["tipo"] in ("modalita", "programma") and a.get("modalita") not in ("comfort", "eco", "empty"):
+        if (a["tipo"] == "modalita" or (a["tipo"] == "programma" and "device_id" not in a))                 and a.get("modalita") not in ("comfort", "eco", "empty"):
             return False
         if a["tipo"] == "comando":
             if a.get("capability") not in ("switch", "climate", "heating") or not isinstance(a.get("device_id"), str):
@@ -341,7 +334,8 @@ def main() -> int:
                 messages, tools = request_messages(QUESTIONS[i % len(QUESTIONS)])
                 if a.no_tools:
                     tools = None
-                    messages[0] = {"role": "system", "content": messages[0]["content"] + JSON_INSTRUCTIONS}
+                    if "Rispondi SOLO con un oggetto JSON" not in messages[0]["content"]:     # the engine asks it already
+                        messages[0] = {"role": "system", "content": messages[0]["content"] + JSON_INSTRUCTIONS}
                 if kind == "nativo":
                     body = native_body(messages, tools, a.max_tokens, reasoning)
                 elif kind == "anthropic":
