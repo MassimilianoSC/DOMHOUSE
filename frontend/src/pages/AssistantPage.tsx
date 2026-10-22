@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Bot, Loader2, SendHorizontal, Trash2 } from "lucide-react";
 import type { AskStatus } from "@/api/types";
 import { ApiError } from "@/api/bff";
 import { instanceApi } from "@/api/instance";
 import { useRole } from "@/auth/AuthProvider";
-import { ChatApproval } from "@/components/assistant/ChatApproval";
+import { ChatApproval, type ApprovalOutcome } from "@/components/assistant/ChatApproval";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
@@ -16,18 +16,31 @@ import { newCorrelationId } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
 const SUGGESTIONS = ["off", "temp", "at", "boiler"] as const;
+
+/** A question of the chat; approval_outcome is kept by the site only, so the badge follows the decision (P-75). */
+type ChatMessage = AskStatus & { approval_outcome?: ApprovalOutcome };
+
+const OUTCOME_STYLE: Record<ApprovalOutcome, string> = {
+  approved: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
+  rejected: "border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300",
+  expired: "border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300",
+};
+const outcomeText = (o: ApprovalOutcome) => (o === "approved" ? t("assistant.outcome.approved") : o === "rejected" ? t("assistant.outcome.rejected") : t("assistant.outcome.expired"));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-function load(aptId: string): AskStatus[] {
+function load(aptId: string): ChatMessage[] {
   try {
-    return JSON.parse(sessionStorage.getItem(`assistant.${aptId}`) ?? "[]") as AskStatus[];
+    return JSON.parse(sessionStorage.getItem(`assistant.${aptId}`) ?? "[]") as ChatMessage[];
   } catch {
     return [];
   }
 }
 
-function Message({ aptId, m, canWrite }: { aptId: string; m: AskStatus; canWrite: boolean }) {
+function Message({ aptId, m, canWrite, onOutcome }: { aptId: string; m: ChatMessage; canWrite: boolean; onOutcome: (askId: string, o: ApprovalOutcome) => void }) {
   const pending = m.status === "pending";
+  const settled = useCallback((o: ApprovalOutcome) => onOutcome(m.ask_id, o), [onOutcome, m.ask_id]);
+  // P-75: once decided, the badge says how, never «richiede approvazione» next to the decision
+  const outcome = m.status === "needs_approval" ? m.approval_outcome : undefined;
   return (
     <div className="space-y-2" data-testid={`ask-message-${m.ask_id}`} data-status={m.status}>
       <div className="flex justify-end">
@@ -42,11 +55,11 @@ function Message({ aptId, m, canWrite }: { aptId: string; m: AskStatus; canWrite
             <p data-testid={`ask-answer-${m.ask_id}`}>{m.answer}</p>
           )}
           {/* D-154: «Sì» / «No» right here, as on the Approvazioni page; whoever only reads sees the question only */}
-          {m.status === "needs_approval" && canWrite && <ChatApproval aptId={aptId} askId={m.ask_id} correlationId={m.correlation_id} approvalId={m.approval_id ?? null} />}
+          {m.status === "needs_approval" && canWrite && <ChatApproval aptId={aptId} askId={m.ask_id} correlationId={m.correlation_id} approvalId={m.approval_id ?? null} onOutcome={settled} />}
           {!pending && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <Badge className={cn(m.status === "answered" && "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300", m.status === "needs_approval" && "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300", m.status === "failed" && "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300")} data-testid={`ask-status-${m.ask_id}`}>
-                {t(`assistant.status.${m.status}`)}
+              <Badge className={cn(m.status === "answered" && "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300", m.status === "needs_approval" && !outcome && "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300", outcome && OUTCOME_STYLE[outcome], m.status === "failed" && "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300")} data-testid={`ask-status-${m.ask_id}`}>
+                {outcome ? outcomeText(outcome) : t(`assistant.status.${m.status}`)}
               </Badge>
               {m.actions.map((a, i) => (
                 <Badge key={i} className="font-mono" data-testid={`ask-action-${m.ask_id}-${i}`}>
@@ -69,7 +82,7 @@ function Message({ aptId, m, canWrite }: { aptId: string; m: AskStatus; canWrite
 export default function AssistantPage() {
   const { aptId = "" } = useParams();
   const { canWrite } = useRole();
-  const [messages, setMessages] = useState<AskStatus[]>(() => load(aptId));
+  const [messages, setMessages] = useState<ChatMessage[]>(() => load(aptId));
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
@@ -80,6 +93,9 @@ export default function AssistantPage() {
   }, [messages, aptId]);
 
   const update = (m: AskStatus) => setMessages((list) => list.map((x) => (x.ask_id === m.ask_id ? m : x)));
+  // P-75: the outcome of the question's approvals, kept with the message (and in the tab's storage) for the badge
+  const onOutcome = useCallback((askId: string, o: ApprovalOutcome) =>
+    setMessages((list) => (list.some((x) => x.ask_id === askId && x.approval_outcome !== o) ? list.map((x) => (x.ask_id === askId ? { ...x, approval_outcome: o } : x)) : list)), []);
 
   const send = async (value: string) => {
     const q = value.trim();
@@ -129,7 +145,7 @@ export default function AssistantPage() {
             </div>
           </div>
         ) : (
-          messages.map((m) => <Message key={m.ask_id} aptId={aptId} m={m} canWrite={canWrite} />)
+          messages.map((m) => <Message key={m.ask_id} aptId={aptId} m={m} canWrite={canWrite} onOutcome={onOutcome} />)
         )}
         <div ref={endRef} />
       </Card>

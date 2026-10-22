@@ -1,5 +1,6 @@
 import { t } from "@/i18n";
-import { actionLabel, DECISION_ACTIONS, describeActor, personLabel } from "./describe";
+import { capitalizeFirst } from "@/lib/format";
+import { actionLabel, DECISION_ACTIONS, decisionValue, describeActor, personLabel } from "./describe";
 
 // Who did something, as the site shows it (P-48, D-87): the email the BFF resolved, or «utente rimosso» for a deleted
 // account; a pseudonym the BFF did not rewrite is never shown raw.
@@ -82,5 +83,28 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
   it("un'azione che il motore aggiungerà e il sito non conosce ancora: il codice, la pagina non si rompe", () => {
     expect(actionLabel("future_action")).toBe("future_action");
     expect(actionLabel("")).toBe("");
+  });
+});
+
+describe("modalità «casa vuota» (D-158)", () => {
+  it("la modalità empty si chiama «casa vuota»; l'occupazione resta «vuoto»", () => {
+    expect(t("mode.empty")).toBe("casa vuota");
+    expect(t("occupancy.vacant")).toBe("vuoto");
+  });
+
+  it("maiuscola solo sulla prima lettera: «Casa vuota», non «Casa Vuota»", () => {
+    expect(capitalizeFirst(t("mode.empty"))).toBe("Casa vuota");
+    expect(capitalizeFirst(t("mode.comfort"))).toBe("Comfort");
+    expect(capitalizeFirst("")).toBe("");
+  });
+
+  it("Decisioni, valori prima e dopo: le modalità in italiano, il resto com'è", () => {
+    expect(decisionValue("empty")).toBe("casa vuota");
+    expect(decisionValue("comfort")).toBe("comfort");
+    expect(decisionValue("eco")).toBe("eco");
+    expect(decisionValue("21.5")).toBe("21.5");
+    expect(decisionValue("on")).toBe("on");
+    expect(decisionValue(null)).toBe("—");
+    expect(decisionValue("")).toBe("—");
   });
 });

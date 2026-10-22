@@ -13,7 +13,7 @@ import { CopyableId } from "@/components/ui/CopyableId";
 import { Badge, Card, Input, NativeSelect, Skeleton } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { MAX_RESULTS, matchesDecision, periodFrom } from "@/lib/decisionSearch";
-import { actionLabel, describeActor, deviceLabel } from "@/lib/describe";
+import { actionLabel, decisionValue, describeActor, deviceLabel } from "@/lib/describe";
 import { DEFAULT_TZ, fmtDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
@@ -56,9 +56,9 @@ function DecisionRow({ d, tz, ruleLabels }: { d: Decision; tz: string; ruleLabel
           <span className="rounded bg-secondary px-1.5 py-0.5 text-xs" title={d.action} data-testid={`decision-action-${d.decision_id}`}>{actionLabel(d.action)}</span>
           {(d.old_value || d.new_value) && (
             <span className="inline-flex items-center gap-1">
-              <span className="text-muted-foreground">{d.old_value ?? "—"}</span>
+              <span className="text-muted-foreground">{decisionValue(d.old_value)}</span>
               <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-              <span>{d.new_value ?? "—"}</span>
+              <span>{decisionValue(d.new_value)}</span>
             </span>
           )}
         </div>

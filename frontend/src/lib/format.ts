@@ -47,6 +47,9 @@ export function fmtTime(iso: string | null | undefined, tz = DEFAULT_TZ): string
   return new Intl.DateTimeFormat(LOCALE, { hour: "2-digit", minute: "2-digit", timeZone: tz }).format(new Date(iso));
 }
 
+/** First letter upper case, the rest as it is («casa vuota» → «Casa vuota»): CSS capitalize would give «Casa Vuota». */
+export const capitalizeFirst = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+
 export function fmtNumber(n: number | null | undefined, maxDigits = 1): string {
   if (n === null || n === undefined || Number.isNaN(n)) return "—";
   return new Intl.NumberFormat(LOCALE, { maximumFractionDigits: maxDigits }).format(n);

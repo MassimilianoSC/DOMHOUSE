@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge, Card, Skeleton } from "@/components/ui/primitives";
 import { useApartments } from "@/hooks/useFeatures";
 import { t } from "@/i18n";
-import { fmtNumber, fmtShortDateTime } from "@/lib/format";
+import { capitalizeFirst, fmtNumber, fmtShortDateTime } from "@/lib/format";
 import { platformApartmentsUrl } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
@@ -57,8 +57,8 @@ function ApartmentCard({ a, index }: { a: ApartmentSummary; index: number }) {
         {apt && (
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <OccupancyBadge occupancy={apt.occupancy} testId={`apartment-occupancy-${a.apartment_id}`} />
-            <Badge className="border-primary/30 bg-primary/10 capitalize text-primary" data-testid={`apartment-mode-${a.apartment_id}`}>
-              {t(`mode.${apt.mode}`)}
+            <Badge className="border-primary/30 bg-primary/10 text-primary" data-testid={`apartment-mode-${a.apartment_id}`}>
+              {capitalizeFirst(t(`mode.${apt.mode}`))}
             </Badge>
             {(a.pending_approvals ?? 0) > 0 && (
               <Badge className="animate-pulse border-primary bg-primary text-primary-foreground" data-testid={`apartment-approvals-${a.apartment_id}`}>

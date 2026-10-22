@@ -4,6 +4,7 @@ import { instanceApi } from "@/api/instance";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, Input, Label, NativeSelect } from "@/components/ui/primitives";
 import { t } from "@/i18n";
+import { capitalizeFirst } from "@/lib/format";
 import { runAction } from "@/lib/actions";
 import { useApartmentStore } from "@/store/apartmentStore";
 
@@ -104,7 +105,7 @@ export function ScheduleDialog({ aptId, tz, open, onOpenChange, onDone, move }: 
                 <div className="space-y-1.5">
                   <Label htmlFor="schedule-mode">{t("mode.label")}</Label>
                   <NativeSelect id="schedule-mode" value={mode} onChange={(e) => setMode(e.target.value as ApartmentMode)} data-testid="schedule-mode-select">
-                    {(["comfort", "eco", "empty"] as ApartmentMode[]).map((m) => <option key={m} value={m}>{t(`mode.${m}`)}</option>)}
+                    {(["comfort", "eco", "empty"] as ApartmentMode[]).map((m) => <option key={m} value={m}>{capitalizeFirst(t(`mode.${m}`))}</option>)}
                   </NativeSelect>
                 </div>
               ) : (

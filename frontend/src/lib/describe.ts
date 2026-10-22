@@ -66,4 +66,9 @@ export const DECISION_ACTIONS = [
 ] as const;
 
 /** The kind of action of a decision, in Italian («Forzatura scaduta»); its code for one not translated yet. */
+/** A value before or after a decision: a mode in Italian («empty» → «casa vuota», D-158), anything else as the
+ *  engine writes it. */
+const MODE_VALUES = new Set(["comfort", "eco", "empty"]);
+export const decisionValue = (v: string | null | undefined): string => (v === null || v === undefined || v === "" ? "—" : MODE_VALUES.has(v) ? t(`mode.${v}`) : v);
+
 export const actionLabel = (code: string): string => (code ? tOr(`decisions.actions.${code}`, code) : code);

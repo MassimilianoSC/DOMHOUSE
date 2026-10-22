@@ -20,7 +20,7 @@ const approval = (approval_id: string, status: string, description: string, corr
 
 const s = vi.hoisted(() => ({ canWrite: true, lists: [] as unknown[][], decide: vi.fn() }));
 
-vi.mock("@/auth/AuthProvider", () => ({ useRole: () => ({ canWrite: s.canWrite }) }));
+vi.mock("@/auth/AuthProvider", () => ({ useRole: () => ({ canWrite: s.canWrite }), useAuth: () => ({ me: { user: { email: "anna@fs.it" } } }) }));
 vi.mock("@/api/instance", () => ({
   instanceApi: () => ({
     // every read gives the next state of the list; the last one stays
