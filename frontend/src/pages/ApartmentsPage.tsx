@@ -18,7 +18,7 @@ function Stat({ icon, label, value, testId }: { icon: React.ReactNode; label: st
       <span className="text-muted-foreground [&_svg]:size-4">{icon}</span>
       <div className="min-w-0">
         <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</div>
-        <div className="truncate text-sm font-semibold tabular">{value}</div>
+        <div className="text-sm font-semibold tabular [overflow-wrap:anywhere]">{value}</div>
       </div>
     </div>
   );
@@ -36,10 +36,10 @@ function ApartmentCard({ a, index }: { a: ApartmentSummary; index: number }) {
       style={{ animationDelay: `${index * 60}ms` }}
     >
       <Card className={cn("h-full p-5 transition-[box-shadow,transform] duration-150 group-hover:-translate-y-0.5 group-hover:shadow-md animate-fade-up", offline && "bg-muted/60 grayscale")}>
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <h2 className="truncate text-lg font-extrabold">{a.name}</h2>
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 className="text-lg font-extrabold [overflow-wrap:anywhere]">{a.name}</h2>
               {a.simulated && <DemoBadge testId={`apartment-demo-${a.apartment_id}`} />}
             </div>
             <p className="truncate text-xs text-muted-foreground">{a.address}</p>
@@ -107,7 +107,7 @@ export default function ApartmentsPage() {
         )}
       </header>
       {isLoading && (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {[0, 1].map((i) => <Skeleton key={i} className="h-60 rounded-3xl" />)}
         </div>
       )}
@@ -117,7 +117,7 @@ export default function ApartmentsPage() {
           <p className="mt-1 text-sm text-muted-foreground" data-testid="apartments-empty-hint">{emptyHint}</p>
         </Card>
       )}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {data?.map((a, i) => <ApartmentCard key={a.apartment_id} a={a} index={i} />)}
       </div>
     </div>
