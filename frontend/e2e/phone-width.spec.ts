@@ -51,6 +51,25 @@ async function firstApartment(page: Page): Promise<string> {
 
 const APARTMENT_PAGES = ["", "/approvazioni", "/decisioni", "/consumi", "/riepiloghi", "/programmazione", "/regole", "/assistente", "/simulatore"];
 
+test.describe("la misura stessa (D-155): se smette di vedere uno sbordo, questa prova è rossa", () => {
+  test("un elemento largo 419 px, come l'elenco degli appartamenti prima della correzione, viene segnalato", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/impostazioni");
+    await settle(page);
+    expect(await overflowing(page)).toEqual([]);
+    await page.evaluate(() => {
+      const wide = document.createElement("div");
+      wide.setAttribute("data-testid", "sbordo-di-prova");
+      wide.style.width = "419px";
+      wide.style.height = "20px";
+      document.querySelector("main")!.appendChild(wide);
+    });
+    const found = await overflowing(page);
+    expect(found[0]).toMatch(/^pagina larga \d+ px su 360$/);
+    expect(found.some((line) => line.startsWith("sbordo-di-prova"))).toBe(true);
+  });
+});
+
 test.describe("telefono a 360 px: niente fuori dallo schermo (P-73)", () => {
   test("elenco degli appartamenti, la prima pagina dopo l'accesso", async ({ page }) => {
     await signIn(page);
