@@ -254,7 +254,7 @@ def test_instance_down_waits_for_the_offline_alert_minutes(users, fcm, monkeypat
 def test_unsubscribe_removes_the_token_from_every_holder(users):
     """F4 (D-70): on a shared device the token may still be registered to a previous user; unsubscribe clears it from
     everyone, so no leftover push reaches the device after sign-out."""
-    from bff.auth import CurrentUser
+    from bff.auth import CurrentUser, Identity
     from bff.routes import push as push_routes
 
     async def scenario():
@@ -266,7 +266,8 @@ def test_unsubscribe_removes_the_token_from_every_holder(users):
         me = await repo.get_user("u-push-1")
         me.push_tokens = ["tok-device"]
         await repo.upsert_user(me)
-        caller = CurrentUser("u-push-1", "p1@test.it", TENANT, "admin")
+        member = CurrentUser("u-push-1", "p1@test.it", TENANT, "admin")
+        caller = Identity(uid=member.uid, email=member.email, display_name="", user=member, platform_manager=False)
         out = await push_routes.unsubscribe(push_routes.TokenBody(token="tok-device"), caller)
         assert out == {"subscribed": False, "tokens": 0}
         assert await repo.users_with_push_token("tok-device") == []
@@ -324,3 +325,24 @@ def test_bookings_is_on_also_for_preferences_saved_before():
                                "notification_prefs": {"approvals": True, "offline": False, "decisions": False}})
     assert old.notification_prefs.bookings is True and old.notification_prefs.offline is False
     assert NotificationPrefs().bookings is True
+
+
+def test_a_platform_manager_without_organisation_can_still_clear_a_device(users):
+    """Lot 27: a member used this browser before and left the token; a platform manager without an organisation signs
+    in on it: the removal (F4) is not refused for lack of a tenant, and the member's pushes stop reaching the device."""
+    from bff.auth import Identity
+    from bff.routes import push as push_routes
+
+    async def scenario():
+        repo = get_repository()
+        me = await repo.get_user("u-push-2")
+        me.push_tokens = ["tok-shared-pc", "tok-c"]
+        await repo.upsert_user(me)
+        manager = Identity(uid="u-plat-alone", email="solo@piattaforma.it", display_name="", user=None,
+                           platform_manager=True)
+        out = await push_routes.unsubscribe(push_routes.TokenBody(token="tok-shared-pc"), manager)
+        assert out == {"subscribed": False, "tokens": 0}
+        assert (await repo.get_user("u-push-2")).push_tokens == ["tok-c"]
+        assert await repo.get_user("u-plat-alone") is None                 # no record made for someone without a tenant
+    run(scenario())
+

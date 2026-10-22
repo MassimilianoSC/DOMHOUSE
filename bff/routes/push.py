@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from ..auth import CurrentUser, resolve_own_user
+from ..auth import CurrentUser, Identity, resolve_own_identity, resolve_own_user
 from ..config import get_settings
 from ..repository import NotificationPrefs, User, get_repository
 
@@ -40,15 +40,18 @@ async def subscribe(body: TokenBody, user: CurrentUser = Depends(resolve_own_use
 
 
 @router.delete("/push/subscribe")
-async def unsubscribe(body: TokenBody, user: CurrentUser = Depends(resolve_own_user)):
+async def unsubscribe(body: TokenBody, identity: Identity = Depends(resolve_own_identity)):
+    """Also for a platform manager without an organisation (lot 27): a device used before by a member must stop
+    receiving that member's pushes whoever signs in on it, so the removal is never refused for lack of a tenant."""
     repo = get_repository()
     # F4 (D-70): remove the device token from EVERY user that holds it, of any organisation. On a shared device the
     # token may still be registered to whoever used it before; signing out must stop their pushes to that device too.
-    await _stored(user)  # make sure the caller has a record (first call after sign-in)
+    if identity.user is not None:
+        await _stored(identity.user)  # make sure the caller has a record (first call after sign-in)
     for holder in await repo.users_with_push_token(body.token):
         holder.push_tokens = [t for t in holder.push_tokens if t != body.token]
         await repo.upsert_user(holder)
-    caller = await repo.get_user(user.uid)
+    caller = await repo.get_user(identity.uid)
     return {"subscribed": False, "tokens": len(caller.push_tokens) if caller else 0}
 
 
