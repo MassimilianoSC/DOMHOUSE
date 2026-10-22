@@ -57,13 +57,16 @@ test.describe("la misura stessa (D-155): se smette di vedere uno sbordo, questa 
     await page.goto("/impostazioni");
     await settle(page);
     expect(await overflowing(page)).toEqual([]);
+    // In document.body, which always exists and is not React's: inside <main> the element could find no container
+    // or be dropped by a re-render, and on the CI runner it found none (D-155: the check is fixed, never re-run).
     await page.evaluate(() => {
       const wide = document.createElement("div");
       wide.setAttribute("data-testid", "sbordo-di-prova");
       wide.style.width = "419px";
       wide.style.height = "20px";
-      document.querySelector("main")!.appendChild(wide);
+      document.body.appendChild(wide);
     });
+    await expect(page.getByTestId("sbordo-di-prova")).toBeAttached();
     const found = await overflowing(page);
     expect(found[0]).toMatch(/^pagina larga \d+ px su 360$/);
     expect(found.some((line) => line.startsWith("sbordo-di-prova"))).toBe(true);
