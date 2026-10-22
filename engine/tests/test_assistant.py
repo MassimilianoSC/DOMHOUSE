@@ -108,7 +108,8 @@ def test_d182_an_invalid_json_runs_nothing_and_says_the_state(monkeypatch):
         a = ask(e, "spegni il clima")
         assert a["status"] == "answered" and e.commands == {}
         assert a["answer"].startswith("Non ho capito la risposta dell'assistente: non ho eseguito niente. Modalità ")
-    assert logged[-1] == ("assistant fallback", {"apartment_id": "apt-prova-01", "cause": "json_invalid"})
+    assert logged[-1] == ("assistant fallback", {"apartment_id": "apt-prova-01", "cause": "json_invalid", "command": False})
+    assert a["reason"] == "risposta_rapida:json_invalid"
     assert assistant.parse_answer("```json\n" + json.dumps({"risposta": "ok", "azioni": []}) + "\n```") == {
         "risposta": "ok", "azioni": []}
 
@@ -181,12 +182,12 @@ def test_the_daily_limit_the_monthly_cap_and_the_time_limit(monkeypatch):
     second = ask(e, "seconda domanda")
     assert (second["status"], second["reason"]) == ("failed", "daily_limit") and "Limite di 1 domande" in second["answer"]
     capped = ask(engine(Script(fail=assistant.ModelRefused("monthly_cap", "Limite mensile raggiunto, riprova dal mese prossimo"))),
-                 "accendi")
-    assert (capped["status"], capped["reason"], capped["answer"]) == (
-        "failed", "monthly_cap", "Limite mensile raggiunto, riprova dal mese prossimo")
+                 "accendi")                                                   # D-182: the quick assistant answers
+    assert (capped["status"], capped["reason"]) == ("answered", "risposta_rapida:monthly_cap")
+    assert capped["answer"].endswith("Risposta rapida: l'assistente completo ha raggiunto il limite mensile.")
     monkeypatch.setattr(assistant, "ASK_TIMEOUT_S", 0.2)
     slow = ask(engine(Script(js("tardi"), delay=1.0)), "lento")
-    assert (slow["status"], slow["reason"]) == ("failed", "timeout")
+    assert (slow["status"], slow["reason"]) == ("answered", "risposta_rapida:timeout")
 
 
 def _budget(monkeypatch, total=3.0, no_proposal_reserve=2.0):
@@ -211,7 +212,7 @@ def test_the_model_gets_all_but_the_reserve_and_a_late_answer_ends_early(monkeyp
             await asyncio.sleep(0.02)
         return e.asks[a["ask_id"]], loop.time() - start
     a, took = asyncio.run(main())
-    assert (a["status"], a["reason"]) == ("failed", "timeout") and took < 2.0
+    assert (a["status"], a["reason"]) == ("answered", "risposta_rapida:timeout") and took < 2.0
 
 
 def _bff(status: int, body: dict | None, delay: float = 0.0, location: str | None = "eu"):
@@ -383,3 +384,47 @@ def test_d181_a_european_answer_is_used():
     a = ask(e, "accendi la stufetta in camera")
     server.shutdown()
     assert a["status"] == "answered" and e.devices[PRESA]["capabilities"]["switch"]["on"] is True
+
+
+# -------- D-182 layer 3: the quick assistant, only for unequivocal phrases --------
+def _late(e_kwargs=None, **settings):
+    """An engine whose model never answers in time (ASK_TIMEOUT_S patched by the caller)."""
+    return engine(Script(js("tardi"), delay=1.0), **(e_kwargs or {}), **settings)
+
+
+@pytest.fixture
+def no_time(monkeypatch):
+    monkeypatch.setattr(assistant, "ASK_TIMEOUT_S", 1.5)
+    monkeypatch.setattr(assistant, "NO_PROPOSAL_RESERVE_S", 1.4)            # the model has 0.1 s: always late
+
+
+def test_d182_the_quick_assistant_runs_an_unequivocal_command(no_time, monkeypatch):
+    from engine import log
+    logged = []
+    monkeypatch.setattr(log, "warn", lambda msg, **kw: logged.append((msg, kw)))
+    e = _late()
+    a = ask(e, "Spegni la caldaia")                                         # a suggestion of the page
+    assert (a["status"], a["reason"]) == ("answered", "risposta_rapida:timeout")
+    assert a["answer"].endswith("Risposta rapida: l'assistente completo non ha risposto in tempo.")
+    assert any(c["device_id"] == "dev-caldaia" and c["action"] == "turn_off" for c in e.commands.values())
+    assert logged[-1] == ("assistant fallback", {"apartment_id": "apt-prova-01", "cause": "timeout", "command": True})
+    e = _late()
+    ask(e, "Porta il soggiorno a 21 gradi")                                 # another suggestion: the room's climate
+    assert any(c["device_id"] == CLIMA and c["params"].get("setpoint") == 21 for c in e.commands.values())
+
+
+@pytest.mark.parametrize("text", ["non spegnere il clima", "Alle 18 metti il clima a 22 gradi", "spegni tutto",
+                                  "se fa freddo accendi la caldaia", "spegni il clima e la presa"])
+def test_d182_anything_not_unequivocal_runs_nothing_and_says_the_state(no_time, text):
+    e = _late()
+    a = ask(e, text)
+    assert e.commands == {} and a["status"] == "answered" and a["reason"] == "risposta_rapida:timeout"
+    assert a["answer"].startswith("Modalità ") and "Per i comandi usa i pulsanti dell'app." in a["answer"]
+
+
+def test_d182_the_quick_assistant_keeps_the_confirmations(no_time):
+    e = _late(occupied=True)
+    a = ask(e, "Spegni il clima del soggiorno")                             # guests in: the usual approval
+    assert a["status"] == "needs_approval" and e.pending_approval()["source"] == "assistant"
+    assert "Spengo climatizzatore soggiorno con ospiti presenti?" in a["answer"] and e.commands == {}
+

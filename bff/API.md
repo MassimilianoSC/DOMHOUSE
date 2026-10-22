@@ -675,6 +675,15 @@ Ragionamento spento: `thinkingConfig.thinkingBudget` = `AI_THINKING_BUDGET` (0; 
 formato compatibile OpenAI che parlano motore e proposte (`bff/vertex_native.py`) e ritorno; consumo e prezzi da
 `usageMetadata`. Nessuno strumento: assistente e proposte delle regole chiedono il JSON nel testo e lo validano.
 `AI_REASONING_EFFORT` vale solo per `openai` (predefinito vuoto). La seconda richiesta parte dopo 6 s.
+Risposta rapida (D-182, strato 3): se il modello non risponde in tempo, non è raggiungibile o il tetto mensile è
+finito, il motore risponde senza modello. Esegue un comando solo per una frase inequivocabile (un verbo e un solo
+dispositivo per tipo, stanza o nome, oppure una modalità; niente negazioni, condizioni od orari), con le stesse
+conferme di sempre; altrimenti scrive lo stato e rimanda ai pulsanti dell'app. In fondo: «Risposta rapida:
+l'assistente completo non ha risposto in tempo.» (o «non è raggiungibile ora.», «ha raggiunto il limite mensile.»).
+Ogni ricorso è registrato: nel log del motore «assistant fallback» con `cause` (`timeout`, `model_unavailable`,
+`monthly_cap`, `json_invalid`) e `command`; nell'esito della domanda `reason` `risposta_rapida:<causa>` (il sito lo
+mostra solo per le domande fallite); la seconda richiesta nel log del BFF «assistant model twin started». Una risposta
+senza località europea (D-181) non ha risposta rapida: la domanda fallisce.
 
 Località del modello (D-180): sempre nell'Unione europea, `AI_LOCATION` `eu` o una regione `europe-…`, per qualunque
 modello e ambiente; `global` e `us` sono esclusi. Il BFF non parte con un altro valore (riga «model location refused»

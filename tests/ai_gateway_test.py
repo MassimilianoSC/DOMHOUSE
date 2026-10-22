@@ -174,6 +174,7 @@ def test_a_silent_first_request_gets_a_twin_and_the_first_answer_wins(model, mon
     r, took = run(timed())
     assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == "risposta 2"
     assert len(calls) == 2 and took < 1.0 and logged[-1]["attempt"] == 2
+    assert {"apartment_id": APT, "after_s": 0.05} in logged                    # D-182: the twin recorded
     assert run(get_repository().get_ai_usage(ai_gateway.month_now()))["calls"] == 1   # one answer, one cost
 
 

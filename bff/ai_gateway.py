@@ -138,7 +138,7 @@ async def _alert(month: str, spent: float) -> None:
         warn("assistant spending alert email failed", error=type(exc).__name__)
 
 
-async def _hedged(request: dict) -> tuple[dict, int]:
+async def _hedged(request: dict, apartment_id: str = "") -> tuple[dict, int]:
     """C-10 layer 1: the model's answer and which request gave it (1 or 2). A second identical request starts when the
     first is still silent after AI_HEDGE_AFTER_S; the first answer that arrives wins, the other is cancelled. A request
     that fails is not hedged: its error comes back at once (or the other's answer, if one is running)."""
@@ -147,6 +147,7 @@ async def _hedged(request: dict) -> tuple[dict, int]:
     try:
         done, _ = await asyncio.wait(tasks, timeout=s.ai_hedge_after_s)
         if not done:
+            info("assistant model twin started", apartment_id=apartment_id, after_s=s.ai_hedge_after_s)   # D-182 point 4
             tasks.append(asyncio.create_task(call_model(dict(request))))
         error: BaseException | None = None
         running = list(tasks)
@@ -181,13 +182,13 @@ async def chat(apartment_id: str, body: dict) -> dict:
     started = time.monotonic()
     try:
         try:
-            answer, attempt = await _hedged(request)
+            answer, attempt = await _hedged(request, apartment_id)
         except GatewayError as exc:
             if "reasoning_effort" not in request or " 400" not in exc.message:
                 raise
             _refuse_reasoning(apartment_id)             # the model does not take it: once more without, then never
             request.pop("reasoning_effort")
-            answer, attempt = await _hedged(request)
+            answer, attempt = await _hedged(request, apartment_id)
     except GatewayError as exc:              # lot 28 d: every failed call leaves a line, with how long it took
         warn("assistant model call failed", apartment_id=apartment_id, error=exc.error, phase=exc.phase,
              seconds=round(time.monotonic() - started, 2))

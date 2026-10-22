@@ -143,9 +143,12 @@ TOOLS = [
 
 
 class ModelRefused(Exception):
-    def __init__(self, reason: str, message: str):
+    """The model's way refused: reason (monthly_cap, model_unavailable); fallback False when the quick assistant must
+    not answer either (D-181: an answer from outside the EU)."""
+
+    def __init__(self, reason: str, message: str, fallback: bool = True):
         super().__init__(message)
-        self.reason, self.message = reason, message
+        self.reason, self.message, self.fallback = reason, message, fallback
 
 
 class ModelClient:
@@ -198,7 +201,8 @@ class ModelClient:
             raise ModelRefused("model_unavailable", "L'assistente non è disponibile ora, riprova più tardi") from None
         if not european_location(location):           # D-181: refused before anything in the answer is used
             log.error("model location refused", apartment_id=self.apartment_id, ai_location=location or "assente")
-            raise ModelRefused("model_unavailable", "L'assistente non è disponibile ora, riprova più tardi")
+            raise ModelRefused("model_unavailable", "L'assistente non è disponibile ora, riprova più tardi",
+                               fallback=False)
         if status == 429:
             try:
                 message = json.loads(raw).get("message")
@@ -258,13 +262,21 @@ class Assistant:
         loop = asyncio.get_running_loop()
         end = loop.time() + ASK_TIMEOUT_S
         # D-182: one call, no tools; C-10 layer 2: the model gets all but NO_PROPOSAL_RESERVE_S (the BFF's twin after 6 s)
-        answer = await asyncio.wait_for(self.client.chat(messages, []),
-                                        timeout=max(end - NO_PROPOSAL_RESERVE_S - loop.time(), 0.01))
+        try:
+            answer = await asyncio.wait_for(self.client.chat(messages, []),
+                                            timeout=max(end - NO_PROPOSAL_RESERVE_S - loop.time(), 0.01))
+        except TimeoutError:                         # D-182 layer 3: the model did not answer in time
+            await self.quick(ask, actor, "timeout", end)
+            return
+        except ModelRefused as exc:
+            if not exc.fallback:
+                raise
+            await self.quick(ask, actor, exc.reason, end)
+            return
         msg = (answer.get("choices") or [{}])[0].get("message") or {}
         data = parse_answer(msg.get("content"))
         if data is None:                             # D-182: not the JSON asked: the state, nothing run
-            from . import log
-            log.warn("assistant fallback", apartment_id=self.e.apartment_id, cause="json_invalid")
+            self._recourse(ask, "json_invalid", False)
             ask["answer"] = "Non ho capito la risposta dell'assistente: non ho eseguito niente. " + self.state_text()
             if ask["status"] == "pending":
                 ask["status"] = "answered"
@@ -294,6 +306,81 @@ class Assistant:
                            ensure_ascii=False, default=str)
         return [{"role": "system", "content": SYSTEM_PROMPT.format(now=now, tz=self.e.timezone, state=state)},
                 {"role": "user", "content": text}]
+
+    # ---- D-182 layer 3: the quick assistant ------------------------------------------------------------------------
+    QUICK_FOOTER = {"timeout": "Risposta rapida: l'assistente completo non ha risposto in tempo.",
+                    "model_unavailable": "Risposta rapida: l'assistente completo non è raggiungibile ora.",
+                    "monthly_cap": "Risposta rapida: l'assistente completo ha raggiunto il limite mensile."}
+
+    def _recourse(self, ask: dict, cause: str, command: bool) -> None:
+        """D-182 point 4: every recourse with its cause, in the engine's log and in the ask's reason (not shown by the
+        site for an answered question; the BFF can count it)."""
+        from . import log
+        log.warn("assistant fallback", apartment_id=self.e.apartment_id, cause=cause, command=command)
+        ask["reason"] = f"risposta_rapida:{cause}"
+
+    def quick_proposal(self, text: str, proposals: list[dict]) -> bool:
+        """D-167/D-182: a command only for an unequivocal phrase: a verb and one device (by kind, room or name) or a
+        mode, no negation, no condition, no time. True when a proposal was made (checked by the usual validators)."""
+        import re
+        t = " " + re.sub(r"\s+", " ", text.lower().replace("'", " ")) + " "
+        if re.search(r"\b(non|no|mai|niente|nessun[oa]?|se|quando|appena|dopo|prima|alle|entro|tra|fra|finché|ogni)\b", t):
+            return False
+        number = re.search(r"\b(\d{1,2}(?:[.,]\d)?)\s*(?:gradi|°)", t)
+        off = re.search(r"\b(spegni|disattiva)\b", t)
+        on = re.search(r"\b(accendi|attiva)\b", t)
+        set_to = re.search(r"\b(porta|metti|imposta)\b", t)
+        mode = re.search(r"\b(comfort|eco|casa vuota)\b", t)
+        if mode and set_to and not number and not off and not on:
+            m = {"comfort": "comfort", "eco": "eco", "casa vuota": "empty"}[mode.group(1)]
+            return "errore" not in self.tool("cambia_modalita", {"modalita": m}, proposals)
+        kinds = [cap for cap, words in (("climate", r"\b(clima|climatizzatore|condizionatore|split)\b"),
+                                        ("heating", r"\b(caldaia|riscaldamento|termosifoni?)\b"),
+                                        ("switch", r"\b(presa|prese|stufetta|luce)\b")) if re.search(words, t)]
+        if len(kinds) > 1 or sum(bool(x) for x in (off, on, number)) != 1:
+            return False
+        rooms = {r["room_id"] for r in self.e.rooms if f" {r['name'].lower()} " in t}
+        candidates = []
+        for d in self.e.devices.values():
+            caps = [c for c in ("climate", "heating", "switch") if c in d["capabilities"]]
+            if not caps or not d["online"] or (kinds and kinds[0] not in caps):
+                continue
+            if rooms and d["room_id"] not in rooms:
+                continue
+            candidates.append((d, kinds[0] if kinds else caps[0]))
+        if not kinds and number:                          # «porta il soggiorno a 21 gradi»: the room's climate
+            candidates = [(d, c) for d, c in candidates if c == "climate"]
+        if len(candidates) != 1 or (not kinds and not rooms):
+            return False
+        device, cap = candidates[0]
+        if number:
+            if cap == "switch" or not set_to:
+                return False
+            setpoint = float(number.group(1).replace(",", "."))
+            action = "set_climate" if cap == "climate" else "set_heating"
+            body = {"capability": cap, "action": action, "params": {"on": True, "setpoint": setpoint}}
+        elif off:
+            body = {"capability": cap, "action": "turn_off", "params": {}}
+        else:
+            body = ({"capability": "switch", "action": "turn_on", "params": {}} if cap == "switch" else
+                    {"capability": cap, "action": "set_climate" if cap == "climate" else "set_heating",
+                     "params": {"on": True}})
+        return "errore" not in self.tool("comanda_dispositivo", {"device_id": device["device_id"], **body}, proposals)
+
+    async def quick(self, ask: dict, actor: str, cause: str, end: float) -> None:
+        """The answer when the model does not give one (D-182 layer 3): the unequivocal command, through the usual
+        approvals; otherwise the state and the app's controls. Never «non sono riuscito» alone."""
+        proposals: list[dict] = []
+        command = self.quick_proposal(ask["text"], proposals)
+        self._recourse(ask, cause, command)
+        footer = self.QUICK_FOOTER.get(cause, self.QUICK_FOOTER["model_unavailable"])
+        if command:
+            lines = await self.apply(proposals, ask, actor, until=end - 1.0)
+            ask["answer"] = "\n".join([*lines, footer])
+        else:
+            ask["answer"] = f"{self.state_text()} Per i comandi usa i pulsanti dell'app.\n{footer}"
+        if ask["status"] == "pending":
+            ask["status"] = "answered"
 
     def state_text(self) -> str:
         """The apartment in plain words: mode, occupancy, what is on, the temperatures."""
