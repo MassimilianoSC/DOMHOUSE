@@ -374,6 +374,13 @@ dell&#x27;organizzazione, dopo un&#x27;anteprima.</p>
 dita (dal lotto 26).</p>
 </li>
 <li>
+<p><strong>Temperature delle modalità regolabili</strong> (sezione 5, Regole): comfort, eco e raffrescamento per appartamento;
+con il sensore della stanza, in comfort il climatizzatore scalda o raffresca da solo.</p>
+</li>
+<li>
+<p><strong>Caldaia senza sensore</strong>: non si accende più da sola; a casa vuota l&#x27;antigelo non è attivo e arriva una notifica.</p>
+</li>
+<li>
 <p><strong>Due registri con nomi diversi</strong>: in Amministrazione «Registro dell&#x27;organizzazione» (chi ha fatto cosa nella tua
 organizzazione), in Organizzazioni «Registro della piattaforma» (solo per i gestori della piattaforma). Prima si
 chiamavano entrambi «Registro attività».</p>
@@ -603,7 +610,10 @@ velocità della ventola, letture di potenza, consumi, temperatura, umidità, fin
 <strong>«Riscaldamento abilitato» / «Riscaldamento disabilitato»</strong> e il pulsante «Attiva» / «Disattiva»: il termostato del
 sistema la accende e la spegne da solo intorno alla temperatura voluta (si vede dalle Decisioni), e se ha un misuratore
 che segna più di 30 W compare «sta scaldando ora». A casa vuota l&#x27;antigelo la accende sotto la soglia anche se è
-disabilitata.</p>
+disabilitata. Senza un sensore di temperatura collegato la caldaia segue solo i comandi manuali: in comfort ed eco
+non si accende da sola, e a casa vuota l&#x27;antigelo non è attivo: nelle Decisioni compare «sensore di temperatura
+mancante: antigelo non attivo» e arriva la notifica con il nome dell&#x27;appartamento e «antigelo non attivo» (categoria «Dispositivi e
+istanza offline»).</p>
 </li>
 <li>
 <p>Sotto ogni comando compare l&#x27;esito: «in corso», poi «eseguito», oppure l&#x27;errore. Un dispositivo offline ha i comandi
@@ -734,7 +744,13 @@ Le otto regole (valori di partenza e limiti):</p>
 <p><strong>Finestra aperta spegne il clima</strong>: dopo 5 minuti di finestra aperta (da 1 a 30).</p>
 </li>
 <li>
-<p><strong>Limiti del setpoint</strong>: la temperatura chiesta resta fra 16 e 24 °C.</p>
+<p><strong>Limiti del setpoint</strong>: la temperatura chiesta resta fra 16 e 24 °C. Qui stanno anche le temperature delle tre
+modalità, regolabili per appartamento (dal lotto 30): comfort 21 °C (da 16 a 26), eco 18 °C (da 10 a 22, non sopra
+comfort), raffrescamento 25 °C (da 22 a 28). In comfort il climatizzatore scalda quando la stanza è sotto la
+temperatura di comfort e raffresca quando è sopra quella di raffrescamento, usando il sensore della stessa stanza;
+senza sensore nella stanza il sistema non lo comanda da solo (solo i comandi manuali) e lo scrive nelle Decisioni
+una volta («sensore di temperatura mancante: regolazione automatica disattivata»). In eco il climatizzatore è spento
+e la caldaia tiene la temperatura di eco; in casa vuota la caldaia tiene la temperatura dell&#x27;antigelo.</p>
 </li>
 <li>
 <p><strong>Antigelo a casa vuota</strong>: accende la caldaia sotto 8 °C (da 5 a 12), anche se è disabilitata.</p>

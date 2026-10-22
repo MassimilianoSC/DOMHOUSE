@@ -255,7 +255,7 @@ quali appartamenti vedi.
   che segna più di 30 W compare «sta scaldando ora». A casa vuota l'antigelo la accende sotto la soglia anche se è
   disabilitata. Senza un sensore di temperatura collegato la caldaia segue solo i comandi manuali: in comfort ed eco
   non si accende da sola, e a casa vuota l'antigelo non è attivo: nelle Decisioni compare «sensore di temperatura
-  mancante: antigelo non attivo» e arriva la notifica «<appartamento>: antigelo non attivo» (categoria «Dispositivi e
+  mancante: antigelo non attivo» e arriva la notifica con il nome dell'appartamento e «antigelo non attivo» (categoria «Dispositivi e
   istanza offline»).
 - Sotto ogni comando compare l'esito: «in corso», poi «eseguito», oppure l'errore. Un dispositivo offline ha i comandi
   disattivati.
