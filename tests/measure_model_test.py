@@ -61,3 +61,40 @@ def test_causes_and_summary(monkeypatch, capsys):
     assert "rete: DNS 10 ms, TCP 30 ms, TLS 50 ms" in out
     assert "riuscite 1 su 4" in out and "mediana" in out and "p95" in out and "Costo stimato totale:" in out
     assert json.dumps(sent).count("progetto-prova") == 0                  # the project goes in the URL, not the body
+
+
+def test_the_native_regional_endpoint(monkeypatch, capsys):
+    """The committente's test (2): Vertex's generateContent on a regional endpoint, same prompt and tools translated."""
+    mm = _script()
+    from bff import net_phase
+    usage = {"promptTokenCount": 1000, "candidatesTokenCount": 50, "thoughtsTokenCount": 150, "totalTokenCount": 1200}
+    replies = [
+        httpx.Response(200, json={"candidates": [{"content": {"parts": [{"functionCall": {"name": "comanda_dispositivo",
+                                                                                         "args": {}}}]},
+                                                  "finishReason": "STOP"}], "usageMetadata": usage}),
+        httpx.Response(200, json={"candidates": [{"content": {"parts": []}, "finishReason": "MAX_TOKENS"}],
+                                  "usageMetadata": usage}),
+    ]
+    sent = []
+
+    async def fake_post(url, json=None, headers=None, connect_s=None, read_s=None, network=None):
+        sent.append((url, json))
+        return replies[(len(sent) - 1) % len(replies)]
+    monkeypatch.setattr(net_phase, "post_traced", fake_post)
+    monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
+    monkeypatch.setenv("GCP_PROJECT_ID", "progetto-prova")
+    monkeypatch.setattr("sys.argv", ["measure_model.py", "-n", "2", "--endpoint", "nativo", "--location", "europe-west4",
+                                     "--model", "google/gemini-3.8-flash", "--reasoning", "low"])
+    assert mm.main() == 0
+    out = capsys.readouterr().out
+    url, body = sent[0]
+    assert url == ("https://europe-west4-aiplatform.googleapis.com/v1/projects/progetto-prova/locations/europe-west4"
+                   "/publishers/google/models/gemini-3.8-flash:generateContent")
+    assert "Stato attuale dell'appartamento" in body["systemInstruction"]["parts"][0]["text"]
+    assert body["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "low"}
+    declared = {f["name"]: f for f in body["tools"][0]["functionDeclarations"]}
+    assert declared["comanda_dispositivo"]["parameters"]["properties"]["params"]["properties"]["setpoint"] == {"type": "number"}
+    assert "riuscite 1 su 2" in out and "troncata: max_tokens esauriti: 1" in out and "(ragionamento 150 token)" in out
+    assert "nativo europe-west4" in out
+    monkeypatch.setattr("sys.argv", ["measure_model.py", "--endpoint", "nativo"])          # «eu» is not a region
+    assert mm.main() == 2
