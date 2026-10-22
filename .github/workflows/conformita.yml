@@ -170,3 +170,38 @@ jobs:
         run: |
           tail -80 emulator.log || true
           tail -80 firebase-debug.log ci/firebase-debug.log 2>/dev/null || true
+
+  sito:
+    # D-155: le prove del sito (vitest) e quelle nel browser a 360 px (Playwright, P-73) con il BFF di sviluppo (dati in
+    # memoria, motori simulati). Nessun rilancio: una prova instabile si corregge, non si ripete (come P-64).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Dipendenze
+        run: |
+          pip install -r bff/requirements.txt
+          cd frontend && yarn install --frozen-lockfile
+
+      - name: Prove del sito (vitest)
+        working-directory: frontend
+        run: yarn test:ci
+
+      - name: Browser per le prove a 360 px
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove nel browser a 360 px (yarn e2e)
+        working-directory: frontend
+        env:
+          PYTHON: python                # il BFF di sviluppo con il Python di setup-python
+        run: yarn e2e
