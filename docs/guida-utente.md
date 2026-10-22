@@ -383,6 +383,8 @@ risposta dall'assistente: riprova». La conversazione resta solo in quella sched
 - L'esito lo scrive il sistema, non il modello: «Fatto: …» solo quando il dispositivo ha confermato; altrimenti
   «Comando inviato: …, l'esito arriva nell'app», «Serve la tua approvazione: …» oppure «Programmato: …». Se non sa una
   cosa lo dice e rimanda all'app.
+- Se l'assistente non riesce a rispondere entro mezzo minuto, esegue comunque le azioni che aveva già proposto e te lo
+  scrive; se non aveva ancora proposto niente, ti chiede di riprovare.
 - Limiti: 50 domande al giorno per appartamento («Limite di 50 domande al giorno raggiunto per questo appartamento:
   riprova domani»); un tetto di spesa mensile per tutto il servizio, raggiunto il quale compare «Limite mensile
   raggiunto, riprova dal mese prossimo». Anche gli appartamenti dimostrativi usano l'assistente vero.
