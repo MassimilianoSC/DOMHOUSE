@@ -36,6 +36,10 @@ un sistema che non è il suo, né ricevere le prenotazioni di una struttura altr
 - Il gestore della piattaforma vede l'elenco delle organizzazioni e i dati di base dei loro appartamenti (nome e
   collegamento al sistema domotico). **Non vede** dispositivi, consumi, decisioni né utenti delle organizzazioni.
 - Gli amministratori delle organizzazioni continuano a usare l'app esattamente come oggi.
+- **Dimostrativi, com'è l'appartamento all'inizio** (dal lotto 26): nel campo «URL istanza» di un dimostrativo il gestore
+  della piattaforma scrive `mock://builtin?variante=vuoto` (nessun ospite, casa fredda) oppure
+  `mock://builtin?variante=occupato` (soggiorno in corso). Per cambiarla a un dimostrativo esistente modifica il
+  collegamento e premi «Ripristina» nel Simulatore. Senza variante l'appartamento parte occupato.
 
 ## Parole usate in questa guida
 
