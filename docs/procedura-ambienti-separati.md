@@ -292,4 +292,7 @@ sopra). Nella console: IAM e amministrazione › Quote e limiti di sistema › f
 5. Impostazioni del server per usare Claude, quando deciso: `AI_API=anthropic`, `AI_MODEL=claude-haiku-5-5` (o
 `claude-sonnet-5-5`), `AI_LOCATION=eu` (host `aiplatform.eu.rep.googleapis.com`), prezzi `AI_PRICE_*` confermati sul
 listino ufficiale di Google prima della pubblicazione (D-143). Vanno nei manifesti della pubblicazione (M8 per lo
-staging, M12 per la produzione). Nessuna chiave da creare né da conservare.
+staging, M12 per la produzione). Nessuna chiave da creare né da conservare. **Regola D-180:** per qualunque modello la
+località è `eu` o una regione europea (`europe-…`); `global` e `us` sono esclusi in tutti gli ambienti. Il server
+rifiuta di partire con una località diversa (messaggio nel log) e `scripts/publish.sh` controlla lo stesso valore nel
+manifesto prima di pubblicare.
