@@ -371,7 +371,9 @@ risposta dall'assistente: riprova». La conversazione resta solo in quella sched
   Approvazioni.», con i pulsanti «Sì» e «No» e l'ora di scadenza. Il clic vale come una risposta dalla pagina
   Approvazioni: compare lì e nelle Decisioni con il tuo nome, e scade allo stesso modo (respinta se nessuno risponde
   entro 30 minuti). Più azioni in una richiesta («spegni clima e caldaia») diventano una domanda ciascuna, in coda; una
-  domanda già decisa da un collega o scaduta compare come «Già decisa» o «Scaduta», senza pulsanti. Chi legge soltanto
+  domanda già decisa da un collega o scaduta compare come «Già decisa: approvata», «Già decisa: respinta» o «Scaduta»,
+  senza pulsanti; se davanti c'è un'altra approvazione da decidere compare «In attesa: prima va decisa l'approvazione
+  aperta.» con il link «Vai alle approvazioni». Chi legge soltanto
   vede la domanda senza pulsanti.
 - L'esito lo scrive il sistema, non il modello: «Fatto: …» solo quando il dispositivo ha confermato; altrimenti
   «Comando inviato: …, l'esito arriva nell'app», «Serve la tua approvazione: …» oppure «Programmato: …». Se non sa una
