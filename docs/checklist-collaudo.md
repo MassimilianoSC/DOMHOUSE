@@ -191,8 +191,8 @@ normale di prova con un **operatore**.
 | N. | Ruolo | Passi | Risultato atteso | Esito |
 |---|---|---|---|---|
 | J1 | Gestore che è anche amministratore | Guarda il fondo della barra laterale; poi Amministrazione > Appartamenti. | Due righe: «Amministratore · …» e «Gestore della piattaforma»; nessuna nota «scrivi all'assistenza». | |
-| J2 | Amministratore | Cambia il ruolo di un utente, poi apri Amministrazione > Registro attività. | La voce in cima dice chi ha cambiato il ruolo di chi, da quale ruolo a quale, con la data. | |
-| J3 | Gestore | Organizzazioni > Registro attività, scegli l'organizzazione di J2. | La stessa azione compare con i soli ruoli («Un amministratore ha cambiato il ruolo di un utente…»), senza nomi né email. | |
+| J2 | Amministratore | Cambia il ruolo di un utente, poi apri Amministrazione > Registro dell'organizzazione. | La voce in cima dice chi ha cambiato il ruolo di chi, da quale ruolo a quale, con la data. | |
+| J3 | Gestore | Organizzazioni > Registro della piattaforma, scegli l'organizzazione di J2. | La stessa azione compare con i soli ruoli («Un amministratore ha cambiato il ruolo di un utente…»), senza nomi né email. | |
 | J4 | Gestore | Elenco organizzazioni > «Sospendi» su un'organizzazione di prova (con un utente collegato), con un motivo. | L'organizzazione ha l'etichetta «Sospesa»; l'utente collegato esce con «La tua organizzazione è sospesa…» e non riesce a rientrare. | |
 | J5 | Gestore | «Riattiva» sulla stessa organizzazione. | L'utente rientra normalmente; nel Registro attività ci sono sospensione (con il motivo) e riattivazione. | |
 | J6 | Gestore | Elenco organizzazioni > «Accesso di assistenza» su un'organizzazione di prova: 1 ora, un motivo; poi «Entra come assistenza». | Barra in alto «Stai lavorando come assistenza in … con i permessi di un operatore.»; si vedono gli appartamenti di quell'organizzazione; Amministrazione non c'è. | |

@@ -91,6 +91,9 @@ un sistema che non è il suo, né ricevere le prenotazioni di una struttura altr
 - **Minuti di presenza dopo il check-out**: nuovo valore nella regola «Risparmio al check-out».
 - **Sul telefono** le schede degli appartamenti stanno tutte nello schermo: non serve più restringere la pagina con le
   dita (dal lotto 26).
+- **Due registri con nomi diversi**: in Amministrazione «Registro dell'organizzazione» (chi ha fatto cosa nella tua
+  organizzazione), in Organizzazioni «Registro della piattaforma» (solo per i gestori della piattaforma). Prima si
+  chiamavano entrambi «Registro attività».
 - **«Casa vuota»**: la modalità per l'appartamento senza ospiti si chiama così (prima «vuoto»). Nella scheda, «vuoto»
   indica invece l'occupazione, cioè che non c'è nessuno. Nelle Decisioni un cambio di modalità si legge «comfort → casa
   vuota».
@@ -490,7 +493,7 @@ e se sono state trasmesse al sistema domotico che gestisce l'appartamento.
 - Date e ore sono nel fuso orario italiano.
 - Le prove fatte con il Simulatore non passano da qui e non compaiono in questa scheda.
 
-**Registro attività:** «Chi ha fatto cosa nella tua organizzazione: inviti, ruoli, appartamenti, funzioni e accessi di
+**Registro dell'organizzazione** (prima «Registro attività»): «Chi ha fatto cosa nella tua organizzazione: inviti, ruoli, appartamenti, funzioni e accessi di
 assistenza.» Ogni voce è una frase con la data, dalla più recente; «Carica altri» mostra le 50 successive. Esempio:
 «Anna Rossi ha cambiato il ruolo di bruno@… da «Sola lettura» a «Operatore»». Chi ha eliminato il proprio account
 compare come «utente rimosso».
@@ -511,7 +514,7 @@ un'email «BFF non raggiungibile»; quando torna su arriva l'email di chiusura.
 
 Chi ha il ruolo di gestore della piattaforma (HQE) vede nel menu la voce **Organizzazioni**. Gli amministratori delle
 organizzazioni non la vedono. La pagina ha quattro schede: **Elenco organizzazioni**, **Gestori della piattaforma**,
-**Prenotazioni non attribuite** e **Registro attività**.
+**Prenotazioni non attribuite** e **Registro della piattaforma**.
 - **Nuova organizzazione** (in Elenco organizzazioni): scrivi il nome e l'email della persona che la amministrerà. Quella persona riceve un'email
   per entrare; una volta dentro invita da sola gli altri utenti. Due organizzazioni non possono avere lo stesso nome.
 - **Reinvia invito:** se l'email non è partita o la persona non la trova. Il pulsante sparisce quando l'amministratore
@@ -542,7 +545,7 @@ organizzazioni non la vedono. La pagina ha quattro schede: **Elenco organizzazio
   compare «L'accesso di assistenza a … è finito: ora vedi di nuovo la tua area.». Non c'è per un'organizzazione
   sospesa. Se la chiusura sul server non riesce, compare «Chiusura dell'accesso sul server non riuscita: chiudilo da
   Organizzazioni.». Tutto resta nel Registro attività, con il tuo nome.
-- **Registro attività:** con «Registro di» scegli un'organizzazione, oppure «Azioni della piattaforma» (gestori
+- **Registro della piattaforma** (prima «Registro attività»): con «Registro di» scegli un'organizzazione, oppure «Azioni della piattaforma» (gestori
   nominati e tolti). Per le persone delle organizzazioni vedi solo il ruolo, non il nome né l'email: per esempio «Un
   amministratore ha invitato un utente come «Sola lettura»».
 - **Gestori della piattaforma:** aggiungi un altro gestore scrivendo la sua email; diventa gestore quando entra
@@ -565,7 +568,7 @@ nomi simili ma fanno cose diverse:
 | **Utenti:** le persone della propria organizzazione, con ruolo e appartamenti visibili. | **Gestori della piattaforma:** le persone di HQE che gestiscono il servizio. Della singola organizzazione il gestore vede solo il primo amministratore («Reinvia invito»). |
 | **Funzioni:** quali schermate sono attive. | Nessuna scheda corrispondente. |
 | **Prenotazioni ricevute:** le prenotazioni arrivate ai propri appartamenti. | **Prenotazioni non attribuite:** le prenotazioni che non corrispondono a nessun appartamento. Le due schede non si sovrappongono. |
-| **Registro attività:** chi ha fatto cosa, con i nomi. | **Registro attività:** cosa è successo in un'organizzazione, con i soli ruoli; più le azioni della piattaforma. |
+| **Registro dell'organizzazione:** chi ha fatto cosa, con i nomi. | **Registro della piattaforma:** cosa è successo in un'organizzazione, con i soli ruoli; più le azioni della piattaforma. |
 | Avviso dell'accesso di assistenza, con «Chiudi accesso». | **Accesso di assistenza** (in Elenco organizzazioni): aprirlo, entrare, chiuderlo. |
 | Nessuna scheda corrispondente. | **Elenco organizzazioni:** creare un'organizzazione, rinominarla, invitare il primo amministratore. |
 
