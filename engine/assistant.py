@@ -313,11 +313,17 @@ class Assistant:
 
     def needs_approval(self, p: dict, together: bool) -> bool:
         """D-132 point 2: with guests in, the guest's comfort (switching off a climate or a boiler, the mode); and any
-        action together with others (one approval each, D-144)."""
+        action together with others (one approval each, D-144). D-162: the setting ASSISTANT_CONFIRM, «ospiti» (this,
+        the default), «sempre» (every action), «multiple» (only actions together)."""
         if p["type"] == "schedule":
             return False
+        policy = self.e.setting("ASSISTANT_CONFIRM")
+        if policy == "sempre":
+            return True
         if together:
             return True
+        if policy == "multiple":
+            return False
         if self.e.apartment().get("occupancy") != "occupied":
             return False
         if p["type"] == "mode":

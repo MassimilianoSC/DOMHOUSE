@@ -68,8 +68,13 @@ NAMES = {"apt-rimini-01": "Via Roma 12 – int. 3", "apt-bologna-01": "Corso Ita
 DEFAULT_RULES = [
     {"rule_id": "window_open_off", "label": "Finestra aperta spegne il clima", "enabled": True, "editable": True,
      "params": {"minutes": 5}, "limits": {"minutes": {"min": 1, "max": 30}}},
+    # D-161, D-162: the modes' temperatures, parameters added to a fixed rule (Rule.params admits them, D-151):
+    # comfort_celsius (boiler and climate heating in comfort), eco_celsius (boiler in eco), comfort_cool_celsius (climate
+    # cooling in comfort); eco <= comfort < cool. «Casa vuota» keeps frost_protection.celsius
     {"rule_id": "setpoint_limits", "label": "Limiti del setpoint", "enabled": True, "editable": True,
-     "params": {"min": 16, "max": 24}, "limits": {"min": {"min": 7, "max": 20}, "max": {"min": 20, "max": 28}}},
+     "params": {"min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18, "comfort_cool_celsius": 25},
+     "limits": {"min": {"min": 7, "max": 20}, "max": {"min": 20, "max": 28}, "comfort_celsius": {"min": 16, "max": 26},
+                "eco_celsius": {"min": 10, "max": 22}, "comfort_cool_celsius": {"min": 22, "max": 28}}},
     {"rule_id": "frost_protection", "label": "Antigelo a casa vuota", "enabled": True, "editable": True,
      "params": {"celsius": 8}, "limits": {"celsius": {"min": 5, "max": 12}}},
     {"rule_id": "mold_protection", "label": "Antimuffa a casa vuota", "enabled": True, "editable": True,
@@ -271,6 +276,7 @@ class ApartmentEngine:
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode
+        self.no_sensor_noted: set[str] = set()        # D-162: climates without a room sensor, noted in this comfort
         self.model = model                           # P-60 step 9: engine/assistant.ModelClient, None = keywords
         self.restored = bool(self.store.get_meta("initialized"))
         if self.restored:
@@ -306,6 +312,19 @@ class ApartmentEngine:
             if rule["rule_id"] == "compressor_min_off":
                 rule["params"]["minutes"] = minutes
                 rule["limits"]["minutes"] = {"min": minutes, "max": minutes}
+
+    def _rule_defaults(self) -> None:
+        """A rule saved before a parameter existed (D-151, D-161) gets it with its default and limits; a value already
+        there is never changed."""
+        defaults = {r["rule_id"]: r for r in DEFAULT_RULES}
+        for rule in self.rules:
+            base = defaults.get(rule["rule_id"])
+            if not base:
+                continue
+            for key, value in base["params"].items():
+                if key not in rule["params"]:
+                    rule["params"][key] = value
+                    rule["limits"][key] = dict(base["limits"][key])
 
     def _presence_from_settings(self, fresh: bool = False) -> None:
         """D-151: checkout_eco's presence_minutes starts from the setting CHECKOUT_PRESENCE_MINUTES (a rule saved before
@@ -370,6 +389,7 @@ class ApartmentEngine:
         self.rules = apt.get("rules", self.rules)
         self._compressor_from_settings()
         self._presence_from_settings()
+        self._rule_defaults()                  # after presence_minutes, which takes its first value from the setting
         self.rules_updated_at = apt.get("rules_updated_at", self.rules_updated_at)
         self.counter = st.get_meta("counter", self.counter)
         self.meters = {k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
@@ -922,34 +942,69 @@ class ApartmentEngine:
     def apartment_changed(self, correlation_id: str | None) -> None:
         self.emit("apartment.changed", self.apartment(), correlation_id)
 
-    def mode_commands(self, mode: str) -> list[tuple[str, dict]]:
+    def room_temperature(self, device: dict) -> float | None:
+        """D-162: the temperature of the room of a climate, from a sensor with «temperature» in the same room, online;
+        None without one (the explicit link sensor_device_id is the boiler's, connector.md §2.2)."""
+        for d in sorted(self.devices.values(), key=lambda x: x["device_id"]):
+            t = d["capabilities"].get("temperature")
+            if (d["room_id"] == device["room_id"] and d["device_id"] != device["device_id"] and t and d["online"]
+                    and isinstance(t.get("celsius"), (int, float))):
+                return float(t["celsius"])
+        return None
+
+    def mode_commands(self, mode: str, correlation_id: str | None = None) -> list[tuple[str, dict]]:
+        """The commands of a mode (D-161, D-162). Boiler: comfort_celsius, eco_celsius, or the frost protection's in
+        «casa vuota». Climate: off in eco and «casa vuota»; in comfort by the room's sensor: heating to
+        comfort_celsius under it, cooling to comfort_cool_celsius over that, nothing in between; without a sensor no
+        automatic command (only manual ones) and one decision per episode, which ends when the apartment leaves comfort
+        or the sensor answers again."""
         out = []
+        sl = self.rule("setpoint_limits")["params"]
         frost = self.rule("frost_protection")["params"]["celsius"]
+        if mode != "comfort":
+            self.no_sensor_noted.clear()
         for d in self.devices.values():
             caps = d["capabilities"]
             if not d["online"]:
                 continue
             if "climate" in caps:
                 c = caps["climate"]
-                if mode == "comfort":
-                    sp = min(max(21, c["setpoint_min"]), c["setpoint_max"])
-                    out.append((d["device_id"], {"capability": "climate", "action": "set_climate",
-                                                 "params": {"on": True, "mode": "heat", "setpoint": sp}}))
-                else:
+                if mode != "comfort":
                     out.append((d["device_id"], {"capability": "climate", "action": "turn_off"}))
+                else:
+                    room = self.room_temperature(d)
+                    if room is None:
+                        self._note_no_sensor(d, correlation_id)
+                    else:
+                        self.no_sensor_noted.discard(d["device_id"])
+                        heat, cool = sl["comfort_celsius"], sl["comfort_cool_celsius"]
+                        if room < heat or room > cool:
+                            climate_mode, target = ("heat", heat) if room < heat else ("cool", cool)
+                            sp = min(max(target, c["setpoint_min"]), c["setpoint_max"])
+                            out.append((d["device_id"], {"capability": "climate", "action": "set_climate",
+                                                         "params": {"on": True, "mode": climate_mode, "setpoint": sp}}))
             if "heating" in caps:
                 h = caps["heating"]
-                target = {"comfort": 21, "eco": 18, "empty": frost}[mode]
+                target = {"comfort": sl["comfort_celsius"], "eco": sl["eco_celsius"], "empty": frost}[mode]
                 sp = min(max(target, h["setpoint_min"]), h["setpoint_max"])
                 out.append((d["device_id"], {"capability": "heating", "action": "set_heating",
                                              "params": {"on": True, "setpoint": sp}}))
         return out
 
+    def _note_no_sensor(self, device: dict, correlation_id: str | None) -> None:
+        """D-162: one decision per episode for a climate without a temperature sensor in its room."""
+        if device["device_id"] in self.no_sensor_noted:
+            return
+        self.no_sensor_noted.add(device["device_id"])
+        self.log("system", {"type": "device", "device_id": device["device_id"]}, "auto_regulation_off", None, None,
+                 f"{device['label']}: sensore di temperatura mancante, regolazione automatica disattivata",
+                 "informational", correlation_id or str(uuid.uuid4()))
+
     def set_mode(self, mode: str, actor: str, correlation_id: str, reasoning: str, decision_actor: str | None = None) -> list[str]:
         if mode not in MODES:
             raise bad_request("Modalità non valida")
         command_ids = []
-        for device_id, body in self.mode_commands(mode):
+        for device_id, body in self.mode_commands(mode, correlation_id):
             try:
                 cmd = self.create_command(device_id, body, actor, correlation_id, decision_actor=decision_actor,
                                           reasoning=f"Modalità {mode}")
@@ -1426,6 +1481,11 @@ class ApartmentEngine:
         sl = by_id["setpoint_limits"]["params"]
         if sl["min"] > sl["max"]:
             raise MockError(422, "invalid_range", "Il minimo del setpoint non può superare il massimo")
+        if sl.get("eco_celsius", 0) > sl.get("comfort_celsius", 99):        # D-161
+            raise MockError(422, "invalid_range", "La temperatura eco non può superare quella comfort")
+        if sl.get("comfort_celsius", 0) >= sl.get("comfort_cool_celsius", 99):   # D-162
+            raise MockError(422, "invalid_range",
+                            "La temperatura di raffrescamento deve essere più alta di quella comfort")
         self.rules = staged
         self.rules_updated_at = iso(utcnow())
         self._save_apartment()

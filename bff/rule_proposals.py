@@ -32,7 +32,8 @@ ENABLED_FIELD = "attiva"      # the tool's name for on/off: valore 1 = attiva, 0
 # the predefined values (the contract's example of GET /rules, the engine's DEFAULT_RULES), for «regole personalizzate»
 DEFAULTS = {
     "window_open_off": {"enabled": True, "minutes": 5},
-    "setpoint_limits": {"enabled": True, "min": 16, "max": 24},
+    "setpoint_limits": {"enabled": True, "min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18,
+                        "comfort_cool_celsius": 25},
     "frost_protection": {"enabled": True, "celsius": 8},
     "mold_protection": {"enabled": True, "humidity_percent": 65},
     "prearrival": {"enabled": True, "hours_before": 2},
@@ -43,7 +44,9 @@ DEFAULTS = {
 # what each rule and parameter means, for the model (the same words as the site's Rules page)
 MEANING = {
     "window_open_off": "spegne clima e caldaia se una finestra resta aperta più di minutes minuti",
-    "setpoint_limits": "limita la temperatura impostabile da ospiti e app: da min a max gradi",
+    "setpoint_limits": ("limita la temperatura impostabile da ospiti e app: da min a max gradi; in comfort la caldaia "
+                        "e il clima scaldano a comfort_celsius, il clima raffresca a comfort_cool_celsius; in eco la "
+                        "caldaia sta a eco_celsius"),
     "frost_protection": "con la casa vuota mantiene almeno celsius gradi",
     "mold_protection": "con la casa vuota deumidifica sopra humidity_percent di umidità",
     "prearrival": "porta la casa in comfort hours_before ore prima dell'arrivo degli ospiti",
@@ -195,7 +198,7 @@ _NUM = r"(\d+(?:[.,]\d+)?)"
 _RULE_WORDS = (("window_open_off", ("finestr",)), ("frost_protection", ("antigelo", "gelo")),
                ("mold_protection", ("muffa", "umidit")), ("prearrival", ("arrivo",)),
                ("checkout_eco", ("check-out", "checkout", "partenza")), ("offline_alert", ("offline",)),
-               ("setpoint_limits", ("setpoint", "temperatura")))
+               ("setpoint_limits", ("setpoint", "temperatura", "comfort", " eco", "raffresc")))
 
 
 def simple(text: str) -> bool:
@@ -228,7 +231,7 @@ def recognize(text: str, ruleset: dict) -> tuple[list | None, str]:
             ("checkout_eco", "minutes_after")
     elif "offline" in t:
         rule, key = "offline_alert", "minutes"
-    elif "setpoint" in t or "temperatura" in t:
+    elif "setpoint" in t or "temperatura" in t or "comfort" in t or "raffresc" in t or re.search(r"\beco\b", t):
         rule = "setpoint_limits"
     if rule is None:
         return None, ("Posso cambiare le regole della pagina: finestra aperta, limiti del setpoint, antigelo, "
@@ -237,6 +240,13 @@ def recognize(text: str, ruleset: dict) -> tuple[list | None, str]:
         return [{"rule_id": rule, "enabled": False}], "Spengo la regola."
     if re.search(r"\b(attiv|accend|riattiv)", t) and not n:
         return [{"rule_id": rule, "enabled": True}], "Attivo la regola."
+    if rule == "setpoint_limits" and n and len(n) == 1:              # D-161: the modes' temperatures
+        if "raffresc" in t:
+            return [{"rule_id": rule, "params": {"comfort_cool_celsius": _num(n[0])}}], "Cambio il raffrescamento in comfort."
+        if "comfort" in t:
+            return [{"rule_id": rule, "params": {"comfort_celsius": _num(n[0])}}], "Cambio la temperatura comfort."
+        if re.search(r"\beco\b", t):
+            return [{"rule_id": rule, "params": {"eco_celsius": _num(n[0])}}], "Cambio la temperatura eco."
     if rule == "setpoint_limits":
         if len(n) >= 2:
             return [{"rule_id": rule, "params": {"min": _num(min(n[:2])), "max": _num(max(n[:2]))}}], \

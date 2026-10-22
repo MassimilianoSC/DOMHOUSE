@@ -62,6 +62,10 @@ CHOICES: dict[str, tuple[str, tuple[str, ...]]] = {
     # (guests in, warm); «auto» keeps the rule before P-72 (empty for an id containing "bologna"). Read at the first
     # start of an apartment (its data are kept afterwards)
     "DEMO_VARIANT": ("auto", ("auto", "vuoto", "occupato")),
+    # D-162: when the assistant asks the manager before acting: «ospiti» (with guests in, for switching off a climate
+    # or a boiler and for a mode; and two or more actions together), «sempre» (every action, scheduled ones excepted),
+    # «multiple» (only two or more actions together, guests or not). No «never», on purpose
+    "ASSISTANT_CONFIRM": ("ospiti", ("ospiti", "sempre", "multiple")),
 }
 DEFAULT_SETTINGS: dict[str, float | str] = {name: spec[0] for name, spec in (SETTINGS | CHOICES).items()}
 ENGINE_VARIABLES = {"APARTMENT_ID", "API_KEY", "CONNECTOR", "HOST", "PORT", "DATA_DIR", "CATALOG_PATH",

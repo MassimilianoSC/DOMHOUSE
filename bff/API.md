@@ -583,6 +583,12 @@ Esempio di risposta di #38 a «la finestra aperta spegne dopo 10 minuti e la pre
   numerici in più in una regola fissa; non è una modifica del contratto. Il primo è `presence_minutes` di
   `checkout_eco` (minuti di presenza dopo il check-out, da 5 a 180): il primo valore viene da
   `CHECKOUT_PRESENCE_MINUTES` del motore, poi si cambia dall'app.
+- Dal lotto 30 (D-161, D-162) «Limiti del setpoint» (`setpoint_limits`) ha tre parametri in più: `comfort_celsius`
+  (21, da 16 a 26: caldaia e clima che scalda in comfort), `eco_celsius` (18, da 10 a 22: caldaia in eco) e
+  `comfort_cool_celsius` (25, da 22 a 28: clima che raffresca in comfort); eco ≤ comfort < raffrescamento, altrimenti
+  422 `invalid_range`. In comfort il clima segue il sensore di temperatura della sua stanza: scalda sotto
+  `comfort_celsius`, raffresca sopra `comfort_cool_celsius`, nella fascia fra i due niente; senza sensore nessun
+  comando automatico e una decisione `auto_regulation_off` per episodio. «Casa vuota» resta sull'antigelo.
 
 ## Copia delle regole (P-60 passo 12, D-151 punto 22)
 
