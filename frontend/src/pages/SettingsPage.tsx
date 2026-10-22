@@ -50,7 +50,10 @@ function InstallCard() {
 
 export default function SettingsPage() {
   const { me, logout } = useAuth();
-  const apartments = useApartments();
+  // Without an organization (a platform manager only) the organization routes answer 403 (P-36): no apartments to
+  // count and no notifications, which come per apartment, so neither call is made.
+  const withTenant = Boolean(me?.tenant);
+  const apartments = useApartments(withTenant);
   if (!me) return null;
   // Admins always see every apartment; others see "all" or their list (P-18), named from the list the BFF gives them.
   const scope = me.role === "admin" ? "all" : (me.user.apartment_ids ?? "all");
@@ -67,7 +70,7 @@ export default function SettingsPage() {
         <Row label={t("settings.env")} value={<span className="font-mono text-xs">{me.env.app_env} · auth {me.env.auth_mode} · {me.env.instance_mode}</span>} testId="settings-env" />
       </Card>
       <AccountSettings />
-      <NotificationSettings />
+      {withTenant && <NotificationSettings />}
       <InstallCard />
       <Card className="p-5">
         <label htmlFor="lang" className="mb-2 block text-base font-bold md:text-lg">{t("settings.language")}</label>

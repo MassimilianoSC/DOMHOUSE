@@ -12,10 +12,13 @@ export function useApartmentSummary(aptId: string | undefined) {
   });
 }
 
-export function useApartments() {
+/** enabled false: a person without an organization (a platform manager only) has no apartments, and the route would
+ *  answer 403 (P-36): no call at all. */
+export function useApartments(enabled = true) {
   return useQuery({
     queryKey: ["apartments"],
     queryFn: () => bffFetch<ApartmentSummary[]>("/app/apartments"),
+    enabled,
     refetchInterval: 20_000,
   });
 }
