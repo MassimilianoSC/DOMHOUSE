@@ -366,8 +366,13 @@ risposta dall'assistente: riprova». La conversazione resta solo in quella sched
 - L'assistente legge stati, consumi, programmazioni e Decisioni dell'appartamento (sa rispondere a «perché si è spento
   il clima?») e può fare solo ciò che un operatore fa dall'app: modalità, comandi ai dispositivi, programmazioni. Non
   tocca regole, utenti e appartamenti, e non riceve mai dati personali degli ospiti.
-- Con ospiti presenti, spegnere il clima o la caldaia o cambiare modalità passa da un'approvazione; più azioni in una
-  richiesta («spegni clima e caldaia») diventano un'approvazione ciascuna, in coda.
+- Con ospiti presenti l'assistente non spegne il clima o la caldaia e non cambia la modalità da solo: te lo chiede nella
+  chat, per esempio «Spengo climatizzatore soggiorno con ospiti presenti? Rispondi Sì o No qui sotto, oppure dalla pagina
+  Approvazioni.», con i pulsanti «Sì» e «No» e l'ora di scadenza. Il clic vale come una risposta dalla pagina
+  Approvazioni: compare lì e nelle Decisioni con il tuo nome, e scade allo stesso modo (respinta se nessuno risponde
+  entro 30 minuti). Più azioni in una richiesta («spegni clima e caldaia») diventano una domanda ciascuna, in coda; una
+  domanda già decisa da un collega o scaduta compare come «Già decisa» o «Scaduta», senza pulsanti. Chi legge soltanto
+  vede la domanda senza pulsanti.
 - L'esito lo scrive il sistema, non il modello: «Fatto: …» solo quando il dispositivo ha confermato; altrimenti
   «Comando inviato: …, l'esito arriva nell'app», «Serve la tua approvazione: …» oppure «Programmato: …». Se non sa una
   cosa lo dice e rimanda all'app.

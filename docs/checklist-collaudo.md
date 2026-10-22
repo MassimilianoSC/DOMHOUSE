@@ -87,7 +87,8 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D9 | Operatore | Programmazione: «Nuova azione» fra 10 minuti, poi «Sposta», poi «Annulla azione». | «Azione programmata», «Orario aggiornato», «Azione annullata». | |
 | D10 | Operatore | Regole: cambia un valore fuori dai limiti, poi uno valido e salva. | Prima l'errore sotto il campo, poi «Regole aggiornate». | |
 | D11 | Operatore (su un dimostrativo «vuoto», vedi D6b) | Assistente: «accendi la stufetta in camera». | Entro 30 secondi: «Fatto: accendere presa stufetta camera.»; in Panoramica la presa risulta accesa; nelle Decisioni l'autore è l'assistente. | |
-| D11b | Operatore (su un dimostrativo «occupato») | Assistente: «spegni il clima». | «Serve la tua approvazione: …» con il link «Vai alle approvazioni»; la richiesta compare in Approvazioni e il clima resta acceso finché non approvi. | |
+| D11b | Operatore (su un dimostrativo «occupato») | Assistente: «spegni il clima». | La risposta finisce con «Spengo climatizzatore soggiorno con ospiti presenti? Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni.» e sotto ci sono i pulsanti «Sì» e «No» con «scade alle …»; il clima resta acceso. Premi «Sì»: «Approvato: il comando parte, l'esito arriva nell'app»; in Approvazioni la richiesta risulta approvata da te, con l'ora, e nelle Decisioni compare con il tuo nome. | |
+| D11e | Sola lettura (stesso dimostrativo, nuova richiesta da un operatore) | Apri l'Assistente mentre c'è una domanda aperta. | La domanda si vede senza i pulsanti «Sì» e «No». | |
 | D11c | Operatore (su un dimostrativo) | Dal Simulatore apri una finestra e aspetta che il clima si spenga (5 minuti); poi Assistente: «perché si è spento il clima?». | Una risposta che cita la finestra aperta, presa dalle Decisioni. | |
 | D11d | Sola lettura | Apri la pagina Assistente. | Nessun campo per scrivere: il ruolo non fa domande. | |
 
