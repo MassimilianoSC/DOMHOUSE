@@ -9,17 +9,20 @@ cause. Writes nothing (no Firestore, no monthly counter): it only calls the mode
 
 Options: -n calls per variant (20); --model (repeatable; AI_MODEL or google/gemini-3.8-flash); --reasoning (repeatable:
 default = no reasoning_effort sent, or a value such as low, none; default only); --location (AI_LOCATION or eu);
---max-tokens (AI_MAX_TOKENS or 4096); --timeout seconds per call (AI_TIMEOUT_S or 25). Each variant is model x reasoning.
+--max-tokens (AI_MAX_TOKENS or 4096); --timeout seconds to wait for the answer (AI_TIMEOUT_S or 25); --connect-timeout
+seconds for DNS, TCP and TLS each (AI_CONNECT_TIMEOUT_S or 5). Each variant is model x reasoning.
 
 The request is the engine's own (engine/assistant.py): its system prompt with the state of a demonstration apartment
 (simulated catalog, no guest data), its tools, and five questions in turn («spegni il clima», «che temperatura c'è in
 soggiorno?», «perché si è spento il clima?», «metti eco», «accendi la stufetta in camera»). One call each: the time of
 one model call, the unit the assistant's budget is made of.
 
-Causes of a failure: «timeout» (no answer within --timeout); «troncata: max_tokens esauriti» (finish_reason length with
-nothing usable: the reasoning ate the tokens); «endpoint HTTP <code>» (with the first 300 characters of the error; 429 is a
-quota of Vertex, not the app's monthly cap, which this script never touches); «rete» (connection). Prices: the app's
-(AI_PRICE_*), output tokens = total - input, reasoning included.
+Causes of a failure: «timeout nella fase …» or «errore nella fase …», the phase being DNS, connessione (TCP), TLS,
+invio della richiesta, attesa della risposta (no first byte within --timeout), lettura della risposta (bff/net_phase.py,
+the same code as the BFF's calls); «troncata: max_tokens esauriti» (finish_reason length with nothing usable: the
+reasoning ate the tokens); «endpoint HTTP <code>» (with the first 300 characters of the error; 429 is a quota of Vertex,
+not the app's monthly cap, which this script never touches). Each answer shows its network times (DNS, TCP, TLS).
+Prices: the app's (AI_PRICE_*), output tokens = total - input, reasoning included.
 """
 import argparse
 import json
@@ -62,17 +65,19 @@ def classify(answer: dict) -> str | None:
     return f"vuota (finish_reason {choice.get('finish_reason')})"
 
 
-def one_call(url: str, token: str, body: dict, timeout: float) -> tuple[float, str | None, dict]:
-    """(seconds, cause or None, usage)."""
-    import httpx
+def one_call(url: str, token: str, body: dict, timeout: float, connect: float = 5.0,
+             network: dict | None = None) -> tuple[float, str | None, dict]:
+    """(seconds, cause or None, usage); `network` receives the DNS, TCP and TLS seconds of a call that got that far."""
+    import asyncio
+
+    from bff import net_phase
 
     started = time.monotonic()
     try:
-        resp = httpx.post(url, json=body, headers={"Authorization": f"Bearer {token}"}, timeout=timeout)
-    except httpx.TimeoutException:
-        return time.monotonic() - started, "timeout", {}
-    except httpx.HTTPError as exc:
-        return time.monotonic() - started, f"rete ({type(exc).__name__})", {}
+        resp = asyncio.run(net_phase.post_traced(url, json=body, headers={"Authorization": f"Bearer {token}"},
+                                                 connect_s=connect, read_s=timeout, network=network))
+    except net_phase.PhaseFailure as exc:
+        return exc.seconds, f"{'timeout' if exc.timeout else 'errore'} nella fase «{exc.phase}»", {}
     took = time.monotonic() - started
     if resp.status_code != 200:
         words = " ".join(resp.text.split())[:300]          # enough to read the allowed values of a 400
@@ -95,6 +100,7 @@ def main() -> int:
     ap.add_argument("--location", default=os.environ.get("AI_LOCATION", "eu"))
     ap.add_argument("--max-tokens", type=int, default=int(os.environ.get("AI_MAX_TOKENS", "4096")))
     ap.add_argument("--timeout", type=float, default=float(os.environ.get("AI_TIMEOUT_S", "25")))
+    ap.add_argument("--connect-timeout", type=float, default=float(os.environ.get("AI_CONNECT_TIMEOUT_S", "5")))
     a = ap.parse_args()
     project = os.environ.get("GCP_PROJECT_ID", "").strip()
     if not project:
@@ -108,7 +114,7 @@ def main() -> int:
     url = (f"https://aiplatform.googleapis.com/v1/projects/{project}/locations/{a.location}"
            f"/endpoints/openapi/chat/completions")
     print(f"Misura del modello: progetto {project}, località {a.location}, {a.n} chiamate per variante, "
-          f"max_tokens {a.max_tokens}, timeout {a.timeout:g} s")
+          f"max_tokens {a.max_tokens}, attesa della risposta {a.timeout:g} s, connessione {a.connect_timeout:g} s")
     try:
         token = ai_gateway._token()
     except Exception as exc:
@@ -127,14 +133,17 @@ def main() -> int:
                         "max_tokens": a.max_tokens}
                 if reasoning != "default":
                     body["reasoning_effort"] = reasoning
-                took, cause, usage = one_call(url, token, body, a.timeout)
+                network: dict = {}
+                took, cause, usage = one_call(url, token, body, a.timeout, a.connect_timeout, network)
                 if usage:
                     c, _, _ = ai_gateway.cost_eur(usage)
                     cost += c
                 reasoning_tokens = ((usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
                                     if usage else None)
+                net = (f"  rete: DNS {network['dns'] * 1000:.0f} ms, TCP {network['connessione'] * 1000:.0f} ms, "
+                       f"TLS {network['tls'] * 1000:.0f} ms") if "tls" in network else ""
                 print(f"  {i + 1:2d}. {took:5.1f} s  {cause or 'ok'}"
-                      + (f"  (ragionamento {reasoning_tokens} token)" if reasoning_tokens else ""))
+                      + (f"  (ragionamento {reasoning_tokens} token)" if reasoning_tokens else "") + net)
                 if cause:
                     causes[cause] = causes.get(cause, 0) + 1
                 else:

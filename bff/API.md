@@ -667,3 +667,10 @@ si paga una sola risposta. «assistant model call» ha `attempt` 1 o 2. Nel moto
 proposte vale solo quando ce ne sono: prima, il modello ha fino a circa 26 s; l'attesa dell'esito dei comandi non va mai
 oltre i 27 s della domanda, e un comando non ancora confermato si annuncia con «Comando inviato: …, l'esito arriva
 nell'app».
+
+Fasi di un fallimento (lotto 30): le chiamate del BFF ad Agent Platform hanno un tempo di connessione separato
+(`AI_CONNECT_TIMEOUT_S`, 5 s per DNS, TCP e TLS) da quello della risposta (`AI_TIMEOUT_S`, 25 s), e ogni
+«assistant model call failed» ha `phase`: `DNS`, `connessione`, `TLS`, `invio della richiesta`, `attesa della risposta`
+(nessun primo byte entro il tempo), `lettura della risposta`, oppure `credenziali o rete` (il gettone di accesso).
+Lo stesso nel motore verso il BFF (5 s per la connessione, poi il tempo della domanda), nel log del motore, e in
+`scripts/measure_model.py`, che per ogni risposta stampa anche i tempi di DNS, TCP e TLS.

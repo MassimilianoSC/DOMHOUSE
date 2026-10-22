@@ -5,9 +5,7 @@ written by the engine ("Fatto" only when acked), the daily limit, the monthly ca
 Run: python -m pytest engine/tests -q
 """
 import asyncio
-import io
 import json
-import urllib.error
 from datetime import timedelta
 
 import pytest
@@ -176,32 +174,71 @@ def test_the_daily_limit_the_monthly_cap_and_the_time_limit(monkeypatch):
     assert (slow["status"], slow["reason"]) == ("failed", "timeout")
 
 
+def _bff(status: int, body: dict | None, delay: float = 0.0):
+    """A local stand-in for the BFF's /internal/ai/chat: (server, url, seen requests)."""
+    import http.server
+    import threading
+    import time as _time
+    seen = []
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            seen.append({"path": self.path, "headers": dict(self.headers),
+                         "body": json.loads(self.rfile.read(int(self.headers["Content-Length"])))})
+            _time.sleep(delay)
+            data = json.dumps(body or {}).encode()
+            self.send_response(status)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def log_message(self, *a):
+            pass
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, f"http://127.0.0.1:{server.server_address[1]}", seen
+
+
 def test_the_model_client_maps_the_bffs_answers(monkeypatch):
-    client = assistant.ModelClient("https://bff.example", "apt-prova-01", "k" * 16)
-    seen = {}
-
-    def ok(req, timeout):
-        seen.update(url=req.full_url, headers=dict(req.header_items()), body=json.loads(req.data))
-        return io.BytesIO(json.dumps(says("ciao")).encode())
-    monkeypatch.setattr(assistant.urllib.request, "urlopen", ok)
+    server, url, seen = _bff(200, says("ciao"))
+    client = assistant.ModelClient(url, "apt-prova-01", "k" * 16)
     assert asyncio.run(client.chat([{"role": "user", "content": "x"}], [])) == says("ciao")
-    assert seen["url"] == "https://bff.example/internal/ai/chat" and seen["headers"]["X-apartment-id"] == "apt-prova-01"
-    assert seen["headers"]["X-api-key"] == "k" * 16 and seen["body"]["temperature"] == assistant.TEMPERATURE
-
-    def capped(req, timeout):
-        raise urllib.error.HTTPError(req.full_url, 429, "cap", {}, io.BytesIO(json.dumps(
-            {"error": "monthly_cap", "message": "Limite mensile raggiunto, riprova dal mese prossimo"}).encode()))
-    monkeypatch.setattr(assistant.urllib.request, "urlopen", capped)
+    assert seen[0]["path"] == "/internal/ai/chat" and seen[0]["headers"]["X-Apartment-Id"] == "apt-prova-01"
+    assert seen[0]["headers"]["X-API-Key"] == "k" * 16 and seen[0]["body"]["temperature"] == assistant.TEMPERATURE
+    server.shutdown()
+    server, url, _ = _bff(429, {"error": "monthly_cap", "message": "Limite mensile raggiunto, riprova dal mese prossimo"})
     with pytest.raises(assistant.ModelRefused) as refused:
-        asyncio.run(client.chat([], []))
+        asyncio.run(assistant.ModelClient(url, "apt-prova-01", "k" * 16).chat([], []))
     assert refused.value.reason == "monthly_cap"
+    server.shutdown()
 
-    def down(req, timeout):
-        raise urllib.error.URLError("rete")
-    monkeypatch.setattr(assistant.urllib.request, "urlopen", down)
+
+def test_lot30_a_failure_towards_the_bff_says_its_phase(monkeypatch):
+    """The committente's instruction: a separate connection timeout, and the phase of every failure in the log."""
+    from engine import log
+    logged = []
+    monkeypatch.setattr(log, "warn", lambda msg, **kw: logged.append((msg, kw)))
+    server, url, _ = _bff(200, says("tardi"), delay=1.0)                 # no answer within the reading time
+    monkeypatch.setattr(assistant, "ASK_TIMEOUT_S", 0.3)
     with pytest.raises(assistant.ModelRefused) as refused:
-        asyncio.run(client.chat([], []))
+        asyncio.run(assistant.ModelClient(url, "apt-prova-01", "k" * 16).chat([], []))
     assert refused.value.reason == "model_unavailable"
+    msg, kw = logged[-1]
+    assert msg == "assistant model call failed" and kw["phase"] == "attesa della risposta" and kw["timeout"] is True
+    server.shutdown()
+    import socket
+    s = socket.socket()
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()                                                              # nobody listens there
+    monkeypatch.setattr(assistant, "CONNECT_TIMEOUT_S", 1.0)
+    with pytest.raises(assistant.ModelRefused):
+        asyncio.run(assistant.ModelClient(f"http://127.0.0.1:{port}", "apt-prova-01", "k" * 16).chat([], []))
+    assert logged[-1][1]["phase"] == "connessione"
+    with pytest.raises(assistant.ModelRefused):
+        asyncio.run(assistant.ModelClient("https://domhouse-prova.invalid", "apt-prova-01", "k" * 16).chat([], []))
+    assert logged[-1][1]["phase"] == "DNS"
 
 
 def test_settings_of_the_assistant():

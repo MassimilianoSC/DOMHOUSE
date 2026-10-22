@@ -22,7 +22,7 @@ from email.utils import formataddr
 
 import httpx
 
-from . import instances
+from . import instances, net_phase
 from .config import get_settings
 from .logs import info, warn
 from .repository import get_repository
@@ -33,9 +33,9 @@ _credentials = None
 
 
 class GatewayError(Exception):
-    def __init__(self, status: int, error: str, message: str):
+    def __init__(self, status: int, error: str, message: str, phase: str | None = None):
         super().__init__(message)
-        self.status, self.error, self.message = status, error, message
+        self.status, self.error, self.message, self.phase = status, error, message, phase
 
 
 def _refuse_reasoning(apartment_id: str) -> None:
@@ -91,8 +91,13 @@ async def call_model(body: dict) -> dict:
     url = (f"https://aiplatform.googleapis.com/v1/projects/{s.gcp_project_id}/locations/{s.ai_location}"
            f"/endpoints/openapi/chat/completions")
     token = await asyncio.to_thread(_token)
-    async with httpx.AsyncClient(timeout=s.ai_timeout_s) as client:
-        resp = await client.post(url, json=body, headers={"Authorization": f"Bearer {token}"})
+    try:                                     # lot 30: a separate connection timeout, and the phase of a failure
+        resp = await net_phase.post_traced(url, json=body, headers={"Authorization": f"Bearer {token}"},
+                                           connect_s=s.ai_connect_timeout_s, read_s=s.ai_timeout_s)
+    except net_phase.PhaseFailure as exc:
+        if exc.timeout:
+            raise GatewayError(504, "timeout", "Il modello non ha risposto in tempo", phase=exc.phase) from None
+        raise GatewayError(502, "model_unavailable", "Modello non raggiungibile", phase=exc.phase) from None
     if resp.status_code != 200:
         raise GatewayError(502, "model_error", f"Il modello ha risposto {resp.status_code}")
     return resp.json()
@@ -178,16 +183,16 @@ async def chat(apartment_id: str, body: dict) -> dict:
             request.pop("reasoning_effort")
             answer, attempt = await _hedged(request)
     except GatewayError as exc:              # lot 28 d: every failed call leaves a line, with how long it took
-        warn("assistant model call failed", apartment_id=apartment_id, error=exc.error,
+        warn("assistant model call failed", apartment_id=apartment_id, error=exc.error, phase=exc.phase,
              seconds=round(time.monotonic() - started, 2))
         raise
-    except httpx.TimeoutException:
-        warn("assistant model call failed", apartment_id=apartment_id, error="timeout",
+    except httpx.TimeoutException as exc:
+        warn("assistant model call failed", apartment_id=apartment_id, error="timeout", phase=net_phase.phase_of(exc),
              seconds=round(time.monotonic() - started, 2))
-        raise GatewayError(504, "timeout", "Il modello non ha risposto in tempo") from None
+        raise GatewayError(504, "timeout", "Il modello non ha risposto in tempo", phase=net_phase.phase_of(exc)) from None
     except Exception as exc:                 # network, credentials (e.g. no identity on a developer's PC)
         warn("assistant model call failed", apartment_id=apartment_id, error=type(exc).__name__,
-             seconds=round(time.monotonic() - started, 2))
+             phase="credenziali o rete", seconds=round(time.monotonic() - started, 2))
         raise GatewayError(502, "model_unavailable", "Modello non raggiungibile") from None
     cost, tokens_in, tokens_out = cost_eur(answer.get("usage") or {})
     totals = await repo.add_ai_usage(month, cost, tokens_in, tokens_out)

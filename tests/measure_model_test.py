@@ -38,13 +38,17 @@ def test_causes_and_summary(monkeypatch, capsys):
     ]
     sent = []
 
-    def fake_post(url, json=None, headers=None, timeout=None):
+    from bff import net_phase
+
+    async def fake_post(url, json=None, headers=None, connect_s=None, read_s=None, network=None):
         sent.append(json)
         r = replies[(len(sent) - 1) % len(replies)]
         if r == "timeout":
-            raise httpx.ReadTimeout("lento")
+            raise net_phase.PhaseFailure(net_phase.WAIT, True, 25.0, httpx.ReadTimeout("lento"))
+        if network is not None:
+            network.update(dns=0.01, connessione=0.03, tls=0.05)
         return r
-    monkeypatch.setattr(httpx, "post", fake_post)
+    monkeypatch.setattr(net_phase, "post_traced", fake_post)
     monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
     monkeypatch.setenv("GCP_PROJECT_ID", "progetto-prova")
     monkeypatch.setattr("sys.argv", ["measure_model.py", "-n", "4", "--reasoning", "default", "--reasoning", "low"])
@@ -52,6 +56,8 @@ def test_causes_and_summary(monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "reasoning_effort" not in sent[0] and sent[4]["reasoning_effort"] == "low"
     assert "troncata: max_tokens esauriti" in out and "(ragionamento 4096 token)" in out
-    assert "endpoint HTTP 429: Resource exhausted: quota" in out and "timeout" in out
+    assert "endpoint HTTP 429: Resource exhausted: quota" in out
+    assert "timeout nella fase «attesa della risposta»: 1" in out                # the phase, in the summary too
+    assert "rete: DNS 10 ms, TCP 30 ms, TLS 50 ms" in out
     assert "riuscite 1 su 4" in out and "mediana" in out and "p95" in out and "Costo stimato totale:" in out
     assert json.dumps(sent).count("progetto-prova") == 0                  # the project goes in the URL, not the body

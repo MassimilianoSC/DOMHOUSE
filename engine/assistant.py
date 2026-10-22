@@ -28,8 +28,6 @@ bookings' people (the engine has none of them anyway: names, emails and phones s
 """
 import asyncio
 import json
-import urllib.error
-import urllib.request
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -39,6 +37,7 @@ ACK_WAIT_S = 10.0             # a command's outcome is final within 10 s (contra
 APPLY_RESERVE_S = ACK_WAIT_S + 1.0    # lot 28 c: kept for running the proposals and waiting for their outcome
 NO_PROPOSAL_RESERVE_S = 2.0   # C-10 layer 2: with nothing proposed yet, only this is kept (the model gets ~25 s)
 MIN_CALL_S = 4.0              # lot 28 c: no new model call with less than this left in the model's budget
+CONNECT_TIMEOUT_S = 5.0       # lot 30: DNS, TCP and TLS towards the BFF, apart from waiting for the answer
 PROPOSALS = {"cambia_modalita", "comanda_dispositivo", "programma"}
 TIMEOUT_ANSWER = "Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app."
 TEMPERATURE = 0.2
@@ -106,20 +105,57 @@ class ModelClient:
         self.apartment_id, self.api_key = apartment_id, api_key
 
     def _post(self, body: dict) -> dict:
-        req = urllib.request.Request(self.url, data=json.dumps(body).encode(), method="POST", headers={
-            "Content-Type": "application/json", "X-Apartment-Id": self.apartment_id, "X-API-Key": self.api_key})
+        """POST to the BFF with the phases watched (lot 30): DNS, connessione (TCP, CONNECT_TIMEOUT_S), TLS
+        (CONNECT_TIMEOUT_S), invio della richiesta, attesa della risposta (ASK_TIMEOUT_S), lettura della risposta. A
+        failure is logged with its phase ("assistant model call failed") and becomes model_unavailable."""
+        import http.client
+        import socket
+        import ssl
+        import time
+        from urllib.parse import urlsplit
+
+        from . import log
+
+        parts = urlsplit(self.url)
+        https = parts.scheme == "https"
+        host, port = parts.hostname, parts.port or (443 if https else 80)
+        path = parts.path + (f"?{parts.query}" if parts.query else "")
+        headers = {"Content-Type": "application/json", "X-Apartment-Id": self.apartment_id, "X-API-Key": self.api_key}
+        phase, started = "DNS", time.monotonic()
         try:
-            with urllib.request.urlopen(req, timeout=ASK_TIMEOUT_S) as resp:
-                return json.loads(resp.read())
-        except urllib.error.HTTPError as exc:
-            try:
-                err = json.loads(exc.read())
-            except ValueError:
-                err = {}
-            if exc.code == 429:
-                raise ModelRefused("monthly_cap", err.get("message") or "Limite mensile raggiunto, riprova dal mese prossimo")
+            socket.getaddrinfo(host, port)
+            phase = "connessione"
+            sock = socket.create_connection((host, port), timeout=CONNECT_TIMEOUT_S)
+            if https:
+                phase = "TLS"
+                sock = ssl.create_default_context().wrap_socket(sock, server_hostname=host)
+            sock.settimeout(ASK_TIMEOUT_S)
+            conn = (http.client.HTTPSConnection if https else http.client.HTTPConnection)(host, port)
+            conn.sock = sock
+            phase = "invio della richiesta"
+            conn.request("POST", path, body=json.dumps(body).encode(), headers=headers)
+            phase = "attesa della risposta"
+            resp = conn.getresponse()
+            phase = "lettura della risposta"
+            status, raw = resp.status, resp.read()
+            conn.close()
+        except (OSError, http.client.HTTPException) as exc:
+            log.warn("assistant model call failed", apartment_id=self.apartment_id,
+                     phase="DNS" if isinstance(exc, socket.gaierror) else phase,
+                     timeout=isinstance(exc, TimeoutError), error=type(exc).__name__,
+                     seconds=round(time.monotonic() - started, 2))
             raise ModelRefused("model_unavailable", "L'assistente non è disponibile ora, riprova più tardi") from None
-        except (urllib.error.URLError, TimeoutError, ValueError):
+        if status == 429:
+            try:
+                message = json.loads(raw).get("message")
+            except ValueError:
+                message = None
+            raise ModelRefused("monthly_cap", message or "Limite mensile raggiunto, riprova dal mese prossimo")
+        if status != 200:
+            raise ModelRefused("model_unavailable", "L'assistente non è disponibile ora, riprova più tardi")
+        try:
+            return json.loads(raw)
+        except ValueError:
             raise ModelRefused("model_unavailable", "L'assistente non è disponibile ora, riprova più tardi") from None
 
     async def chat(self, messages: list[dict], tools: list[dict]) -> dict:
