@@ -96,7 +96,27 @@ def test_the_native_regional_endpoint(monkeypatch, capsys):
     assert declared["comanda_dispositivo"]["parameters"]["properties"]["params"]["properties"]["setpoint"] == {"type": "number"}
     assert "riuscite 1 su 2" in out and "troncata: max_tokens esauriti: 1" in out and "(ragionamento 150 token)" in out
     assert "nativo europe-west4" in out
-    # a multi-region (eu, global) is served by the plain host, without a region prefix
+    # Google's hosts: eu and us on aiplatform.<loc>.rep.googleapis.com, global on the plain host
     assert mm.native_url("p", "eu", "google/gemini-3.8-flash") == (
-        "https://aiplatform.googleapis.com/v1/projects/p/locations/eu/publishers/google/models/gemini-3.8-flash:generateContent")
+        "https://aiplatform.eu.rep.googleapis.com/v1/projects/p/locations/eu/publishers/google/models/gemini-3.8-flash:generateContent")
     assert mm.native_url("p", "global", "gemini-3.8-flash").startswith("https://aiplatform.googleapis.com/v1/projects/p/locations/global/")
+    assert mm.host_for("europe-west1") == "europe-west1-aiplatform.googleapis.com"
+
+
+def test_rep_host_for_the_openai_endpoint(monkeypatch, capsys):
+    mm = _script()
+    from bff import net_phase
+    urls = []
+
+    async def fake_post(url, json=None, headers=None, connect_s=None, read_s=None, network=None):
+        urls.append(url)
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}, "finish_reason": "stop"}], "usage": {}})
+    monkeypatch.setattr(net_phase, "post_traced", fake_post)
+    monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
+    monkeypatch.setenv("GCP_PROJECT_ID", "p")
+    monkeypatch.setattr("sys.argv", ["measure_model.py", "-n", "1", "--rep-host"])
+    assert mm.main() == 0
+    assert urls == ["https://aiplatform.eu.rep.googleapis.com/v1/projects/p/locations/eu/endpoints/openapi/chat/completions"]
+    monkeypatch.setattr("sys.argv", ["measure_model.py", "-n", "1"])                     # today's host, as the BFF
+    mm.main()
+    assert urls[-1].startswith("https://aiplatform.googleapis.com/v1/projects/p/locations/eu/")

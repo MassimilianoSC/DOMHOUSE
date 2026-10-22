@@ -9,8 +9,9 @@ cause. Writes nothing (no Firestore, no monthly counter): it only calls the mode
 
 Two ways to call the model (--endpoint): «openai» (default), the OpenAI-compatible endpoint the BFF uses
 (https://aiplatform.googleapis.com/v1/projects/<p>/locations/eu/endpoints/openapi/chat/completions); «nativo», Vertex's
-own generateContent, on a regional endpoint (--location europe-west4 or europe-west1) or on a multi-region (--location
-eu, or global) served by aiplatform.googleapis.com without a region prefix; eu stays in Europe. E.g.
+own generateContent, on a regional endpoint (--location europe-west4 or europe-west1, host <region>-aiplatform…) or on
+a multi-region (--location eu or us: host aiplatform.<eu|us>.rep.googleapis.com; global: aiplatform.googleapis.com);
+eu stays in Europe. --rep-host puts the OpenAI-compatible endpoint on the same host as well. E.g.
 https://europe-west4-aiplatform.googleapis.com/v1/projects/<p>/locations/europe-west4/publishers/google/models/
 gemini-3.8-flash:generateContent. With «nativo» the same system prompt goes in systemInstruction, the same tools in
 functionDeclarations (a «params» object without properties is described with the command's fields: on, mode, setpoint,
@@ -83,14 +84,18 @@ def native_schema(schema: dict) -> dict:
     return out
 
 
-MULTI_REGIONS = ("eu", "us", "global")       # served by the host without a region prefix
+def host_for(location: str) -> str:
+    """Google's hosts (docs: vertex-ai/generative-ai/docs/learn/locations): the multi-regions eu and us on
+    aiplatform.<eu|us>.rep.googleapis.com, global on aiplatform.googleapis.com, a single region on <region>-aiplatform…"""
+    if location in ("eu", "us"):
+        return f"aiplatform.{location}.rep.googleapis.com"
+    if location == "global":
+        return "aiplatform.googleapis.com"
+    return f"{location}-aiplatform.googleapis.com"
 
 
 def native_url(project: str, location: str, model: str) -> str:
-    """generateContent: a region on its own host (europe-west4-aiplatform…), a multi-region (eu, global) on the plain
-    host aiplatform.googleapis.com."""
-    host = "aiplatform.googleapis.com" if location in MULTI_REGIONS else f"{location}-aiplatform.googleapis.com"
-    return (f"https://{host}/v1/projects/{project}/locations/{location}/publishers/google/models/"
+    return (f"https://{host_for(location)}/v1/projects/{project}/locations/{location}/publishers/google/models/"
             f"{model.split('/')[-1]}:generateContent")
 
 
@@ -178,6 +183,9 @@ def main() -> int:
     ap.add_argument("--connect-timeout", type=float, default=float(os.environ.get("AI_CONNECT_TIMEOUT_S", "5")))
     ap.add_argument("--endpoint", choices=("openai", "nativo"), default="openai")
     ap.add_argument("--no-tools", action="store_true")
+    ap.add_argument("--rep-host", action="store_true",
+                    help="with --endpoint openai: Google's host for the location (aiplatform.eu.rep.googleapis.com for eu) "
+                         "instead of aiplatform.googleapis.com, which the BFF uses today")
     a = ap.parse_args()
     project = os.environ.get("GCP_PROJECT_ID", "").strip()
     if not project:
@@ -189,9 +197,10 @@ def main() -> int:
     models = a.model or [os.environ.get("AI_MODEL", "google/gemini-3.8-flash")]
     reasonings = a.reasoning or ["default"]
     native = a.endpoint == "nativo"
-    url = (f"https://aiplatform.googleapis.com/v1/projects/{project}/locations/{a.location}"
-           f"/endpoints/openapi/chat/completions")
-    print(f"Endpoint {'nativo regionale (generateContent)' if native else 'compatibile OpenAI'}, "
+    url = (f"https://{host_for(a.location) if a.rep_host else 'aiplatform.googleapis.com'}/v1/projects/{project}"
+           f"/locations/{a.location}/endpoints/openapi/chat/completions")
+    print(f"Endpoint {'nativo (generateContent)' if native else 'compatibile OpenAI'}"
+          f"{'' if native else (' su ' + url.split('/')[2])}, "
           f"strumenti {'no' if a.no_tools else 'sì'}")
     print(f"Misura del modello: progetto {project}, località {a.location}, {a.n} chiamate per variante, "
           f"max_tokens {a.max_tokens}, attesa della risposta {a.timeout:g} s, connessione {a.connect_timeout:g} s")
