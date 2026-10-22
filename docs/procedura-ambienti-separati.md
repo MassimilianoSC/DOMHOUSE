@@ -127,6 +127,27 @@ Console Firebase → Authentication → Settings → Authorized domains → Add 
 Cosa fa: permette l'accesso (Google e password) dal sito di staging. Verifica: i due domini nell'elenco, accanto a quelli
 di oggi.
 
+## M5b. Chiave API del browser: il sito di prova fra i referrer ammessi (scrive su Google Cloud)
+
+La chiave «Browser key (auto created by Firebase)» accetta richieste solo dai siti elencati (P-1): senza il sito di
+prova, l'accesso con Google e con password fallisce prima di arrivare al server, con il messaggio generico «Accesso
+non riuscito: controlla email e password» (scoperto il 22 ottobre). Cosa fa: aggiunge i due indirizzi del sito di prova
+ai referrer ammessi, mantenendo quelli di oggi. Il valore della chiave non compare mai.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud services api-keys update projects/444239063209/locations/global/keys/d6cdcf10-17c7-4318-b1af-7ff65352eb72 --allowed-referrers="https://domotica-poc-511707.web.app/*,https://domotica-poc-511707.firebaseapp.com/*,http://localhost:5173/*,https://domhouse-staging.web.app/*,https://domhouse-staging.firebaseapp.com/*" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+```
+
+Verifica (sola lettura): i cinque indirizzi.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud services api-keys describe projects/444239063209/locations/global/keys/d6cdcf10-17c7-4318-b1af-7ff65352eb72 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="value(restrictions.browserKeyRestrictions.allowedReferrers)"
+```
+
 ## M6. Permessi degli utenti nel formato per ambiente
 
 Cosa fa: chi ha i permessi vecchi («piatti», per esempio il primo amministratore) riceve ANCHE i permessi di produzione
