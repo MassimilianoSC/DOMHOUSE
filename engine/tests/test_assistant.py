@@ -75,11 +75,12 @@ def ask(e, text):
 def test_a_read_and_a_command_done_says_fatto_only_when_acked():
     script = Script(tools(call("leggi_dispositivi")),
                     tools(call("comanda_dispositivo", device_id=PRESA, capability="switch", action="turn_on")),
-                    says("Accendo la presa della camera."))
+                    says("mai chiesta"))
     e = engine(script)
     a = ask(e, "accendi la stufetta in camera")
     assert a["status"] == "answered" and a["approval_id"] is None
-    assert a["answer"] == "Accendo la presa della camera.\nFatto: accendere presa stufetta camera."
+    assert a["answer"] == "Fatto: accendere presa stufetta camera."            # lot 28 b: no final call
+    assert len(script.sent) == 2
     cmd = e.commands[a["actions"][0]["command_id"]]
     assert cmd["status"] == "acked" and e.devices[PRESA]["capabilities"]["switch"]["on"] is True
     assert e.decisions[-1]["actor"] == "assistant" and "Richiesta all'assistente" in e.decisions[-1]["reasoning"]
@@ -228,3 +229,61 @@ def test_the_demonstrations_get_the_model_from_the_registry():
         return with_model.asks[a["ask_id"]]
     assert asyncio.run(main())["answer"] == "Ciao dal modello."
     assert core.Registry().model_for is None                                  # the default: keywords
+
+
+# -------- lot 28: within the time --------
+def test_the_state_is_in_the_request_and_a_command_needs_one_call():
+    """a) the apartment and the devices with their state are already in the request; b) a turn of valid proposals only
+    ends the conversation: the engine writes the outcome, the model's words of that turn first."""
+    script = Script({"choices": [{"message": {"role": "assistant", "content": "Accendo la stufetta.", "tool_calls": [
+        call("comanda_dispositivo", device_id=PRESA, capability="switch", action="turn_on")]}}]})
+    e = engine(script)
+    a = ask(e, "accendi la stufetta in camera")
+    assert len(script.sent) == 1
+    assert a["answer"] == "Accendo la stufetta.\nFatto: accendere presa stufetta camera."
+    system = script.sent[0]["messages"][0]["content"]
+    assert "Stato attuale dell'appartamento" in system and PRESA in system and CLIMA in system
+    assert '"occupancy"' in system and "guest" not in system
+
+
+def test_a_wrong_proposal_still_goes_back_to_the_model():
+    script = Script(tools(call("comanda_dispositivo", device_id="dev-che-non-esiste", capability="switch",
+                               action="turn_on")),
+                    says("Quel dispositivo non c'è."))
+    a = ask(engine(script), "accendi il frigo")
+    assert len(script.sent) == 2 and a["answer"] == "Quel dispositivo non c'è."
+
+
+def _budget(monkeypatch, total=3.0, reserve=1.0, min_call=0.5):
+    monkeypatch.setattr(assistant, "ASK_TIMEOUT_S", total)
+    monkeypatch.setattr(assistant, "APPLY_RESERVE_S", reserve)
+    monkeypatch.setattr(assistant, "MIN_CALL_S", min_call)
+
+
+def test_out_of_the_models_time_what_was_proposed_is_applied(monkeypatch):
+    """c) the model's budget is 2 s here: the second call (1.2 s each) is cut, the proposal of the first is applied."""
+    _budget(monkeypatch)
+    script = Script(tools(call("leggi_decisioni"), call("comanda_dispositivo", device_id=PRESA, capability="switch",
+                                                        action="turn_on")),
+                    says("troppo tardi"), delay=1.2)
+    a = ask(engine(script), "accendi la stufetta e dimmi perché era spenta")
+    assert a["status"] == "answered" and a["answer"] == "Fatto: accendere presa stufetta camera."
+
+
+def test_out_of_the_models_time_with_nothing_proposed_the_answer_comes_early(monkeypatch):
+    _budget(monkeypatch)
+    script = Script(tools(call("leggi_decisioni")), says("troppo tardi"), delay=1.2)
+
+    async def main():
+        e = engine(script)
+        e.ensure_started()
+        loop = asyncio.get_running_loop()
+        start = loop.time()
+        a = e.create_ask({"text": "perché?"}, ACTOR, CORR)
+        while e.asks[a["ask_id"]]["status"] == "pending":
+            await asyncio.sleep(0.02)
+        return e.asks[a["ask_id"]], loop.time() - start
+    a, took = asyncio.run(main())
+    assert (a["status"], a["reason"], a["answer"]) == ("failed", "timeout", assistant.TIMEOUT_ANSWER)
+    assert took < 2.6                                       # at the model's budget (2 s), not at the 3 s limit
+

@@ -8,16 +8,21 @@ CI run it.
 
 How one question goes:
 1. ASK_DAILY_LIMIT (50) questions a day per apartment (the apartment's local day), counted before calling the model.
-2. The model reads with tools (apartment, devices, consumption, decisions, schedule) and PROPOSES actions with tools
-   (mode, a device command, a scheduled action): each proposal is validated at once and answered to the model, but
-   nothing is executed while the model talks.
+2. The request already carries the apartment's state (mode, occupancy, devices and their state: lot 28 a), so a
+   command needs no reading turn; the model can still read with tools (consumption, decisions, schedule, the state
+   again) and PROPOSES actions with tools (mode, a device command, a scheduled action): each proposal is validated at
+   once and answered to the model, but nothing is executed while the model talks. A turn made only of valid
+   proposals ends the conversation (lot 28 b): the engine writes the outcome itself, no final call to the model.
 3. When the model has finished, the engine decides (D-132 point 2, D-144): with guests in, switching off a climate or
    a boiler or changing the mode needs the manager's approval; two or more actions together need it too, one approval
    per action, queued. Otherwise the commands run as automatic ones (actor "assistant", within the limits, R6).
 4. The engine writes the outcome itself after the model's text (fixed rule 2: "done" only with acked): "Fatto: …" for
    an acked command, "Comando inviato: …, l'esito arriva nell'app" when it is not final within ACK_WAIT_S, "Serve la tua
    approvazione: …" for each approval, "Programmato: …" for a scheduled action.
-5. The whole answer within ASK_TIMEOUT_S (inside the contract's 30 s): otherwise status failed, reason timeout.
+5. The whole answer within ASK_TIMEOUT_S (inside the contract's 30 s). Lot 28 c: the model's calls must end by
+   ASK_TIMEOUT_S - APPLY_RESERVE_S (the reserve is for running the proposals and waiting for their outcome); a call
+   that would go beyond is cut there, no new call starts with less than MIN_CALL_S left, and what was proposed so far
+   is applied and answered; with nothing proposed, status failed, reason timeout, at once rather than at 28 s.
 Fixed rule 1: no guest data reaches the model: the tools give states, consumption, schedule and decisions, never the
 bookings' people (the engine has none of them anyway: names, emails and phones stay with the BFF).
 """
@@ -31,6 +36,10 @@ from zoneinfo import ZoneInfo
 MAX_TURNS = 6                 # model calls for one question (reads, then the answer)
 ASK_TIMEOUT_S = 28.0          # the contract's 30 s, with a margin for saving and the app's polling
 ACK_WAIT_S = 10.0             # a command's outcome is final within 10 s (contract)
+APPLY_RESERVE_S = ACK_WAIT_S + 1.0    # lot 28 c: kept for running the proposals and waiting for their outcome
+MIN_CALL_S = 4.0              # lot 28 c: no new model call with less than this left in the model's budget
+PROPOSALS = {"cambia_modalita", "comanda_dispositivo", "programma"}
+TIMEOUT_ANSWER = "Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app."
 TEMPERATURE = 0.2
 # D-154: the modes in the manager's sentences by their Italian names («vuoto», not the contract's «empty»)
 MODE_NAMES = {"comfort": "comfort", "eco": "eco", "empty": "vuoto"}
@@ -47,7 +56,9 @@ Regole fisse, sempre:
 5. Puoi cambiare la modalità, comandare un dispositivo e programmare un'azione; non puoi cambiare regole, utenti o
    appartamenti. Per le regole rispondi che si scrive la richiesta nella pagina Regole dell'app, dove l'assistente
    propone la modifica e il gestore la conferma; per utenti e appartamenti, che si fa dall'app.
-Ora locale dell'appartamento: {now} (fuso {tz}). Modalità: comfort, eco, vuoto (empty)."""
+Ora locale dell'appartamento: {now} (fuso {tz}). Modalità: comfort, eco, vuoto (empty).
+Stato attuale dell'appartamento e dei dispositivi (letto adesso, non serve rileggerlo per un comando):
+{state}"""
 
 
 def _fn(name: str, description: str, properties: dict | None = None, required: list[str] | None = None) -> dict:
@@ -125,8 +136,7 @@ class Assistant:
         try:
             await asyncio.wait_for(self._run(ask, actor), timeout=ASK_TIMEOUT_S)
         except TimeoutError:
-            ask.update(status="failed", reason="timeout",
-                       answer="Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app.")
+            ask.update(status="failed", reason="timeout", answer=TIMEOUT_ANSWER)
         except ModelRefused as exc:
             ask.update(status="failed", reason=exc.reason, answer=exc.message)
         except Exception as exc:                          # never a pending question left behind
@@ -151,18 +161,29 @@ class Assistant:
             return
         tz = ZoneInfo(self.e.timezone)
         now = utcnow().astimezone(tz).strftime("%Y-%m-%d %H:%M")
-        messages = [{"role": "system", "content": SYSTEM_PROMPT.format(now=now, tz=self.e.timezone)},
+        state = json.dumps({"appartamento": self.tool("leggi_appartamento", {}, []),
+                            **self.tool("leggi_dispositivi", {}, [])}, ensure_ascii=False, default=str)
+        messages = [{"role": "system", "content": SYSTEM_PROMPT.format(now=now, tz=self.e.timezone, state=state)},
                     {"role": "user", "content": ask["text"]}]
         proposals: list[dict] = []
         text = ""
+        loop = asyncio.get_running_loop()
+        model_deadline = loop.time() + ASK_TIMEOUT_S - APPLY_RESERVE_S      # lot 28 c
         for _ in range(MAX_TURNS):
-            answer = await self.client.chat(messages, TOOLS)
+            left = model_deadline - loop.time()
+            if left < MIN_CALL_S:
+                break
+            try:
+                answer = await asyncio.wait_for(self.client.chat(messages, TOOLS), timeout=left)
+            except TimeoutError:
+                break
             msg = (answer.get("choices") or [{}])[0].get("message") or {}
             calls = msg.get("tool_calls") or []
             if not calls:
                 text = (msg.get("content") or "").strip()
                 break
             messages.append({"role": "assistant", "content": msg.get("content"), "tool_calls": calls})
+            valid_proposals_only = True
             for call in calls:
                 fn = call.get("function") or {}
                 try:
@@ -170,8 +191,16 @@ class Assistant:
                 except ValueError:
                     args = {}
                 result = self.tool(fn.get("name", ""), args if isinstance(args, dict) else {}, proposals)
+                if fn.get("name") not in PROPOSALS or "errore" in result:
+                    valid_proposals_only = False
                 messages.append({"role": "tool", "tool_call_id": call.get("id", ""),
                                  "content": json.dumps(result, ensure_ascii=False, default=str)})
+            if valid_proposals_only:                 # lot 28 b: the engine writes the outcome, no final call
+                text = (msg.get("content") or "").strip()
+                break
+        if not proposals and not text:               # lot 28 c: out of time with nothing to do or say
+            ask.update(status="failed", reason="timeout", answer=TIMEOUT_ANSWER)
+            return
         lines = await self.apply(proposals, ask, actor)
         ask["answer"] = "\n".join([t for t in [text, *lines] if t]) or "Non lo so: guarda nell'app."
         if ask["status"] == "pending":

@@ -99,7 +99,9 @@ def test_one_email_to_the_platform_managers_at_80_percent(model, monkeypatch):
     assert managers and all(m in msg["To"] for m in managers)
 
 
-def test_the_models_failures(model):
+def test_the_models_failures(model, monkeypatch):
+    logged = []
+    monkeypatch.setattr(ai_gateway, "warn", lambda msg, **kw: logged.append((msg, kw["error"], "seconds" in kw)))
     model.fail = httpx.ConnectTimeout("lento")
     assert run(post(BODY)).json()["error"] == "timeout"
     model.fail = RuntimeError("nessuna identità")
@@ -108,6 +110,10 @@ def test_the_models_failures(model):
     model.fail = ai_gateway.GatewayError(502, "model_error", "Il modello ha risposto 500")
     assert run(post(BODY)).json()["error"] == "model_error"
     assert run(get_repository().get_ai_usage(ai_gateway.month_now()))["calls"] == 0   # nothing is counted
+    # lot 28 d: every failed call leaves a line with how long it took (a timeout left none before)
+    assert logged == [("assistant model call failed", "timeout", True),
+                      ("assistant model call failed", "RuntimeError", True),
+                      ("assistant model call failed", "model_error", True)]
 
 
 def ai_gateway_empty():

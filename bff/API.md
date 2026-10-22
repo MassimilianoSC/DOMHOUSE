@@ -626,3 +626,12 @@ gestori della piattaforma. Impostazioni: `AI_MODEL`, `AI_LOCATION`, `AI_MONTHLY_
 `AI_PRICE_IN_EUR_PER_M` (0.83), `AI_PRICE_OUT_EUR_PER_M` (4.13), `AI_PRICE_CACHED_EUR_PER_M` (0.08; prezzi da aggiornare
 il 1° gennaio 2027 a 1.65 e 8.25), `AI_MAX_TOKENS` (4096), `AI_TIMEOUT_S` (25), `AI_DEMOS` (i dimostrativi con il modello
 vero). Serve il ruolo `roles/aiplatform.user` sull'account del BFF.
+
+Ogni chiamata riuscita lascia nel log «assistant model call» (token, costo, secondi); dal lotto 28 anche ogni chiamata
+non riuscita lascia «assistant model call failed», con `error` (`timeout`, `model_error` o il tipo
+dell'errore) e i secondi passati. Tempi dell'assistente nel motore (lotto 28): la richiesta porta già lo stato
+dell'appartamento e dei dispositivi, così un comando richiede una sola chiamata; un turno fatto solo di proposte valide
+chiude la conversazione e l'esito lo scrive il motore; le chiamate al modello devono finire entro 17 s (i 28 s della
+domanda meno 11 s per eseguire le proposte e aspettarne l'esito), nessuna chiamata nuova parte con meno di 4 s, e
+quello che è già stato proposto viene eseguito; senza proposte la domanda finisce subito con «Non sono riuscito a
+rispondere in tempo».

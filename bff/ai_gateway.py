@@ -135,12 +135,17 @@ async def chat(apartment_id: str, body: dict) -> dict:
     started = time.monotonic()
     try:
         answer = await call_model(request)
-    except GatewayError:
+    except GatewayError as exc:              # lot 28 d: every failed call leaves a line, with how long it took
+        warn("assistant model call failed", apartment_id=apartment_id, error=exc.error,
+             seconds=round(time.monotonic() - started, 2))
         raise
     except httpx.TimeoutException:
+        warn("assistant model call failed", apartment_id=apartment_id, error="timeout",
+             seconds=round(time.monotonic() - started, 2))
         raise GatewayError(504, "timeout", "Il modello non ha risposto in tempo") from None
     except Exception as exc:                 # network, credentials (e.g. no identity on a developer's PC)
-        warn("assistant model call failed", apartment_id=apartment_id, error=type(exc).__name__)
+        warn("assistant model call failed", apartment_id=apartment_id, error=type(exc).__name__,
+             seconds=round(time.monotonic() - started, 2))
         raise GatewayError(502, "model_unavailable", "Modello non raggiungibile") from None
     cost, tokens_in, tokens_out = cost_eur(answer.get("usage") or {})
     totals = await repo.add_ai_usage(month, cost, tokens_in, tokens_out)
