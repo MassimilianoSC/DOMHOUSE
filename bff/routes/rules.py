@@ -48,9 +48,17 @@ async def _ask_model(apt, ruleset: dict, text: str) -> tuple[list | None, str]:
     s = get_settings()
     if apt.simulated and not s.ai_demos:          # D-151 point 21: the recognizer on the demonstrations
         return rp.recognize(text, ruleset)
-    answer = await ai_gateway.chat(apt.apartment_id, {
-        "messages": [{"role": "system", "content": rp.prompt(ruleset)}, {"role": "user", "content": text}],
-        "tools": [rp.TOOL], "tool_choice": "auto", "temperature": 0.1})
+    if rp.simple(text):                           # lot 29: one rule, one value: no model call
+        patches, said = rp.recognize(text, ruleset)
+        if patches is not None:
+            return patches, said
+    try:
+        answer = await asyncio.wait_for(ai_gateway.chat(apt.apartment_id, {
+            "messages": [{"role": "system", "content": rp.prompt(ruleset)}, {"role": "user", "content": text}],
+            "tools": [rp.TOOL], "tool_choice": "auto", "temperature": 0.1}), timeout=rp.PROPOSAL_TIMEOUT_S)
+    except TimeoutError:                          # lot 29: a clear answer within the site's patience
+        warn("rule proposal: model call cut", apartment_id=apt.apartment_id, seconds=rp.PROPOSAL_TIMEOUT_S)
+        raise ai_gateway.GatewayError(504, "timeout", rp.TIMEOUT_MESSAGE) from None
     return rp.from_answer(answer)
 
 

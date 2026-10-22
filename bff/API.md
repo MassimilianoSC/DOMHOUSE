@@ -548,6 +548,13 @@ un riconoscitore semplice di frasi («finestra 10 minuti», «antigelo 9 gradi»
 regola dell'antimuffa»). Al massimo 20 proposte al giorno per appartamento (giorno dell'appartamento), contate prima di
 chiamare il modello.
 
+Dal lotto 29 il riconoscitore risponde dappertutto, anche dove c'è il modello, quando la frase nomina una sola regola
+con un solo valore (due per il setpoint): nessuna chiamata, risposta immediata. Il modello riceve solo le regole
+modificabili, una riga ciascuna, e uno strumento con righe semplici (regola, parametro, valore numerico; «attiva» con 1
+o 0 per accendere o spegnere). La sua chiamata ha al massimo 15 s: oltre, #38 risponde 504 `timeout` «L'assistente non
+ha risposto in tempo: riprova con una frase più breve, oppure cambia la regola a mano qui sotto.» e il log scrive
+«rule proposal: model call cut».
+
 Esempio di risposta di #38 a «la finestra aperta spegne dopo 10 minuti e la presenza al check-out guarda l'ultima ora»:
 
 ```json

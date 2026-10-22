@@ -9,6 +9,9 @@ the BFF writes «regole modificate» in the activity log. The proposal is not st
 
 The model: through bff/ai_gateway.py (monthly cap, prices, 80 % alert). On a demonstration apartment without AI_DEMOS a
 simple recognizer of Italian phrases answers instead (D-151 point 21): enough for the tests and the checklist.
+Lot 29 (a proposal over the gateway's 25 s in staging): a simple phrase, one rule and one value, is answered by the
+recognizer everywhere, with no model call; the model gets only the editable rules, one line each, and one flat tool
+(rule, parameter, number: no object with free keys); its call has PROPOSAL_TIMEOUT_S, then a clear answer.
 At most DAILY_LIMIT proposals a day per apartment (the apartment's local day), counted before the model is asked.
 
 Every rule and parameter comes from the engine's GET /rules: the contract's Rule.params admits further numeric
@@ -21,6 +24,10 @@ from zoneinfo import ZoneInfo
 
 DAILY_LIMIT = 20
 TEXT_MAX = 500
+PROPOSAL_TIMEOUT_S = 15.0     # lot 29: the model's call for a proposal; then «L'assistente non ha risposto in tempo…»
+TIMEOUT_MESSAGE = ("L'assistente non ha risposto in tempo: riprova con una frase più breve, oppure cambia la regola a "
+                   "mano qui sotto.")
+ENABLED_FIELD = "attiva"      # the tool's name for on/off: valore 1 = attiva, 0 = spenta
 
 # the predefined values (the contract's example of GET /rules, the engine's DEFAULT_RULES), for «regole personalizzate»
 DEFAULTS = {
@@ -130,31 +137,38 @@ proponi_modifiche, una volta sola, con solo le regole da cambiare. Regole fisse:
 2. Se la richiesta non riguarda queste regole, è fuori dai limiti o non è chiara, non chiamare lo strumento:
    rispondi in una frase che cosa si può fare (per esempio «Il massimo per questa regola è 30 minuti»).
 3. La spiegazione è una frase breve in italiano per il gestore.
-Regole dell'appartamento (rule_id, nome, significato, attiva, parametri, limiti):
+Regole modificabili dell'appartamento (rule_id «nome»: significato; stato; parametri con valore e limiti):
 {rules}"""
 
 TOOL = {"type": "function", "function": {
     "name": "proponi_modifiche",
     "description": "Propone al gestore le modifiche alle regole; si applicano solo se lui conferma.",
     "parameters": {"type": "object", "required": ["modifiche", "spiegazione"], "properties": {
-        "modifiche": {"type": "array", "items": {"type": "object", "required": ["rule_id"], "properties": {
+        "modifiche": {"type": "array", "items": {"type": "object", "required": ["rule_id", "parametro", "valore"],
+                                                 "properties": {
             "rule_id": {"type": "string"},
-            "enabled": {"type": "boolean", "description": "true per attivare la regola, false per spegnerla"},
-            "params": {"type": "object", "additionalProperties": {"type": "number"}}}}},
+            "parametro": {"type": "string", "description": "il nome del parametro, oppure «attiva» per accendere o "
+                                                           "spegnere la regola"},
+            "valore": {"type": "number", "description": "il nuovo valore; per «attiva»: 1 accesa, 0 spenta"}}}},
         "spiegazione": {"type": "string"}}}}}
 
 
 def prompt(ruleset: dict) -> str:
+    """Only the editable rules, one short line each (lot 29)."""
     lines = []
     for r in ruleset.get("rules") or []:
-        lines.append(json.dumps({"rule_id": r["rule_id"], "nome": r["label"], "significato": MEANING.get(r["rule_id"], ""),
-                                 "attiva": r["enabled"], "modificabile": r["editable"], "parametri": r["params"],
-                                 "limiti": r["limits"]}, ensure_ascii=False))
+        if not r["editable"]:
+            continue
+        params = ", ".join(f"{k}={fmt(v)} (da {fmt(r['limits'][k]['min'])} a {fmt(r['limits'][k]['max'])})"
+                           for k, v in r["params"].items() if k in r["limits"])
+        lines.append(f"- {r['rule_id']} «{r['label']}»: {MEANING.get(r['rule_id'], '')}; "
+                     f"{'attiva' if r['enabled'] else 'spenta'}; {params}")
     return SYSTEM_PROMPT.format(rules="\n".join(lines))
 
 
 def from_answer(answer: dict) -> tuple[list | None, str]:
-    """(the proposed patches or None, the explanation or the model's sentence)."""
+    """(the proposed patches or None, the explanation or the model's sentence). The tool's flat rows (rule, parameter,
+    number) become RulePatch: «attiva» 1/0 -> enabled true/false, any other parameter -> params."""
     msg = ((answer.get("choices") or [{}])[0]).get("message") or {}
     for call in msg.get("tool_calls") or []:
         fn = call.get("function") or {}
@@ -163,12 +177,35 @@ def from_answer(answer: dict) -> tuple[list | None, str]:
                 args = json.loads(fn.get("arguments") or "{}")
             except ValueError:
                 return None, "Non ho capito la richiesta: prova a scriverla in un altro modo."
-            return args.get("modifiche") or [], str(args.get("spiegazione") or "").strip()
+            by_rule: dict[str, dict] = {}
+            for row in args.get("modifiche") or []:
+                if not isinstance(row, dict) or not isinstance(row.get("rule_id"), str):
+                    continue
+                patch = by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"]})
+                if row.get("parametro") == ENABLED_FIELD:
+                    patch["enabled"] = bool(row.get("valore"))
+                elif isinstance(row.get("parametro"), str):
+                    patch.setdefault("params", {})[row["parametro"]] = row.get("valore")
+            return list(by_rule.values()), str(args.get("spiegazione") or "").strip()
     return None, str(msg.get("content") or "").strip() or "Non ho capito la richiesta: prova a scriverla in un altro modo."
 
 
 # ---- the recognizer for the demonstrations without the model -------------------------------------------------------
 _NUM = r"(\d+(?:[.,]\d+)?)"
+_RULE_WORDS = (("window_open_off", ("finestr",)), ("frost_protection", ("antigelo", "gelo")),
+               ("mold_protection", ("muffa", "umidit")), ("prearrival", ("arrivo",)),
+               ("checkout_eco", ("check-out", "checkout", "partenza")), ("offline_alert", ("offline",)),
+               ("setpoint_limits", ("setpoint", "temperatura")))
+
+
+def simple(text: str) -> bool:
+    """Lot 29: one rule named, at most one number (two for the setpoint's range): the recognizer answers, no model."""
+    t = text.lower()
+    named = [rule for rule, words in _RULE_WORDS if any(w in t for w in words)]
+    if len(named) != 1:
+        return False
+    numbers = len(re.findall(_NUM, t))
+    return numbers <= (2 if named[0] == "setpoint_limits" else 1)
 
 
 def recognize(text: str, ruleset: dict) -> tuple[list | None, str]:

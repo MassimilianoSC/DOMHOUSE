@@ -72,8 +72,15 @@ def model(monkeypatch, answer: dict, seen: list | None = None):
 
 
 def tool_call(modifiche, spiegazione="Ok."):
+    """The model's call in the tool's flat rows (lot 29): written here as RulePatch for readability."""
+    rows = []
+    for m in modifiche:
+        if "enabled" in m:
+            rows.append({"rule_id": m["rule_id"], "parametro": "attiva", "valore": 1 if m["enabled"] else 0})
+        for key, value in (m.get("params") or {}).items():
+            rows.append({"rule_id": m["rule_id"], "parametro": key, "valore": value})
     return {"tool_calls": [{"type": "function", "function": {"name": "proponi_modifiche", "arguments": json.dumps(
-        {"modifiche": modifiche, "spiegazione": spiegazione})}}]}
+        {"modifiche": rows, "spiegazione": spiegazione})}}]}
 
 
 async def post(path, body, who=ADMIN):
@@ -244,3 +251,39 @@ def test_copy_outcomes_per_apartment_and_who_can(more_apartments):
     assert copy("/preview", {"to": []}).status_code == 422
     assert copy("/preview", {"to": ["apt-altra-01"]}).status_code == 404               # another organisation's
     assert copy("", {"to": [RIMINI]}).status_code == 422                                # without the preview
+
+
+# -------- lot 29: the proposal within its time --------
+def test_a_simple_phrase_needs_no_model_even_with_one(engines, monkeypatch):
+    """One rule and one value: the recognizer answers at once, the model is not called (it took over 25 s in staging)."""
+    seen = []
+    model(monkeypatch, tool_call([{"rule_id": "window_open_off", "params": {"minutes": 99}}]), seen)
+    p = propose("finestra 10 minuti").json()
+    assert seen == [] and p["changes"][0]["new"] == 10
+
+
+def test_the_tool_is_flat_and_the_prompt_short():
+    from engine import core as engine_core
+    e = engine_core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
+    items = rp.TOOL["function"]["parameters"]["properties"]["modifiche"]["items"]
+    assert set(items["properties"]) == {"rule_id", "parametro", "valore"} and "additionalProperties" not in json.dumps(rp.TOOL)
+    text = rp.prompt(e.ruleset())
+    assert "compressor_min_off" not in text and "- window_open_off «Finestra aperta spegne il clima»" in text
+    assert "minutes=5 (da 1 a 30)" in text
+    patches, _ = rp.from_answer({"choices": [{"message": tool_call(
+        [{"rule_id": "mold_protection", "enabled": False}, {"rule_id": "setpoint_limits", "params": {"min": 18, "max": 25}}])}]})
+    assert patches == [{"rule_id": "mold_protection", "enabled": False},
+                       {"rule_id": "setpoint_limits", "params": {"min": 18, "max": 25}}]
+
+
+def test_a_slow_model_gets_a_clear_answer(engines, monkeypatch):
+    monkeypatch.setattr(rp, "PROPOSAL_TIMEOUT_S", 0.2)
+    monkeypatch.setattr(rules_routes, "get_settings", lambda: dataclasses.replace(get_settings(), ai_demos=True))
+
+    async def slow(body):
+        await asyncio.sleep(1)
+        return {"choices": [{"message": {"content": "tardi"}}], "usage": {}}
+    monkeypatch.setattr(ai_gateway, "call_model", slow)
+    r = propose("la finestra spegne dopo 10 minuti e l'antigelo sta a 9 gradi")      # two rules: the model
+    assert r.status_code == 504 and r.json() == {"error": "timeout", "message": rp.TIMEOUT_MESSAGE}
+
