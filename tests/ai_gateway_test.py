@@ -67,7 +67,7 @@ def test_the_bff_chooses_model_and_tokens_and_forwards_only_what_it_knows(model)
     sent = model[0]
     assert sent["model"] == "google/gemini-3.8-flash" and sent["max_tokens"] == 4096
     assert "stream" not in sent and sent["temperature"] == 0.1 and sent["tools"][0]["function"]["name"] == "stato"
-    assert sent["reasoning_effort"] == "low"                                      # C-10: a short reasoning
+    assert "reasoning_effort" not in sent                                         # D-182: nothing by default
     assert run(post({"messages": []})).status_code == 422
 
 
@@ -134,6 +134,8 @@ def test_a_demonstration_engines_client_is_accepted(model):
 
 # -------- C-10 layer 1 --------
 def test_a_refused_reasoning_effort_is_dropped_once_and_for_all(model, monkeypatch):
+    monkeypatch.setattr(ai_gateway, "get_settings",
+                        lambda: dataclasses.replace(get_settings(), ai_reasoning_effort="low"))
     logged = []
     monkeypatch.setattr(ai_gateway, "warn", lambda msg, **kw: logged.append(msg))
     calls = []
@@ -180,4 +182,32 @@ def test_d181_every_answer_says_the_location(model):
     assert r.status_code == 200 and r.headers["X-AI-Location"] == "eu"
     r = run(post(BODY, key="sbagliata"))                                  # errors too
     assert r.status_code == 401 and r.headers["X-AI-Location"] == "eu"
+
+
+# -------- D-182: Vertex's native endpoint, reasoning off --------
+def test_d182_the_native_endpoint_with_reasoning_off(monkeypatch):
+    """call_model on the native endpoint: the host of eu, generateContent, thinkingBudget 0, the answer back in the
+    OpenAI shape the engine reads, usage for the prices."""
+    from bff import net_phase
+    sent = []
+
+    async def fake_post(url, json=None, headers=None, connect_s=None, read_s=None, network=None):
+        sent.append((url, json))
+        return httpx.Response(200, json={
+            "candidates": [{"content": {"parts": [{"text": '{"risposta": "Fatto.", "azioni": []}'}]},
+                            "finishReason": "STOP"}],
+            "usageMetadata": {"promptTokenCount": 1000, "candidatesTokenCount": 30, "totalTokenCount": 1030}})
+    monkeypatch.setattr(net_phase, "post_traced", fake_post)
+    monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
+    monkeypatch.setattr(ai_gateway, "get_settings",
+                        lambda: dataclasses.replace(get_settings(), gcp_project_id="progetto-prova"))
+    answer = run(ai_gateway.call_model({"model": "google/gemini-3.8-flash", "max_tokens": 4096, "temperature": 0.2,
+                                        "messages": [{"role": "system", "content": "S"}, {"role": "user", "content": "q"}]}))
+    url, body = sent[0]
+    assert url == ("https://aiplatform.eu.rep.googleapis.com/v1/projects/progetto-prova/locations/eu/publishers/google/"
+                   "models/gemini-3.8-flash:generateContent")
+    assert body["generationConfig"] == {"temperature": 0.2, "maxOutputTokens": 4096, "thinkingConfig": {"thinkingBudget": 0}}
+    assert body["systemInstruction"] == {"parts": [{"text": "S"}]} and "tools" not in body
+    assert answer["choices"][0]["message"]["content"] == '{"risposta": "Fatto.", "azioni": []}'
+    assert ai_gateway.cost_eur(answer["usage"])[1:] == (1000, 30)
 

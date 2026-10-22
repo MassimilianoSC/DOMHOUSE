@@ -139,27 +139,17 @@ def customized(ruleset: dict) -> list[dict]:
 
 # ---- the model ------------------------------------------------------------------------------------------------------
 SYSTEM_PROMPT = """Sei l'assistente di DOMHOUSE per le regole automatiche di un appartamento in affitto breve.
-Il gestore ti scrive in italiano che cosa vuole cambiare. Tu proponi le modifiche chiamando lo strumento
-proponi_modifiche, una volta sola, con solo le regole da cambiare. Regole fisse:
+Il gestore ti scrive in italiano che cosa vuole cambiare. Rispondi SOLO con un oggetto JSON, senza altro testo e senza
+blocchi di codice:
+{{"modifiche": [{{"rule_id": "<id>", "parametro": "<nome del parametro, oppure attiva>", "valore": <numero>}}],
+ "spiegazione": "<frase breve in italiano per il gestore>"}}
+Per «attiva» il valore è 1 per accendere la regola e 0 per spegnerla. Regole fisse:
 1. Usa solo le regole e i parametri dell'elenco, dentro i loro limiti. Non inventare regole nuove.
-2. Se la richiesta non riguarda queste regole, è fuori dai limiti o non è chiara, non chiamare lo strumento:
-   rispondi in una frase che cosa si può fare (per esempio «Il massimo per questa regola è 30 minuti»).
-3. La spiegazione è una frase breve in italiano per il gestore.
+2. Se la richiesta non riguarda queste regole, è fuori dai limiti o non è chiara: «modifiche» vuoto e nella
+   spiegazione che cosa si può fare (per esempio «Il massimo per questa regola è 30 minuti»).
+3. Solo le regole da cambiare.
 Regole modificabili dell'appartamento (rule_id «nome»: significato; stato; parametri con valore e limiti):
 {rules}"""
-
-TOOL = {"type": "function", "function": {
-    "name": "proponi_modifiche",
-    "description": "Propone al gestore le modifiche alle regole; si applicano solo se lui conferma.",
-    "parameters": {"type": "object", "required": ["modifiche", "spiegazione"], "properties": {
-        "modifiche": {"type": "array", "items": {"type": "object", "required": ["rule_id", "parametro", "valore"],
-                                                 "properties": {
-            "rule_id": {"type": "string"},
-            "parametro": {"type": "string", "description": "il nome del parametro, oppure «attiva» per accendere o "
-                                                           "spegnere la regola"},
-            "valore": {"type": "number", "description": "il nuovo valore; per «attiva»: 1 accesa, 0 spenta"}}}},
-        "spiegazione": {"type": "string"}}}}}
-
 
 def prompt(ruleset: dict) -> str:
     """Only the editable rules, one short line each (lot 29)."""
@@ -174,27 +164,47 @@ def prompt(ruleset: dict) -> str:
     return SYSTEM_PROMPT.format(rules="\n".join(lines))
 
 
+def _json_object(text: str) -> dict | None:
+    """The JSON object of an answer, also inside a ```json block; None when there is none."""
+    raw = (text or "").strip()
+    if raw.startswith("```"):
+        raw = raw.split("\n", 1)[1] if "\n" in raw else ""
+        raw = raw.rsplit("```", 1)[0].strip()
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def from_answer(answer: dict) -> tuple[list | None, str]:
-    """(the proposed patches or None, the explanation or the model's sentence). The tool's flat rows (rule, parameter,
-    number) become RulePatch: «attiva» 1/0 -> enabled true/false, any other parameter -> params."""
+    """(the proposed patches or None, the explanation or the model's sentence). D-182: the proposal is the JSON object
+    of the text (a tool call, if a model still makes one, is read the same way). The flat rows (rule, parameter, number)
+    become RulePatch: «attiva» 1/0 -> enabled true/false, any other parameter -> params."""
     msg = ((answer.get("choices") or [{}])[0]).get("message") or {}
+    args = None
     for call in msg.get("tool_calls") or []:
         fn = call.get("function") or {}
         if fn.get("name") == "proponi_modifiche":
-            try:
-                args = json.loads(fn.get("arguments") or "{}")
-            except ValueError:
-                return None, "Non ho capito la richiesta: prova a scriverla in un altro modo."
-            by_rule: dict[str, dict] = {}
-            for row in args.get("modifiche") or []:
-                if not isinstance(row, dict) or not isinstance(row.get("rule_id"), str):
-                    continue
-                patch = by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"]})
-                if row.get("parametro") == ENABLED_FIELD:
-                    patch["enabled"] = bool(row.get("valore"))
-                elif isinstance(row.get("parametro"), str):
-                    patch.setdefault("params", {})[row["parametro"]] = row.get("valore")
-            return list(by_rule.values()), str(args.get("spiegazione") or "").strip()
+            args = _json_object(fn.get("arguments") or "{}") or {}
+    if args is None:
+        args = _json_object(msg.get("content") or "")
+    if args is not None:
+        if not isinstance(args.get("modifiche", []), list):
+            return None, "Non ho capito la richiesta: prova a scriverla in un altro modo."
+        by_rule: dict[str, dict] = {}
+        for row in args.get("modifiche") or []:
+            if not isinstance(row, dict) or not isinstance(row.get("rule_id"), str):
+                continue
+            patch = by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"]})
+            if row.get("parametro") == ENABLED_FIELD:
+                patch["enabled"] = bool(row.get("valore"))
+            elif isinstance(row.get("parametro"), str):
+                patch.setdefault("params", {})[row["parametro"]] = row.get("valore")
+        said = str(args.get("spiegazione") or "").strip()
+        if not by_rule:                          # nothing proposed: the model's sentence says why
+            return None, said or "Non ho capito la richiesta: prova a scriverla in un altro modo."
+        return list(by_rule.values()), said
     return None, str(msg.get("content") or "").strip() or "Non ho capito la richiesta: prova a scriverla in un altro modo."
 
 

@@ -72,15 +72,15 @@ def model(monkeypatch, answer: dict, seen: list | None = None):
 
 
 def tool_call(modifiche, spiegazione="Ok."):
-    """The model's call in the tool's flat rows (lot 29): written here as RulePatch for readability."""
+    """The model's answer (D-182: the JSON object in the text, the flat rows of lot 29), written here as RulePatch for
+    readability."""
     rows = []
     for m in modifiche:
         if "enabled" in m:
             rows.append({"rule_id": m["rule_id"], "parametro": "attiva", "valore": 1 if m["enabled"] else 0})
         for key, value in (m.get("params") or {}).items():
             rows.append({"rule_id": m["rule_id"], "parametro": key, "valore": value})
-    return {"tool_calls": [{"type": "function", "function": {"name": "proponi_modifiche", "arguments": json.dumps(
-        {"modifiche": rows, "spiegazione": spiegazione})}}]}
+    return {"content": json.dumps({"modifiche": rows, "spiegazione": spiegazione}, ensure_ascii=False)}
 
 
 async def post(path, body, who=ADMIN):
@@ -109,7 +109,8 @@ def test_the_model_proposes_nothing_changes_until_apply(engines, monkeypatch):
         {"rule_id": "checkout_eco", "label": "Risparmio al check-out", "field": "presence_minutes", "old": 30, "new": 60}]
     assert p["explanation"] == "Finestra a 10 minuti e presenza al check-out a 60." and engines.puts == []
     system = seen[0]["messages"][0]["content"]
-    assert "presence_minutes" in system and "window_open_off" in system and seen[0]["tools"] == [rp.TOOL]
+    assert "presence_minutes" in system and "window_open_off" in system and "tools" not in seen[0]   # D-182
+    assert '"modifiche"' in system and '"parametro"' in system
     r = apply({"based_on": p["based_on"], "rules": p["rules"]}, who=OPERATOR)
     assert r.status_code == 200 and engines.engines[BOLOGNA].rule("window_open_off")["params"]["minutes"] == 10
     apt, actor, _ = engines.puts[0]
@@ -265,8 +266,7 @@ def test_a_simple_phrase_needs_no_model_even_with_one(engines, monkeypatch):
 def test_the_tool_is_flat_and_the_prompt_short():
     from engine import core as engine_core
     e = engine_core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
-    items = rp.TOOL["function"]["parameters"]["properties"]["modifiche"]["items"]
-    assert set(items["properties"]) == {"rule_id", "parametro", "valore"} and "additionalProperties" not in json.dumps(rp.TOOL)
+    assert '{"rule_id": "<id>", "parametro": "<nome del parametro, oppure attiva>", "valore": <numero>}' in rp.prompt(e.ruleset())
     text = rp.prompt(e.ruleset())
     assert "compressor_min_off" not in text and "- window_open_off «Finestra aperta spegne il clima»" in text
     assert "minutes=5 (da 1 a 30)" in text
@@ -306,3 +306,18 @@ def test_temperatura_alone_is_a_question_not_a_limit(engines):
     assert p["changes"] == [] and p["explanation"] == rp.AMBIGUOUS_TEMPERATURE
     assert propose("temperatura massima 23").json()["changes"][0]["field"] == "max"
     assert propose("comfort 22").json()["changes"][0]["field"] == "comfort_celsius"
+
+
+def test_d182_the_proposal_is_the_json_of_the_text():
+    """D-182: no tools; the JSON object of the text (also in a ```json block), an empty one says why, prose too; a tool
+    call from an older model is still read."""
+    def ans(message):
+        return {"choices": [{"message": message}]}
+    rows = {"modifiche": [{"rule_id": "window_open_off", "parametro": "minutes", "valore": 10}], "spiegazione": "Dieci."}
+    assert rp.from_answer(ans({"content": json.dumps(rows)})) == ([{"rule_id": "window_open_off", "params": {"minutes": 10}}], "Dieci.")
+    assert rp.from_answer(ans({"content": "```json" + chr(10) + json.dumps(rows) + chr(10) + "```"}))[0][0]["params"] == {"minutes": 10}
+    assert rp.from_answer(ans({"content": json.dumps({"modifiche": [], "spiegazione": "Il massimo è 30 minuti."})})) == (
+        None, "Il massimo è 30 minuti.")
+    assert rp.from_answer(ans({"content": "Posso cambiare solo le regole."})) == (None, "Posso cambiare solo le regole.")
+    assert rp.from_answer(ans({"tool_calls": [{"function": {"name": "proponi_modifiche", "arguments": json.dumps(rows)}}]}))[1] == "Dieci."
+

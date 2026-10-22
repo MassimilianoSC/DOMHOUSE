@@ -668,6 +668,14 @@ proposte vale solo quando ce ne sono: prima, il modello ha fino a circa 26 s; l'
 oltre i 27 s della domanda, e un comando non ancora confermato si annuncia con «Comando inviato: …, l'esito arriva
 nell'app».
 
+Modello e chiamata (D-182): `gemini-3.8-flash` (`AI_MODEL`), località `eu`, endpoint nativo di Vertex (`AI_API`
+`nativo`, predefinito; `openai` torna all'endpoint compatibile): `generateContent` su
+`aiplatform.eu.rep.googleapis.com/v1/projects/<progetto>/locations/eu/publishers/google/models/gemini-3.8-flash`.
+Ragionamento spento: `thinkingConfig.thinkingBudget` = `AI_THINKING_BUDGET` (0; -1 non lo manda). Il BFF traduce dal
+formato compatibile OpenAI che parlano motore e proposte (`bff/vertex_native.py`) e ritorno; consumo e prezzi da
+`usageMetadata`. Nessuno strumento: assistente e proposte delle regole chiedono il JSON nel testo e lo validano.
+`AI_REASONING_EFFORT` vale solo per `openai` (predefinito vuoto). La seconda richiesta parte dopo 6 s.
+
 Località del modello (D-180): sempre nell'Unione europea, `AI_LOCATION` `eu` o una regione `europe-…`, per qualunque
 modello e ambiente; `global` e `us` sono esclusi. Il BFF non parte con un altro valore (riga «model location refused»
 nel log, livello ERROR) e `scripts/deploy.sh` si ferma prima di pubblicare se il manifesto dell'ambiente ne ha un

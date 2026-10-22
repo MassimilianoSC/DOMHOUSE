@@ -22,7 +22,7 @@ from email.utils import formataddr
 
 import httpx
 
-from . import instances, net_phase
+from . import instances, net_phase, vertex_native
 from .config import get_settings
 from .logs import info, warn
 from .repository import get_repository
@@ -88,11 +88,17 @@ def _token() -> str:
 async def call_model(body: dict) -> dict:
     """The model's answer (OpenAI chat completion) from Agent Platform. Replaced in the tests."""
     s = get_settings()
-    url = (f"https://aiplatform.googleapis.com/v1/projects/{s.gcp_project_id}/locations/{s.ai_location}"
-           f"/endpoints/openapi/chat/completions")
+    native = s.ai_api == "nativo"            # D-182: Vertex's own generateContent, on the location's host
+    if native:
+        url = vertex_native.url(s.gcp_project_id, s.ai_location, s.ai_model)
+        payload = vertex_native.request(body, s.ai_thinking_budget)
+    else:
+        url = (f"https://aiplatform.googleapis.com/v1/projects/{s.gcp_project_id}/locations/{s.ai_location}"
+               f"/endpoints/openapi/chat/completions")
+        payload = body
     token = await asyncio.to_thread(_token)
     try:                                     # lot 30: a separate connection timeout, and the phase of a failure
-        resp = await net_phase.post_traced(url, json=body, headers={"Authorization": f"Bearer {token}"},
+        resp = await net_phase.post_traced(url, json=payload, headers={"Authorization": f"Bearer {token}"},
                                            connect_s=s.ai_connect_timeout_s, read_s=s.ai_timeout_s)
     except net_phase.PhaseFailure as exc:
         if exc.timeout:
@@ -100,7 +106,7 @@ async def call_model(body: dict) -> dict:
         raise GatewayError(502, "model_unavailable", "Modello non raggiungibile", phase=exc.phase) from None
     if resp.status_code != 200:
         raise GatewayError(502, "model_error", f"Il modello ha risposto {resp.status_code}")
-    return resp.json()
+    return vertex_native.answer(resp.json()) if native else resp.json()
 
 
 def _alert_email(to: list[str], month: str, spent: float) -> EmailMessage:

@@ -55,7 +55,7 @@ async def _ask_model(apt, ruleset: dict, text: str) -> tuple[list | None, str]:
     try:
         answer = await asyncio.wait_for(ai_gateway.chat(apt.apartment_id, {
             "messages": [{"role": "system", "content": rp.prompt(ruleset)}, {"role": "user", "content": text}],
-            "tools": [rp.TOOL], "tool_choice": "auto", "temperature": 0.1}), timeout=rp.PROPOSAL_TIMEOUT_S)
+            "temperature": 0.1}), timeout=rp.PROPOSAL_TIMEOUT_S)      # D-182: no tools, the JSON in the text
     except TimeoutError:                          # lot 29: a clear answer within the site's patience
         warn("rule proposal: model call cut", apartment_id=apt.apartment_id, seconds=rp.PROPOSAL_TIMEOUT_S)
         raise ai_gateway.GatewayError(504, "timeout", rp.TIMEOUT_MESSAGE) from None

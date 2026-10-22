@@ -50,7 +50,9 @@ class Settings:
     ai_max_tokens: int = 4096                 # the most a call may ask (the flash model spends tokens on reasoning)
     ai_timeout_s: float = 25.0                # inside the contract's 30 s for an answer (reading the answer)
     ai_connect_timeout_s: float = 5.0         # DNS, TCP and TLS each (lot 30, the committente's instruction)
-    ai_reasoning_effort: str = "low"          # C-10: a short reasoning ("" sends nothing); dropped if Vertex refuses it
+    ai_reasoning_effort: str = ""             # C-10: «low»… for the OpenAI-compatible endpoint; "" sends nothing
+    ai_api: str = "nativo"                    # D-182: Vertex's own generateContent («openai» = the compatible endpoint)
+    ai_thinking_budget: int = 0               # D-182: reasoning off on the native endpoint (-1 = not sent)
     ai_hedge_after_s: float = 6.0             # C-10: a second identical request when the first is still silent
     ai_demos: bool = False                    # the demonstration apartments with the real model (AI_DEMOS=true)
     # P-67 (D-136): the Firestore database of this environment, "(default)" in production, "staging" in staging
@@ -114,7 +116,9 @@ def get_settings() -> Settings:
         ai_max_tokens=int(e("AI_MAX_TOKENS", "4096")),
         ai_timeout_s=float(e("AI_TIMEOUT_S", "25")),
         ai_connect_timeout_s=float(e("AI_CONNECT_TIMEOUT_S", "5")),
-        ai_reasoning_effort=e("AI_REASONING_EFFORT", "low").strip().lower(),
+        ai_reasoning_effort=e("AI_REASONING_EFFORT", "").strip().lower(),
+        ai_api=e("AI_API", "nativo").strip().lower(),
+        ai_thinking_budget=int(e("AI_THINKING_BUDGET", "0")),
         ai_hedge_after_s=float(e("AI_HEDGE_AFTER_S", "6")),
         ai_demos=_bool("AI_DEMOS"),
         firestore_database=e("FIRESTORE_DATABASE", "(default)").strip() or "(default)",
