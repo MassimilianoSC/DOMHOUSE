@@ -9,7 +9,8 @@ cause. Writes nothing (no Firestore, no monthly counter): it only calls the mode
 
 Two ways to call the model (--endpoint): «openai» (default), the OpenAI-compatible endpoint the BFF uses
 (https://aiplatform.googleapis.com/v1/projects/<p>/locations/eu/endpoints/openapi/chat/completions); «nativo», Vertex's
-own generateContent on a regional endpoint (--location europe-west4 or europe-west1: it stays in Europe), e.g.
+own generateContent, on a regional endpoint (--location europe-west4 or europe-west1) or on a multi-region (--location
+eu, or global) served by aiplatform.googleapis.com without a region prefix; eu stays in Europe. E.g.
 https://europe-west4-aiplatform.googleapis.com/v1/projects/<p>/locations/europe-west4/publishers/google/models/
 gemini-3.8-flash:generateContent. With «nativo» the same system prompt goes in systemInstruction, the same tools in
 functionDeclarations (a «params» object without properties is described with the command's fields: on, mode, setpoint,
@@ -80,6 +81,17 @@ def native_schema(schema: dict) -> dict:
     if "properties" in out:
         out["properties"] = {k: native_schema(v) for k, v in out["properties"].items()}
     return out
+
+
+MULTI_REGIONS = ("eu", "us", "global")       # served by the host without a region prefix
+
+
+def native_url(project: str, location: str, model: str) -> str:
+    """generateContent: a region on its own host (europe-west4-aiplatform…), a multi-region (eu, global) on the plain
+    host aiplatform.googleapis.com."""
+    host = "aiplatform.googleapis.com" if location in MULTI_REGIONS else f"{location}-aiplatform.googleapis.com"
+    return (f"https://{host}/v1/projects/{project}/locations/{location}/publishers/google/models/"
+            f"{model.split('/')[-1]}:generateContent")
 
 
 def native_body(messages: list[dict], tools: list[dict] | None, max_tokens: int, reasoning: str) -> dict:
@@ -177,9 +189,6 @@ def main() -> int:
     models = a.model or [os.environ.get("AI_MODEL", "google/gemini-3.8-flash")]
     reasonings = a.reasoning or ["default"]
     native = a.endpoint == "nativo"
-    if native and a.location in ("eu", "global"):
-        print("Con --endpoint nativo serve una regione, per esempio --location europe-west4 (oppure europe-west1).")
-        return 2
     url = (f"https://aiplatform.googleapis.com/v1/projects/{project}/locations/{a.location}"
            f"/endpoints/openapi/chat/completions")
     print(f"Endpoint {'nativo regionale (generateContent)' if native else 'compatibile OpenAI'}, "
@@ -197,8 +206,7 @@ def main() -> int:
         for reasoning in reasonings:
             label = f"{model} · reasoning {reasoning} · {'nativo ' + a.location if native else 'openai ' + a.location}"
             if native:
-                url = (f"https://{a.location}-aiplatform.googleapis.com/v1/projects/{project}/locations/{a.location}"
-                       f"/publishers/google/models/{model.split('/')[-1]}:generateContent")
+                url = native_url(project, a.location, model)
             print(f"\n== {label}")
             times, causes, cost = [], {}, 0.0
             for i in range(a.n):

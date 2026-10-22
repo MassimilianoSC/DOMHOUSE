@@ -96,5 +96,7 @@ def test_the_native_regional_endpoint(monkeypatch, capsys):
     assert declared["comanda_dispositivo"]["parameters"]["properties"]["params"]["properties"]["setpoint"] == {"type": "number"}
     assert "riuscite 1 su 2" in out and "troncata: max_tokens esauriti: 1" in out and "(ragionamento 150 token)" in out
     assert "nativo europe-west4" in out
-    monkeypatch.setattr("sys.argv", ["measure_model.py", "--endpoint", "nativo"])          # «eu» is not a region
-    assert mm.main() == 2
+    # a multi-region (eu, global) is served by the plain host, without a region prefix
+    assert mm.native_url("p", "eu", "google/gemini-3.8-flash") == (
+        "https://aiplatform.googleapis.com/v1/projects/p/locations/eu/publishers/google/models/gemini-3.8-flash:generateContent")
+    assert mm.native_url("p", "global", "gemini-3.8-flash").startswith("https://aiplatform.googleapis.com/v1/projects/p/locations/global/")
