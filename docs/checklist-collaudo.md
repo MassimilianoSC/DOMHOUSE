@@ -33,6 +33,8 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | A14 | Qualsiasi | Impostazioni > Notifiche. | C'è «Attiva su questo dispositivo» (le notifiche sono attive anche nell'ambiente di prova); nessuna scritta «Modalità sviluppo» né «FCM». | |
 | A15 📱 | Amministratore | Guarda il titolo della scheda del browser e la pagina di accesso; poi invita un tuo indirizzo nuovo. | Ovunque compare il nome **DOMHOUSE**; l'email d'invito ha l'oggetto «Invito a DOMHOUSE». | |
 
+| A16 | Qualsiasi | Chiudi la finestra di Google senza scegliere un account; poi prova una password sbagliata. | Nessun messaggio nel primo caso; nel secondo «Accesso non riuscito: controlla email e password» con sotto «Codice: auth/invalid-credential», che un tocco copia. | |
+
 ## B. Installazione 📱
 
 | N. | Dispositivo | Passi | Risultato atteso | Esito |

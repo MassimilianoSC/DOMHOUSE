@@ -141,6 +141,11 @@ un sistema che non è il suo, né ricevere le prenotazioni di una struttura altr
 
 ## 1. Entrare nell'app
 
+Se l'accesso non riesce, l'avviso in alto dice cosa fare (per esempio «Il browser ha bloccato la finestra di Google:
+consenti le finestre pop-up per questo sito e riprova», oppure «Questo indirizzo del sito non è autorizzato per
+l'accesso: avvisa l'assistenza HQE») e, sotto, mostra un codice («Codice: auth/…»). Toccalo per copiarlo e mandalo
+all'assistenza HQE insieme alla segnalazione. Se chiudi tu la finestra di Google, non compare nulla.
+
 Indirizzo: **https://domotica-poc-511707.web.app**
 
 **Il primo accesso** avviene sempre da un invito. Si riceve un'email «Invito a DOMHOUSE» con il pulsante
