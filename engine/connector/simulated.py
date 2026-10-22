@@ -138,6 +138,7 @@ class SimulatedConnector:
     api_version = CONNECTOR_API_VERSION
 
     def __init__(self, variant: int = 0):
+        self.variant = variant
         rooms, devices = seed_devices(variant)
         # the split is confirmed by its own meter and the boiler regulated on the living-room sensor (§2.2)
         links = {"dev-clima-soggiorno": {"confirmation_device_id": "dev-misura-clima"},
@@ -284,6 +285,18 @@ class SimulatedConnector:
                 q.put_nowait(change)
 
 
+VARIANTS = {"occupato": 0, "vuoto": 1}      # P-72 (D-154): the demonstration's two variants
+
+
+def variant_of(apartment_id: str, chosen: str | None = None) -> int:
+    """P-72: «vuoto» -> 1 (empty and cold), «occupato» -> 0 (guests in, warm); without a choice (or «auto») the rule
+    before P-72: empty and cold for an apartment whose id contains "bologna", occupied otherwise."""
+    if chosen in VARIANTS:
+        return VARIANTS[chosen]
+    return 1 if "bologna" in apartment_id else 0
+
+
 def make_connector(config: ConnectorConfig) -> SimulatedConnector:
-    """CONNECTOR=simulated: the demonstration catalog, the cold empty one for a "bologna" apartment."""
-    return SimulatedConnector(variant=1 if "bologna" in config.apartment_id else 0)
+    """CONNECTOR=simulated: the demonstration catalog, in the variant of SIMULATED_VARIANT (from the engine's setting
+    DEMO_VARIANT, engine/config.py), else by the apartment's id as before P-72."""
+    return SimulatedConnector(variant=variant_of(config.apartment_id, config.env.get("SIMULATED_VARIANT")))

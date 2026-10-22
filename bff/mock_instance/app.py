@@ -3,6 +3,7 @@ connectors, any apartment at /{apartment_id}/api/v1. The code is the engine's (e
 import os
 
 from engine.api import create_contract_app
+from engine.connector.simulated import VARIANTS
 from engine.core import ALL_FEATURES, Registry
 
 
@@ -17,4 +18,15 @@ def create_mock_app(api_key: str, features: list[str] | None = None, ping_second
                               ping_seconds=ping_seconds or float(os.environ.get("MOCK_PING_S", "25")),
                               title="Mock instance (contract 1.0.5)")
     app.state.registry = registry
+
+    @app.middleware("http")
+    async def demo_variant(request, call_next):
+        """P-72 (D-154): the BFF sends the variant written in the apartment's link (mock://builtin?variante=…) as
+        X-Demo-Variant; the registry keeps it for when the apartment's engine is built (first call, «Ripristina»)."""
+        value = request.headers.get("X-Demo-Variant")
+        parts = request.url.path.split("/")
+        if value in VARIANTS and "api" in parts:
+            apartment_id = parts[parts.index("api") - 1]
+            registry.variants[apartment_id] = value
+        return await call_next(request)
     return app

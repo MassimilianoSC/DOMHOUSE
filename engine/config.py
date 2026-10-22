@@ -58,6 +58,10 @@ CHOICES: dict[str, tuple[str, tuple[str, ...]]] = {
     # D-137, F2: what an unanswered "switch off in an empty apartment" does when it expires: rejected by default (it
     # could be the cleaners' washing machine or a water heater)
     "EMPTY_POWER_EXPIRED_ACTION": ("reject", ("reject", "approve")),
+    # P-72 (D-154), CONNECTOR=simulated only: the demonstration's variant, «vuoto» (empty and cold) or «occupato»
+    # (guests in, warm); «auto» keeps the rule before P-72 (empty for an id containing "bologna"). Read at the first
+    # start of an apartment (its data are kept afterwards)
+    "DEMO_VARIANT": ("auto", ("auto", "vuoto", "occupato")),
 }
 DEFAULT_SETTINGS: dict[str, float | str] = {name: spec[0] for name, spec in (SETTINGS | CHOICES).items()}
 ENGINE_VARIABLES = {"APARTMENT_ID", "API_KEY", "CONNECTOR", "HOST", "PORT", "DATA_DIR", "CATALOG_PATH",
@@ -103,6 +107,8 @@ class EngineConfig:
         prefix = self.connector.upper() + "_"
         env = {k: v for k, v in self.env.items()
                if k.startswith(prefix) and k not in ENGINE_VARIABLES and not k.startswith(("DOMOTICA_", "MOCK_"))}
+        if self.connector == "simulated":     # P-72: DEMO_VARIANT reaches the simulated connector as its own variable
+            env["SIMULATED_VARIANT"] = str(self.settings.get("DEMO_VARIANT", "auto"))
         return ConnectorConfig(apartment_id=self.apartment_id, data_dir=self.data_dir, catalog_path=self.catalog_path,
                                env=env)
 

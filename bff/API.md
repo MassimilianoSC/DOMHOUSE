@@ -282,6 +282,17 @@ suo buffer: ogni client si riconnette e si risincronizza (gli id degli eventi ri
 codice Italianway, utenti e loro appartamenti, registro (con la voce `simulator_reset`), log dei webhook. I consumi
 del motore simulato sono calcolati e restano uguali.
 
+Variante del dimostrativo (P-72, D-154): si scrive nel collegamento. `mock://builtin?variante=vuoto` è il
+dimostrativo vuoto e freddo (nessun ospite, modalità «vuoto»), `mock://builtin?variante=occupato` il dimostrativo
+occupato (soggiorno in corso, modalità «comfort»), maiuscole indifferenti. Una variante diversa è rifiutata al
+salvataggio dalla piattaforma con «Variante sconosciuta: scrivi mock://builtin?variante=vuoto oppure
+mock://builtin?variante=occupato». Il BFF la manda al motore simulato integrato con l'intestazione interna
+`X-Demo-Variant`, mai verso un motore vero. Il motore la usa quando costruisce l'appartamento: alla prima chiamata dopo
+l'avvio del BFF e dopo il Ripristino (#35). Per cambiare variante a un dimostrativo esistente: cambiare il collegamento
+e premere «Ripristina». Senza variante vale la regola di prima: vuoto se l'identificativo dell'appartamento contiene
+«bologna», occupato altrimenti. Su un motore della VM con `CONNECTOR=simulated` la stessa scelta è l'impostazione
+`DEMO_VARIANT` (`auto`, `vuoto`, `occupato`; `auto` è la regola di prima), letta al primo avvio dell'appartamento.
+
 ## Rendiconto dei consumi (P-52, D-92)
 
 #34 genera un vero file Excel (XlsxWriter, nessuna dipendenza; circa 1,7 MB nell'immagine). Il BFF chiede a `GET

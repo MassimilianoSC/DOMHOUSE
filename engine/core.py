@@ -203,15 +203,22 @@ class ApartmentEngine:
     def __init__(self, apartment_id: str, connector=None, *, simulated: bool = True, seed: bool | None = None,
                  implementation: dict | None = None, store: MemoryStore | None = None,
                  confirm_watts: tuple[float, float] | None = None, settings: dict[str, float] | None = None,
-                 model=None):
+                 model=None, variant: str | None = None):
         """Without a connector: the demonstration apartment, a SimulatedConnector chosen by the apartment's id. seed
         (by default: without a connector) adds the demonstration's bookings and decisions; otherwise the history
         starts empty and the apartment in mode "empty". store: where the state lives (engine/store.py), in memory by
-        default; a store that already holds an apartment is loaded instead of seeded."""
+        default; a store that already holds an apartment is loaded instead of seeded. variant (P-72): «vuoto» or
+        «occupato» for the demonstration; otherwise the connector's own (a simulated one on the VM, DEMO_VARIANT), else
+        by the apartment's id as before P-72."""
         self.apartment_id = apartment_id
         self.name = NAMES.get(apartment_id, apartment_id)
         self.timezone = "Europe/Rome"
-        variant = 1 if "bologna" in apartment_id else 0
+        from .connector.simulated import variant_of
+        if variant is None and connector is not None and hasattr(connector, "variant"):
+            variant_n = connector.variant
+        else:
+            variant_n = variant_of(apartment_id, variant)
+        variant = variant_n
         seeded = connector is None if seed is None else seed
         self.connector = SimulatedConnector(variant) if connector is None else connector
         self.store = store if store is not None else MemoryStore()
@@ -2226,9 +2233,12 @@ def actor_of(x_actor: str) -> str:
 class Registry:
     def __init__(self, model_for=None) -> None:
         """model_for(apartment_id): the model client of a demonstration apartment (P-60 step 9, D-132 point 5: the BFF's
-        demonstrations with the real assistant, within the cap); None keeps the keyword assistant."""
+        demonstrations with the real assistant, within the cap); None keeps the keyword assistant. variants (P-72):
+        apartment_id -> «vuoto» | «occupato», as the BFF last sent it (X-Demo-Variant); used when the apartment's
+        engine is built: at the first call and after «Ripristina» (reset)."""
         self.sims: dict[str, ApartmentEngine] = {}
         self.model_for = model_for
+        self.variants: dict[str, str] = {}
 
     def reset(self, apartment_id: str) -> bool:
         """D-97: forget the apartment's simulated engine and stop its tasks; the next call builds it from the seed."""
@@ -2244,6 +2254,7 @@ class Registry:
         sim = self.sims.get(apartment_id)
         if sim is None:
             sim = self.sims[apartment_id] = ApartmentEngine(
-                apartment_id, model=self.model_for(apartment_id) if self.model_for else None)
+                apartment_id, model=self.model_for(apartment_id) if self.model_for else None,
+                variant=self.variants.get(apartment_id))
         sim.ensure_started()
         return sim

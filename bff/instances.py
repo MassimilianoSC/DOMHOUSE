@@ -2,7 +2,7 @@ import asyncio
 import re
 import time
 import uuid
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 import httpx
 
@@ -44,6 +44,20 @@ def is_mock(url: str | None) -> bool:
     return normalize_instance_url(url or "").startswith("mock://")
 
 
+DEMO_VARIANTS = ("vuoto", "occupato")
+MSG_BAD_VARIANT = "Variante sconosciuta: scrivi mock://builtin?variante=vuoto oppure mock://builtin?variante=occupato"
+
+
+def demo_variant(url: str | None) -> str | None:
+    """P-72 (D-154): the variant written in a demonstration's link, mock://builtin?variante=vuoto|occupato; None
+    without it (the rule before P-72: empty and cold for an id containing "bologna"). Lower case, spaces trimmed."""
+    v = normalize_instance_url(url or "")
+    if not v.startswith("mock://") or "?" not in v:
+        return None
+    values = parse_qs(v.split("?", 1)[1]).get("variante")
+    return values[0].strip().lower() if values else None
+
+
 def instance_url_problem(raw: str) -> str | None:
     """Plain-Italian reason why an instance URL cannot work with the current INSTANCE_MODE, or None. With
     INSTANCE_MODE=mock only mock:// is reachable (staging has no VPC egress), so anything else is refused (D-28). In real
@@ -53,7 +67,8 @@ def instance_url_problem(raw: str) -> str | None:
         # P-67 (D-136): the demonstration apartments live in staging; production has real apartments only
         return "I dimostrativi stanno nell'ambiente di prova: in produzione solo appartamenti veri"
     if v.startswith("mock://"):
-        return None
+        variant = demo_variant(v)
+        return MSG_BAD_VARIANT if variant is not None and variant not in DEMO_VARIANTS else None
     if get_settings().instance_mode == "mock":
         return MSG_USE_MOCK
     parts = urlsplit(v)
@@ -156,11 +171,14 @@ def correlation_id(incoming: str | None) -> str:
 
 
 async def instance_headers(apt: Apartment, actor: str, correlation_id: str | None = None) -> dict[str, str]:
-    return {
+    headers = {
         "X-API-Key": await api_key(apt),
         "X-Actor": actor,
         "X-Correlation-Id": correlation_id or str(uuid.uuid4()),
     }
+    if is_mock(apt.instance_url) and (variant := demo_variant(apt.instance_url)) in DEMO_VARIANTS:
+        headers["X-Demo-Variant"] = variant      # P-72: internal, only towards the built-in demonstration engine
+    return headers
 
 
 async def call(
