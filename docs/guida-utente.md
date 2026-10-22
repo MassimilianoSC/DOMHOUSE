@@ -255,8 +255,9 @@ quali appartamenti vedi.
   che segna più di 30 W compare «sta scaldando ora». A casa vuota l'antigelo la accende sotto la soglia anche se è
   disabilitata. Senza un sensore di temperatura collegato la caldaia segue solo i comandi manuali: in comfort ed eco
   non si accende da sola, e a casa vuota l'antigelo non è attivo: nelle Decisioni compare «sensore di temperatura
-  mancante: antigelo non attivo» e arriva la notifica con il nome dell'appartamento e «antigelo non attivo» (categoria «Dispositivi e
-  istanza offline»).
+  mancante: antigelo non attivo» (tipo «Antigelo non attivo») e arriva la notifica con il nome dell'appartamento e
+  «antigelo non attivo» (categoria «Dispositivi e istanza offline», la cui spiegazione nelle Impostazioni è ora
+  «Dispositivo offline oltre la soglia della regola, istanza non raggiungibile, antigelo non attivo»).
 - Sotto ogni comando compare l'esito: «in corso», poi «eseguito», oppure l'errore. Un dispositivo offline ha i comandi
   disattivati.
 - Menu ⋮ di un dispositivo > «Rinomina o sposta» per cambiare nome o stanza.
@@ -349,11 +350,13 @@ Le regole automatiche dell'appartamento, con interruttore e valori. Quelle con �
 Le otto regole (valori di partenza e limiti):
 - **Finestra aperta spegne il clima**: dopo 5 minuti di finestra aperta (da 1 a 30).
 - **Limiti del setpoint**: la temperatura chiesta resta fra 16 e 24 °C. Qui stanno anche le temperature delle tre
-  modalità, regolabili per appartamento (dal lotto 30): comfort 21 °C (da 16 a 26), eco 18 °C (da 10 a 22, non sopra
-  comfort), raffrescamento 25 °C (da 22 a 28). In comfort il climatizzatore scalda quando la stanza è sotto la
+  modalità, regolabili per appartamento (dal lotto 30): «Temperatura in comfort (°C)» 21 (da 16 a 26), «Temperatura in
+  eco (°C)» 18 (da 10 a 22, non sopra comfort), «Raffrescamento in comfort (°C)» 25 (da 22 a 28); con valori incoerenti
+  il salvataggio dice «La temperatura eco non può superare quella comfort» o «La temperatura di raffrescamento deve
+  essere più alta di quella comfort». In comfort il climatizzatore scalda quando la stanza è sotto la
   temperatura di comfort e raffresca quando è sopra quella di raffrescamento, usando il sensore della stessa stanza;
   senza sensore nella stanza il sistema non lo comanda da solo (solo i comandi manuali) e lo scrive nelle Decisioni
-  una volta («sensore di temperatura mancante: regolazione automatica disattivata»). In eco il climatizzatore è spento
+  una volta (tipo «Regolazione automatica disattivata»). In eco il climatizzatore è spento
   e la caldaia tiene la temperatura di eco; in casa vuota la caldaia tiene la temperatura dell'antigelo.
 - **Antigelo a casa vuota**: accende la caldaia sotto 8 °C (da 5 a 12), anche se è disabilitata.
 - **Antimuffa a casa vuota**: avviso sopra il 65 % di umidità (da 50 a 80), una volta al giorno.
