@@ -49,11 +49,26 @@ describe("Regole: le temperature delle modalità (lotto 30)", () => {
     expect(card).toHaveTextContent("In eco la caldaia sta alla temperatura eco.");
   });
 
-  it("temperature incoerenti (422 invalid_range): il messaggio del server", async () => {
+  it.each([
+    ["eco_celsius", "22", "La temperatura eco non può superare quella comfort"],
+    // comfort uguale al raffrescamento (25): non più alta, quindi rifiutata
+    ["comfort_celsius", "25", "La temperatura di raffrescamento deve essere più alta di quella comfort"],
+    ["comfort_celsius", "26", "La temperatura di raffrescamento deve essere più alta di quella comfort"],
+  ])("prima del salvataggio, %s a %s: «%s», e niente salvataggio", async (param, value, message) => {
+    s.canWrite = true;
+    await open();
+    fireEvent.change(screen.getByTestId(`rule-param-setpoint_limits-${param}`), { target: { value } });
+    expect(screen.getByTestId("rules-range-error")).toHaveTextContent(message);
+    expect(screen.getByTestId("rules-save-btn")).toBeDisabled();
+    expect(s.update).not.toHaveBeenCalled();
+  });
+
+  it("valori coerenti per il sito ma rifiutati dal server (422): il messaggio del server", async () => {
     s.canWrite = true;
     s.update.mockRejectedValueOnce(new ApiError(422, "invalid_range", "La temperatura eco non può superare quella comfort", "c-1"));
     await open();
-    fireEvent.change(screen.getByTestId("rule-param-setpoint_limits-eco_celsius"), { target: { value: "22" } });
+    fireEvent.change(screen.getByTestId("rule-param-setpoint_limits-comfort_celsius"), { target: { value: "22" } });
+    expect(screen.queryByTestId("rules-range-error")).toBeNull();
     await act(async () => {
       fireEvent.click(screen.getByTestId("rules-save-btn"));
     });

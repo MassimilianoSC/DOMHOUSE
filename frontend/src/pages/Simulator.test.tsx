@@ -10,7 +10,7 @@ import App from "@/App";
 
 // Simulatore (D-97): it follows the apartment, not the environment: admins only, on a simulated apartment, in
 // production too. The reset needs the built-in engine; after it everything of the apartment is read again.
-const s = vi.hoisted(() => ({ me: null as unknown, simulated: true, url: "mock://builtin", calls: [] as string[], bodies: {} as Record<string, unknown>, resetStatus: 204, resync: vi.fn(async () => {}) }));
+const s = vi.hoisted(() => ({ me: null as unknown, simulated: true, url: "mock://builtin", calls: [] as string[], bodies: {} as Record<string, unknown>, events: [] as string[], resetStatus: 204, resync: vi.fn(async () => {}) }));
 
 vi.mock("@/auth/AuthProvider", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/auth/AuthProvider")>();
@@ -41,6 +41,12 @@ function bff() {
     if (path === "/app/apartments") return json([SUMMARY()]);
     if (path === "/app/admin/apartments") return json([{ apartment_id: "apt-001", name: "Milano Centro", address: "", timezone: "Europe/Rome", instance_url: s.url, port: null, enabled: true, italianway_id: null, enabled_features: null, simulated: s.simulated }]);
     if (path === "/app/apartments/apt-001/instance/_test/state") return new Response(null, { status: 204 });
+    if (path === "/app/apartments/apt-001/simulator/booking") {
+      const ev = JSON.parse(String(init?.body));
+      const duplicate = s.events.includes(ev.event_id);
+      s.events.push(ev.event_id);
+      return json({ event_id: ev.event_id, accepted: true, duplicate, schedule_ids: duplicate ? [] : ["sch-1", "sch-2"], correlation_id: "c-1" });
+    }
     if (path === "/app/apartments/apt-001/simulator/reset") return s.resetStatus === 204 ? new Response(null, { status: 204 }) : json({ error: "reset_not_available", message: "Ripristino non disponibile" }, s.resetStatus);
     return json([]);
   }));
@@ -66,6 +72,7 @@ beforeEach(() => {
   s.url = "mock://builtin";
   s.calls = [];
   s.bodies = {};
+  s.events = [];
   s.resetStatus = 204;
   Element.prototype.scrollIntoView = vi.fn();
 });
@@ -182,5 +189,26 @@ describe("Simulatore: «Simula movimento» (D-140)", () => {
     const card = await openWith([]);
     expect(card).toHaveTextContent(t("simulator.noMotion"));
     expect(within(card).queryByRole("button")).toBeNull();
+  });
+});
+
+describe("Simulatore: lo stesso evento inviato di nuovo (C-4, lotto 30)", () => {
+  const send = () => act(async () => {
+    fireEvent.click(screen.getByTestId("sim-booking-send-btn"));
+  });
+
+  it("stesso modulo, stesso event_id: la seconda volta «Evento già elaborato»; cambiando un campo è un evento nuovo", async () => {
+    open("/a/apt-001/simulatore");
+    await screen.findByTestId("simulator-booking");
+    await send();
+    const first = (s.bodies["/app/apartments/apt-001/simulator/booking"] as { event_id: string }).event_id;
+    expect(screen.getByTestId("sim-booking-result")).toHaveTextContent(t("simulator.scheduled", { count: 2 }));
+    await send();
+    expect((s.bodies["/app/apartments/apt-001/simulator/booking"] as { event_id: string }).event_id).toBe(first);
+    expect(screen.getByTestId("sim-booking-result")).toHaveTextContent(t("simulator.duplicate"));
+    fireEvent.change(screen.getByTestId("sim-booking-guests"), { target: { value: "3" } });
+    await send();
+    expect((s.bodies["/app/apartments/apt-001/simulator/booking"] as { event_id: string }).event_id).not.toBe(first);
+    expect(screen.getByTestId("sim-booking-result")).toHaveTextContent(t("simulator.scheduled", { count: 2 }));
   });
 });

@@ -124,7 +124,17 @@ export default function RulesPage() {
   const hasErrors = rules.some((r) => Object.keys(paramErrors(r, draft[r.rule_id])).length > 0);
   const sl = rules.find((r) => r.rule_id === "setpoint_limits");
   const slEff = sl ? effective(sl, draft[sl.rule_id]).params : null;
-  const rangeError = slEff && slEff.min > slEff.max ? t("rules.invalidRange") : null;
+  // The same checks as the engine, before saving, with its sentences (lotto 30): min ≤ max, and for an engine that has
+  // the temperatures of the modes, eco ≤ comfort < cooling.
+  const has = (k: string) => slEff !== null && typeof slEff[k] === "number";
+  const rangeErrors = slEff
+    ? [
+        slEff.min > slEff.max ? t("rules.invalidRange") : null,
+        has("eco_celsius") && has("comfort_celsius") && slEff.eco_celsius > slEff.comfort_celsius ? t("rules.ecoAboveComfort") : null,
+        has("comfort_cool_celsius") && has("comfort_celsius") && slEff.comfort_cool_celsius <= slEff.comfort_celsius ? t("rules.coolNotAboveComfort") : null,
+      ].filter((e): e is string => e !== null)
+    : [];
+  const rangeError = rangeErrors.length ? rangeErrors.join(" · ") : null;
 
   const save = async () => {
     setSaving(true);

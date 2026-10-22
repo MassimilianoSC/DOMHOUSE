@@ -88,6 +88,8 @@
     "range": "da {min} a {max}",
     "outOfRange": "Valore fuori dai limiti ({min}–{max})",
     "invalidRange": "Il minimo non può superare il massimo",
+    "ecoAboveComfort": "La temperatura eco non può superare quella comfort",
+    "coolNotAboveComfort": "La temperatura di raffrescamento deve essere più alta di quella comfort",
     "dirty": "{count} regole modificate",
     "save": "Salva le modifiche",
     "discard": "Annulla le modifiche",

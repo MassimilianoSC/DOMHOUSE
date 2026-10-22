@@ -17,6 +17,8 @@ import { useApartmentStore } from "@/store/apartmentStore";
 
 const pad = (n: number) => String(n).padStart(2, "0");
 const toLocal = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** A new event of the simulated booking: kept until a field of the form changes (see sendBooking). */
+const newEventId = () => `sim-${crypto.randomUUID().slice(0, 8)}`;
 const plusDays = (n: number, h: number) => {
   const d = new Date();
   d.setDate(d.getDate() + n);
@@ -104,6 +106,13 @@ export default function SimulatorPage() {
     guests: "2",
   });
   const [lastBooking, setLastBooking] = useState<{ schedule_ids: string[]; duplicate: boolean } | null>(null);
+  // The same event sent again keeps its event_id, as Italianway does when it retries: the engine answers «duplicate»
+  // and nothing is applied twice («Evento già elaborato»). Any change to the form makes it a new event.
+  const [eventId, setEventId] = useState(newEventId);
+  const change = (patch: Partial<typeof booking>) => {
+    setBooking((b) => ({ ...b, ...patch }));
+    setEventId(newEventId());
+  };
 
   // Admins only, on a simulated apartment, in any environment (D-97); SimulatorOnly in App guards the address too.
   if (me?.role !== "admin" || summary.data?.simulated !== true) return null;
@@ -116,7 +125,7 @@ export default function SimulatorPage() {
 
   const sendBooking = async () => {
     const body: SimBookingInput = {
-      event_id: `sim-${crypto.randomUUID().slice(0, 8)}`,
+      event_id: eventId,
       type: booking.type,
       booking_id: booking.booking_id.trim(),
       checkin_at: new Date(booking.checkin).toISOString(),
@@ -199,25 +208,25 @@ export default function SimulatorPage() {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="sim-type">{t("simulator.eventType")}</Label>
-              <NativeSelect id="sim-type" value={booking.type} onChange={(e) => setBooking({ ...booking, type: e.target.value as SimBookingInput["type"] })} data-testid="sim-booking-type">
+              <NativeSelect id="sim-type" value={booking.type} onChange={(e) => change({ type: e.target.value as SimBookingInput["type"] })} data-testid="sim-booking-type">
                 {(["booking_created", "booking_changed", "booking_cancelled", "checkin", "checkout"] as const).map((v) => <option key={v} value={v}>{t(`simulator.types.${v}`)}</option>)}
               </NativeSelect>
             </div>
             <div className="space-y-1">
               <Label htmlFor="sim-bid">{t("simulator.bookingId")}</Label>
-              <Input id="sim-bid" value={booking.booking_id} onChange={(e) => setBooking({ ...booking, booking_id: e.target.value })} data-testid="sim-booking-id" />
+              <Input id="sim-bid" value={booking.booking_id} onChange={(e) => change({ booking_id: e.target.value })} data-testid="sim-booking-id" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="sim-ci">{t("simulator.checkin")}</Label>
-              <Input id="sim-ci" type="datetime-local" value={booking.checkin} onChange={(e) => setBooking({ ...booking, checkin: e.target.value })} data-testid="sim-booking-checkin" />
+              <Input id="sim-ci" type="datetime-local" value={booking.checkin} onChange={(e) => change({ checkin: e.target.value })} data-testid="sim-booking-checkin" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="sim-co">{t("simulator.checkout")}</Label>
-              <Input id="sim-co" type="datetime-local" value={booking.checkout} onChange={(e) => setBooking({ ...booking, checkout: e.target.value })} data-testid="sim-booking-checkout" />
+              <Input id="sim-co" type="datetime-local" value={booking.checkout} onChange={(e) => change({ checkout: e.target.value })} data-testid="sim-booking-checkout" />
             </div>
             <div className="space-y-1">
               <Label htmlFor="sim-guests">{t("simulator.guests")}</Label>
-              <Input id="sim-guests" type="number" min={0} value={booking.guests} onChange={(e) => setBooking({ ...booking, guests: e.target.value })} data-testid="sim-booking-guests" />
+              <Input id="sim-guests" type="number" min={0} value={booking.guests} onChange={(e) => change({ guests: e.target.value })} data-testid="sim-booking-guests" />
             </div>
           </div>
           <Button onClick={sendBooking} disabled={busy !== null || !booking.booking_id.trim() || !booking.checkin || !booking.checkout} data-testid="sim-booking-send-btn">
