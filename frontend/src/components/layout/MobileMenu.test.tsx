@@ -176,3 +176,23 @@ describe("ambiente di prova (P-67)", () => {
     expect(screen.queryByTestId("env-banner")).toBeNull();
   });
 });
+
+describe("menu: il nome della persona (D-170)", () => {
+  it("con il nome visualizzato: il nome in grassetto e sotto l'email", async () => {
+    s.me = { ...me("admin"), user: { ...me("admin").user, display_name: "Anna Rossi" } };
+    open("/a/apt-001");
+    await screen.findByTestId("mobile-menu-btn");
+    const aside = within(screen.getByRole("complementary"));
+    expect(aside.getByTestId("sidebar-user-name")).toHaveTextContent("Anna Rossi");
+    expect(aside.getByTestId("sidebar-user-email")).toHaveTextContent("anna@demo.it");
+  });
+
+  it("senza nome (o solo spazi): solo l'email, come prima", async () => {
+    s.me = { ...me("admin"), user: { ...me("admin").user, display_name: "  " } };
+    open("/a/apt-001");
+    await screen.findByTestId("mobile-menu-btn");
+    const aside = within(screen.getByRole("complementary"));
+    expect(aside.queryByTestId("sidebar-user-name")).toBeNull();
+    expect(aside.getByTestId("sidebar-user-email")).toHaveTextContent("anna@demo.it");
+  });
+});

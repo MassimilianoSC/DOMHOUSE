@@ -671,8 +671,6 @@
       "approvalsHint": "Quando il motore chiede il tuo consenso",
       "offline": "Dispositivi e istanza offline",
       "offlineHint": "Dispositivo offline oltre la soglia della regola, istanza non raggiungibile, antigelo non attivo",
-      "decisions": "Decisioni del motore",
-      "decisionsHint": "Riepilogo delle azioni automatiche (solo in app)",
       "bookings": "Prenotazioni",
       "bookingsHint": "Avvisi sulle prenotazioni che cambiano il programma dell'appartamento",
       "summary": "Riepilogo",

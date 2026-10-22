@@ -11,7 +11,9 @@ import { runAction, showError } from "@/lib/actions";
 import { disablePush, enablePush, PushError, pushState, type PushState } from "@/lib/push";
 import { env } from "@/lib/utils";
 
-const KEYS: (keyof NotificationPrefs)[] = ["approvals", "offline", "decisions", "bookings", "summary"];
+// D-170: «Decisioni del motore» is gone (it saved a choice nothing used); whatever else the server sends in the
+// preferences travels back unchanged when saving.
+const KEYS: (keyof NotificationPrefs)[] = ["approvals", "offline", "bookings", "summary"];
 
 /** Why this device does not receive push (null when it can): the card says it instead of a silent disabled button. */
 function blockedText(state: PushState): string | null {

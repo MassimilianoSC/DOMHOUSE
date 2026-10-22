@@ -189,12 +189,12 @@ describe("Impostazioni > Notifiche: «Prenotazioni» (D-123)", () => {
 
   it("cambiando un'altra voce, «Prenotazioni» viaggia comunque nel salvataggio", async () => {
     renderCard();
-    const sw = await screen.findByTestId("settings-pref-decisions");
+    const sw = await screen.findByTestId("settings-pref-approvals");
     await waitFor(() => expect(screen.getByTestId("settings-pref-bookings")).toBeChecked());
     await act(async () => {
       fireEvent.click(sw);
     });
-    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: true, decisions: true, bookings: true, summary: true });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: false, offline: true, decisions: false, bookings: true, summary: true });
   });
 
   it("server precedente, senza la voce: si mostra attiva (il predefinito) e si manda attiva", async () => {
@@ -220,7 +220,7 @@ describe("Impostazioni > Notifiche: «Riepilogo» (D-150)", () => {
     expect(card).toHaveTextContent("Riepilogo");
     expect(card).toHaveTextContent("Ogni lunedì, solo se la settimana ha qualcosa da segnalare");
     const order = screen.getAllByRole("switch").map((el) => el.getAttribute("data-testid"));
-    expect(order).toEqual(["settings-pref-approvals", "settings-pref-offline", "settings-pref-decisions", "settings-pref-bookings", "settings-pref-summary"]);
+    expect(order).toEqual(["settings-pref-approvals", "settings-pref-offline", "settings-pref-bookings", "settings-pref-summary"]);
   });
 
   it("spenta: si salva con tutte le altre voci", async () => {
@@ -242,5 +242,29 @@ describe("Impostazioni > Notifiche: «Riepilogo» (D-150)", () => {
       fireEvent.click(screen.getByTestId("settings-pref-offline"));
     });
     expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: false, decisions: false, bookings: true, summary: true });
+  });
+});
+
+describe("Impostazioni > Notifiche: niente più «Decisioni del motore» (D-170)", () => {
+  it("le quattro voci, senza «Decisioni del motore»; una preferenza già salvata torna al server invariata", async () => {
+    state.prefs = { approvals: true, offline: true, decisions: true, bookings: true, summary: true };
+    const card = renderCard();
+    await waitFor(() => expect(screen.getByTestId("settings-pref-summary")).toBeChecked());
+    expect(screen.queryByTestId("settings-pref-decisions")).toBeNull();
+    expect(card).not.toHaveTextContent("Decisioni del motore");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("settings-pref-offline"));
+    });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: false, decisions: true, bookings: true, summary: true });
+  });
+
+  it("un server che non manda più la voce: il salvataggio manda le quattro", async () => {
+    state.prefs = { approvals: true, offline: true, bookings: true, summary: true };
+    renderCard();
+    await waitFor(() => expect(screen.getByTestId("settings-pref-offline")).toBeChecked());
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("settings-pref-offline"));
+    });
+    expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: false, bookings: true, summary: true });
   });
 });

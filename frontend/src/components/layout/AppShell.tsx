@@ -88,7 +88,15 @@ function MenuContent({ prefix, onNavigate }: { prefix: "sidebar" | "drawer"; onN
       <div className="mt-auto pt-4" />
       <SidebarInstall prefix={prefix} />
       <div className="rounded-2xl bg-secondary/70 p-3">
-        <div className="truncate text-sm font-bold" data-testid={`${prefix}-user-email`}>{me?.user.email}</div>
+        {/* D-170: the name chosen in Settings, with the email under it; without one, the email alone */}
+        {me?.user.display_name?.trim() ? (
+          <>
+            <div className="truncate text-sm font-bold" data-testid={`${prefix}-user-name`}>{me.user.display_name.trim()}</div>
+            <div className="truncate text-xs text-muted-foreground" data-testid={`${prefix}-user-email`}>{me.user.email}</div>
+          </>
+        ) : (
+          <div className="truncate text-sm font-bold" data-testid={`${prefix}-user-email`}>{me?.user.email}</div>
+        )}
         <div className="text-xs text-muted-foreground" data-testid={`${prefix}-user-role`}>
           {me?.role ? t(`roles.${me.role}`) : me?.user.platform_manager ? t("roles.platform") : ""}
           {me?.tenant ? ` · ${me.tenant.name}` : ""}
