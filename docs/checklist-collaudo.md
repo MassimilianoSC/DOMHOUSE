@@ -27,10 +27,12 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | A8 | Utente con password | Impostazioni > Cambia email verso un altro tuo indirizzo. | «Link inviato a …»; il cambio avviene solo dopo aver aperto il link. | |
 | A9 | Utente Google | Apri Impostazioni. | Al posto di password ed email: «…si gestiscono dal tuo account Google». | |
 | A10 | Qualsiasi | Cambia il nome visualizzato e salva. | «Nome aggiornato»; il nome nuovo compare in Amministrazione > Utenti. | |
+| A10b | Qualsiasi | Con il nome visualizzato impostato, apri la barra laterale (computer) o il menu a tre righe (telefono); poi svuota il nome e riapri. | In fondo il nome in grassetto con sotto l'email in piccolo, poi il ruolo e l'organizzazione; senza nome resta solo l'email. | |
 | A11 | Qualsiasi, su due dispositivi | Entra su due dispositivi, poi su uno «Esci da tutti i dispositivi». | Torni all'accesso su quel dispositivo; sull'altro, entro un minuto, l'app chiede di accedere di nuovo. | |
 | A12 | Operatore di prova | «Elimina il mio account» e conferma. | «Account eliminato»; per rientrare serve un nuovo invito. | |
 | A13 | Unico amministratore | «Elimina il mio account». | L'eliminazione è rifiutata con un messaggio che chiede di nominare un altro amministratore. | |
 | A14 | Qualsiasi | Impostazioni > Notifiche. | C'è «Attiva su questo dispositivo» (le notifiche sono attive anche nell'ambiente di prova); nessuna scritta «Modalità sviluppo» né «FCM». | |
+| A14b | Qualsiasi | Impostazioni > Notifiche: conta le voci e cambiane una. | Quattro voci: «Approvazioni richieste», «Dispositivi e istanza offline», «Prenotazioni», «Riepilogo»; nessuna «Decisioni del motore»; cambiarne una dà «Preferenze salvate». | |
 | A15 📱 | Amministratore | Guarda il titolo della scheda del browser e la pagina di accesso; poi invita un tuo indirizzo nuovo. | Ovunque compare il nome **DOMHOUSE**; l'email d'invito ha l'oggetto «Invito a DOMHOUSE». | |
 | A16 | Qualsiasi | Chiudi la finestra di Google senza scegliere un account; poi prova una password sbagliata. | Nessun messaggio nel primo caso; nel secondo «Accesso non riuscito: controlla email e password» con sotto «Codice: auth/invalid-credential», che un tocco copia. | |
 
@@ -220,7 +222,7 @@ normale di prova con un **operatore**.
 |---|---|---|---|---|
 | M1 📱 | Qualsiasi | Menu dell'appartamento > «Riepiloghi» (dopo «Consumi»). | L'elenco delle settimane dalla più recente, ciascuna con «Settimana dal … al …» e «N segnalazioni» oppure «Nessuna novità»; su un appartamento appena creato «Nessun riepilogo ancora. Ogni lunedì mattina arriva quello della settimana appena finita.» | |
 | M2 | Qualsiasi (su un dimostrativo) | Apri la settimana più recente. | Le frasi del riepilogo (o «Settimana senza novità») e il riquadro «Consumi a parità di occupazione» con notti, kWh per notte, mediana delle 4 settimane prima e stato («Nella norma», «Alto», «Confronto non disponibile», «Nessuna notte»). | |
-| M3 | Qualsiasi | Impostazioni > Notifiche. | La voce «Riepilogo» (ultima delle cinque) è attiva dall'inizio, con «Ogni lunedì, solo se la settimana ha qualcosa da segnalare»; spegnerla e riaccenderla dà «Preferenze salvate». | |
+| M3 | Qualsiasi | Impostazioni > Notifiche. | La voce «Riepilogo» (ultima delle quattro) è attiva dall'inizio, con «Ogni lunedì, solo se la settimana ha qualcosa da segnalare»; spegnerla e riaccenderla dà «Preferenze salvate». | |
 | M5 | Qualsiasi (su un dimostrativo, entro pochi minuti dalla pubblicazione) | Apri «Riepiloghi». | C'è la settimana appena finita; nel riquadro dei consumi compare «dati insufficienti …» con la data (i dimostrativi non hanno ancora 5 settimane di dati veri). | |
 | M4 | Telefono con notifiche attive | Il lunedì mattina dopo le 8, su un appartamento con qualcosa da segnalare. | Arriva UNA notifica «Riepilogo»; toccandola si apre la pagina di quella settimana. Nessuna notifica per una settimana senza novità. | |
 

@@ -94,6 +94,10 @@ un sistema che non è il suo, né ricevere le prenotazioni di una struttura altr
 - **Temperature delle modalità regolabili** (sezione 5, Regole): comfort, eco e raffrescamento per appartamento;
   con il sensore della stanza, in comfort il climatizzatore scalda o raffresca da solo.
 - **Caldaia senza sensore**: non si accende più da sola; a casa vuota l'antigelo non è attivo e arriva una notifica.
+- **Il tuo nome nel menu**: in fondo alla barra laterale e al menu del telefono compare il nome scelto nelle
+  Impostazioni, con sotto l'email; senza nome, solo l'email.
+- **Notifiche: quattro voci**: la voce «Decisioni del motore» è stata tolta dalle Impostazioni finché non avrà un
+  comportamento definito.
 - **Due registri con nomi diversi**: in Amministrazione «Registro dell'organizzazione» (chi ha fatto cosa nella tua
   organizzazione), in Organizzazioni «Registro della piattaforma» (solo per i gestori della piattaforma). Prima si
   chiamavano entrambi «Registro attività».
@@ -205,8 +209,9 @@ attiva per quell'appartamento.
 
 **Come muoversi.** Su computer c'è la barra laterale a sinistra. Sul telefono le pagine si aprono dal pulsante con le tre
 righe in alto a sinistra («Apri il menu»): si apre il menu con tutte le pagine, generali e dell'appartamento in cui sei;
-la pagina aperta è evidenziata e in fondo trovi il tuo nome, il ruolo e «Esci». Per chiuderlo tocca fuori dal menu o la
-X («Chiudi il menu»); si chiude anche scegliendo una pagina. In fondo alla barra laterale (o al menu), sotto l'email, ci sono i tuoi ruoli: per esempio
+la pagina aperta è evidenziata e in fondo trovi il tuo nome (quello scelto nelle Impostazioni) con sotto l'email, il ruolo
+e «Esci»; se non hai scelto un nome, solo l'email. Per chiuderlo tocca fuori dal menu o la X («Chiudi il menu»); si chiude
+anche scegliendo una pagina. In fondo alla barra laterale (o al menu), sotto il nome e l'email, ci sono i tuoi ruoli: per esempio
 «Amministratore · Flatsharing» e, se hai anche il ruolo di HQE, «Gestore della piattaforma». Quando le schede di una
 pagina non stanno sullo schermo del telefono, la loro barra scorre in orizzontale.
 
@@ -603,14 +608,15 @@ L'unico punto in comune è «Verifica connessione», presente in tutte e due le 
   servirà un nuovo invito.» Se invece è un amministratore a toglierti dall'organizzazione, il tuo accesso si chiude
   subito e quello che hai fatto resta nel registro attività per 24 mesi con il tuo nome visibile ai colleghi
   amministratori; per far cancellare nome ed email prima, elimina tu stesso l'account o chiedilo al gestore.
-- **Notifiche:** quali avvisi ricevere, per categoria: «Approvazioni richieste», «Dispositivi e istanza offline» e
-  «Prenotazioni» (avvisi sulle prenotazioni che cambiano il programma dell'appartamento, per esempio una disdetta dopo
-  che l'appartamento è stato preparato per l'arrivo) e «Riepilogo» (il riepilogo settimanale, ogni lunedì, solo se la
-  settimana ha qualcosa da segnalare), tutte attive dall'inizio; «Decisioni del motore» (riepilogo delle
-  azioni automatiche, solo in app) è spenta finché non la attivi. Le notifiche sul telefono sono attive anche
-  nell'ambiente di prova (vedi sotto). Se in un ambiente non lo fossero, la scheda direbbe «Notifiche sul telefono non
-  attive in questo ambiente»: gli avvisi (nuove approvazioni, dispositivi offline, istanza non raggiungibile,
-  prenotazioni annullate) compaiono in alto nello schermo solo mentre l'app è aperta sulla pagina di un appartamento.
+- **Notifiche:** quali avvisi ricevere sul telefono, per categoria: «Approvazioni richieste», «Dispositivi e istanza
+  offline» (anche «antigelo non attivo»), «Prenotazioni» (avvisi sulle prenotazioni che cambiano il programma
+  dell'appartamento, per esempio una disdetta dopo che l'appartamento è stato preparato per l'arrivo) e «Riepilogo» (il
+  riepilogo settimanale, ogni lunedì, solo se la settimana ha qualcosa da segnalare), tutte attive dall'inizio. Le scelte
+  valgono per le notifiche sul telefono; mentre l'app è aperta sulla pagina di un appartamento, gli avvisi in alto nello
+  schermo (nuova approvazione, dispositivo offline, istanza non raggiungibile o di nuovo raggiungibile, prenotazione
+  annullata) compaiono comunque. La voce «Decisioni del motore» non c'è più (dal lotto 30): tornerà quando avrà un
+  comportamento definito. Le notifiche sul telefono sono attive anche nell'ambiente di prova (vedi sotto); se in un
+  ambiente non lo fossero, la scheda direbbe «Notifiche sul telefono non attive in questo ambiente».
 - **Installa l'app** e **Lingua** (per ora solo italiano). In fondo «Esci».
 - Un gestore della piattaforma che non fa parte di un'organizzazione non vede, nelle Impostazioni, il riquadro
   «Notifiche»: le notifiche arrivano per appartamento.
