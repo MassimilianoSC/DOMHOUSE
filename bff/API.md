@@ -419,6 +419,9 @@ leggibile); `instance_down` (evento `instance.health` con `status` `down`: istan
 motore giù, D-131) parte se resta giù per gli stessi minuti della regola `offline_alert`, mai con la regola spenta, una
 volta sola finché l'istanza non torna su: una caduta seguita da un ritorno prima dei minuti non manda niente.
 
+D-170: la vecchia preferenza `decisions` («Decisioni del motore») non esiste più: non faceva niente. Un corpo di #28 o un
+record salvato che la contiene è accettato e la chiave è ignorata; `GET /app/push/status` e `/app/me` non la mandano più.
+
 Destinatari: solo gli utenti che vedono l'appartamento del messaggio (`apartment_id`, vedi «Appartamenti per
 utente»).
 

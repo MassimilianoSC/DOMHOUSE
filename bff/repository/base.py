@@ -32,7 +32,9 @@ def tenant_name_key(name: str) -> str:
 class NotificationPrefs(BaseModel):
     approvals: bool = True
     offline: bool = True
-    decisions: bool = False
+    # D-170: «Decisioni del motore» is gone (it never did anything); a body or a stored record that still has
+    # «decisions» is accepted and the key ignored (pydantic drops unknown fields). It comes back when it has a defined
+    # behaviour (candidate: a daily summary of the automatic actions)
     # D-123 «Prenotazioni»: bookings that change the apartment's schedule (today: cancelled after the prearrival). On by
     # default, also for preferences saved before it existed: a stored record without the key reads True.
     bookings: bool = True

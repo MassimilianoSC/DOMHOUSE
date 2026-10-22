@@ -365,3 +365,26 @@ def test_frost_inactive_goes_to_who_wants_offline(users, fcm):
         "/a/apt-push/decisioni", "dev-caldaia")
     assert "tok-z" not in fcm.sent[0].tokens                   # u-push-3 turned «offline» off
     assert fcm.sent[0].webpush.headers == {"Urgency": "high", "TTL": "86400"}
+
+
+# -------- D-170: «Decisioni del motore» is gone, without breaking saved preferences --------
+def test_decisions_preference_is_accepted_and_ignored():
+    import httpx as _httpx
+    from bff.main import app as _app
+
+    old = User.model_validate({"uid": "u-d170", "email": "d170@test.it", "tenant_id": TENANT, "role": "admin",
+                               "notification_prefs": {"approvals": True, "offline": True, "decisions": True}})
+    assert set(old.notification_prefs.model_dump()) == {"approvals", "offline", "bookings", "summary"}
+
+    async def scenario():
+        async with _httpx.AsyncClient(transport=_httpx.ASGITransport(app=_app), base_url="http://t") as c:
+            with_key = await c.put("/app/me/notification-prefs", headers={"X-Dev-User": "admin@demo.it"},
+                                   json={"approvals": True, "offline": False, "decisions": True, "bookings": True,
+                                         "summary": True})
+            without = await c.put("/app/me/notification-prefs", headers={"X-Dev-User": "admin@demo.it"},
+                                  json={"approvals": True, "offline": True, "bookings": True, "summary": True})
+            status = await c.get("/app/push/status", headers={"X-Dev-User": "admin@demo.it"})
+        return with_key, without, status
+    with_key, without, status = run(scenario())
+    assert with_key.status_code == 200 and "decisions" not in with_key.json()
+    assert without.status_code == 200 and "decisions" not in status.json()["prefs"]
