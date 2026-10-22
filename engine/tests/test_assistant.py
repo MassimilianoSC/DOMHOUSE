@@ -100,8 +100,15 @@ def test_with_guests_in_switching_off_the_climate_needs_an_approval():
     approval = e.pending_approval()
     assert a["approval_id"] == approval["approval_id"] and approval["source"] == "assistant"
     assert approval["description"] == "Spegnere climatizzatore soggiorno" and approval["expires_action"] == "reject"
-    assert a["answer"].endswith("Serve la tua approvazione: spegnere climatizzatore soggiorno.")
+    assert a["answer"].endswith("Spengo climatizzatore soggiorno con ospiti presenti? Rispondi Sì o No qui sotto, "
+                                "oppure dalla pagina Approvazioni.")                 # D-154: a question in the chat
     assert e.devices[CLIMA]["capabilities"]["climate"]["on"] is True          # nothing done
+    # «Sì» in the chat is the Approvals page's own call: the same record, author and outcome
+    async def yes():
+        return e.decide(a["approval_id"], {"decision": "approve"}, "prova@hqe.it", "22222222-2222-2222-2222-222222222222")
+    done = asyncio.run(yes())
+    assert (done["status"], done["decided_by"]) == ("approved", "prova@hqe.it")
+    assert any(d.get("approval_id") == a["approval_id"] and d["action"] == "approve" for d in e.decisions)
 
 
 def test_two_actions_together_need_one_approval_each_queued():
@@ -113,7 +120,8 @@ def test_two_actions_together_need_one_approval_each_queued():
     a = ask(e, "accendi la stufetta e porta il clima a 22")
     assert a["status"] == "needs_approval" and len(e.approval_queue) == 1
     assert a["approval_id"] == e.pending_approval()["approval_id"]
-    assert a["answer"].count("Serve la tua approvazione") == 2 and "climatizzatore soggiorno a 22 °C" in a["answer"]
+    assert a["answer"].count("Rispondi Sì o No qui sotto") == 2
+    assert "Confermi: climatizzatore soggiorno a 22 °C?" in a["answer"] and "Confermi: accendere " in a["answer"]
 
 
 def test_a_scheduled_action_and_a_wrong_proposal_corrected_by_the_model():

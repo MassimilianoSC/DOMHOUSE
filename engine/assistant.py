@@ -267,6 +267,18 @@ class Assistant:
             return f"{label} a {target['setpoint']:g} °C"
         return f"accendere {label}"
 
+    def question(self, what: str) -> str:
+        """D-154 point 2: the approval asked as a question in the chat, answered with «Sì» / «No» under it (the same
+        call as the Approvals page, so the same record) or from the Approvals page."""
+        tail = " Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni."
+        if self.e.apartment().get("occupancy") == "occupied":
+            if what.startswith("spegnere "):
+                return f"Spengo {what[len('spegnere '):]} con ospiti presenti?{tail}"
+            if what.startswith("modalità "):
+                return f"Passo alla {what} con ospiti presenti?{tail}"
+            return f"Confermi, con ospiti presenti: {what}?{tail}"
+        return f"Confermi: {what}?{tail}"
+
     def needs_approval(self, p: dict, together: bool) -> bool:
         """D-132 point 2: with guests in, the guest's comfort (switching off a climate or a boiler, the mode); and any
         action together with others (one approval each, D-144)."""
@@ -299,7 +311,7 @@ class Assistant:
                     if ask["approval_id"] is None:
                         ask["approval_id"] = approval["approval_id"]
                         ask["status"] = "needs_approval"
-                    lines.append(f"Serve la tua approvazione: {what}.")
+                    lines.append(self.question(what))
                 elif p["type"] == "mode":
                     for command_id in e.set_mode(p["mode"], actor, corr, why, "assistant"):
                         ask["actions"].append({"type": "command", "command_id": command_id})
