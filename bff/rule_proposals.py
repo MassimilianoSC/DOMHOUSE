@@ -114,6 +114,11 @@ def changes(ruleset: dict, patches: list) -> tuple[list[dict], list[dict]]:
     sl = after.get("setpoint_limits")
     if sl and sl["min"] > sl["max"]:
         raise ProposalError(422, "invalid_range", "Il minimo del setpoint non può superare il massimo")
+    # D-161/D-162, the engine's own checks (lot 30): a proposal never shows a change that «Applica» would refuse
+    if sl and "eco_celsius" in sl and "comfort_celsius" in sl and sl["eco_celsius"] > sl["comfort_celsius"]:
+        raise ProposalError(422, "invalid_range", "La temperatura eco non può superare quella comfort")
+    if sl and "comfort_celsius" in sl and "comfort_cool_celsius" in sl and sl["comfort_celsius"] >= sl["comfort_cool_celsius"]:
+        raise ProposalError(422, "invalid_range", "La temperatura di raffrescamento deve essere più alta di quella comfort")
     return clean, out
 
 
@@ -195,6 +200,8 @@ def from_answer(answer: dict) -> tuple[list | None, str]:
 
 # ---- the recognizer for the demonstrations without the model -------------------------------------------------------
 _NUM = r"(\d+(?:[.,]\d+)?)"
+AMBIGUOUS_TEMPERATURE = ("È la temperatura comfort, eco, di raffrescamento o un limite (minimo o massimo)? Scrivilo, per "
+                         "esempio «comfort 22» o «massimo 24».")
 _RULE_WORDS = (("window_open_off", ("finestr",)), ("frost_protection", ("antigelo", "gelo")),
                ("mold_protection", ("muffa", "umidit")), ("prearrival", ("arrivo",)),
                ("checkout_eco", ("check-out", "checkout", "partenza")), ("offline_alert", ("offline",)),
@@ -253,8 +260,10 @@ def recognize(text: str, ruleset: dict) -> tuple[list | None, str]:
                 "Cambio i limiti del setpoint."
         if n and "min" in t:
             return [{"rule_id": rule, "params": {"min": _num(n[0])}}], "Cambio il minimo del setpoint."
-        if n:
+        if n and "mass" in t:
             return [{"rule_id": rule, "params": {"max": _num(n[0])}}], "Cambio il massimo del setpoint."
+        if n:                                     # lot 30: «temperatura 22» alone is not a limit, ask which one
+            return None, AMBIGUOUS_TEMPERATURE
     elif n:
         return [{"rule_id": rule, "params": {key: _num(n[0])}}], "Cambio il valore della regola."
     return None, "Scrivi anche il valore, per esempio «finestra aperta 10 minuti»."

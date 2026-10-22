@@ -287,3 +287,22 @@ def test_a_slow_model_gets_a_clear_answer(engines, monkeypatch):
     r = propose("la finestra spegne dopo 10 minuti e l'antigelo sta a 9 gradi")      # two rules: the model
     assert r.status_code == 504 and r.json() == {"error": "timeout", "message": rp.TIMEOUT_MESSAGE}
 
+
+
+# -------- lot 30: the modes' temperatures in the proposals --------
+def test_a_proposal_never_breaks_eco_comfort_cooling(engines, monkeypatch):
+    """The engine's own checks (D-161/D-162) before «Applica»: eco ≤ comfort < cooling, with the engine's sentence."""
+    model(monkeypatch, tool_call([{"rule_id": "setpoint_limits", "params": {"eco_celsius": 22}}]))
+    p = propose("alza la temperatura di risparmio a 22").json()                 # ambiguous for the recognizer: the model
+    assert p["changes"] == [] and p["explanation"] == "La temperatura eco non può superare quella comfort"
+    p = propose("comfort 25").json()                                           # the recognizer: comfort = cooling (25)
+    assert p["changes"] == [] and p["explanation"] == "La temperatura di raffrescamento deve essere più alta di quella comfort"
+    with pytest.raises(rp.ProposalError):                                      # the copy's preview uses the same check
+        rp.changes(engines.engines[BOLOGNA].ruleset(), [{"rule_id": "setpoint_limits", "params": {"comfort_celsius": 26}}])
+
+
+def test_temperatura_alone_is_a_question_not_a_limit(engines):
+    p = propose("temperatura 22").json()                                       # a demonstration: the recognizer
+    assert p["changes"] == [] and p["explanation"] == rp.AMBIGUOUS_TEMPERATURE
+    assert propose("temperatura massima 23").json()["changes"][0]["field"] == "max"
+    assert propose("comfort 22").json()["changes"][0]["field"] == "comfort_celsius"
