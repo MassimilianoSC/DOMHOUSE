@@ -97,6 +97,9 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D11e | Sola lettura (stesso dimostrativo, nuova richiesta da un operatore) | Apri l'Assistente mentre c'è una domanda aperta. | La domanda si vede senza i pulsanti «Sì» e «No». | |
 | D11c | Operatore (su un dimostrativo) | Dal Simulatore apri una finestra e aspetta che il clima si spenga (5 minuti); poi Assistente: «perché si è spento il clima?». | Una risposta che cita la finestra aperta, presa dalle Decisioni. | |
 | D11d | Sola lettura | Apri la pagina Assistente. | Nessun campo per scrivere: il ruolo non fa domande. | |
+| D11f | Operatore (su un dimostrativo «occupato» con il clima acceso) | Assistente: «non spegnere il clima». | Nessun comando: il clima resta acceso e la risposta descrive lo stato (eventuale riga finale «Risposta rapida: …» se il modello non ha risposto in tempo). | |
+| D11g | Operatore (su un dimostrativo «occupato») | Assistente: «Alle 18 metti il clima a 22 gradi» (o un orario futuro in cui ci sono ospiti). | La risposta finisce con «Programmo …, con ospiti presenti a quell'ora? Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni.» con i pulsanti; in Approvazioni la richiesta si legge «Programmare …». Premi «Sì»: l'azione compare in Programmazione all'ora chiesta con origine «assistente». | |
+| D11h | Operatore (su un dimostrativo «vuoto») | Assistente: «spegni la caldaia» (suggerimento della pagina). | «Fatto: …» o «Comando inviato: …»; se in fondo c'è «Risposta rapida: …», il comando è partito lo stesso perché la frase è semplice. | |
 
 ## E. Amministrazione
 
@@ -232,7 +235,7 @@ normale di prova con un **operatore**.
 |---|---|---|---|---|
 | N1 | Operatore (su un dimostrativo) | Regole › «Chiedi all'assistente»: scrivi «finestra 10 minuti» e premi «Proponi». | «Modifiche proposte» con «Finestra aperta spegne il clima · Minuti: 5 → 10» e i pulsanti «Applica» e «Scarta»; nulla è cambiato finché non premi «Applica». | |
 | N2 | Operatore | Premi «Applica». | «Regole aggiornate come proposto»; il campo Minuti mostra 10; nelle Decisioni compare la modifica con il tuo nome; nel registro attività (amministratore) «ha modificato le regole … su proposta dell'assistente: Finestra aperta spegne il clima, minuti da 5 a 10». | |
-| N3 | Operatore | Scrivi «finestra 90 minuti» e premi «Proponi». | Nessuna proposta e nessun «Applica»: solo la frase che spiega il limite («Il valore deve essere tra 1 e 30 minuti.»). | |
+| N3 | Operatore | Scrivi «finestra 90 minuti» e premi «Proponi». | Nessuna proposta e nessun «Applica»: solo una frase che spiega il limite (il testo può variare, per esempio «Il massimo è 30 minuti» o «Il valore deve essere tra 1 e 30 minuti.»). | |
 | N4 | Operatore | Cambia a mano un valore senza salvare, poi chiedi una proposta. | «Applica» è disattivato con «Salva o annulla prima le modifiche fatte a mano». | |
 | N5 | Sola lettura | Apri Regole. | Il riquadro «Chiedi all'assistente» non c'è. | |
 | N6 | Operatore | Regole › «Risparmio al check-out». | C'è il campo «Minuti di presenza dopo il check-out» (da 5 a 180, 30 all'inizio); fuori limite viene segnalato sotto il campo. | |

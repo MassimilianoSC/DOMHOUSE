@@ -1061,7 +1061,8 @@ regole (rimanda alla pagina Regole), utenti e appartamenti. L&#x27;esito lo scri
 solo quando il dispositivo ha confermato; «Comando inviato: …, l&#x27;esito arriva nell&#x27;app.» se la conferma non è ancora
 arrivata; «Non riuscito: … (…).» o «Non fatto: … (…).» con il motivo; «Programmato: ….» per un&#x27;azione a orario.
 Sotto la risposta compaiono le etichette «Comando» e «Programmazione» con gli identificativi. Controlla sempre in
-Panoramica.</p>
+Panoramica. Il modello propone le azioni in una forma controllata e il sistema le verifica una per una prima di
+eseguirle (limiti, conferme, regole): un&#x27;azione non ammessa non parte e viene detta con «Non fatto: … (…).».</p>
 </li>
 <li>
 <p><strong>Con ospiti dentro</strong>, spegnere il clima o la caldaia e cambiare modalità non avviene da solo: l&#x27;assistente chiede in
@@ -1092,9 +1093,18 @@ quando esci.</p>
 <li>
 <p>Limiti: 50 domande al giorno per appartamento («Limite di … domande al giorno raggiunto per questo appartamento:
 riprova domani.») e un tetto di spesa mensile per tutto il servizio («Limite mensile raggiunto, riprova dal mese
-prossimo»). Se l&#x27;assistente non ce la fa in tempo leggi «Non sono riuscito a rispondere in tempo: riprova, oppure fai
-dall&#x27;app.» oppure «L&#x27;assistente non è disponibile ora, riprova più tardi» o «Non sono riuscito a rispondere: riprova.».
-Se aveva già proposto delle azioni le esegue comunque e te lo scrive.</p>
+prossimo»).</p>
+</li>
+<li>
+<p><strong>Risposta rapida</strong> (dal lotto 30). Se l&#x27;assistente completo non risponde in tempo, non è raggiungibile o ha
+raggiunto il limite mensile, risponde il sistema da solo. Esegue il comando solo se la frase è inequivocabile: un
+verbo e un solo dispositivo (per tipo, stanza o nome) oppure una modalità, senza «non», condizioni od orari. Per
+esempio «Spegni la caldaia» o «Porta il soggiorno a 21 gradi» partono; «non spegnere il clima», «alle 18 …», «se
+fa freddo …», «spegni tutto», «spegni il clima e la presa» non fanno nulla: leggi lo stato e un rimando ai pulsanti
+dell&#x27;app. Con ospiti dentro chiede conferma come sempre. In fondo alla risposta leggi «Risposta rapida:
+l&#x27;assistente completo non ha risposto in tempo.» (oppure «… non è raggiungibile ora.» o «… ha raggiunto il limite
+mensile.»). Se invece leggi «L&#x27;assistente non è disponibile ora, riprova più tardi», il sistema ha scartato una
+risposta arrivata da fuori Europa (una protezione: il modello lavora solo in Europa): riprova.</p>
 </li>
 </ol>
 <p>Sui dimostrativi senza il modello configurato risponde un riconoscitore semplice: capisce «spegni …», «… a 21 gradi» e
@@ -1608,7 +1618,8 @@ la caldaia» o «alle 18 metti la casa in eco». Premi «Invia».</p>
 <li>
 <p>Leggi la risposta. Per una domanda ottieni una spiegazione presa da stati, consumi e Decisioni. Per un comando leggi
 l&#x27;esito scritto dal sistema: «Fatto: ….», «Comando inviato: …, l&#x27;esito arriva nell&#x27;app.», «Non riuscito: … (…).» o
-«Programmato: ….».</p>
+«Programmato: ….». Se in fondo leggi «Risposta rapida: …», ha risposto il sistema da solo: un comando semplice è
+stato eseguito, uno complesso no; in quel caso usa i pulsanti dell&#x27;app.</p>
 </li>
 <li>
 <p>Se con ospiti dentro chiedi di spegnere clima o caldaia o di cambiare modalità, o se programmi un&#x27;azione per un&#x27;ora
@@ -1971,6 +1982,7 @@ dell&#x27;email di chi comanda.</p>
 <tr><td data-label="Cosa vedi" class="align-left">«Hai già chiesto 20 proposte oggi per questo appartamento: riprova domani o cambia le regole a mano»</td><td data-label="Cosa significa" class="align-left">Limite giornaliero delle proposte</td><td data-label="Cosa fare" class="align-left">Cambia la regola a mano o riprova domani</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«L&#x27;assistente non ha risposto in tempo: riprova con una frase più breve, oppure cambia la regola a mano qui sotto.»</td><td data-label="Cosa significa" class="align-left">Il modello non ha risposto in tempo</td><td data-label="Cosa fare" class="align-left">Riprova con una frase più breve</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Nessuna risposta dall&#x27;assistente: riprova», «Non sono riuscito a rispondere in tempo: riprova, oppure fai dall&#x27;app.», «L&#x27;assistente non è disponibile ora, riprova più tardi», «Non sono riuscito a rispondere: riprova.»</td><td data-label="Cosa significa" class="align-left">L&#x27;assistente non ha risposto</td><td data-label="Cosa fare" class="align-left">Riprova o usa i comandi dell&#x27;app</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Risposta rapida: l&#x27;assistente completo non ha risposto in tempo.», «… non è raggiungibile ora.», «… ha raggiunto il limite mensile.» (in fondo alla risposta)</td><td data-label="Cosa significa" class="align-left">Ha risposto il sistema da solo: solo un comando semplice è stato eseguito</td><td data-label="Cosa fare" class="align-left">Per comandi complessi usa i pulsanti dell&#x27;app; riprova più tardi per le domande</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Limite di … domande al giorno raggiunto per questo appartamento: riprova domani.»</td><td data-label="Cosa significa" class="align-left">Limite giornaliero dell&#x27;assistente</td><td data-label="Cosa fare" class="align-left">Usa i comandi dell&#x27;app</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Limite mensile raggiunto, riprova dal mese prossimo»</td><td data-label="Cosa significa" class="align-left">Tetto di spesa del servizio raggiunto</td><td data-label="Cosa fare" class="align-left">Usa i comandi dell&#x27;app; HQE riceve un&#x27;email</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Nessun altro appartamento nella tua organizzazione», «Scegli almeno un appartamento di destinazione», «Al massimo 100 appartamenti alla volta», «Solo gli amministratori possono copiare le regole»</td><td data-label="Cosa significa" class="align-left">Condizioni della copia delle regole</td><td data-label="Cosa fare" class="align-left">Correggi la scelta</td></tr>
@@ -2084,6 +2096,7 @@ dell&#x27;email di chi comanda.</p>
 <p>una schermata, se possibile.</p>
 </li>
 </ol>
+<p>Manda tutto a <strong>operations@hqe.it</strong>, l&#x27;indirizzo dell&#x27;assistenza HQE.</p>
 </section>
 <section aria-labelledby="14-novita-710a48f5">
 <h2 id="14-novita-710a48f5">14. Novità</h2>
@@ -2103,6 +2116,11 @@ ogni minuto, mai contro un comando di una persona; senza sensore «Regolazione a
 </li>
 <li>
 <p><strong>Programmazioni dell&#x27;assistente con ospiti</strong>: conferma in chat se all&#x27;ora programmata ci saranno ospiti.</p>
+</li>
+<li>
+<p><strong>Assistente più solido</strong>: il modello propone le azioni in una forma controllata e il sistema le verifica una per
+una; se il modello non risponde, una «Risposta rapida» esegue solo i comandi semplici e inequivocabili. Il modello
+lavora soltanto in Europa.</p>
 </li>
 <li>
 <p><strong>Il tuo nome nel menu</strong>, in grassetto, con sotto l&#x27;email.</p>

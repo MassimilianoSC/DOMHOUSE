@@ -549,7 +549,8 @@ Il riquadro «Applica le stesse regole ad altri appartamenti» è riservato agli
    solo quando il dispositivo ha confermato; «Comando inviato: …, l'esito arriva nell'app.» se la conferma non è ancora
    arrivata; «Non riuscito: … (…).» o «Non fatto: … (…).» con il motivo; «Programmato: ….» per un'azione a orario.
    Sotto la risposta compaiono le etichette «Comando» e «Programmazione» con gli identificativi. Controlla sempre in
-   Panoramica.
+   Panoramica. Il modello propone le azioni in una forma controllata e il sistema le verifica una per una prima di
+   eseguirle (limiti, conferme, regole): un'azione non ammessa non parte e viene detta con «Non fatto: … (…).».
 5. **Con ospiti dentro**, spegnere il clima o la caldaia e cambiare modalità non avviene da solo: l'assistente chiede in
    chat, per esempio «Spengo climatizzatore soggiorno con ospiti presenti? Rispondi Sì o No qui sotto, oppure dalla
    pagina Approvazioni.», con i pulsanti «Sì» e «No», «Scade alle …» e il link «Vai alle approvazioni». È la stessa
@@ -572,9 +573,16 @@ Il riquadro «Applica le stesse regole ad altri appartamenti» è riservato agli
    quando esci.
 8. Limiti: 50 domande al giorno per appartamento («Limite di … domande al giorno raggiunto per questo appartamento:
    riprova domani.») e un tetto di spesa mensile per tutto il servizio («Limite mensile raggiunto, riprova dal mese
-   prossimo»). Se l'assistente non ce la fa in tempo leggi «Non sono riuscito a rispondere in tempo: riprova, oppure fai
-   dall'app.» oppure «L'assistente non è disponibile ora, riprova più tardi» o «Non sono riuscito a rispondere: riprova.».
-   Se aveva già proposto delle azioni le esegue comunque e te lo scrive.
+   prossimo»).
+9. **Risposta rapida** (dal lotto 30). Se l'assistente completo non risponde in tempo, non è raggiungibile o ha
+   raggiunto il limite mensile, risponde il sistema da solo. Esegue il comando solo se la frase è inequivocabile: un
+   verbo e un solo dispositivo (per tipo, stanza o nome) oppure una modalità, senza «non», condizioni od orari. Per
+   esempio «Spegni la caldaia» o «Porta il soggiorno a 21 gradi» partono; «non spegnere il clima», «alle 18 …», «se
+   fa freddo …», «spegni tutto», «spegni il clima e la presa» non fanno nulla: leggi lo stato e un rimando ai pulsanti
+   dell'app. Con ospiti dentro chiede conferma come sempre. In fondo alla risposta leggi «Risposta rapida:
+   l'assistente completo non ha risposto in tempo.» (oppure «… non è raggiungibile ora.» o «… ha raggiunto il limite
+   mensile.»). Se invece leggi «L'assistente non è disponibile ora, riprova più tardi», il sistema ha scartato una
+   risposta arrivata da fuori Europa (una protezione: il modello lavora solo in Europa): riprova.
 
 Sui dimostrativi senza il modello configurato risponde un riconoscitore semplice: capisce «spegni …», «… a 21 gradi» e
 «alle 18 …» (se l'ora è già passata, programma per domani); se nomini la caldaia con ospiti dentro chiede l'approvazione
@@ -979,7 +987,8 @@ Decisioni. Alle richieste dell'assistente puoi rispondere anche in chat con «S�
    la caldaia» o «alle 18 metti la casa in eco». Premi «Invia».
 2. Leggi la risposta. Per una domanda ottieni una spiegazione presa da stati, consumi e Decisioni. Per un comando leggi
    l'esito scritto dal sistema: «Fatto: ….», «Comando inviato: …, l'esito arriva nell'app.», «Non riuscito: … (…).» o
-   «Programmato: ….».
+   «Programmato: ….». Se in fondo leggi «Risposta rapida: …», ha risposto il sistema da solo: un comando semplice è
+   stato eseguito, uno complesso no; in quel caso usa i pulsanti dell'app.
 3. Se con ospiti dentro chiedi di spegnere clima o caldaia o di cambiare modalità, o se programmi un'azione per un'ora
    in cui ci saranno ospiti, rispondi «Sì» o «No» alla domanda in chat.
 4. Controlla in Panoramica o in Programmazione che sia successo davvero.
@@ -1253,6 +1262,7 @@ dell'email di chi comanda.
 | «Hai già chiesto 20 proposte oggi per questo appartamento: riprova domani o cambia le regole a mano» | Limite giornaliero delle proposte | Cambia la regola a mano o riprova domani |
 | «L'assistente non ha risposto in tempo: riprova con una frase più breve, oppure cambia la regola a mano qui sotto.» | Il modello non ha risposto in tempo | Riprova con una frase più breve |
 | «Nessuna risposta dall'assistente: riprova», «Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app.», «L'assistente non è disponibile ora, riprova più tardi», «Non sono riuscito a rispondere: riprova.» | L'assistente non ha risposto | Riprova o usa i comandi dell'app |
+| «Risposta rapida: l'assistente completo non ha risposto in tempo.», «… non è raggiungibile ora.», «… ha raggiunto il limite mensile.» (in fondo alla risposta) | Ha risposto il sistema da solo: solo un comando semplice è stato eseguito | Per comandi complessi usa i pulsanti dell'app; riprova più tardi per le domande |
 | «Limite di … domande al giorno raggiunto per questo appartamento: riprova domani.» | Limite giornaliero dell'assistente | Usa i comandi dell'app |
 | «Limite mensile raggiunto, riprova dal mese prossimo» | Tetto di spesa del servizio raggiunto | Usa i comandi dell'app; HQE riceve un'email |
 | «Nessun altro appartamento nella tua organizzazione», «Scegli almeno un appartamento di destinazione», «Al massimo 100 appartamenti alla volta», «Solo gli amministratori possono copiare le regole» | Condizioni della copia delle regole | Correggi la scelta |
@@ -1353,6 +1363,8 @@ Per ogni problema annota:
 4. dispositivo e browser (per esempio «iPhone, Safari» o «PC, Chrome»), data e ora;
 5. una schermata, se possibile.
 
+Manda tutto a **operations@hqe.it**, l'indirizzo dell'assistenza HQE.
+
 ## 14. Novità
 
 ### 22 ottobre 2026 (lotto 30)
@@ -1364,6 +1376,9 @@ Per ogni problema annota:
   ogni minuto, mai contro un comando di una persona; senza sensore «Regolazione automatica disattivata».
 - **Caldaia senza sensore**: non si accende più da sola; a casa vuota «Antigelo non attivo» con notifica.
 - **Programmazioni dell'assistente con ospiti**: conferma in chat se all'ora programmata ci saranno ospiti.
+- **Assistente più solido**: il modello propone le azioni in una forma controllata e il sistema le verifica una per
+  una; se il modello non risponde, una «Risposta rapida» esegue solo i comandi semplici e inequivocabili. Il modello
+  lavora soltanto in Europa.
 - **Il tuo nome nel menu**, in grassetto, con sotto l'email.
 - **Notifiche: quattro voci**: tolta «Decisioni del motore».
 - **Due registri con nomi diversi**: «Registro dell'organizzazione» e «Registro della piattaforma».
