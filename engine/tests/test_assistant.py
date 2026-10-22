@@ -111,6 +111,14 @@ def test_with_guests_in_switching_off_the_climate_needs_an_approval():
     assert any(d.get("approval_id") == a["approval_id"] and d["action"] == "approve" for d in e.decisions)
 
 
+def test_the_modes_by_their_italian_names():
+    """D-154: «vuoto», not the contract's «empty», in the manager's sentences."""
+    script = Script(tools(call("cambia_modalita", modalita="empty")), says("Chiedo la modalità vuoto."))
+    e = engine(script, occupied=True)
+    a = ask(e, "metti la casa a vuoto")
+    assert "Passo alla modalità vuoto con ospiti presenti?" in a["answer"] and "empty" not in a["answer"]
+
+
 def test_two_actions_together_need_one_approval_each_queued():
     script = Script(tools(call("comanda_dispositivo", device_id=PRESA, capability="switch", action="turn_on"),
                           call("comanda_dispositivo", device_id=CLIMA, capability="climate", action="set_climate",

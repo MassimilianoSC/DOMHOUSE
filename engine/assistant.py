@@ -32,6 +32,8 @@ MAX_TURNS = 6                 # model calls for one question (reads, then the an
 ASK_TIMEOUT_S = 28.0          # the contract's 30 s, with a margin for saving and the app's polling
 ACK_WAIT_S = 10.0             # a command's outcome is final within 10 s (contract)
 TEMPERATURE = 0.2
+# D-154: the modes in the manager's sentences by their Italian names («vuoto», not the contract's «empty»)
+MODE_NAMES = {"comfort": "comfort", "eco": "eco", "empty": "vuoto"}
 
 SYSTEM_PROMPT = """Sei l'assistente di DOMHOUSE: aiuti il gestore di un appartamento in affitto breve a controllare
 clima, caldaia, prese e modalità. Rispondi in italiano, in modo breve: al massimo tre frasi.
@@ -249,11 +251,11 @@ class Assistant:
     def describe(self, p: dict) -> str:
         e = self.e
         if p["type"] == "mode":
-            return f"modalità {p['mode']}"
+            return f"modalità {MODE_NAMES.get(p['mode'], p['mode'])}"
         if p["type"] == "schedule":
             local = datetime.fromisoformat(p["run_at"].replace("Z", "+00:00")).astimezone(ZoneInfo(e.timezone))
             a = p["action"]
-            what = f"modalità {a['mode']}" if a["type"] == "apartment_mode" else \
+            what = f"modalità {MODE_NAMES.get(a['mode'], a['mode'])}" if a["type"] == "apartment_mode" else \
                 self.describe({"type": "command", "device_id": a["device_id"], "body": a})
             return f"{what} alle {local.strftime('%H:%M')} del {local.strftime('%d/%m')}"
         device = e.devices[p["device_id"]]
@@ -315,7 +317,7 @@ class Assistant:
                 elif p["type"] == "mode":
                     for command_id in e.set_mode(p["mode"], actor, corr, why, "assistant"):
                         ask["actions"].append({"type": "command", "command_id": command_id})
-                    lines.append(f"Modalità {p['mode']} impostata: i comandi ai dispositivi partono ora, l'esito arriva "
+                    lines.append(f"Modalità {MODE_NAMES.get(p['mode'], p['mode'])} impostata: i comandi ai dispositivi partono ora, l'esito arriva "
                                  f"nell'app.")
                 elif p["type"] == "schedule":
                     item = e.create_schedule({"run_at": p["run_at"], "action": p["action"]}, actor, corr,
