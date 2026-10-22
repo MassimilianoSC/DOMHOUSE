@@ -2008,7 +2008,7 @@ class ApartmentEngine:
                 else:
                     mode = "eco" if "eco" in text else ("empty" if "vuot" in text else "comfort")
                     action = {"type": "apartment_mode", "mode": mode}
-                    what = f"la modalità {'vuoto' if mode == 'empty' else mode}"   # D-154: Italian names
+                    what = f"la modalità {'casa vuota' if mode == 'empty' else mode}"   # decision 55
                 item = self.create_schedule({"run_at": iso(run), "action": action}, actor, corr, source="assistant")
                 ask.update(status="answered", actions=[{"type": "schedule", "schedule_id": item["schedule_id"]}],
                            answer=f"Ho programmato {what} alle {hh:02d}:{mm:02d}.")

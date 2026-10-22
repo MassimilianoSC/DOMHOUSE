@@ -41,8 +41,9 @@ MIN_CALL_S = 4.0              # lot 28 c: no new model call with less than this 
 PROPOSALS = {"cambia_modalita", "comanda_dispositivo", "programma"}
 TIMEOUT_ANSWER = "Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app."
 TEMPERATURE = 0.2
-# D-154: the modes in the manager's sentences by their Italian names («vuoto», not the contract's «empty»)
-MODE_NAMES = {"comfort": "comfort", "eco": "eco", "empty": "vuoto"}
+# D-154, decision 55: the modes in the manager's sentences by their Italian names: «casa vuota», not the contract's
+# «empty» nor «vuoto», which is the occupancy (vuoto / occupato / prenotato)
+MODE_NAMES = {"comfort": "comfort", "eco": "eco", "empty": "casa vuota"}
 
 SYSTEM_PROMPT = """Sei l'assistente di DOMHOUSE: aiuti il gestore di un appartamento in affitto breve a controllare
 clima, caldaia, prese e modalità. Rispondi in italiano, in modo breve: al massimo tre frasi.
@@ -56,7 +57,7 @@ Regole fisse, sempre:
 5. Puoi cambiare la modalità, comandare un dispositivo e programmare un'azione; non puoi cambiare regole, utenti o
    appartamenti. Per le regole rispondi che si scrive la richiesta nella pagina Regole dell'app, dove l'assistente
    propone la modifica e il gestore la conferma; per utenti e appartamenti, che si fa dall'app.
-Ora locale dell'appartamento: {now} (fuso {tz}). Modalità: comfort, eco, vuoto (empty).
+Ora locale dell'appartamento: {now} (fuso {tz}). Modalità: comfort, eco, casa vuota (empty).
 Stato attuale dell'appartamento e dei dispositivi (letto adesso, non serve rileggerlo per un comando):
 {state}"""
 
