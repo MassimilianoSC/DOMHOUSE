@@ -589,6 +589,12 @@ Esempio di risposta di #38 a «la finestra aperta spegne dopo 10 minuti e la pre
   422 `invalid_range`. In comfort il clima segue il sensore di temperatura della sua stanza: scalda sotto
   `comfort_celsius`, raffresca sopra `comfort_cool_celsius`, nella fascia fra i due niente; senza sensore nessun
   comando automatico e una decisione `auto_regulation_off` per episodio. «Casa vuota» resta sull'antigelo.
+  D-169: la regolazione è continua. Ogni minuto, in comfort, ogni clima messo dalla modalità segue il sensore della sua
+  stanza (scalda sotto `comfort_celsius` meno l'isteresi, raffresca sopra `comfort_cool_celsius` più l'isteresi; isteresi
+  e tempo minimo fra due cambi del termostato, `THERMOSTAT_HYSTERESIS_C` e `THERMOSTAT_MIN_SWITCH_MINUTES`); ogni cambio
+  è una decisione `set_climate` dell'attore `system` («Climatizzatore soggiorno: 19 °C, sotto 21 °C: scalda»). Un comando
+  di una persona su quel clima lo toglie alla regolazione fino al prossimo cambio di modalità. Niente regolazione durante
+  una forzatura o con una finestra aperta.
 
 ## Copia delle regole (P-60 passo 12, D-151 punto 22)
 

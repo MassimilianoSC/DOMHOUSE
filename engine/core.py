@@ -260,6 +260,9 @@ class ApartmentEngine:
         self.relay_busy: set[str] = set()            # boilers with a thermostat switch running
         self.thermostat_issue: dict[str, str] = {}   # boiler -> the sensor episode already reported (D-164)
         self.heating_by_mode: set[str] = set()       # D-164: boilers whose intention a mode set (not a person)
+        self.climate_by_mode: set[str] = set()       # D-169: climates comfort regulates (no person touched them since)
+        self.climate_switched: dict[str, float] = {}  # D-169: climate -> monotonic time of its last automatic change
+        self._auto_climate = False                   # D-169: a climate command of the mode or of the regulation
         self.last_regulation = 0.0
         self.decisions: list[dict] = []
         self.asks: dict[str, dict] = {}
@@ -394,6 +397,7 @@ class ApartmentEngine:
         self.rules_updated_at = apt.get("rules_updated_at", self.rules_updated_at)
         self.counter = st.get_meta("counter", self.counter)
         self.heating_by_mode = set(st.get_meta("heating_by_mode", []) or [])
+        self.climate_by_mode = set(st.get_meta("climate_by_mode", []) or [])
         self.meters = {k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
         profile = st.get_meta("energy_profile")
         self.profile_until = parse_dt(profile["until"]) if profile else None
@@ -782,6 +786,54 @@ class ApartmentEngine:
                 continue
             self.relay_busy.add(device_id)
             self.spawn(self._switch_relay(device, want, temperature, setpoint, frost))
+        self._regulate_climates()
+
+    def _regulate_climates(self) -> None:
+        """D-169: in comfort, every "minute", each climate the mode set and no person changed since follows its room's
+        sensor: heating to comfort_celsius below it minus the hysteresis, cooling to comfort_cool_celsius above it plus
+        the hysteresis, left as it is in between; at most one automatic change every THERMOSTAT_MIN_SWITCH_MINUTES (the
+        compressor's pause applies as to any command). Not during a hold (comfort rules suspended) nor with a window
+        open (its rule is stronger). Without a sensor: nothing, one decision per episode. Each change is a decision."""
+        if self.mode != "comfort" or self.hold:
+            return
+        sl = self.rule("setpoint_limits")["params"]
+        heat, cool = sl["comfort_celsius"], sl["comfort_cool_celsius"]
+        margin = self.setting("THERMOSTAT_HYSTERESIS_C")
+        wait = self.setting("THERMOSTAT_MIN_SWITCH_MINUTES") * seconds_per_minute()
+        for device_id in sorted(self.climate_by_mode):
+            device = self.devices.get(device_id)
+            if not device or not device["online"] or "climate" not in device["capabilities"]:
+                continue
+            room = self.room_temperature(device)
+            if room is None:
+                self._note_no_sensor(device, None)
+                continue
+            self.no_sensor_noted.discard(device_id)
+            if any(r[0] == device_id for r in self.inflight):
+                continue
+            if time.monotonic() - self.climate_switched.get(device_id, -1e18) < wait:
+                continue
+            if self.window_open() and self.window_rule_active():
+                continue
+            c = device["capabilities"]["climate"]
+            if room < heat - margin and not (c["on"] and c["mode"] == "heat"):
+                climate_mode, target, words = "heat", heat, f"sotto {fmt_num(heat)} °C: scalda"
+            elif room > cool + margin and not (c["on"] and c["mode"] == "cool"):
+                climate_mode, target, words = "cool", cool, f"sopra {fmt_num(cool)} °C: raffresca"
+            else:
+                continue
+            setpoint = min(max(target, c["setpoint_min"]), c["setpoint_max"])
+            self.climate_switched[device_id] = time.monotonic()
+            self._auto_climate = True
+            try:
+                self.create_command(device_id, {"capability": "climate", "action": "set_climate",
+                                                "params": {"on": True, "mode": climate_mode, "setpoint": setpoint}},
+                                    "system:engine", str(uuid.uuid4()), decision_actor="system",
+                                    reasoning=f"{device['label']}: {fmt_num(room)} °C, {words}")
+            except MockError:
+                pass
+            finally:
+                self._auto_climate = False
 
     def _sensor_episode(self, device: dict, problem: str | None) -> str | None:
         """D-164: None (the sensor answers), «manuale» (a person's intention, followed unregulated), «antigelo» (in
@@ -1031,16 +1083,24 @@ class ApartmentEngine:
         if mode not in MODES:
             raise bad_request("Modalità non valida")
         command_ids = []
-        for device_id, body in self.mode_commands(mode, correlation_id):
-            try:
-                cmd = self.create_command(device_id, body, actor, correlation_id, decision_actor=decision_actor,
-                                          reasoning=f"Modalità {mode}")
-                if cmd:
-                    command_ids.append(cmd["command_id"])
-            except MockError:
-                continue
-            if body["capability"] == "heating":
-                self._heating_set_by(device_id, mode=True)        # D-164: a mode's intention, never unregulated
+        self._auto_climate = True
+        try:
+            for device_id, body in self.mode_commands(mode, correlation_id):
+                try:
+                    cmd = self.create_command(device_id, body, actor, correlation_id, decision_actor=decision_actor,
+                                              reasoning=f"Modalità {mode}")
+                    if cmd:
+                        command_ids.append(cmd["command_id"])
+                except MockError:
+                    continue
+                if body["capability"] == "heating":
+                    self._heating_set_by(device_id, mode=True)        # D-164: a mode's intention, never unregulated
+        finally:
+            self._auto_climate = False
+        # D-169: in comfort every climate is the regulation's until a person changes it; in eco and «casa vuota» none
+        self.climate_by_mode = ({d["device_id"] for d in self.devices.values() if "climate" in d["capabilities"]}
+                                if mode == "comfort" else set())
+        self.store.put_meta("climate_by_mode", sorted(self.climate_by_mode))
         old = self.mode
         self.mode = mode
         self._save_apartment()
@@ -1157,6 +1217,9 @@ class ApartmentEngine:
         device = self.get_device(device_id)
         if body.get("capability") == "heating" and device_id in self.heating_by_mode:
             self._heating_set_by(device_id, mode=False)       # D-164: a person's (or a scheduled) command
+        if body.get("capability") == "climate" and device_id in self.climate_by_mode and not self._auto_climate:
+            self.climate_by_mode.discard(device_id)          # D-169: never against a person, until the next mode
+            self.store.put_meta("climate_by_mode", sorted(self.climate_by_mode))
         if not self.connector_up():                          # D-131: nothing can reach the devices
             raise MockError(409, "device_offline", "Collegamento ai dispositivi non disponibile; riprova quando torna")
         if not device["online"]:

@@ -5,6 +5,8 @@ nothing by itself, with one decision per episode; ASSISTANT_CONFIRM chooses when
 
 Run: python -m pytest engine/tests -q
 """
+import asyncio
+
 import pytest
 
 from engine import assistant, core
@@ -109,3 +111,88 @@ def test_assistant_confirm(policy, alone_off_with_guests, alone_on_empty, togeth
     assert a.needs_approval(on, False) is alone_on_empty
     assert a.needs_approval(on, True) is together
     assert a.needs_approval({"type": "schedule"}, True) is False          # a scheduled action never asks
+
+
+# -------- D-169: the climate in comfort is regulated every minute --------
+MINUTE = 0.02
+
+
+@pytest.fixture
+def quick(monkeypatch):
+    """Commands complete at once in the simulated catalog, minutes are fast."""
+    from engine.connector import simulated
+    for name in ("SENT_AFTER_S", "VERIFYING_AFTER_S", "OUTCOME_AFTER_S"):
+        monkeypatch.setattr(simulated, name, 0)
+    monkeypatch.setenv("MOCK_TIME_SCALE", str(MINUTE))
+
+
+def _climate_decisions(e):
+    return [d for d in e.decisions if d["target"].get("device_id") == CLIMA and d["action"] == "set_climate"
+            and d["actor"] == "system"]
+
+
+async def _wait_commands(e):
+    await asyncio.sleep(0.15)               # an automatic start may wait for the compressor's pause (3 «minutes»)
+    for _ in range(200):
+        if all(c["status"] in core.FINAL for c in e.commands.values()):
+            return
+        await asyncio.sleep(0.02)
+
+
+def test_d169_the_room_is_followed_every_minute_and_never_against_a_person(quick):
+    import asyncio as _asyncio
+
+    async def main():
+        e = engine(THERMOSTAT_MIN_SWITCH_MINUTES=60.0)                  # 1,2 s here: «too soon» is sure
+        e.ensure_started()
+        e.create_command(CLIMA, {"capability": "climate", "action": "turn_off"}, ACTOR, CORR)   # the split starts off
+        await _wait_commands(e)
+        room(e, 23.0)                                                   # in the band: comfort sends nothing
+        e.set_mode("comfort", ACTOR, CORR, "prova")
+        await _wait_commands(e)
+        assert CLIMA in e.climate_by_mode and not _climate_decisions(e)
+        room(e, 19.0)                                                   # the room cools: heats to comfort
+        e.regulate()
+        await _wait_commands(e)
+        c = e.devices[CLIMA]["capabilities"]["climate"]
+        assert (c["on"], c["mode"], c["setpoint"]) == (True, "heat", 21)
+        assert _climate_decisions(e)[-1]["reasoning"] == "Climatizzatore soggiorno: 19 °C, sotto 21 °C: scalda"
+        room(e, 27.5)                                                   # too soon: at most one change per 5 minutes
+        e.regulate()
+        await _wait_commands(e)
+        assert e.devices[CLIMA]["capabilities"]["climate"]["mode"] == "heat"
+        await _asyncio.sleep(60 * MINUTE + 0.05)
+        e.regulate()
+        await _wait_commands(e)
+        assert e.devices[CLIMA]["capabilities"]["climate"]["mode"] == "cool"
+        assert "sopra 25 °C: raffresca" in _climate_decisions(e)[-1]["reasoning"]
+        e.create_command(CLIMA, {"capability": "climate", "action": "turn_off"}, ACTOR, CORR)   # a person
+        await _wait_commands(e)
+        assert CLIMA not in e.climate_by_mode
+        await _asyncio.sleep(60 * MINUTE + 0.05)
+        room(e, 18.0)
+        e.regulate()
+        await _wait_commands(e)
+        assert e.devices[CLIMA]["capabilities"]["climate"]["on"] is False       # left alone until the next mode
+        e.set_mode("eco", ACTOR, CORR, "prova")
+        assert e.climate_by_mode == set()
+        e.set_mode("comfort", ACTOR, CORR, "prova")
+        assert CLIMA in e.climate_by_mode                                       # the next comfort takes it again
+    _asyncio.run(main())
+
+
+def test_d169_not_during_a_hold(quick):
+    import asyncio as _asyncio
+
+    async def main():
+        e = engine()
+        e.ensure_started()
+        room(e, 23.0)
+        e.set_mode("comfort", ACTOR, CORR, "prova")
+        await _wait_commands(e)
+        e.set_hold(30, None, ACTOR, CORR)                                       # comfort rules suspended
+        room(e, 15.0)
+        e.regulate()
+        await _wait_commands(e)
+        assert not _climate_decisions(e)
+    _asyncio.run(main())
