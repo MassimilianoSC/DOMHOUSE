@@ -396,22 +396,22 @@ La notifica la mostra il service worker della PWA, che ignora le chiavi in più.
 
 | Chiave di `data` (tutte stringhe) | Quando | Valore |
 |---|---|---|
-| `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: istanza non raggiungibile» / «…: prenotazione annullata, appartamento rimesso a vuoto» / «…: riepilogo della settimana» |
+| `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: istanza non raggiungibile» / «…: prenotazione annullata, appartamento rimesso a vuoto» / «…: riepilogo della settimana» / «…: antigelo non attivo» |
 | `body` | sempre | testo breve, tagliato a 200 caratteri con «…» |
-| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking), `/a/<apartment_id>/riepiloghi/<week>` (summary) |
-| `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>`, `booking:<decision_id>`, `summary:<apartment_id>:<week>` |
-| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` \| `summary` |
+| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking), `/a/<apartment_id>/riepiloghi/<week>` (summary), `/a/<apartment_id>/decisioni` (frost_inactive) |
+| `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>`, `booking:<decision_id>`, `summary:<apartment_id>:<week>`, `frost:<apartment_id>:<device_id>` |
+| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` \| `summary` \| `frost_inactive` |
 | `apartment_id` | sempre | |
 | `approval_id` | solo `approval` | |
-| `device_id` | solo `device_offline` | |
+| `device_id` | solo `device_offline` e `frost_inactive` | |
 | `ts` | se l'evento del motore lo porta | `ts` dell'evento, ISO 8601 UTC |
 
 `webpush.headers`: `Urgency: high` (`normal` per `summary`, che non è un allarme); `TTL` (secondi, stringa) `3600` per
-`approval`, `86400` per `device_offline`, `instance_down` e `booking`, `604800` (una settimana) per `summary`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
+`approval`, `86400` per `device_offline`, `instance_down` e `booking`, `604800` (una settimana) per `summary`, `86400` per `frost_inactive`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
 
 Preferenze: `approval` ← `notification_prefs.approvals`; `device_offline` e `instance_down` ← `notification_prefs.offline`;
 `booking` ← `notification_prefs.bookings` («Prenotazioni», D-123, attiva di default anche per chi aveva già salvato le
-preferenze); `summary` ← `notification_prefs.summary` («Riepilogo», D-150, attiva di default allo stesso modo).
+preferenze); `frost_inactive` ← `notification_prefs.offline` (D-164: caldaia senza sensore di temperatura utilizzabile a «casa vuota», l'antigelo non può agire; parte dalla decisione `frost_inactive`, una per episodio, il `body` è il suo testo); `summary` ← `notification_prefs.summary` («Riepilogo», D-150, attiva di default allo stesso modo).
 `booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
 annullata dopo il pre-arrivo, con l'appartamento rimesso a vuoto dal motore (D-121); il `body` è il testo della decisione.
 `device_offline` parte se il dispositivo è ancora offline dopo i minuti della regola `offline_alert` (15 se non

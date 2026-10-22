@@ -346,3 +346,22 @@ def test_a_platform_manager_without_organisation_can_still_clear_a_device(users)
         assert await repo.get_user("u-plat-alone") is None                 # no record made for someone without a tenant
     run(scenario())
 
+
+
+# -------- D-164: a boiler without its sensor in «casa vuota» («Dispositivi e istanza offline») --------
+def test_frost_inactive_goes_to_who_wants_offline(users, fcm):
+    reason = "Caldaia: sensore di temperatura mancante, antigelo non attivo (nessun sensore di temperatura collegato)"
+
+    async def scenario():
+        await push.on_stream_event(APT, event("decision.logged", {
+            "decision_id": "dec-9", "action": "frost_inactive", "target": {"type": "device", "device_id": "dev-caldaia"},
+            "reasoning": reason}))
+        await drain()
+    run(scenario())
+    assert len(fcm.sent) == 1
+    data = fcm.sent[0].data
+    assert (data["kind"], data["title"], data["body"], data["tag"], data["link"], data["device_id"]) == (
+        "frost_inactive", "Milano Centro: antigelo non attivo", reason, "frost:apt-push:dev-caldaia",
+        "/a/apt-push/decisioni", "dev-caldaia")
+    assert "tok-z" not in fcm.sent[0].tokens                   # u-push-3 turned «offline» off
+    assert fcm.sent[0].webpush.headers == {"Urgency": "high", "TTL": "86400"}

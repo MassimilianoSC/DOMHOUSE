@@ -152,3 +152,55 @@ def test_the_intention_survives_a_restart(tmp_path):
     second = core.ApartmentEngine("apt-prova-01", conn, seed=False, store=SqliteStore(db))
     assert second.devices[BOILER]["capabilities"]["heating"]["on"] is True and second.relay[BOILER] is False
     second.store.close()
+
+
+# -------- D-164: a boiler without a usable sensor never heats by itself --------
+def _no_sensor_decisions(e):
+    return [d for d in e.decisions if d["action"] in ("thermostat_sensor", "frost_inactive")]
+
+
+def test_without_a_sensor_a_modes_intention_keeps_the_relay_off_a_persons_is_followed():
+    async def main():
+        e = core.ApartmentEngine("apt-prova-01", Recorder(), seed=False)
+        e.ensure_started()
+        e.test_state({"device_id": SENSOR, "online": False}, ACTOR, CORR)
+        e.set_mode("comfort", ACTOR, CORR, "prova")                    # a mode: the boiler must not heat unregulated
+        await asyncio.sleep(0.3)
+        await wait_min_switch()
+        await regulate_and_wait(e)
+        assert e.devices[BOILER]["capabilities"]["heating"]["on"] is True and e.relay[BOILER] is False
+        issues = _no_sensor_decisions(e)
+        assert [d["action"] for d in issues] == ["thermostat_sensor"]
+        assert issues[0]["reasoning"].startswith("Caldaia: sensore di temperatura mancante, regolazione automatica disattivata")
+        await regulate_and_wait(e)
+        assert len(_no_sensor_decisions(e)) == 1                       # once per episode
+        cmd = e.create_command(BOILER, {"capability": "heating", "action": "set_heating",
+                                        "params": {"on": True, "setpoint": 22}}, ACTOR, CORR)   # a person's command
+        while e.commands[cmd["command_id"]]["status"] not in core.FINAL:
+            await asyncio.sleep(0.02)
+        await wait_min_switch()
+        await regulate_and_wait(e)
+        assert e.relay[BOILER] is True and "segue il comando manuale" in _no_sensor_decisions(e)[-1]["reasoning"]
+    asyncio.run(main())
+
+
+def test_without_a_sensor_in_casa_vuota_the_frost_protection_says_it_cannot_act():
+    async def main():
+        e = core.ApartmentEngine("apt-prova-01", Recorder(), seed=False)
+        e.ensure_started()
+        e.set_mode("empty", ACTOR, CORR, "prova")
+        await asyncio.sleep(0.3)
+        e.test_state({"device_id": SENSOR, "online": False}, ACTOR, CORR)
+        await wait_min_switch()
+        await regulate_and_wait(e)
+        frost = [d for d in e.decisions if d["action"] == "frost_inactive"]
+        assert len(frost) == 1 and e.relay[BOILER] is False
+        assert frost[0]["reasoning"].startswith("Caldaia: sensore di temperatura mancante, antigelo non attivo")
+        await regulate_and_wait(e)
+        assert len([d for d in e.decisions if d["action"] == "frost_inactive"]) == 1
+        e.test_state({"device_id": SENSOR, "online": True}, ACTOR, CORR)
+        temperature(e, 5.0)                                            # the sensor answers: the frost protection acts
+        await wait_min_switch()
+        await regulate_and_wait(e)
+        assert e.relay[BOILER] is True and "regolazione ripresa" in _no_sensor_decisions(e)[-1]["reasoning"]
+    asyncio.run(main())

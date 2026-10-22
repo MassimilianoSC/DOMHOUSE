@@ -15,7 +15,8 @@ from .sse_hub import SseEvent, envelope, hub_manager
 
 BODY_MAX = 200
 TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400, "booking": 86400,
-               "summary": 7 * 86400}   # P-60 step 11: the weekly summary stays a week
+               "summary": 7 * 86400,   # P-60 step 11: the weekly summary stays a week
+               "frost_inactive": 86400}  # D-164: a boiler without its sensor in «casa vuota»
 
 _offline_timers: dict[tuple[str, str], asyncio.Task] = {}
 _health_down: set[str] = set()
@@ -59,6 +60,13 @@ def booking_reset_push(apt: Apartment, decision_id: str, reasoning: str | None, 
     body = (reasoning or "").strip() or "Prenotazione annullata dopo il pre-arrivo: appartamento rimesso a vuoto"
     return build_push("booking", apt, f"{apt.name}: prenotazione annullata, appartamento rimesso a vuoto", body,
                       f"/a/{apt.apartment_id}/decisioni", f"booking:{decision_id}", ts)
+
+
+def frost_inactive_push(apt: Apartment, device_id: str, reasoning: str | None, ts: str | None):
+    """D-164: the frost protection cannot act, the boiler's temperature sensor is missing or not answering."""
+    body = (reasoning or "").strip() or "Sensore di temperatura mancante: antigelo non attivo"
+    return build_push("frost_inactive", apt, f"{apt.name}: antigelo non attivo", body, f"/a/{apt.apartment_id}/decisioni",
+                      f"frost:{apt.apartment_id}:{device_id}", ts, device_id=device_id)
 
 
 async def send_to_tenant(tenant_id: str, pref: str, data: dict[str, str], headers: dict[str, str]) -> int:
@@ -198,6 +206,10 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
         decision_id = str(data.get("decision_id", ""))
         _spawn(send_to_tenant(apt.tenant_id, "bookings", *booking_reset_push(apt, decision_id, data.get("reasoning"), ts)),
                "booking", apt.apartment_id)
+    elif ev.event == "decision.logged" and data.get("action") == "frost_inactive":     # D-164
+        device_id = str((data.get("target") or {}).get("device_id", ""))
+        _spawn(send_to_tenant(apt.tenant_id, "offline", *frost_inactive_push(apt, device_id, data.get("reasoning"), ts)),
+               "frost_inactive", apt.apartment_id)
     elif ev.event == "instance.health":
         down = data.get("status") == "down"
         if down and apt.apartment_id not in _health_down:

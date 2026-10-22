@@ -258,7 +258,8 @@ class ApartmentEngine:
         self.relay: dict[str, bool] = {}             # boiler -> its relay as the device reports it (R2, D-128)
         self.relay_switched: dict[str, float] = {}   # boiler -> when the thermostat last switched it (monotonic)
         self.relay_busy: set[str] = set()            # boilers with a thermostat switch running
-        self.thermostat_issue: dict[str, str] = {}   # boiler -> the sensor problem already reported
+        self.thermostat_issue: dict[str, str] = {}   # boiler -> the sensor episode already reported (D-164)
+        self.heating_by_mode: set[str] = set()       # D-164: boilers whose intention a mode set (not a person)
         self.last_regulation = 0.0
         self.decisions: list[dict] = []
         self.asks: dict[str, dict] = {}
@@ -392,6 +393,7 @@ class ApartmentEngine:
         self._rule_defaults()                  # after presence_minutes, which takes its first value from the setting
         self.rules_updated_at = apt.get("rules_updated_at", self.rules_updated_at)
         self.counter = st.get_meta("counter", self.counter)
+        self.heating_by_mode = set(st.get_meta("heating_by_mode", []) or [])
         self.meters = {k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
         profile = st.get_meta("energy_profile")
         self.profile_until = parse_dt(profile["until"]) if profile else None
@@ -732,7 +734,8 @@ class ApartmentEngine:
     def thermostat(self, device: dict, intention: dict | None = None) -> tuple[bool, float | None, float | None, bool]:
         """(relay wanted, temperature, setpoint used, frost) for a boiler. Enabled (heating.on) it keeps the setpoint;
         in an empty apartment the frost protection keeps at least its threshold even when disabled (a safety rule,
-        never suspended). Without a usable sensor the relay follows the intention, as a plain switch."""
+        never suspended). Without a usable sensor (D-164) the relay follows only a person's intention, as a plain
+        switch; a mode's intention and the frost protection keep it off: nothing heats by itself unregulated."""
         intention = intention if intention is not None else device["capabilities"]["heating"]
         enabled = bool(intention.get("on"))
         frost_rule = self.rule("frost_protection")
@@ -747,7 +750,7 @@ class ApartmentEngine:
         frost_only = frost and (not enabled or setpoint == float(frost_rule["params"]["celsius"]))
         temperature, _, problem = self._sensor(device)
         if problem:
-            return enabled, None, setpoint, frost_only
+            return enabled and device["device_id"] not in self.heating_by_mode, None, setpoint, frost_only
         current = self.relay.get(device["device_id"], False)
         if temperature < setpoint:
             return True, temperature, setpoint, frost_only
@@ -766,8 +769,9 @@ class ApartmentEngine:
                 continue
             device_id = device["device_id"]
             _, _, problem = self._sensor(device)
-            if problem != self.thermostat_issue.get(device_id):
-                self._sensor_issue(device, problem)
+            episode = self._sensor_episode(device, problem)
+            if episode != self.thermostat_issue.get(device_id):
+                self._sensor_issue(device, problem, episode)
             if device_id in self.relay_busy or any(r[0] == device_id for r in self.inflight):
                 continue
             want, temperature, setpoint, frost = self.thermostat(device)
@@ -779,17 +783,36 @@ class ApartmentEngine:
             self.relay_busy.add(device_id)
             self.spawn(self._switch_relay(device, want, temperature, setpoint, frost))
 
-    def _sensor_issue(self, device: dict, problem: str | None) -> None:
+    def _sensor_episode(self, device: dict, problem: str | None) -> str | None:
+        """D-164: None (the sensor answers), «manuale» (a person's intention, followed unregulated), «antigelo» (in
+        «casa vuota» with the frost protection on: it cannot act), «regolazione» (a mode's intention: kept off)."""
+        if not problem:
+            return None
+        heating = device["capabilities"]["heating"]
+        if heating.get("on") and device["device_id"] not in self.heating_by_mode:
+            return "manuale"
+        if self.mode == "empty" and self.rule("frost_protection")["enabled"]:
+            return "antigelo"
+        return "regolazione"
+
+    def _sensor_issue(self, device: dict, problem: str | None, episode: str | None) -> None:
         device_id = device["device_id"]
-        if problem:
-            self.thermostat_issue[device_id] = problem
-            reasoning = (f"Termostato di {device['label'].lower()}: {problem}; la caldaia segue l'accensione richiesta "
-                         f"senza regolazione")
-        else:
+        action = "thermostat_sensor"
+        if episode is None:
             self.thermostat_issue.pop(device_id, None)
-            reasoning = f"Termostato di {device['label'].lower()}: sensore di nuovo disponibile, regolazione ripresa"
-        self.log("system", {"type": "device", "device_id": device_id}, "thermostat_sensor", None,
-                 "problema" if problem else "ok", reasoning, "informational", str(uuid.uuid4()))
+            reasoning = f"{device['label']}: sensore di nuovo disponibile, regolazione ripresa"
+        else:
+            self.thermostat_issue[device_id] = episode
+            if episode == "antigelo":           # the BFF turns it into a push (category «Dispositivi e istanza offline»)
+                action = "frost_inactive"
+                reasoning = f"{device['label']}: sensore di temperatura mancante, antigelo non attivo ({problem})"
+            elif episode == "regolazione":
+                reasoning = (f"{device['label']}: sensore di temperatura mancante, regolazione automatica disattivata "
+                             f"({problem})")
+            else:
+                reasoning = f"{device['label']}: {problem}; segue il comando manuale senza regolazione"
+        self.log("system", {"type": "device", "device_id": device_id}, action, None,
+                 "problema" if episode else "ok", reasoning, "informational", str(uuid.uuid4()))
 
     async def _switch_relay(self, device: dict, on: bool, temperature, setpoint, frost: bool) -> None:
         device_id = device["device_id"]
@@ -991,6 +1014,10 @@ class ApartmentEngine:
                                              "params": {"on": True, "setpoint": sp}}))
         return out
 
+    def _heating_set_by(self, device_id: str, mode: bool) -> None:
+        (self.heating_by_mode.add if mode else self.heating_by_mode.discard)(device_id)
+        self.store.put_meta("heating_by_mode", sorted(self.heating_by_mode))
+
     def _note_no_sensor(self, device: dict, correlation_id: str | None) -> None:
         """D-162: one decision per episode for a climate without a temperature sensor in its room."""
         if device["device_id"] in self.no_sensor_noted:
@@ -1012,6 +1039,8 @@ class ApartmentEngine:
                     command_ids.append(cmd["command_id"])
             except MockError:
                 continue
+            if body["capability"] == "heating":
+                self._heating_set_by(device_id, mode=True)        # D-164: a mode's intention, never unregulated
         old = self.mode
         self.mode = mode
         self._save_apartment()
@@ -1126,6 +1155,8 @@ class ApartmentEngine:
                        decision_actor: str | None = None, reasoning: str | None = None) -> dict | None:
         """A command, or None when an automatic one waits for the compressor's pause (R4) and starts after it."""
         device = self.get_device(device_id)
+        if body.get("capability") == "heating" and device_id in self.heating_by_mode:
+            self._heating_set_by(device_id, mode=False)       # D-164: a person's (or a scheduled) command
         if not self.connector_up():                          # D-131: nothing can reach the devices
             raise MockError(409, "device_offline", "Collegamento ai dispositivi non disponibile; riprova quando torna")
         if not device["online"]:
