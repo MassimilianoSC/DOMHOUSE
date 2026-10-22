@@ -369,6 +369,13 @@
     "devTitle": "Accesso di sviluppo",
     "devHint": "Modalità sviluppo: scegli un utente di prova, nessuna password richiesta.",
     "failed": "Accesso non riuscito: controlla email e password",
+    "errors": {
+      "code": "Codice",
+      "domain": "Questo indirizzo del sito non è autorizzato per l'accesso: avvisa l'assistenza HQE",
+      "popupBlocked": "Il browser ha bloccato la finestra di Google: consenti le finestre pop-up per questo sito e riprova",
+      "googleDisabled": "Accesso con Google non attivo: avvisa l'assistenza HQE",
+      "googleFailed": "Accesso con Google non riuscito"
+    },
     "notEnabled": "Non hai i permessi per accedere. Chiedi un invito.",
     "tenantSuspended": "La tua organizzazione è sospesa: l'app non è disponibile. Per informazioni contatta l'assistenza HQE.",
     "tenantInactive": "La tua organizzazione non è attiva: contatta HQE.",

@@ -7,6 +7,7 @@ import { bffFetch } from "@/api/bff";
 import type { DevUser } from "@/api/types";
 import { authErrorMessage, useAuth } from "@/auth/AuthProvider";
 import { firebaseConfigured } from "@/auth/firebase";
+import { showLoginError } from "@/lib/loginErrors";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label, Skeleton } from "@/components/ui/primitives";
 import { t } from "@/i18n";
@@ -89,8 +90,8 @@ function FirebaseLogin() {
     setBusy(true);
     try {
       await emailLogin(email, password);
-    } catch {
-      toast.error(t("login.failed"));
+    } catch (err) {
+      showLoginError(err, "email"); // D-156: the sentence and «Codice: auth/…»
     } finally {
       setBusy(false);
     }
@@ -112,7 +113,7 @@ function FirebaseLogin() {
       </div>
       <Button type="submit" className="w-full" disabled={busy} data-testid="login-submit-btn">{t("login.submit")}</Button>
       <div className="text-center text-xs text-muted-foreground">{t("login.or")}</div>
-      <Button type="button" variant="outline" className="w-full" onClick={() => googleLogin().catch(() => toast.error(t("login.failed")))} data-testid="login-google-btn">
+      <Button type="button" variant="outline" className="w-full" onClick={() => googleLogin().catch((err) => showLoginError(err, "google"))} data-testid="login-google-btn">
         {t("login.google")}
       </Button>
     </form>
