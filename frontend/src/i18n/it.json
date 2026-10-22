@@ -333,6 +333,18 @@
     "command": "Comando",
     "schedule": "Programmazione",
     "rulesChanged": "Regole modificate",
+    "confirm": {
+      "yes": "Sì",
+      "no": "No",
+      "expiresAt": "Scade alle {time}",
+      "approved": "Approvato: il comando parte, l'esito arriva nell'app",
+      "rejected": "Respinto",
+      "next": "Ora: {description}",
+      "alreadyApproved": "Già decisa: approvata",
+      "alreadyRejected": "Già decisa: respinta",
+      "expired": "Scaduta",
+      "queued": "In attesa: prima va decisa l'approvazione aperta."
+    },
     "suggestions": {
       "off": "Spegni il clima del soggiorno",
       "temp": "Porta il soggiorno a 21 gradi",

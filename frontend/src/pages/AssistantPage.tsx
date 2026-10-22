@@ -5,6 +5,7 @@ import type { AskStatus } from "@/api/types";
 import { ApiError } from "@/api/bff";
 import { instanceApi } from "@/api/instance";
 import { useRole } from "@/auth/AuthProvider";
+import { ChatApproval } from "@/components/assistant/ChatApproval";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
@@ -25,7 +26,7 @@ function load(aptId: string): AskStatus[] {
   }
 }
 
-function Message({ aptId, m }: { aptId: string; m: AskStatus }) {
+function Message({ aptId, m, canWrite }: { aptId: string; m: AskStatus; canWrite: boolean }) {
   const pending = m.status === "pending";
   return (
     <div className="space-y-2" data-testid={`ask-message-${m.ask_id}`} data-status={m.status}>
@@ -40,6 +41,8 @@ function Message({ aptId, m }: { aptId: string; m: AskStatus }) {
           ) : (
             <p data-testid={`ask-answer-${m.ask_id}`}>{m.answer}</p>
           )}
+          {/* D-154: «Sì» / «No» right here, as on the Approvazioni page; whoever only reads sees the question only */}
+          {m.status === "needs_approval" && canWrite && <ChatApproval aptId={aptId} askId={m.ask_id} correlationId={m.correlation_id} approvalId={m.approval_id ?? null} />}
           {!pending && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
               <Badge className={cn(m.status === "answered" && "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300", m.status === "needs_approval" && "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300", m.status === "failed" && "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300")} data-testid={`ask-status-${m.ask_id}`}>
@@ -126,7 +129,7 @@ export default function AssistantPage() {
             </div>
           </div>
         ) : (
-          messages.map((m) => <Message key={m.ask_id} aptId={aptId} m={m} />)
+          messages.map((m) => <Message key={m.ask_id} aptId={aptId} m={m} canWrite={canWrite} />)
         )}
         <div ref={endRef} />
       </Card>
