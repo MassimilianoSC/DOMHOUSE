@@ -278,7 +278,7 @@ la scheda › «Abilita» (accettazione delle condizioni); lo stesso per «Claud
 sull'endpoint `global`: nessuna regione singola europea (`europe-west1` ha solo le generazioni precedenti). Le quote
 predefinite di progetto sono per famiglia di modelli e località: Haiku 5.5 in `eu` 1.500 richieste al minuto, 15
 milioni di token in ingresso e 1,5 milioni in uscita al minuto; Sonnet 5.5 in `eu` 1.250 richieste al minuto. Lettura
-dal PC (sola lettura; memoria storica, 22 ottobre 16:55):
+dal PC (sola lettura; memoria storica, 22 ottobre, registrata alle 16:58):
 
 ```
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
