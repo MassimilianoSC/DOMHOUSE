@@ -405,8 +405,7 @@ risposta dall'assistente: riprova». La conversazione resta solo in quella sched
   domanda decisa da te resta «Approvato: il comando parte, l'esito arriva nell'app» (o «Respinto») e, se riapri la
   conversazione, «Approvata da te alle …» o «Respinta da te alle …»; una domanda decisa da un collega o scaduta compare
   come «Già decisa: approvata», «Già decisa: respinta» o «Scaduta», senza pulsanti; se davanti c'è un'altra approvazione da decidere compare «In attesa: prima va decisa l'approvazione
-  aperta.» con il link «Vai alle approvazioni». Chi legge soltanto
-  vede la domanda senza pulsanti.
+  aperta.» con il link «Vai alle approvazioni».
 - L'esito lo scrive il sistema, non il modello: «Fatto: …» solo quando il dispositivo ha confermato; altrimenti
   «Comando inviato: …, l'esito arriva nell'app», «Serve la tua approvazione: …» oppure «Programmato: …». Se non sa una
   cosa lo dice e rimanda all'app.
