@@ -349,8 +349,10 @@ e dopo (per esempio «Finestra aperta spegne il clima · Minuti: 5 → 10»), co
 «Applica» e «Scarta». Niente cambia finché non premi «Applica»; dopo compare «Regole aggiornate come proposto». Se la richiesta è fuori dai limiti della regola o non
 riguarda le regole, lo dice e non propone niente. Se nel frattempo qualcuno ha cambiato le regole, l'app chiede di
 rifare la richiesta; se hai modifiche fatte a mano non salvate, «Applica» resta disattivato finché non le salvi o le
-annulli. Al massimo 20 richieste al giorno per appartamento. La modifica compare nelle Decisioni con il tuo nome e nel
-registro attività («regole modificate»); quello che scrivi non viene conservato. Sui dimostrativi l'assistente delle
+annulli. Le richieste semplici («finestra 10 minuti») ricevono la proposta subito; per quelle più articolate risponde il
+modello, e se non risponde entro pochi secondi l'app te lo dice: puoi riprovare con una frase più breve o cambiare la
+regola a mano. Al massimo 20 richieste al giorno per appartamento. La modifica compare nelle Decisioni con il tuo nome
+e nel registro attività («regole modificate»); quello che scrivi non viene conservato. Sui dimostrativi l'assistente delle
 regole capisce frasi semplici come «finestra 10 minuti», «antigelo 10 gradi», «spegni la regola dell'antimuffa»,
 «presenza al check-out 45 minuti», «setpoint da 18 a 25».
 
