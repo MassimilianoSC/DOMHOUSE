@@ -16,8 +16,16 @@ https://europe-west4-aiplatform.googleapis.com/v1/projects/<p>/locations/europe-
 gemini-3.8-flash:generateContent. With «nativo» the same system prompt goes in systemInstruction, the same tools in
 functionDeclarations (a «params» object without properties is described with the command's fields: on, mode, setpoint,
 fan), --reasoning maps to generationConfig.thinkingConfig (a number = thinkingBudget, a word = thinkingLevel); a model
-missing in that region answers 404, shown as the cause. --no-tools sends the questions without tools (said in the
-summary), in case the endpoint refuses the tools.
+missing in that region answers 404, shown as the cause.
+
+--endpoint anthropic: Claude on Vertex AI (rawPredict, the Messages API body with anthropic_version vertex-2023-10-16,
+the same credentials, no key), --model claude-haiku-5-5 or claude-sonnet-5-5, --location europe-west1, eu or global;
+tools as tools/input_schema; --reasoning low|medium|high = output_config.effort, a number = thinking budget; prices with
+--price-in/--price-out (€ per million tokens). A model not enabled in the project answers 403 or 404, shown as the cause.
+
+--no-tools (D-179 test 1): no tools declared; the prompt asks the answer and the actions as a JSON object in the text,
+which the script validates (shape and allowed values) and counts. The summary ends with a table: model, endpoint, tools
+yes/no, timeouts, median, p95, cost per answered question, valid JSON answers.
 
     GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python scripts/measure_model.py -n 20 --endpoint nativo \
         --location europe-west4 --model google/gemini-3.8-flash
@@ -143,9 +151,105 @@ def classify(answer: dict) -> str | None:
     return f"vuota (finish_reason {choice.get('finish_reason')})"
 
 
+JSON_INSTRUCTIONS = """
+
+Non hai strumenti. Rispondi SOLO con un oggetto JSON, senza altro testo e senza blocchi di codice:
+{"risposta": "<frase breve per il gestore>", "azioni": [<zero o più azioni>]}
+Ogni azione è una di queste tre forme:
+{"tipo": "modalita", "modalita": "comfort" | "eco" | "empty"}
+{"tipo": "comando", "device_id": "<id del dispositivo>", "capability": "switch" | "climate" | "heating",
+ "action": "turn_on" | "turn_off" | "set_climate" | "set_heating",
+ "params": {"on": true | false, "mode": "cool" | "heat" | "dry" | "fan", "setpoint": <numero>, "fan": "auto" | "low" | "mid" | "high"}}
+{"tipo": "programma", "quando": "<data e ora ISO 8601>", "modalita": "comfort" | "eco" | "empty"}"""
+
+_ACTION_KEYS = {"modalita": {"tipo", "modalita"}, "comando": {"tipo", "device_id", "capability", "action", "params"},
+                "programma": {"tipo", "quando", "modalita"}}
+
+
+def json_answer_valid(text: str | None) -> bool:
+    """The no-tools test (1): the answer is the JSON object asked, with actions of the three forms and allowed values."""
+    raw = (text or "").strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`").split("\n", 1)[-1] if "\n" in raw else ""
+        raw = raw.rsplit("```", 1)[0].strip()
+    try:
+        data = json.loads(raw)
+    except ValueError:
+        return False
+    if not isinstance(data, dict) or not isinstance(data.get("risposta"), str) or not isinstance(data.get("azioni"), list):
+        return False
+    for a in data["azioni"]:
+        if not isinstance(a, dict) or a.get("tipo") not in _ACTION_KEYS or not set(a) <= _ACTION_KEYS[a["tipo"]]:
+            return False
+        if a["tipo"] in ("modalita", "programma") and a.get("modalita") not in ("comfort", "eco", "empty"):
+            return False
+        if a["tipo"] == "comando":
+            if a.get("capability") not in ("switch", "climate", "heating") or not isinstance(a.get("device_id"), str):
+                return False
+            if a.get("action") not in ("turn_on", "turn_off", "set_climate", "set_heating"):
+                return False
+            params = a.get("params") or {}
+            if not isinstance(params, dict) or not set(params) <= {"on", "mode", "setpoint", "fan"}:
+                return False
+    return True
+
+
+def anthropic_url(project: str, location: str, model: str) -> str:
+    """Claude on Vertex AI (rawPredict, Messages API), on the location's host."""
+    return (f"https://{host_for(location)}/v1/projects/{project}/locations/{location}/publishers/anthropic/models/"
+            f"{model.split('/')[-1]}:rawPredict")
+
+
+def anthropic_body(messages: list[dict], tools: list[dict] | None, max_tokens: int, reasoning: str) -> dict:
+    body = {"anthropic_version": "vertex-2023-10-16", "max_tokens": max_tokens, "system": messages[0]["content"],
+            "messages": [{"role": "user", "content": m["content"]} for m in messages[1:]], "temperature": 0.2}
+    if tools:
+        body["tools"] = [{"name": t["function"]["name"], "description": t["function"].get("description", ""),
+                          "input_schema": t["function"]["parameters"]} for t in tools]
+    if reasoning.isdigit():                         # extended thinking: a budget of tokens (temperature must be 1)
+        body["thinking"] = {"type": "enabled", "budget_tokens": int(reasoning)}
+        body.pop("temperature")
+    elif reasoning in ("low", "medium", "high"):    # the effort of the answer (adaptive thinking by default)
+        body["output_config"] = {"effort": reasoning}
+    return body
+
+
+def classify_anthropic(answer: dict) -> str | None:
+    blocks = answer.get("content") or []
+    if any(b.get("type") == "tool_use" or (b.get("type") == "text" and (b.get("text") or "").strip()) for b in blocks):
+        return None
+    if answer.get("stop_reason") == "max_tokens":
+        return "troncata: max_tokens esauriti"
+    return f"vuota (stop_reason {answer.get('stop_reason')})"
+
+
+def anthropic_usage(answer: dict) -> dict:
+    u = answer.get("usage") or {}
+    prompt = int(u.get("input_tokens") or 0) + int(u.get("cache_read_input_tokens") or 0)
+    out = int(u.get("output_tokens") or 0)
+    return {"prompt_tokens": prompt, "completion_tokens": out, "total_tokens": prompt + out,
+            "prompt_tokens_details": {"cached_tokens": int(u.get("cache_read_input_tokens") or 0)}}
+
+
+def text_of(kind: str, answer: dict) -> str:
+    if kind == "nativo":
+        parts = (((answer.get("candidates") or [{}])[0]).get("content") or {}).get("parts") or []
+        return "".join(p.get("text") or "" for p in parts if not p.get("thought"))
+    if kind == "anthropic":
+        return "".join(b.get("text") or "" for b in answer.get("content") or [] if b.get("type") == "text")
+    return (((answer.get("choices") or [{}])[0]).get("message") or {}).get("content") or ""
+
+
+def cost_of(usage: dict, price_in: float, price_out: float, price_cached: float) -> float:
+    prompt = int(usage.get("prompt_tokens") or 0)
+    total = int(usage.get("total_tokens") or 0) or prompt + int(usage.get("completion_tokens") or 0)
+    cached = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0)
+    return ((prompt - cached) * price_in + cached * price_cached + max(total - prompt, 0) * price_out) / 1_000_000
+
+
 def one_call(url: str, token: str, body: dict, timeout: float, connect: float = 5.0,
-             network: dict | None = None, native: bool = False) -> tuple[float, str | None, dict]:
-    """(seconds, cause or None, usage); `network` receives the DNS, TCP and TLS seconds of a call that got that far."""
+             network: dict | None = None, kind: str = "openai") -> tuple[float, str | None, dict, str]:
+    """(seconds, cause or None, usage, text of the answer); `network` receives the DNS, TCP and TLS seconds."""
     import asyncio
 
     from bff import net_phase
@@ -155,15 +259,17 @@ def one_call(url: str, token: str, body: dict, timeout: float, connect: float = 
         resp = asyncio.run(net_phase.post_traced(url, json=body, headers={"Authorization": f"Bearer {token}"},
                                                  connect_s=connect, read_s=timeout, network=network))
     except net_phase.PhaseFailure as exc:
-        return exc.seconds, f"{'timeout' if exc.timeout else 'errore'} nella fase «{exc.phase}»", {}
+        return exc.seconds, f"{'timeout' if exc.timeout else 'errore'} nella fase «{exc.phase}»", {}, ""
     took = time.monotonic() - started
     if resp.status_code != 200:
         words = " ".join(resp.text.split())[:300]          # enough to read the allowed values of a 400
-        return took, f"endpoint HTTP {resp.status_code}: {words}", {}
+        return took, f"endpoint HTTP {resp.status_code}: {words}", {}, ""
     answer = resp.json()
-    if native:
-        return took, classify_native(answer), native_usage(answer)
-    return took, classify(answer), answer.get("usage") or {}
+    if kind == "nativo":
+        return took, classify_native(answer), native_usage(answer), text_of(kind, answer)
+    if kind == "anthropic":
+        return took, classify_anthropic(answer), anthropic_usage(answer), text_of(kind, answer)
+    return took, classify(answer), answer.get("usage") or {}, text_of(kind, answer)
 
 
 def p95(values: list[float]) -> float:
@@ -181,27 +287,33 @@ def main() -> int:
     ap.add_argument("--max-tokens", type=int, default=int(os.environ.get("AI_MAX_TOKENS", "4096")))
     ap.add_argument("--timeout", type=float, default=float(os.environ.get("AI_TIMEOUT_S", "25")))
     ap.add_argument("--connect-timeout", type=float, default=float(os.environ.get("AI_CONNECT_TIMEOUT_S", "5")))
-    ap.add_argument("--endpoint", choices=("openai", "nativo"), default="openai")
+    ap.add_argument("--endpoint", choices=("openai", "nativo", "anthropic"), default="openai")
     ap.add_argument("--no-tools", action="store_true")
     ap.add_argument("--rep-host", action="store_true",
                     help="with --endpoint openai: Google's host for the location (aiplatform.eu.rep.googleapis.com for eu) "
                          "instead of aiplatform.googleapis.com, which the BFF uses today")
+    ap.add_argument("--price-in", type=float, default=float(os.environ.get("AI_PRICE_IN_EUR_PER_M", "0.83")))
+    ap.add_argument("--price-out", type=float, default=float(os.environ.get("AI_PRICE_OUT_EUR_PER_M", "4.13")))
+    ap.add_argument("--price-cached", type=float, default=float(os.environ.get("AI_PRICE_CACHED_EUR_PER_M", "0.08")))
     a = ap.parse_args()
     project = os.environ.get("GCP_PROJECT_ID", "").strip()
     if not project:
         print("Manca GCP_PROJECT_ID: scrivi GCP_PROJECT_ID=<progetto> prima del comando.")
         return 2
-    os.environ.setdefault("APP_ENV", "dev")                   # the BFF's settings for its prices, nothing else
+    if a.endpoint == "anthropic" and not a.model:
+        print("Con --endpoint anthropic indica il modello, per esempio --model claude-haiku-5-5.")
+        return 2
+    os.environ.setdefault("APP_ENV", "dev")                   # the BFF's settings (credentials), nothing else
     from bff import ai_gateway
 
     models = a.model or [os.environ.get("AI_MODEL", "google/gemini-3.8-flash")]
     reasonings = a.reasoning or ["default"]
-    native = a.endpoint == "nativo"
+    kind = a.endpoint
     url = (f"https://{host_for(a.location) if a.rep_host else 'aiplatform.googleapis.com'}/v1/projects/{project}"
            f"/locations/{a.location}/endpoints/openapi/chat/completions")
-    print(f"Endpoint {'nativo (generateContent)' if native else 'compatibile OpenAI'}"
-          f"{'' if native else (' su ' + url.split('/')[2])}, "
-          f"strumenti {'no' if a.no_tools else 'sì'}")
+    tools_label = "no (JSON nel testo)" if a.no_tools else "sì"
+    print(f"Endpoint {kind}{(' su ' + url.split('/')[2]) if kind == 'openai' else ''}, strumenti {tools_label}, "
+          f"prezzi {a.price_in:g}/{a.price_out:g} €/M")
     print(f"Misura del modello: progetto {project}, località {a.location}, {a.n} chiamate per variante, "
           f"max_tokens {a.max_tokens}, attesa della risposta {a.timeout:g} s, connessione {a.connect_timeout:g} s")
     try:
@@ -213,17 +325,22 @@ def main() -> int:
     rows, total_cost = [], 0.0
     for model in models:
         for reasoning in reasonings:
-            label = f"{model} · reasoning {reasoning} · {'nativo ' + a.location if native else 'openai ' + a.location}"
-            if native:
+            label = f"{model} · reasoning {reasoning} · {kind} {a.location}"
+            if kind == "nativo":
                 url = native_url(project, a.location, model)
+            elif kind == "anthropic":
+                url = anthropic_url(project, a.location, model)
             print(f"\n== {label}")
-            times, causes, cost = [], {}, 0.0
+            times, causes, cost, valid = [], {}, 0.0, 0
             for i in range(a.n):
                 messages, tools = request_messages(QUESTIONS[i % len(QUESTIONS)])
                 if a.no_tools:
                     tools = None
-                if native:
+                    messages[0] = {"role": "system", "content": messages[0]["content"] + JSON_INSTRUCTIONS}
+                if kind == "nativo":
                     body = native_body(messages, tools, a.max_tokens, reasoning)
+                elif kind == "anthropic":
+                    body = anthropic_body(messages, tools, a.max_tokens, reasoning)
                 else:
                     body = {"model": model, "messages": messages, "temperature": 0.2, "max_tokens": a.max_tokens}
                     if tools:
@@ -231,30 +348,44 @@ def main() -> int:
                     if reasoning != "default":
                         body["reasoning_effort"] = reasoning
                 network: dict = {}
-                took, cause, usage = one_call(url, token, body, a.timeout, a.connect_timeout, network, native)
+                took, cause, usage, text = one_call(url, token, body, a.timeout, a.connect_timeout, network, kind)
                 if usage:
-                    c, _, _ = ai_gateway.cost_eur(usage)
-                    cost += c
+                    cost += cost_of(usage, a.price_in, a.price_out, a.price_cached)
                 reasoning_tokens = ((usage.get("completion_tokens_details") or {}).get("reasoning_tokens")
                                     if usage else None)
                 net = (f"  rete: DNS {network['dns'] * 1000:.0f} ms, TCP {network['connessione'] * 1000:.0f} ms, "
                        f"TLS {network['tls'] * 1000:.0f} ms") if "tls" in network else ""
-                print(f"  {i + 1:2d}. {took:5.1f} s  {cause or 'ok'}"
+                checked = ""
+                if a.no_tools and not cause:
+                    ok_json = json_answer_valid(text)
+                    valid += ok_json
+                    checked = "  JSON valido" if ok_json else "  JSON NON valido"
+                print(f"  {i + 1:2d}. {took:5.1f} s  {cause or 'ok'}{checked}"
                       + (f"  (ragionamento {reasoning_tokens} token)" if reasoning_tokens else "") + net)
                 if cause:
                     causes[cause] = causes.get(cause, 0) + 1
                 else:
                     times.append(took)
             total_cost += cost
-            rows.append((label, times, causes, cost))
+            rows.append((model, label, times, causes, cost, valid))
     print("\n=== Riepilogo (tempi delle sole risposte riuscite)")
-    for label, times, causes, cost in rows:
+    for model, label, times, causes, cost, valid in rows:
         ok = len(times)
         stats = (f"min {min(times):.1f} s, mediana {statistics.median(times):.1f} s, p95 {p95(times):.1f} s, "
                  f"max {max(times):.1f} s") if times else "nessuna risposta riuscita"
         failed = "; ".join(f"{k}: {v}" for k, v in sorted(causes.items())) or "nessuno"
-        print(f"{label}\n  riuscite {ok} su {a.n} · {stats}\n  fallimenti: {failed}\n  costo stimato {cost:.4f} €")
+        print(f"{label}\n  riuscite {ok} su {a.n} · {stats}\n  fallimenti: {failed}\n  costo stimato {cost:.4f} €"
+              + (f"\n  risposte JSON valide {valid} su {ok}" if a.no_tools else ""))
     print(f"\nCosto stimato totale: {total_cost:.4f} €")
+    print(f"\n=== Tabella\n| modello | endpoint | strumenti | timeout su {a.n} | mediana | p95 | costo per domanda | JSON valide |")
+    print("|---|---|---|---|---|---|---|---|")
+    for model, label, times, causes, cost, valid in rows:
+        timeouts = sum(v for k, v in causes.items() if k.startswith("timeout"))
+        med = f"{statistics.median(times):.1f} s" if times else "–"
+        top = f"{p95(times):.1f} s" if times else "–"
+        per = f"{cost / len(times):.5f} €" if times else "–"
+        js = f"{valid} su {len(times)}" if a.no_tools else "–"
+        print(f"| {model} | {kind} {a.location} | {tools_label} | {timeouts} | {med} | {top} | {per} | {js} |")
     return 0
 
 

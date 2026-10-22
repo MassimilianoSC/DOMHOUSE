@@ -120,3 +120,44 @@ def test_rep_host_for_the_openai_endpoint(monkeypatch, capsys):
     monkeypatch.setattr("sys.argv", ["measure_model.py", "-n", "1"])                     # today's host, as the BFF
     mm.main()
     assert urls[-1].startswith("https://aiplatform.googleapis.com/v1/projects/p/locations/eu/")
+
+
+def test_the_json_in_the_text_is_checked():
+    """D-179 test (1): no tools, the command asked as a JSON object in the text, validated by us."""
+    mm = _script()
+    good = '{"risposta": "Spengo il clima.", "azioni": [{"tipo": "comando", "device_id": "dev-clima-soggiorno", ' \
+           '"capability": "climate", "action": "turn_off", "params": {}}]}'
+    assert mm.json_answer_valid(good) and mm.json_answer_valid("```json\n" + good + "\n```")
+    assert mm.json_answer_valid('{"risposta": "Ci sono 20 gradi.", "azioni": []}')
+    assert not mm.json_answer_valid("Spengo il clima.")                                     # prose
+    assert not mm.json_answer_valid('{"risposta": "x", "azioni": [{"tipo": "modalita", "modalita": "notte"}]}')
+    assert not mm.json_answer_valid('{"risposta": "x", "azioni": [{"tipo": "comando", "device_id": "d", '
+                                    '"capability": "climate", "action": "explode", "params": {}}]}')
+
+
+def test_claude_on_vertex_and_the_final_table(monkeypatch, capsys):
+    mm = _script()
+    from bff import net_phase
+    sent = []
+
+    async def fake_post(url, json=None, headers=None, connect_s=None, read_s=None, network=None):
+        sent.append((url, json))
+        if len(sent) == 1:
+            return httpx.Response(200, json={"content": [{"type": "tool_use", "id": "toolu_1", "name": "comanda_dispositivo",
+                                                          "input": {}}], "stop_reason": "tool_use",
+                                             "usage": {"input_tokens": 1000, "output_tokens": 100}})
+        raise net_phase.PhaseFailure(net_phase.WAIT, True, 25.0, httpx.ReadTimeout("lento"))
+    monkeypatch.setattr(net_phase, "post_traced", fake_post)
+    monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
+    monkeypatch.setenv("GCP_PROJECT_ID", "p")
+    monkeypatch.setattr("sys.argv", ["measure_model.py", "-n", "2", "--endpoint", "anthropic", "--location", "europe-west1",
+                                     "--model", "claude-haiku-5-5", "--price-in", "1", "--price-out", "5"])
+    assert mm.main() == 0
+    out = capsys.readouterr().out
+    url, body = sent[0]
+    assert url == "https://europe-west1-aiplatform.googleapis.com/v1/projects/p/locations/europe-west1/publishers/anthropic/models/claude-haiku-5-5:rawPredict"
+    assert body["anthropic_version"] == "vertex-2023-10-16" and "Stato attuale dell'appartamento" in body["system"]
+    assert {t["name"] for t in body["tools"]} >= {"comanda_dispositivo"} and "input_schema" in body["tools"][0]
+    assert "| claude-haiku-5-5 | anthropic europe-west1 | sì | 1 | " in out and "| 0.00150 € | – |" in out
+    monkeypatch.setattr("sys.argv", ["measure_model.py", "--endpoint", "anthropic"])            # a model is needed
+    assert mm.main() == 2
