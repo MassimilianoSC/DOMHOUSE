@@ -967,7 +967,8 @@
     "dismiss": "Nascondi l'avviso"
   },
   "audit": {
-    "title": "Registro attività",
+    "titleTenant": "Registro dell'organizzazione",
+    "titlePlatform": "Registro della piattaforma",
     "hint": "Chi ha fatto cosa nella tua organizzazione: inviti, ruoli, appartamenti, funzioni e accessi di assistenza.",
     "platformHint": "Chi ha fatto cosa in un'organizzazione, oppure le azioni della piattaforma (gestori nominati e tolti).",
     "scope": "Registro di",

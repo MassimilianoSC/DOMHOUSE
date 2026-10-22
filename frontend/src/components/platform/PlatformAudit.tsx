@@ -7,7 +7,7 @@ import { Label, NativeSelect } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 
 /**
- * Organizzazioni > Registro attività (P-47): the log of one organization at a time (the BFF wants tenant_id), or the
+ * Organizzazioni > Registro della piattaforma (P-47, D-160): the log of one organization at a time (the BFF wants tenant_id), or the
  * platform's own actions. Starts on the first organization; without any, on the platform's log.
  */
 export function PlatformAudit() {
@@ -16,6 +16,7 @@ export function PlatformAudit() {
   const scope = chosen ?? tenants.data?.[0]?.tenant_id ?? (tenants.isLoading ? null : PLATFORM_SCOPE);
   return (
     <div className="space-y-4">
+      <h2 className="text-base font-bold md:text-lg" data-testid="audit-title">{t("audit.titlePlatform")}</h2>
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor="audit-scope">{t("audit.scope")}</Label>
         <NativeSelect id="audit-scope" className="w-auto max-w-full" value={scope ?? ""} disabled={!scope} onChange={(e) => setChosen(e.target.value)} data-testid="audit-scope-select">

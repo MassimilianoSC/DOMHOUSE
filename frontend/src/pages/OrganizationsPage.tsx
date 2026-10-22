@@ -41,7 +41,7 @@ export default function OrganizationsPage() {
               { value: "tenants", label: t("platform.tabTenants") },
               { value: "managers", label: t("platform.tabManagers") },
               { value: "webhooks", label: t("platform.tabUnattributed") },
-              { value: "audit", label: t("audit.title") },
+              { value: "audit", label: t("audit.titlePlatform") },
             ]}
           />
         }

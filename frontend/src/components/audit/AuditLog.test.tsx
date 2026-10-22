@@ -90,3 +90,24 @@ describe("Organizzazioni > Registro attività", () => {
     expect(calls).toEqual(["/app/platform/audit?tenant_id=t-9&limit=50&before=cur", "/app/platform/audit?scope=platform&limit=50"]);
   });
 });
+
+describe("i due registri hanno nomi diversi (D-160)", () => {
+  it("Amministrazione: «Registro dell'organizzazione» sopra il registro", async () => {
+    wrap(<AuditLog load={adminApi.audit} queryKey={["admin", "audit"]} hint={t("audit.hint")} title={t("audit.titleTenant")} />);
+    expect(screen.getByTestId("audit-title")).toHaveTextContent("Registro dell'organizzazione");
+    expect(await screen.findByTestId("audit-empty")).toBeInTheDocument();
+  });
+
+  it("Organizzazioni: «Registro della piattaforma» sopra la scelta del registro", async () => {
+    wrap(<PlatformAudit />);
+    expect(screen.getByTestId("audit-title")).toHaveTextContent("Registro della piattaforma");
+    expect(await screen.findByTestId("audit-scope-select")).toBeInTheDocument();
+  });
+
+  it("senza titolo il registro resta com'era, e nessuno dei due si chiama più «Registro attività»", () => {
+    wrap(<AuditLog load={adminApi.audit} queryKey={["admin", "audit", "x"]} hint={t("audit.hint")} />);
+    expect(screen.queryByTestId("audit-title")).toBeNull();
+    expect(t("audit.titleTenant")).not.toBe("Registro attività");
+    expect(t("audit.titlePlatform")).not.toBe("Registro attività");
+  });
+});

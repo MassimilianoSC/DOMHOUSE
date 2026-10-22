@@ -18,10 +18,10 @@ export default function AdminPage() {
         title={t("admin.title")}
         subtitle={t("admin.subtitle")}
         testId="admin-header"
-        actions={<SegmentedControl value={tab} onChange={setTab} testId="admin-tab" options={[{ value: "apartments", label: t("admin.apartments.title") }, { value: "users", label: t("admin.users.title") }, { value: "features", label: t("admin.features.title") }, { value: "webhooks", label: t("admin.bookingsReceived.title") }, { value: "audit", label: t("audit.title") }]} />}
+        actions={<SegmentedControl value={tab} onChange={setTab} testId="admin-tab" options={[{ value: "apartments", label: t("admin.apartments.title") }, { value: "users", label: t("admin.users.title") }, { value: "features", label: t("admin.features.title") }, { value: "webhooks", label: t("admin.bookingsReceived.title") }, { value: "audit", label: t("audit.titleTenant") }]} />}
       />
       {tab === "webhooks" && <AdminWebhookLogs />}
-      {tab === "audit" && <AuditLog load={adminApi.audit} queryKey={["admin", "audit"]} hint={t("audit.hint")} />}
+      {tab === "audit" && <AuditLog load={adminApi.audit} queryKey={["admin", "audit"]} hint={t("audit.hint")} title={t("audit.titleTenant")} />}
       {tab === "users" && <AdminUsers />}
       {tab === "apartments" && <AdminApartments />}
       {tab === "features" && <AdminFeatures />}

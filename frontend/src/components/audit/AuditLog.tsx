@@ -10,7 +10,7 @@ import { fmtDateTime } from "@/lib/format";
  * «Registro attività» (P-47): one sentence per action, newest first, with «Carica altri». The same list for the admin
  * (their organization) and for the platform (one organization, or the platform's own actions).
  */
-export function AuditLog({ load, queryKey, hint }: { load: (before?: string) => Promise<AuditPage>; queryKey: unknown[]; hint: string }) {
+export function AuditLog({ load, queryKey, hint, title }: { load: (before?: string) => Promise<AuditPage>; queryKey: unknown[]; hint: string; title?: string }) {
   const q = useInfiniteQuery({
     queryKey,
     queryFn: ({ pageParam }) => load(pageParam),
@@ -21,6 +21,7 @@ export function AuditLog({ load, queryKey, hint }: { load: (before?: string) => 
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
   return (
     <div className="space-y-4">
+      {title && <h2 className="text-base font-bold md:text-lg" data-testid="audit-title">{title}</h2>}
       <p className="text-sm text-muted-foreground" data-testid="audit-hint">{hint}</p>
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="audit-error" />}
       {q.isLoading ? <Skeleton className="h-48 rounded-2xl" /> : q.data && items.length === 0 ? (
