@@ -21,6 +21,10 @@ the last commit, in a python:3.11-slim container as a non-root user (about 3 min
 there). One check per step of the job; Docker missing or not running counts one red with the reason, never a skip.
 It runs in the full run and with --suite linux; --no-linux declares it skipped (visible in the totals), and a pytest
 filter (-- -k ...) leaves it out like the other non-pytest suites. It tests the COMMIT, not uncommitted changes.
+The "e2e" suite is o2's browser checks (P-73), `yarn --cwd frontend e2e`: Playwright starts the development BFF on
+127.0.0.1:8011 (with this Python, PYTHON) and the site on 5174, and its JSON report gives the totals. Either port
+already taken counts one red with the reason (never a server reused); without a browser on the machine Playwright
+skips the checks with the reason and they are counted as skipped.
 Exit code 0 only when there are no failures and no errors.
 """
 import argparse
@@ -78,6 +82,9 @@ SCRIPT_SUITE = "script_sh"
 SCRIPTS_PATHSPEC = "scripts/*.sh"  # a git pathspec: "*" also crosses "/", so scripts in subfolders are included
 SITE_REPORT = ROOT / "frontend" / "test-results" / "vitest.json"
 SIZE_SUITE = "dimensione"
+E2E_SUITE = "e2e"
+E2E_PORTS = (8011, 5174)                   # frontend/playwright.config.ts: the BFF and the site of the browser checks
+E2E_TIMEOUT_S = 600
 LINUX_SUITE = "linux"
 LINUX_SCRIPT = ROOT / "scripts" / "ci-linux.sh"
 LINUX_TIMEOUT_S = 900
@@ -290,6 +297,66 @@ def run_site_suite() -> dict:
     return c
 
 
+def port_taken(port: int) -> bool:
+    for host in ("127.0.0.1", "::1"):
+        try:
+            with socket.create_connection((host, port), timeout=0.5):
+                return True
+        except OSError:
+            continue
+    return False
+
+
+def e2e_counts(report: dict, code: int) -> dict:
+    """Totals from Playwright's JSON report (stats: expected, unexpected, flaky, skipped), cross-checked with the exit
+    code; a flaky check (passed on a retry) counts as passed."""
+    s = report.get("stats") or {}
+    passed, failed = int(s.get("expected", 0)) + int(s.get("flaky", 0)), int(s.get("unexpected", 0))
+    c = result(tests=passed + failed + int(s.get("skipped", 0)), failures=failed, skipped=int(s.get("skipped", 0)))
+    errors = [e.get("message", "") for e in report.get("errors") or []]
+    if errors:
+        c["errors"] += 1
+        c["note"] = errors[0].splitlines()[0][:200] if errors[0] else "errore di Playwright"
+    elif c["tests"] == 0:
+        c["errors"] += 1
+        c["note"] = "il rapporto dichiara 0 prove"
+    elif code != 0 and failed == 0:
+        c["errors"] += 1
+        c["note"] = f"uscita {code} senza prove fallite nel rapporto"
+    return c
+
+
+def run_e2e_suite(work: Path) -> dict:
+    """o2's browser checks (P-73): yarn --cwd frontend e2e, totals from the JSON report."""
+    try:
+        scripts = frontend_scripts()
+    except (OSError, ValueError) as exc:
+        return result(errors=1, note=f"frontend/package.json illeggibile: {exc}")
+    if "e2e" not in scripts:
+        return result(note="manca lo script e2e in frontend/package.json", suite_skipped=True)
+    yarn = shutil.which("yarn")
+    if not yarn:
+        return result(errors=1, note="yarn non trovato nel PATH")
+    taken = [port for port in E2E_PORTS if port_taken(port)]
+    if taken:
+        return result(errors=1, note=f"porta {', '.join(map(str, taken))} già occupata: chiudere quel programma "
+                                     "(le prove nel browser non riusano un server già acceso)")
+    report_path = work / "e2e.json"
+    report_path.unlink(missing_ok=True)
+    env = {**os.environ, "PYTHON": sys.executable, "PLAYWRIGHT_JSON_OUTPUT_NAME": str(report_path)}
+    print(f"\n=== {E2E_SUITE}: yarn --cwd frontend e2e")
+    try:
+        code = subprocess.call([yarn, "--cwd", "frontend", "e2e", "--reporter=list,json"], cwd=ROOT, env=env,
+                               timeout=E2E_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return result(errors=1, note=f"oltre {E2E_TIMEOUT_S} s")
+    try:
+        report = json.loads(report_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return result(errors=1, note=f"rapporto JSON di Playwright assente o illeggibile (uscita {code})")
+    return e2e_counts(report, code)
+
+
 def frontend_scripts() -> dict:
     return json.loads((ROOT / "frontend" / "package.json").read_text(encoding="utf-8")).get("scripts", {})
 
@@ -464,7 +531,8 @@ def run_linux_suite(skip: bool) -> dict:
 def selected_suites(chosen: list[str], extra: list[str]) -> list[str]:
     """--suite picks by name; otherwise a pytest filter (-- -k …) runs only the pytest suites: "sito", "dimensione" and
     "script_sh" never receive pytest's arguments and would only add a long, unrelated run (lot 11); the same for "linux"."""
-    every = [SCRIPT_SUITE] + HTTP_SUITES + LOCAL_SUITES + [CONFORMANCE_SUITE, LINUX_SUITE, SITE_SUITE, SIZE_SUITE]
+    every = [SCRIPT_SUITE] + HTTP_SUITES + LOCAL_SUITES + [CONFORMANCE_SUITE, LINUX_SUITE, SITE_SUITE, E2E_SUITE,
+                                                          SIZE_SUITE]
     if chosen:
         return [s for s in every if any(f in s for f in chosen)]
     return HTTP_SUITES + LOCAL_SUITES if extra else every
@@ -509,6 +577,8 @@ def main() -> int:
             c = run_linux_suite(args.no_linux)
         elif suite == SITE_SUITE:
             c = run_site_suite()
+        elif suite == E2E_SUITE:
+            c = run_e2e_suite(work)
         elif suite == SIZE_SUITE:
             c = run_size_suite()
         elif suite == FIRESTORE_SUITE:

@@ -112,7 +112,7 @@ def test_site_and_size_are_skipped_when_filtering_pytest():
         rt.selected_suites([], ["-k", "webhook"])
     assert rt.SITE_SUITE in rt.selected_suites(["sito"], ["-k", "x"])         # chosen explicitly: it runs
     everything = rt.selected_suites([], [])
-    assert everything[0] == rt.SCRIPT_SUITE and everything[-2:] == [rt.SITE_SUITE, rt.SIZE_SUITE]
+    assert everything[0] == rt.SCRIPT_SUITE and everything[-3:] == [rt.SITE_SUITE, rt.E2E_SUITE, rt.SIZE_SUITE]
 
 
 # -------- lot 11 (P-57): the log-based alert watches messages the BFF really writes --------
@@ -203,3 +203,27 @@ def test_a_suite_that_hangs_is_stopped_and_counted_red(tmp_path, monkeypatch):
     suite.write_text("import time\n\ndef test_ferma():\n    time.sleep(60)\n", encoding="utf-8")
     c = rt.run_pytest(str(suite), tmp_path, [], {**__import__("os").environ})
     assert c["errors"] == 1 and "bloccata" in c["note"]
+
+
+def test_e2e_totals_from_the_playwright_report():
+    """P-73: the browser checks' totals from Playwright's JSON report; a red never hides behind an exit code."""
+    rt = _runner()
+    ok = rt.e2e_counts({"stats": {"expected": 14, "flaky": 1, "unexpected": 0, "skipped": 0}}, 0)
+    assert (ok["tests"], ok["failures"], ok["errors"], ok["skipped"]) == (15, 0, 0, 0)
+    red = rt.e2e_counts({"stats": {"expected": 13, "unexpected": 2, "skipped": 0}}, 1)
+    assert (red["tests"], red["failures"]) == (15, 2)
+    skipped = rt.e2e_counts({"stats": {"expected": 0, "unexpected": 0, "skipped": 15}}, 0)   # no browser: skipped
+    assert (skipped["tests"], skipped["skipped"], skipped["errors"]) == (15, 15, 0)
+    assert rt.e2e_counts({"stats": {}}, 0)["errors"] == 1                                # 0 checks declared
+    assert rt.e2e_counts({"stats": {"expected": 3}}, 1)["errors"] == 1                  # exit code without a red
+    broken = rt.e2e_counts({"stats": {}, "errors": [{"message": "http://127.0.0.1:8011 is already used" + chr(10) + "more"}]}, 1)
+    assert broken["errors"] == 1 and broken["note"] == "http://127.0.0.1:8011 is already used"
+
+
+def test_e2e_refuses_a_taken_port(tmp_path, monkeypatch):
+    rt = _runner()
+    monkeypatch.setattr(rt, "port_taken", lambda port: port == 5174)
+    monkeypatch.setattr(rt.shutil, "which", lambda name: "yarn")
+    c = rt.run_e2e_suite(tmp_path)
+    assert c["errors"] == 1 and c["note"].startswith("porta 5174 già occupata")
+
