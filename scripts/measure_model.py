@@ -17,7 +17,7 @@ soggiorno?», «perché si è spento il clima?», «metti eco», «accendi la st
 one model call, the unit the assistant's budget is made of.
 
 Causes of a failure: «timeout» (no answer within --timeout); «troncata: max_tokens esauriti» (finish_reason length with
-nothing usable: the reasoning ate the tokens); «endpoint HTTP <code>» (with the first words of the error; 429 is a
+nothing usable: the reasoning ate the tokens); «endpoint HTTP <code>» (with the first 300 characters of the error; 429 is a
 quota of Vertex, not the app's monthly cap, which this script never touches); «rete» (connection). Prices: the app's
 (AI_PRICE_*), output tokens = total - input, reasoning included.
 """
@@ -75,7 +75,7 @@ def one_call(url: str, token: str, body: dict, timeout: float) -> tuple[float, s
         return time.monotonic() - started, f"rete ({type(exc).__name__})", {}
     took = time.monotonic() - started
     if resp.status_code != 200:
-        words = " ".join(resp.text.split())[:80]
+        words = " ".join(resp.text.split())[:300]          # enough to read the allowed values of a 400
         return took, f"endpoint HTTP {resp.status_code}: {words}", {}
     answer = resp.json()
     return took, classify(answer), answer.get("usage") or {}

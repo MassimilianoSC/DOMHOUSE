@@ -301,6 +301,11 @@ class Assistant:
             return f"{label} a {target['setpoint']:g} °C"
         return f"accendere {label}"
 
+    def schedule_question(self, what: str) -> str:
+        """D-170: a scheduled action that will find guests in."""
+        return (f"Programmo {what}, con ospiti presenti a quell'ora? Rispondi Sì o No qui sotto, oppure dalla pagina "
+                f"Approvazioni.")
+
     def question(self, what: str) -> str:
         """D-154 point 2: the approval asked as a question in the chat, answered with «Sì» / «No» under it (the same
         call as the Approvals page, so the same record) or from the Approvals page."""
@@ -313,13 +318,29 @@ class Assistant:
             return f"Confermi, con ospiti presenti: {what}?{tail}"
         return f"Confermi: {what}?{tail}"
 
+    def _touches_comfort_at(self, p: dict) -> bool:
+        """D-170: guests in at the action's time and a mode, or a climate or a boiler switched off."""
+        from .core import parse_dt
+        if not self.e.occupied_at(parse_dt(p["run_at"])):
+            return False
+        a = p["action"]
+        if a["type"] == "apartment_mode":
+            return True
+        device = self.e.devices.get(a.get("device_id", ""))
+        if not device:
+            return False
+        cap, action, params = self.e.validate_command(device, a)
+        return cap in ("climate", "heating") and not self.e.target_state(device, cap, action, params).get("on")
+
     def needs_approval(self, p: dict, together: bool) -> bool:
         """D-132 point 2: with guests in, the guest's comfort (switching off a climate or a boiler, the mode); and any
         action together with others (one approval each, D-144). D-162: the setting ASSISTANT_CONFIRM, «ospiti» (this,
         the default), «sempre» (every action), «multiple» (only actions together)."""
-        if p["type"] == "schedule":
-            return False
         policy = self.e.setting("ASSISTANT_CONFIRM")
+        if p["type"] == "schedule":
+            # D-170: a scheduled action, by the calendar at its time (the same rule as an immediate one on the guests'
+            # comfort); with «multiple» and «sempre» as before: scheduled actions do not ask
+            return policy == "ospiti" and self._touches_comfort_at(p)
         if policy == "sempre":
             return True
         if together:
@@ -346,14 +367,21 @@ class Assistant:
             what = self.describe(p)
             try:
                 if self.needs_approval(p, together):
-                    proposed = ({"type": "apartment_mode", "mode": p["mode"]} if p["type"] == "mode" else
-                                {"type": "device_command", "device_id": p["device_id"], **p["body"]})
-                    opened = e._new_approval("assistant", what[0].upper() + what[1:], why, proposed, "reject", corr)
+                    if p["type"] == "schedule":           # D-170: the action, its time kept aside by the engine
+                        proposed = p["action"]
+                        description = f"Programmare {what}"
+                    else:
+                        proposed = ({"type": "apartment_mode", "mode": p["mode"]} if p["type"] == "mode" else
+                                    {"type": "device_command", "device_id": p["device_id"], **p["body"]})
+                        description = what[0].upper() + what[1:]
+                    opened = e._new_approval("assistant", description, why, proposed, "reject", corr)
                     approval = opened or e.approval_queue[-1]
+                    if p["type"] == "schedule":
+                        e.schedule_approval(approval["approval_id"], p["run_at"])
                     if ask["approval_id"] is None:
                         ask["approval_id"] = approval["approval_id"]
                         ask["status"] = "needs_approval"
-                    lines.append(self.question(what))
+                    lines.append(self.schedule_question(what) if p["type"] == "schedule" else self.question(what))
                 elif p["type"] == "mode":
                     for command_id in e.set_mode(p["mode"], actor, corr, why, "assistant"):
                         ask["actions"].append({"type": "command", "command_id": command_id})

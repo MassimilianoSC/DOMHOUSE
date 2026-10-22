@@ -299,3 +299,53 @@ def test_with_nothing_proposed_yet_the_model_gets_almost_all_the_time(monkeypatc
     script = Script(says("Il clima è acceso."), delay=1.5)
     a = ask(engine(script), "il clima è acceso?")
     assert (a["status"], a["answer"]) == ("answered", "Il clima è acceso.")
+
+
+# -------- D-170: a scheduled action with guests in at its time --------
+def _booked(e, start, end):
+    e.ingest_booking({"event_id": f"evt-{start}", "type": "booking_created", "booking_id": "bk-d170",
+                      "checkin_at": core.iso(start), "checkout_at": core.iso(end), "source": "simulator",
+                      "ts": core.iso(core.utcnow())}, CORR)
+
+
+def _at_18_tomorrow():
+    tz = assistant.ZoneInfo("Europe/Rome")
+    local = (core.utcnow() + timedelta(days=1)).astimezone(tz).replace(hour=18, minute=0, second=0, microsecond=0)
+    return local, local.strftime("%Y-%m-%dT18:00:00")
+
+
+def test_d170_scheduled_with_guests_at_its_time_asks_then_schedules():
+    local, when = _at_18_tomorrow()
+    script = Script(tools(call("programma", quando=when, modalita="eco")))
+    e = engine(script)                                                          # empty now
+    _booked(e, local - timedelta(hours=3), local + timedelta(days=2))           # guests in at 18:00 tomorrow
+    a = ask(e, "domani alle 18 metti eco")
+    assert a["status"] == "needs_approval"
+    approval = e.pending_approval()
+    assert approval["description"].startswith("Programmare modalità eco alle 18:00")
+    assert approval["proposed_action"] == {"type": "apartment_mode", "mode": "eco"}
+    assert "Programmo modalità eco alle 18:00" in a["answer"] and "con ospiti presenti a quell'ora?" in a["answer"]
+    assert not [s for s in e.schedule.values() if s["source"] == "assistant"]   # nothing scheduled yet
+
+    async def yes():
+        return e.decide(approval["approval_id"], {"decision": "approve"}, ACTOR, "33333333-3333-3333-3333-333333333333")
+    asyncio.run(yes())
+    planned = [s for s in e.schedule.values() if s["source"] == "assistant"]
+    assert len(planned) == 1 and planned[0]["action"] == {"type": "apartment_mode", "mode": "eco"}
+    assert core.parse_dt(planned[0]["run_at"]) == local and e.mode != "eco"     # at its time, not now
+    assert e.approval_schedules == {}
+
+
+def test_d170_without_guests_at_its_time_it_is_scheduled_at_once_and_a_no_schedules_nothing():
+    local, when = _at_18_tomorrow()
+    e = engine(Script(tools(call("programma", quando=when, modalita="eco"))))
+    a = ask(e, "domani alle 18 metti eco")                                      # no booking then
+    assert a["status"] == "answered" and a["actions"][0]["type"] == "schedule"
+    e = engine(Script(tools(call("programma", quando=when, modalita="eco"))))
+    _booked(e, local - timedelta(hours=3), local + timedelta(days=2))
+    a = ask(e, "domani alle 18 metti eco")
+
+    async def no():
+        return e.decide(a["approval_id"], {"decision": "reject"}, ACTOR, "44444444-4444-4444-4444-444444444444")
+    asyncio.run(no())
+    assert not [s for s in e.schedule.values() if s["source"] == "assistant"] and e.approval_schedules == {}

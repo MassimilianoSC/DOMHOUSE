@@ -251,6 +251,7 @@ class ApartmentEngine:
         self.commands: dict[str, dict] = {}
         self.approvals: list[dict] = []
         self.approval_queue: list[dict] = []
+        self.approval_schedules: dict[str, str] = {}   # D-170: approval -> the time of the scheduled action it asks
         self.deferred: dict[str, str] = {}      # schedule_id -> the hold's end, for mode actions waiting for it (D-122)
         self.compressor_off: dict[str, float] = {}   # climate device -> when it went off (monotonic), R4
         self.offline_watch: dict[str, object] = {}   # device -> the offline episode being watched, R5
@@ -380,6 +381,21 @@ class ApartmentEngine:
     def _save_queue(self) -> None:
         self.store.put_meta("approval_queue", self.approval_queue)
 
+    def schedule_approval(self, approval_id: str, run_at: str) -> None:
+        """D-170: this approval asks a scheduled action at run_at."""
+        self.approval_schedules[approval_id] = run_at
+        self.store.put_meta("approval_schedules", self.approval_schedules)
+
+    def _take_schedule(self, approval_id: str) -> str | None:
+        run_at = self.approval_schedules.pop(approval_id, None)
+        if run_at is not None:
+            self.store.put_meta("approval_schedules", self.approval_schedules)
+        return run_at
+
+    def occupied_at(self, when: datetime) -> bool:
+        """D-170: the bookings' calendar says guests are in at that time (a booking not cancelled covering it)."""
+        return any(not b["cancelled"] and b["checkin"] <= when < b["checkout"] for b in self.bookings.values())
+
     def _save_ask(self, a: dict) -> None:
         self.store.put("asks", a["ask_id"], a, expire_at=expire(a["created_at"], days=COMMAND_DAYS))
 
@@ -435,6 +451,7 @@ class ApartmentEngine:
         self.processed_events = dict(st.all("processed_events"))
         self.approvals = [a for _, a in st.all("approvals")]
         self.approval_queue = st.get_meta("approval_queue", [])
+        self.approval_schedules = st.get_meta("approval_schedules", {}) or {}
         self.deferred = st.get_meta("deferred", {})
         self.asks = dict(st.all("asks"))
         now = time.time()
@@ -1919,6 +1936,13 @@ class ApartmentEngine:
 
     def _execute_proposed(self, approval: dict, actor: str, correlation_id: str, decision_actor: str) -> None:
         pa = approval["proposed_action"]
+        run_at = self._take_schedule(approval["approval_id"])
+        if run_at is not None and parse_dt(run_at) > utcnow() + timedelta(seconds=30):
+            try:                                          # D-170: approved, the action is scheduled at its time
+                self.create_schedule({"run_at": run_at, "action": pa}, actor, correlation_id, source="assistant")
+            except MockError:
+                pass
+            return
         try:
             if pa["type"] == "apartment_mode":
                 self.set_mode(pa["mode"], actor, correlation_id, "Azione approvata", decision_actor)
@@ -1950,6 +1974,8 @@ class ApartmentEngine:
                  approval_id=approval_id)
         if approve:
             self._execute_proposed(approval, actor, correlation_id, who)
+        else:
+            self._take_schedule(approval_id)
         self._dequeue_approval()
         return copy.deepcopy(approval)
 
@@ -2282,6 +2308,8 @@ class ApartmentEngine:
                          approval_id=a["approval_id"])
                 if a["expires_action"] == "approve":
                     self._execute_proposed(a, "system:engine", corr, "system")
+                else:
+                    self._take_schedule(a["approval_id"])
                 self._dequeue_approval()
         # by time, and by creation for the same time (a stable sort on the creation order, which engine.db keeps too).
         # An action is closed (done/failed) and saved in this same pass, so a later pass never runs it again. After a
