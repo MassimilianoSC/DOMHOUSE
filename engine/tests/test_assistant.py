@@ -174,7 +174,7 @@ def test_the_daily_limit_the_monthly_cap_and_the_time_limit(monkeypatch):
     assert (slow["status"], slow["reason"]) == ("failed", "timeout")
 
 
-def _bff(status: int, body: dict | None, delay: float = 0.0):
+def _bff(status: int, body: dict | None, delay: float = 0.0, location: str | None = "eu"):
     """A local stand-in for the BFF's /internal/ai/chat: (server, url, seen requests)."""
     import http.server
     import threading
@@ -189,6 +189,8 @@ def _bff(status: int, body: dict | None, delay: float = 0.0):
             data = json.dumps(body or {}).encode()
             self.send_response(status)
             self.send_header("Content-Type", "application/json")
+            if location is not None:
+                self.send_header("X-AI-Location", location)          # D-181
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
@@ -386,3 +388,31 @@ def test_d170_without_guests_at_its_time_it_is_scheduled_at_once_and_a_no_schedu
         return e.decide(a["approval_id"], {"decision": "reject"}, ACTOR, "44444444-4444-4444-4444-444444444444")
     asyncio.run(no())
     assert not [s for s in e.schedule.values() if s["source"] == "assistant"] and e.approval_schedules == {}
+
+
+# -------- D-181: an answer from outside the EU (or without its location) is refused before anything runs --------
+@pytest.mark.parametrize("location", [None, "global", "us"])
+def test_d181_an_answer_without_a_european_location_runs_nothing(monkeypatch, location):
+    from engine import log
+    refused = []
+    monkeypatch.setattr(log, "error", lambda msg, **kw: refused.append((msg, kw)))
+    server, url, seen = _bff(200, tools(call("comanda_dispositivo", device_id=PRESA, capability="switch",
+                                             action="turn_on")), location=location)
+    e = engine(assistant.ModelClient(url, "apt-prova-01", "k" * 16))
+    a = ask(e, "accendi la stufetta in camera")
+    server.shutdown()
+    assert len(seen) == 1                                                  # the model was asked once
+    assert (a["status"], a["reason"]) == ("failed", "model_unavailable")
+    assert a["answer"] == "L'assistente non è disponibile ora, riprova più tardi"
+    assert e.commands == {} and e.devices[PRESA]["capabilities"]["switch"]["on"] is False   # nothing ran
+    assert refused == [("model location refused", {"apartment_id": "apt-prova-01", "ai_location": location or "assente"})]
+
+
+def test_d181_a_european_answer_is_used():
+    server, url, _ = _bff(200, tools(call("comanda_dispositivo", device_id=PRESA, capability="switch",
+                                          action="turn_on")), location="eu")
+    e = engine(assistant.ModelClient(url, "apt-prova-01", "k" * 16))
+    a = ask(e, "accendi la stufetta in camera")
+    server.shutdown()
+    assert a["status"] == "answered" and e.devices[PRESA]["capabilities"]["switch"]["on"] is True
+

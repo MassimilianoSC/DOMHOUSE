@@ -173,3 +173,11 @@ def test_a_silent_first_request_gets_a_twin_and_the_first_answer_wins(model, mon
     assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == "risposta 2"
     assert len(calls) == 2 and took < 1.0 and logged[-1]["attempt"] == 2
     assert run(get_repository().get_ai_usage(ai_gateway.month_now()))["calls"] == 1   # one answer, one cost
+
+
+def test_d181_every_answer_says_the_location(model):
+    r = run(post(BODY))
+    assert r.status_code == 200 and r.headers["X-AI-Location"] == "eu"
+    r = run(post(BODY, key="sbagliata"))                                  # errors too
+    assert r.status_code == 401 and r.headers["X-AI-Location"] == "eu"
+

@@ -38,6 +38,13 @@ APPLY_RESERVE_S = ACK_WAIT_S + 1.0    # lot 28 c: kept for running the proposals
 NO_PROPOSAL_RESERVE_S = 2.0   # C-10 layer 2: with nothing proposed yet, only this is kept (the model gets ~25 s)
 MIN_CALL_S = 4.0              # lot 28 c: no new model call with less than this left in the model's budget
 CONNECT_TIMEOUT_S = 5.0       # lot 30: DNS, TCP and TLS towards the BFF, apart from waiting for the answer
+
+
+def european_location(location: str | None) -> bool:
+    """D-180/D-181: the model's location as the BFF declares it (X-AI-Location): eu or a European region; a missing
+    one counts as not European."""
+    v = (location or "").strip().lower()
+    return v == "eu" or v.startswith("europe-")
 PROPOSALS = {"cambia_modalita", "comanda_dispositivo", "programma"}
 TIMEOUT_ANSWER = "Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app."
 TEMPERATURE = 0.2
@@ -137,7 +144,7 @@ class ModelClient:
             phase = "attesa della risposta"
             resp = conn.getresponse()
             phase = "lettura della risposta"
-            status, raw = resp.status, resp.read()
+            status, raw, location = resp.status, resp.read(), resp.getheader("X-AI-Location")
             conn.close()
         except (OSError, http.client.HTTPException) as exc:
             log.warn("assistant model call failed", apartment_id=self.apartment_id,
@@ -145,6 +152,9 @@ class ModelClient:
                      timeout=isinstance(exc, TimeoutError), error=type(exc).__name__,
                      seconds=round(time.monotonic() - started, 2))
             raise ModelRefused("model_unavailable", "L'assistente non è disponibile ora, riprova più tardi") from None
+        if not european_location(location):           # D-181: refused before anything in the answer is used
+            log.error("model location refused", apartment_id=self.apartment_id, ai_location=location or "assente")
+            raise ModelRefused("model_unavailable", "L'assistente non è disponibile ora, riprova più tardi")
         if status == 429:
             try:
                 message = json.loads(raw).get("message")
