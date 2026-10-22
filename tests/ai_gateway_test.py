@@ -37,6 +37,7 @@ def model(monkeypatch):
             raise sent.fail
         return {"choices": [{"message": {"role": "assistant", "content": "Ciao"}}], "usage": USAGE}
     monkeypatch.setattr(ai_gateway, "call_model", fake)
+    monkeypatch.setattr(ai_gateway, "_reasoning_refused", False)
     get_repository().ai_usage = {}
     return sent
 
@@ -66,6 +67,7 @@ def test_the_bff_chooses_model_and_tokens_and_forwards_only_what_it_knows(model)
     sent = model[0]
     assert sent["model"] == "google/gemini-3.8-flash" and sent["max_tokens"] == 4096
     assert "stream" not in sent and sent["temperature"] == 0.1 and sent["tools"][0]["function"]["name"] == "stato"
+    assert sent["reasoning_effort"] == "low"                                      # C-10: a short reasoning
     assert run(post({"messages": []})).status_code == 422
 
 
@@ -128,3 +130,46 @@ def test_a_demonstration_engines_client_is_accepted(model):
     assert client.url == "http://127.0.0.1:1/internal/ai/chat"
     r = run(post(BODY, apartment=client.apartment_id, key=client.api_key))
     assert r.status_code == 200
+
+
+# -------- C-10 layer 1 --------
+def test_a_refused_reasoning_effort_is_dropped_once_and_for_all(model, monkeypatch):
+    logged = []
+    monkeypatch.setattr(ai_gateway, "warn", lambda msg, **kw: logged.append(msg))
+    calls = []
+
+    async def fake(body):
+        calls.append(dict(body))
+        if "reasoning_effort" in body:
+            raise ai_gateway.GatewayError(502, "model_error", "Il modello ha risposto 400")
+        return {"choices": [{"message": {"role": "assistant", "content": "Ciao"}}], "usage": USAGE}
+    monkeypatch.setattr(ai_gateway, "call_model", fake)
+    assert run(post(BODY)).status_code == 200
+    assert ["reasoning_effort" in c for c in calls] == [True, False]
+    assert logged == ["assistant model: reasoning_effort refused, sent without it from now on"]
+    run(post(BODY))
+    assert "reasoning_effort" not in calls[-1] and len(calls) == 3                 # not sent again
+
+
+def test_a_silent_first_request_gets_a_twin_and_the_first_answer_wins(model, monkeypatch):
+    monkeypatch.setattr(ai_gateway, "get_settings",
+                        lambda: dataclasses.replace(get_settings(), ai_hedge_after_s=0.05))
+    calls, logged = [], []
+    monkeypatch.setattr(ai_gateway, "info", lambda msg, **kw: logged.append(kw))
+
+    async def fake(body):
+        calls.append(body)
+        if len(calls) == 1:
+            await asyncio.sleep(2)                                                 # the slow tail of the model
+        return {"choices": [{"message": {"role": "assistant", "content": f"risposta {len(calls)}"}}], "usage": USAGE}
+    monkeypatch.setattr(ai_gateway, "call_model", fake)
+
+    async def timed():
+        loop = asyncio.get_running_loop()
+        start = loop.time()
+        r = await post(BODY)
+        return r, loop.time() - start
+    r, took = run(timed())
+    assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == "risposta 2"
+    assert len(calls) == 2 and took < 1.0 and logged[-1]["attempt"] == 2
+    assert run(get_repository().get_ai_usage(ai_gateway.month_now()))["calls"] == 1   # one answer, one cost

@@ -648,3 +648,13 @@ chiude la conversazione e l'esito lo scrive il motore; le chiamate al modello de
 domanda meno 11 s per eseguire le proposte e aspettarne l'esito), nessuna chiamata nuova parte con meno di 4 s, e
 quello che è già stato proposto viene eseguito; senza proposte la domanda finisce subito con «Non sono riuscito a
 rispondere in tempo».
+
+Dal lotto 30 (C-10, l'assistente risponde sempre): il passaggio chiede a Vertex un ragionamento breve
+(`reasoning_effort`, impostazione `AI_REASONING_EFFORT`, predefinita `low`; vuota non lo manda). Se Vertex rifiuta il
+parametro con un 400, la stessa chiamata riparte subito senza, il log scrive «assistant model: reasoning_effort refused,
+sent without it from now on» e il processo non lo manda più. Se dopo `AI_HEDGE_AFTER_S` (6 s) Vertex non ha ancora
+risposto, il passaggio manda una seconda richiesta identica e usa la prima risposta che arriva; l'altra viene chiusa e
+si paga una sola risposta. «assistant model call» ha `attempt` 1 o 2. Nel motore la riserva di 11 s per eseguire le
+proposte vale solo quando ce ne sono: prima, il modello ha fino a circa 26 s; l'attesa dell'esito dei comandi non va mai
+oltre i 27 s della domanda, e un comando non ancora confermato si annuncia con «Comando inviato: …, l'esito arriva
+nell'app».

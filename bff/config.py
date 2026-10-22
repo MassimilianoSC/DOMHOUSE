@@ -49,6 +49,8 @@ class Settings:
     ai_price_cached_eur_per_m: float = 0.08
     ai_max_tokens: int = 4096                 # the most a call may ask (the flash model spends tokens on reasoning)
     ai_timeout_s: float = 25.0                # inside the contract's 30 s for an answer
+    ai_reasoning_effort: str = "low"          # C-10: a short reasoning ("" sends nothing); dropped if Vertex refuses it
+    ai_hedge_after_s: float = 6.0             # C-10: a second identical request when the first is still silent
     ai_demos: bool = False                    # the demonstration apartments with the real model (AI_DEMOS=true)
     # P-67 (D-136): the Firestore database of this environment, "(default)" in production, "staging" in staging
     firestore_database: str = "(default)"
@@ -103,6 +105,8 @@ def get_settings() -> Settings:
         ai_price_cached_eur_per_m=float(e("AI_PRICE_CACHED_EUR_PER_M", "0.08")),
         ai_max_tokens=int(e("AI_MAX_TOKENS", "4096")),
         ai_timeout_s=float(e("AI_TIMEOUT_S", "25")),
+        ai_reasoning_effort=e("AI_REASONING_EFFORT", "low").strip().lower(),
+        ai_hedge_after_s=float(e("AI_HEDGE_AFTER_S", "6")),
         ai_demos=_bool("AI_DEMOS"),
         firestore_database=e("FIRESTORE_DATABASE", "(default)").strip() or "(default)",
         summary_job=_bool("SUMMARY_JOB", "true"),

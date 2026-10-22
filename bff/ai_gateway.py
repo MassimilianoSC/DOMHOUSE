@@ -28,6 +28,7 @@ from .logs import info, warn
 from .repository import get_repository
 
 CAP_MESSAGE = "Limite mensile raggiunto, riprova dal mese prossimo"
+_reasoning_refused = False      # C-10: Vertex refused reasoning_effort once: not sent again by this process
 _credentials = None
 
 
@@ -35,6 +36,12 @@ class GatewayError(Exception):
     def __init__(self, status: int, error: str, message: str):
         super().__init__(message)
         self.status, self.error, self.message = status, error, message
+
+
+def _refuse_reasoning(apartment_id: str) -> None:
+    global _reasoning_refused
+    _reasoning_refused = True
+    warn("assistant model: reasoning_effort refused, sent without it from now on", apartment_id=apartment_id)
 
 
 def month_now() -> str:
@@ -120,6 +127,32 @@ async def _alert(month: str, spent: float) -> None:
         warn("assistant spending alert email failed", error=type(exc).__name__)
 
 
+async def _hedged(request: dict) -> tuple[dict, int]:
+    """C-10 layer 1: the model's answer and which request gave it (1 or 2). A second identical request starts when the
+    first is still silent after AI_HEDGE_AFTER_S; the first answer that arrives wins, the other is cancelled. A request
+    that fails is not hedged: its error comes back at once (or the other's answer, if one is running)."""
+    s = get_settings()
+    tasks = [asyncio.create_task(call_model(dict(request)))]
+    try:
+        done, _ = await asyncio.wait(tasks, timeout=s.ai_hedge_after_s)
+        if not done:
+            tasks.append(asyncio.create_task(call_model(dict(request))))
+        error: BaseException | None = None
+        running = list(tasks)
+        while running:
+            done, _ = await asyncio.wait(running, return_when=asyncio.FIRST_COMPLETED)
+            for t in done:
+                running.remove(t)
+                if t.exception() is None:
+                    return t.result(), tasks.index(t) + 1
+                error = t.exception()
+        raise error
+    finally:
+        for t in tasks:
+            if not t.done():
+                t.cancel()
+
+
 async def chat(apartment_id: str, body: dict) -> dict:
     """One model call for an engine: cap, model, tokens, cost, alert."""
     s = get_settings()
@@ -132,9 +165,18 @@ async def chat(apartment_id: str, body: dict) -> dict:
     request = {k: v for k, v in body.items() if k in ("messages", "tools", "tool_choice", "temperature")}
     request["model"] = s.ai_model
     request["max_tokens"] = min(int(body.get("max_tokens") or s.ai_max_tokens), s.ai_max_tokens)
+    if s.ai_reasoning_effort and not _reasoning_refused:
+        request["reasoning_effort"] = s.ai_reasoning_effort
     started = time.monotonic()
     try:
-        answer = await call_model(request)
+        try:
+            answer, attempt = await _hedged(request)
+        except GatewayError as exc:
+            if "reasoning_effort" not in request or " 400" not in exc.message:
+                raise
+            _refuse_reasoning(apartment_id)             # the model does not take it: once more without, then never
+            request.pop("reasoning_effort")
+            answer, attempt = await _hedged(request)
     except GatewayError as exc:              # lot 28 d: every failed call leaves a line, with how long it took
         warn("assistant model call failed", apartment_id=apartment_id, error=exc.error,
              seconds=round(time.monotonic() - started, 2))
@@ -150,7 +192,8 @@ async def chat(apartment_id: str, body: dict) -> dict:
     cost, tokens_in, tokens_out = cost_eur(answer.get("usage") or {})
     totals = await repo.add_ai_usage(month, cost, tokens_in, tokens_out)
     info("assistant model call", apartment_id=apartment_id, input_tokens=tokens_in, output_tokens=tokens_out,
-         cost_eur=round(cost, 6), month_eur=round(totals["cost_eur"], 4), seconds=round(time.monotonic() - started, 2))
+         cost_eur=round(cost, 6), month_eur=round(totals["cost_eur"], 4), seconds=round(time.monotonic() - started, 2),
+         attempt=attempt)
     if totals["cost_eur"] >= s.ai_monthly_cap_eur * s.ai_alert_percent / 100:
         await _alert(month, totals["cost_eur"])
     return answer

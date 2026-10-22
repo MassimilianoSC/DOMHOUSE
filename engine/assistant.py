@@ -37,6 +37,7 @@ MAX_TURNS = 6                 # model calls for one question (reads, then the an
 ASK_TIMEOUT_S = 28.0          # the contract's 30 s, with a margin for saving and the app's polling
 ACK_WAIT_S = 10.0             # a command's outcome is final within 10 s (contract)
 APPLY_RESERVE_S = ACK_WAIT_S + 1.0    # lot 28 c: kept for running the proposals and waiting for their outcome
+NO_PROPOSAL_RESERVE_S = 2.0   # C-10 layer 2: with nothing proposed yet, only this is kept (the model gets ~25 s)
 MIN_CALL_S = 4.0              # lot 28 c: no new model call with less than this left in the model's budget
 PROPOSALS = {"cambia_modalita", "comanda_dispositivo", "programma"}
 TIMEOUT_ANSWER = "Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app."
@@ -169,9 +170,10 @@ class Assistant:
         proposals: list[dict] = []
         text = ""
         loop = asyncio.get_running_loop()
-        model_deadline = loop.time() + ASK_TIMEOUT_S - APPLY_RESERVE_S      # lot 28 c
+        end = loop.time() + ASK_TIMEOUT_S
         for _ in range(MAX_TURNS):
-            left = model_deadline - loop.time()
+            # lot 28 c, C-10 layer 2: the reserve for running proposals only once there are some
+            left = end - (APPLY_RESERVE_S if proposals else NO_PROPOSAL_RESERVE_S) - loop.time()
             if left < MIN_CALL_S:
                 break
             try:
@@ -202,7 +204,7 @@ class Assistant:
         if not proposals and not text:               # lot 28 c: out of time with nothing to do or say
             ask.update(status="failed", reason="timeout", answer=TIMEOUT_ANSWER)
             return
-        lines = await self.apply(proposals, ask, actor)
+        lines = await self.apply(proposals, ask, actor, until=end - 1.0)
         ask["answer"] = "\n".join([t for t in [text, *lines] if t]) or "Non lo so: guarda nell'app."
         if ask["status"] == "pending":
             ask["status"] = "answered"
@@ -332,7 +334,9 @@ class Assistant:
         cap, action, params = self.e.validate_command(device, p["body"])
         return cap in ("climate", "heating") and not self.e.target_state(device, cap, action, params).get("on")
 
-    async def apply(self, proposals: list[dict], ask: dict, actor: str) -> list[str]:
+    async def apply(self, proposals: list[dict], ask: dict, actor: str, until: float | None = None) -> list[str]:
+        """Runs the proposals; waits for the commands' outcome at most ACK_WAIT_S and never beyond `until` (C-10: a
+        command not final by then is announced as sent, its outcome arrives in the app)."""
         from .core import FINAL, MockError
         e = self.e
         corr, why = ask["correlation_id"], f"Richiesta all'assistente: «{ask['text']}»"
@@ -372,6 +376,8 @@ class Assistant:
             except MockError as exc:
                 lines.append(f"Non fatto: {what} ({exc.message}).")
         deadline = asyncio.get_running_loop().time() + ACK_WAIT_S
+        if until is not None:
+            deadline = min(deadline, until)
         while waiting and any(e.commands[c]["status"] not in FINAL for c, _ in waiting) \
                 and asyncio.get_running_loop().time() < deadline:
             await asyncio.sleep(0.1)

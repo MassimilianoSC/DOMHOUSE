@@ -254,20 +254,24 @@ def test_a_wrong_proposal_still_goes_back_to_the_model():
     assert len(script.sent) == 2 and a["answer"] == "Quel dispositivo non c'è."
 
 
-def _budget(monkeypatch, total=3.0, reserve=1.0, min_call=0.5):
+def _budget(monkeypatch, total=3.0, reserve=1.0, min_call=0.5, no_proposal_reserve=2.0):
     monkeypatch.setattr(assistant, "ASK_TIMEOUT_S", total)
     monkeypatch.setattr(assistant, "APPLY_RESERVE_S", reserve)
     monkeypatch.setattr(assistant, "MIN_CALL_S", min_call)
+    monkeypatch.setattr(assistant, "NO_PROPOSAL_RESERVE_S", no_proposal_reserve)
 
 
 def test_out_of_the_models_time_what_was_proposed_is_applied(monkeypatch):
-    """c) the model's budget is 2 s here: the second call (1.2 s each) is cut, the proposal of the first is applied."""
-    _budget(monkeypatch)
+    """c) the first call (1.2 s) fits, nothing being proposed yet (C-10); then the reserve for running counts and the
+    second call is cut at 2 s: the proposal of the first is applied."""
+    _budget(monkeypatch, no_proposal_reserve=0.5)
     script = Script(tools(call("leggi_decisioni"), call("comanda_dispositivo", device_id=PRESA, capability="switch",
                                                         action="turn_on")),
                     says("troppo tardi"), delay=1.2)
     a = ask(engine(script), "accendi la stufetta e dimmi perché era spenta")
-    assert a["status"] == "answered" and a["answer"] == "Fatto: accendere presa stufetta camera."
+    assert a["status"] == "answered" and a["answer"] in (       # C-10: no time left to wait for the outcome
+        "Comando inviato: accendere presa stufetta camera, l'esito arriva nell'app.",
+        "Fatto: accendere presa stufetta camera.")
 
 
 def test_out_of_the_models_time_with_nothing_proposed_the_answer_comes_early(monkeypatch):
@@ -287,3 +291,11 @@ def test_out_of_the_models_time_with_nothing_proposed_the_answer_comes_early(mon
     assert (a["status"], a["reason"], a["answer"]) == ("failed", "timeout", assistant.TIMEOUT_ANSWER)
     assert took < 2.6                                       # at the model's budget (2 s), not at the 3 s limit
 
+
+def test_with_nothing_proposed_yet_the_model_gets_almost_all_the_time(monkeypatch):
+    """C-10 layer 2: the reserve for running proposals counts only once there are some; a slow first answer (1.5 s
+    out of 3) still arrives."""
+    _budget(monkeypatch, no_proposal_reserve=0.5)
+    script = Script(says("Il clima è acceso."), delay=1.5)
+    a = ask(engine(script), "il clima è acceso?")
+    assert (a["status"], a["answer"]) == ("answered", "Il clima è acceso.")
