@@ -91,6 +91,12 @@ un sistema che non è il suo, né ricevere le prenotazioni di una struttura altr
 - **Minuti di presenza dopo il check-out**: nuovo valore nella regola «Risparmio al check-out».
 - **Sul telefono** le schede degli appartamenti stanno tutte nello schermo: non serve più restringere la pagina con le
   dita (dal lotto 26).
+- **«Casa vuota»**: la modalità per l'appartamento senza ospiti si chiama così (prima «vuoto»). Nella scheda, «vuoto»
+  indica invece l'occupazione, cioè che non c'è nessuno. Nelle Decisioni un cambio di modalità si legge «comfort → casa
+  vuota».
+- **Assistente**: dopo «Sì» o «No» la chat dice com'è andata («Approvato: il comando parte, l'esito arriva nell'app» o
+  «Respinto»); se riapri la conversazione leggi «Approvata da te alle …» o «Respinta da te alle …»; «Già decisa» compare
+  solo se ha deciso un'altra persona.
 
 ---
 
@@ -378,8 +384,9 @@ risposta dall'assistente: riprova». La conversazione resta solo in quella sched
   Approvazioni.», con i pulsanti «Sì» e «No» e l'ora di scadenza. Il clic vale come una risposta dalla pagina
   Approvazioni: compare lì e nelle Decisioni con il tuo nome, e scade allo stesso modo (respinta se nessuno risponde
   entro 30 minuti). Più azioni in una richiesta («spegni clima e caldaia») diventano una domanda ciascuna, in coda; una
-  domanda già decisa da un collega o scaduta compare come «Già decisa: approvata», «Già decisa: respinta» o «Scaduta»,
-  senza pulsanti; se davanti c'è un'altra approvazione da decidere compare «In attesa: prima va decisa l'approvazione
+  domanda decisa da te resta «Approvato: il comando parte, l'esito arriva nell'app» (o «Respinto») e, se riapri la
+  conversazione, «Approvata da te alle …» o «Respinta da te alle …»; una domanda decisa da un collega o scaduta compare
+  come «Già decisa: approvata», «Già decisa: respinta» o «Scaduta», senza pulsanti; se davanti c'è un'altra approvazione da decidere compare «In attesa: prima va decisa l'approvazione
   aperta.» con il link «Vai alle approvazioni». Chi legge soltanto
   vede la domanda senza pulsanti.
 - L'esito lo scrive il sistema, non il modello: «Fatto: …» solo quando il dispositivo ha confermato; altrimenti
