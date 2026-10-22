@@ -85,6 +85,8 @@ un sistema che non è il suo, né ricevere le prenotazioni di una struttura altr
 - **Copia delle regole** (solo amministratori): le regole di un appartamento si possono copiare su altri appartamenti
   dell'organizzazione, dopo un'anteprima.
 - **Minuti di presenza dopo il check-out**: nuovo valore nella regola «Risparmio al check-out».
+- **Sul telefono** le schede degli appartamenti stanno tutte nello schermo: non serve più restringere la pagina con le
+  dita (dal lotto 26).
 
 ---
 

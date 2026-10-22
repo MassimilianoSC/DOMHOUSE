@@ -64,7 +64,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 
 | N. | Ruolo | Passi | Risultato atteso | Esito |
 |---|---|---|---|---|
-| D1 📱 | Qualsiasi | Apri l'elenco Appartamenti. | Schede con nome, stato, occupazione, kWh di oggi. | |
+| D1 📱 | Qualsiasi | Apri l'elenco Appartamenti. | Schede con nome, stato, occupazione, kWh di oggi. Sul telefono niente esce a destra e la pagina non scorre di lato; nome intero e date di check-in e check-out intere, anche su due righe. | |
 | D2 | Operatore | Panoramica: cambia modalità in eco. | Rotellina, poi «eco» selezionata. | |
 | D3b | Operatore | «Forza per…» 2 ore, poi in Programmazione «Nuova azione»: modalità eco tra 2 minuti. | Allo scadere dei 2 minuti la modalità NON cambia; nelle Decisioni compare «rimandata per la forzatura, si esegue alla sua fine»; con «Annulla forzatura» l'azione si esegue e la modalità passa a eco. | |
 | D3c | Operatore (su un dimostrativo) | Dal Simulatore apri una finestra; poi «Forza per…» 30 minuti. | Finestra di conferma «Finestra aperta» con il testo «Finestra aperta in Soggiorno: durante la forzatura il clima resta acceso.» (con il nome della stanza) e i pulsanti «Annulla» e «Forza comunque»; con «Forza comunque» la forzatura parte e il clima resta acceso. Aprendo una finestra dal Simulatore a forzatura attiva: in Decisioni una riga «Finestra: regola sospesa», attore la regola della finestra, frase con il nome della finestra e l'ora di fine forzatura; mai un codice inglese. | |
