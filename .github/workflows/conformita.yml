@@ -3,13 +3,15 @@
 #  2. il motore (python -m engine, connector simulato) rispetti il contratto (suite di conformità, 16 scenari +
 #     connector fermo) e passi le sue prove, con quelle comuni a ogni connector (engine/); lo stesso per l'immagine
 #     del motore (engine/Dockerfile), che senza chiave non deve partire;
-#  3. i repository (memoria e Firestore, con emulatore) passino la suite condivisa.
+#  3. i repository (memoria e Firestore, con emulatore) passino la suite condivisa;
+#  4. il sito passi le sue prove (vitest) e quelle nel browser a 360 px (Playwright, D-155): nessuna pagina più larga
+#     dello schermo di un telefono, con una prova che controlla la misura stessa.
 # Se 1 o 2 falliscono, l'app sta usando qualcosa che il motore reale non avrà: fermarsi e correggere.
 name: conformita
 
 # Un push (o una PR) che tocca SOLO documenti non fa partire la CI: docs/** e i .md della radice (README.md,
 # CLAUDE.md), che nessun passo legge. "*.md" senza "/" vale solo per la radice: engine/connector/connector.md,
-# contract/conformance/README.md e bff/API.md restano inclusi. Basta un file fuori da questi percorsi e i tre
+# contract/conformance/README.md e bff/API.md restano inclusi. Basta un file fuori da questi percorsi e i quattro
 # controlli girano tutti.
 on:
   push:
