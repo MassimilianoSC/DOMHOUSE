@@ -240,3 +240,44 @@ Dopo M8 (o M12), con il commit del lotto scelto: immagine del motore (`docs/moto
 `engine-vm.sh` e di `compose.yaml` sulla VM (C1) e reinstallazione di `dev` con la nuova immagine (C2, ripetibile);
 facoltativo `engine-vm.sh set dev MODEL_BASE_URL=<indirizzo del server di staging>` per l'assistente vero (D2);
 poi i tre comandi del passo 10 (sezione E2: timer, log dei motori, allarmi).
+
+## M14. Modello Claude su Vertex AI (D-179): ruolo, abilitazione, quota, impostazioni
+
+Il server (identità `domotica-bff@domotica-poc-511707.iam.gserviceaccount.com`) chiama Vertex AI con la propria
+identità, senza chiavi. Il ruolo necessario è `roles/aiplatform.user`, lo stesso già dato per Gemini al passo 9. Per i
+modelli Claude servono in più l'abilitazione nel Model Garden (console, un clic per modello: accettazione delle
+condizioni di Anthropic) e la quota nella regione scelta.
+
+1. Verifica del ruolo (sola lettura; può farla la memoria storica). Git Bash:
+
+```
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud projects get-iam-policy domotica-poc-511707 --flatten="bindings[].members" --filter="bindings.members:domotica-bff@domotica-poc-511707.iam.gserviceaccount.com" --format="value(bindings.role)"
+```
+
+Verifica: tra le righe c'è `roles/aiplatform.user`. Letto il 22 ottobre 2026 alle 16:51: presente (con
+`roles/datastore.user`, `roles/firebaseauth.admin`, `roles/firebasecloudmessaging.admin`, `roles/logging.logWriter`).
+
+2. Solo se il ruolo manca (scrive su GCP: lo lancia il committente, D-116). Git Bash:
+
+```
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud projects add-iam-policy-binding domotica-poc-511707 --member="serviceAccount:domotica-bff@domotica-poc-511707.iam.gserviceaccount.com" --role="roles/aiplatform.user"
+```
+
+Cosa fa: dà al server il permesso di chiamare i modelli di Vertex AI (Gemini e Claude) e nient'altro. Verifica:
+ripetere il comando del punto 1.
+
+3. Abilitazione dei modelli Claude (console, committente): Vertex AI › Model Garden › cerca «Claude Haiku 5.5» › apri
+la scheda › «Abilita» (accettazione delle condizioni); lo stesso per «Claude Sonnet 5.5». Verifica: la misura
+`scripts/measure_model.py --endpoint anthropic --location europe-west1 --model claude-haiku-5-5` non risponde più
+«endpoint HTTP 403» né «404».
+
+4. Quota (console, committente): IAM e amministrazione › Quote e limiti di sistema › filtro «aiplatform.googleapis.com»
+e «anthropic» (oppure la regione `europe-west1`): le quote di richieste al minuto per i modelli Claude nella regione
+scelta non devono essere 0; se lo sono, chiedere l'aumento dalla stessa pagina.
+
+5. Impostazioni del server per usare Claude, quando deciso: `AI_API=anthropic`, `AI_MODEL=claude-haiku-5-5` (o
+`claude-sonnet-5-5`), `AI_LOCATION=europe-west1` (o la multi-regione `eu`), prezzi `AI_PRICE_*` confermati sul
+listino ufficiale di Google prima della pubblicazione (D-143). Vanno nei manifesti della pubblicazione (M8 per lo
+staging, M12 per la produzione). Nessuna chiave da creare né da conservare.
