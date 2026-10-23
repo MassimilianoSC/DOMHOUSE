@@ -178,7 +178,7 @@ export default function RulesPage() {
       {/* D-151 point 6: the same rules on other apartments of the organization, admins only */}
       {isAdmin && canWrite && q.data && <CopyRulesCard aptId={aptId} hasManualChanges={patches.length > 0} />}
       {patches.length > 0 && (
-        <div className="fixed inset-x-0 bottom-20 z-30 mx-auto flex w-[calc(100%-2rem)] max-w-3xl flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-lg md:bottom-6" data-testid="rules-save-bar">
+        <div className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 mx-auto flex w-[calc(100%-2rem)] max-w-3xl flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-lg md:bottom-6" data-testid="rules-save-bar">
           <span className="text-sm font-semibold">{t("rules.dirty", { count: patches.length })}</span>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => { setDraft({}); setSaveError(null); }} disabled={saving} data-testid="rules-discard-btn">{t("rules.discard")}</Button>

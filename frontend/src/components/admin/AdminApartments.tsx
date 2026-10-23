@@ -39,7 +39,7 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
   };
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto" data-testid="apartment-dialog">
+      <DialogContent data-testid="apartment-dialog">
         <DialogTitle>{t("admin.apartments.edit")}</DialogTitle>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field id="name" label={t("admin.apartments.name")} value={f.name} onChange={set("name")} />

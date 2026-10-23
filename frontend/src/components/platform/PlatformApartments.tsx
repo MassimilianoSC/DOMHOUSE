@@ -34,7 +34,7 @@ function CreateDialog({ tenantId, tenantName, onClose, onCreated }: { tenantId: 
   };
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto" data-testid="platform-apt-create-dialog">
+      <DialogContent data-testid="platform-apt-create-dialog">
         <DialogTitle>{t("platform.aptAddTitle", { name: tenantName })}</DialogTitle>
         <DialogDescription>{t("platform.aptAddHint")}</DialogDescription>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">

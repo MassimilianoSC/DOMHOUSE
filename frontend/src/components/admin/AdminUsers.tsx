@@ -39,7 +39,7 @@ function ScopeDialog({ user, apartments, onClose, onSaved }: { user: AdminUser; 
   };
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto" data-testid={`scope-dialog-${user.uid}`}>
+      <DialogContent data-testid={`scope-dialog-${user.uid}`}>
         <DialogTitle>{t("admin.users.scopeDialogTitle", { email: user.email })}</DialogTitle>
         <DialogDescription>{t("admin.users.scopeDialogHint")}</DialogDescription>
         <div className="mt-4">
