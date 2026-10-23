@@ -41,7 +41,7 @@ function CreateDialog({ tenantId, tenantName, onClose, onCreated }: { tenantId: 
           <Field id="name" label={t("admin.apartments.name")} value={f.name} onChange={(v) => setF({ ...f, name: v })} />
           <Field id="instance_url" label={t("admin.apartments.instanceUrl")} value={f.instance_url} onChange={(v) => setF({ ...f, instance_url: v })} placeholder={t("admin.apartments.instanceUrlPlaceholder")} hint={t(mock ? "admin.apartments.instanceUrlHintMock" : "admin.apartments.instanceUrlHint")} />
           <Field id="port" label={t("admin.apartments.port")} value={f.port} onChange={(v) => setF({ ...f, port: v })} type="number" />
-          <Field id="timezone" label={t("admin.apartments.timezone")} value={f.timezone} onChange={(v) => setF({ ...f, timezone: v })} />
+          <Field id="timezone" label={t("admin.apartments.timezone")} value={f.timezone} onChange={(v) => setF({ ...f, timezone: v })} hint={t("admin.apartments.timezoneInitial")} />
           <Field id="italianway_id" label={t("admin.apartments.italianway")} value={f.italianway_id} onChange={(v) => setF({ ...f, italianway_id: v })} hint={t("platform.italianwayHint")} />
           <SimulatedField url={f.instance_url} value={f.simulated} onChange={(v) => setF({ ...f, simulated: v })} />
           <div className="flex items-center justify-between rounded-xl bg-secondary/60 px-3 py-2">

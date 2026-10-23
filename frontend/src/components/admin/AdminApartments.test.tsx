@@ -92,11 +92,16 @@ describe.each(["mock", "real"])("Amministrazione > Appartamenti, ambiente %s: li
     expect(within(dialog).getByTestId("apt-form-connection-locked")).toHaveTextContent(t("admin.apartments.connectionByPlatform"));
     expect(within(dialog).getByTestId("apt-form-italianway-locked")).toHaveTextContent("IW-7");
     expect(within(dialog).getByTestId("apt-form-italianway-locked")).toHaveTextContent(t("admin.apartments.italianwayByPlatform"));
+    // D-183: the time zone is shown, set on the engine, not editable here
+    expect(screen.queryByTestId("apt-form-timezone")).not.toBeInTheDocument();
+    expect(within(dialog).getByTestId("apt-form-timezone-locked")).toHaveTextContent("Europe/Rome");
+    expect(within(dialog).getByTestId("apt-form-timezone-locked")).toHaveTextContent(t("admin.apartments.timezoneOnEngine"));
     fireEvent.change(field("name"), { target: { value: "Milano Duomo" } });
     await save();
     expect(state.patchApartment).toHaveBeenCalledTimes(1);
     expect(state.patchApartment.mock.calls[0][0]).toBe("apt-001");
-    expect(state.patchApartment.mock.calls[0][1]).toEqual({ name: "Milano Duomo", address: "Via Roma 1", timezone: "Europe/Rome", enabled: true });
+    // D-183: the time zone is set on the engine, never sent from here
+    expect(state.patchApartment.mock.calls[0][1]).toEqual({ name: "Milano Duomo", address: "Via Roma 1", enabled: true });
     expect(screen.queryByTestId("apartment-dialog")).not.toBeInTheDocument();
   });
 

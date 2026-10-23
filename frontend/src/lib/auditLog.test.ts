@@ -196,3 +196,11 @@ describe("regole modificate nel registro (D-151)", () => {
     expect(sentence({ action: "rules_changed", target: apt, details: { source: "futuro" } })).toBe("Anna Rossi ha modificato le regole dell'appartamento «Milano Centro»");
   });
 });
+
+describe("fuso orario cambiato sul motore (D-183)", () => {
+  it("la frase con il vecchio e il nuovo fuso, scritta dal sistema", () => {
+    const system = { kind: "system" as const, uid: null, email: null, display_name: null, removed: false };
+    expect(sentence({ action: "timezone_changed", actor: system, target: { type: "apartment", id: "apt-001", label: "Milano Centro" }, details: { from: "Europe/Rome", to: "Europe/London" } }))
+      .toBe("Fuso orario dell'appartamento «Milano Centro» cambiato sul motore: Europe/Rome → Europe/London");
+  });
+});

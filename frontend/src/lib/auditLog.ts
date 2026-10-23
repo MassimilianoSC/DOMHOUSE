@@ -13,7 +13,7 @@ export const AUDIT_ACTIONS = [
   "tenant_created", "tenant_renamed", "tenant_suspended", "tenant_reactivated",
   "support_access_requested", "support_access_opened", "support_access_approved", "support_access_rejected", "support_access_closed", "support_access_expired",
   "manager_added", "manager_removed", "account_deleted",
-  "energy_price_changed", "apartment_simulated_changed", "simulator_reset", "rules_changed",
+  "energy_price_changed", "apartment_simulated_changed", "simulator_reset", "rules_changed", "timezone_changed",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -132,6 +132,9 @@ export function describeEntry(e: AuditEntry): { sentence: string; note: string |
       if (from === null) return { sentence: t("audit.priceSet", { ...v, where, to }), note };
       return { sentence: t("audit.priceChanged", { ...v, where, from, to }), note };
     }
+    case "timezone_changed":
+      // D-183: the time zone is set on the engine; the BFF writes it here when it reads a different one
+      return { sentence: t("audit.actions.timezone_changed", { ...v, from: text(d.from) ?? "—", to: text(d.to) ?? "—" }), note };
     case "rules_changed": {
       // Rules changed on the assistant's proposal or copied from another apartment (D-151), with the values that
       // changed; the text the manager wrote is never saved. An unknown or missing source: the plain sentence.

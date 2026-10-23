@@ -20,10 +20,11 @@ import { fmtPrice, parsePrice, priceInput } from "@/lib/price";
 const priceText = (n: number | null | undefined) => (n === null || n === undefined ? t("admin.price.notSet") : t("admin.price.value", { price: fmtPrice(n) }));
 
 function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartment; orgPrice: number | null; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ name: apt.name, address: apt.address, timezone: apt.timezone, enabled: apt.enabled });
+  // D-183: the time zone is set on the engine, not here: shown, never sent
+  const [f, setF] = useState({ name: apt.name, address: apt.address, enabled: apt.enabled });
   const [price, setPrice] = useState(priceInput(apt.energy_price_eur_kwh));
   const [saving, setSaving] = useState(false);
-  const set = (k: "name" | "address" | "timezone") => (v: string) => setF((s) => ({ ...s, [k]: v }));
+  const set = (k: "name" | "address") => (v: string) => setF((s) => ({ ...s, [k]: v }));
   const parsed = parsePrice(price);
   const save = async () => {
     setSaving(true);
@@ -43,7 +44,11 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field id="name" label={t("admin.apartments.name")} value={f.name} onChange={set("name")} />
           <Field id="address" label={t("admin.apartments.address")} value={f.address} onChange={set("address")} />
-          <Field id="timezone" label={t("admin.apartments.timezone")} value={f.timezone} onChange={set("timezone")} />
+          <div className="space-y-1 rounded-xl border border-dashed px-3 py-2 sm:col-span-2" data-testid="apt-form-timezone-locked">
+            <div className="text-sm font-semibold">{t("admin.apartments.timezone")}</div>
+            <div className="font-mono text-xs text-muted-foreground">{apt.timezone}</div>
+            <p className="text-xs text-muted-foreground">{t("admin.apartments.timezoneOnEngine")}</p>
+          </div>
           <div className="space-y-1 rounded-xl border border-dashed px-3 py-2 sm:col-span-2" data-testid="apt-form-connection-locked">
             <div className="text-sm font-semibold">{t("admin.apartments.connection")}</div>
             <div className="font-mono text-xs text-muted-foreground">{apt.instance_url}{apt.port ? `:${apt.port}` : ""}</div>

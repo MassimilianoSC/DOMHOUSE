@@ -801,6 +801,8 @@
       "connection": "Collegamento al sistema domotico",
       "italianwayByPlatform": "Il codice Italianway lo imposta il gestore della piattaforma (HQE). Se va cambiato, scrivi all'assistenza.",
       "connectionByPlatform": "Il collegamento al sistema domotico lo imposta il gestore della piattaforma (HQE). Se va cambiato, scrivi all'assistenza.",
+      "timezoneOnEngine": "Impostato sul motore dell'appartamento. Se va cambiato, scrivi all'assistenza.",
+      "timezoneInitial": "Valore iniziale: dopo la creazione il fuso orario si imposta sul motore.",
       "createdByPlatform": "I nuovi appartamenti li aggiunge il gestore della piattaforma (HQE): per averne uno, scrivi all'assistenza.",
       "saved": "Appartamento salvato"
     },
@@ -1041,7 +1043,8 @@
       "energy_price_changed": "{actor} ha cambiato il prezzo dell'energia di {target}",
       "apartment_simulated_changed": "{actor} ha cambiato il tipo di istanza dell'appartamento {target}",
       "simulator_reset": "{actor} ha ripristinato lo stato iniziale dell'appartamento simulato {target}",
-      "rules_changed": "{actor} ha modificato le regole dell'appartamento {target}"
+      "rules_changed": "{actor} ha modificato le regole dell'appartamento {target}",
+      "timezone_changed": "Fuso orario dell'appartamento {target} cambiato sul motore: {from} → {to}"
     }
   },
   "errors": {
