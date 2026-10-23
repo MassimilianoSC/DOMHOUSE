@@ -397,3 +397,28 @@ Da fare sullo staging `https://domhouse-staging.web.app` con `inspect.mjs --app`
 14. Colore della barra di stato del telefono con l'app installata (`theme-color #c4541f` in `index.html`): arancione pieno sopra un'app chiara.
 15. Effetto delle entrate in dissolvenza a ogni navigazione: lampeggio del contenuto, soprattutto con la rete lenta.
 16. Lettura a cinque secondi della Panoramica da parte di una persona estranea: capisce come sta la casa e cosa fare?
+
+### Esito della seconda passata (o2, 23 ottobre, 15:40–16:00, lotto 33 = commit 6357b81)
+
+Come è stata fatta: lo staging chiede email e password e o2 non ha un account lì; lo strumento `inspect.mjs` della skill vuole Node 22 (qui c'è il 20) e non sa entrare. Le misure sono quindi state fatte con Playwright sullo **stesso commit dello staging** (6357b81, sito identico), con il server di sviluppo in locale, la fascia «Ambiente di prova» simulata e i dati lunghi iniettati. Dallo staging vero è stata vista solo la pagina di accesso. Schermate nello scratchpad di o2 (`shots/partf`).
+
+| # | Verifica | Misura | Esito |
+|---|---|---|---|
+| 1 | Pixel colorati | 2,1–3,5 % nelle pagine di lavoro (arancione 0,9–1,4 %); Consumi 7,3 % per il grafico; accesso 54 % per il pannello blu notte | Nella quota della skill (≈ 3 %). È anche il motivo del giudizio del committente «non vedo quasi più colori»: vincolo per il lotto 34 |
+| 2 | Raggi e righe irregolari | Due raggi soli: 12 px sulle schede, pillola sui pulsanti (10 px nella striscia degli appartamenti); nessuna riga irregolare in Regole, Panoramica, Simulatore | Risolto |
+| 3 | Vuoti nelle schede | Uno, nel Simulatore (scheda «Approvazione» stirata accanto a «Connettività») | Da correggere |
+| 4 | Contrasto | Grigio su bianco 4,83:1; grigio sul fondo pagina 4,55:1; **grigio su `bg-secondary/60` 4,28:1**; verdi, gialli e rossi fra 5,2 e 6,8:1 | Da correggere solo il grigio su `secondary/60` (riquadro delle notifiche, selettori a pillola) |
+| 5 | Caratteri | Due famiglie caricate (Manrope 400 e 700, Plus Jakarta Sans 700 e 800), pronte in 0,7 s in locale | Il lotto 34 passa a una sola famiglia |
+| 6 | Dati lunghi | Codice da 36 caratteri e nomi lunghi in Decisioni a 360 px: nessuno sbordo | Risolto |
+| 7 | Cornice del telefono | Barra 56 px + fascia 28 px = 84 px su 780 (11 %); i messaggi a comparsa stanno in alto al centro, sopra la fascia | Accettabile; da rivedere con il lotto 34 |
+| 8 | Tastiera aperta (360 × 380) | **La barra «Salva le modifiche» va su due righe (101 px) e copre il campo in cui si scrive.** Il modulo dell'Assistente resta attaccato al fondo visibile | Da correggere la barra delle Regole (margine di scorrimento pari alla barra, o barra su una riga) |
+| 9 | Dialoghi (360 × 380) | «Programma un'azione» sta nello schermo e scorre al suo interno | Risolto |
+| 10 | Linguette con sei voci (360 px) | Tre intere, la quarta tagliata a metà: si capisce che la riga scorre | Risolto |
+| 11 | Grafico (360 px) | Barre da 11 px, etichette a 12 px, valori dell'asse non tagliati | Risolto |
+| 12 | Salto di impaginazione | Appartamenti 0; Panoramica 0,072; Decisioni 0,021 (soglia «buona» 0,1) | Risolto |
+| 13 | Tablet 768 px | Contenuto 512 px con la barra laterale aperta; **il Simulatore sborda di 3 px** («Richiedi un'approvazione» non va a capo) e il modulo «Evento prenotazione» taglia i campi in colonne da 80 px; nel Simulatore restano le icone in riquadro colorato | Da correggere il Simulatore (una colonna fino a 1024 px) |
+| 14 | Colore della barra di stato | `theme-color #c4541f`: arancione pieno | Da decidere con la tavolozza del lotto 34 |
+| 15 | Entrate in dissolvenza | Nessuna animazione a riposo in nessuna pagina (resta solo la pulsazione dei segnaposto) | Risolto |
+| 16 | Lettura a cinque secondi | Non misurabile da o2: serve una persona estranea davanti alla Panoramica | Da fare al committente o a un collega |
+
+Da correggere, in ordine: punto 8 (barra delle Regole con la tastiera), punto 13 (Simulatore su tablet), punto 4 (grigio su `secondary/60`), punto 3 (vuoto nel Simulatore). Sono piccoli e possono entrare nel primo commit del lotto 34.
