@@ -1,3 +1,5 @@
+import { t } from "@/i18n";
+
 const LOCALE = "it-IT";
 export const DEFAULT_TZ = "Europe/Rome";
 
@@ -88,4 +90,16 @@ export function fmtCountdown(ms: number): string {
   const mm = Math.floor(s / 60).toString().padStart(2, "0");
   const ss = (s % 60).toString().padStart(2, "0");
   return `${mm}:${ss}`;
+}
+
+const part = (d: Date, tz: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("it-IT", { ...opts, timeZone: tz }).format(d);
+
+/** «dal 12 al 18 ottobre», «dal 28 settembre al 4 ottobre»: Monday to Sunday in the apartment's time zone; `to` is
+ *  the exclusive end (the Monday after, at midnight), so the last day is the instant before it. */
+export function weekRange(from: string, to: string, tz: string, now = new Date()): string {
+  const first = new Date(from);
+  const last = new Date(new Date(to).getTime() - 1);
+  const sameMonth = part(first, tz, { month: "numeric", year: "numeric" }) === part(last, tz, { month: "numeric", year: "numeric" });
+  const start = sameMonth ? part(first, tz, { day: "numeric" }) : fmtDayMonth(first.toISOString(), tz, now);
+  return t("summaries.range", { from: start, to: fmtDayMonth(last.toISOString(), tz, now) });
 }

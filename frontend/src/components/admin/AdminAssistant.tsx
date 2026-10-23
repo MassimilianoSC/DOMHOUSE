@@ -1,0 +1,81 @@
+import { useQuery } from "@tanstack/react-query";
+import { AlertTriangle } from "lucide-react";
+import { adminApi, type AssistantWeek } from "@/api/admin";
+import { ErrorNotice } from "@/components/apartment/ErrorNotice";
+import { Card, Skeleton } from "@/components/ui/primitives";
+import { t } from "@/i18n";
+import { DEFAULT_TZ, fmtNumber, weekRange } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+/** Share of the questions that ended in a quick answer because the model did not answer in time (decision 120). */
+const percent = (w: AssistantWeek) => (w.asks > 0 ? (w.timeouts / w.asks) * 100 : 0);
+const quickTotal = (w: AssistantWeek) => w.quick.timeout + w.quick.model_unavailable + w.quick.monthly_cap + w.quick.json_invalid;
+
+/**
+ * Amministrazione › Assistente (decision 120, D-183): the organization's questions to the assistant week by week,
+ * the timeouts and the quick answers. Weeks above the threshold are highlighted; two complete weeks in a row above it
+ * (the server's over_threshold) say that the choice of the model has to be reopened (D-182).
+ */
+export function AdminAssistant() {
+  const q = useQuery({ queryKey: ["admin", "assistant-stats"], queryFn: () => adminApi.assistantStats(8) });
+  const data = q.data;
+  const weeks = data?.weeks ?? [];
+  const threshold = data?.threshold_percent ?? 10;
+  const anyAsk = weeks.some((w) => w.asks > 0);
+  const causes = weeks.reduce(
+    (s, w) => ({ timeout: s.timeout + w.quick.timeout, model_unavailable: s.model_unavailable + w.quick.model_unavailable, monthly_cap: s.monthly_cap + w.quick.monthly_cap, json_invalid: s.json_invalid + w.quick.json_invalid }),
+    { timeout: 0, model_unavailable: 0, monthly_cap: 0, json_invalid: 0 },
+  );
+  return (
+    <div className="space-y-4" data-testid="admin-assistant">
+      <div>
+        <h2 className="text-base font-bold md:text-lg">{t("admin.assistant.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("admin.assistant.hint")}</p>
+      </div>
+      {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="admin-assistant-error" />}
+      {q.isLoading && <Skeleton className="h-48 rounded-2xl" />}
+      {data?.over_threshold && (
+        <p className="flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200" data-testid="admin-assistant-alert">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden /> {t("admin.assistant.alert", { threshold })}
+        </p>
+      )}
+      {data && !anyAsk && <Card className="p-5 text-sm text-muted-foreground" data-testid="admin-assistant-empty">{t("admin.assistant.empty")}</Card>}
+      {data && anyAsk && (
+        <Card className="space-y-3 p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm" data-testid="admin-assistant-table">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="px-4 py-2 font-semibold">{t("admin.assistant.week")}</th>
+                  <th className="px-2 py-2 text-right font-semibold">{t("admin.assistant.asks")}</th>
+                  <th className="px-2 py-2 text-right font-semibold">{t("admin.assistant.timeouts")}</th>
+                  <th className="px-2 py-2 text-right font-semibold">{t("admin.assistant.quick")}</th>
+                  <th className="px-4 py-2 text-right font-semibold">{t("admin.assistant.percent")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {weeks.map((w, i) => {
+                  const p = percent(w);
+                  const over = p > threshold;
+                  return (
+                    <tr key={w.week} className={cn("border-b last:border-0", over && "bg-amber-50 dark:bg-amber-950/40")} data-testid={`admin-assistant-week-${w.week}`} data-over={over}>
+                      <td className="px-4 py-2">
+                        {weekRange(w.from, w.to, DEFAULT_TZ)}
+                        {i === 0 && <span className="ml-1 text-xs text-muted-foreground">({t("admin.assistant.current")})</span>}
+                      </td>
+                      <td className="px-2 py-2 text-right tabular">{w.asks}</td>
+                      <td className="px-2 py-2 text-right tabular">{w.timeouts}</td>
+                      <td className="px-2 py-2 text-right tabular">{quickTotal(w)}</td>
+                      <td className={cn("px-4 py-2 text-right tabular", over && "font-bold text-amber-800 dark:text-amber-300")}>{w.asks > 0 ? `${fmtNumber(p, 1)} %` : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          <p className="px-4 pb-3 text-xs text-muted-foreground" data-testid="admin-assistant-causes">{t("admin.assistant.causes", causes)}</p>
+        </Card>
+      )}
+    </div>
+  );
+}

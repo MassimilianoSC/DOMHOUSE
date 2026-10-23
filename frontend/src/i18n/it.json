@@ -741,6 +741,19 @@
     }
   },
   "admin": {
+    "assistant": {
+      "title": "Assistente",
+      "hint": "Le domande all'assistente nella tua organizzazione, settimana per settimana: quante, quante non hanno avuto risposta in tempo dall'assistente completo e quante hanno avuto una risposta rapida.",
+      "week": "Settimana",
+      "asks": "Domande",
+      "timeouts": "Timeout",
+      "quick": "Risposte rapide",
+      "percent": "% timeout",
+      "current": "in corso",
+      "alert": "Timeout oltre il {threshold} % per due settimane di fila: va riaperta la scelta del modello dell'assistente.",
+      "empty": "Nessuna domanda all'assistente nelle ultime settimane.",
+      "causes": "Risposte rapide per causa, nelle settimane mostrate: tempo scaduto {timeout} · assistente non raggiungibile {model_unavailable} · limite mensile {monthly_cap} · risposta non valida {json_invalid}"
+    },
     "title": "Amministrazione",
     "subtitle": "Utenti, appartamenti e funzioni della tua organizzazione",
     "users": {

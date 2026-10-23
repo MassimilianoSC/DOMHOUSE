@@ -6,21 +6,12 @@ import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge, Card, Skeleton } from "@/components/ui/primitives";
 import { t } from "@/i18n";
-import { DEFAULT_TZ, fmtDateTime, fmtDayMonth, fmtNumber } from "@/lib/format";
+import { DEFAULT_TZ, fmtDateTime, fmtNumber, weekRange } from "@/lib/format";
+
+// The week's label lives in lib/format (also the assistant's counter in Amministrazione uses it).
+export { weekRange };
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
-
-const part = (d: Date, tz: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("it-IT", { ...opts, timeZone: tz }).format(d);
-
-/** «dal 12 al 18 ottobre», «dal 28 settembre al 4 ottobre»: Monday to Sunday in the apartment's time zone; `to` is
- *  the exclusive end (the Monday after, at midnight), so the last day is the instant before it. */
-export function weekRange(from: string, to: string, tz: string, now = new Date()): string {
-  const first = new Date(from);
-  const last = new Date(new Date(to).getTime() - 1);
-  const sameMonth = part(first, tz, { month: "numeric", year: "numeric" }) === part(last, tz, { month: "numeric", year: "numeric" });
-  const start = sameMonth ? part(first, tz, { day: "numeric" }) : fmtDayMonth(first.toISOString(), tz, now);
-  return t("summaries.range", { from: start, to: fmtDayMonth(last.toISOString(), tz, now) });
-}
 
 const GREY = "border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300";
 const STATUS_STYLE: Record<SummaryStatus, string> = {

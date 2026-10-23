@@ -92,7 +92,24 @@ export interface WebhookLog {
   guests?: number | null;
 }
 
+/** One week of the organization's questions to the assistant (decision 120, D-183): `timeouts` are the questions that
+ *  ended in a quick answer because the model did not answer in time (the threshold is timeouts / asks); `twins` the
+ *  second requests started, information only. From and to: Monday 00:00 and the Monday after (exclusive), in Rome. */
+export interface AssistantWeek {
+  week: string;
+  from: string;
+  to: string;
+  asks: number;
+  timeouts: number;
+  twins: number;
+  quick: { timeout: number; model_unavailable: number; monthly_cap: number; json_invalid: number };
+}
+
 export const adminApi = {
+  /** The most recent week first (the current one), also without questions; over_threshold: each of the last two
+   *  complete weeks above threshold_percent. weeks 1-26. */
+  assistantStats: (weeks = 8) =>
+    bffFetch<{ weeks: AssistantWeek[]; threshold_percent: number; over_threshold: boolean }>("/app/admin/assistant-stats", { query: { weeks } }),
   /** The admin ends an assistance access on their organization (P-50, D-86). */
   closeSupport: (accessId: string, correlationId: string) =>
     bffFetch<void>(`/app/admin/support-access/${encodeURIComponent(accessId)}`, { method: "DELETE", correlationId }),
