@@ -151,7 +151,7 @@ export default function RulesPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 pb-24">
+    <div className="mx-auto max-w-6xl space-y-8 pb-24">
       <PageHeader title={t("rules.title")} subtitle={t("rules.subtitle")} testId="rules-header" />
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="rules-error" />}
       {/* D-151: the assistant proposes, the manager applies; whoever only reads does not see it */}

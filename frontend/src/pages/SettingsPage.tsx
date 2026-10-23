@@ -59,7 +59,7 @@ export default function SettingsPage() {
   // Admins always see every apartment; others see "all" or their list (P-18), named from the list the BFF gives them.
   const scope = me.role === "admin" ? "all" : (me.user.apartment_ids ?? "all");
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader title={t("settings.title")} testId="settings-header" />
       <Card className="p-5">
         <h2 className="mb-2 text-base font-semibold">{t("settings.profile")}</h2>

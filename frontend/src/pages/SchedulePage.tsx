@@ -83,7 +83,7 @@ export default function SchedulePage() {
   const history = items.filter((i) => i.status !== "planned").sort((a, b) => b.run_at.localeCompare(a.run_at));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8">
+    <div className="mx-auto max-w-6xl space-y-8">
       <PageHeader
         title={t("schedule.title")}
         subtitle={t("schedule.subtitle")}

@@ -143,7 +143,7 @@ export default function SimulatorPage() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title={t("simulator.title")} subtitle={t("simulator.subtitle")} testId="simulator-header" actions={<DemoBadge testId="simulator-demo-badge" />} />
       <div className="grid gap-4 md:grid-cols-2">
         <Section icon={<DoorOpen className="h-5 w-5" />} title={t("simulator.windows")} hint={t("simulator.windowsHint")} testId="simulator-windows">

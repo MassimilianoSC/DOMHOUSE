@@ -141,7 +141,7 @@ export default function EnergyPage() {
   const maxDevice = Math.max(1, ...(r?.by_device.map((d) => d.kwh) ?? [1]));
 
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="mx-auto max-w-6xl space-y-8">
       <PageHeader
         title={t("energy.title")}
         subtitle={t("energy.subtitle")}

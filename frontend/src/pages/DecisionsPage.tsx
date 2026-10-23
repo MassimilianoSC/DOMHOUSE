@@ -110,7 +110,7 @@ export default function DecisionsPage() {
   else if (search.status === "ready") status = p.done ? t("decisions.searchedAll", { found: p.results.length, count: p.scanned }) : t("decisions.searchedUntil", { found: p.results.length, when, count: p.scanned });
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title={t("decisions.title")} subtitle={t("decisions.subtitle")} testId="decisions-header" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="decisions-filters">
         <NativeSelect value={actor} onChange={(e) => setActor(e.target.value)} aria-label={t("decisions.actor")} data-testid="decisions-actor-select">

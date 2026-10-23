@@ -14,7 +14,7 @@ type Tab = "users" | "apartments" | "features" | "webhooks" | "audit" | "assista
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("apartments");
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader
         title={t("admin.title")}
         subtitle={t("admin.subtitle")}

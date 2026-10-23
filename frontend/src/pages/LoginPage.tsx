@@ -126,8 +126,6 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden flex-col justify-between overflow-hidden bg-[hsl(215_28%_14%)] p-12 text-[hsl(40_20%_96%)] lg:flex">
-        <div className="absolute -right-24 -top-24 h-96 w-96 rounded-full bg-primary/40 blur-3xl" />
-        <div className="absolute -bottom-32 left-10 h-80 w-80 rounded-full bg-accent/30 blur-3xl" />
         <img src="/favicon.svg" alt="" className="relative h-12 w-12" />
         <div className="relative space-y-4">
           <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl lg:text-6xl">{env.appName}</h1>
@@ -135,7 +133,12 @@ export default function LoginPage() {
         </div>
         <p className="relative tabular text-xs opacity-60">{t("login.footer")}</p>
       </section>
-      <section className="flex items-center justify-center p-5">
+      <section className="flex flex-col items-center justify-center gap-6 p-5">
+        {/* where the brand panel is hidden (phone, tablet), the mark and the name sit above the card (design review c.14) */}
+        <div className="flex items-center gap-3 lg:hidden" data-testid="login-brand">
+          <img src="/favicon.svg" alt="" className="h-10 w-10" />
+          <span className="font-heading text-2xl font-extrabold">{env.appName}</span>
+        </div>
         <Card className="w-full max-w-md p-6 sm:p-8">
           <h2 className="text-2xl font-extrabold">{t("login.title")}</h2>
           <p className="mb-6 mt-1 text-sm text-muted-foreground">{t("login.subtitle")}</p>
