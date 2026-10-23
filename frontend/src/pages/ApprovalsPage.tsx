@@ -81,7 +81,7 @@ function ApprovalCard({ aptId, a, canWrite, onDecided }: { aptId: string; a: App
             <Button className="flex-1" onClick={() => decide("approve")} disabled={busy !== null} data-testid={`approve-action-btn-${a.approval_id}`}>
               <Check /> {t("approvals.approve")}
             </Button>
-            <Button className="flex-1 border-destructive/40 text-destructive hover:bg-destructive/10" variant="outline" onClick={() => decide("reject")} disabled={busy !== null} data-testid={`reject-action-btn-${a.approval_id}`}>
+            <Button className="flex-1" variant="destructive" onClick={() => decide("reject")} disabled={busy !== null} data-testid={`reject-action-btn-${a.approval_id}`}>
               <X /> {t("approvals.reject")}
             </Button>
           </div>

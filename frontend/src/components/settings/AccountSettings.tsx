@@ -162,7 +162,7 @@ export function AccountSettings() {
           </div>
           <div className="border-t pt-4">
             <p className="mb-2 text-sm text-muted-foreground">{t("account.deleteHint")}</p>
-            <Button variant="destructive" disabled={busy} onClick={remove} data-testid="account-delete"><Trash2 /> {t("account.delete")}</Button>
+            <Button variant="destructiveSolid" disabled={busy} onClick={remove} data-testid="account-delete"><Trash2 /> {t("account.delete")}</Button>
           </div>
         </div>
       </Section>

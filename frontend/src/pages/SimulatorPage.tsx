@@ -78,7 +78,7 @@ function ResetSection({ aptId, name }: { aptId: string; name: string }) {
             <DialogDescription>{t("simulator.resetText")}</DialogDescription>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setConfirming(false)} data-testid="sim-reset-cancel">{t("common.cancel")}</Button>
-              <Button variant="destructive" onClick={() => void reset()} disabled={busy} data-testid="sim-reset-confirm">{t("simulator.resetConfirm")}</Button>
+              <Button variant="destructiveSolid" onClick={() => void reset()} disabled={busy} data-testid="sim-reset-confirm">{t("simulator.resetConfirm")}</Button>
             </div>
           </DialogContent>
         </Dialog>

@@ -171,7 +171,7 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
                     <Button size="sm" variant="secondary" onClick={() => void check(a.apartment_id)} disabled={v === "loading"} data-testid={`platform-apt-verify-${a.apartment_id}`}>
                       <PlugZap /> {v === "loading" ? t("common.loading") : t("admin.apartments.verify")}
                     </Button>
-                    <Button size="sm" variant="ghost" className="text-destructive" onClick={() => void remove(a)} data-testid={`platform-apt-delete-${a.apartment_id}`}><Trash2 /> {t("platform.aptDelete")}</Button>
+                    <Button size="sm" variant="destructive" onClick={() => void remove(a)} data-testid={`platform-apt-delete-${a.apartment_id}`}><Trash2 /> {t("platform.aptDelete")}</Button>
                   </div>
                 </div>
                 {v && v !== "loading" && <VerifyBadge r={v} />}

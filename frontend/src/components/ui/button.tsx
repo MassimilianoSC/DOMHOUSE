@@ -8,16 +8,18 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        default: "bg-foreground text-background hover:bg-foreground/85",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         outline: "border border-border bg-card hover:bg-secondary",
         ghost: "hover:bg-secondary",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        // the one red style: outline with red text; solid red only to delete or reset (destructiveSolid)
+        destructive: "border border-negative-border bg-card text-negative hover:bg-negative-bg",
+        destructiveSolid: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         accent: "bg-accent text-accent-foreground hover:bg-accent/90",
       },
       size: {
         default: "h-11 px-5",
-        sm: "h-9 px-3.5 text-xs",
+        sm: "h-9 px-3.5 text-[13px]",
         lg: "h-12 px-6 text-base",
         icon: "h-11 w-11",
         iconSm: "h-9 w-9",

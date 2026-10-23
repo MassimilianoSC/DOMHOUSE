@@ -291,7 +291,7 @@ export function PlatformTenants({ openTenant = null }: { openTenant?: string | n
                 {tn.suspended ? (
                   <Button variant="outline" size="sm" onClick={() => void reactivate(tn)} data-testid={`tenant-reactivate-btn-${tn.tenant_id}`}><Play /> {t("platform.reactivate")}</Button>
                 ) : (
-                  <Button variant="outline" size="sm" className="text-destructive" onClick={() => setSuspending(tn)} data-testid={`tenant-suspend-btn-${tn.tenant_id}`}><Pause /> {t("platform.suspend")}</Button>
+                  <Button variant="destructive" size="sm" onClick={() => setSuspending(tn)} data-testid={`tenant-suspend-btn-${tn.tenant_id}`}><Pause /> {t("platform.suspend")}</Button>
                 )}
                 {tn.first_admin?.pending && (
                   <Button variant="outline" size="sm" disabled={resending === tn.tenant_id} onClick={() => void resend(tn)} data-testid={`tenant-resend-btn-${tn.tenant_id}`}>

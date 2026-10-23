@@ -163,7 +163,7 @@ export function AdminUsers() {
                   <Mail /> {t("admin.users.resend")}
                 </Button>
               )}
-              <Button variant="ghost" size="icon" className="text-destructive" disabled={u.uid === me?.user.uid} aria-label={t("common.delete")} onClick={() => remove(u)} data-testid={`admin-user-delete-${u.uid}`}><Trash2 /></Button>
+              <Button variant="destructive" size="icon" disabled={u.uid === me?.user.uid} aria-label={t("common.delete")} onClick={() => remove(u)} data-testid={`admin-user-delete-${u.uid}`}><Trash2 /></Button>
             </div>
           ))}
         </Card>

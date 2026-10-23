@@ -61,7 +61,7 @@ function Row({ aptId, item, tz, canWrite }: { aptId: string; item: ScheduleItem;
           <Button size="sm" variant="outline" onClick={() => setMoveOpen(true)} disabled={busy} data-testid={`schedule-move-btn-${item.schedule_id}`}>
             <CalendarClock /> {t("schedule.move")}
           </Button>
-          <Button size="sm" variant="ghost" className="text-destructive" onClick={cancel} disabled={busy} data-testid={`schedule-cancel-btn-${item.schedule_id}`}>
+          <Button size="sm" variant="destructive" onClick={cancel} disabled={busy} data-testid={`schedule-cancel-btn-${item.schedule_id}`}>
             <Trash2 /> {t("schedule.cancel")}
           </Button>
           <ScheduleDialog aptId={aptId} tz={tz} open={moveOpen} onOpenChange={setMoveOpen} move={item} onDone={refresh} />

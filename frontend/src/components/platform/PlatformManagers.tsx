@@ -78,7 +78,7 @@ export function PlatformManagers() {
                 </div>
                 <div className="text-xs text-muted-foreground">{m.display_name || "—"}</div>
               </div>
-              <Button variant="ghost" size="sm" className="text-destructive" onClick={() => void remove(m)} data-testid={`platform-manager-remove-${m.email}`}>
+              <Button variant="destructive" size="sm" onClick={() => void remove(m)} data-testid={`platform-manager-remove-${m.email}`}>
                 <Trash2 /> {t("platform.removeManager")}
               </Button>
             </div>
