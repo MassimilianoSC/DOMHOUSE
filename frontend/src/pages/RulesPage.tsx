@@ -44,7 +44,7 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
     <Card className={cn("space-y-4 p-5 animate-fade-up", dirty && "border-primary/50 ring-1 ring-primary/20")} data-testid={`rule-card-${rule.rule_id}`} data-enabled={eff.enabled}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h3 className="text-base font-bold">{rule.label}</h3>
+          <h3 className="text-base font-semibold">{rule.label}</h3>
           <p className="text-sm text-muted-foreground">{tOr(`rules.desc.${rule.rule_id}`, "")}</p>
         </div>
         <div className="flex items-center gap-2">

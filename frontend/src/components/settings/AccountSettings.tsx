@@ -13,7 +13,7 @@ const MIN_PASSWORD = 8;
 function Section({ icon, title, children, testId }: { icon: ReactNode; title: string; children: ReactNode; testId: string }) {
   return (
     <Card className="p-5" data-testid={testId}>
-      <h2 className="mb-3 flex items-center gap-2 text-base font-bold md:text-lg [&_svg]:h-4 [&_svg]:w-4">{icon} {title}</h2>
+      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold [&_svg]:h-4 [&_svg]:w-4">{icon} {title}</h2>
       {children}
     </Card>
   );
@@ -143,7 +143,7 @@ export function AccountSettings() {
           <div className="space-y-6">
             <ChangePassword />
             <div className="border-t pt-5">
-              <h3 className="mb-2 flex items-center gap-2 text-sm font-bold"><Mail className="h-4 w-4" /> {t("account.emailTitle")}</h3>
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Mail className="h-4 w-4" /> {t("account.emailTitle")}</h3>
               <ChangeEmail />
             </div>
           </div>

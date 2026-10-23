@@ -1,13 +1,31 @@
 import type { ReactNode } from "react";
 
-export function PageHeader({ title, subtitle, actions, testId }: { title: string; subtitle?: string; actions?: ReactNode; testId: string }) {
+/**
+ * The title of every page (lotto 32, design review b.7): 24 px at 700, an app title, not a landing one. `badges`
+ * sit beside the title (the apartment's state), `children` below it (the Panoramica's facts).
+ */
+export function PageHeader({ title, subtitle, actions, testId, titleTestId, badges, children }: {
+  title: string;
+  subtitle?: string;
+  actions?: ReactNode;
+  testId: string;
+  titleTestId?: string;
+  badges?: ReactNode;
+  children?: ReactNode;
+}) {
   return (
-    <header className="flex flex-wrap items-end justify-between gap-4" data-testid={testId}>
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+    <header className="space-y-4" data-testid={testId}>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl font-bold tracking-tight [overflow-wrap:anywhere]" data-testid={titleTestId}>{title}</h1>
+            {badges}
+          </div>
+          {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
+        </div>
+        {actions && <div className="flex min-w-0 max-w-full flex-wrap gap-2">{actions}</div>}
       </div>
-      {actions && <div className="flex min-w-0 max-w-full flex-wrap gap-2">{actions}</div>}
+      {children}
     </header>
   );
 }

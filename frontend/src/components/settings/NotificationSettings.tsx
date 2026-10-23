@@ -91,7 +91,7 @@ export function NotificationSettings() {
 
   return (
     <Card className="space-y-4 p-5" data-testid="settings-notifications">
-      <h2 className="flex items-center gap-2 text-base font-bold md:text-lg"><BellRing className="h-4 w-4" /> {t("settings.notifications.title")}</h2>
+      <h2 className="flex items-center gap-2 text-base font-semibold"><BellRing className="h-4 w-4" /> {t("settings.notifications.title")}</h2>
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-secondary/60 px-3 py-2">
         <div className="text-sm">
           <div className="font-semibold" data-testid="settings-push-mode">{env.fcmEnabled ? t("settings.notifications.pushMode") : t(dev ? "settings.notifications.devMode" : "settings.notifications.inAppMode")}</div>

@@ -8,7 +8,7 @@ function Notice({ icon, title, text, testId, action }: { icon: ReactNode; title:
   return (
     <div data-testid={testId} className="mx-auto flex max-w-lg flex-col items-center gap-3 rounded-3xl border border-dashed bg-card/60 px-6 py-14 text-center">
       <span className="rounded-2xl bg-secondary p-3 text-muted-foreground">{icon}</span>
-      <h2 className="text-lg font-bold">{title}</h2>
+      <h2 className="text-base font-semibold">{title}</h2>
       <p className="text-sm text-muted-foreground">{text}</p>
       {action}
     </div>

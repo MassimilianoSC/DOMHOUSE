@@ -36,7 +36,7 @@ export function AdminAssistant() {
   return (
     <div className="space-y-4" data-testid="admin-assistant">
       <div>
-        <h2 className="text-base font-bold md:text-lg">{t("admin.assistant.title")}</h2>
+        <h2 className="text-base font-semibold">{t("admin.assistant.title")}</h2>
         <p className="text-sm text-muted-foreground">{t("admin.assistant.hint")}</p>
       </div>
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="admin-assistant-error" />}

@@ -58,7 +58,7 @@ export function AdminFeatures() {
     <div className="space-y-6">
       <Card className="space-y-3 p-5" data-testid="admin-tenant-features">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-bold md:text-lg">{t("admin.features.tenant", { name: tenant.data?.name ?? "" })}</h2>
+          <h2 className="text-base font-semibold">{t("admin.features.tenant", { name: tenant.data?.name ?? "" })}</h2>
           {tenant.data?.enabled_features !== null && (
             <Button size="sm" variant="ghost" onClick={async () => { const r = await runAction((c) => adminApi.patchTenant({ clear_features: true }, c), { success: t("admin.features.saved") }); if (r) refresh(); }} data-testid="admin-tenant-features-reset">{t("admin.features.enableAll")}</Button>
           )}
@@ -69,7 +69,7 @@ export function AdminFeatures() {
       {apts.data?.map((a) => (
         <Card key={a.apartment_id} className="space-y-3 p-5" data-testid={`admin-apartment-features-${a.apartment_id}`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h3 className="text-base font-bold">{a.name}</h3>
+            <h3 className="text-base font-semibold">{a.name}</h3>
             <span className="text-xs text-muted-foreground">
               {a.enabled_features === null ? t("admin.features.inherit") : t("admin.features.override")}
               {a.enabled_features !== null && <Button size="sm" variant="ghost" className="ml-2" onClick={() => resetApt(a)} data-testid={`admin-apartment-features-reset-${a.apartment_id}`}>{t("admin.features.resetToTenant")}</Button>}

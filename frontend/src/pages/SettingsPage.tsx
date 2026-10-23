@@ -7,6 +7,7 @@ import { scopeSummary } from "@/components/admin/ApartmentScope";
 import { AccountSettings } from "@/components/settings/AccountSettings";
 import { useApartments } from "@/hooks/useFeatures";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { t } from "@/i18n";
 
 function Row({ label, value, testId }: { label: string; value: React.ReactNode; testId: string }) {
@@ -42,7 +43,7 @@ function InstallCard() {
   }
   return (
     <Card className="p-5" data-testid="settings-install-card">
-      <h2 className="mb-3 flex items-center gap-2 text-base font-bold md:text-lg"><Smartphone className="h-4 w-4" /> {t("settings.install")}</h2>
+      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold"><Smartphone className="h-4 w-4" /> {t("settings.install")}</h2>
       {body}
     </Card>
   );
@@ -59,9 +60,9 @@ export default function SettingsPage() {
   const scope = me.role === "admin" ? "all" : (me.user.apartment_ids ?? "all");
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <h1 className="text-3xl font-extrabold tracking-tight sm:text-4xl">{t("settings.title")}</h1>
+      <PageHeader title={t("settings.title")} testId="settings-header" />
       <Card className="p-5">
-        <h2 className="mb-2 text-base font-bold md:text-lg">{t("settings.profile")}</h2>
+        <h2 className="mb-2 text-base font-semibold">{t("settings.profile")}</h2>
         <Row label={t("common.email")} value={me.user.email} testId="settings-email" />
         <Row label={t("settings.role")} value={me.role ? t(`roles.${me.role}`) : "—"} testId="settings-role" />
         {me.user.platform_manager && <Row label={t("settings.platform")} value={t("roles.platform")} testId="settings-platform" />}

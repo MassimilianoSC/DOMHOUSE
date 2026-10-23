@@ -21,7 +21,7 @@ export function AuditLog({ load, queryKey, hint, title }: { load: (before?: stri
   const items = q.data?.pages.flatMap((p) => p.items) ?? [];
   return (
     <div className="space-y-4">
-      {title && <h2 className="text-base font-bold md:text-lg" data-testid="audit-title">{title}</h2>}
+      {title && <h2 className="text-base font-semibold" data-testid="audit-title">{title}</h2>}
       <p className="text-sm text-muted-foreground" data-testid="audit-hint">{hint}</p>
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="audit-error" />}
       {q.isLoading ? <Skeleton className="h-48 rounded-2xl" /> : q.data && items.length === 0 ? (

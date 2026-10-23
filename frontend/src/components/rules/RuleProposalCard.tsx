@@ -64,7 +64,7 @@ export function RuleProposalCard({ aptId, hasManualChanges, onApplied, onRulesCh
       <div className="flex items-start gap-3">
         <span className="rounded-xl bg-accent/15 p-2 text-accent"><Sparkles className="h-5 w-5" /></span>
         <div>
-          <h2 className="text-base font-bold md:text-lg">{t("rules.proposal.title")}</h2>
+          <h2 className="text-base font-semibold">{t("rules.proposal.title")}</h2>
           <p className="text-sm text-muted-foreground">{t("rules.proposal.hint")}</p>
         </div>
       </div>
@@ -94,7 +94,7 @@ export function RuleProposalCard({ aptId, hasManualChanges, onApplied, onRulesCh
       )}
       {proposal && proposal.changes.length > 0 && (
         <div className="space-y-3 rounded-xl border border-primary/40 bg-primary/5 p-4" data-testid="rule-proposal-result">
-          <h3 className="text-sm font-bold">{t("rules.proposal.changesTitle")}</h3>
+          <h3 className="text-sm font-semibold">{t("rules.proposal.changesTitle")}</h3>
           <ul className="space-y-2">
             {proposal.changes.map((c) => (
               <li key={`${c.rule_id}-${c.field}`} className="text-sm" data-testid={`rule-proposal-change-${c.rule_id}-${c.field}`}>

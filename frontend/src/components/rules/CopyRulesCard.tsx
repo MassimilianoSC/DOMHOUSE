@@ -113,7 +113,7 @@ export function CopyRulesCard({ aptId, hasManualChanges }: { aptId: string; hasM
       <div className="flex items-start gap-3">
         <span className="rounded-xl bg-accent/15 p-2 text-accent"><Copy className="h-5 w-5" /></span>
         <div>
-          <h2 className="text-base font-bold md:text-lg">{t("rules.copy.title")}</h2>
+          <h2 className="text-base font-semibold">{t("rules.copy.title")}</h2>
           <p className="text-sm text-muted-foreground">{t("rules.copy.hint")}</p>
         </div>
       </div>
@@ -162,7 +162,7 @@ export function CopyRulesCard({ aptId, hasManualChanges }: { aptId: string; hasM
 
       {preview && (
         <div className="space-y-3" data-testid="rules-copy-preview-result">
-          <h3 className="text-sm font-bold">{t("rules.copy.previewTitle", { from: preview.from.name })}</h3>
+          <h3 className="text-sm font-semibold">{t("rules.copy.previewTitle", { from: preview.from.name })}</h3>
           {preview.targets.map((x) => (
             <div key={x.apartment_id} className="space-y-2 rounded-xl border p-3" data-testid={`rules-copy-row-${x.apartment_id}`} data-status={x.status}>
               <div className="text-sm font-bold">{x.name}</div>
@@ -186,7 +186,7 @@ export function CopyRulesCard({ aptId, hasManualChanges }: { aptId: string; hasM
 
       {results && (
         <div className="space-y-3" data-testid="rules-copy-results">
-          <h3 className="text-sm font-bold">{t("rules.copy.resultsTitle")}</h3>
+          <h3 className="text-sm font-semibold">{t("rules.copy.resultsTitle")}</h3>
           {results.map((r) => (
             <div key={r.apartment_id} className="space-y-1 rounded-xl border p-3" data-testid={`rules-copy-result-${r.apartment_id}`} data-outcome={r.outcome}>
               <div className="text-sm"><span className="font-bold">{r.name}</span> · <span className={r.outcome === "applied" ? "font-semibold text-positive-fg" : "text-muted-foreground"}>{outcomeText(r)}</span></div>

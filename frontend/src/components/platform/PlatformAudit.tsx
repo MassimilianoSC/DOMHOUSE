@@ -16,7 +16,7 @@ export function PlatformAudit() {
   const scope = chosen ?? tenants.data?.[0]?.tenant_id ?? (tenants.isLoading ? null : PLATFORM_SCOPE);
   return (
     <div className="space-y-4">
-      <h2 className="text-base font-bold md:text-lg" data-testid="audit-title">{t("audit.titlePlatform")}</h2>
+      <h2 className="text-base font-semibold" data-testid="audit-title">{t("audit.titlePlatform")}</h2>
       <div className="flex flex-wrap items-center gap-2">
         <Label htmlFor="audit-scope">{t("audit.scope")}</Label>
         <NativeSelect id="audit-scope" className="w-auto max-w-full" value={scope ?? ""} disabled={!scope} onChange={(e) => setChosen(e.target.value)} data-testid="audit-scope-select">

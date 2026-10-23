@@ -80,7 +80,7 @@ const PHASE2: { path: string; feature: AppFeature; element: React.ReactNode }[] 
 function NotFound() {
   return (
     <div className="py-20 text-center" data-testid="not-found">
-      <h1 className="text-2xl font-extrabold">{t("errors.notFound")}</h1>
+      <h1 className="text-2xl font-bold">{t("errors.notFound")}</h1>
       <p className="mt-2 text-sm text-muted-foreground">{t("errors.notFoundHint")}</p>
     </div>
   );

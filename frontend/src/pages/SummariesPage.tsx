@@ -48,7 +48,7 @@ function EnergyCard({ energy }: { energy: WeeklySummary["energy"] }) {
   return (
     <Card className="space-y-3 p-5" data-testid="summary-energy">
       <div>
-        <h2 className="text-base font-bold md:text-lg">{t("summaries.energyTitle")}</h2>
+        <h2 className="text-base font-semibold">{t("summaries.energyTitle")}</h2>
         <p className="text-xs text-muted-foreground">{t("summaries.energyHint")}</p>
       </div>
       {!energy.available ? (
@@ -61,7 +61,7 @@ function EnergyCard({ energy }: { energy: WeeklySummary["energy"] }) {
           </div>
           {energy.devices.length > 0 && (
             <div className="space-y-3 pt-2">
-              <h3 className="text-sm font-bold">{t("summaries.byDevice")}</h3>
+              <h3 className="text-sm font-semibold">{t("summaries.byDevice")}</h3>
               {energy.devices.map((d) => (
                 <div key={d.device_id} className="rounded-xl bg-secondary/50 px-3 py-1" data-testid={`summary-device-${d.device_id}`}>
                   <div className="pt-1 text-[13px] font-medium text-muted-foreground">{d.label}</div>

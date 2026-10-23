@@ -32,7 +32,7 @@ function Section({ icon, title, hint, children, testId }: { icon: React.ReactNod
       <div className="flex items-start gap-3">
         <span className="rounded-xl bg-accent/15 p-2 text-accent">{icon}</span>
         <div>
-          <h2 className="text-base font-bold md:text-lg">{title}</h2>
+          <h2 className="text-base font-semibold">{title}</h2>
           <p className="text-sm text-muted-foreground">{hint}</p>
         </div>
       </div>

@@ -45,7 +45,7 @@ function Stat({ icon, label, value, unit, hint, testId }: { icon: React.ReactNod
       <span className="rounded-2xl bg-primary/10 p-3 text-primary">{icon}</span>
       <div>
         <div className="text-[13px] font-medium text-muted-foreground">{label}</div>
-        <div className="text-2xl font-extrabold tabular">{value} <span className="text-sm font-semibold text-muted-foreground">{unit}</span></div>
+        <div className="text-2xl font-bold tabular">{value} <span className="text-sm font-semibold text-muted-foreground">{unit}</span></div>
       </div>
     </Card>
   );
@@ -81,7 +81,7 @@ function MonthlyReport({ aptId, tz }: { aptId: string; tz: string }) {
   return (
     <Card className="flex flex-wrap items-end gap-3 p-5" data-testid="energy-export">
       <div className="min-w-0 flex-1 space-y-1">
-        <h2 className="text-base font-bold md:text-lg">{t("energy.exportTitle")}</h2>
+        <h2 className="text-base font-semibold">{t("energy.exportTitle")}</h2>
         <p className="text-xs text-muted-foreground">{t("energy.exportHint")}</p>
       </div>
       <div className="flex flex-wrap items-center gap-2">
@@ -110,7 +110,7 @@ function StayComparison({ current, previous, prev, tz, aptId }: { current: numbe
         </div>
       </div>
       <div className="text-right">
-        <div className={`text-xl font-extrabold tabular ${up ? "text-negative-fg" : "text-positive-fg"}`} data-testid="energy-stay-delta">
+        <div className={`text-xl font-bold tabular ${up ? "text-negative-fg" : "text-positive-fg"}`} data-testid="energy-stay-delta">
           {delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta}%`}
         </div>
         <div className="text-xs text-muted-foreground">{t("energy.vsPrevious")}</div>
@@ -165,7 +165,7 @@ export default function EnergyPage() {
             <Stat icon={<Leaf className="h-5 w-5" />} label={t("energy.avoided")} value={r.avoided_hvac_hours === null ? t("energy.notComputed") : fmtNumber(r.avoided_hvac_hours)} unit={r.avoided_hvac_hours === null ? "" : "h"} hint={t("energy.avoidedHint")} testId="energy-avoided" />
           </div>
           <Card className="p-5" data-testid="energy-chart">
-            <h2 className="mb-4 text-base font-bold md:text-lg">{t("energy.chart", { bucket: t(`energy.${params.bucket}`) })}</h2>
+            <h2 className="mb-4 text-base font-semibold">{t("energy.chart", { bucket: t(`energy.${params.bucket}`) })}</h2>
             {r.series.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground" data-testid="energy-empty">{t("energy.empty")}</p>
             ) : (
@@ -189,7 +189,7 @@ export default function EnergyPage() {
             {since && <p className="mt-3 text-xs text-muted-foreground" data-testid="energy-since">{t("energy.since", { date: since })}</p>}
           </Card>
           <Card className="space-y-3 p-5" data-testid="energy-by-device">
-            <h2 className="text-base font-bold md:text-lg">{t("energy.byDevice")}</h2>
+            <h2 className="text-base font-semibold">{t("energy.byDevice")}</h2>
             {r.by_device.map((d) => (
               <div key={d.device_id} className="space-y-1" data-testid={`energy-device-${d.device_id}`}>
                 <div className="flex justify-between text-sm"><span className="font-semibold">{d.label}</span><span className="tabular text-muted-foreground">{fmtNumber(d.kwh, 2)} {t("energy.kwh")}</span></div>

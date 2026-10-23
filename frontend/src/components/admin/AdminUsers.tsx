@@ -104,7 +104,7 @@ export function AdminUsers() {
   return (
     <div className="space-y-6">
       <Card className="space-y-4 p-5" data-testid="admin-invite-card">
-        <h2 className="flex items-center gap-2 text-base font-bold md:text-lg"><UserPlus className="h-4 w-4" /> {t("admin.users.invite")}</h2>
+        <h2 className="flex items-center gap-2 text-base font-semibold"><UserPlus className="h-4 w-4" /> {t("admin.users.invite")}</h2>
         <p className="text-sm text-muted-foreground">{t("admin.users.inviteHint")}</p>
         <div className="grid gap-3 sm:grid-cols-[2fr_2fr_1fr_auto] sm:items-end">
           <div className="space-y-1">

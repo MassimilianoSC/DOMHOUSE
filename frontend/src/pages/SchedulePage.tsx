@@ -98,14 +98,14 @@ export default function SchedulePage() {
       ) : (
         <>
           <section className="space-y-3" aria-label={t("schedule.planned")}>
-            <h2 className="text-base font-bold md:text-lg">{t("schedule.planned")} <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{planned.length}</span></h2>
+            <h2 className="text-base font-semibold">{t("schedule.planned")} <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{planned.length}</span></h2>
             {planned.length === 0 ? (
               <Card className="p-10 text-center text-sm text-muted-foreground" data-testid="schedule-empty">{t("schedule.empty")}</Card>
             ) : planned.map((i) => <Row key={i.schedule_id} aptId={aptId} item={i} tz={tz} canWrite={canWrite} />)}
           </section>
           {history.length > 0 && (
             <section className={cn("space-y-3")} aria-label={t("schedule.history")}>
-              <h2 className="text-base font-bold text-muted-foreground md:text-lg">{t("schedule.history")}</h2>
+              <h2 className="text-base font-semibold text-muted-foreground">{t("schedule.history")}</h2>
               {history.map((i) => <Row key={i.schedule_id} aptId={aptId} item={i} tz={tz} canWrite={false} />)}
             </section>
           )}

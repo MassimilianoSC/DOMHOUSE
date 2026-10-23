@@ -64,7 +64,7 @@ function ApprovalCard({ aptId, a, canWrite, onDecided }: { aptId: string; a: App
         </div>
         {pending && a.expires_at && <Countdown until={a.expires_at} id={a.approval_id} />}
       </div>
-      <h3 className="text-lg font-bold leading-snug" data-testid={`approval-description-${a.approval_id}`}>{a.description}</h3>
+      <h3 className="text-lg font-semibold leading-snug" data-testid={`approval-description-${a.approval_id}`}>{a.description}</h3>
       <div className="rounded-xl bg-secondary/60 p-3">
         <div className="text-[13px] font-medium text-muted-foreground">{t("approvals.why")}</div>
         <p className="mt-1 text-sm" data-testid={`approval-reason-${a.approval_id}`}>{a.reason}</p>

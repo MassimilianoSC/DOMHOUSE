@@ -258,7 +258,7 @@ export function PlatformTenants({ openTenant = null }: { openTenant?: string | n
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-bold" data-testid={`tenant-name-${tn.tenant_id}`}>{tn.name}</h3>
+                  <h3 className="text-base font-semibold" data-testid={`tenant-name-${tn.tenant_id}`}>{tn.name}</h3>
                   {tn.suspended && <Badge className="border-negative-border bg-negative-bg text-negative-fg" data-testid={`tenant-suspended-${tn.tenant_id}`}>{t("platform.suspendedBadge")}</Badge>}
                 </div>
                 <p className="text-xs text-muted-foreground">{t("platform.createdAt", { when: fmtDateTime(tn.created_at) })}</p>
