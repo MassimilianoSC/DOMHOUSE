@@ -477,7 +477,8 @@ La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account�
 | In alto | «In tempo reale» | La pagina si aggiorna da sola |
 | In alto | «Riconnessione…» | Sta ricollegandosi: non prendere per buono un valore vecchio |
 | La striscia di salute | «In salute», «Degradata» o «Ferma» | Lo stato del sistema domotico |
-| La striscia di salute | «Connettore» «attivo» o «fermo», «… dispositivi connessi», «Modello» (lo stato dell'assistente), «Contratto» e «Ultimo evento …» | I dettagli della salute |
+| La striscia di salute | «Connettore» «attivo» o «fermo», «… dispositivi connessi» | Il collegamento con i dispositivi |
+| La striscia di salute | «Modello» (lo stato dell'assistente), «Contratto» e «Ultimo evento …» | Gli altri dettagli della salute |
 | La striscia di salute | «Sistema domotico non raggiungibile» | Il sistema domotico non risponde |
 | La striscia di salute | «Versione del contratto non compatibile» e «Il sistema domotico dichiara il contratto …: questa app supporta solo la versione 1.x. Contatta il supporto tecnico.» | La versione del sistema non è compatibile |
 | «Modalità» | La modalità attuale fra «comfort», «eco» e «casa vuota» | La modalità in corso |
@@ -490,7 +491,10 @@ La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account�
 |---|---|
 | Prese e interruttori | «Acceso» o «Spento» |
 | Caldaia | «Riscaldamento abilitato» o «Riscaldamento disabilitato»; se il suo misuratore segna più di 30 W, «sta scaldando ora» |
-| Climatizzatore | Acceso o spento; «Modo» («caldo», «freddo», «deumidifica», «ventilazione»); «Ventola» («auto», «bassa», «media», «alta»); «Temperatura» desiderata con «da … a … °C» |
+| Climatizzatore | Acceso o spento |
+| Climatizzatore, «Modo» | «caldo», «freddo», «deumidifica», «ventilazione» |
+| Climatizzatore, «Ventola» | «auto», «bassa», «media», «alta» |
+| Climatizzatore, «Temperatura» | La temperatura desiderata con «da … a … °C» |
 | Misuratore di consumo | «Potenza» (in W, cioè quanto consuma adesso) e «Oggi» (kWh di oggi) |
 | Sensori | «Temperatura», «Umidità» |
 | Contatto finestra | «Aperta» o «Chiusa» «da …» |
@@ -561,9 +565,11 @@ per 24 mesi.
 | Ogni riga mostra | Valori possibili |
 |---|---|
 | La data | Quando è successo |
-| Chi ha deciso | «Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; una persona che ha eliminato l'account compare come «utente rimosso» |
+| Chi ha deciso | «Motore AI», «Regola «…»», «Gestore» |
+| Chi ha deciso | «Assistente», «Sistema»; una persona che ha eliminato l'account compare come «utente rimosso» |
 | Su cosa | «appartamento», «dispositivo», «regole», «programmazione» |
-| Il tipo di azione, in italiano | Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata», «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo» |
+| Il tipo di azione, in italiano | Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata» |
+| Altri esempi di tipo | «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo» |
 | Il valore prima e dopo, il motivo | Che cosa è cambiato e perché |
 | L'esito | «Applicata», «Respinta», «in attesa di approvazione», «Non riuscita», «Informativa» |
 | L'«ID richiesta» | L'identificativo dell'operazione |
@@ -824,7 +830,9 @@ I comandi funzionano solo sui dispositivi online e con la funzione «Comandi» a
 | Prese e interruttori | Tocca l'interruttore («Accendi …» / «Spegni …») | Lo stato diventa «Acceso» o «Spento» |
 | Caldaia | «Attiva …» / «Disattiva …» abilita o disabilita il riscaldamento | Leggi «Riscaldamento abilitato» / «Riscaldamento disabilitato» |
 | Caldaia e climatizzatore | «Diminuisci temperatura» e «Aumenta temperatura» accanto a «Temperatura», a passi di 0,5 °C, entro «da … a … °C» | Fuori dai limiti il comando è rifiutato («Il setpoint deve essere tra … e …») |
-| Climatizzatore | L'interruttore, «Modo» («caldo», «freddo», «deumidifica», «ventilazione») e «Ventola» («auto», «bassa», «media», «alta») | Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all'inizio) |
+| Climatizzatore | L'interruttore | Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all'inizio) |
+| Climatizzatore, «Modo» | Scegli «caldo», «freddo», «deumidifica», «ventilazione» | Il modo cambia |
+| Climatizzatore, «Ventola» | Scegli «auto», «bassa», «media», «alta» | La ventola cambia |
 
 > **Da sapere**
 >
@@ -2513,7 +2521,8 @@ Per ogni problema annota:
   questo appartamento».
 - **Stati con l'iniziale maiuscola**: «In attesa», «Approvata», «Respinta», «Scaduta», «Applicata», «Non riuscita»,
   «In programma», «Eseguita».
-- **E anche**: «Risposto», «Richiede approvazione», «Vuoto», «Occupato», «Prenotato», come «In salute» e «Online».
+- **E anche**: «Risposto», «Richiede approvazione».
+- **E l'occupazione**: «Vuoto», «Occupato», «Prenotato», come «In salute» e «Online».
 - **Interfaccia ripulita**: pulsante principale scuro, meno effetti, testi più leggibili sul telefono.
 - **Via** la riga «Ambiente» dalle Impostazioni, il piè di pagina della pagina di accesso e i codici inglesi in
   Amministrazione › Funzioni: le funzioni si leggono con i nomi del menu.

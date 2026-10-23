@@ -1079,7 +1079,8 @@ lettura».</p>
 <tr><td data-label="Zona della pagina" class="align-left">In alto</td><td data-label="Cosa vedi" class="align-left">«In tempo reale»</td><td data-label="Cosa vuol dire" class="align-left">La pagina si aggiorna da sola</td></tr>
 <tr><td data-label="Zona della pagina" class="align-left">In alto</td><td data-label="Cosa vedi" class="align-left">«Riconnessione…»</td><td data-label="Cosa vuol dire" class="align-left">Sta ricollegandosi: non prendere per buono un valore vecchio</td></tr>
 <tr><td data-label="Zona della pagina" class="align-left">La striscia di salute</td><td data-label="Cosa vedi" class="align-left">«In salute», «Degradata» o «Ferma»</td><td data-label="Cosa vuol dire" class="align-left">Lo stato del sistema domotico</td></tr>
-<tr><td data-label="Zona della pagina" class="align-left">La striscia di salute</td><td data-label="Cosa vedi" class="align-left">«Connettore» «attivo» o «fermo», «… dispositivi connessi», «Modello» (lo stato dell&#x27;assistente), «Contratto» e «Ultimo evento …»</td><td data-label="Cosa vuol dire" class="align-left">I dettagli della salute</td></tr>
+<tr><td data-label="Zona della pagina" class="align-left">La striscia di salute</td><td data-label="Cosa vedi" class="align-left">«Connettore» «attivo» o «fermo», «… dispositivi connessi»</td><td data-label="Cosa vuol dire" class="align-left">Il collegamento con i dispositivi</td></tr>
+<tr><td data-label="Zona della pagina" class="align-left">La striscia di salute</td><td data-label="Cosa vedi" class="align-left">«Modello» (lo stato dell&#x27;assistente), «Contratto» e «Ultimo evento …»</td><td data-label="Cosa vuol dire" class="align-left">Gli altri dettagli della salute</td></tr>
 <tr><td data-label="Zona della pagina" class="align-left">La striscia di salute</td><td data-label="Cosa vedi" class="align-left">«Sistema domotico non raggiungibile»</td><td data-label="Cosa vuol dire" class="align-left">Il sistema domotico non risponde</td></tr>
 <tr><td data-label="Zona della pagina" class="align-left">La striscia di salute</td><td data-label="Cosa vedi" class="align-left">«Versione del contratto non compatibile» e «Il sistema domotico dichiara il contratto …: questa app supporta solo la versione 1.x. Contatta il supporto tecnico.»</td><td data-label="Cosa vuol dire" class="align-left">La versione del sistema non è compatibile</td></tr>
 <tr><td data-label="Zona della pagina" class="align-left">«Modalità»</td><td data-label="Cosa vedi" class="align-left">La modalità attuale fra «comfort», «eco» e «casa vuota»</td><td data-label="Cosa vuol dire" class="align-left">La modalità in corso</td></tr>
@@ -1092,7 +1093,10 @@ lettura».</p>
 <tbody>
 <tr><td data-label="Dispositivo" class="align-left">Prese e interruttori</td><td data-label="Cosa vedi" class="align-left">«Acceso» o «Spento»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Caldaia</td><td data-label="Cosa vedi" class="align-left">«Riscaldamento abilitato» o «Riscaldamento disabilitato»; se il suo misuratore segna più di 30 W, «sta scaldando ora»</td></tr>
-<tr><td data-label="Dispositivo" class="align-left">Climatizzatore</td><td data-label="Cosa vedi" class="align-left">Acceso o spento; «Modo» («caldo», «freddo», «deumidifica», «ventilazione»); «Ventola» («auto», «bassa», «media», «alta»); «Temperatura» desiderata con «da … a … °C»</td></tr>
+<tr><td data-label="Dispositivo" class="align-left">Climatizzatore</td><td data-label="Cosa vedi" class="align-left">Acceso o spento</td></tr>
+<tr><td data-label="Dispositivo" class="align-left">Climatizzatore, «Modo»</td><td data-label="Cosa vedi" class="align-left">«caldo», «freddo», «deumidifica», «ventilazione»</td></tr>
+<tr><td data-label="Dispositivo" class="align-left">Climatizzatore, «Ventola»</td><td data-label="Cosa vedi" class="align-left">«auto», «bassa», «media», «alta»</td></tr>
+<tr><td data-label="Dispositivo" class="align-left">Climatizzatore, «Temperatura»</td><td data-label="Cosa vedi" class="align-left">La temperatura desiderata con «da … a … °C»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Misuratore di consumo</td><td data-label="Cosa vedi" class="align-left">«Potenza» (in W, cioè quanto consuma adesso) e «Oggi» (kWh di oggi)</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Sensori</td><td data-label="Cosa vedi" class="align-left">«Temperatura», «Umidità»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Contatto finestra</td><td data-label="Cosa vedi" class="align-left">«Aperta» o «Chiusa» «da …»</td></tr>
@@ -1177,9 +1181,11 @@ per 24 mesi.</p>
 <thead><tr><th scope="col" class="align-left">Ogni riga mostra</th><th scope="col" class="align-left">Valori possibili</th></tr></thead>
 <tbody>
 <tr><td data-label="Ogni riga mostra" class="align-left">La data</td><td data-label="Valori possibili" class="align-left">Quando è successo</td></tr>
-<tr><td data-label="Ogni riga mostra" class="align-left">Chi ha deciso</td><td data-label="Valori possibili" class="align-left">«Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; una persona che ha eliminato l&#x27;account compare come «utente rimosso»</td></tr>
+<tr><td data-label="Ogni riga mostra" class="align-left">Chi ha deciso</td><td data-label="Valori possibili" class="align-left">«Motore AI», «Regola «…»», «Gestore»</td></tr>
+<tr><td data-label="Ogni riga mostra" class="align-left">Chi ha deciso</td><td data-label="Valori possibili" class="align-left">«Assistente», «Sistema»; una persona che ha eliminato l&#x27;account compare come «utente rimosso»</td></tr>
 <tr><td data-label="Ogni riga mostra" class="align-left">Su cosa</td><td data-label="Valori possibili" class="align-left">«appartamento», «dispositivo», «regole», «programmazione»</td></tr>
-<tr><td data-label="Ogni riga mostra" class="align-left">Il tipo di azione, in italiano</td><td data-label="Valori possibili" class="align-left">Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata», «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo»</td></tr>
+<tr><td data-label="Ogni riga mostra" class="align-left">Il tipo di azione, in italiano</td><td data-label="Valori possibili" class="align-left">Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata»</td></tr>
+<tr><td data-label="Ogni riga mostra" class="align-left">Altri esempi di tipo</td><td data-label="Valori possibili" class="align-left">«Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo»</td></tr>
 <tr><td data-label="Ogni riga mostra" class="align-left">Il valore prima e dopo, il motivo</td><td data-label="Valori possibili" class="align-left">Che cosa è cambiato e perché</td></tr>
 <tr><td data-label="Ogni riga mostra" class="align-left">L&#x27;esito</td><td data-label="Valori possibili" class="align-left">«Applicata», «Respinta», «in attesa di approvazione», «Non riuscita», «Informativa»</td></tr>
 <tr><td data-label="Ogni riga mostra" class="align-left">L&#x27;«ID richiesta»</td><td data-label="Valori possibili" class="align-left">L&#x27;identificativo dell&#x27;operazione</td></tr>
@@ -1546,7 +1552,9 @@ regole ripartono.</p>
 <tr><td data-label="Dispositivo" class="align-left">Prese e interruttori</td><td data-label="Cosa puoi fare" class="align-left">Tocca l&#x27;interruttore («Accendi …» / «Spegni …»)</td><td data-label="Cosa succede" class="align-left">Lo stato diventa «Acceso» o «Spento»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Caldaia</td><td data-label="Cosa puoi fare" class="align-left">«Attiva …» / «Disattiva …» abilita o disabilita il riscaldamento</td><td data-label="Cosa succede" class="align-left">Leggi «Riscaldamento abilitato» / «Riscaldamento disabilitato»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Caldaia e climatizzatore</td><td data-label="Cosa puoi fare" class="align-left">«Diminuisci temperatura» e «Aumenta temperatura» accanto a «Temperatura», a passi di 0,5 °C, entro «da … a … °C»</td><td data-label="Cosa succede" class="align-left">Fuori dai limiti il comando è rifiutato («Il setpoint deve essere tra … e …»)</td></tr>
-<tr><td data-label="Dispositivo" class="align-left">Climatizzatore</td><td data-label="Cosa puoi fare" class="align-left">L&#x27;interruttore, «Modo» («caldo», «freddo», «deumidifica», «ventilazione») e «Ventola» («auto», «bassa», «media», «alta»)</td><td data-label="Cosa succede" class="align-left">Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all&#x27;inizio)</td></tr>
+<tr><td data-label="Dispositivo" class="align-left">Climatizzatore</td><td data-label="Cosa puoi fare" class="align-left">L&#x27;interruttore</td><td data-label="Cosa succede" class="align-left">Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all&#x27;inizio)</td></tr>
+<tr><td data-label="Dispositivo" class="align-left">Climatizzatore, «Modo»</td><td data-label="Cosa puoi fare" class="align-left">Scegli «caldo», «freddo», «deumidifica», «ventilazione»</td><td data-label="Cosa succede" class="align-left">Il modo cambia</td></tr>
+<tr><td data-label="Dispositivo" class="align-left">Climatizzatore, «Ventola»</td><td data-label="Cosa puoi fare" class="align-left">Scegli «auto», «bassa», «media», «alta»</td><td data-label="Cosa succede" class="align-left">La ventola cambia</td></tr>
 </tbody></table></div>
 <blockquote class="note-info">
 <p><strong>Da sapere</strong></p>
@@ -4048,7 +4056,10 @@ questo appartamento».</p>
 «In programma», «Eseguita».</p>
 </li>
 <li>
-<p><strong>E anche</strong>: «Risposto», «Richiede approvazione», «Vuoto», «Occupato», «Prenotato», come «In salute» e «Online».</p>
+<p><strong>E anche</strong>: «Risposto», «Richiede approvazione».</p>
+</li>
+<li>
+<p><strong>E l&#x27;occupazione</strong>: «Vuoto», «Occupato», «Prenotato», come «In salute» e «Online».</p>
 </li>
 <li>
 <p><strong>Interfaccia ripulita</strong>: pulsante principale scuro, meno effetti, testi più leggibili sul telefono.</p>
