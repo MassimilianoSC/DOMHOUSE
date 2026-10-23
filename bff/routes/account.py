@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 from .. import accounts, audit, erasure, support
 from ..auth import CurrentUser, Identity, resolve_own_identity, resolve_own_user
 from ..logs import info, warn
-from ..repository import User, get_repository
+from ..repository import User, get_repository, normalize_email
 
 router = APIRouter(prefix="/app/me")
 
@@ -23,18 +23,30 @@ class ProfilePatch(BaseModel):
 
 
 @router.patch("")
-async def patch_profile(body: ProfilePatch, user: CurrentUser = Depends(resolve_own_user)):
+async def patch_profile(body: ProfilePatch, identity: Identity = Depends(resolve_own_identity)):
+    """The name: a member's in the organisation's record, a platform manager's in the managers' list (D-178: also
+    without an organisation); a manager who is also a member gets both."""
     repo = get_repository()
-    stored = await repo.get_user(user.uid) or User(uid=user.uid, email=user.email, tenant_id=user.tenant_id, role=user.role)
-    stored.display_name = body.display_name.strip()
-    saved = await repo.upsert_user(stored)
-    return {"display_name": saved.display_name}
+    name = body.display_name.strip()
+    user = identity.user
+    if user is not None:
+        stored = await repo.get_user(user.uid) or User(uid=user.uid, email=user.email, tenant_id=user.tenant_id,
+                                                       role=user.role)
+        stored.display_name = name
+        await repo.upsert_user(stored)
+    if identity.platform_manager:
+        member = await repo.get_platform_member(normalize_email(identity.email))
+        if member is not None:
+            member.display_name = name
+            await repo.add_platform_member(member)
+    return {"display_name": name}
 
 
 @router.post("/revoke-sessions", status_code=204)
-async def revoke_sessions(user: CurrentUser = Depends(resolve_own_user)):
-    """Signs the user out everywhere: every refresh token is revoked and current ID tokens are refused."""
-    await asyncio.to_thread(accounts.revoke_sessions, user.uid)
+async def revoke_sessions(identity: Identity = Depends(resolve_own_identity)):
+    """Signs the person out everywhere (D-178: also a platform manager without an organisation): every refresh token is
+    revoked and current ID tokens are refused. One Firebase account for every environment: everywhere means everywhere."""
+    await asyncio.to_thread(accounts.revoke_sessions, identity.uid)
 
 
 @router.delete("", status_code=204)

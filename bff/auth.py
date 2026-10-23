@@ -322,6 +322,10 @@ async def _identity(request: Request, allow_suspended: bool = False) -> Identity
             user = None
         name = (user.display_name if user else claims.get("name", "")) or ""
     platform = await _is_platform_member(email, verified, name)
+    if user is None and platform:                 # D-178: the name saved in the managers' list
+        member = await repo.get_platform_member(normalize_email(email))
+        if member is not None and member.display_name:
+            name = member.display_name
     if user is None and not platform:
         if settings.auth_mode == "dev":
             raise _err(401, "unauthorized", "Utente di sviluppo sconosciuto")
