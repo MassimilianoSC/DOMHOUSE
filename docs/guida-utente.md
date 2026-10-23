@@ -850,9 +850,9 @@ dispositivi o consumi.
 - **«Istanza simulata (appartamento dimostrativo)»** («Per prove e dimostrazioni: gli amministratori
   dell'organizzazione vedono il Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»): con il
   motore simulato integrato è sempre accesa («Con il motore simulato integrato (mock://) l'istanza è sempre simulata.»).
-  Passando a un sistema domotico vero l'appartamento torna reale, salvo lasciare accesa la casella. Nel sito vero non si
-  possono creare appartamenti con il motore simulato integrato («I dimostrativi stanno nell'ambiente di prova: in
-  produzione solo appartamenti veri») e un tale appartamento non può avere un codice Italianway («In produzione un
+  Passando a un sistema domotico vero l'appartamento torna reale, salvo lasciare accesa la casella. Nel sito vero, fino
+  alla consegna al cliente, i dimostrativi con il motore simulato integrato sono ammessi come nell'ambiente di prova
+  (dal 23 ottobre); un tale appartamento non può avere un codice Italianway («In produzione un
   appartamento dimostrativo non può avere un codice Italianway»); un sistema domotico vero segnato dimostrativo può
   averlo. Ogni cambio del tipo resta nel registro («… ha segnato l'appartamento … come istanza simulata»).
 - **Com'è il dimostrativo all'inizio**: nel campo «URL istanza» scrivi `mock://builtin?variante=vuoto` (nessun ospite,
@@ -1305,7 +1305,7 @@ dell'email di chi comanda.
 | «La durata va da 1 a 24 ore», «Scrivi il motivo dell'accesso di assistenza», «L'organizzazione è sospesa», «Hai già un accesso di assistenza aperto in questa organizzazione», «Accesso non aperto: riprova tra poco» | Condizioni dell'accesso di assistenza | Correggi o riprova |
 | «Accesso di assistenza inesistente» | L'accesso è già chiuso | Niente da fare |
 | «Identificativo non disponibile», «Collegamento già usato da un altro appartamento», «Codice Italianway già in uso» | Valori già usati o non riusabili | Scegli valori diversi |
-| «Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi mock://builtin nel campo URL istanza», «I dimostrativi stanno nell'ambiente di prova: in produzione solo appartamenti veri» | Collegamento non ammesso in questo ambiente | Correggi il collegamento |
+| «Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi mock://builtin nel campo URL istanza» | Collegamento scritto male o non ammesso | Correggi il collegamento |
 | «Ha già il ruolo di gestore della piattaforma», «Non è un gestore della piattaforma», «È l'ultimo gestore della piattaforma: nomina prima qualcun altro» | Condizioni sui gestori | Rileggi l'elenco |
 
 ### Nelle Impostazioni e nelle notifiche
