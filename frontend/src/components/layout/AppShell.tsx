@@ -28,7 +28,7 @@ function useNav() {
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
     "flex min-h-[44px] items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors focus-ring [&_svg]:size-[18px]",
-    isActive ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+    isActive ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
   );
 
 function Links({ items, prefix, onNavigate }: { items: NavItem[]; prefix: string; onNavigate?: () => void }) {
@@ -53,9 +53,9 @@ function SidebarInstall({ prefix }: { prefix: string }) {
     else toast.info(t("settings.install"), { description: t(isIos() ? "settings.installIos" : "settings.installDesktop"), duration: 12000 });
   };
   return (
-    <Button variant="outline" className="mb-3 w-full justify-start" onClick={onClick} data-testid={`${prefix}-install-btn`}>
+    <button type="button" className={cn(linkClass({ isActive: false }), "mb-3 w-full")} onClick={onClick} data-testid={`${prefix}-install-btn`}>
       <Download /> {t("settings.install")}
-    </Button>
+    </button>
   );
 }
 
@@ -124,7 +124,7 @@ function MenuContent({ prefix, onNavigate }: { prefix: "sidebar" | "drawer"; onN
 /** Computer: the fixed sidebar. */
 function Sidebar() {
   return (
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r bg-card/80 p-4 backdrop-blur md:flex" aria-label={t("nav.mainMenu")}>
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r bg-background p-4 md:flex" aria-label={t("nav.mainMenu")}>
       <MenuContent prefix="sidebar" />
     </aside>
   );
@@ -141,7 +141,7 @@ function MobileMenu() {
   useEffect(() => setOpen(false), [pathname]); // any change of page closes it, whatever caused it
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
-      <header className="pt-safe sticky top-0 z-40 border-b bg-card/85 backdrop-blur-xl md:hidden">
+      <header className="pt-safe sticky top-0 z-40 border-b bg-background md:hidden">
         <div className="flex h-14 items-center gap-2 px-2">
           <DialogPrimitive.Trigger asChild>
             <Button variant="ghost" size="icon" aria-label={t("nav.openMenu")} data-testid="mobile-menu-btn">
@@ -155,7 +155,7 @@ function MobileMenu() {
         <EnvBanner testId="env-banner-mobile" />
       </header>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/30 backdrop-blur-sm data-[state=open]:animate-in data-[state=open]:fade-in-0 md:hidden" />
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/30 data-[state=open]:animate-in data-[state=open]:fade-in-0 md:hidden" />
         <DialogPrimitive.Content
           aria-describedby={undefined}
           className="pt-safe pb-safe pl-safe fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col overflow-y-auto border-r bg-card px-4 pb-4 shadow-xl data-[state=open]:animate-in data-[state=open]:slide-in-from-left md:hidden"
