@@ -6,9 +6,11 @@ import { AdminAssistant } from "./AdminAssistant";
 // organization; a week above 10 % highlighted; two complete weeks in a row above it reopen the choice of the model.
 const s = vi.hoisted(() => ({ answer: null as unknown, calls: [] as string[] }));
 
+// The BFF's shape (o1 32d50fe): from the Monday to the Sunday, both included, as calendar dates.
+const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const week = (n: number, asks: number, timeouts: number, quick = { timeout: timeouts, model_unavailable: 0, monthly_cap: 0, json_invalid: 0 }) => {
-  const monday = new Date(Date.UTC(2026, 9, 18, 22) - n * 7 * 86_400_000); // Monday 00:00 in Rome (19 Oct 2026, CEST)
-  return { week: `2026-W${43 - n}`, from: monday.toISOString(), to: new Date(monday.getTime() + 7 * 86_400_000).toISOString(), asks, timeouts, twins: 0, quick };
+  const monday = Date.UTC(2026, 9, 19) - n * 7 * 86_400_000; // Monday 19 October 2026
+  return { week: `2026-W${43 - n}`, from: day(monday), to: day(monday + 6 * 86_400_000), asks, timeouts, twins: 0, quick };
 };
 
 beforeEach(() => {
@@ -58,5 +60,13 @@ describe("Amministrazione › Assistente (decisione 120)", () => {
     open();
     expect(await screen.findByTestId("admin-assistant-empty")).toHaveTextContent("Nessuna domanda all'assistente nelle ultime settimane.");
     expect(screen.queryByTestId("admin-assistant-table")).toBeNull();
+  });
+});
+
+describe("settimana a cavallo di due mesi, con le date del server", () => {
+  it("«dal 28 settembre al 4 ottobre»", async () => {
+    s.answer = { weeks: [{ week: "2026-W40", from: "2026-09-28", to: "2026-10-04", asks: 1, timeouts: 0, twins: 0, quick: { timeout: 0, model_unavailable: 0, monthly_cap: 0, json_invalid: 0 } }], threshold_percent: 10, over_threshold: false };
+    open();
+    expect(await screen.findByTestId("admin-assistant-week-2026-W40")).toHaveTextContent("dal 28 settembre al 4 ottobre");
   });
 });

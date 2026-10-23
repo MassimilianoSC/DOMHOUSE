@@ -94,7 +94,8 @@ export interface WebhookLog {
 
 /** One week of the organization's questions to the assistant (decision 120, D-183): `timeouts` are the questions that
  *  ended in a quick answer because the model did not answer in time (the threshold is timeouts / asks); `twins` the
- *  second requests started, information only. From and to: Monday 00:00 and the Monday after (exclusive), in Rome. */
+ *  second requests started, information only. From and to: the Monday and the Sunday (both included) as calendar
+ *  dates, «2026-10-19» and «2026-10-25», weeks in Europe/Rome (o1 32d50fe). */
 export interface AssistantWeek {
   week: string;
   from: string;

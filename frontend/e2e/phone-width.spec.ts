@@ -99,6 +99,24 @@ test.describe("telefono a 360 px: niente fuori dallo schermo (P-73)", () => {
     });
   }
 
+  test("Amministrazione › Assistente, con la route vera del contatore", async ({ page }) => {
+    await signIn(page);
+    // one question first: the counter counts it when the site reads its final state
+    await page.goto(`/a/${await firstApartment(page)}/assistente`);
+    await settle(page);
+    await page.getByTestId("assistant-input").fill("spegni la presa della camera");
+    await page.getByTestId("assistant-send-btn").click();
+    await expect(page.locator("[data-testid^=\"ask-message-\"]").first()).not.toHaveAttribute("data-status", "pending", { timeout: 30_000 });
+    await page.goto("/admin");
+    await settle(page);
+    await page.getByTestId("admin-tab-assistant").click();
+    const current = page.locator("[data-testid^=\"admin-assistant-week-\"]").first();
+    await expect(current).toContainText("in corso");
+    expect(Number(await current.locator("td").nth(1).textContent())).toBeGreaterThanOrEqual(1);
+    await expect(page.getByTestId("admin-assistant-error")).toHaveCount(0);
+    expect(await overflowing(page)).toEqual([]);
+  });
+
   test("organizzazioni, come gestore della piattaforma", async ({ page }) => {
     await signIn(page, /Gestore della piattaforma/);
     await page.goto("/organizzazioni");

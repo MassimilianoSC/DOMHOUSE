@@ -9,6 +9,13 @@ import { cn } from "@/lib/utils";
 
 /** Share of the questions that ended in a quick answer because the model did not answer in time (decision 120). */
 const percent = (w: AssistantWeek) => (w.asks > 0 ? (w.timeouts / w.asks) * 100 : 0);
+/** The week as «dal 13 al 19 ottobre». The BFF sends calendar dates, Monday and Sunday included (o1 32d50fe): read
+ *  as days, with no time zone in between; instants with an exclusive end are still understood. */
+const isDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
+const weekLabel = (w: AssistantWeek) =>
+  isDate(w.from) && isDate(w.to)
+    ? weekRange(`${w.from}T00:00:00Z`, new Date(Date.parse(`${w.to}T00:00:00Z`) + 86_400_000).toISOString(), "UTC")
+    : weekRange(w.from, w.to, DEFAULT_TZ);
 const quickTotal = (w: AssistantWeek) => w.quick.timeout + w.quick.model_unavailable + w.quick.monthly_cap + w.quick.json_invalid;
 
 /**
@@ -60,7 +67,7 @@ export function AdminAssistant() {
                   return (
                     <tr key={w.week} className={cn("border-b last:border-0", over && "bg-amber-50 dark:bg-amber-950/40")} data-testid={`admin-assistant-week-${w.week}`} data-over={over}>
                       <td className="px-4 py-2">
-                        {weekRange(w.from, w.to, DEFAULT_TZ)}
+                        {weekLabel(w)}
                         {i === 0 && <span className="ml-1 text-xs text-muted-foreground">({t("admin.assistant.current")})</span>}
                       </td>
                       <td className="px-2 py-2 text-right tabular">{w.asks}</td>
