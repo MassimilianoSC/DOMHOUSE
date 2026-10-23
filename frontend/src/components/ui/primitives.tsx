@@ -49,7 +49,7 @@ export const NativeSelect = React.forwardRef<HTMLSelectElement, React.SelectHTML
 NativeSelect.displayName = "NativeSelect";
 
 export const Label = ({ className, ...p }: React.LabelHTMLAttributes<HTMLLabelElement>) => (
-  <label className={cn("text-xs font-semibold uppercase tracking-wide text-muted-foreground", className)} {...p} />
+  <label className={cn("text-[13px] font-medium text-muted-foreground", className)} {...p} />
 );
 
 export const Switch = React.forwardRef<React.ElementRef<typeof SwitchPrimitive.Root>, React.ComponentPropsWithoutRef<typeof SwitchPrimitive.Root>>(

@@ -69,7 +69,7 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
         <div className="grid gap-3 sm:grid-cols-2">
           {Object.entries(rule.limits).map(([key, lim]) => (
             <div key={key} className="space-y-1">
-              <label htmlFor={`rule-${rule.rule_id}-${key}`} className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <label htmlFor={`rule-${rule.rule_id}-${key}`} className="text-[13px] font-medium text-muted-foreground">
                 {tOr(`rules.params.${key}`, key)} <span className="font-normal normal-case">({t("rules.range", { min: fmtNumber(lim.min), max: fmtNumber(lim.max) })})</span>
               </label>
               <Input

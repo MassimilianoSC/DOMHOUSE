@@ -91,7 +91,7 @@ function Row({ log, apartments }: { log: WebhookLog; apartments: AdminApartment[
             </span>
           </div>
           <div className="text-xs font-semibold text-muted-foreground">{t("admin.bookingsReceived.rawBody")}</div>
-          <pre className="max-h-64 overflow-auto rounded-xl bg-secondary/70 p-3 font-mono text-[11px] leading-relaxed" data-testid={`webhook-log-body-${log.log_id}`}>{log.raw_body || "∅"}</pre>
+          <pre className="max-h-64 overflow-auto rounded-xl bg-secondary/70 p-3 font-mono text-xs leading-relaxed" data-testid={`webhook-log-body-${log.log_id}`}>{log.raw_body || "∅"}</pre>
         </div>
       )}
     </li>

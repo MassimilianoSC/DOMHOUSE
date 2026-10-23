@@ -26,7 +26,7 @@ export function CopyableId({ id, testId, className, label, full = false }: { id:
       aria-label={`${t("common.copy")} ${name} ${id}`}
       data-testid={testId ?? "correlation-id"}
       data-correlation-id={id}
-      className={cn("inline-flex max-w-full items-center gap-1 rounded-md border border-dashed border-current/40 px-1.5 py-0.5 font-mono text-[11px] opacity-80 transition-opacity hover:opacity-100 focus-ring", className)}
+      className={cn("inline-flex max-w-full items-center gap-1 rounded-md border border-dashed border-current/40 px-1.5 py-0.5 font-mono text-xs opacity-80 transition-opacity hover:opacity-100 focus-ring", className)}
     >
       {copied ? <Check className="h-3 w-3" aria-hidden /> : <Copy className="h-3 w-3" aria-hidden />}
       <span className="truncate">{copied ? t("common.copied") : full ? id : id.slice(0, 8)}</span>

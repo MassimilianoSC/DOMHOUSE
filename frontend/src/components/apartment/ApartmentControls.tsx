@@ -40,7 +40,7 @@ export function ModeSelector({ aptId, apartment, canWrite }: { aptId: string; ap
 
   return (
     <div className="space-y-2">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("mode.label")}</div>
+      <div className="text-[13px] font-medium text-muted-foreground">{t("mode.label")}</div>
       <div role="radiogroup" aria-label={t("mode.label")} className="inline-flex rounded-full border bg-secondary/60 p-1" data-testid="mode-selector">
         {MODES.map((m) => (
           <button
@@ -114,7 +114,7 @@ export function HoldControl({ aptId, apartment, canWrite }: { aptId: string; apa
   const h = apartment.hold;
   return (
     <div className="space-y-2" data-testid="hold-control">
-      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("hold.label")}</div>
+      <div className="text-[13px] font-medium text-muted-foreground">{t("hold.label")}</div>
       {h ? (
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-primary/30 bg-primary/5 px-3 py-2" data-testid="hold-active">
           <Timer className="h-4 w-4 text-primary" aria-hidden />

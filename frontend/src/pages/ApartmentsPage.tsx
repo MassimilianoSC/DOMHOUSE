@@ -17,7 +17,7 @@ function Stat({ icon, label, value, testId }: { icon: React.ReactNode; label: st
     <div className="flex items-center gap-2.5" data-testid={testId}>
       <span className="text-muted-foreground [&_svg]:size-4">{icon}</span>
       <div className="min-w-0">
-        <div className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-[13px] font-medium text-muted-foreground">{label}</div>
         <div className="text-sm font-semibold tabular [overflow-wrap:anywhere]">{value}</div>
       </div>
     </div>

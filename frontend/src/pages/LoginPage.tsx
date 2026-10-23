@@ -38,7 +38,7 @@ function DevLogin() {
             <span className="block truncate text-sm font-bold">{u.display_name}</span>
             <span className="block truncate text-xs text-muted-foreground">{u.email}</span>
           </span>
-          <span className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-bold">{u.role ? t(`roles.${u.role}`) : t("roles.platform")}</span>
+          <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-bold">{u.role ? t(`roles.${u.role}`) : t("roles.platform")}</span>
         </button>
       ))}
     </div>

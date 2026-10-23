@@ -44,7 +44,7 @@ function Stat({ icon, label, value, unit, hint, testId }: { icon: React.ReactNod
     <Card className="flex items-center gap-4 p-5" data-testid={testId} tabIndex={hint ? 0 : undefined}>
       <span className="rounded-2xl bg-primary/10 p-3 text-primary">{icon}</span>
       <div>
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-[13px] font-medium text-muted-foreground">{label}</div>
         <div className="text-2xl font-extrabold tabular">{value} <span className="text-sm font-semibold text-muted-foreground">{unit}</span></div>
       </div>
     </Card>
@@ -113,7 +113,7 @@ function StayComparison({ current, previous, prev, tz, aptId }: { current: numbe
         <div className={`text-xl font-extrabold tabular ${up ? "text-negative-fg" : "text-positive-fg"}`} data-testid="energy-stay-delta">
           {delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta}%`}
         </div>
-        <div className="text-[11px] text-muted-foreground">{t("energy.vsPrevious")}</div>
+        <div className="text-xs text-muted-foreground">{t("energy.vsPrevious")}</div>
       </div>
       <StayReportButton aptId={aptId} bookingId={prev.booking_id} testId="energy-export-previous-stay" />
     </Card>

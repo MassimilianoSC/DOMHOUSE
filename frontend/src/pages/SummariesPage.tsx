@@ -64,7 +64,7 @@ function EnergyCard({ energy }: { energy: WeeklySummary["energy"] }) {
               <h3 className="text-sm font-bold">{t("summaries.byDevice")}</h3>
               {energy.devices.map((d) => (
                 <div key={d.device_id} className="rounded-xl bg-secondary/50 px-3 py-1" data-testid={`summary-device-${d.device_id}`}>
-                  <div className="pt-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">{d.label}</div>
+                  <div className="pt-1 text-[13px] font-medium text-muted-foreground">{d.label}</div>
                   <Comparison label={t("summaries.occupied")} c={d.occupied} testId={`summary-device-${d.device_id}-occupied`} />
                   <Comparison label={t("summaries.vacant")} c={d.vacant} testId={`summary-device-${d.device_id}-vacant`} />
                 </div>

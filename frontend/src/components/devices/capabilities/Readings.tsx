@@ -10,9 +10,9 @@ function Reading({ icon, label, value, sub, testId, tone }: { icon: ReactNode; l
     <div className="flex items-center gap-3 rounded-xl bg-secondary/60 px-3 py-2" data-testid={testId}>
       <span className={cn("text-muted-foreground", tone === "warn" && "text-primary")}>{icon}</span>
       <div className="min-w-0">
-        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-[13px] font-medium text-muted-foreground">{label}</div>
         <div className={cn("text-sm font-bold tabular", tone === "warn" && "text-primary")}>{value}</div>
-        {sub && <div className="truncate text-[11px] text-muted-foreground">{sub}</div>}
+        {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
       </div>
     </div>
   );

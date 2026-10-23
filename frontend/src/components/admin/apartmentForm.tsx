@@ -35,7 +35,7 @@ export function SimulatedField({ url, value, onChange }: { url: string; value: b
         <Label htmlFor="apt-simulated">{t("platform.simulated")}</Label>
         <Switch id="apt-simulated" checked={locked || value} disabled={locked} onCheckedChange={onChange} data-testid="apt-form-simulated" />
       </div>
-      <p className="text-[11px] text-muted-foreground" data-testid="apt-form-simulated-hint">{t(locked ? "platform.simulatedLocked" : "platform.simulatedHint")}</p>
+      <p className="text-xs text-muted-foreground" data-testid="apt-form-simulated-hint">{t(locked ? "platform.simulatedLocked" : "platform.simulatedHint")}</p>
     </div>
   );
 }
@@ -53,7 +53,7 @@ export function Field({ id, label, value, onChange, type = "text", placeholder, 
     <div className="space-y-1">
       <Label htmlFor={id}>{label}</Label>
       <Input id={id} type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} data-testid={`apt-form-${id}`} />
-      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }

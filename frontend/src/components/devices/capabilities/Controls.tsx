@@ -83,7 +83,7 @@ export function HeatingControl({ device, state, disabled, send }: CapProps<Heati
         onToggle={(v) => send(v ? { capability: "heating", action: "set_heating", params: { on: true } } : { capability: "heating", action: "turn_off" })}
       />
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("cap.setpoint")}</span>
+        <span className="text-[13px] font-medium text-muted-foreground">{t("cap.setpoint")}</span>
         <SetpointStepper
           value={state.setpoint}
           min={state.setpoint_min}
@@ -138,14 +138,14 @@ export function ClimateControl({ device, state, disabled, send }: CapProps<Clima
         </div>
         {state.confirmation === "none" && (
           <Tip content={t("cap.notVerifiedHint")}>
-            <span tabIndex={0} data-testid={tid(device, "climate-unverified")} className="rounded-full border border-dashed px-2 py-0.5 text-[10px] font-semibold uppercase text-muted-foreground focus-ring">
+            <span tabIndex={0} data-testid={tid(device, "climate-unverified")} className="rounded-full border border-dashed px-2 py-0.5 text-xs font-medium text-muted-foreground focus-ring">
               {t("cap.notVerified")}
             </span>
           </Tip>
         )}
       </div>
       <div className="flex items-center justify-between gap-2">
-        <span className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="flex items-center gap-1 text-[13px] font-medium text-muted-foreground">
           <Power className="h-3 w-3" aria-hidden /> {t("cap.setpoint")}
         </span>
         <SetpointStepper
@@ -159,7 +159,7 @@ export function ClimateControl({ device, state, disabled, send }: CapProps<Clima
       </div>
       <Pills value={state.mode} options={CLIMATE_MODES} label={t("cap.climateMode")} disabled={disabled} onPick={(m) => set({ mode: m })} testId={tid(device, "climate-mode")} i18n="cap.climateModes" />
       <div className="flex items-center gap-2">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("cap.fan")}</span>
+        <span className="text-[13px] font-medium text-muted-foreground">{t("cap.fan")}</span>
         <Pills value={state.fan} options={FANS} label={t("cap.fan")} disabled={disabled} onPick={(f) => set({ fan: f })} testId={tid(device, "climate-fan")} i18n="cap.fans" />
       </div>
     </div>

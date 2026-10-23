@@ -63,7 +63,7 @@ function DecisionRow({ d, tz, ruleLabels }: { d: Decision; tz: string; ruleLabel
           )}
         </div>
         <p className="text-sm text-muted-foreground" data-testid={`decision-reasoning-${d.decision_id}`}>{d.reasoning}</p>
-        <div className="flex flex-wrap gap-2 text-[11px] text-muted-foreground">
+        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
           <CopyableId id={d.correlation_id} testId={`decision-correlation-${d.decision_id}`} />
           {d.command_id && <span className="font-mono">{d.command_id}</span>}
           {d.approval_id && <span className="font-mono">{d.approval_id}</span>}

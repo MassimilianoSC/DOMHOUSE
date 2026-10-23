@@ -62,7 +62,7 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
           <div className="space-y-1 sm:col-span-2">
             <Label htmlFor="apt-price">{t("admin.price.aptLabel")}</Label>
             <Input id="apt-price" inputMode="decimal" value={price} placeholder={t("admin.price.placeholder")} onChange={(e) => setPrice(e.target.value)} data-testid="apt-form-price" />
-            <p className={parsed === undefined ? "text-[11px] text-destructive" : "text-[11px] text-muted-foreground"} data-testid="apt-form-price-hint">
+            <p className={parsed === undefined ? "text-xs text-destructive" : "text-xs text-muted-foreground"} data-testid="apt-form-price-hint">
               {parsed === undefined ? t("admin.price.invalid") : t("admin.price.aptHint", { price: priceText(orgPrice) })}
             </p>
           </div>

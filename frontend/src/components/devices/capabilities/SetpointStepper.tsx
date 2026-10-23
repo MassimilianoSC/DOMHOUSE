@@ -36,7 +36,7 @@ export function SetpointStepper(props: {
         <div className="font-heading text-2xl font-extrabold tabular" data-testid={`${testId}-value`}>
           {fmtNumber(value)}°
         </div>
-        <div className="text-[10px] text-muted-foreground">{t("cap.range", { min: fmtNumber(min), max: fmtNumber(max) })}</div>
+        <div className="text-xs text-muted-foreground">{t("cap.range", { min: fmtNumber(min), max: fmtNumber(max) })}</div>
       </div>
       <Button
         variant="outline"

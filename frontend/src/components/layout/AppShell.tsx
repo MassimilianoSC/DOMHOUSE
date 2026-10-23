@@ -78,7 +78,7 @@ function MenuContent({ prefix, onNavigate }: { prefix: "sidebar" | "drawer"; onN
       </nav>
       {apt.length > 0 && (
         <nav className="mt-5 space-y-1 border-t pt-4" aria-label={t("nav.apartmentMenu")} data-testid={`${prefix}-apartment`}>
-          <div className="truncate px-3 pb-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">{aptName}</div>
+          <div className="truncate px-3 pb-1 text-[13px] font-medium text-muted-foreground">{aptName}</div>
           <Links items={apt} prefix={prefix} onNavigate={onNavigate} />
         </nav>
       )}
