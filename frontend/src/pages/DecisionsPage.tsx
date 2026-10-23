@@ -10,7 +10,8 @@ import { useDecisionLog } from "@/hooks/useDecisionLog";
 import { useDecisionSearch } from "@/hooks/useDecisionSearch";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
-import { Card, Input, NativeSelect, Skeleton } from "@/components/ui/primitives";
+import { Card, Input, NativeSelect } from "@/components/ui/primitives";
+import { RowsSkeleton } from "@/components/ui/Skeletons";
 import { t } from "@/i18n";
 import { MAX_RESULTS, matchesDecision, periodFrom } from "@/lib/decisionSearch";
 import { actionLabel, decisionValue, describeActor, deviceLabel } from "@/lib/describe";
@@ -159,7 +160,7 @@ export default function DecisionsPage() {
       {search.status === "error" && <ErrorNotice error={search.error} onRetry={search.more} testId="decisions-search-error" />}
       {!searching && log.head.error && <ErrorNotice error={log.head.error} onRetry={() => void log.head.refetch()} testId="decisions-error" />}
       {!searching && log.head.isLoading ? (
-        <div className="space-y-3">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-20 rounded-2xl" />)}</div>
+        <RowsSkeleton rows={4} lines={3} />
       ) : items.length === 0 ? (
         !searching && <Card className="p-10 text-center text-sm text-muted-foreground" data-testid="decisions-empty">{t("decisions.empty")}</Card>
       ) : (

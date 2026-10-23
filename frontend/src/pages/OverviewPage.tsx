@@ -8,6 +8,7 @@ import { FeatureUnavailable } from "@/components/apartment/Notices";
 import { StatusBand } from "@/components/apartment/StatusBand";
 import { DeviceCard } from "@/components/devices/DeviceCard";
 import { Card, Skeleton } from "@/components/ui/primitives";
+import { StripSkeleton } from "@/components/ui/Skeletons";
 import { useFeatures } from "@/hooks/useFeatures";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { t } from "@/i18n";
@@ -55,6 +56,7 @@ export default function OverviewPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-8">
       <Header aptId={aptId} />
+      {has("apartment") && !apartment && <StripSkeleton cells={6} className="grid-cols-2 sm:grid-cols-3 2xl:grid-cols-6" />}
       {has("apartment") && apartment && (
         <StatusBand apartment={apartment} devices={devices} rooms={rooms} kwhToday={summary.data?.kwh_today ?? null} energyOn={has("energy")} tz={tz} />
       )}
@@ -68,7 +70,19 @@ export default function OverviewPage() {
         {!has("devices") ? (
           <FeatureUnavailable />
         ) : !loaded ? (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-48 rounded-2xl" />)}</div>
+          // the final layout: a room title, then cards on the phone and one list on a computer (design lot 2)
+          <div className="space-y-3">
+            <Skeleton className="h-5 w-32 rounded-md" />
+            <div className="grid gap-4 md:grid-cols-2 lg:block lg:divide-y lg:overflow-hidden lg:rounded-lg lg:border lg:bg-card">
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="space-y-2 rounded-lg border bg-card p-4 lg:rounded-none lg:border-0 lg:px-5">
+                  <Skeleton className="h-4 w-40 rounded-sm" />
+                  <Skeleton className="h-3 w-24 rounded-sm" />
+                  <Skeleton className="h-16 rounded-md lg:ml-[14.5rem] lg:h-10 lg:max-w-2xl" />
+                </div>
+              ))}
+            </div>
+          </div>
         ) : devices.length === 0 ? (
           <Card className="p-10 text-center text-sm text-muted-foreground" data-testid="devices-empty">{t("overview.noDevices")}</Card>
         ) : (

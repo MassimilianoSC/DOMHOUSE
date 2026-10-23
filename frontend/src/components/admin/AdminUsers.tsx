@@ -7,8 +7,9 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ApartmentScopePicker, isNoneScope, scopeSummary } from "@/components/admin/ApartmentScope";
 import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { Button } from "@/components/ui/button";
-import { Badge, Card, Dialog, DialogContent, DialogDescription, DialogTitle, Input, Label, NativeSelect, Skeleton } from "@/components/ui/primitives";
+import { Badge, Card, Dialog, DialogContent, DialogDescription, DialogTitle, Input, Label, NativeSelect } from "@/components/ui/primitives";
 import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
+import { RowsSkeleton } from "@/components/ui/Skeletons";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 
@@ -129,7 +130,7 @@ export function AdminUsers() {
         )}
       </Card>
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="admin-users-error" />}
-      {q.isLoading ? <Skeleton className="h-48 rounded-2xl" /> : (
+      {q.isLoading ? <RowsSkeleton rows={4} /> : (
         <Card className="divide-y px-4 sm:px-5" data-testid="admin-users-list">
           {q.data?.map((u) => {
             const self = u.uid === me?.user.uid;

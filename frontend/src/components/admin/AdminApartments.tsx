@@ -8,7 +8,8 @@ import { DemoBadge, Field, LastCheck, VerifyBadge } from "@/components/admin/apa
 import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
-import { Badge, Card, Dialog, DialogContent, DialogTitle, Input, Label, Skeleton, Switch } from "@/components/ui/primitives";
+import { RowsSkeleton } from "@/components/ui/Skeletons";
+import { Badge, Card, Dialog, DialogContent, DialogTitle, Input, Label, Switch } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { fmtPrice, parsePrice, priceInput } from "@/lib/price";
@@ -210,7 +211,7 @@ export function AdminApartments() {
       {!isPlatform && <p className="text-sm text-muted-foreground" data-testid="admin-apartments-note">{t("admin.apartments.createdByPlatform")}</p>}
       {tenant.data && <PriceCard current={orgPrice} />}
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="admin-apartments-error" />}
-      {q.isLoading ? <Skeleton className="h-48 rounded-2xl" /> : q.data && q.data.length > 0 && (
+      {q.isLoading ? <RowsSkeleton rows={2} lines={3} /> : q.data && q.data.length > 0 && (
         <Card className="divide-y p-0" data-testid="admin-apartments-list">
           {q.data.map((a) => (
             <ApartmentRow key={a.apartment_id} a={a} orgPrice={orgPrice} verify={verify[a.apartment_id]} onVerify={() => void check(a.apartment_id)} onToggle={(v) => void toggle(a, v)} onEdit={() => setEditing(a)} />

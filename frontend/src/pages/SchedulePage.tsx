@@ -9,7 +9,8 @@ import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ScheduleDialog } from "@/components/schedule/ScheduleDialog";
 import { Button } from "@/components/ui/button";
-import { Card, Skeleton, StatusBadge, type Tone } from "@/components/ui/primitives";
+import { Card, StatusBadge, type Tone } from "@/components/ui/primitives";
+import { RowsSkeleton } from "@/components/ui/Skeletons";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { describeAction } from "@/lib/describe";
@@ -94,7 +95,7 @@ export default function SchedulePage() {
       />
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="schedule-error" />}
       {q.isLoading ? (
-        <div className="space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-24 rounded-2xl" />)}</div>
+        <RowsSkeleton rows={3} />
       ) : (
         <>
           <section className="space-y-3" aria-label={t("schedule.planned")}>

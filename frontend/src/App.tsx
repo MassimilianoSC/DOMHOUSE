@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useAuth, useRole } from "@/auth/AuthProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { Skeleton } from "@/components/ui/primitives";
+import { PageSkeleton } from "@/components/ui/Skeletons";
 import { useFeatures } from "@/hooks/useFeatures";
 import { t } from "@/i18n";
 import { lazyPage } from "@/lib/lazyPage";
@@ -29,7 +30,7 @@ const OrganizationsPage = lazyPage(() => import("@/pages/OrganizationsPage"));
 /** Suspense per page, so the menu stays in place while a page block loads. */
 function Lazy({ page: Page }: { page: ComponentType }) {
   return (
-    <Suspense fallback={<Skeleton className="h-64 rounded-3xl" />}>
+    <Suspense fallback={<PageSkeleton />}>
       <Page />
     </Suspense>
   );

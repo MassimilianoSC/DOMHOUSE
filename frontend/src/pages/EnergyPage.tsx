@@ -10,6 +10,7 @@ import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { PageHeader, SegmentedControl } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Card, NativeSelect, Skeleton } from "@/components/ui/primitives";
+import { StripSkeleton } from "@/components/ui/Skeletons";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { downloadEnergyReport, monthLabel, recentMonths, type EnergyReport } from "@/lib/energyExport";
@@ -156,7 +157,10 @@ export default function EnergyPage() {
       )}
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="energy-error" />}
       {q.isLoading || !r ? (
-        <div className="space-y-4"><div className="grid gap-4 sm:grid-cols-2"><Skeleton className="h-24 rounded-2xl" /><Skeleton className="h-24 rounded-2xl" /></div><Skeleton className="h-72 rounded-2xl" /></div>
+        <div className="space-y-8">
+          <StripSkeleton cells={2} className="sm:grid-cols-2" cellClassName="h-[92px]" />
+          <Skeleton className="h-[370px] rounded-lg" />
+        </div>
       ) : (
         <>
           <div className="space-y-3">
