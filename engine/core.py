@@ -539,8 +539,9 @@ class ApartmentEngine:
                     "setpoint_max": hi, "confirmation": "none"}
         if cap == "heating":
             lo, hi, _ = self.effective_limits(device_id, cap)
-            frost = self.rule("frost_protection")["params"]["celsius"]
-            return {"on": False, "setpoint": clamp(frost, lo, hi), "setpoint_min": lo, "setpoint_max": hi}
+            frost = self.rule("frost_protection")["params"]["celsius"]     # D-183 point 125: the device's limits only
+            return {"on": False, "setpoint": clamp(frost, *self.frost_limits(device_id)), "setpoint_min": lo,
+                    "setpoint_max": hi}
         return {"switch": {"on": False}, "power_meter": {"watts": 0, "kwh_today": 0},
                 "contact": {"open": False, "since": None}, "motion": {"detected": False, "last_seen": None}}.get(cap, {})
 
@@ -634,6 +635,12 @@ class ApartmentEngine:
         """D-174: the device's own limits, from the catalog (DEVICE_LIMITS_FALLBACK when it lists none)."""
         return self.catalog_limits.get((device_id, cap), DEVICE_LIMITS_FALLBACK[cap])
 
+    def frost_limits(self, device_id: str) -> tuple:
+        """D-183 point 125: the only limits of the frost protection, the boiler's own (never the manager's). Every place
+        that sets or keeps a boiler on the frost protection asks here (E-24: a new apartment, the mode, the commands of
+        «casa vuota», a change of the rules)."""
+        return self.device_limits(device_id, "heating")
+
     def effective_limits(self, device_id: str, cap: str) -> tuple:
         """D-174 (D-183 point 124): (min, max, conflict). «Limiti del setpoint» on = the manager's limits inside the
         device's, for climate and boiler; off = the device's; an empty intersection = the device's, conflict True."""
@@ -650,14 +657,15 @@ class ApartmentEngine:
         """The limits a command is checked against: the state's (the effective ones); the boiler's commands of «casa
         vuota» only the device's (D-183 point 125: the frost protection never follows the manager's limits)."""
         if cap == "heating" and self._frost_command:
-            return self.device_limits(device["device_id"], cap)
+            return self.frost_limits(device["device_id"])
         state = device["capabilities"][cap]
         return state["setpoint_min"], state["setpoint_max"]
 
     def _apply_limits(self, correlation_id: str | None = None, emit: bool = False) -> None:
-        """D-174: every climate and boiler gets its effective limits and its setpoint inside them (a boiler a mode set
-        in «casa vuota» only inside the device's: the frost protection); an empty intersection is one decision per
-        episode (D-183 point 124), the episode ends when the limits overlap again."""
+        """D-174: every climate and boiler gets its effective limits and its setpoint inside them; in «casa vuota» a
+        boiler a mode set, or one switched off, only inside the device's: its setpoint is the frost protection's (D-183
+        point 125; staging, 23 Oct: a new «Demo vuoto» showed 16 °C instead of 8). An empty intersection is one decision
+        per episode (D-183 point 124), the episode ends when the limits overlap again."""
         conflicts = set()
         for d in self.devices.values():
             for cap in ("climate", "heating"):
@@ -670,9 +678,9 @@ class ApartmentEngine:
                     conflicts.add(key)
                     if key not in self.limits_conflicts:
                         self._note_limits_conflict(d, cap, correlation_id)
-                bound = (self.device_limits(d["device_id"], cap)
-                         if cap == "heating" and self.mode == "empty" and d["device_id"] in self.heating_by_mode
-                         else (lo, hi))
+                frost = cap == "heating" and self.mode == "empty" and (d["device_id"] in self.heating_by_mode
+                                                                       or not c.get("on"))
+                bound = self.frost_limits(d["device_id"]) if frost else (lo, hi)
                 sp = c.get("setpoint")
                 fixed = min(max(sp, bound[0]), bound[1]) if isinstance(sp, (int, float)) else sp
                 if (c.get("setpoint_min"), c.get("setpoint_max"), sp) != (lo, hi, fixed):
@@ -1148,7 +1156,7 @@ class ApartmentEngine:
             if "heating" in caps:
                 h = caps["heating"]
                 target = {"comfort": sl["comfort_celsius"], "eco": sl["eco_celsius"], "empty": frost}[mode]
-                lo, hi = (self.device_limits(d["device_id"], "heating") if mode == "empty"     # D-183 point 125
+                lo, hi = (self.frost_limits(d["device_id"]) if mode == "empty"     # D-183 point 125
                           else (h["setpoint_min"], h["setpoint_max"]))
                 sp = min(max(target, lo), hi)
                 out.append((d["device_id"], {"capability": "heating", "action": "set_heating",

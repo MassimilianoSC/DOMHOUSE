@@ -214,9 +214,10 @@ def test_catalog_and_energy_as_the_contract_wants():
     presa = engine.devices["dev-presa"]["capabilities"]
     assert set(presa) == {"switch", "power_meter"}                    # unknown capability left out
     assert presa["switch"] == {"on": False} and presa["power_meter"] == {"watts": 0, "kwh_today": 0}
-    # D-174: the boiler gets the manager's limits (16-24 by default) inside the catalog's (7-23)
+    # D-174: the boiler gets the manager's limits (16-24 by default) inside the catalog's (7-23); D-183 point 125: off
+    # in «casa vuota» (a new apartment) its setpoint is the frost protection's, 8 °C, under the manager's minimum
     assert engine.devices["dev-caldaia"]["capabilities"]["heating"] == {"setpoint_min": 16, "setpoint_max": 23,
-                                                                        "on": False, "setpoint": 16}
+                                                                        "on": False, "setpoint": 8}
     assert "links" not in engine.devices["dev-caldaia"]
     t0 = datetime.now(UTC)
     for wh, kwh in ((1500, 0.5), (1600, 0.6), (200, 0.8)):              # 200: the device restarted its counter

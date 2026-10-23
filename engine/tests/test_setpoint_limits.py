@@ -144,3 +144,39 @@ def test_an_empty_intersection_the_devices_limits_and_one_decision_per_episode(t
     assert e.limits_conflicts == set() and limits(e, CALDAIA, "heating") == (5, 12)
     rules(e, enabled=True)                                        # a new episode: a new decision
     assert len(ignored(e)) == 2
+
+
+def test_a_new_empty_apartment_shows_the_frost_setpoint_and_keeps_it(tmp_path):
+    """Staging, 23 Oct, test 14: a new «Demo vuoto» (born in «casa vuota», no mode command) showed the boiler at 16 °C,
+    the manager's minimum; the frost protection's 8 °C is its setpoint (D-183 point 125), through rule changes and
+    restarts. A boiler a person switched on follows the manager's limits."""
+    db = tmp_path / "engine.db"
+    e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(1), seed=True, store=SqliteStore(db))   # «vuoto»
+    assert e.mode == "empty" and CALDAIA not in e.heating_by_mode
+    assert e.devices[CALDAIA]["capabilities"]["heating"]["setpoint"] == 8 and limits(e, CALDAIA, "heating") == (16, 23)
+    rules(e, min=17)
+    assert e.devices[CALDAIA]["capabilities"]["heating"]["setpoint"] == 8
+    e.store.close()
+    e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(1), seed=True, store=SqliteStore(db))
+    assert e.restored and e.devices[CALDAIA]["capabilities"]["heating"]["setpoint"] == 8
+    e.devices[CALDAIA]["capabilities"]["heating"].update(on=True, setpoint=18)       # a person's: on at 18 °C
+    rules(e, min=20)
+    assert e.devices[CALDAIA]["capabilities"]["heating"]["setpoint"] == 20
+
+
+def test_after_ripristina_a_demonstration_born_empty_is_at_the_frost_setpoint_again():
+    """«Ripristina» of the Simulator (D-97): the registry forgets the apartment and builds it again from the seed."""
+    async def main():
+        reg = core.Registry()
+        reg.variants["demo-vuoto"] = "vuoto"
+        e = reg.get("demo-vuoto")
+        first = e.devices[CALDAIA]["capabilities"]["heating"]["setpoint"]
+        e.devices[CALDAIA]["capabilities"]["heating"]["setpoint"] = 20
+        assert reg.reset("demo-vuoto")
+        e = reg.get("demo-vuoto")
+        state = e.devices[CALDAIA]["capabilities"]["heating"]
+        reg.reset("demo-vuoto")
+        return e.mode, first, state
+    mode, first, state = asyncio.run(main())
+    assert mode == "empty" and first == 8
+    assert (state["setpoint"], state["setpoint_min"], state["setpoint_max"]) == (8, 16, 23)
