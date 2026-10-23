@@ -330,9 +330,26 @@ def ancora(titolo: str) -> str:
     return f"{base}-{hashlib.sha256(titolo.encode('utf-8')).hexdigest()[:8]}"
 
 
-def rendi(blocco: Blocco) -> str:
+ETICHETTE_RIQUADRO = {"Attenzione": "note-warning", "Da sapere": "note-info", "Esempio": "note-example"}
+RIGA_GUIDA = re.compile(r"\*\*[^*\n]+\*\*")
+
+
+def classe_riquadro(figli: list[Blocco]) -> str:
+    """Un riquadro che inizia con **Attenzione**, **Da sapere** o **Esempio** prende la sua tinta."""
+    if any("Ambiente di prova" in b.testo for b in figli):
+        return "test-notice"
+    if figli and figli[0].tipo == "paragrafo":
+        for etichetta, classe in ETICHETTE_RIQUADRO.items():
+            if figli[0].testo.startswith(f"**{etichetta}"):
+                return classe
+    return ""
+
+
+def rendi(blocco: Blocco, guida: bool = False) -> str:
     if blocco.tipo == "paragrafo":
-        return f"<p>{inline(blocco.testo, blocco.riga)}</p>"
+        # La riga guida è il paragrafo tutto in grassetto subito dopo un titolo.
+        classe = ' class="lead"' if guida and RIGA_GUIDA.fullmatch(blocco.testo) else ""
+        return f"<p{classe}>{inline(blocco.testo, blocco.riga)}</p>"
     if blocco.tipo == "titolo":
         n = blocco.livello
         return f'<h{n} id="{ancora(blocco.testo)}">{inline(blocco.testo, blocco.riga, True)}</h{n}>'
@@ -343,8 +360,8 @@ def rendi(blocco: Blocco) -> str:
         attributi = f' start="{blocco.numero}"' if tag == "ol" and blocco.numero != 1 else ""
         return f"<{tag}{attributi}>\n" + "\n".join(map(rendi, blocco.figli)) + f"\n</{tag}>"
     if blocco.tipo == "citazione":
-        avviso = any("Ambiente di prova" in b.testo for b in blocco.figli)
-        classe = ' class="test-notice"' if avviso else ""
+        nome = classe_riquadro(blocco.figli)
+        classe = f' class="{nome}"' if nome else ""
         return f"<blockquote{classe}>\n" + "\n".join(map(rendi, blocco.figli)) + "\n</blockquote>"
     if blocco.tipo == "tabella":
         righe = []
@@ -408,7 +425,7 @@ def genera(fonte: str, modello: str) -> str:
     if titoli:
         indice.append("</ol></li>" if sottolista else "</li>")
 
-    contenuto, sezione = [], False
+    contenuto, sezione, dopo_titolo = [], False, False
     for b in elementi:
         if b.tipo == "titolo" and b.livello == 2:
             if sezione:
@@ -416,7 +433,8 @@ def genera(fonte: str, modello: str) -> str:
             classe = ' class="featured-section"' if b.testo in SEZIONI_EVIDENTI else ""
             contenuto.append(f'<section{classe} aria-labelledby="{ancora(b.testo)}">')
             sezione = True
-        contenuto.append(rendi(b))
+        contenuto.append(rendi(b, guida=dopo_titolo))
+        dopo_titolo = b.tipo == "titolo"
     if sezione:
         contenuto.append("</section>")
 
