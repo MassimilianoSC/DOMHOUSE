@@ -26,7 +26,7 @@ const ON_OFF: OnOffTexts = {
 function OnOff({ on, label, disabled, onToggle, testId, texts = ON_OFF, statusTestId, extra }: { on: boolean; label: string; disabled: boolean; onToggle: (v: boolean) => void; testId: string; texts?: OnOffTexts; statusTestId?: string; extra?: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className={cn("flex flex-wrap items-center gap-2 text-sm font-semibold", on ? "text-accent" : "text-muted-foreground")}>
+      <span className={cn("flex flex-wrap items-center gap-2 text-sm font-semibold", on ? "text-positive" : "text-muted-foreground")}>
         <span className={cn("h-2 w-2 rounded-full", on ? "bg-accent shadow-[0_0_8px_hsl(var(--accent))]" : "bg-muted-foreground/40")} />
         <span data-testid={statusTestId}>{on ? texts.on() : texts.off()}</span>
         {extra}
