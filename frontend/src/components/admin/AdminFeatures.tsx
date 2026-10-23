@@ -10,13 +10,33 @@ import { runAction } from "@/lib/actions";
 /** A feature by the name of its menu entry («Consumi», «Assistente»), never by its code. */
 export const featureName = (f: string) => tOr(`nav.${f === "ask" ? "assistant" : f === "apartment" ? "overview" : f}`, f);
 
-function FeatureGrid({ all, value, inherited, onToggle, testId }: { all: AppFeature[]; value: string[] | null; inherited?: string[] | null; onToggle: (f: AppFeature, on: boolean) => void; testId: string }) {
+/** One line on what each function shows, for the organization's list (design lot 2). */
+const EXPLAIN: Record<string, () => string> = {
+  apartment: () => t("admin.features.explain.apartment"),
+  devices: () => t("admin.features.explain.devices"),
+  commands: () => t("admin.features.explain.commands"),
+  energy: () => t("admin.features.explain.energy"),
+  schedule: () => t("admin.features.explain.schedule"),
+  rules: () => t("admin.features.explain.rules"),
+  approvals: () => t("admin.features.explain.approvals"),
+  decisions: () => t("admin.features.explain.decisions"),
+  ask: () => t("admin.features.explain.ask"),
+};
+
+/**
+ * The switches of the functions (design lot 2). `explained`: one column, each with its line of explanation (the
+ * organization's list); otherwise a compact grid of names and switches (each apartment's exceptions).
+ */
+function FeatureGrid({ all, value, inherited, onToggle, testId, explained }: { all: AppFeature[]; value: string[] | null; inherited?: string[] | null; onToggle: (f: AppFeature, on: boolean) => void; testId: string; explained?: boolean }) {
   const effective = value ?? inherited ?? all;
   return (
-    <div className="grid gap-2 sm:grid-cols-3" data-testid={testId}>
+    <div className={explained ? "divide-y" : "grid gap-x-6 sm:grid-cols-2 lg:grid-cols-3"} data-testid={testId}>
       {all.map((f) => (
-        <label key={f} className="flex items-center justify-between gap-2 rounded-xl bg-secondary/60 px-3 py-2 text-sm font-semibold">
-          <span>{featureName(f)}</span>
+        <label key={f} className={explained ? "flex items-center justify-between gap-4 py-3" : "flex items-center justify-between gap-2 border-b py-2 text-sm"}>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold">{featureName(f)}</span>
+            {explained && EXPLAIN[f] && <span className="block text-[13px] text-muted-foreground">{EXPLAIN[f]()}</span>}
+          </span>
           <Switch checked={effective.includes(f)} onCheckedChange={(on) => onToggle(f, on)} aria-label={featureName(f)} data-testid={`${testId}-${f}`} />
         </label>
       ))}
@@ -67,7 +87,7 @@ export function AdminFeatures() {
           )}
         </div>
         <p className="text-sm text-muted-foreground">{t("admin.features.tenantHint")}</p>
-        <FeatureGrid all={all} value={tenant.data?.enabled_features ?? null} onToggle={toggleTenant} testId="tenant-feature" />
+        <FeatureGrid all={all} value={tenant.data?.enabled_features ?? null} onToggle={toggleTenant} testId="tenant-feature" explained />
       </Card>
       {apts.data?.map((a) => (
         <Card key={a.apartment_id} className="space-y-3 p-5" data-testid={`admin-apartment-features-${a.apartment_id}`}>

@@ -846,7 +846,18 @@
       "resetToTenant": "Torna all'organizzazione",
       "scope": "Funzioni",
       "none": "nessuna",
-      "saved": "Funzioni aggiornate"
+      "saved": "Funzioni aggiornate",
+      "explain": {
+        "apartment": "La fascia di stato della casa, la modalità e la forzatura.",
+        "devices": "L'elenco dei dispositivi per stanza, con le letture.",
+        "commands": "Accendere, spegnere e regolare i dispositivi dall'app.",
+        "energy": "Consumi per ora, giorno e dispositivo, e il rendiconto in Excel.",
+        "schedule": "Le azioni pianificate dal motore e dal gestore.",
+        "rules": "Gli automatismi del motore e i loro valori.",
+        "approvals": "Le azioni che il motore esegue solo con il consenso del gestore.",
+        "decisions": "Il registro di ciò che il motore ha deciso e perché.",
+        "ask": "Le richieste a parole all'assistente."
+      }
     },
     "price": {
       "title": "Prezzo dell'energia",

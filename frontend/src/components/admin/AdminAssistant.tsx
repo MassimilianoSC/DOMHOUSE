@@ -65,7 +65,7 @@ export function AdminAssistant() {
                   const p = percent(w);
                   const over = p > threshold;
                   return (
-                    <tr key={w.week} className={cn("border-b last:border-0", over && "bg-warning-bg")} data-testid={`admin-assistant-week-${w.week}`} data-over={over}>
+                    <tr key={w.week} className="border-b last:border-0" data-testid={`admin-assistant-week-${w.week}`} data-over={over}>
                       <td className="px-4 py-2">
                         {weekLabel(w)}
                         {i === 0 && <span className="ml-1 text-xs text-muted-foreground">({t("admin.assistant.current")})</span>}
@@ -73,7 +73,10 @@ export function AdminAssistant() {
                       <td className="px-2 py-2 text-right tabular">{w.asks}</td>
                       <td className="px-2 py-2 text-right tabular">{w.timeouts}</td>
                       <td className="px-2 py-2 text-right tabular">{quickTotal(w)}</td>
-                      <td className={cn("px-4 py-2 text-right tabular", over && "font-bold text-warning-fg")}>{w.asks > 0 ? `${fmtNumber(p, 1)} %` : "—"}</td>
+                      <td className={cn("px-4 py-2 text-right tabular", over && "font-semibold text-warning-fg")}>
+                        {over && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-warning-fg align-middle" aria-hidden />}
+                        {w.asks > 0 ? `${fmtNumber(p, 1)} %` : "—"}
+                      </td>
                     </tr>
                   );
                 })}
