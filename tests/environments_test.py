@@ -112,11 +112,14 @@ def test_production_updates_its_own_or_the_flat_claims_and_revokes(env, firebase
     assert fake.calls[0] == ("claims", {"tenant_id": TENANT, "role": "admin"}) and fake.calls[1][0] == "revoke"
 
 
-def test_demonstrations_only_in_staging(env):
-    env("prod")
-    assert "ambiente di prova" in instances.instance_url_problem("mock://builtin")
-    env("staging")
-    assert instances.instance_url_problem("mock://builtin") is None
+def test_d188_demonstrations_in_production_as_in_staging(env):
+    """D-188 (revises D-136 for this phase): the collaborators test on the production app, so a demonstration apartment
+    (mock://builtin, with or without its variant) is accepted there as in staging; a wrong variant stays refused."""
+    for name in ("prod", "staging"):
+        env(name)
+        assert instances.instance_url_problem("mock://builtin") is None, name
+        assert instances.instance_url_problem("mock://builtin?variante=occupato") is None, name
+        assert instances.instance_url_problem("mock://builtin?variante=pieno") == instances.MSG_BAD_VARIANT, name
 
 
 def _set_claims():

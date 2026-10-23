@@ -257,6 +257,12 @@ Regole:
 
 ## Appartamenti dimostrativi (D-97, D-98)
 
+D-188 (23 ottobre, rivede D-136 per questa fase): i dimostrativi (`mock://builtin`, con o senza variante) sono accettati
+anche in produzione, dove i collaboratori provano l'app finché non viene svuotata dei dati di prova prima della consegna
+al cliente; prima di D-188 la produzione li rifiutava («I dimostrativi stanno nell'ambiente di prova: in produzione solo
+appartamenti veri»). Il resto non cambia: niente codice Italianway su un dimostrativo in produzione (D-98), Simulatore
+solo per gli amministratori e solo sui dimostrativi, assistente vero con `AI_DEMOS`.
+
 Il motore simulato integrato è montato in OGNI modalità, anche in produzione (`INSTANCE_MODE=real`), per gli
 appartamenti dimostrativi accanto a quelli veri; resta del solo BFF: da internet `/mock` risponde 404 (F2), e la sua
 chiave, casuale per processo (mai `INSTANCE_API_KEY_FALLBACK` nei file di Cloud Run: una prova lo controlla), è
