@@ -41,11 +41,11 @@ function range(period: Period, tz: string, stayFrom?: string | null) {
 }
 
 /** One indicator of the strip (design lot 2): label 13 px, value 24 px, unit in grey, an optional note under it. */
-function Stat({ label, value, unit, sub, testId }: { label: string; value: string; unit?: string; sub?: React.ReactNode; testId: string }) {
+function Stat({ label, value, unit, sub, testId, data }: { label: string; value: string; unit?: string; sub?: React.ReactNode; testId: string; data?: boolean }) {
   return (
     <div className="min-w-0 bg-card px-5 py-4" data-testid={testId}>
       <div className="text-[13px] font-medium text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tabular">
+      <div className={`mt-1 text-2xl font-semibold tabular ${data ? "text-primary" : ""}`}>
         {value} {unit && <span className="text-base font-medium text-muted-foreground">{unit}</span>}
       </div>
       {sub && <div className="mt-1 text-[13px] text-muted-foreground">{sub}</div>}
@@ -166,7 +166,7 @@ export default function EnergyPage() {
           <div className="space-y-3">
             {/* one strip divided by 1 px lines; «Ore di clima evitate» only once the engine computes them (design lot 2) */}
             <div className={`grid gap-px overflow-hidden rounded-lg border bg-border ${r.avoided_hvac_hours === null ? "sm:grid-cols-2" : "sm:grid-cols-3"}`} data-testid="energy-stats">
-              <Stat label={t("energy.total")} value={fmtNumber(r.total_kwh, 2)} unit={t("energy.kwh")} testId="energy-total" />
+              <Stat label={t("energy.total")} value={fmtNumber(r.total_kwh, 2)} unit={t("energy.kwh")} testId="energy-total" data />
               <Stat
                 label={params.bucket === "hour" ? t("energy.peakHour") : t("energy.peakDay")}
                 value={peak ? fmtNumber(peak.kwh, 2) : "—"}

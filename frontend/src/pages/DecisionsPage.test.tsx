@@ -118,10 +118,10 @@ describe("Decisioni: il tipo di azione (D-125)", () => {
 });
 
 describe("Decisioni: la riga (design, lotto 2)", () => {
-  it("esito come testo a destra, colorato solo se non riuscita; il codice del comando dietro «Dettagli»", async () => {
+  it("esito come badge a colore pieno (lotto 34); il codice del comando dietro «Dettagli»", async () => {
     open();
-    expect(await screen.findByTestId("decision-outcome-d-1")).toHaveClass("text-muted-foreground");
-    expect(screen.getByTestId("decision-outcome-d-2")).toHaveClass("text-negative-fg");
+    expect(await screen.findByTestId("decision-outcome-d-1")).toHaveClass("bg-positive-bg");
+    expect(screen.getByTestId("decision-outcome-d-2")).toHaveClass("bg-negative-bg");
     expect(screen.getByTestId("decision-row-d-2")).not.toHaveTextContent("cmd-2222");
     expect(screen.queryByTestId("decision-details-toggle-d-1")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("decision-details-toggle-d-2"));

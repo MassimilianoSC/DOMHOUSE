@@ -10,7 +10,7 @@ import { useDecisionLog } from "@/hooks/useDecisionLog";
 import { useDecisionSearch } from "@/hooks/useDecisionSearch";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
-import { Card, Input, NativeSelect } from "@/components/ui/primitives";
+import { Card, Input, NativeSelect, StatusBadge, type Tone } from "@/components/ui/primitives";
 import { RowsSkeleton } from "@/components/ui/Skeletons";
 import { t } from "@/i18n";
 import { MAX_RESULTS, matchesDecision, periodFrom } from "@/lib/decisionSearch";
@@ -20,13 +20,13 @@ import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
 
 const ACTOR_FILTERS = ["", "brain", "rule", "user", "assistant", "system"];
-/** The outcome as text on the right (design lot 2): coloured only when it went wrong, or waits for someone. */
-const OUTCOME_INK: Record<Decision["outcome"], string> = {
-  applied: "text-muted-foreground",
-  rejected: "text-negative-fg",
-  pending_approval: "text-warning-fg",
-  failed: "text-negative-fg",
-  informational: "text-muted-foreground",
+/** The outcome as a badge on the right, on a full colour (lot 34, D-194: full colour where a state is said). */
+const OUTCOME_TONE: Record<Decision["outcome"], Tone> = {
+  applied: "positive",
+  rejected: "negative",
+  pending_approval: "warning",
+  failed: "negative",
+  informational: "neutral",
 };
 
 /**
@@ -54,7 +54,7 @@ function DecisionRow({ d, tz, ruleLabels }: { d: Decision; tz: string; ruleLabel
             </span>
           )}
         </div>
-        <span className={cn("shrink-0 text-[13px] font-medium", OUTCOME_INK[d.outcome])} data-testid={`decision-outcome-${d.decision_id}`}>{t(`decisions.outcome.${d.outcome}`)}</span>
+        <StatusBadge tone={OUTCOME_TONE[d.outcome]} className="shrink-0" data-testid={`decision-outcome-${d.decision_id}`}>{t(`decisions.outcome.${d.outcome}`)}</StatusBadge>
       </div>
       <div className="text-[13px] text-muted-foreground">
         <span className="tabular">{fmtDateTime(d.ts, tz)}</span> · <span className="font-medium text-foreground" data-testid={`decision-actor-${d.decision_id}`}>{actor.label}</span> · {target}
