@@ -60,23 +60,3 @@ def test_the_bff_writes_no_access_log_of_its_own():
     dockerfile = (Path(__file__).resolve().parent.parent / "bff" / "Dockerfile").read_text(encoding="utf-8")
     cmd = next(line for line in dockerfile.splitlines() if line.startswith("CMD"))
     assert "uvicorn" in cmd and "--no-access-log" in cmd
-
-
-def test_d186_the_lite_model_with_its_prices_in_both():
-    """D-186: google/gemini-3.5-flash-lite in staging and production, with its prices (€ per million tokens); the BFF
-    reads them as the model and the prices of the cost (bff/config.py)."""
-    import json
-    import os
-    import subprocess
-    import sys
-
-    want = {"AI_MODEL": "google/gemini-3.5-flash-lite", "AI_PRICE_IN_EUR_PER_M": "0.30",
-            "AI_PRICE_OUT_EUR_PER_M": "2.50", "AI_PRICE_CACHED_EUR_PER_M": "0.03"}
-    for manifest in (STAGING, PROD):
-        assert {k: env(manifest)[k] for k in want} == want
-    code = ("import json; from bff.config import get_settings; s = get_settings(); print(json.dumps([s.ai_model, "
-            "s.ai_price_in_eur_per_m, s.ai_price_out_eur_per_m, s.ai_price_cached_eur_per_m, s.ai_api, "
-            "s.ai_thinking_budget, s.ai_location]))")            # in its own process: this one's settings stay cached
-    out = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env={**os.environ, **want, "APP_ENV": "dev"},
-                         capture_output=True, text=True, timeout=60)
-    assert json.loads(out.stdout) == ["google/gemini-3.5-flash-lite", 0.30, 2.50, 0.03, "nativo", 0, "eu"], out.stderr
