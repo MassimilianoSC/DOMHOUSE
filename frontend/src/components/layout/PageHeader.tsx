@@ -42,7 +42,31 @@ export function SegmentedControl<T extends string>({ value, options, onChange, t
           aria-selected={value === o.value}
           onClick={() => onChange(o.value)}
           data-testid={`${testId}-${o.value}`}
-          className={`min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-bold transition-colors focus-ring ${value === o.value ? "bg-card text-primary" : "text-muted-foreground hover:text-foreground"}`}
+          className={`min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-semibold transition-colors focus-ring ${value === o.value ? "bg-card text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Underlined tabs on one full-width row under the title (design lot 2), for the sections of a page (Amministrazione,
+ * Organizzazioni); SegmentedControl stays for filters. On a phone the row scrolls: the cut tab at the edge says so.
+ */
+export function Tabs<T extends string>({ value, options, onChange, testId }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void; testId: string }) {
+  return (
+    <div role="tablist" className="flex gap-6 overflow-x-auto border-b [scrollbar-width:none]" data-testid={testId}>
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="tab"
+          aria-selected={value === o.value}
+          onClick={() => onChange(o.value)}
+          data-testid={`${testId}-${o.value}`}
+          className={`-mb-px min-h-[44px] shrink-0 whitespace-nowrap border-b-2 text-sm font-semibold transition-colors focus-ring ${value === o.value ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
           {o.label}
         </button>
