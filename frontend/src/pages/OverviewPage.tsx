@@ -44,7 +44,7 @@ function Header({ aptId }: { aptId: string }) {
         <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted-foreground">
           <span className="flex items-center gap-1.5" data-testid="apartment-next-checkin"><CalendarArrowDown className="h-4 w-4" /> {t("overview.checkin")}: {fmtShortDateTime(apartment.next_checkin, tz)}</span>
           <span className="flex items-center gap-1.5" data-testid="apartment-next-checkout"><CalendarArrowUp className="h-4 w-4" /> {t("overview.checkout")}: {fmtShortDateTime(apartment.next_checkout, tz)}</span>
-          {apartment.current_booking_id && <span data-testid="apartment-booking">{t("overview.booking")} <span className="font-mono">{apartment.current_booking_id}</span></span>}
+          {apartment.current_booking_id && <span data-testid="apartment-booking">{t("overview.booking")} <span className="tabular">{apartment.current_booking_id}</span></span>}
           <span data-testid="apartment-devices-online">{t("overview.devicesOnline", { online: apartment.devices_online, total: apartment.devices_total })}</span>
         </div>
       )}

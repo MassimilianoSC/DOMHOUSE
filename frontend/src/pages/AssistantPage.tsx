@@ -62,14 +62,14 @@ function Message({ aptId, m, canWrite, onOutcome }: { aptId: string; m: ChatMess
                 {outcome ? outcomeText(outcome) : t(`assistant.status.${m.status}`)}
               </Badge>
               {m.actions.map((a, i) => (
-                <Badge key={i} className="font-mono" data-testid={`ask-action-${m.ask_id}-${i}`}>
+                <Badge key={i} className="tabular" data-testid={`ask-action-${m.ask_id}-${i}`}>
                   {a.type === "command" ? `${t("assistant.command")} ${a.command_id}` : a.type === "schedule" ? `${t("assistant.schedule")} ${a.schedule_id}` : t("assistant.rulesChanged")}
                 </Badge>
               ))}
               {m.approval_id && (
                 <Link to={`/a/${aptId}/approvazioni`} className="font-semibold text-primary underline-offset-2 hover:underline" data-testid={`ask-approval-link-${m.ask_id}`}>{t("assistant.openApprovals")}</Link>
               )}
-              {m.status === "failed" && m.reason && <span className="font-mono text-negative-fg">{m.reason}</span>}
+              {m.status === "failed" && m.reason && <span className="tabular text-negative-fg">{m.reason}</span>}
               {(m.status === "failed" || m.actions.length > 0 || m.approval_id) && <CopyableId id={m.correlation_id} testId={`ask-correlation-${m.ask_id}`} className="text-muted-foreground" />}
             </div>
           )}

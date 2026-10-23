@@ -158,12 +158,12 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs font-bold">{a.apartment_id}</span>
+                      <span className="tabular text-xs font-bold">{a.apartment_id}</span>
                       <span className="font-semibold">{a.name}</span>
                       {a.simulated && <DemoBadge testId={`platform-apt-demo-${a.apartment_id}`} />}
                       {!a.enabled && <Badge className="border-neutral-border bg-neutral-bg text-neutral-fg">{t("admin.apartments.disabled")}</Badge>}
                     </div>
-                    <div className="font-mono text-xs text-muted-foreground">{a.instance_url}{a.port ? `:${a.port}` : ""} · {a.timezone}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</div>
+                    <div className="tabular text-xs text-muted-foreground">{a.instance_url}{a.port ? `:${a.port}` : ""} · {a.timezone}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</div>
                     <div className="text-xs">{t("admin.apartments.lastCheck")}: <LastCheck check={a.last_check} testId={`platform-apt-check-${a.apartment_id}`} /></div>
                   </div>
                   <div className="flex flex-wrap gap-2">

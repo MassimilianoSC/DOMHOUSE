@@ -87,7 +87,7 @@ export function VerifyBadge({ r }: { r: VerifyResult }) {
           {r.features ? ` · ${r.features.length} ${t("admin.features.title").toLowerCase()}` : ""}
         </span>
       )}
-      {r.error && <span className="font-mono text-destructive">{r.error}</span>}
+      {r.error && <span className="tabular text-destructive">{r.error}</span>}
     </div>
   );
 }

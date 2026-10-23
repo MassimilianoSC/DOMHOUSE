@@ -133,7 +133,7 @@ export default function LoginPage() {
           <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl lg:text-6xl">{env.appName}</h1>
           <p className="max-w-md text-lg opacity-80">{t("app.tagline")}</p>
         </div>
-        <p className="relative font-mono text-xs opacity-60">{t("login.footer")}</p>
+        <p className="relative tabular text-xs opacity-60">{t("login.footer")}</p>
       </section>
       <section className="flex items-center justify-center p-5">
         <Card className="w-full max-w-md p-6 sm:p-8">

@@ -68,7 +68,7 @@ export default function SettingsPage() {
         {me.user.platform_manager && <Row label={t("settings.platform")} value={t("roles.platform")} testId="settings-platform" />}
         <Row label={t("settings.tenant")} value={me.tenant?.name ?? "—"} testId="settings-tenant" />
         {me.tenant && <Row label={t("settings.apartments")} value={scopeSummary(scope, apartments.data ?? []).text} testId="settings-apartments" />}
-        <Row label={t("settings.env")} value={<span className="font-mono text-xs">{me.env.app_env} · auth {me.env.auth_mode} · {me.env.instance_mode}</span>} testId="settings-env" />
+        <Row label={t("settings.env")} value={<span className="tabular text-xs">{me.env.app_env} · auth {me.env.auth_mode} · {me.env.instance_mode}</span>} testId="settings-env" />
       </Card>
       <AccountSettings />
       {withTenant && <NotificationSettings />}

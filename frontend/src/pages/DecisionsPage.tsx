@@ -46,7 +46,7 @@ function DecisionRow({ d, tz, ruleLabels }: { d: Decision; tz: string; ruleLabel
       </span>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span className="font-mono tabular">{fmtDateTime(d.ts, tz)}</span>
+          <span className="tabular">{fmtDateTime(d.ts, tz)}</span>
           <span className="font-semibold text-foreground" data-testid={`decision-actor-${d.decision_id}`}>{actor.label}</span>
           <span>· {target}</span>
           <StatusBadge tone={OUTCOME_TONE[d.outcome]} className="ml-auto" data-testid={`decision-outcome-${d.decision_id}`}>{t(`decisions.outcome.${d.outcome}`)}</StatusBadge>
@@ -65,8 +65,8 @@ function DecisionRow({ d, tz, ruleLabels }: { d: Decision; tz: string; ruleLabel
         <p className="text-sm text-muted-foreground" data-testid={`decision-reasoning-${d.decision_id}`}>{d.reasoning}</p>
         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
           <CopyableId id={d.correlation_id} testId={`decision-correlation-${d.decision_id}`} />
-          {d.command_id && <span className="font-mono">{d.command_id}</span>}
-          {d.approval_id && <span className="font-mono">{d.approval_id}</span>}
+          {d.command_id && <span className="tabular">{d.command_id}</span>}
+          {d.approval_id && <span className="tabular">{d.approval_id}</span>}
         </div>
       </div>
     </li>

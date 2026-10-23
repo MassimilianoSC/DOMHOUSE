@@ -20,7 +20,7 @@ export function ErrorNotice({ error, onRetry, testId = "error-notice", className
     <div role="alert" data-testid={testId} className={cn("flex flex-wrap items-center gap-2 rounded-xl border border-negative-border bg-negative-bg px-3 py-2 text-sm text-negative-fg", className)}>
       <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden />
       <span className="font-medium">{message}</span>
-      {api?.code && <span className="font-mono text-xs opacity-70">{api.code}</span>}
+      {api?.code && <span className="tabular text-xs opacity-70">{api.code}</span>}
       {api?.correlationId && <CopyableId id={api.correlationId} testId={`${testId}-correlation`} />}
       {onRetry && (
         <Button size="sm" variant="ghost" className="ml-auto" onClick={onRetry} data-testid={`${testId}-retry`}>

@@ -13,7 +13,7 @@ function FeatureGrid({ all, value, inherited, onToggle, testId }: { all: AppFeat
     <div className="grid gap-2 sm:grid-cols-3" data-testid={testId}>
       {all.map((f) => (
         <label key={f} className="flex items-center justify-between gap-2 rounded-xl bg-secondary/60 px-3 py-2 text-sm font-semibold">
-          <span>{tOr(`nav.${f === "ask" ? "assistant" : f === "apartment" ? "overview" : f}`, f)} <span className="font-mono text-xs text-muted-foreground">{f}</span></span>
+          <span>{tOr(`nav.${f === "ask" ? "assistant" : f === "apartment" ? "overview" : f}`, f)} <span className="tabular text-xs text-muted-foreground">{f}</span></span>
           <Switch checked={effective.includes(f)} onCheckedChange={(on) => onToggle(f, on)} aria-label={f} data-testid={`${testId}-${f}`} />
         </label>
       ))}

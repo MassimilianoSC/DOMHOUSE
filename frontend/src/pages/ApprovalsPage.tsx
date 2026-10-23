@@ -33,7 +33,7 @@ function Countdown({ until, id }: { until: string; id: string }) {
   const ms = new Date(until).getTime() - now;
   const urgent = ms < 5 * 60_000;
   return (
-    <span className={cn("inline-flex items-center gap-1 font-mono text-sm font-bold tabular", urgent ? "text-destructive" : "text-foreground")} data-testid={`approval-countdown-${id}`} aria-live="polite">
+    <span className={cn("inline-flex items-center gap-1 text-sm font-bold tabular", urgent ? "text-destructive" : "text-foreground")} data-testid={`approval-countdown-${id}`} aria-live="polite">
       <Hourglass className="h-3.5 w-3.5" aria-hidden /> {ms > 0 ? t("approvals.remaining", { time: fmtCountdown(ms) }) : t("approvals.expired")}
     </span>
   );

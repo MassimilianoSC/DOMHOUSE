@@ -42,7 +42,7 @@ export function InstanceStatus({ health, contractVersion, features, compact }: P
           {i.icon} {i.text}
         </span>
       ))}
-      <span className="font-mono text-xs text-muted-foreground" data-testid="instance-version">
+      <span className="tabular text-xs text-muted-foreground" data-testid="instance-version">
         {health.implementation.name} {health.implementation.version}
         {contractVersion ? ` · ${t("instance.contract")} ${contractVersion}` : ""}
       </span>
@@ -52,7 +52,7 @@ export function InstanceStatus({ health, contractVersion, features, compact }: P
       {features && !compact && (
         <span className="flex flex-wrap gap-1" data-testid="instance-features">
           {features.map((f) => (
-            <span key={f} className="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-xs">
+            <span key={f} className="rounded-md bg-secondary px-1.5 py-0.5 tabular text-xs">
               {f}
             </span>
           ))}

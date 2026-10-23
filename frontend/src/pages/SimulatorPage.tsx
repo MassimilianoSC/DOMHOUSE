@@ -235,7 +235,7 @@ export default function SimulatorPage() {
           {lastBooking && (
             <p className="text-xs text-muted-foreground" data-testid="sim-booking-result">
               {lastBooking.duplicate ? t("simulator.duplicate") : t("simulator.scheduled", { count: lastBooking.schedule_ids.length })}
-              {lastBooking.schedule_ids.length > 0 && <span className="ml-1 font-mono">{lastBooking.schedule_ids.join(", ")}</span>}
+              {lastBooking.schedule_ids.length > 0 && <span className="ml-1 tabular">{lastBooking.schedule_ids.join(", ")}</span>}
             </p>
           )}
         </Section>

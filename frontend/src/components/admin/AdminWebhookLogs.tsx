@@ -76,13 +76,13 @@ function Row({ log, apartments }: { log: WebhookLog; apartments: AdminApartment[
             <Badge className={httpOk ? OK : log.outcome === "duplicate" ? WARN : KO} data-testid={`webhook-log-outcome-${log.log_id}`}>
               {t("admin.bookingsReceived.response")}: {log.status_code} · {log.outcome}
             </Badge>
-            {log.apartment_id && <span className="font-mono">{log.apartment_id}</span>}
+            {log.apartment_id && <span className="tabular">{log.apartment_id}</span>}
           </div>
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>{t("admin.bookingsReceived.eventId")}: <span className="font-mono text-foreground" data-testid={`webhook-log-event-${log.log_id}`}>{log.event_id ?? "—"}</span></span>
-            {log.booking_id && <span>{t("admin.bookingsReceived.booking")}: <span className="font-mono text-foreground">{log.booking_id}</span></span>}
-            {log.external_id && <span>{t("admin.bookingsReceived.externalId")}: <span className="font-mono text-foreground" data-testid={`webhook-log-external-${log.log_id}`}>{log.external_id}</span></span>}
-            {log.guests != null && <span>{t("admin.bookingsReceived.guests")}: <span className="font-mono text-foreground" data-testid={`webhook-log-guests-${log.log_id}`}>{log.guests}</span></span>}
+            <span>{t("admin.bookingsReceived.eventId")}: <span className="tabular text-foreground" data-testid={`webhook-log-event-${log.log_id}`}>{log.event_id ?? "—"}</span></span>
+            {log.booking_id && <span>{t("admin.bookingsReceived.booking")}: <span className="tabular text-foreground">{log.booking_id}</span></span>}
+            {log.external_id && <span>{t("admin.bookingsReceived.externalId")}: <span className="tabular text-foreground" data-testid={`webhook-log-external-${log.log_id}`}>{log.external_id}</span></span>}
+            {log.guests != null && <span>{t("admin.bookingsReceived.guests")}: <span className="tabular text-foreground" data-testid={`webhook-log-guests-${log.log_id}`}>{log.guests}</span></span>}
             <span className="inline-flex items-center gap-1">{t("common.correlationId")}: <CopyableId id={log.correlation_id} testId={`webhook-log-correlation-${log.log_id}`} /></span>
             <span data-testid={`webhook-log-forward-${log.log_id}`}>
               {t("admin.bookingsReceived.forward")}: <span className={cn("font-semibold", log.forward_status === null ? "" : log.forward_status < 400 ? OK_TEXT : "text-destructive")}>

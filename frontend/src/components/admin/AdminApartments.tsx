@@ -46,17 +46,17 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
           <Field id="address" label={t("admin.apartments.address")} value={f.address} onChange={set("address")} />
           <div className="space-y-1 rounded-xl border border-dashed px-3 py-2 sm:col-span-2" data-testid="apt-form-timezone-locked">
             <div className="text-sm font-semibold">{t("admin.apartments.timezone")}</div>
-            <div className="font-mono text-xs text-muted-foreground">{apt.timezone}</div>
+            <div className="tabular text-xs text-muted-foreground">{apt.timezone}</div>
             <p className="text-xs text-muted-foreground">{t("admin.apartments.timezoneOnEngine")}</p>
           </div>
           <div className="space-y-1 rounded-xl border border-dashed px-3 py-2 sm:col-span-2" data-testid="apt-form-connection-locked">
             <div className="text-sm font-semibold">{t("admin.apartments.connection")}</div>
-            <div className="font-mono text-xs text-muted-foreground">{apt.instance_url}{apt.port ? `:${apt.port}` : ""}</div>
+            <div className="tabular text-xs text-muted-foreground">{apt.instance_url}{apt.port ? `:${apt.port}` : ""}</div>
             <p className="text-xs text-muted-foreground">{t("admin.apartments.connectionByPlatform")}</p>
           </div>
           <div className="space-y-1 rounded-xl border border-dashed px-3 py-2 sm:col-span-2" data-testid="apt-form-italianway-locked">
             <div className="text-sm font-semibold">{t("admin.apartments.italianway")}</div>
-            <div className="font-mono text-xs text-muted-foreground">{apt.italianway_id || "—"}</div>
+            <div className="tabular text-xs text-muted-foreground">{apt.italianway_id || "—"}</div>
             <p className="text-xs text-muted-foreground">{t("admin.apartments.italianwayByPlatform")}</p>
           </div>
           <div className="space-y-1 sm:col-span-2">
@@ -162,7 +162,7 @@ export function AdminApartments() {
                   {!a.enabled && <Badge className="border-neutral-border bg-neutral-bg text-neutral-fg">{t("admin.apartments.disabled")}</Badge>}
                 </div>
                 <p className="text-sm text-muted-foreground">{a.address || "—"} · {a.timezone}</p>
-                <p className="font-mono text-xs text-muted-foreground">{a.instance_url}{a.port ? `:${a.port}` : ""}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</p>
+                <p className="tabular text-xs text-muted-foreground">{a.instance_url}{a.port ? `:${a.port}` : ""}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</p>
                 <p className="text-xs text-muted-foreground">{t("admin.apartments.lastCheck")}: <LastCheck check={a.last_check} testId={`admin-apartment-check-${a.apartment_id}`} /></p>
                 <p className="text-xs text-muted-foreground" data-testid={`admin-apartment-price-${a.apartment_id}`}>
                   {a.energy_price_eur_kwh != null ? t("admin.price.lineApt", { price: priceText(a.energy_price_eur_kwh) }) : t("admin.price.lineOrg", { price: priceText(orgPrice) })}

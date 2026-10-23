@@ -46,13 +46,13 @@ function Row({ aptId, item, tz, canWrite }: { aptId: string; item: ScheduleItem;
     <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid={`schedule-item-${item.schedule_id}`} data-status={item.status}>
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-mono text-sm font-bold tabular" data-testid={`schedule-run-at-${item.schedule_id}`}>{fmtShortDateTime(item.run_at, tz)}</span>
+          <span className="text-sm font-bold tabular" data-testid={`schedule-run-at-${item.schedule_id}`}>{fmtShortDateTime(item.run_at, tz)}</span>
           <StatusBadge tone={STATUS_TONE[item.status]} data-testid={`schedule-status-${item.schedule_id}`}>{t(`schedule.status.${item.status}`)}</StatusBadge>
         </div>
         <div className="text-base font-semibold" data-testid={`schedule-action-${item.schedule_id}`}>{describeAction(item.action, devices)}</div>
         <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
           <span>{t(`schedule.kind.${item.kind}`)} · {t(`schedule.source.${item.source}`)}</span>
-          {item.booking_id && <span className="font-mono">{item.booking_id}</span>}
+          {item.booking_id && <span className="tabular">{item.booking_id}</span>}
           {item.source === "booking" && item.status === "planned" && <span>{t("schedule.bookingNote")}</span>}
         </div>
       </div>
