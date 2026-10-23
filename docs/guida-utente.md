@@ -1,7 +1,7 @@
 # Guida all'app DOMHOUSE
 
 Tutto quello che l'app sa fare, spiegato passo per passo e diviso per ruolo. Non servono conoscenze tecniche.
-*Versione del 23 ottobre 2026 (lotto 33).*
+*Versione del 23 ottobre 2026 (lotto 34).*
 
 > **Ambiente di prova**
 >
@@ -201,7 +201,7 @@ la frase «Aggiungi l'app alla schermata Home: si apre a schermo intero e riceve
 
 > **Da sapere**
 >
-> - **La pagina aperta** è evidenziata.
+> - **La pagina aperta** è bianca, con un filo arancione a sinistra.
 > - **Se le schede di una pagina** non stanno nello schermo, la loro barra scorre in orizzontale.
 > - **Mentre i dati arrivano** la pagina mostra già la sua forma (fascia, striscia, righe) in grigio chiaro, al
 >   posto di un rettangolo grigio.
@@ -450,16 +450,16 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 
 | Cosa vedi | Cosa vuol dire |
 |---|---|
-| In alto: nome e indirizzo; a destra l'occupazione e lo stato | «Online», «Non raggiungibile» oppure «Disattivato» |
+| In alto: nome e indirizzo; a destra la pillola dello stato | «Online» (verde), «Non raggiungibile» oppure «Disattivato» (tortora) |
 | «Dimostrativo» accanto al nome | Un appartamento finto usato per le prove |
-| L'occupazione | «Vuoto» (nessuno), «Occupato» (ospiti dentro, dopo il check-in effettivo), «Prenotato» (c'è una prenotazione ma non è stato comunicato l'arrivo) |
-| La striscia dei dati: «Modalità» | Comfort, Eco o Casa vuota |
-| «Consumo di oggi» | Il consumo di oggi in kWh, non un importo |
-| «Prossimo check-in», «Prossimo check-out» | I prossimi arrivo e partenza |
+| La striscia dei dati: «Modalità», nel colore della modalità | Comfort (arancione chiaro), Eco (verde salvia) o Casa vuota (azzurro ardesia) |
+| «Occupazione», a fondo pieno | «Vuoto» (tortora: nessuno), «Occupato» (verde: ospiti dentro, dopo il check-in effettivo), «Prenotato» (ambra: c'è una prenotazione ma non è stato comunicato l'arrivo) |
+| «Consumo di oggi», con il numero in arancione | Il consumo di oggi in kWh, non un importo |
+| «Prossimo check-in», «Prossimo check-out» | I prossimi arrivo e partenza; «Prossimo check-out» occupa tutta la larghezza |
 | In fondo, «1 approvazione in attesa» o «… approvazioni in attesa» con una freccia | Le richieste che aspettano una risposta; la riga non c'è se non ce ne sono |
 
 - **I dati si aggiornano** ogni 20 secondi; un valore mancante è un trattino.
-- **Una scheda offline** non è grigia: lo dicono il badge e i dati scritti in grigio.
+- **Una scheda offline** non è grigia: lo dicono la pillola e i dati scritti in grigio; la striscia perde i colori.
 - **Tocca una scheda** per aprire l'appartamento («Apri …»).
 
 **Quando l'elenco è vuoto o l'appartamento non si apre:**
@@ -485,24 +485,25 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | La striscia di salute | «Sistema domotico non raggiungibile» | Il sistema domotico non risponde |
 | La striscia di salute | «Versione del contratto non compatibile» e «Il sistema domotico dichiara il contratto …: questa app supporta solo la versione 1.x. Contatta il supporto tecnico.» | La versione del sistema non è compatibile |
 | La fascia di stato | Sei caselle: «Modalità», «Occupazione», «Prossimo check-in» o «Prossimo check-out», «Finestre», «Consumo di oggi», «Dispositivi online» | Come sta la casa adesso (tabella sotto) |
-| «Modalità» | La scelta fra Comfort, Eco e Casa vuota: quella in corso è scritta in bianco su fondo scuro | La modalità in corso |
-| «Forza per…» | «Forzatura … attiva fino alle …» e «ancora …», in un riquadro giallo chiaro | C'è una forzatura in corso |
+| «Modalità» | La scelta fra Comfort, Eco e Casa vuota: quella in corso ha il colore della modalità (tabella sotto) | La modalità in corso |
+| «Forza per…» | «Forzatura … attiva fino alle …» e «ancora …», in un riquadro ambra | C'è una forzatura in corso |
 | «Dispositivi» | I dispositivi raggruppati per stanza («Senza stanza» per quelli senza); accanto al nome della stanza, in grigio, quanti sono | Vedi le tabelle sotto |
 
 **La fascia di stato, casella per casella:**
 
-| Casella | Cosa vedi |
-|---|---|
-| «Modalità» | Comfort, Eco o Casa vuota; durante una forzatura, sotto, «forzata fino alle …» |
-| «Occupazione» | «Vuoto», «Occupato» o «Prenotato» |
-| «Prossimo check-in» o «Prossimo check-out» | Il primo fra arrivo e partenza; senza nessuno dei due, «Prossimo evento» con un trattino |
-| «Finestre» | «Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore» |
-| «Consumo di oggi» | I kWh di oggi; un trattino se la funzione Consumi è spenta |
-| «Dispositivi online» | Quanti rispondono, per esempio 5/6; sotto, «… offline» se qualcuno manca |
+| Casella | Cosa vedi | Di che colore è |
+|---|---|---|
+| «Modalità» | Comfort, Eco o Casa vuota; durante una forzatura, sotto, «forzata fino alle …» | Il colore della modalità: Comfort arancione chiaro, Eco verde salvia, Casa vuota azzurro ardesia |
+| «Occupazione» | «Vuoto», «Occupato» o «Prenotato» | «Occupato» verde, «Prenotato» ambra, «Vuoto» tortora |
+| «Prossimo check-in» o «Prossimo check-out» | Il primo fra arrivo e partenza; senza nessuno dei due, «Prossimo evento» con un trattino | Bianca |
+| «Finestre» | «Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore» | Verde se sono tutte chiuse, ambra se una è aperta; bianca senza sensori |
+| «Consumo di oggi» | I kWh di oggi; un trattino se la funzione Consumi è spenta | Bianca, con il numero in arancione |
+| «Dispositivi online» | Quanti rispondono, per esempio 5/6; sotto, «… offline» se qualcuno manca | Verde se rispondono tutti, ambra se qualcuno è offline |
 
 > **Da sapere**
 >
-> - **Le caselle che chiedono attenzione** (una finestra aperta, un dispositivo offline) sono scritte in giallo.
+> - **Le caselle che chiedono attenzione** (una finestra aperta, un dispositivo offline) sono ambra; verdi quando tutto è
+>   a posto.
 > - **Su computer** (da 1024 px) ogni stanza è un elenco con una riga per dispositivo; sul telefono e sul tablet
 >   ogni dispositivo è una scheda.
 
@@ -590,7 +591,7 @@ per 24 mesi.
 | Prima linea, in nero: il tipo di azione e i valori prima → dopo | Per esempio «Modalità» con «comfort → casa vuota» |
 | Il tipo di azione, in italiano | Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata» |
 | Altri esempi di tipo | «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo» |
-| A destra della prima linea: l'esito, a parole | «Applicata» e «Informativa» in grigio; «Respinta» e «Non riuscita» in rosso; «in attesa di approvazione» in giallo |
+| A destra della prima linea: l'esito, in un badge colorato | «Applicata» verde; «Respinta» e «Non riuscita» rosso mattone; «in attesa di approvazione» ambra; «Informativa» tortora |
 | Seconda linea, in grigio: la data · chi ha deciso · su cosa | «Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; «appartamento», «dispositivo», «regole», «programmazione» |
 | Chi ha deciso, se ha eliminato l'account | «utente rimosso» |
 | Sotto: il motivo | Perché è successo |
@@ -660,7 +661,7 @@ per 24 mesi.
 | Cosa vedi | Cosa puoi fare | Cosa succede |
 |---|---|---|
 | Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso» | Toccare una delle pillole: la scelta è scritta in scuro | «Soggiorno in corso» compare solo con ospiti dentro e una prenotazione conosciuta dall'app |
-| La casella «Totale periodo» in «kWh» | Leggere il totale | I numeri si aggiornano ogni minuto |
+| La casella «Totale periodo» in «kWh», con il numero in arancione | Leggere il totale | I numeri si aggiornano ogni minuto |
 | La casella «Ora con più consumo» (oggi) o «Giorno con più consumo» (periodi più lunghi) | Leggere il picco | Sotto il valore, «ore …» oppure la data |
 | La casella «Ore di clima evitate» | Leggere le ore | Compare solo quando il motore le calcola; oggi non compare |
 | Il grafico «Consumo per ora (kWh)» (oggi) o «Consumo per giorno (kWh)» (periodi più lunghi) | Passare con il puntatore: leggi «ore …» e i kWh | Le ore senza letture contano zero. Senza dati: «Nessun dato nel periodo» |
@@ -812,14 +813,14 @@ lavora con un accesso di assistenza.
 **Scegliere comfort, eco o casa vuota con un tocco.**
 
 1. **Sotto «Modalità»** tocca Comfort, Eco o Casa vuota.
-2. **La scelta diventa bianca su fondo scuro** quando il sistema conferma (non c'è un avviso verde).
+2. **La scelta prende il colore della modalità** (tabella sotto) quando il sistema conferma (non c'è un avviso verde).
 3. **Nelle Decisioni** compare «Modalità» con prima e dopo, per esempio «comfort → casa vuota».
 
-| Modalità | In breve (i dettagli nella parte 10) |
-|---|---|
-| comfort | Scalda alla temperatura di comfort |
-| eco | Abbassa la caldaia e spegne il clima |
-| casa vuota | Spegne il clima e tiene solo l'antigelo |
+| Modalità | Colore | In breve (i dettagli nella parte 10) |
+|---|---|---|
+| comfort | Arancione chiaro | Scalda alla temperatura di comfort |
+| eco | Verde salvia | Abbassa la caldaia e spegne il clima |
+| casa vuota | Azzurro ardesia | Spegne il clima e tiene solo l'antigelo |
 
 > **Attenzione**
 >
@@ -1000,6 +1001,8 @@ Nelle Decisioni compare «Approvazione scaduta».
 > - **I nuovi limiti minimo e massimo** si applicano subito ai climatizzatori.
 > - **Le nuove temperature delle modalità** valgono dal prossimo cambio di modalità e, in comfort, dalla regolazione
 >   automatica del clima.
+> - **Sul telefono**, mentre scrivi in un campo, la barra «Salva le modifiche» non lo copre: il campo resta sopra
+>   la barra.
 
 ### Regole: chiedere una proposta all'assistente
 
@@ -1535,6 +1538,8 @@ per le prove e le dimostrazioni, anche accanto agli appartamenti veri.
 - **Su di loro** gli amministratori vedono «Simulatore» («Provoca eventi su questo appartamento dimostrativo: lo
   vedono solo gli amministratori.»).
 - **Su un appartamento vero** la voce non c'è e l'indirizzo dà «Pagina non trovata».
+- **Fino a 1024 px** (telefono e tablet) i riquadri stanno in una colonna; su schermi più larghi in due, senza
+  spazi vuoti.
 
 | Riquadro | Cosa dice l'app | Cosa puoi fare | Cosa succede |
 |---|---|---|---|
@@ -2586,6 +2591,30 @@ Per ogni problema annota:
 ## 14. Novità
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
+
+### 23 ottobre 2026 (lotto 34)
+
+**Colori caldi e un colore per ogni stato: modalità, occupazione, finestre, dispositivi, esiti.**
+
+- **Aspetto**: un foglio bianco caldo dentro una cornice color sabbia; il menu laterale e, sul telefono, la barra in
+  alto stanno sulla cornice (sul telefono la cornice è sottile).
+- **Menu**: la voce aperta è bianca, con un filo arancione a sinistra.
+- **Pulsanti principali** marrone scuro; testi e grigi in toni caldi.
+- **Panoramica, «Modalità»**: Comfort arancione chiaro, Eco verde salvia, Casa vuota azzurro ardesia; così anche il
+  selettore della modalità.
+- **Panoramica, «Occupazione»**: «Occupato» verde, «Prenotato» ambra, «Vuoto» tortora.
+- **Panoramica, «Finestre» e «Dispositivi online»**: verdi se tutto è a posto, ambra con una finestra aperta o un
+  dispositivo offline.
+- **Panoramica, «Consumo di oggi»**: il numero in arancione; così anche «Totale periodo» in Consumi.
+- **Appartamenti**: in alto resta solo la pillola «Online» o «Non raggiungibile»; via la pillola «Vuoto»/«Occupato».
+- **Appartamenti, la striscia**: «Modalità» nel colore della modalità, «Occupazione» a fondo pieno, «Consumo di oggi»
+  in arancione, «Prossimo check-out» a tutta larghezza.
+- **Decisioni**: l'esito è di nuovo un badge colorato: «Applicata» verde, «Respinta» e «Non riuscita» rosso mattone,
+  «in attesa di approvazione» ambra, «Informativa» tortora.
+- **Regole sul telefono**: mentre scrivi, la barra «Salva le modifiche» non copre il campo.
+- **Simulatore**: una colonna fino a 1024 px e, sopra, due colonne senza spazi vuoti; icone senza riquadro colorato.
+- **App installata**: la barra di stato del telefono è color sabbia, non più arancione.
+- **Testi dell'app**: nessuno cambiato.
 
 ### 23 ottobre 2026 (lotto 33)
 
