@@ -595,11 +595,23 @@ programmare un'azione.» o «Indica la temperatura, ad esempio «porta il soggio
 L'amministratore fa tutto quello delle parti 4 e 5 su tutti gli appartamenti dell'organizzazione e in più ha la pagina
 «Amministrazione» («Utenti, appartamenti e funzioni della tua organizzazione»), la copia delle regole e il Simulatore.
 
-### Amministrazione: le cinque schede
+### Amministrazione: le sei schede
 
-«Appartamenti» (aperta all'inizio), «Utenti», «Funzioni», «Prenotazioni ricevute», «Registro dell'organizzazione».
+«Appartamenti» (aperta all'inizio), «Utenti», «Funzioni», «Prenotazioni ricevute», «Registro dell'organizzazione»,
+«Assistente» (dal lotto 31).
 Riguardano solo la tua organizzazione. Chi non è amministratore non vede la pagina («Operazione riservata agli
 amministratori» se ci prova dal server).
+
+### Assistente: domande, timeout, risposte rapide
+
+«Le domande all'assistente nella tua organizzazione, settimana per settimana: quante, quante non hanno avuto risposta
+in tempo dall'assistente completo e quante hanno avuto una risposta rapida.» La tabella mostra le ultime 8 settimane
+(da lunedì a domenica, «dal 13 al 19 ottobre», «(in corso)» sulla prima) con «Settimana», «Domande», «Timeout»,
+«Risposte rapide» e «% timeout»; le righe sopra il 10 % sono in giallo. Sotto: «Risposte rapide per causa, nelle
+settimane mostrate: tempo scaduto … · assistente non raggiungibile … · limite mensile … · risposta non valida …».
+Con due settimane complete di fila sopra la soglia, in cima: «Timeout oltre il 10 % per due settimane di fila: va
+riaperta la scelta del modello dell'assistente.» Senza domande: «Nessuna domanda all'assistente nelle ultime
+settimane.» I numeri sono dell'intera organizzazione; sul telefono la tabella scorre di lato nel suo riquadro.
 
 ### Utenti: invitare, ruoli, appartamenti visibili, rimuovere
 
@@ -640,8 +652,11 @@ amministratori» se ci prova dal server).
   questo appartamento)» o «Prezzo dell'energia: … (dell'organizzazione)») e «Dimostrativo». L'identificativo
   dell'appartamento si copia toccandolo. Non ci sono «Nuovo appartamento» né cestino: «I nuovi appartamenti li aggiunge
   il gestore della piattaforma (HQE): per averne uno, scrivi all'assistenza.».
-- **«Modifica»** apre «Modifica appartamento»: «Nome», «Indirizzo», «Fuso orario», «Attivo», «Prezzo per kWh di questo
+- **«Modifica»** apre «Modifica appartamento»: «Nome», «Indirizzo», «Attivo», «Prezzo per kWh di questo
   appartamento (€)» («Lascia vuoto per usare quello dell'organizzazione (…).»), poi «Salva» («Appartamento salvato»).
+  Il «Fuso orario» si vede ma non si cambia (dal lotto 31): «Impostato sul motore dell'appartamento. Se va cambiato,
+  scrivi all'assistenza.» Quando cambia sul motore, nel «Registro dell'organizzazione» compare «Fuso orario
+  dell'appartamento «…» cambiato sul motore: … → …».
   «Collegamento al sistema domotico» e codice Italianway si vedono ma non si cambiano: «Il collegamento al sistema
   domotico lo imposta il gestore della piattaforma (HQE). Se va cambiato, scrivi all'assistenza.», «Il codice Italianway
   lo imposta il gestore della piattaforma (HQE). Se va cambiato, scrivi all'assistenza.». Un fuso non valido dà «Fuso
@@ -819,7 +834,8 @@ dispositivi o consumi.
   numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l'amministratore
   dell'organizzazione.»): «ID» (da 3 a 64 caratteri, minuscole, numeri e trattini, per esempio apt-milano-01, mai
   riutilizzabile), «Nome» (fino a 120 caratteri), «URL istanza» (nell'ambiente di prova «In questo ambiente usa
-  mock://builtin»), «Porta» (da 1 a 65535, facoltativa), «Fuso orario» (Europe/Rome all'inizio), «ID Italianway» (fino
+  mock://builtin»), «Porta» (da 1 a 65535, facoltativa), «Fuso orario» (Europe/Rome all'inizio; «Valore iniziale: dopo la creazione il
+  fuso orario si imposta sul motore.»), «ID Italianway» (fino
   a 120 caratteri; «Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.»),
   «Attivo», «Istanza simulata (appartamento dimostrativo)»; «Salva». Leggi «Appartamento … creato» e, con un sistema
   domotico vero, «Prima di usarlo: crea la chiave dell'istanza e poi premi Verifica connessione.»: la chiave la prepara il
@@ -1087,7 +1103,8 @@ Decisioni. Alle richieste dell'assistente puoi rispondere anche in chat con «S�
 | «casa vuota» | Abilitata alla temperatura dell'«Antigelo a casa vuota» (8 °C all'inizio). | Spento. |
 
 Le tre temperature si regolano per appartamento nella regola «Limiti del setpoint» (parte 9). I valori chiesti restano
-sempre entro i limiti del dispositivo. La regolazione automatica del clima ogni minuto rispetta l'isteresi (0,5 °C) e
+sempre entro i limiti del dispositivo e, con la regola accesa, entro il minimo e il massimo che hai scelto; i pulsanti
+«−» e «+» della temperatura non escono mai dai limiti (una caldaia a 8 °C con minimo 16 passa a 16 con un tocco). La regolazione automatica del clima ogni minuto rispetta l'isteresi (0,5 °C) e
 il tempo minimo fra due cambi (5 minuti), non agisce durante una forzatura né con una finestra aperta e regola finestra
 attiva, e non va mai contro un comando di una persona: un clima che hai comandato tu resta com'è fino al prossimo
 cambio di modalità. Ogni cambio automatico è una decisione con la temperatura letta, per esempio «…: 19 °C, sotto
@@ -1100,9 +1117,9 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | Regola | Descrizione nell'app | Valori di partenza e limiti | Che cosa fa davvero |
 |---|---|---|---|
 | «Finestra aperta spegne il clima» | «Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.» | «Minuti»: 5, da 1 a 30 | Spegne clima e riscaldamento di tutto l'appartamento, non solo della stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte. |
-| «Limiti del setpoint» | «Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c'è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.» | «Minimo (°C)»: 16, da 7 a 20; «Massimo (°C)»: 24, da 20 a 28; «Temperatura in comfort (°C)»: 21, da 16 a 26; «Temperatura in eco (°C)»: 18, da 10 a 22; «Raffrescamento in comfort (°C)»: 25, da 22 a 28 | Minimo e massimo valgono per i climatizzatori: un comando fuori intervallo è rifiutato, i comandi automatici vengono riportati dentro. La caldaia usa i limiti del suo dispositivo. Spegnere l'interruttore di questa regola oggi non toglie i limiti. Le tre temperature guidano le modalità. |
+| «Limiti del setpoint» | «Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c'è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.» | «Minimo (°C)»: 16, da 7 a 20; «Massimo (°C)»: 24, da 20 a 28; «Temperatura in comfort (°C)»: 21, da 16 a 26; «Temperatura in eco (°C)»: 18, da 10 a 22; «Raffrescamento in comfort (°C)»: 25, da 22 a 28 | Acceso (dal lotto 31): clima e caldaia restano fra il minimo e il massimo che scegli, sempre dentro i limiti del dispositivo; un comando fuori intervallo è rifiutato, i comandi automatici vengono riportati dentro. Spento: valgono solo i limiti del dispositivo. Se i tuoi limiti sono tutti fuori da quelli del dispositivo valgono quelli del dispositivo e nelle Decisioni compare «Limiti del setpoint ignorati». L'antigelo a casa vuota non segue questi limiti. Le tre temperature guidano le modalità. |
 | «Antigelo a casa vuota» | «Con la casa vuota mantiene almeno questa temperatura.» | «Temperatura (°C)»: 8, da 5 a 12 | A casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più 0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve un sensore: senza, «Antigelo non attivo». |
-| «Antimuffa a casa vuota» | «Con la casa vuota deumidifica sopra questa soglia.» | «Umidità (%)»: 65, da 50 a 80 | Oggi scrive solo «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione, anche se la descrizione lo dice. |
+| «Antimuffa a casa vuota» | «Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.» | «Umidità (%)»: 65, da 50 a 80 | Scrive «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione. |
 | «Pre-arrivo» | «Porta la casa in comfort prima dell'arrivo degli ospiti.» | «Ore prima del check-in»: 2, da 0 a 6 | Ogni prenotazione creata o modificata programma il comfort. Cambiare le ore vale per le prenotazioni che arrivano o cambiano dopo: le azioni già in programma non vengono ricalcolate. |
 | «Risparmio al check-out» | «Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.» | «Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180 | Programma casa vuota dopo la partenza. Con movimento recente apre la richiesta «Mettere l'appartamento a vuoto dopo il check-out»; senza risposta la approva. |
 | «Pausa minima del compressore» | «Pausa minima tra spegnimento e riaccensione del compressore.» | «Minuti»: 3; «Non modificabile» (chi gestisce il sistema può impostare da 1 a 15) | Dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico viene rimandato, uno di una persona o dell'assistente può essere rifiutato se manca più di qualche secondo. |
@@ -1312,7 +1329,7 @@ dell'email di chi comanda.
 | Accesso di assistenza | Ingresso temporaneo (da 1 a 24 ore) di un gestore della piattaforma in un'organizzazione, con i permessi di un operatore, motivo visibile all'amministratore. |
 | Ambiente di prova | Il sito con dati separati da quelli veri, con la fascia gialla «Ambiente di prova». Non è un ruolo. |
 | Antigelo | Protezione a casa vuota: la caldaia si accende sotto la soglia, se c'è un sensore. |
-| Antimuffa | Oggi solo un avviso di umidità sopra soglia a casa vuota; non deumidifica. |
+| Antimuffa | Un avviso di umidità sopra soglia a casa vuota, al massimo uno al giorno; non deumidifica. |
 | Approvazione | Una richiesta che aspetta il sì o il no di una persona prima di un'azione; alla scadenza segue quanto scritto nella scheda. |
 | Avviso nell'app | Messaggio temporaneo in alto nella pagina aperta; non è una notifica sul telefono. |
 | Capacità | Una cosa che un dispositivo sa fare o misurare: interruttore, clima, riscaldamento, temperatura, umidità, contatto, movimento, potenza. |
@@ -1366,6 +1383,20 @@ Per ogni problema annota:
 Manda tutto a **operations@hqe.it**, l'indirizzo dell'assistenza HQE.
 
 ## 14. Novità
+
+### 23 ottobre 2026 (lotto 31)
+
+- **«Limiti del setpoint» con effetto**: acceso, clima e caldaia restano fra il minimo e il massimo scelti, dentro i
+  limiti del dispositivo; spento, valgono solo quelli del dispositivo; l'antigelo non li segue. I pulsanti «−» e «+»
+  della temperatura non escono mai dai limiti.
+- **Antimuffa**: la descrizione dice quello che fa davvero, un avviso al giorno nelle Decisioni.
+- **Fuso orario sul motore**: in Amministrazione si vede e non si modifica; quando cambia, il registro
+  dell'organizzazione lo annota.
+- **Amministrazione › Assistente**: le domande all'assistente settimana per settimana (da lunedì a domenica), quante
+  senza risposta in tempo dall'assistente completo, quante con una risposta rapida e per quale causa; le righe sopra
+  il 10 % sono in giallo; con due settimane complete di fila sopra la soglia compare l'avviso che va riaperta la
+  scelta del modello.
+- **Gestore della piattaforma senza organizzazione**: salva il nome ed esce da tutti i dispositivi senza errori.
 
 ### 22 ottobre 2026 (lotto 30)
 

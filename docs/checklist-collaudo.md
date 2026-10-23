@@ -34,6 +34,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | A14 | Qualsiasi | Impostazioni > Notifiche. | C'è «Attiva su questo dispositivo» (le notifiche sono attive anche nell'ambiente di prova); nessuna scritta «Modalità sviluppo» né «FCM». | |
 | A14b | Qualsiasi | Impostazioni > Notifiche: conta le voci e cambiane una. | Quattro voci: «Approvazioni richieste», «Dispositivi e istanza offline», «Prenotazioni», «Riepilogo»; nessuna «Decisioni del motore»; cambiarne una dà «Preferenze salvate». | |
 | A15 📱 | Amministratore | Guarda il titolo della scheda del browser e la pagina di accesso; poi invita un tuo indirizzo nuovo. | Ovunque compare il nome **DOMHOUSE**; l'email d'invito ha l'oggetto «Invito a DOMHOUSE». | |
+| A17 | Gestore della piattaforma senza organizzazione | Impostazioni: cambia il nome visualizzato e salva; poi «Esci da tutti i dispositivi». | «Nome aggiornato» senza errori e il nome compare nel menu; l'uscita riesce; il riquadro Notifiche non c'è. | |
 | A16 | Qualsiasi | Chiudi la finestra di Google senza scegliere un account; poi prova una password sbagliata. | Nessun messaggio nel primo caso; nel secondo «Accesso non riuscito: controlla email e password» con sotto «Codice: auth/invalid-credential», che un tocco copia. | |
 
 ## B. Installazione 📱
@@ -100,6 +101,9 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D11f | Operatore (su un dimostrativo «occupato» con il clima acceso) | Assistente: «non spegnere il clima». | Nessun comando: il clima resta acceso e la risposta descrive lo stato (eventuale riga finale «Risposta rapida: …» se il modello non ha risposto in tempo). | |
 | D11g | Operatore (su un dimostrativo «occupato») | Assistente: «Alle 18 metti il clima a 22 gradi» (o un orario futuro in cui ci sono ospiti). | La risposta finisce con «Programmo …, con ospiti presenti a quell'ora? Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni.» con i pulsanti; in Approvazioni la richiesta si legge «Programmare …». Premi «Sì»: l'azione compare in Programmazione all'ora chiesta con origine «assistente». | |
 | D11h | Operatore (su un dimostrativo «vuoto») | Assistente: «spegni la caldaia» (suggerimento della pagina). | «Fatto: …» o «Comando inviato: …»; se in fondo c'è «Risposta rapida: …», il comando è partito lo stesso perché la frase è semplice. | |
+| D12 | Operatore (su un dimostrativo) | Regole › «Limiti del setpoint»: spegni l'interruttore della regola e salva; poi riaccendilo e salva. | Da spento, in Panoramica la caldaia accetta da 7 a 23 °C (i limiti del dispositivo); da acceso, da 16 a 23 (il minimo del gestore dentro quelli del dispositivo). | |
+| D12b | Operatore (su un dimostrativo «vuoto», caldaia a 8 °C per l'antigelo, regola accesa con minimo 16) | In Panoramica premi «+» sulla caldaia. | Il valore passa a 16 senza errori; «−» è disattivato finché il valore è sotto il minimo. | |
+| D12c | Operatore | Regole › «Antimuffa a casa vuota». | La descrizione dice «Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.» | |
 
 ## E. Amministrazione
 
@@ -115,6 +119,9 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | E6 | Amministratore | Prenotazioni ricevute: apri la scheda. | In cima «Ultime 24 ore: …»; poi l'elenco con una frase per riga e l'esito verde o rosso, oppure «Nessuna prenotazione ricevuta». «Dettagli tecnici» apre i dati per l'assistenza. | |
 | E7 | Amministratore, più un utente di prova con l'app aperta su un appartamento | Abbassa il ruolo dell'utente (per esempio da Amministratore a Sola lettura) e togligli tutti gli appartamenti. | Entro un minuto all'utente l'app chiede di accedere di nuovo; rientrando non vede l'appartamento. | |
 | E8 | Amministratore | Apri «Modifica» su un appartamento. | Il codice Italianway si vede ma non si può cambiare. | |
+| E9 | Amministratore | Apri «Modifica» su un appartamento: il fuso orario. | Si vede ma non si cambia, con la nota «Impostato sul motore dell'appartamento. Se va cambiato, scrivi all'assistenza.»; il salvataggio funziona come prima. | |
+| E10 | Amministratore | Fai una domanda all'assistente su un appartamento, poi Amministrazione › «Assistente». | La tabella delle ultime 8 settimane con «Settimana», «Domande», «Timeout», «Risposte rapide», «% timeout»; la prima riga «(in corso)» conta la domanda; nessun errore; sul telefono la pagina non scorre di lato. | |
+| E11 | Amministratore | Amministrazione › «Assistente» in un'organizzazione senza domande. | «Nessuna domanda all'assistente nelle ultime settimane.» | |
 
 ## F. Simulatore (solo amministratore, su un appartamento «Dimostrativo»)
 
