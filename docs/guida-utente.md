@@ -1,7 +1,7 @@
 # Guida all'app DOMHOUSE
 
 Tutto quello che l'app sa fare, spiegato passo per passo e diviso per ruolo. Non servono conoscenze tecniche.
-*Versione del 22 ottobre 2026 (lotto 30), ambiente di prova.*
+*Versione del 23 ottobre 2026 (lotto 32).*
 
 > **Ambiente di prova**
 >
