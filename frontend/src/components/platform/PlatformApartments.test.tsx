@@ -87,6 +87,18 @@ describe("Piattaforma > Appartamenti di un'organizzazione", () => {
     await waitFor(() => expect(s.apartments).toHaveBeenCalledTimes(2));
   });
 
+  it("dimostrativo in produzione (D-188): mock://builtin scritto a mano, nessun promemoria della chiave", async () => {
+    await open();
+    await click(screen.getByTestId("platform-apt-add-btn-t-1"));
+    expect(screen.getByTestId("apt-form-instance_url").closest("div")).toHaveTextContent(t("admin.apartments.instanceUrlHint"));
+    type("apt-form-apartment_id", "apt-demo-01");
+    type("apt-form-name", "Demo");
+    type("apt-form-instance_url", "mock://builtin");
+    await click(screen.getByTestId("platform-apt-create-save"));
+    expect(s.createApartment).toHaveBeenCalledWith("t-1", expect.objectContaining({ instance_url: "mock://builtin", simulated: true }), expect.any(String));
+    expect(toast.info).not.toHaveBeenCalledWith(t("platform.aptKeyFirst"), expect.anything());
+  });
+
   it("nuovo appartamento in staging (mock): parte da mock://builtin, nessun promemoria della chiave", async () => {
     s.mode = "mock";
     await open();

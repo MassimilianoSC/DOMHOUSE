@@ -798,7 +798,7 @@
       "timezone": "Fuso orario",
       "instanceUrl": "URL istanza",
       "instanceUrlPlaceholder": "https://domotica.esempio.it",
-      "instanceUrlHint": "In sviluppo usa mock://builtin",
+      "instanceUrlHint": "Per un appartamento dimostrativo scrivi mock://builtin; per uno vero, l'indirizzo del suo motore",
       "instanceUrlHintMock": "In questo ambiente usa mock://builtin",
       "port": "Porta",
       "italianway": "ID Italianway",

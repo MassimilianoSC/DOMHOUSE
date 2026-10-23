@@ -25,8 +25,9 @@ function CreateDialog({ tenantId, tenantName, onClose, onCreated }: { tenantId: 
     const res = await runAction((c) => platformApi.createApartment(tenantId, body, c), { success: t("platform.aptCreated", { id: body.apartment_id }) });
     setSaving(false);
     if (res) {
-      // In production the instance key langbrain-api-key-<id> is created by HQE outside the app (R1).
-      if (real) toast.info(t("platform.aptKeyFirst"), { duration: 15000 });
+      // In production the instance key langbrain-api-key-<id> is created by HQE outside the app (R1); a demonstration
+      // apartment (mock://, D-188: also in production) has no key to create.
+      if (real && !isBuiltinMock(body.instance_url)) toast.info(t("platform.aptKeyFirst"), { duration: 15000 });
       onCreated();
       onClose();
     }
