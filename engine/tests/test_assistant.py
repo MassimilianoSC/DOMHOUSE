@@ -109,7 +109,8 @@ def test_d182_an_invalid_json_runs_nothing_and_says_the_state(monkeypatch):
         a = ask(e, "spegni il clima")
         assert a["status"] == "answered" and e.commands == {}
         assert a["answer"].startswith("Non ho capito la risposta dell'assistente: non ho eseguito niente. Modalità ")
-    assert logged[-1] == ("assistant fallback", {"apartment_id": "apt-prova-01", "cause": "json_invalid", "command": False})
+    assert logged[-1] == ("assistant fallback", {"apartment_id": "apt-prova-01", "ask_id": a["ask_id"],   # the question
+                                                 "cause": "json_invalid", "command": False})
     assert a["reason"] == "risposta_rapida:json_invalid"
     assert assistant.parse_answer("```json\n" + json.dumps({"risposta": "ok", "azioni": []}) + "\n```") == {
         "risposta": "ok", "azioni": []}
@@ -408,7 +409,8 @@ def test_d182_the_quick_assistant_runs_an_unequivocal_command(no_time, monkeypat
     assert (a["status"], a["reason"]) == ("answered", "risposta_rapida:timeout")
     assert a["answer"].endswith("Risposta rapida: l'assistente completo non ha risposto in tempo.")
     assert any(c["device_id"] == "dev-caldaia" and c["action"] == "turn_off" for c in e.commands.values())
-    assert logged[-1] == ("assistant fallback", {"apartment_id": "apt-prova-01", "cause": "timeout", "command": True})
+    assert logged[-1] == ("assistant fallback", {"apartment_id": "apt-prova-01", "ask_id": a["ask_id"],
+                                                 "cause": "timeout", "command": True})
     e = _late()
     ask(e, "Porta il soggiorno a 21 gradi")                                 # another suggestion: the room's climate
     assert any(c["device_id"] == CLIMA and c["params"].get("setpoint") == 21 for c in e.commands.values())
@@ -527,3 +529,44 @@ def test_e23_a_scheduled_command_with_every_field_at_the_local_hour():
     run_at = core.parse_dt(item["run_at"]).astimezone(tz)
     assert (run_at.date(), run_at.hour, run_at.minute) == (day, 18, 0)
     assert item["action"]["params"]["setpoint"] == 22 and "Non fatto" not in a["answer"]
+
+
+
+def test_the_model_call_says_which_question_to_the_bff(monkeypatch):
+    """Staging, 23 Oct (ask-03ed): the engine's request to the BFF carries X-Ask-Id, so the BFF's log lines of that call
+    («assistant model call», «… failed», «… twin started») say which question; none outside a question."""
+    sent = []
+
+    class Conn:
+        def __init__(self, *a, **k):
+            pass
+
+        def request(self, method, path, body=None, headers=None):
+            sent.append(dict(headers))
+
+        def getresponse(self):
+            raise OSError("fermo qui")
+
+        def close(self):
+            pass
+    import http.client
+    import socket
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *a, **k: [])
+    class Sock:
+        def settimeout(self, s):
+            pass
+
+        def close(self):
+            pass
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **k: Sock())
+    monkeypatch.setattr(http.client, "HTTPConnection", Conn)
+    client = assistant.ModelClient("http://127.0.0.1:9", "apt-prova-01", "k" * 16)
+    token = assistant.current_ask.set("ask-03ed")
+    try:
+        with pytest.raises(assistant.ModelRefused):
+            asyncio.run(client.chat([{"role": "user", "content": "x"}], []))
+    finally:
+        assistant.current_ask.reset(token)
+    with pytest.raises(assistant.ModelRefused):
+        asyncio.run(client.chat([{"role": "user", "content": "x"}], []))
+    assert sent[0]["X-Ask-Id"] == "ask-03ed" and "X-Ask-Id" not in sent[1]

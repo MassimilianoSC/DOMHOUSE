@@ -292,3 +292,20 @@ def test_d187_the_prices_of_the_twin_and_the_native_url_of_its_model(monkeypatch
     monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
     run(ai_gateway.call_model({"model": LITE, "messages": [{"role": "user", "content": "q"}]}))
     assert sent[0].endswith("/publishers/google/models/gemini-3.5-flash-lite:generateContent")
+
+
+def test_the_log_lines_say_which_question(model, monkeypatch):
+    """Staging, 23 Oct (ask-03ed): with the engine's X-Ask-Id the BFF's lines of the call say the question; a failure
+    too; without it (the rules' proposals) nothing is added."""
+    logged = []
+    monkeypatch.setattr(ai_gateway, "info", lambda msg, **kw: logged.append((msg, kw)))
+    monkeypatch.setattr(ai_gateway, "warn", lambda msg, **kw: logged.append((msg, kw)))
+    assert run(post(BODY, **{"X-Ask-Id": "ask-03ed"})).status_code == 200
+    assert [kw.get("ask_id") for msg, kw in logged if msg == "assistant model call"] == ["ask-03ed"]
+    model.fail = ai_gateway.GatewayError(502, "model_error", "Il modello ha risposto 500")
+    assert run(post(BODY, **{"X-Ask-Id": "ask-03ee"})).status_code == 502
+    assert [kw.get("ask_id") for msg, kw in logged if msg == "assistant model call failed"] == ["ask-03ee"]
+    model.fail = None
+    logged.clear()
+    assert run(post(BODY)).status_code == 200
+    assert "ask_id" not in [kw for msg, kw in logged if msg == "assistant model call"][0]

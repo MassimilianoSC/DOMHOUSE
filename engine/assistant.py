@@ -26,6 +26,7 @@ Fixed rule 1: no guest data reaches the model: the state has devices, consumptio
 bookings' people (the engine has none of them anyway: names, emails and phones stay with the BFF).
 """
 import asyncio
+import contextvars
 import json
 import re
 from datetime import datetime, timedelta
@@ -44,6 +45,8 @@ def european_location(location: str | None) -> bool:
     return v == "eu" or v.startswith("europe-")
 TIMEOUT_ANSWER = "Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app."
 TEMPERATURE = 0.2
+# the question being answered, for the log lines and the BFF's (X-Ask-Id); set by Assistant.resolve in its own task
+current_ask: contextvars.ContextVar[str] = contextvars.ContextVar("current_ask", default="")
 
 
 def fmt_c(value) -> str:
@@ -222,6 +225,8 @@ class ModelClient:
         host, port = parts.hostname, parts.port or (443 if https else 80)
         path = parts.path + (f"?{parts.query}" if parts.query else "")
         headers = {"Content-Type": "application/json", "X-Apartment-Id": self.apartment_id, "X-API-Key": self.api_key}
+        if current_ask.get():
+            headers["X-Ask-Id"] = current_ask.get()          # the BFF's log lines say which question
         phase, started = "DNS", time.monotonic()
         try:
             socket.getaddrinfo(host, port)
@@ -241,7 +246,7 @@ class ModelClient:
             status, raw, location = resp.status, resp.read(), resp.getheader("X-AI-Location")
             conn.close()
         except (OSError, http.client.HTTPException) as exc:
-            log.warn("assistant model call failed", apartment_id=self.apartment_id,
+            log.warn("assistant model call failed", apartment_id=self.apartment_id, ask_id=current_ask.get(),
                      phase="DNS" if isinstance(exc, socket.gaierror) else phase,
                      timeout=isinstance(exc, TimeoutError), error=type(exc).__name__,
                      seconds=round(time.monotonic() - started, 2))
@@ -279,6 +284,7 @@ class Assistant:
     # ---- the question ---------------------------------------------------------------------------------------------
     async def resolve(self, ask: dict, actor: str) -> None:
         from .core import iso, utcnow
+        current_ask.set(ask["ask_id"])                      # this task's question (its log lines, X-Ask-Id)
         try:
             await asyncio.wait_for(self._run(ask, actor), timeout=ASK_TIMEOUT_S)
         except TimeoutError:
@@ -365,7 +371,8 @@ class Assistant:
         """D-182 point 4: every recourse with its cause, in the engine's log and in the ask's reason (not shown by the
         site for an answered question; the BFF can count it)."""
         from . import log
-        log.warn("assistant fallback", apartment_id=self.e.apartment_id, cause=cause, command=command)
+        log.warn("assistant fallback", apartment_id=self.e.apartment_id, ask_id=ask["ask_id"], cause=cause,
+                 command=command)
         ask["reason"] = f"risposta_rapida:{cause}"
 
     def quick_proposal(self, text: str, proposals: list[dict]) -> bool:

@@ -149,7 +149,7 @@ async def _alert(month: str, spent: float) -> None:
         warn("assistant spending alert email failed", error=type(exc).__name__)
 
 
-async def _hedged(request: dict, apartment_id: str = "") -> tuple[dict, int]:
+async def _hedged(request: dict, apartment_id: str = "", ask_id: str = "") -> tuple[dict, int]:
     """C-10 layer 1: the model's answer and which request gave it (1 or 2). A second request starts when the first is
     still silent after AI_HEDGE_AFTER_S; the first answer that arrives wins, the other is cancelled. D-187: the second
     goes to AI_TWIN_MODEL when there is one (another model: failures independent) and then starts at once also when
@@ -161,7 +161,7 @@ async def _hedged(request: dict, apartment_id: str = "") -> tuple[dict, int]:
         done, _ = await asyncio.wait(tasks, timeout=s.ai_hedge_after_s)
         failed = bool(done) and tasks[0].exception() is not None
         if not done or (failed and s.ai_twin_model):
-            info("assistant model twin started", apartment_id=apartment_id, after_s=s.ai_hedge_after_s,   # D-182 point 4
+            info("assistant model twin started", apartment_id=apartment_id, **_ask(ask_id), after_s=s.ai_hedge_after_s,
                  model=twin_model, reason="errore" if done else "silenzio")
             if apartment_id:
                 await ai_stats.count_twin(apartment_id)              # decision 120: the twins of the week
@@ -182,8 +182,13 @@ async def _hedged(request: dict, apartment_id: str = "") -> tuple[dict, int]:
                 t.cancel()
 
 
-async def chat(apartment_id: str, body: dict) -> dict:
-    """One model call for an engine: cap, model, tokens, cost, alert."""
+def _ask(ask_id: str) -> dict:
+    """The question in the log lines, when the engine said it (X-Ask-Id); nothing for the rules' proposals."""
+    return {"ask_id": ask_id} if ask_id else {}
+
+
+async def chat(apartment_id: str, body: dict, ask_id: str = "") -> dict:
+    """One model call for an engine: cap, model, tokens, cost, alert. ask_id: only for the log lines."""
     s = get_settings()
     if not isinstance(body, dict) or not isinstance(body.get("messages"), list) or not body["messages"]:
         raise GatewayError(422, "bad_request", "messages obbligatorio")
@@ -199,29 +204,29 @@ async def chat(apartment_id: str, body: dict) -> dict:
     started = time.monotonic()
     try:
         try:
-            answer, attempt = await _hedged(request, apartment_id)
+            answer, attempt = await _hedged(request, apartment_id, ask_id)
         except GatewayError as exc:
             if "reasoning_effort" not in request or " 400" not in exc.message:
                 raise
             _refuse_reasoning(apartment_id)             # the model does not take it: once more without, then never
             request.pop("reasoning_effort")
-            answer, attempt = await _hedged(request, apartment_id)
+            answer, attempt = await _hedged(request, apartment_id, ask_id)
     except GatewayError as exc:              # lot 28 d: every failed call leaves a line, with how long it took
-        warn("assistant model call failed", apartment_id=apartment_id, error=exc.error, phase=exc.phase,
+        warn("assistant model call failed", apartment_id=apartment_id, **_ask(ask_id), error=exc.error, phase=exc.phase,
              seconds=round(time.monotonic() - started, 2))
         raise
     except httpx.TimeoutException as exc:
-        warn("assistant model call failed", apartment_id=apartment_id, error="timeout", phase=net_phase.phase_of(exc),
+        warn("assistant model call failed", apartment_id=apartment_id, **_ask(ask_id), error="timeout", phase=net_phase.phase_of(exc),
              seconds=round(time.monotonic() - started, 2))
         raise GatewayError(504, "timeout", "Il modello non ha risposto in tempo", phase=net_phase.phase_of(exc)) from None
     except Exception as exc:                 # network, credentials (e.g. no identity on a developer's PC)
-        warn("assistant model call failed", apartment_id=apartment_id, error=type(exc).__name__,
+        warn("assistant model call failed", apartment_id=apartment_id, **_ask(ask_id), error=type(exc).__name__,
              phase="credenziali o rete", seconds=round(time.monotonic() - started, 2))
         raise GatewayError(502, "model_unavailable", "Modello non raggiungibile") from None
     twin = attempt == 2 and bool(s.ai_twin_model)
     cost, tokens_in, tokens_out = cost_eur(answer.get("usage") or {}, prices(twin))   # D-187: the winner's prices
     totals = await repo.add_ai_usage(month, cost, tokens_in, tokens_out)
-    info("assistant model call", apartment_id=apartment_id, model=s.ai_twin_model if twin else s.ai_model,
+    info("assistant model call", apartment_id=apartment_id, **_ask(ask_id), model=s.ai_twin_model if twin else s.ai_model,
          input_tokens=tokens_in, output_tokens=tokens_out,
          cost_eur=round(cost, 6), month_eur=round(totals["cost_eur"], 4), seconds=round(time.monotonic() - started, 2),
          attempt=attempt)
