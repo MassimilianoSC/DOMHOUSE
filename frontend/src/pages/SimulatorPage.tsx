@@ -188,7 +188,7 @@ export default function SimulatorPage() {
         <Section icon={<WifiOff className="h-5 w-5" />} title={t("simulator.online")} hint={t("simulator.onlineHint")} testId="simulator-online">
           {devices.map((d) => (
             <div key={d.device_id} className="flex items-center justify-between gap-3 rounded-xl bg-secondary/50 px-3 py-2">
-              <span className="text-sm font-semibold">{d.label} <span className={`text-xs ${d.online ? "text-emerald-600" : "text-destructive"}`}>· {d.online ? t("simulator.stateOnline") : t("simulator.stateOffline")}</span></span>
+              <span className="text-sm font-semibold">{d.label} <span className={`text-xs ${d.online ? "text-positive-fg" : "text-destructive"}`}>· {d.online ? t("simulator.stateOnline") : t("simulator.stateOffline")}</span></span>
               <Switch
                 checked={d.online}
                 disabled={busy !== null}

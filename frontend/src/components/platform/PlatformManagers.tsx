@@ -72,7 +72,7 @@ export function PlatformManagers() {
                 <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
                   <span>{m.email}</span>
                   {same(me?.user.email, m.email) && <Badge>{t("admin.users.you")}</Badge>}
-                  <Badge className={m.active ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "border-amber-200 bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300"} data-testid={`platform-manager-state-${m.email}`}>
+                  <Badge className={m.active ? "border-positive-border bg-positive-bg text-positive-fg" : "border-warning-border bg-warning-bg text-warning-fg"} data-testid={`platform-manager-state-${m.email}`}>
                     {m.active ? t("platform.managerActive") : t("platform.managerPending")}
                   </Badge>
                 </div>

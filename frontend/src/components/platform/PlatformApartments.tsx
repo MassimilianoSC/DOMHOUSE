@@ -161,7 +161,7 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
                       <span className="font-mono text-xs font-bold">{a.apartment_id}</span>
                       <span className="font-semibold">{a.name}</span>
                       {a.simulated && <DemoBadge testId={`platform-apt-demo-${a.apartment_id}`} />}
-                      {!a.enabled && <Badge className="border-stone-300 bg-stone-100 text-stone-600">{t("admin.apartments.disabled")}</Badge>}
+                      {!a.enabled && <Badge className="border-neutral-border bg-neutral-bg text-neutral-fg">{t("admin.apartments.disabled")}</Badge>}
                     </div>
                     <div className="font-mono text-xs text-muted-foreground">{a.instance_url}{a.port ? `:${a.port}` : ""} · {a.timezone}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</div>
                     <div className="text-xs">{t("admin.apartments.lastCheck")}: <LastCheck check={a.last_check} testId={`platform-apt-check-${a.apartment_id}`} /></div>

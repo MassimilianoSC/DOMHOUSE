@@ -10,7 +10,7 @@ import { useDecisionLog } from "@/hooks/useDecisionLog";
 import { useDecisionSearch } from "@/hooks/useDecisionSearch";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
-import { Badge, Card, Input, NativeSelect, Skeleton } from "@/components/ui/primitives";
+import { Card, Input, NativeSelect, Skeleton, StatusBadge, type Tone } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { MAX_RESULTS, matchesDecision, periodFrom } from "@/lib/decisionSearch";
 import { actionLabel, decisionValue, describeActor, deviceLabel } from "@/lib/describe";
@@ -27,12 +27,12 @@ const ACTOR_ICON: Record<string, React.ReactNode> = {
   organ: <Cpu className="h-4 w-4" />,
 };
 const ACTOR_FILTERS = ["", "brain", "rule", "user", "assistant", "system"];
-const OUTCOME_STYLE: Record<Decision["outcome"], string> = {
-  applied: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-  rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300",
-  pending_approval: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-  failed: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300",
-  informational: "border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300",
+const OUTCOME_TONE: Record<Decision["outcome"], Tone> = {
+  applied: "positive",
+  rejected: "negative",
+  pending_approval: "warning",
+  failed: "negative",
+  informational: "neutral",
 };
 
 function DecisionRow({ d, tz, ruleLabels }: { d: Decision; tz: string; ruleLabels: Record<string, string> }) {
@@ -49,7 +49,7 @@ function DecisionRow({ d, tz, ruleLabels }: { d: Decision; tz: string; ruleLabel
           <span className="font-mono tabular">{fmtDateTime(d.ts, tz)}</span>
           <span className="font-semibold text-foreground" data-testid={`decision-actor-${d.decision_id}`}>{actor.label}</span>
           <span>· {target}</span>
-          <Badge className={cn("ml-auto", OUTCOME_STYLE[d.outcome])} data-testid={`decision-outcome-${d.decision_id}`}>{t(`decisions.outcome.${d.outcome}`)}</Badge>
+          <StatusBadge tone={OUTCOME_TONE[d.outcome]} className="ml-auto" data-testid={`decision-outcome-${d.decision_id}`}>{t(`decisions.outcome.${d.outcome}`)}</StatusBadge>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
           {/* The kind of action in Italian (D-125); the engine's code stays in the tooltip, and shows for a new one. */}

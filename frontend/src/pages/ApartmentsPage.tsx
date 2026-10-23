@@ -45,12 +45,12 @@ function ApartmentCard({ a, index }: { a: ApartmentSummary; index: number }) {
             <p className="truncate text-xs text-muted-foreground">{a.address}</p>
           </div>
           {offline ? (
-            <Badge data-testid={`apartment-offline-${a.apartment_id}`} className="border-slate-300 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+            <Badge data-testid={`apartment-offline-${a.apartment_id}`} className="border-neutral-border bg-neutral-bg text-neutral-fg">
               <WifiOff className="h-3 w-3" /> {a.enabled ? t("apartments.unreachable") : t("apartments.disabled")}
             </Badge>
           ) : (
-            <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300" data-testid={`apartment-online-${a.apartment_id}`}>
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" /> {t("apartments.online")}
+            <Badge className="border-positive-border bg-positive-bg text-positive-fg" data-testid={`apartment-online-${a.apartment_id}`}>
+              <span className="h-1.5 w-1.5 rounded-full bg-positive" /> {t("apartments.online")}
             </Badge>
           )}
         </div>

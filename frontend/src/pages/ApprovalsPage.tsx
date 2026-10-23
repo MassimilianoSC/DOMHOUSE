@@ -9,7 +9,7 @@ import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { PageHeader, SegmentedControl } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
-import { Badge, Card, Input, Skeleton } from "@/components/ui/primitives";
+import { Card, Input, Skeleton, StatusBadge, type Tone } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { describeAction, personLabel } from "@/lib/describe";
@@ -17,11 +17,11 @@ import { DEFAULT_TZ, fmtCountdown, fmtDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
 
-const STATUS_STYLE: Record<Approval["status"], string> = {
-  pending: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-  approved: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-  rejected: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300",
-  expired: "border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300",
+const STATUS_TONE: Record<Approval["status"], Tone> = {
+  pending: "warning",
+  approved: "positive",
+  rejected: "negative",
+  expired: "neutral",
 };
 
 function Countdown({ until, id }: { until: string; id: string }) {
@@ -59,7 +59,7 @@ function ApprovalCard({ aptId, a, canWrite, onDecided }: { aptId: string; a: App
     <Card className={cn("space-y-4 p-5 animate-fade-up", pending && "border-primary/40 shadow-md")} data-testid={`approval-card-${a.approval_id}`} data-status={a.status}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className={STATUS_STYLE[a.status]} data-testid={`approval-status-${a.approval_id}`}>{t(`approvals.status.${a.status}`)}</Badge>
+          <StatusBadge tone={STATUS_TONE[a.status]} data-testid={`approval-status-${a.approval_id}`}>{t(`approvals.status.${a.status}`)}</StatusBadge>
           <span className="text-xs text-muted-foreground">{t(`approvals.source.${a.source}`)} · {fmtDateTime(a.created_at, tz)}</span>
         </div>
         {pending && a.expires_at && <Countdown until={a.expires_at} id={a.approval_id} />}

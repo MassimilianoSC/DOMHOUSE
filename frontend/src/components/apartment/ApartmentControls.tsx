@@ -11,9 +11,9 @@ import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
 
 const OCCUPANCY_STYLE: Record<Occupancy, string> = {
-  vacant: "border-stone-300 bg-stone-100 text-stone-700 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300",
-  occupied: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-  reserved: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+  vacant: "border-neutral-border bg-neutral-bg text-neutral-fg",
+  occupied: "border-positive-border bg-positive-bg text-positive-fg",
+  reserved: "border-warning-border bg-warning-bg text-warning-fg",
 };
 
 export function OccupancyBadge({ occupancy, testId }: { occupancy: Occupancy; testId?: string }) {

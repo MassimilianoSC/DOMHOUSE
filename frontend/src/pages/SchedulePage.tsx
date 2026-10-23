@@ -9,7 +9,7 @@ import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { ScheduleDialog } from "@/components/schedule/ScheduleDialog";
 import { Button } from "@/components/ui/button";
-import { Badge, Card, Skeleton } from "@/components/ui/primitives";
+import { Card, Skeleton, StatusBadge, type Tone } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { describeAction } from "@/lib/describe";
@@ -17,11 +17,11 @@ import { DEFAULT_TZ, fmtShortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
 
-const STATUS_STYLE: Record<ScheduleItem["status"], string> = {
-  planned: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-  done: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-  cancelled: "border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300",
-  failed: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300",
+const STATUS_TONE: Record<ScheduleItem["status"], Tone> = {
+  planned: "warning",
+  done: "positive",
+  cancelled: "neutral",
+  failed: "negative",
 };
 
 function Row({ aptId, item, tz, canWrite }: { aptId: string; item: ScheduleItem; tz: string; canWrite: boolean }) {
@@ -47,7 +47,7 @@ function Row({ aptId, item, tz, canWrite }: { aptId: string; item: ScheduleItem;
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-sm font-bold tabular" data-testid={`schedule-run-at-${item.schedule_id}`}>{fmtShortDateTime(item.run_at, tz)}</span>
-          <Badge className={STATUS_STYLE[item.status]} data-testid={`schedule-status-${item.schedule_id}`}>{t(`schedule.status.${item.status}`)}</Badge>
+          <StatusBadge tone={STATUS_TONE[item.status]} data-testid={`schedule-status-${item.schedule_id}`}>{t(`schedule.status.${item.status}`)}</StatusBadge>
         </div>
         <div className="text-base font-semibold" data-testid={`schedule-action-${item.schedule_id}`}>{describeAction(item.action, devices)}</div>
         <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">

@@ -21,9 +21,9 @@ const SUGGESTIONS = ["off", "temp", "at", "boiler"] as const;
 type ChatMessage = AskStatus & { approval_outcome?: ApprovalOutcome };
 
 const OUTCOME_STYLE: Record<ApprovalOutcome, string> = {
-  approved: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-  rejected: "border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300",
-  expired: "border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300",
+  approved: "border-positive-border bg-positive-bg text-positive-fg",
+  rejected: "border-neutral-border bg-neutral-bg text-neutral-fg",
+  expired: "border-neutral-border bg-neutral-bg text-neutral-fg",
 };
 const outcomeText = (o: ApprovalOutcome) => (o === "approved" ? t("assistant.outcome.approved") : o === "rejected" ? t("assistant.outcome.rejected") : t("assistant.outcome.expired"));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -48,7 +48,7 @@ function Message({ aptId, m, canWrite, onOutcome }: { aptId: string; m: ChatMess
       </div>
       <div className="flex gap-2">
         <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden><Bot className="h-4 w-4" /></span>
-        <div className={cn("max-w-[85%] space-y-2 rounded-2xl rounded-tl-md border bg-card px-4 py-2.5 text-sm shadow-sm", m.status === "failed" && "border-red-200 dark:border-red-900")}>
+        <div className={cn("max-w-[85%] space-y-2 rounded-2xl rounded-tl-md border bg-card px-4 py-2.5 text-sm shadow-sm", m.status === "failed" && "border-negative-border")}>
           {pending ? (
             <span className="inline-flex items-center gap-2 text-muted-foreground" data-testid={`ask-pending-${m.ask_id}`}><Loader2 className="h-4 w-4 animate-spin" aria-hidden /> {t("assistant.thinking")}</span>
           ) : (
@@ -58,7 +58,7 @@ function Message({ aptId, m, canWrite, onOutcome }: { aptId: string; m: ChatMess
           {m.status === "needs_approval" && canWrite && <ChatApproval aptId={aptId} askId={m.ask_id} correlationId={m.correlation_id} approvalId={m.approval_id ?? null} onOutcome={settled} />}
           {!pending && (
             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <Badge className={cn(m.status === "answered" && "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300", m.status === "needs_approval" && !outcome && "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300", outcome && OUTCOME_STYLE[outcome], m.status === "failed" && "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300")} data-testid={`ask-status-${m.ask_id}`}>
+              <Badge className={cn(m.status === "answered" && "border-positive-border bg-positive-bg text-positive-fg", m.status === "needs_approval" && !outcome && "border-warning-border bg-warning-bg text-warning-fg", outcome && OUTCOME_STYLE[outcome], m.status === "failed" && "border-negative-border bg-negative-bg text-negative-fg")} data-testid={`ask-status-${m.ask_id}`}>
                 {outcome ? outcomeText(outcome) : t(`assistant.status.${m.status}`)}
               </Badge>
               {m.actions.map((a, i) => (
@@ -69,7 +69,7 @@ function Message({ aptId, m, canWrite, onOutcome }: { aptId: string; m: ChatMess
               {m.approval_id && (
                 <Link to={`/a/${aptId}/approvazioni`} className="font-semibold text-primary underline-offset-2 hover:underline" data-testid={`ask-approval-link-${m.ask_id}`}>{t("assistant.openApprovals")}</Link>
               )}
-              {m.status === "failed" && m.reason && <span className="font-mono text-red-700 dark:text-red-300">{m.reason}</span>}
+              {m.status === "failed" && m.reason && <span className="font-mono text-negative-fg">{m.reason}</span>}
               {(m.status === "failed" || m.actions.length > 0 || m.approval_id) && <CopyableId id={m.correlation_id} testId={`ask-correlation-${m.ask_id}`} className="text-muted-foreground" />}
             </div>
           )}

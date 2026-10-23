@@ -11,10 +11,10 @@ import { eventOf, outcomeOf, summary24h, type Outcome, type ReadEvent } from "@/
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const OK = "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300";
-const KO = "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300";
-const WARN = "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300";
-const OK_TEXT = "text-emerald-700 dark:text-emerald-300";
+const OK = "border-positive-border bg-positive-bg text-positive-fg";
+const KO = "border-negative-border bg-negative-bg text-negative-fg";
+const WARN = "border-warning-border bg-warning-bg text-warning-fg";
+const OK_TEXT = "text-positive-fg";
 
 /**
  * Apartment name of a call: the one the BFF matched (apartment_id), otherwise the one carrying the Italianway code of

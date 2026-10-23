@@ -17,7 +17,7 @@ export function ErrorNotice({ error, onRetry, testId = "error-notice", className
   const api = error instanceof ApiError ? error : null;
   const message = api?.message ?? (error instanceof Error ? error.message : t("errors.generic"));
   return (
-    <div role="alert" data-testid={testId} className={cn("flex flex-wrap items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300", className)}>
+    <div role="alert" data-testid={testId} className={cn("flex flex-wrap items-center gap-2 rounded-xl border border-negative-border bg-negative-bg px-3 py-2 text-sm text-negative-fg", className)}>
       <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden />
       <span className="font-medium">{message}</span>
       {api?.code && <span className="font-mono text-xs opacity-70">{api.code}</span>}

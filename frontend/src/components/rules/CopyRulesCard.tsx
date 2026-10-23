@@ -149,7 +149,7 @@ export function CopyRulesCard({ aptId, hasManualChanges }: { aptId: string; hasM
               </div>
             </div>
           )}
-          {hasManualChanges && others.length > 0 && <p className="text-xs font-medium text-amber-700 dark:text-amber-300" data-testid="rules-copy-unsaved">{t("rules.proposal.unsaved")}</p>}
+          {hasManualChanges && others.length > 0 && <p className="text-xs font-medium text-warning-fg" data-testid="rules-copy-unsaved">{t("rules.proposal.unsaved")}</p>}
           {others.length > 0 && (
             <div className="flex justify-end">
               <Button variant="outline" onClick={() => void askPreview()} disabled={busy !== null || chosen.length === 0 || hasManualChanges} data-testid="rules-copy-preview">
@@ -169,7 +169,7 @@ export function CopyRulesCard({ aptId, hasManualChanges }: { aptId: string; hasM
               {x.status === "changes" && x.changes && <Changes changes={x.changes} testId={`rules-copy-changes-${x.apartment_id}`} />}
               {statusText(x) && <p className="text-sm text-muted-foreground">{statusText(x)}</p>}
               {x.customized && x.customized.length > 0 && (
-                <p className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-2 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300" data-testid={`rules-copy-customized-${x.apartment_id}`}>
+                <p className="flex items-start gap-1.5 rounded-lg bg-warning-bg px-2.5 py-2 text-xs font-medium text-warning-fg" data-testid={`rules-copy-customized-${x.apartment_id}`}>
                   <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden /> {customizedText(x.customized)}
                 </p>
               )}
@@ -189,7 +189,7 @@ export function CopyRulesCard({ aptId, hasManualChanges }: { aptId: string; hasM
           <h3 className="text-sm font-bold">{t("rules.copy.resultsTitle")}</h3>
           {results.map((r) => (
             <div key={r.apartment_id} className="space-y-1 rounded-xl border p-3" data-testid={`rules-copy-result-${r.apartment_id}`} data-outcome={r.outcome}>
-              <div className="text-sm"><span className="font-bold">{r.name}</span> · <span className={r.outcome === "applied" ? "font-semibold text-emerald-700 dark:text-emerald-300" : "text-muted-foreground"}>{outcomeText(r)}</span></div>
+              <div className="text-sm"><span className="font-bold">{r.name}</span> · <span className={r.outcome === "applied" ? "font-semibold text-positive-fg" : "text-muted-foreground"}>{outcomeText(r)}</span></div>
               {r.message && <p className="text-xs text-muted-foreground">{r.message}</p>}
               {r.outcome === "applied" && r.changes && r.changes.length > 0 && <Changes changes={r.changes} testId={`rules-copy-result-changes-${r.apartment_id}`} />}
             </div>

@@ -67,7 +67,7 @@ export function SupportBar() {
     setBusy(false);
   };
   return (
-    <div role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-200" data-testid="support-bar">
+    <div role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm font-medium text-warning-fg" data-testid="support-bar">
       <LifeBuoy className="h-4 w-4 shrink-0" aria-hidden />
       <span className="min-w-0 flex-1">{t("support.bar", { name: me?.tenant?.name ?? "", until: fmtTime(support.expires_at) })}</span>
       <Button size="sm" variant="outline" onClick={() => void end()} disabled={busy} data-testid="support-end-btn">{t("support.end")}</Button>
@@ -114,7 +114,7 @@ export function AdminSupportNotice() {
         const name = a.operator_name || a.operator_email || t("common.removedUser");
         const who = a.operator_name && a.operator_email ? `${a.operator_name} (${a.operator_email})` : name;
         return (
-          <div key={a.access_id} role="status" className="flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950/60 dark:text-amber-200" data-testid={`support-notice-${a.access_id}`}>
+          <div key={a.access_id} role="status" className="flex items-start gap-3 rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm text-warning-fg" data-testid={`support-notice-${a.access_id}`}>
             <LifeBuoy className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <div className="min-w-0 flex-1 space-y-1">
               <p className="font-medium">{t("support.notice", { name: who, until: fmtDateTime(a.expires_at) })}</p>

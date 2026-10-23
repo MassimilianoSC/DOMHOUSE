@@ -183,7 +183,7 @@ function AdminState({ tenant }: { tenant: PlatformTenant }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-2" data-testid={`tenant-admin-${tenant.tenant_id}`}>
       <span className="font-semibold text-foreground">{a.email}</span>
-      <Badge className={a.pending ? "border-amber-200 bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"}>
+      <Badge className={a.pending ? "border-warning-border bg-warning-bg text-warning-fg" : "border-positive-border bg-positive-bg text-positive-fg"}>
         {a.pending ? t("platform.pending") : t("platform.active")}
       </Badge>
     </span>
@@ -259,11 +259,11 @@ export function PlatformTenants({ openTenant = null }: { openTenant?: string | n
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-base font-bold" data-testid={`tenant-name-${tn.tenant_id}`}>{tn.name}</h3>
-                  {tn.suspended && <Badge className="border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300" data-testid={`tenant-suspended-${tn.tenant_id}`}>{t("platform.suspendedBadge")}</Badge>}
+                  {tn.suspended && <Badge className="border-negative-border bg-negative-bg text-negative-fg" data-testid={`tenant-suspended-${tn.tenant_id}`}>{t("platform.suspendedBadge")}</Badge>}
                 </div>
                 <p className="text-xs text-muted-foreground">{t("platform.createdAt", { when: fmtDateTime(tn.created_at) })}</p>
                 {tn.support_access && (
-                  <p className="text-xs font-medium text-amber-800 dark:text-amber-300" data-testid={`tenant-support-info-${tn.tenant_id}`}>
+                  <p className="text-xs font-medium text-warning-fg" data-testid={`tenant-support-info-${tn.tenant_id}`}>
                     {tn.support_access.mine
                       ? t("support.openUntil", { until: fmtDateTime(tn.support_access.expires_at) })
                       : t("support.openBy", { name: tn.support_access.operator_name || tn.support_access.operator_email || t("common.removedUser"), until: fmtDateTime(tn.support_access.expires_at) })}

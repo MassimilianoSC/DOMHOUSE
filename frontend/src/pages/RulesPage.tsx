@@ -50,7 +50,7 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
         <div className="flex items-center gap-2">
           {!rule.editable && (
             <Tip content={t("rules.lockedHint")}>
-              <Badge tabIndex={0} className="border-stone-300 bg-stone-100 text-stone-600 dark:bg-stone-800 dark:text-stone-300" data-testid={`rule-locked-${rule.rule_id}`}>
+              <Badge tabIndex={0} className="border-neutral-border bg-neutral-bg text-neutral-fg" data-testid={`rule-locked-${rule.rule_id}`}>
                 <Lock className="h-3 w-3" aria-hidden /> {t("rules.locked")}
               </Badge>
             </Tip>

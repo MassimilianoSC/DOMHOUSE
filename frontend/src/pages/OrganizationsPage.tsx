@@ -47,7 +47,7 @@ export default function OrganizationsPage() {
         }
       />
       {own?.suspended && (
-        <p role="status" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300" data-testid="own-tenant-suspended">
+        <p role="status" className="rounded-xl border border-negative-border bg-negative-bg px-3 py-2 text-sm font-medium text-negative-fg" data-testid="own-tenant-suspended">
           {t("platform.ownSuspended", { name: own.name })}
         </p>
       )}

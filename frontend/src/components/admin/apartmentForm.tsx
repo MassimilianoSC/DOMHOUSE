@@ -40,9 +40,9 @@ export function SimulatedField({ url, value, onChange }: { url: string; value: b
   );
 }
 
-/** Badge of a simulated apartment (D-98), the same word in every list. */
+/** Badge of a simulated apartment (D-98), the same word in every list: neutral and outlined (lotto 32), not a status. */
 export function DemoBadge({ testId }: { testId: string }) {
-  return <Badge className="border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-300" data-testid={testId}>{t("apartments.demo")}</Badge>;
+  return <Badge className="border-neutral-border bg-card text-neutral-fg" data-testid={testId}>{t("apartments.demo")}</Badge>;
 }
 
 /** With INSTANCE_MODE=mock the BFF accepts only mock:// URLs (D-28): a new apartment starts with the built-in mock. */
@@ -65,7 +65,7 @@ export type LastCheckInfo = { ok: boolean; checked_at: string; error: string | n
 export function LastCheck({ check, testId }: { check: LastCheckInfo | undefined; testId: string }) {
   if (!check) return <span className="text-muted-foreground" data-testid={testId}>{t("admin.apartments.lastCheckNever")}</span>;
   return (
-    <span className={check.ok ? "text-emerald-700 dark:text-emerald-300" : "text-destructive"} data-testid={testId} data-ok={check.ok}>
+    <span className={check.ok ? "text-positive-fg" : "text-destructive"} data-testid={testId} data-ok={check.ok}>
       {check.ok ? <Check className="mr-1 inline h-3 w-3" /> : <X className="mr-1 inline h-3 w-3" />}
       {t(check.ok ? "admin.apartments.lastCheckOk" : "admin.apartments.lastCheckKo", { when: fmtDateTime(check.checked_at) })}
       {!check.ok && check.error ? ` · ${check.error}` : ""}
@@ -77,7 +77,7 @@ export function VerifyBadge({ r }: { r: VerifyResult }) {
   const health = (r.health?.body as { status?: string } | null)?.status;
   return (
     <div className="flex flex-wrap items-center gap-2 text-xs" data-testid={`verify-result-${r.apartment_id}`} data-ok={r.ok}>
-      <Badge className={r.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" : "border-red-200 bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300"}>
+      <Badge className={r.ok ? "border-positive-border bg-positive-bg text-positive-fg" : "border-negative-border bg-negative-bg text-negative-fg"}>
         {r.ok ? <Check className="h-3 w-3" /> : <X className="h-3 w-3" />} {r.ok ? t("admin.apartments.verifyOk") : t("admin.apartments.verifyKo")}
       </Badge>
       {health && <span>/health: <strong>{health}</strong> ({r.health?.status_code})</span>}

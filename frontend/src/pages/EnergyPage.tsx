@@ -99,7 +99,7 @@ function StayComparison({ current, previous, prev, tz, aptId }: { current: numbe
   const up = delta !== null && delta > 0;
   return (
     <Card className="flex flex-wrap items-center gap-4 p-4" data-testid="energy-stay-comparison" data-delta={delta ?? ""}>
-      <span className={`rounded-2xl p-2.5 ${up ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300" : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"}`}>
+      <span className={`rounded-2xl p-2.5 ${up ? "bg-negative-bg text-negative-fg" : "bg-positive-bg text-positive-fg"}`}>
         {up ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
       </span>
       <div className="min-w-0 flex-1 text-sm">
@@ -110,7 +110,7 @@ function StayComparison({ current, previous, prev, tz, aptId }: { current: numbe
         </div>
       </div>
       <div className="text-right">
-        <div className={`text-xl font-extrabold tabular ${up ? "text-red-700 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300"}`} data-testid="energy-stay-delta">
+        <div className={`text-xl font-extrabold tabular ${up ? "text-negative-fg" : "text-positive-fg"}`} data-testid="energy-stay-delta">
           {delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta}%`}
         </div>
         <div className="text-[11px] text-muted-foreground">{t("energy.vsPrevious")}</div>

@@ -48,8 +48,8 @@ export function CommandChip({ command, error, testId }: { command?: TrackedComma
 function chip(kind: "busy" | "ok" | "err") {
   return cn(
     "inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold animate-fade-up",
-    kind === "busy" && "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-    kind === "ok" && "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-    kind === "err" && "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300",
+    kind === "busy" && "border-warning-border bg-warning-bg text-warning-fg",
+    kind === "ok" && "border-positive-border bg-positive-bg text-positive-fg",
+    kind === "err" && "border-negative-border bg-negative-bg text-negative-fg",
   );
 }

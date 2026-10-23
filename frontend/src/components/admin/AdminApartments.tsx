@@ -159,7 +159,7 @@ export function AdminApartments() {
                   <h3 className="text-base font-bold">{a.name}</h3>
                   <CopyableId id={a.apartment_id} testId={`admin-apartment-id-${a.apartment_id}`} />
                   {a.simulated && <DemoBadge testId={`admin-apartment-demo-${a.apartment_id}`} />}
-                  {!a.enabled && <Badge className="border-stone-300 bg-stone-100 text-stone-600">{t("admin.apartments.disabled")}</Badge>}
+                  {!a.enabled && <Badge className="border-neutral-border bg-neutral-bg text-neutral-fg">{t("admin.apartments.disabled")}</Badge>}
                 </div>
                 <p className="text-sm text-muted-foreground">{a.address || "—"} · {a.timezone}</p>
                 <p className="font-mono text-xs text-muted-foreground">{a.instance_url}{a.port ? `:${a.port}` : ""}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</p>

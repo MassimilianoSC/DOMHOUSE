@@ -16,7 +16,7 @@ export function PlatformError({ error, onRetry, testId }: { error: unknown; onRe
   }, [lost, refreshMe]);
   if (lost) {
     return (
-      <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300" data-testid={`${testId}-no-access`}>
+      <p role="alert" className="rounded-xl border border-warning-border bg-warning-bg px-3 py-2 text-sm font-medium text-warning-fg" data-testid={`${testId}-no-access`}>
         {t("platform.noAccess")}
       </p>
     );

@@ -13,10 +13,10 @@ export { weekRange };
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
 
-const GREY = "border-stone-300 bg-stone-100 text-stone-600 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300";
+const GREY = "border-neutral-border bg-neutral-bg text-neutral-fg";
 const STATUS_STYLE: Record<SummaryStatus, string> = {
-  normal: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-  anomalous: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300",
+  normal: "border-positive-border bg-positive-bg text-positive-fg",
+  anomalous: "border-negative-border bg-negative-bg text-negative-fg",
   not_comparable: GREY,
   no_nights: GREY,
 };
@@ -126,7 +126,7 @@ function SummaryList({ aptId, tz }: { aptId: string; tz: string }) {
               <CalendarRange className="h-5 w-5 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <div className="text-sm font-semibold">{t("summaries.week", { range: weekRange(w.from, w.to, tz) })}</div>
-                <div className={cn("text-xs", w.notable ? "font-semibold text-amber-700 dark:text-amber-300" : "text-muted-foreground")} data-testid={`summary-week-${w.week}-count`}>
+                <div className={cn("text-xs", w.notable ? "font-semibold text-warning-fg" : "text-muted-foreground")} data-testid={`summary-week-${w.week}-count`}>
                   {!w.notable ? t("summaries.nothing") : w.items === 1 ? t("summaries.itemsOne") : t("summaries.items", { count: w.items })}
                 </div>
               </div>

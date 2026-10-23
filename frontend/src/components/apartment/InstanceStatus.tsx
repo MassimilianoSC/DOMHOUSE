@@ -13,16 +13,16 @@ interface Props {
 }
 
 const STATUS_TONE = {
-  ok: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300",
-  degraded: "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
-  down: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/50 dark:text-red-300",
+  ok: "border-positive-border bg-positive-bg text-positive-fg",
+  degraded: "border-warning-border bg-warning-bg text-warning-fg",
+  down: "border-negative-border bg-negative-bg text-negative-fg",
 };
 
 /** Reusable instance status: /health, plus the contract version and features of the apartment summary. */
 export function InstanceStatus({ health, contractVersion, features, compact }: Props) {
   if (!health) {
     return (
-      <div data-testid="instance-status" className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300">
+      <div data-testid="instance-status" className="flex items-center gap-2 rounded-2xl border border-negative-border bg-negative-bg px-4 py-3 text-sm font-semibold text-negative-fg">
         <ServerCrash className="h-4 w-4" aria-hidden /> {t("instance.unreachable")}
       </div>
     );

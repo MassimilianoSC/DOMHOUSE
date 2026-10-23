@@ -22,7 +22,7 @@ function InstallCard() {
   const { canInstall, installed, install } = useInstallPrompt();
   let body: React.ReactNode;
   if (installed) {
-    body = <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="settings-installed"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> {t("settings.installed")}</p>;
+    body = <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="settings-installed"><CheckCircle2 className="h-4 w-4 text-positive-fg" /> {t("settings.installed")}</p>;
   } else if (canInstall) {
     body = (
       <>

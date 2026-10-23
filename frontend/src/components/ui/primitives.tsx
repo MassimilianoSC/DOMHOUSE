@@ -13,9 +13,26 @@ export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDi
 Card.displayName = "Card";
 
 export const Badge = React.forwardRef<HTMLSpanElement, React.HTMLAttributes<HTMLSpanElement>>(({ className, ...p }, ref) => (
-  <span ref={ref} className={cn("inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-semibold", className)} {...p} />
+  <span ref={ref} className={cn("inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold", className)} {...p} />
 ));
 Badge.displayName = "Badge";
+
+/** The four meanings of a status (lotto 32, design review b.2): one pale pair each, the same in every page. */
+export type Tone = "positive" | "warning" | "negative" | "neutral";
+
+/** Tint, text and border of a tone, for whatever carries the status: a badge, a band, a notice. */
+export const TONE: Record<Tone, string> = {
+  positive: "border-positive-border bg-positive-bg text-positive-fg",
+  warning: "border-warning-border bg-warning-bg text-warning-fg",
+  negative: "border-negative-border bg-negative-bg text-negative-fg",
+  neutral: "border-neutral-border bg-neutral-bg text-neutral-fg",
+};
+
+/** A status as a badge: its tone; like every badge, on one line and never squeezed by its row. */
+export const StatusBadge = React.forwardRef<HTMLSpanElement, React.HTMLAttributes<HTMLSpanElement> & { tone: Tone }>(({ tone, className, ...p }, ref) => (
+  <Badge ref={ref} className={cn(TONE[tone], className)} {...p} />
+));
+StatusBadge.displayName = "StatusBadge";
 
 export const Skeleton = ({ className, ...p }: React.HTMLAttributes<HTMLDivElement>) => (
   <div className={cn("animate-pulse rounded-xl bg-muted", className)} {...p} />

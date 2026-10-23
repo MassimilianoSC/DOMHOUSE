@@ -135,7 +135,7 @@ export function AdminUsers() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
                   <span data-testid={`admin-user-email-${u.uid}`}>{u.email}</span>
-                  {u.pending && <Badge className="border-amber-200 bg-amber-50 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300" data-testid={`admin-user-pending-${u.uid}`}>{t("admin.users.pending")}</Badge>}
+                  {u.pending && <Badge className="border-warning-border bg-warning-bg text-warning-fg" data-testid={`admin-user-pending-${u.uid}`}>{t("admin.users.pending")}</Badge>}
                   {u.uid === me?.user.uid && <Badge>{t("admin.users.you")}</Badge>}
                 </div>
                 <div className="text-xs text-muted-foreground">

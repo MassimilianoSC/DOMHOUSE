@@ -42,7 +42,7 @@ export function DeviceCard({ aptId, device, rooms, tz, canWrite, canRename }: Pr
         <div className="flex items-center gap-1">
           {!device.online && (
             <Tip content={t("device.offlineTooltip")}>
-              <Badge tabIndex={0} data-testid={`device-offline-${device.device_id}`} className="border-slate-300 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <Badge tabIndex={0} data-testid={`device-offline-${device.device_id}`} className="border-neutral-border bg-neutral-bg text-neutral-fg">
                 <WifiOff className="h-3 w-3" aria-hidden /> {t("device.offline")}
               </Badge>
             </Tip>

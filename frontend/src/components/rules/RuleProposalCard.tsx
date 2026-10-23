@@ -105,7 +105,7 @@ export function RuleProposalCard({ aptId, hasManualChanges, onApplied, onRulesCh
             ))}
           </ul>
           {proposal.explanation && <p className="text-sm text-muted-foreground" data-testid="rule-proposal-explanation">{proposal.explanation}</p>}
-          {hasManualChanges && <p className="text-xs font-medium text-amber-700 dark:text-amber-300" data-testid="rule-proposal-unsaved">{t("rules.proposal.unsaved")}</p>}
+          {hasManualChanges && <p className="text-xs font-medium text-warning-fg" data-testid="rule-proposal-unsaved">{t("rules.proposal.unsaved")}</p>}
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="ghost" onClick={() => setProposal(null)} disabled={busy !== null} data-testid="rule-proposal-discard">{t("rules.proposal.discard")}</Button>
             <Button onClick={() => void apply()} disabled={busy !== null || hasManualChanges} data-testid="rule-proposal-apply">{t("rules.proposal.apply")}</Button>
