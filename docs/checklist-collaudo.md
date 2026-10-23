@@ -124,6 +124,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D22 | Operatore | Panoramica: cambia modalità con il selettore (Comfort, Eco, Casa vuota). | La casella «Modalità» della fascia e la scelta nel selettore prendono il colore della modalità: Comfort arancione chiaro, Eco verde salvia, Casa vuota azzurro ardesia. | |
 | D23 📱 | Operatore | Regole sul telefono: modifica l'ultimo valore della pagina con la tastiera aperta. | La barra «Salva le modifiche» in fondo non copre il campo in cui scrivi. | |
 | D24 | Operatore | Decisioni: leggi gli esiti. | Badge colorati: «Applicata» verde, «Respinta» e «Non riuscita» rosso mattone, «In attesa di approvazione» ambra, «Informativa» tortora. | |
+| D25 📱 | Qualsiasi | Consumi su un telefono largo (400–430 px, Android o iPhone Pro Max): scheda «Rendiconto in Excel». | Titolo e descrizione vanno a capo normalmente; la tendina del mese e «Scarica Excel» stanno sotto la descrizione, a tutta larghezza; da tablet in su stanno accanto. Stessa cosa per la riga del confronto con il soggiorno precedente. | |
 
 ## E. Amministrazione
 
