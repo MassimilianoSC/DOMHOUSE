@@ -140,3 +140,39 @@ def test_the_gateways_twins(monkeypatch):
     monkeypatch.setattr(ai_gateway, "call_model", fake)
     run(ai_gateway.chat(OTHER, {"messages": [{"role": "user", "content": "ciao"}]}))
     assert stats(OTHER, ai_stats.week_of(datetime.now(UTC)))["twins"] == 1
+
+
+def test_a_quick_answer_for_timeout_on_a_demonstration_counts_a_timeout(monkeypatch):
+    """23 Oct, 10:50 in staging: an answer «risposta rapida» with cause timeout read by the site through the proxy must
+    count one question and one timeout. A demonstration whose model never answers in time, end to end in-process."""
+    from engine import assistant as eng_assistant
+
+    class Silent:                                    # the model that does not answer within the question's time
+        async def chat(self, messages, tools):
+            await asyncio.sleep(30)
+
+    monkeypatch.setattr(eng_assistant, "ASK_TIMEOUT_S", 1.5)
+    monkeypatch.setattr(eng_assistant, "NO_PROPOSAL_RESERVE_S", 0.5)
+    registry = app.state.mock_registry
+    registry.reset("apt-bologna-01")
+    monkeypatch.setattr(registry, "model_for", lambda apartment_id: Silent())
+
+    async def main():
+        engine = httpx.AsyncClient(transport=httpx.ASGITransport(app=app))
+        monkeypatch.setattr(instances, "http", lambda: engine)
+        try:
+            r = await call("POST", "/app/apartments/apt-bologna-01/instance/ask", ADMIN, json={"text": "che tempo fa?"})
+            ask_id = r.json()["ask_id"]
+            for _ in range(100):
+                r = await call("GET", f"/app/apartments/apt-bologna-01/instance/ask/{ask_id}", ADMIN)
+                if r.json()["status"] != "pending":
+                    break
+                await asyncio.sleep(0.05)
+            return r.json()
+        finally:
+            await engine.aclose()
+            registry.reset("apt-bologna-01")
+    final = run(main())
+    assert final["status"] == "answered" and final["reason"] == "risposta_rapida:timeout", final
+    d = stats("apt-bologna-01", ai_stats.week_of(datetime.now(UTC)))
+    assert (d["asks"], d["timeouts"], d["quick"]) == (1, 1, {"timeout": 1})
