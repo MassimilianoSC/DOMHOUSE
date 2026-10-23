@@ -8,7 +8,7 @@ import DecisionsPage from "./DecisionsPage";
 type Q = { cursor?: string; correlation_id?: string; from?: string; limit?: number };
 const s = vi.hoisted(() => ({ calls: [] as Q[] }));
 
-const dec = (n: number, reasoning: string) => ({ decision_id: `d-${n}`, ts: new Date(Date.UTC(2026, 9, 16, 12) - n * 60_000).toISOString(), actor: "brain", target: { type: "apartment" }, action: n === 0 ? "booking_cancel_reset" : "mode", old_value: null, new_value: null, reasoning, outcome: "applied", correlation_id: n === 1500 ? "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f" : `c-${n}`, command_id: null, approval_id: null });
+const dec = (n: number, reasoning: string) => ({ decision_id: `d-${n}`, ts: new Date(Date.UTC(2026, 9, 16, 12) - n * 60_000).toISOString(), actor: "brain", target: { type: "apartment" }, action: n === 0 ? "booking_cancel_reset" : "mode", old_value: null, new_value: null, reasoning, outcome: n === 2 ? "failed" : "applied", correlation_id: n === 1500 ? "3f2a9c1e-7b4d-4e8a-9c0f-1a2b3c4d5e6f" : `c-${n}`, command_id: n === 2 ? "cmd-2222" : null, approval_id: null });
 
 vi.mock("@/api/instance", () => ({
   instanceApi: () => ({
@@ -114,5 +114,18 @@ describe("Decisioni: il tipo di azione (D-125)", () => {
     expect(await screen.findByTestId("decision-action-d-0")).toHaveTextContent(/^Disdetta dopo il pre-arrivo$/);
     expect(screen.getByTestId("decision-action-d-0")).toHaveAttribute("title", "booking_cancel_reset");
     expect(screen.getByTestId("decision-action-d-1")).toHaveTextContent(/^mode$/);
+  });
+});
+
+describe("Decisioni: la riga (design, lotto 2)", () => {
+  it("esito come testo a destra, colorato solo se non riuscita; il codice del comando dietro «Dettagli»", async () => {
+    open();
+    expect(await screen.findByTestId("decision-outcome-d-1")).toHaveClass("text-muted-foreground");
+    expect(screen.getByTestId("decision-outcome-d-2")).toHaveClass("text-negative-fg");
+    expect(screen.getByTestId("decision-row-d-2")).not.toHaveTextContent("cmd-2222");
+    expect(screen.queryByTestId("decision-details-toggle-d-1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("decision-details-toggle-d-2"));
+    expect(screen.getByTestId("decision-details-d-2")).toHaveTextContent("cmd-2222");
+    expect(screen.getByTestId("decision-correlation-d-2")).toBeInTheDocument();
   });
 });

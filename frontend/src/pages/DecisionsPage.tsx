@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, Bot, Cpu, Loader2, Sparkles, User, Zap } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Loader2, SlidersHorizontal } from "lucide-react";
 import type { Decision } from "@/api/types";
 import { instanceApi } from "@/api/instance";
 import { ErrorNotice } from "@/components/apartment/ErrorNotice";
@@ -10,7 +10,7 @@ import { useDecisionLog } from "@/hooks/useDecisionLog";
 import { useDecisionSearch } from "@/hooks/useDecisionSearch";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
-import { Card, Input, NativeSelect, Skeleton, StatusBadge, type Tone } from "@/components/ui/primitives";
+import { Card, Input, NativeSelect, Skeleton } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { MAX_RESULTS, matchesDecision, periodFrom } from "@/lib/decisionSearch";
 import { actionLabel, decisionValue, describeActor, deviceLabel } from "@/lib/describe";
@@ -18,57 +18,71 @@ import { DEFAULT_TZ, fmtDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
 
-const ACTOR_ICON: Record<string, React.ReactNode> = {
-  brain: <Sparkles className="h-4 w-4" />,
-  rule: <Zap className="h-4 w-4" />,
-  user: <User className="h-4 w-4" />,
-  assistant: <Bot className="h-4 w-4" />,
-  system: <Cpu className="h-4 w-4" />,
-  organ: <Cpu className="h-4 w-4" />,
-};
 const ACTOR_FILTERS = ["", "brain", "rule", "user", "assistant", "system"];
-const OUTCOME_TONE: Record<Decision["outcome"], Tone> = {
-  applied: "positive",
-  rejected: "negative",
-  pending_approval: "warning",
-  failed: "negative",
-  informational: "neutral",
+/** The outcome as text on the right (design lot 2): coloured only when it went wrong, or waits for someone. */
+const OUTCOME_INK: Record<Decision["outcome"], string> = {
+  applied: "text-muted-foreground",
+  rejected: "text-negative-fg",
+  pending_approval: "text-warning-fg",
+  failed: "text-negative-fg",
+  informational: "text-muted-foreground",
 };
 
+/**
+ * One decision on two lines (design lot 2): 1) what and the values, in ink, the outcome on the right; 2) when, who and
+ * what it touched, in grey; then the reason. Only «ID richiesta» in sight; the command and approval codes behind
+ * «Dettagli».
+ */
 function DecisionRow({ d, tz, ruleLabels }: { d: Decision; tz: string; ruleLabels: Record<string, string> }) {
   const devices = useApartmentStore((s) => s.devices);
+  const [open, setOpen] = useState(false);
   const actor = describeActor(d.actor, ruleLabels);
   const target = d.target.type === "device" ? deviceLabel(d.target.device_id, devices) : t(`decisions.target.${d.target.type}`);
+  const codes = Boolean(d.command_id || d.approval_id);
   return (
-    <li className="flex gap-3 py-4" data-testid={`decision-row-${d.decision_id}`} data-actor={actor.kind} data-outcome={d.outcome}>
-      <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full", actor.kind === "user" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground")} aria-hidden>
-        {ACTOR_ICON[actor.kind] ?? <Cpu className="h-4 w-4" />}
-      </span>
-      <div className="min-w-0 flex-1 space-y-1">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-          <span className="tabular">{fmtDateTime(d.ts, tz)}</span>
-          <span className="font-semibold text-foreground" data-testid={`decision-actor-${d.decision_id}`}>{actor.label}</span>
-          <span>· {target}</span>
-          <StatusBadge tone={OUTCOME_TONE[d.outcome]} className="ml-auto" data-testid={`decision-outcome-${d.decision_id}`}>{t(`decisions.outcome.${d.outcome}`)}</StatusBadge>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5 text-sm font-semibold">
+    <li className="space-y-1 py-4" data-testid={`decision-row-${d.decision_id}`} data-actor={actor.kind} data-outcome={d.outcome}>
+      <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm font-semibold">
           {/* The kind of action in Italian (D-125); the engine's code stays in the tooltip, and shows for a new one. */}
-          <span className="rounded bg-secondary px-1.5 py-0.5 text-xs" title={d.action} data-testid={`decision-action-${d.decision_id}`}>{actionLabel(d.action)}</span>
+          <span title={d.action} data-testid={`decision-action-${d.decision_id}`}>{actionLabel(d.action)}</span>
           {(d.old_value || d.new_value) && (
-            <span className="inline-flex items-center gap-1">
+            <span className="inline-flex flex-wrap items-center gap-1 font-normal">
               <span className="text-muted-foreground">{decisionValue(d.old_value)}</span>
               <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
-              <span>{decisionValue(d.new_value)}</span>
+              <span className="font-semibold">{decisionValue(d.new_value)}</span>
             </span>
           )}
         </div>
-        <p className="text-sm text-muted-foreground" data-testid={`decision-reasoning-${d.decision_id}`}>{d.reasoning}</p>
-        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-          <CopyableId id={d.correlation_id} testId={`decision-correlation-${d.decision_id}`} />
-          {d.command_id && <span className="tabular break-all">{d.command_id}</span>}
-          {d.approval_id && <span className="tabular break-all">{d.approval_id}</span>}
-        </div>
+        <span className={cn("shrink-0 text-[13px] font-medium", OUTCOME_INK[d.outcome])} data-testid={`decision-outcome-${d.decision_id}`}>{t(`decisions.outcome.${d.outcome}`)}</span>
       </div>
+      <div className="text-[13px] text-muted-foreground">
+        <span className="tabular">{fmtDateTime(d.ts, tz)}</span> · <span className="font-medium text-foreground" data-testid={`decision-actor-${d.decision_id}`}>{actor.label}</span> · {target}
+      </div>
+      <p className="text-sm text-muted-foreground" data-testid={`decision-reasoning-${d.decision_id}`}>{d.reasoning}</p>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs text-muted-foreground">
+        <CopyableId id={d.correlation_id} testId={`decision-correlation-${d.decision_id}`} />
+        {codes && (
+          <button type="button" className="flex items-center gap-1 font-medium hover:text-foreground focus-ring [&_svg]:size-3.5" aria-expanded={open} onClick={() => setOpen((o) => !o)} data-testid={`decision-details-toggle-${d.decision_id}`}>
+            {open ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />} {t("decisions.details")}
+          </button>
+        )}
+      </div>
+      {open && codes && (
+        <dl className="grid gap-x-4 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-[auto_1fr]" data-testid={`decision-details-${d.decision_id}`}>
+          {d.command_id && (
+            <>
+              <dt className="font-medium">{t("decisions.commandId")}</dt>
+              <dd className="tabular break-all">{d.command_id}</dd>
+            </>
+          )}
+          {d.approval_id && (
+            <>
+              <dt className="font-medium">{t("decisions.approvalId")}</dt>
+              <dd className="tabular break-all">{d.approval_id}</dd>
+            </>
+          )}
+        </dl>
+      )}
     </li>
   );
 }
@@ -87,6 +101,8 @@ export default function DecisionsPage() {
   // `from` is computed once, when the period is chosen: it is part of the query key and must not move per render.
   const [period, setPeriod] = useState<{ days: number; from?: string }>({ days: 0 });
   const [text, setText] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const activeFilters = (actor ? 1 : 0) + (deviceId ? 1 : 0) + (period.days ? 1 : 0);
   const rules = useQuery({ queryKey: ["rules", aptId], queryFn: () => instanceApi(aptId).getRules(), staleTime: 300_000 });
   const ruleLabels = useMemo(() => Object.fromEntries((rules.data?.rules ?? []).map((r) => [r.rule_id, r.label])), [rules.data]);
 
@@ -112,18 +128,26 @@ export default function DecisionsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title={t("decisions.title")} subtitle={t("decisions.subtitle")} testId="decisions-header" />
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-testid="decisions-filters">
-        <NativeSelect value={actor} onChange={(e) => setActor(e.target.value)} aria-label={t("decisions.actor")} data-testid="decisions-actor-select">
-          {ACTOR_FILTERS.map((a) => <option key={a} value={a}>{a ? t(`actor.${a}`, { name: "" }).replace(" «»", "") : `${t("decisions.actor")}: ${t("common.all").toLowerCase()}`}</option>)}
-        </NativeSelect>
-        <NativeSelect value={deviceId} onChange={(e) => setDeviceId(e.target.value)} aria-label={t("decisions.device")} data-testid="decisions-device-select">
-          <option value="">{t("decisions.allDevices")}</option>
-          {devices.map((d) => <option key={d.device_id} value={d.device_id}>{d.label}</option>)}
-        </NativeSelect>
-        <NativeSelect value={period.days} onChange={(e) => { const days = Number(e.target.value); setPeriod({ days, from: periodFrom(days) }); }} aria-label={t("decisions.period")} data-testid="decisions-period-select">
-          {PERIODS.map((d) => <option key={d} value={d}>{periodLabel(d)}</option>)}
-        </NativeSelect>
-        <Input type="search" value={text} onChange={(e) => setText(e.target.value)} placeholder={t("decisions.searchPlaceholder")} aria-label={t("common.search")} data-testid="decisions-search-input" />
+      {/* the search on one full row; on a phone the three filters open under «Filtri» (design lot 2) */}
+      <div className="space-y-3" data-testid="decisions-filters">
+        <div className="flex gap-2">
+          <Input type="search" className="flex-1" value={text} onChange={(e) => setText(e.target.value)} placeholder={t("decisions.searchPlaceholder")} aria-label={t("common.search")} data-testid="decisions-search-input" />
+          <Button variant="outline" className="sm:hidden" aria-expanded={filtersOpen} onClick={() => setFiltersOpen((o) => !o)} data-testid="decisions-filters-toggle">
+            <SlidersHorizontal /> {activeFilters ? t("decisions.filtersCount", { count: activeFilters }) : t("decisions.filters")}
+          </Button>
+        </div>
+        <div className={cn("grid gap-3 sm:grid-cols-3", !filtersOpen && "hidden sm:grid")}>
+          <NativeSelect value={actor} onChange={(e) => setActor(e.target.value)} aria-label={t("decisions.actor")} data-testid="decisions-actor-select">
+            {ACTOR_FILTERS.map((a) => <option key={a} value={a}>{a ? t(`actor.${a}`, { name: "" }).replace(" «»", "") : `${t("decisions.actor")}: ${t("common.all").toLowerCase()}`}</option>)}
+          </NativeSelect>
+          <NativeSelect value={deviceId} onChange={(e) => setDeviceId(e.target.value)} aria-label={t("decisions.device")} data-testid="decisions-device-select">
+            <option value="">{t("decisions.allDevices")}</option>
+            {devices.map((d) => <option key={d.device_id} value={d.device_id}>{d.label}</option>)}
+          </NativeSelect>
+          <NativeSelect value={period.days} onChange={(e) => { const days = Number(e.target.value); setPeriod({ days, from: periodFrom(days) }); }} aria-label={t("decisions.period")} data-testid="decisions-period-select">
+            {PERIODS.map((d) => <option key={d} value={d}>{periodLabel(d)}</option>)}
+          </NativeSelect>
+        </div>
       </div>
       {status && (
         <p className="flex items-center gap-2 text-sm text-muted-foreground" data-testid="decisions-search-status" data-status={search.status} aria-live="polite">
