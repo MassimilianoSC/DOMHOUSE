@@ -420,6 +420,7 @@ Registrati con la loro forma, perché non si ripetano.
 
 ## 7. Da valutare in futuro
 
+- **Lotto 32, da D-188 (o2, registrato alle 12:16):** due testi del sito sbagliati con i dimostrativi in produzione, non bloccanti: sotto «Indirizzo del motore» in produzione compare «In sviluppo usa mock://builtin» → «Per un appartamento dimostrativo scrivi mock://builtin; per uno vero, l'indirizzo del suo motore»; dopo la creazione di un dimostrativo compare «Prima di usarlo: crea la chiave dell'istanza e poi premi Verifica connessione.» → solo quando l'indirizzo non è mock://. Circa 20 minuti con le prove (C-4).
 - **Lotto 32, dalle prove del 23 ott (o2, registrato alle 09:50):** durante un accesso di assistenza `/app/me` mostra il nome copiato all'apertura dell'accesso, non quello attuale del gestore: chi cambia il proprio nome con l'assistenza aperta non lo vede nel menu fino al prossimo accesso (o1, piccolo; la copia resta per il registro). Più la prova del sito «il nome compare nel menu dopo il salvataggio, senza ricaricare» (o2). La prova 1 dello staging era un falso allarme: il committente guardava la produzione.
 - **Lotto 31, candidate dalla guida (22 ott):** le segnalazioni elencate in P-79 (fuso orario al motore, gestore senza organizzazione, cambio email già usata, destinazione della notifica dopo l'accesso, riquadri di errore mancanti, minimo del campo Ospiti, riconoscitore senza modello con «caldaia»), più le risposte alle domande 92–96.
 
