@@ -36,8 +36,11 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | A15 📱 | Amministratore | Guarda il titolo della scheda del browser e la pagina di accesso; poi invita un tuo indirizzo nuovo. | Ovunque compare il nome **DOMHOUSE**; l'email d'invito ha l'oggetto «Invito a DOMHOUSE». | |
 | A17 | Gestore della piattaforma senza organizzazione | Impostazioni: cambia il nome visualizzato e salva; poi «Esci da tutti i dispositivi». | «Nome aggiornato» senza errori e il nome compare nel menu; l'uscita riesce; il riquadro Notifiche non c'è. | |
 | A16 | Qualsiasi | Chiudi la finestra di Google senza scegliere un account; poi prova una password sbagliata. | Nessun messaggio nel primo caso; nel secondo «Accesso non riuscito: controlla email e password» con sotto «Codice: auth/invalid-credential», che un tocco copia. | |
-| A18 | Qualsiasi | Impostazioni › «Profilo»: leggi le righe. | «Email», «Ruolo», «Organizzazione», «Appartamenti» (e «Piattaforma» per il gestore della piattaforma); non c'è più la riga «Ambiente». | |
+| A18 | Qualsiasi | Impostazioni › «Profilo»: leggi le righe. | «Email», «Ruolo», «Organizzazione», «Appartamenti» (e «Piattaforma» per il gestore della piattaforma), poi «Lingua: Italiano» e «Nome visualizzato»; non c'è più la riga «Ambiente» né la scheda «Lingua» con la tendina. | |
 | A19 📱 | Qualsiasi | Telefono con schermo largo 360 px (o finestra del browser ristretta a 360 px): la pagina di accesso prima di entrare, poi «Regole» di un appartamento. | Nessuno scorrimento orizzontale in nessuna delle due pagine; nella scheda «Pausa minima del compressore» il badge e l'interruttore stanno sotto il titolo, non di fianco. | |
+| A20 📱 | Qualsiasi | Pagina di accesso a 360 px e su computer. | Marchio e nome sopra la scheda a ogni larghezza; su computer il pannello scuro mostra «Riscaldamento, clima e consumi dei tuoi appartamenti». | |
+| A21 | Qualsiasi | Impostazioni su computer. | Ogni sezione ha il titolo a sinistra: «Profilo», «Password ed email», «Sicurezza», «Notifiche», «Installa l'app»; «Esci» sta in fondo dopo una riga. | |
+| A22 | Qualsiasi | Ricarica la Panoramica e guarda il primo istante. | Mentre arrivano i dati la pagina mostra già la sua forma (fascia, striscia, righe) invece di un rettangolo grigio. | |
 
 ## B. Installazione 📱
 
@@ -109,6 +112,13 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D12c | Operatore | Regole › «Antimuffa a casa vuota». | La descrizione dice «Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.» | |
 | D13 | Qualsiasi | Approvazioni: leggi lo stato di una richiesta aperta e di una già decisa. | Lo stato ha l'iniziale maiuscola: «In attesa», poi «Approvata», «Respinta» o «Scaduta». | |
 | D14 | Operatore | Regole: guarda il pulsante «Proponi». | È il pulsante principale della pagina, quasi nero. | |
+| D15 📱 | Operatore | Panoramica di un appartamento: guarda sotto il titolo. | Una fascia di sei caselle: «Modalità», «Occupazione», «Prossimo check-in» o «Prossimo check-out», «Finestre», «Consumo di oggi», «Dispositivi online» (per esempio «5/6»); sotto, la striscia «In salute» con «Dettagli tecnici». Sul telefono le caselle vanno a capo e la pagina non scorre di lato. | |
+| D16 📱 | Operatore | Decisioni: sul telefono apri «Filtri»; poi apri «Dettagli» di una riga con un comando. | «Filtri» mostra le tre tendine; sotto la riga compaiono «Comando» e «Approvazione» con i codici; l'esito a parole sta a destra: rosso se «Non riuscita» o «Respinta», giallo se «In attesa di approvazione». Niente icone tonde. | |
+| D17 | Operatore | Regole: cambia un valore senza salvare. | In fondo allo schermo compare la barra piena «Salva le modifiche» con «1 regola modificata» (non «1 regole modificate»); l'elenco delle regole viene prima di «Chiedi all'assistente». | |
+| D18 | Operatore (su un dimostrativo «occupato») | Assistente: scrivi «spegni la presa della camera». | La risposta sta a sinistra sotto «Assistente», senza bolla; compare «Comando inviato» e nessun badge «Risposto»; i codici stanno dietro «Dettagli». | |
+| D19 | Operatore | Programmazione. | «In programma» e «Storico» sono due riquadri a righe con l'orario a sinistra; sotto «Storico» c'è «Ultimi 7 giorni». | |
+| D20 | Operatore | Consumi. | Due caselle «Totale periodo» e «Ora con più consumo» (oppure «Giorno con più consumo»); il grafico si chiama «Consumo per ora (kWh)»; «Scarica Excel» ha il contorno. | |
+| D21 📱 | Qualsiasi | Elenco degli appartamenti: guarda una scheda. | In alto occupazione e «Online» o «Non raggiungibile»; la striscia ha «Modalità», «Consumo di oggi», «Prossimo check-in», «Prossimo check-out»; se ci sono approvazioni in attesa, in fondo la riga «1 approvazione in attesa →»; una scheda offline non è grigia. | |
 
 ## E. Amministrazione
 
@@ -128,6 +138,8 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | E10 | Amministratore | Fai una domanda all'assistente su un appartamento, poi Amministrazione › «Assistente». | La tabella delle ultime 8 settimane con «Settimana», «Domande», «Timeout», «Risposte rapide», «% timeout»; la prima riga «(in corso)» conta la domanda; nessun errore; sul telefono la pagina non scorre di lato. | |
 | E11 | Amministratore | Amministrazione › «Assistente» in un'organizzazione senza domande. | «Nessuna domanda all'assistente nelle ultime settimane.» | |
 | E12 | Amministratore | Amministrazione › «Funzioni»: leggi l'elenco; poi «Appartamenti»: leggi la riga «Funzioni» di un appartamento con un'eccezione. | Sotto ogni funzione nessun codice inglese, solo il nome del menu («Panoramica», «Consumi», «Assistente»…); nella scheda dell'appartamento «Funzioni: Approvazioni, Consumi» con i nomi del menu, mai codici come approvals o energy. | |
+| E13 📱 | Amministratore | Amministrazione › «Utenti»: apri il menu «⋯» di un altro utente. | «Appartamenti», «Reinvia invito», «Elimina» in rosso; sulla tua riga il menu non c'è. Sul telefono ruolo e «⋯» stanno sotto l'email. | |
+| E14 | Amministratore | Apri l'indirizzo `/admin?scheda=registro`, poi premi «indietro» del browser. | Si apre la scheda «Registro dell'organizzazione» (linguette sottolineate sotto il titolo); «indietro» riporta alla scheda o alla pagina di prima senza errori. | |
 
 ## F. Simulatore (solo amministratore, su un appartamento «Dimostrativo»)
 
@@ -203,6 +215,7 @@ Servono un account **gestore della piattaforma** e un **amministratore** normale
 | I12 | Gestore | In un'altra organizzazione crea un appartamento con lo stesso codice Italianway. | Il codice è rifiutato perché già in uso. | |
 | I13 | Gestore | «Nuova organizzazione» indicando come amministratore l'email di un gestore della piattaforma. | L'invito è rifiutato con un messaggio che non dice perché; nessuna organizzazione creata. | |
 | I14 | Gestore | In un'organizzazione, «Nuovo appartamento» con `mock://builtin`. | La casella «Appartamento dimostrativo» è accesa e non si toglie; l'appartamento compare «Dimostrativo». | |
+| I15 | Gestore | Organizzazioni: menu «⋯» di un'organizzazione › «Rinomina». | Si apre la rinomina; nel menu anche «Reinvia invito» e «Sospendi» in rosso (o «Riattiva»); in vista restano «Appartamenti» e «Accesso di assistenza» (oppure «Entra come assistenza» e «Chiudi accesso»). | |
 
 ## J. Registro, sospensione, assistenza, privacy
 
