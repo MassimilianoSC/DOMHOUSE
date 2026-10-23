@@ -7,6 +7,7 @@ import { platformApi, type PlatformApartment } from "@/api/platform";
 import { APARTMENT_ID_RE, DemoBadge, defaultInstanceUrl, Field, isBuiltinMock, LastCheck, SimulatedField, useInstanceMode, VerifyBadge } from "@/components/admin/apartmentForm";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
+import { CopyableId } from "@/components/ui/CopyableId";
 import { Badge, Dialog, DialogContent, DialogDescription, DialogTitle, Label, Skeleton, Switch } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
@@ -158,17 +159,17 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="tabular text-xs font-bold">{a.apartment_id}</span>
-                      <span className="font-semibold">{a.name}</span>
+                      <span className="font-semibold [overflow-wrap:anywhere]">{a.name}</span>
                       {a.simulated && <DemoBadge testId={`platform-apt-demo-${a.apartment_id}`} />}
                       {!a.enabled && <Badge className="border-neutral-border bg-neutral-bg text-neutral-fg">{t("admin.apartments.disabled")}</Badge>}
+                      <CopyableId id={a.apartment_id} testId={`platform-apt-id-${a.apartment_id}`} />
                     </div>
-                    <div className="tabular text-xs text-muted-foreground">{a.instance_url}{a.port ? `:${a.port}` : ""} · {a.timezone}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</div>
+                    <div className="tabular text-xs text-muted-foreground [overflow-wrap:anywhere]">{a.instance_url}{a.port ? `:${a.port}` : ""} · {a.timezone}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</div>
                     <div className="text-xs">{t("admin.apartments.lastCheck")}: <LastCheck check={a.last_check} testId={`platform-apt-check-${a.apartment_id}`} /></div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" variant="outline" onClick={() => setEditing(a)} data-testid={`platform-apt-edit-${a.apartment_id}`}><Waypoints /> {t("platform.aptEditConnection")}</Button>
-                    <Button size="sm" variant="secondary" onClick={() => void check(a.apartment_id)} disabled={v === "loading"} data-testid={`platform-apt-verify-${a.apartment_id}`}>
+                    <Button size="sm" variant="outline" onClick={() => void check(a.apartment_id)} disabled={v === "loading"} data-testid={`platform-apt-verify-${a.apartment_id}`}>
                       <PlugZap /> {v === "loading" ? t("common.loading") : t("admin.apartments.verify")}
                     </Button>
                     <Button size="sm" variant="destructive" onClick={() => void remove(a)} data-testid={`platform-apt-delete-${a.apartment_id}`}><Trash2 /> {t("platform.aptDelete")}</Button>

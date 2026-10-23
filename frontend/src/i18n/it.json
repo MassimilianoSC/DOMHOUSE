@@ -938,6 +938,7 @@
     "noAdmin": "nessun amministratore invitato",
     "pending": "in attesa del primo accesso",
     "active": "attivo",
+    "menu": "Altre azioni per {name}",
     "rename": "Rinomina",
     "renameTitle": "Rinomina l'organizzazione",
     "renamed": "Nome aggiornato",

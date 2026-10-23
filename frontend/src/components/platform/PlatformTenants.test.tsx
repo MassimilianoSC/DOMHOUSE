@@ -6,6 +6,14 @@ import { ApiError } from "@/api/bff";
 import { t } from "@/i18n";
 import { PlatformTenants } from "./PlatformTenants";
 
+// The «⋯» menu of an organization (design lot 2) opens from the keyboard: jsdom has no real pointer events for Radix.
+const openMenu = async (id: string) => {
+  const el = await screen.findByTestId(id);
+  await act(async () => {
+    fireEvent.keyDown(el, { key: "Enter" });
+  });
+};
+
 // Organizzazioni > list, creation, rename, resend (P-36, API shape D-61a), with the BFF simulated.
 const s = vi.hoisted(() => ({
   tenants: vi.fn(),
@@ -66,7 +74,8 @@ describe("Organizzazioni: elenco", () => {
     expect(screen.getByTestId("tenant-admin-t-1")).toHaveTextContent(`anna@fs.it${t("platform.pending")}`);
     expect(screen.getByTestId("tenant-admin-t-2")).toHaveTextContent(`bruno@rr.it${t("platform.active")}`);
     expect(screen.getByTestId("tenant-admin-t-3")).toHaveTextContent(t("platform.noAdmin"));
-    expect(screen.getByTestId("tenant-resend-btn-t-1")).toBeInTheDocument();
+    await openMenu("tenant-menu-t-1");
+    expect(await screen.findByTestId("tenant-resend-btn-t-1")).toBeInTheDocument();
     expect(screen.queryByTestId("tenant-resend-btn-t-2")).not.toBeInTheDocument();
     expect(screen.queryByTestId("tenant-resend-btn-t-3")).not.toBeInTheDocument();
   });
@@ -125,6 +134,7 @@ describe("Organizzazioni: creazione", () => {
 describe("Organizzazioni: rinomina e reinvio", () => {
   it("rinomina: PATCH con il nuovo nome e «Nome aggiornato»", async () => {
     await open();
+    await openMenu("tenant-menu-t-1");
     await click(await screen.findByTestId("tenant-rename-btn-t-1"));
     fireEvent.change(screen.getByTestId("tenant-rename-input"), { target: { value: "Flat Sharing Italia" } });
     await click(screen.getByTestId("tenant-rename-save"));
@@ -135,11 +145,13 @@ describe("Organizzazioni: rinomina e reinvio", () => {
   it("reinvio: «Invito inviato di nuovo»; se nel frattempo è entrato (409) messaggio del server e lista aggiornata", async () => {
     s.resendInvite.mockResolvedValueOnce({ ...LIST[0], first_admin: { email: "anna.nuova@fs.it", pending: true }, email_status: "sent" });
     await open();
+    await openMenu("tenant-menu-t-1");
     await click(await screen.findByTestId("tenant-resend-btn-t-1"));
     expect(s.resendInvite).toHaveBeenCalledWith("t-1", expect.any(String));
     expect(toast.success).toHaveBeenCalledWith(t("platform.resent", { email: "anna.nuova@fs.it" })); // read from the answer (row + email_status)
     s.resendInvite.mockRejectedValueOnce(new ApiError(409, "already_active", "Il primo amministratore è già entrato", "c-3"));
-    await click(screen.getByTestId("tenant-resend-btn-t-1"));
+    await openMenu("tenant-menu-t-1");
+    await click(await screen.findByTestId("tenant-resend-btn-t-1"));
     expect(toast.error).toHaveBeenCalledWith("Il primo amministratore è già entrato", expect.anything());
     await waitFor(() => expect(s.tenants.mock.calls.length).toBeGreaterThanOrEqual(3));
   });
@@ -151,6 +163,7 @@ describe("Organizzazioni: sospensione (P-50, D-85)", () => {
   it("«Sospendi»: motivo obbligatorio (spazi esclusi), spiegazione delle conseguenze, POST con il motivo, avviso e lista aggiornata", async () => {
     s.suspendTenant.mockResolvedValueOnce({ ...LIST[0], suspended: true, suspended_at: "2026-10-16T09:00:00Z", suspended_reason: "Prova" });
     await open();
+    await openMenu("tenant-menu-t-1");
     await click(await screen.findByTestId("tenant-suspend-btn-t-1"));
     const dialog = screen.getByTestId("tenant-suspend-dialog-t-1");
     expect(dialog).toHaveTextContent(t("platform.suspendHint"));
@@ -175,8 +188,9 @@ describe("Organizzazioni: sospensione (P-50, D-85)", () => {
     expect(await screen.findByTestId("tenant-suspended-t-2")).toHaveTextContent(t("platform.suspendedBadge"));
     expect(screen.getByTestId("tenant-suspended-info-t-2")).toHaveTextContent("Contratto scaduto");
     expect(screen.queryByTestId("tenant-suspended-t-1")).not.toBeInTheDocument();
+    await openMenu("tenant-menu-t-2");
     expect(screen.queryByTestId("tenant-suspend-btn-t-2")).not.toBeInTheDocument();
-    await click(screen.getByTestId("tenant-reactivate-btn-t-2"));
+    await click(await screen.findByTestId("tenant-reactivate-btn-t-2"));
     expect(confirm).toHaveBeenCalledWith(t("platform.reactivateConfirm", { name: "Riviera Rent" }));
     expect(s.reactivateTenant).toHaveBeenCalledWith("t-2", expect.any(String));
     expect(toast.success).toHaveBeenCalledWith(t("platform.reactivated", { name: "Riviera Rent" }));
@@ -187,6 +201,7 @@ describe("Organizzazioni: sospensione (P-50, D-85)", () => {
     s.tenants.mockResolvedValue([SUSP]);
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
     await open();
+    await openMenu("tenant-menu-t-2");
     await click(await screen.findByTestId("tenant-reactivate-btn-t-2"));
     expect(s.reactivateTenant).not.toHaveBeenCalled();
     confirm.mockRestore();
@@ -196,6 +211,7 @@ describe("Organizzazioni: sospensione (P-50, D-85)", () => {
     s.ownTenant = "t-1";
     s.suspendTenant.mockResolvedValueOnce({ ...LIST[0], suspended: true, suspended_at: "", suspended_reason: "x" });
     await open();
+    await openMenu("tenant-menu-t-1");
     await click(await screen.findByTestId("tenant-suspend-btn-t-1"));
     fireEvent.change(screen.getByTestId("tenant-suspend-reason"), { target: { value: "x" } });
     await click(screen.getByTestId("tenant-suspend-confirm"));
@@ -205,6 +221,7 @@ describe("Organizzazioni: sospensione (P-50, D-85)", () => {
   it("errore del server (409 already_suspended): messaggio del server, la finestra resta aperta", async () => {
     s.suspendTenant.mockRejectedValueOnce(new ApiError(409, "already_suspended", "Organizzazione già sospesa", "c-9"));
     await open();
+    await openMenu("tenant-menu-t-1");
     await click(await screen.findByTestId("tenant-suspend-btn-t-1"));
     fireEvent.change(screen.getByTestId("tenant-suspend-reason"), { target: { value: "x" } });
     await click(screen.getByTestId("tenant-suspend-confirm"));
@@ -267,7 +284,7 @@ describe("Organizzazioni: accesso di assistenza (P-50, D-86)", () => {
   it("organizzazione sospesa: nessun accesso di assistenza, neppure «Entra» con un accesso proprio ancora aperto", async () => {
     s.tenants.mockResolvedValue([{ ...LIST[0], suspended: true, suspended_at: "", suspended_reason: "x", support_access: MINE }]);
     await open();
-    await screen.findByTestId("tenant-reactivate-btn-t-1");
+    await screen.findByTestId("tenant-suspended-t-1");
     expect(screen.queryByTestId("tenant-support-btn-t-1")).not.toBeInTheDocument();
     expect(screen.queryByTestId("tenant-support-enter-t-1")).not.toBeInTheDocument();
   });

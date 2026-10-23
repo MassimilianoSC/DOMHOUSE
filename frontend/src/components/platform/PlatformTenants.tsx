@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, LifeBuoy, LogIn, Mail, Pause, Pencil, Play, Plus } from "lucide-react";
+import { Building2, ChevronDown, ChevronUp, LifeBuoy, LogIn, Mail, Pause, Pencil, Play, Plus } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import type { EmailStatus } from "@/api/admin";
@@ -10,6 +10,7 @@ import { PlatformApartments } from "@/components/platform/PlatformApartments";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, Dialog, DialogContent, DialogDescription, DialogTitle, Input, Label, NativeSelect, Skeleton } from "@/components/ui/primitives";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { fmtDateTime } from "@/lib/format";
@@ -275,11 +276,11 @@ export function PlatformTenants({ openTenant = null }: { openTenant?: string | n
                   </p>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant={openApts === tn.tenant_id ? "default" : "outline"} size="sm" aria-expanded={openApts === tn.tenant_id} onClick={() => setOpenApts((v) => (v === tn.tenant_id ? null : tn.tenant_id))} data-testid={`tenant-apartments-btn-${tn.tenant_id}`}>
-                  <Building2 /> {t("platform.apartments")}
+              {/* two buttons in sight, the rest in «⋯» (design lot 2) */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button variant="outline" size="sm" aria-expanded={openApts === tn.tenant_id} onClick={() => setOpenApts((v) => (v === tn.tenant_id ? null : tn.tenant_id))} data-testid={`tenant-apartments-btn-${tn.tenant_id}`}>
+                  <Building2 /> {t("platform.apartments")} {openApts === tn.tenant_id ? <ChevronUp /> : <ChevronDown />}
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => setRenaming(tn)} data-testid={`tenant-rename-btn-${tn.tenant_id}`}><Pencil /> {t("platform.rename")}</Button>
                 {tn.support_access?.mine && !tn.suspended ? (
                   <>
                     <Button size="sm" onClick={() => void enter(tn)} data-testid={`tenant-support-enter-${tn.tenant_id}`}><LogIn /> {t("support.enter")}</Button>
@@ -288,16 +289,19 @@ export function PlatformTenants({ openTenant = null }: { openTenant?: string | n
                 ) : (
                   !tn.suspended && <Button variant="outline" size="sm" onClick={() => setSupporting(tn)} data-testid={`tenant-support-btn-${tn.tenant_id}`}><LifeBuoy /> {t("support.open")}</Button>
                 )}
-                {tn.suspended ? (
-                  <Button variant="outline" size="sm" onClick={() => void reactivate(tn)} data-testid={`tenant-reactivate-btn-${tn.tenant_id}`}><Play /> {t("platform.reactivate")}</Button>
-                ) : (
-                  <Button variant="destructive" size="sm" onClick={() => setSuspending(tn)} data-testid={`tenant-suspend-btn-${tn.tenant_id}`}><Pause /> {t("platform.suspend")}</Button>
-                )}
-                {tn.first_admin?.pending && (
-                  <Button variant="outline" size="sm" disabled={resending === tn.tenant_id} onClick={() => void resend(tn)} data-testid={`tenant-resend-btn-${tn.tenant_id}`}>
-                    <Mail /> {t("platform.resend")}
-                  </Button>
-                )}
+                <RowMenu label={t("platform.menu", { name: tn.name })} testId={`tenant-menu-${tn.tenant_id}`}>
+                  <RowMenuItem onSelect={() => setRenaming(tn)} testId={`tenant-rename-btn-${tn.tenant_id}`}><Pencil /> {t("platform.rename")}</RowMenuItem>
+                  {tn.first_admin?.pending && (
+                    <RowMenuItem disabled={resending === tn.tenant_id} onSelect={() => void resend(tn)} testId={`tenant-resend-btn-${tn.tenant_id}`}>
+                      <Mail /> {t("platform.resend")}
+                    </RowMenuItem>
+                  )}
+                  {tn.suspended ? (
+                    <RowMenuItem onSelect={() => void reactivate(tn)} testId={`tenant-reactivate-btn-${tn.tenant_id}`}><Play /> {t("platform.reactivate")}</RowMenuItem>
+                  ) : (
+                    <RowMenuItem danger onSelect={() => setSuspending(tn)} testId={`tenant-suspend-btn-${tn.tenant_id}`}><Pause /> {t("platform.suspend")}</RowMenuItem>
+                  )}
+                </RowMenu>
               </div>
             </div>
             <div className="border-t pt-3 text-sm text-muted-foreground">
