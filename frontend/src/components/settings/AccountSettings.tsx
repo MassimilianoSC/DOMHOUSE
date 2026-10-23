@@ -1,23 +1,17 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { KeyRound, LogOut, Mail, ShieldAlert, Trash2, UserRound } from "lucide-react";
+import { LogOut, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { bffFetch } from "@/api/bff";
 import { authErrorMessage, useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { Card, Input, Label } from "@/components/ui/primitives";
+import { Input, Label } from "@/components/ui/primitives";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { t } from "@/i18n";
 import { env } from "@/lib/utils";
 
 const MIN_PASSWORD = 8;
 
-function Section({ icon, title, children, testId }: { icon: ReactNode; title: string; children: ReactNode; testId: string }) {
-  return (
-    <Card className="p-5" data-testid={testId}>
-      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold [&_svg]:h-4 [&_svg]:w-4">{icon} {title}</h2>
-      {children}
-    </Card>
-  );
-}
+const Section = SettingsSection;
 
 /** Runs an account action with a busy flag; Firebase and BFF errors become an Italian toast. */
 function useAction() {
@@ -119,7 +113,7 @@ function ChangeEmail() {
   );
 }
 
-export function AccountSettings() {
+export function AccountSettings({ profile }: { profile?: ReactNode }) {
   const { providers, logoutEverywhere, deleteAccount } = useAuth();
   const { busy, run } = useAction();
   const hasPassword = providers.includes("password");
@@ -134,16 +128,20 @@ export function AccountSettings() {
 
   return (
     <>
-      <Section icon={<UserRound />} title={t("account.title")} testId="account-card">
-        <DisplayName />
+      {/* «Profilo» and «Account» in one section (design lot 2): who you are, then the name you can change */}
+      <Section title={t("settings.profile")} testId="account-card">
+        {profile}
+        <div className={profile ? "mt-4 border-t pt-4" : undefined}>
+          <DisplayName />
+        </div>
       </Section>
 
-      <Section icon={<KeyRound />} title={t("account.passwordTitle")} testId="account-password-card">
+      <Section title={t("account.passwordTitle")} testId="account-password-card">
         {hasPassword ? (
           <div className="space-y-6">
             <ChangePassword />
             <div className="border-t pt-5">
-              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Mail className="h-4 w-4" /> {t("account.emailTitle")}</h3>
+              <h3 className="mb-2 text-sm font-semibold">{t("account.emailTitle")}</h3>
               <ChangeEmail />
             </div>
           </div>
@@ -154,7 +152,7 @@ export function AccountSettings() {
         )}
       </Section>
 
-      <Section icon={<ShieldAlert />} title={t("account.securityTitle")} testId="account-security-card">
+      <Section title={t("account.securityTitle")} testId="account-security-card">
         <div className="space-y-4">
           <div>
             <p className="mb-2 text-sm text-muted-foreground">{t("account.logoutAllHint")}</p>

@@ -1,12 +1,12 @@
-import { CheckCircle2, Download, LogOut, Smartphone } from "lucide-react";
+import { CheckCircle2, Download, LogOut } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { isIos, useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { Button } from "@/components/ui/button";
-import { Card, NativeSelect } from "@/components/ui/primitives";
 import { scopeSummary } from "@/components/admin/ApartmentScope";
 import { AccountSettings } from "@/components/settings/AccountSettings";
 import { useApartments } from "@/hooks/useFeatures";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { t } from "@/i18n";
 
@@ -42,10 +42,9 @@ function InstallCard() {
     );
   }
   return (
-    <Card className="p-5" data-testid="settings-install-card">
-      <h2 className="mb-3 flex items-center gap-2 text-base font-semibold"><Smartphone className="h-4 w-4" /> {t("settings.install")}</h2>
+    <SettingsSection title={t("settings.install")} testId="settings-install-card">
       {body}
-    </Card>
+    </SettingsSection>
   );
 }
 
@@ -61,26 +60,26 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader title={t("settings.title")} testId="settings-header" />
-      <Card className="p-5">
-        <h2 className="mb-2 text-base font-semibold">{t("settings.profile")}</h2>
-        <Row label={t("common.email")} value={me.user.email} testId="settings-email" />
-        <Row label={t("settings.role")} value={me.role ? t(`roles.${me.role}`) : "—"} testId="settings-role" />
-        {me.user.platform_manager && <Row label={t("settings.platform")} value={t("roles.platform")} testId="settings-platform" />}
-        <Row label={t("settings.tenant")} value={me.tenant?.name ?? "—"} testId="settings-tenant" />
-        {me.tenant && <Row label={t("settings.apartments")} value={scopeSummary(scope, apartments.data ?? []).text} testId="settings-apartments" />}
-      </Card>
-      <AccountSettings />
+      <AccountSettings
+        profile={
+          <div>
+            <Row label={t("common.email")} value={me.user.email} testId="settings-email" />
+            <Row label={t("settings.role")} value={me.role ? t(`roles.${me.role}`) : "—"} testId="settings-role" />
+            {me.user.platform_manager && <Row label={t("settings.platform")} value={t("roles.platform")} testId="settings-platform" />}
+            <Row label={t("settings.tenant")} value={me.tenant?.name ?? "—"} testId="settings-tenant" />
+            {me.tenant && <Row label={t("settings.apartments")} value={scopeSummary(scope, apartments.data ?? []).text} testId="settings-apartments" />}
+            {/* one line instead of a card with a single disabled choice (design lot 2) */}
+            <Row label={t("settings.language")} value={t("settings.italian")} testId="settings-language" />
+          </div>
+        }
+      />
       {withTenant && <NotificationSettings />}
       <InstallCard />
-      <Card className="p-5">
-        <label htmlFor="lang" className="mb-2 block text-base font-bold md:text-lg">{t("settings.language")}</label>
-        <NativeSelect id="lang" value="it" disabled data-testid="settings-language">
-          <option value="it">{t("settings.italian")}</option>
-        </NativeSelect>
-      </Card>
-      <Button variant="outline" onClick={() => void logout()} data-testid="settings-logout-btn">
-        <LogOut /> {t("nav.logout")}
-      </Button>
+      <div className="border-t pt-6">
+        <Button variant="outline" onClick={() => void logout()} data-testid="settings-logout-btn">
+          <LogOut /> {t("nav.logout")}
+        </Button>
+      </div>
     </div>
   );
 }

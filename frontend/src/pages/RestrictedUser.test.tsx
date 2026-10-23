@@ -15,7 +15,7 @@ vi.mock("@/auth/AuthProvider", () => ({
   useRole: () => ({ role: s.role, canWrite: s.role !== "viewer", isAdmin: s.role === "admin" }),
 }));
 vi.mock("@/hooks/useFeatures", () => ({ useApartments: () => ({ data: s.apartments, isLoading: false }) }));
-vi.mock("@/components/settings/AccountSettings", () => ({ AccountSettings: () => null }));
+vi.mock("@/components/settings/AccountSettings", () => ({ AccountSettings: ({ profile }: { profile?: React.ReactNode }) => <>{profile}</> }));
 vi.mock("@/components/settings/NotificationSettings", () => ({ NotificationSettings: () => null }));
 
 const RIMINI = { apartment_id: "apt-rimini-01", name: "Rimini Mare", address: "Viale Vespucci 9", timezone: "Europe/Rome", online: true, enabled: true, apartment: null, kwh_today: null, pending_approvals: 0 };

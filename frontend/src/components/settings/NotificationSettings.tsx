@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { BellRing } from "lucide-react";
 import { pushApi, type NotificationPrefs } from "@/api/admin";
 import { useAuth } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
-import { Card, Switch } from "@/components/ui/primitives";
+import { Switch } from "@/components/ui/primitives";
+import { SettingsSection } from "@/components/settings/SettingsSection";
 import { t } from "@/i18n";
 import { runAction, showError } from "@/lib/actions";
 import { disablePush, enablePush, PushError, pushState, type PushState } from "@/lib/push";
@@ -90,8 +90,8 @@ export function NotificationSettings() {
   const canToggle = state === "on" || state === "off" || state === "revoked";
 
   return (
-    <Card className="space-y-4 p-5" data-testid="settings-notifications">
-      <h2 className="flex items-center gap-2 text-base font-semibold"><BellRing className="h-4 w-4" /> {t("settings.notifications.title")}</h2>
+    <SettingsSection title={t("settings.notifications.title")} testId="settings-notifications">
+      <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-secondary/60 px-3 py-2">
         <div className="text-sm">
           <div className="font-semibold" data-testid="settings-push-mode">{env.fcmEnabled ? t("settings.notifications.pushMode") : t(dev ? "settings.notifications.devMode" : "settings.notifications.inAppMode")}</div>
@@ -114,6 +114,7 @@ export function NotificationSettings() {
           <Switch checked={prefs?.[k] ?? false} disabled={!prefs} onCheckedChange={(v) => toggle(k, v)} aria-label={t(`settings.notifications.${k}`)} data-testid={`settings-pref-${k}`} />
         </div>
       ))}
-    </Card>
+      </div>
+    </SettingsSection>
   );
 }

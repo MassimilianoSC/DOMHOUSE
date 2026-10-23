@@ -7,7 +7,8 @@ import SettingsPage from "./SettingsPage";
 const s = vi.hoisted(() => ({ me: null as unknown, calls: [] as string[] }));
 
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ me: s.me, logout: vi.fn() }) }));
-vi.mock("@/components/settings/AccountSettings", () => ({ AccountSettings: () => null }));
+// the account sections are tested on their own; the profile rows the page passes in still show
+vi.mock("@/components/settings/AccountSettings", () => ({ AccountSettings: ({ profile }: { profile?: React.ReactNode }) => <>{profile}</> }));
 
 const ENV = { app_env: "staging", auth_mode: "firebase", fcm_enabled: false, instance_mode: "real" };
 const PLATFORM_ONLY = { user: { uid: "p1", email: "piattaforma@hqe.it", display_name: "", platform_manager: true }, role: null, tenant: null, env: ENV };

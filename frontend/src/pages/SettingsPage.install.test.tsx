@@ -9,7 +9,7 @@ vi.mock("@/auth/AuthProvider", () => ({
     logout: vi.fn(),
   }),
 }));
-vi.mock("@/components/settings/AccountSettings", () => ({ AccountSettings: () => null }));
+vi.mock("@/components/settings/AccountSettings", () => ({ AccountSettings: ({ profile }: { profile?: React.ReactNode }) => <>{profile}</> }));
 vi.mock("@/components/settings/NotificationSettings", () => ({ NotificationSettings: () => null }));
 vi.mock("@/hooks/useFeatures", () => ({ useApartments: () => ({ data: [] }) }));
 
