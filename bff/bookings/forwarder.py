@@ -43,7 +43,7 @@ async def forward(apt: Apartment, ev: BookingEvent, correlation_id: str | None =
                 await _archive(apt.apartment_id, ev)
                 info("booking forwarded", apartment_id=apt.apartment_id, event_id=ev.event_id, duplicate=body.get("duplicate"))
                 return body
-            last_exc = ForwardError(resp.status_code, resp.json() if resp.content else {"message": "errore istanza"})
+            last_exc = ForwardError(resp.status_code, resp.json() if resp.content else {"message": "errore del sistema domotico"})
         except ForwardError:
             raise
         except Exception as exc:
@@ -51,4 +51,4 @@ async def forward(apt: Apartment, ev: BookingEvent, correlation_id: str | None =
         warn("booking forward retry", apartment_id=apt.apartment_id, event_id=ev.event_id, attempt=attempt + 1, error=str(last_exc))
         if attempt < RETRIES - 1:
             await asyncio.sleep(BACKOFF_S[attempt])
-    raise ForwardError(502, {"error": "instance_unreachable", "message": "Istanza non raggiungibile dopo 3 tentativi"})
+    raise ForwardError(502, {"error": "instance_unreachable", "message": "Sistema domotico non raggiungibile dopo 3 tentativi"})

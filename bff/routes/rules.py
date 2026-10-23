@@ -81,7 +81,7 @@ async def propose(apartment_id: str, request: Request, user: CurrentUser = Depen
         ruleset = await _rules(apt)
     except Exception as exc:
         info("instance unreachable", error=type(exc).__name__, path="rules")
-        return err(502, "instance_unreachable", "Istanza non raggiungibile")
+        return err(502, "instance_unreachable", "Sistema domotico non raggiungibile")
     key = f"rule_proposal:{apt.apartment_id}:{rp.local_day(apt.timezone)}"
     if not await get_repository().take_mail_quota([(key, rp.DAILY_LIMIT)]):
         return err(429, "daily_limit", f"Hai già chiesto {rp.DAILY_LIMIT} proposte oggi per questo appartamento: "
@@ -119,7 +119,7 @@ async def apply(apartment_id: str, request: Request, user: CurrentUser = Depends
         ruleset = await _rules(apt)
     except Exception as exc:
         info("instance unreachable", error=type(exc).__name__, path="rules")
-        return err(502, "instance_unreachable", "Istanza non raggiungibile")
+        return err(502, "instance_unreachable", "Sistema domotico non raggiungibile")
     if ruleset["updated_at"] != body["based_on"]:
         return err(409, "rules_changed", "Le regole sono cambiate nel frattempo: rifai la richiesta")
     try:
@@ -205,7 +205,7 @@ async def _source(apt):
         return await _rules(apt), None
     except Exception as exc:
         info("instance unreachable", error=type(exc).__name__, path="rules")
-        return None, err(502, "instance_unreachable", "Istanza non raggiungibile")
+        return None, err(502, "instance_unreachable", "Sistema domotico non raggiungibile")
 
 
 @router.post("/apartments/{apartment_id}/rules/copy/preview")
@@ -226,7 +226,7 @@ async def copy_preview(apartment_id: str, request: Request, user: CurrentUser = 
         if got is None:
             row.update(status="disabled", message="Appartamento disattivato")
         elif isinstance(got, Exception):
-            row.update(status="unreachable", message="Istanza non raggiungibile")
+            row.update(status="unreachable", message="Sistema domotico non raggiungibile")
         else:
             row["based_on"] = got["updated_at"]
             try:
@@ -268,7 +268,7 @@ async def copy_rules(apartment_id: str, request: Request, user: CurrentUser = De
         if got is None:
             return {**row, "outcome": "disabled", "message": "Appartamento disattivato"}
         if isinstance(got, Exception):
-            return {**row, "outcome": "unreachable", "message": "Istanza non raggiungibile"}
+            return {**row, "outcome": "unreachable", "message": "Sistema domotico non raggiungibile"}
         if got["updated_at"] != based_on.get(t.apartment_id):
             return {**row, "outcome": "changed_meanwhile", "message": "Regole cambiate dopo l'anteprima: non toccato"}
         try:
@@ -283,12 +283,12 @@ async def copy_rules(apartment_id: str, request: Request, user: CurrentUser = De
                                             json={"rules": clean})
             except Exception as exc:
                 info("instance unreachable", error=type(exc).__name__, path="rules")
-                return {**row, "outcome": "unreachable", "message": "Istanza non raggiungibile"}
+                return {**row, "outcome": "unreachable", "message": "Sistema domotico non raggiungibile"}
         if resp.status_code != 200:
             try:
-                message = resp.json().get("message") or "Rifiutato dall'istanza"
+                message = resp.json().get("message") or "Rifiutato dal sistema domotico"
             except ValueError:
-                message = "Rifiutato dall'istanza"
+                message = "Rifiutato dal sistema domotico"
             return {**row, "outcome": "refused", "message": message}
         await audit.record("rules_changed", audit.by_user(user), user.tenant_id,
                            audit.apartment_target(t.apartment_id, t.name), source="copy",

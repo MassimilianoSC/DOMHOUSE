@@ -68,17 +68,17 @@ def test_admin_verify_stores_last_check(monkeypatch):
     monkeypatch.setattr(instances, "_read_secret", lambda name: "chiave-finta")  # never the real Secret Manager
     instances._secret_cache.clear()
     out = run(admin.verify_apartment("apt-real-1", ADMIN))
-    assert out["ok"] is False and out["error"] == "Istanza non raggiungibile"
+    assert out["ok"] is False and out["error"] == "Sistema domotico non raggiungibile"
     lc = run(get_repository().get_apartment("apt-real-1")).last_check
-    assert lc is not None and lc.ok is False and lc.error == "Istanza non raggiungibile" and lc.checked_at
+    assert lc is not None and lc.ok is False and lc.error == "Sistema domotico non raggiungibile" and lc.checked_at
 
 
 @pytest.mark.parametrize("exc_name, expected", [
-    ("NotFound", "Chiave dell'istanza non trovata in Secret Manager: crea il segreto langbrain-api-key-apt-real-1"),
-    ("PermissionDenied", "Chiave dell'istanza non leggibile dal server: manca il permesso su langbrain-api-key-apt-real-1"),
+    ("NotFound", "Chiave del sistema domotico non trovata in Secret Manager: crea il segreto langbrain-api-key-apt-real-1"),
+    ("PermissionDenied", "Chiave del sistema domotico non leggibile dal server: manca il permesso su langbrain-api-key-apt-real-1"),
 ])
 def test_verify_explains_a_missing_or_unreadable_key(monkeypatch, exc_name, expected):
-    # D-67 (N3): otherwise it would look like a network problem ("Istanza non raggiungibile")
+    # D-67 (N3): otherwise it would look like a network problem ("Sistema domotico non raggiungibile")
     from google.api_core import exceptions
 
     def refuse(name):

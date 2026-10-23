@@ -23,7 +23,7 @@ def http() -> httpx.AsyncClient:
     return _http
 
 
-MSG_USE_MOCK = "In questo ambiente di prova scrivi mock://builtin nel campo URL istanza"
+MSG_USE_MOCK = "In questo ambiente di prova scrivi mock://builtin nel campo Indirizzo del sistema domotico"
 MSG_BAD_URL = "Indirizzo non valido: deve cominciare con http:// o https://"
 
 
@@ -210,7 +210,7 @@ async def call(
     )
 
 
-ADMIN_SECRET_MESSAGE = "Chiave dell'istanza non configurata: contatta l'assistenza HQE"
+ADMIN_SECRET_MESSAGE = "Chiave del sistema domotico non configurata: contatta l'assistenza HQE"
 HEALTH_UNUSED = ("devices", "uptime_s", "database", "checked_at", "apartment_id")
 
 
@@ -232,7 +232,7 @@ def for_admin(check: dict | None) -> dict | None:
 
 
 async def _secret_problem(apt: Apartment) -> str | None:
-    """D-67 (N3): a missing or unreadable key otherwise looks like a network problem ("Istanza non raggiungibile")."""
+    """D-67 (N3): a missing or unreadable key otherwise looks like a network problem ("Sistema domotico non raggiungibile")."""
     if get_settings().instance_mode == "mock" or is_mock(apt.instance_url):
         return None
     try:
@@ -243,9 +243,9 @@ async def _secret_problem(apt: Apartment) -> str | None:
 
         name = secret_name(apt.apartment_id)
         if isinstance(exc, NotFound):
-            return f"Chiave dell'istanza non trovata in Secret Manager: crea il segreto {name}"
+            return f"Chiave del sistema domotico non trovata in Secret Manager: crea il segreto {name}"
         if isinstance(exc, PermissionDenied):
-            return f"Chiave dell'istanza non leggibile dal server: manca il permesso su {name}"
+            return f"Chiave del sistema domotico non leggibile dal server: manca il permesso su {name}"
         return None  # anything else: let the calls report it
 
 
@@ -270,7 +270,7 @@ async def verify(apt: Apartment, actor: str) -> dict:
                 out["reachable"] = True
             except Exception as exc:
                 warn("verify failed", apartment_id=apt.apartment_id, step=key, error=type(exc).__name__)
-                out["error"] = "Istanza non raggiungibile"
+                out["error"] = "Sistema domotico non raggiungibile"
         v = (out["version"] or {}).get("body") or {}
         out["contract_version"] = v.get("contract_version")
         out["features"] = v.get("features", [])

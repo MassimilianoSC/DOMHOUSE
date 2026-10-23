@@ -63,7 +63,7 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
             return error(404, "not_found", "Endpoint disponibile solo in modalità simulata")
         feature = feature_for(request.method, path)
         if feature and feature not in enabled:
-            return error(501, "not_implemented", "Funzione non disponibile su questa istanza")
+            return error(501, "not_implemented", "Funzione non disponibile per questo appartamento")
         return await call_next(request)
 
     async def body_of(request: Request):

@@ -162,7 +162,7 @@ async def proxy(apartment_id: str, path: str, request: Request, user: CurrentUse
         tenant = await get_repository().get_tenant(apt.tenant_id)
         allowed = configured_features(tenant.enabled_features if tenant else None, apt.enabled_features)
         if feature not in allowed and feature not in ("bookings", "stream"):
-            return err(501, "not_implemented", "Funzione non disponibile su questa istanza")
+            return err(501, "not_implemented", "Funzione non disponibile per questo appartamento")
 
     body = await request.body()
     try:
@@ -176,7 +176,7 @@ async def proxy(apartment_id: str, path: str, request: Request, user: CurrentUse
         )
     except Exception as exc:
         info("instance unreachable", error=type(exc).__name__, path=path)
-        return err(502, "instance_unreachable", "Istanza non raggiungibile")
+        return err(502, "instance_unreachable", "Sistema domotico non raggiungibile")
     info("proxied", method=method, path=path, status=resp.status_code)
     if top == "ask" and resp.status_code in (200, 201, 202) and "json" in resp.headers.get("content-type", ""):
         try:
@@ -264,7 +264,7 @@ async def energy_export(apartment_id: str, month: str | None = None, booking_id:
     repo = get_repository()
     tenant = await repo.get_tenant(apt.tenant_id)
     if "energy" not in configured_features(tenant.enabled_features if tenant else None, apt.enabled_features):
-        return err(501, "not_implemented", "Funzione non disponibile su questa istanza")
+        return err(501, "not_implemented", "Funzione non disponibile per questo appartamento")
     tz = ZoneInfo(apt.timezone)
     now = datetime.now(UTC)
     stay = None
@@ -296,10 +296,10 @@ async def energy_export(apartment_id: str, month: str | None = None, booking_id:
     try:
         usage = await energy_report.collect(apt, actor, start, end)
     except energy_report.EnergyUnavailable:
-        return err(501, "not_implemented", "Funzione non disponibile su questa istanza")
+        return err(501, "not_implemented", "Funzione non disponibile per questo appartamento")
     except Exception as exc:
         info("energy export failed", error=type(exc).__name__)
-        return err(502, "instance_unreachable", "Istanza non raggiungibile")
+        return err(502, "instance_unreachable", "Sistema domotico non raggiungibile")
     price = apt.energy_price_eur_kwh if apt.energy_price_eur_kwh is not None else (tenant.energy_price_eur_kwh if tenant else None)
     report = energy_report.Report(organisation=tenant.name if tenant else "", apartment=apt.name, apartment_id=apt.apartment_id,
                                   timezone=apt.timezone, start=start, end=end, in_progress=in_progress, price=price,
@@ -315,7 +315,7 @@ def _simulator_refused(user: CurrentUser, apt) -> JSONResponse | None:
     if not user.is_admin:
         return err(403, "forbidden", "Il simulatore è riservato agli amministratori")
     if not apt.simulated:
-        return err(403, "not_simulated", "Questo appartamento non è un'istanza simulata")
+        return err(403, "not_simulated", "Questo appartamento non è un dimostrativo")
     return None
 
 

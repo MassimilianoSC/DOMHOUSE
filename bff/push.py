@@ -51,7 +51,7 @@ def device_offline_push(apt: Apartment, device_id: str, label: str, minutes: flo
 
 
 def instance_down_push(apt: Apartment, ts: str | None):
-    return build_push("instance_down", apt, f"{apt.name}: istanza non raggiungibile", "Il connettore domotico risulta fermo",
+    return build_push("instance_down", apt, f"{apt.name}: sistema domotico non raggiungibile", "Il connettore domotico risulta fermo",
                       f"/a/{apt.apartment_id}", f"instance:{apt.apartment_id}", ts)
 
 

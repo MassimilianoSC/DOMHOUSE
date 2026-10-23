@@ -84,7 +84,7 @@ def test_admin_never_reads_secret_names(monkeypatch):
     instances._secret_cache.clear()
     me = CurrentUser("u-sec", "a@sec.it", "t-sec", "admin")
     out = run(admin.verify_apartment("apt-sec-1", me))
-    assert out["error"] == "Chiave dell'istanza non configurata: contatta l'assistenza HQE"
+    assert out["error"] == "Chiave del sistema domotico non configurata: contatta l'assistenza HQE"
     row = next(a for a in run(admin.list_apartments(me)) if a["apartment_id"] == "apt-sec-1")
     assert "langbrain" not in json.dumps(row) and row["last_check"]["error"] == out["error"]
     from bff.routes import platform
