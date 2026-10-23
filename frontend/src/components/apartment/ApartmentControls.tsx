@@ -55,7 +55,7 @@ export function ModeSelector({ aptId, apartment, canWrite }: { aptId: string; ap
             data-testid={`mode-selector-${m}`}
             className={cn(
               "flex min-h-[40px] items-center gap-1.5 rounded-full px-4 text-sm font-bold transition-colors focus-ring disabled:cursor-not-allowed",
-              apartment.mode === m ? "bg-card text-primary" : "text-muted-foreground hover:text-foreground",
+              apartment.mode === m ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
             )}
           >
             {requested === m && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
@@ -116,8 +116,8 @@ export function HoldControl({ aptId, apartment, canWrite }: { aptId: string; apa
     <div className="space-y-2" data-testid="hold-control">
       <div className="text-[13px] font-medium text-muted-foreground">{t("hold.label")}</div>
       {h ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-primary/30 bg-primary/5 px-3 py-2" data-testid="hold-active">
-          <Timer className="h-4 w-4 text-primary" aria-hidden />
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-warning-border bg-warning-bg px-3 py-2" data-testid="hold-active">
+          <Timer className="h-4 w-4 text-warning-fg" aria-hidden />
           <span className="text-sm font-semibold">
             {t("hold.active", { mode: t(`mode.${h.mode}`), until: fmtTime(h.until, apartment.timezone) })}
           </span>

@@ -1,6 +1,7 @@
 import { Power } from "lucide-react";
-import { Switch, Tip } from "@/components/ui/primitives";
+import { NativeSelect, Switch, Tip } from "@/components/ui/primitives";
 import { t } from "@/i18n";
+import { capitalizeFirst } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { SetpointStepper } from "./SetpointStepper";
 import { tid, type CapProps, type ClimateState, type HeatingState, type SwitchState } from "./types";
@@ -27,7 +28,7 @@ function OnOff({ on, label, disabled, onToggle, testId, texts = ON_OFF, statusTe
   return (
     <div className="flex items-center justify-between gap-3">
       <span className={cn("flex flex-wrap items-center gap-2 text-sm font-semibold", on ? "text-positive" : "text-muted-foreground")}>
-        <span className={cn("h-2 w-2 rounded-full", on ? "bg-accent shadow-[0_0_8px_hsl(var(--accent))]" : "bg-muted-foreground/40")} />
+        <span className={cn("h-2 w-2 rounded-full", on ? "bg-positive" : "bg-muted-foreground/40")} />
         <span data-testid={statusTestId}>{on ? texts.on() : texts.off()}</span>
         {extra}
       </span>
@@ -78,7 +79,7 @@ export function HeatingControl({ device, state, disabled, send }: CapProps<Heati
         texts={HEATING_TEXTS}
         statusTestId={tid(device, "heating-status")}
         extra={state.on && (device.capabilities.power_meter?.watts ?? 0) > HEATING_NOW_W && (
-          <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-semibold" data-testid={tid(device, "heating-now")}>{t("cap.heatingNow")}</span>
+          <span className="rounded-full bg-positive-bg px-2 py-0.5 text-xs font-semibold text-positive-fg" data-testid={tid(device, "heating-now")}>{t("cap.heatingNow")}</span>
         )}
         onToggle={(v) => send(v ? { capability: "heating", action: "set_heating", params: { on: true } } : { capability: "heating", action: "turn_off" })}
       />
@@ -97,27 +98,23 @@ export function HeatingControl({ device, state, disabled, send }: CapProps<Heati
   );
 }
 
-function Pills<T extends string>({ value, options, label, disabled, onPick, testId, i18n }: { value: T; options: readonly T[]; label: string; disabled: boolean; onPick: (v: T) => void; testId: string; i18n: string }) {
+/** «Modo» and «Ventola» as two drop-downs (design lot 2): one line each instead of eight pills. */
+function Choice<T extends string>({ value, options, label, disabled, onPick, testId, i18n }: { value: T; options: readonly T[]; label: string; disabled: boolean; onPick: (v: T) => void; testId: string; i18n: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-1.5" data-testid={testId}>
-      {options.map((o) => (
-        <button
-          key={o}
-          type="button"
-          role="radio"
-          aria-checked={value === o}
-          disabled={disabled}
-          data-testid={`${testId}-${o}`}
-          onClick={() => value !== o && onPick(o)}
-          className={cn(
-            "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus-ring disabled:opacity-50",
-            value === o ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-secondary",
-          )}
-        >
-          {t(`${i18n}.${o}`)}
-        </button>
-      ))}
-    </div>
+    <label className="flex items-center justify-between gap-3">
+      <span className="text-[13px] font-medium text-muted-foreground">{label}</span>
+      <NativeSelect
+        value={value}
+        disabled={disabled}
+        onChange={(e) => e.target.value !== value && onPick(e.target.value as T)}
+        className="h-9 w-40 disabled:opacity-50"
+        data-testid={testId}
+      >
+        {options.map((o) => (
+          <option key={o} value={o} data-testid={`${testId}-${o}`}>{capitalizeFirst(t(`${i18n}.${o}`))}</option>
+        ))}
+      </NativeSelect>
+    </label>
   );
 }
 
@@ -157,11 +154,8 @@ export function ClimateControl({ device, state, disabled, send }: CapProps<Clima
           onChange={(v) => set({ setpoint: v })}
         />
       </div>
-      <Pills value={state.mode} options={CLIMATE_MODES} label={t("cap.climateMode")} disabled={disabled} onPick={(m) => set({ mode: m })} testId={tid(device, "climate-mode")} i18n="cap.climateModes" />
-      <div className="flex items-center gap-2">
-        <span className="text-[13px] font-medium text-muted-foreground">{t("cap.fan")}</span>
-        <Pills value={state.fan} options={FANS} label={t("cap.fan")} disabled={disabled} onPick={(f) => set({ fan: f })} testId={tid(device, "climate-fan")} i18n="cap.fans" />
-      </div>
+      <Choice value={state.mode} options={CLIMATE_MODES} label={t("cap.climateMode")} disabled={disabled} onPick={(m) => set({ mode: m })} testId={tid(device, "climate-mode")} i18n="cap.climateModes" />
+      <Choice value={state.fan} options={FANS} label={t("cap.fan")} disabled={disabled} onPick={(f) => set({ fan: f })} testId={tid(device, "climate-fan")} i18n="cap.fans" />
     </div>
   );
 }

@@ -77,7 +77,8 @@ export default function OverviewPage() {
               <h2 className="text-base font-semibold">
                 {room.name} <span className="font-normal text-muted-foreground tabular">{list.length}</span>
               </h2>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {/* cards on the phone and the tablet, one compact list per room on a computer (design lot 2) */}
+              <div className="grid gap-4 md:grid-cols-2 lg:block lg:divide-y lg:overflow-hidden lg:rounded-lg lg:border lg:bg-card">
                 {list.map((d) => (
                   <DeviceCard key={d.device_id} aptId={aptId} device={d} rooms={rooms} tz={tz} canWrite={canWrite && commandsOn} canRename={canWrite} />
                 ))}
