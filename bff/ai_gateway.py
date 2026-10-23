@@ -48,15 +48,25 @@ def month_now() -> str:
     return datetime.now(UTC).strftime("%Y-%m")
 
 
-def cost_eur(usage: dict) -> tuple[float, int, int]:
-    """(cost, input tokens, output tokens) of one call from its usage; output = total - input (reasoning included)."""
+def prices(twin: bool = False) -> tuple[float, float, float]:
+    """(in, out, cached) € per million tokens: the main model's, or the twin's (D-187) when it is another model; a twin
+    price left empty is the main one."""
     s = get_settings()
+    main = (s.ai_price_in_eur_per_m, s.ai_price_out_eur_per_m, s.ai_price_cached_eur_per_m)
+    if not (twin and s.ai_twin_model):
+        return main
+    own = (s.ai_twin_price_in_eur_per_m, s.ai_twin_price_out_eur_per_m, s.ai_twin_price_cached_eur_per_m)
+    return tuple(o if o is not None else m for o, m in zip(own, main))
+
+
+def cost_eur(usage: dict, price: tuple[float, float, float] | None = None) -> tuple[float, int, int]:
+    """(cost, input tokens, output tokens) of one call from its usage; output = total - input (reasoning included)."""
+    p_in, p_out, p_cached = price or prices()
     prompt = int(usage.get("prompt_tokens") or 0)
     total = int(usage.get("total_tokens") or 0) or prompt + int(usage.get("completion_tokens") or 0)
     output = max(total - prompt, int(usage.get("completion_tokens") or 0))
     cached = int((usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0)
-    cost = ((prompt - cached) * s.ai_price_in_eur_per_m + cached * s.ai_price_cached_eur_per_m
-            + output * s.ai_price_out_eur_per_m) / 1_000_000
+    cost = ((prompt - cached) * p_in + cached * p_cached + output * p_out) / 1_000_000
     return cost, prompt, output
 
 
@@ -86,11 +96,12 @@ def _token() -> str:
 
 
 async def call_model(body: dict) -> dict:
-    """The model's answer (OpenAI chat completion) from Agent Platform. Replaced in the tests."""
+    """The model's answer (OpenAI chat completion) from Agent Platform; the model is body["model"] (the main one or
+    the twin's, D-187). Replaced in the tests."""
     s = get_settings()
     native = s.ai_api == "nativo"            # D-182: Vertex's own generateContent, on the location's host
     if native:
-        url = vertex_native.url(s.gcp_project_id, s.ai_location, s.ai_model)
+        url = vertex_native.url(s.gcp_project_id, s.ai_location, body.get("model") or s.ai_model)
         payload = vertex_native.request(body, s.ai_thinking_budget)
     else:
         url = (f"https://aiplatform.googleapis.com/v1/projects/{s.gcp_project_id}/locations/{s.ai_location}"
@@ -139,18 +150,22 @@ async def _alert(month: str, spent: float) -> None:
 
 
 async def _hedged(request: dict, apartment_id: str = "") -> tuple[dict, int]:
-    """C-10 layer 1: the model's answer and which request gave it (1 or 2). A second identical request starts when the
-    first is still silent after AI_HEDGE_AFTER_S; the first answer that arrives wins, the other is cancelled. A request
-    that fails is not hedged: its error comes back at once (or the other's answer, if one is running)."""
+    """C-10 layer 1: the model's answer and which request gave it (1 or 2). A second request starts when the first is
+    still silent after AI_HEDGE_AFTER_S; the first answer that arrives wins, the other is cancelled. D-187: the second
+    goes to AI_TWIN_MODEL when there is one (another model: failures independent) and then starts at once also when
+    the first fails quickly (an error, a 429); with the same model a quick error comes back at once, as before."""
     s = get_settings()
+    twin_model = s.ai_twin_model or request.get("model")
     tasks = [asyncio.create_task(call_model(dict(request)))]
     try:
         done, _ = await asyncio.wait(tasks, timeout=s.ai_hedge_after_s)
-        if not done:
-            info("assistant model twin started", apartment_id=apartment_id, after_s=s.ai_hedge_after_s)   # D-182 point 4
+        failed = bool(done) and tasks[0].exception() is not None
+        if not done or (failed and s.ai_twin_model):
+            info("assistant model twin started", apartment_id=apartment_id, after_s=s.ai_hedge_after_s,   # D-182 point 4
+                 model=twin_model, reason="errore" if done else "silenzio")
             if apartment_id:
                 await ai_stats.count_twin(apartment_id)              # decision 120: the twins of the week
-            tasks.append(asyncio.create_task(call_model(dict(request))))
+            tasks.append(asyncio.create_task(call_model({**request, "model": twin_model})))
         error: BaseException | None = None
         running = list(tasks)
         while running:
@@ -203,9 +218,11 @@ async def chat(apartment_id: str, body: dict) -> dict:
         warn("assistant model call failed", apartment_id=apartment_id, error=type(exc).__name__,
              phase="credenziali o rete", seconds=round(time.monotonic() - started, 2))
         raise GatewayError(502, "model_unavailable", "Modello non raggiungibile") from None
-    cost, tokens_in, tokens_out = cost_eur(answer.get("usage") or {})
+    twin = attempt == 2 and bool(s.ai_twin_model)
+    cost, tokens_in, tokens_out = cost_eur(answer.get("usage") or {}, prices(twin))   # D-187: the winner's prices
     totals = await repo.add_ai_usage(month, cost, tokens_in, tokens_out)
-    info("assistant model call", apartment_id=apartment_id, input_tokens=tokens_in, output_tokens=tokens_out,
+    info("assistant model call", apartment_id=apartment_id, model=s.ai_twin_model if twin else s.ai_model,
+         input_tokens=tokens_in, output_tokens=tokens_out,
          cost_eur=round(cost, 6), month_eur=round(totals["cost_eur"], 4), seconds=round(time.monotonic() - started, 2),
          attempt=attempt)
     if totals["cost_eur"] >= s.ai_monthly_cap_eur * s.ai_alert_percent / 100:

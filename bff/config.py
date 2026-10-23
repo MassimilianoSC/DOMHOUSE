@@ -54,6 +54,11 @@ class Settings:
     ai_api: str = "nativo"                    # D-182: Vertex's own generateContent («openai» = the compatible endpoint)
     ai_thinking_budget: int = 0               # D-182: reasoning off on the native endpoint (-1 = not sent)
     ai_hedge_after_s: float = 6.0             # C-10: a second identical request when the first is still silent
+    # D-187: the twin on a different model ("" = the same model), with its own prices (empty = the main ones)
+    ai_twin_model: str = ""
+    ai_twin_price_in_eur_per_m: float | None = None
+    ai_twin_price_out_eur_per_m: float | None = None
+    ai_twin_price_cached_eur_per_m: float | None = None
     ai_demos: bool = False                    # the demonstration apartments with the real model (AI_DEMOS=true)
     # P-67 (D-136): the Firestore database of this environment, "(default)" in production, "staging" in staging
     firestore_database: str = "(default)"
@@ -73,6 +78,10 @@ def european_location(location: str) -> bool:
     nor us, for any model and any environment."""
     v = (location or "").strip().lower()
     return v == "eu" or v.startswith("europe-")
+
+
+def _float_or_none(raw: str) -> float | None:
+    return float(raw) if raw.strip() else None
 
 
 @lru_cache
@@ -120,6 +129,10 @@ def get_settings() -> Settings:
         ai_api=e("AI_API", "nativo").strip().lower(),
         ai_thinking_budget=int(e("AI_THINKING_BUDGET", "0")),
         ai_hedge_after_s=float(e("AI_HEDGE_AFTER_S", "6")),
+        ai_twin_model=e("AI_TWIN_MODEL", "").strip(),
+        ai_twin_price_in_eur_per_m=_float_or_none(e("AI_TWIN_PRICE_IN_EUR_PER_M", "")),
+        ai_twin_price_out_eur_per_m=_float_or_none(e("AI_TWIN_PRICE_OUT_EUR_PER_M", "")),
+        ai_twin_price_cached_eur_per_m=_float_or_none(e("AI_TWIN_PRICE_CACHED_EUR_PER_M", "")),
         ai_demos=_bool("AI_DEMOS"),
         firestore_database=e("FIRESTORE_DATABASE", "(default)").strip() or "(default)",
         summary_job=_bool("SUMMARY_JOB", "true"),

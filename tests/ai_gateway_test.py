@@ -174,7 +174,8 @@ def test_a_silent_first_request_gets_a_twin_and_the_first_answer_wins(model, mon
     r, took = run(timed())
     assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == "risposta 2"
     assert len(calls) == 2 and took < 1.0 and logged[-1]["attempt"] == 2
-    assert {"apartment_id": APT, "after_s": 0.05} in logged                    # D-182: the twin recorded
+    assert {"apartment_id": APT, "after_s": 0.05, "model": get_settings().ai_model,          # D-182: the twin recorded
+            "reason": "silenzio"} in logged
     assert run(get_repository().get_ai_usage(ai_gateway.month_now()))["calls"] == 1   # one answer, one cost
 
 
@@ -212,3 +213,82 @@ def test_d182_the_native_endpoint_with_reasoning_off(monkeypatch):
     assert answer["choices"][0]["message"]["content"] == '{"risposta": "Fatto.", "azioni": []}'
     assert ai_gateway.cost_eur(answer["usage"])[1:] == (1000, 30)
 
+
+
+# ---- D-187: the twin on a different model ------------------------------------------------------------------------
+MAIN, LITE = "google/gemini-3.5-flash", "google/gemini-3.5-flash-lite"
+
+
+def _d187(monkeypatch, **extra):
+    values = {"ai_model": MAIN, "ai_hedge_after_s": 0.05, "ai_twin_model": LITE, "ai_price_in_eur_per_m": 1.50,
+              "ai_price_out_eur_per_m": 9.00, "ai_price_cached_eur_per_m": 0.15, "ai_twin_price_in_eur_per_m": 0.30,
+              "ai_twin_price_out_eur_per_m": 2.50, "ai_twin_price_cached_eur_per_m": 0.03}
+    s = dataclasses.replace(get_settings(), **{**values, **extra})
+    monkeypatch.setattr(ai_gateway, "get_settings", lambda: s)
+    logged = []
+    monkeypatch.setattr(ai_gateway, "info", lambda msg, **kw: logged.append((msg, kw)))
+    return logged
+
+
+def test_d187_a_silent_main_model_gets_the_twin_on_the_lite_priced_as_the_lite(model, monkeypatch):
+    logged = _d187(monkeypatch)
+    models = []
+
+    async def fake(body):
+        models.append(body["model"])
+        if body["model"] == MAIN:
+            await asyncio.sleep(2)                                                 # the main model's queue
+        return {"choices": [{"message": {"role": "assistant", "content": body["model"]}}], "usage": USAGE}
+    monkeypatch.setattr(ai_gateway, "call_model", fake)
+    r = run(post(BODY))
+    assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == LITE
+    assert models == [MAIN, LITE]
+    assert ("assistant model twin started", {"apartment_id": APT, "after_s": 0.05, "model": LITE, "reason": "silenzio"}) in logged
+    call = [kw for msg, kw in logged if msg == "assistant model call"][-1]
+    lite_cost = (600 * 0.30 + 400 * 0.03 + 500 * 2.50) / 1_000_000                 # the lite's prices, not the main's
+    assert call["model"] == LITE and call["attempt"] == 2 and call["cost_eur"] == round(lite_cost, 6)
+
+
+def test_d187_a_quick_error_of_the_main_model_starts_the_twin_at_once(model, monkeypatch):
+    _d187(monkeypatch, ai_hedge_after_s=5.0)
+    models = []
+
+    async def fake(body):
+        models.append(body["model"])
+        if body["model"] == MAIN:
+            raise ai_gateway.GatewayError(502, "model_error", "Il modello ha risposto 429")
+        return {"choices": [{"message": {"role": "assistant", "content": "dalla gemella"}}], "usage": USAGE}
+    monkeypatch.setattr(ai_gateway, "call_model", fake)
+
+    async def timed():
+        loop = asyncio.get_running_loop()
+        start = loop.time()
+        r = await post(BODY)
+        return r, loop.time() - start
+    r, took = run(timed())
+    assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == "dalla gemella"
+    assert models == [MAIN, LITE] and took < 1.0                                   # not after 5 s: at once
+
+
+def test_d187_with_the_same_model_a_quick_error_comes_back_as_before(model, monkeypatch):
+    _d187(monkeypatch, ai_twin_model="", ai_hedge_after_s=5.0)
+    model.fail = ai_gateway.GatewayError(502, "model_error", "Il modello ha risposto 500")
+    r = run(post(BODY))
+    assert r.status_code == 502 and len(model) == 1
+
+
+def test_d187_the_prices_of_the_twin_and_the_native_url_of_its_model(monkeypatch):
+    _d187(monkeypatch, ai_twin_price_cached_eur_per_m=None)
+    assert ai_gateway.prices() == (1.50, 9.00, 0.15)
+    assert ai_gateway.prices(twin=True) == (0.30, 2.50, 0.15)                     # an empty twin price = the main one
+    from bff import net_phase
+    sent = []
+
+    async def fake_post(url, json=None, headers=None, connect_s=None, read_s=None, network=None):
+        sent.append(url)
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "{}"}]}, "finishReason": "STOP"}],
+                                         "usageMetadata": {}})
+    monkeypatch.setattr(net_phase, "post_traced", fake_post)
+    monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
+    run(ai_gateway.call_model({"model": LITE, "messages": [{"role": "user", "content": "q"}]}))
+    assert sent[0].endswith("/publishers/google/models/gemini-3.5-flash-lite:generateContent")

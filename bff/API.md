@@ -689,6 +689,13 @@ proposte vale solo quando ce ne sono: prima, il modello ha fino a circa 26 s; l'
 oltre i 27 s della domanda, e un comando non ancora confermato si annuncia con «Comando inviato: …, l'esito arriva
 nell'app».
 
+Gemella su un modello diverso (D-187): con `AI_TWIN_MODEL` la seconda richiesta va a quel modello, dopo
+`AI_HEDGE_AFTER_S` di silenzio del primo oppure subito se il primo fallisce in fretta (errore, 429): i due modelli non
+falliscono insieme. Il costo si conta sulla risposta vincente con i prezzi del suo modello (`AI_TWIN_PRICE_IN_EUR_PER_M`,
+`AI_TWIN_PRICE_OUT_EUR_PER_M`, `AI_TWIN_PRICE_CACHED_EUR_PER_M`; vuoti = quelli del principale); «assistant model twin
+started» dice `model` e `reason` (`silenzio` o `errore`), «assistant model call» il `model` che ha risposto. Senza
+`AI_TWIN_MODEL` la gemella è lo stesso modello e un errore rapido torna subito, come prima.
+
 Modello e chiamata (D-182): `gemini-3.8-flash` (`AI_MODEL`), località `eu`, endpoint nativo di Vertex (`AI_API`
 `nativo`, predefinito; `openai` torna all'endpoint compatibile): `generateContent` su
 `aiplatform.eu.rep.googleapis.com/v1/projects/<progetto>/locations/eu/publishers/google/models/gemini-3.8-flash`.
