@@ -22,6 +22,11 @@ module.exports = {
         accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
         card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
         popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
+        // status pairs (lotto 32): bg, fg (text on bg) and border, plus a text green and red that pass 4.5:1
+        positive: { DEFAULT: "hsl(var(--positive))", bg: "hsl(var(--positive-bg))", fg: "hsl(var(--positive-fg))", border: "hsl(var(--positive-border))" },
+        warning: { bg: "hsl(var(--warning-bg))", fg: "hsl(var(--warning-fg))", border: "hsl(var(--warning-border))" },
+        negative: { DEFAULT: "hsl(var(--negative))", bg: "hsl(var(--negative-bg))", fg: "hsl(var(--negative-fg))", border: "hsl(var(--negative-border))" },
+        neutral: { bg: "hsl(var(--neutral-bg))", fg: "hsl(var(--neutral-fg))", border: "hsl(var(--neutral-border))" },
         chart: {
           1: "hsl(var(--chart-1))",
           2: "hsl(var(--chart-2))",

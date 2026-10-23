@@ -29,6 +29,22 @@
     --chart-3: 38 92% 50%;
     --chart-4: 215 28% 30%;
     --chart-5: 340 65% 50%;
+    /* Status (lotto 32, design review b.2): one pale pair per meaning, the same everywhere; --positive is the green
+       for text (#247b50, 5.2:1 on white: --accent is 4.1:1 and fails as text). */
+    --positive: 150 55% 31%;
+    --positive-bg: 141 76% 92%;
+    --positive-fg: 155 85% 21%;
+    --positive-border: 141 55% 80%;
+    --warning-bg: 48 100% 96%;
+    --warning-fg: 26 83% 31%;
+    --warning-border: 48 96% 76%;
+    --negative: 358 69% 46%;
+    --negative-bg: 8 100% 96%;
+    --negative-fg: 359 65% 31%;
+    --negative-border: 4 90% 88%;
+    --neutral-bg: 35 20% 93%;
+    --neutral-fg: 215 16% 33%;
+    --neutral-border: 35 14% 82%;
   }
   .dark {
     --background: 215 28% 9%;
@@ -55,9 +71,8 @@
     @apply border-border;
   }
   body {
+    /* a flat ground: no texture on a working screen (design review c.0) */
     @apply bg-background text-foreground font-sans antialiased;
-    background-image: radial-gradient(hsl(var(--foreground) / 0.035) 1px, transparent 1px);
-    background-size: 18px 18px;
   }
   h1, h2, h3 {
     @apply font-heading;
