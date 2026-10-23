@@ -1,9 +1,8 @@
 import { Link } from "react-router-dom";
 import { Plus, WifiOff } from "lucide-react";
-import type { ApartmentSummary } from "@/api/types";
+import type { ApartmentSummary, Occupancy } from "@/api/types";
 import { useAuth, useRole } from "@/auth/AuthProvider";
 import { DemoBadge } from "@/components/admin/apartmentForm";
-import { OccupancyBadge } from "@/components/apartment/ApartmentControls";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, Skeleton } from "@/components/ui/primitives";
 import { useApartments } from "@/hooks/useFeatures";
@@ -15,14 +14,18 @@ import { MODE_BG, MODE_FG } from "@/lib/modeColours";
 import { cn } from "@/lib/utils";
 
 /** One datum of the card's strip (design lot 2): label 12 px above the value, no icon; grey when the apartment is offline. */
-function Stat({ label, value, muted, bg, fg, testId }: { label: string; value: React.ReactNode; muted?: boolean; bg?: string; fg?: string; testId: string }) {
+function Stat({ label, value, muted, bg, fg, wide, testId }: { label: string; value: React.ReactNode; muted?: boolean; bg?: string; fg?: string; wide?: boolean; testId: string }) {
   return (
-    <div className={cn("min-w-0 px-3 py-2", !muted && bg ? bg : "bg-card")} data-testid={testId}>
+    <div className={cn("min-w-0 px-3 py-2", !muted && bg ? bg : "bg-card", wide && "col-span-2")} data-testid={testId}>
       <div className={cn("text-xs font-medium", !muted && fg ? fg : "text-muted-foreground")}>{label}</div>
       <div className={cn("text-sm font-semibold tabular [overflow-wrap:anywhere]", muted ? "text-muted-foreground" : fg)}>{value}</div>
     </div>
   );
 }
+
+/** Occupancy on the same colours as the Panoramica's band (lot 34): occupied sage, reserved amber, vacant taupe. */
+const OCCUPANCY_BG: Record<Occupancy, string> = { occupied: "bg-positive-bg", reserved: "bg-warning-bg", vacant: "bg-neutral-bg" };
+const OCCUPANCY_FG: Record<Occupancy, string> = { occupied: "text-positive-fg", reserved: "text-warning-fg", vacant: "text-neutral-fg" };
 
 function ApartmentCard({ a }: { a: ApartmentSummary }) {
   const apt = a.apartment;
@@ -41,7 +44,6 @@ function ApartmentCard({ a }: { a: ApartmentSummary }) {
             <p className="truncate text-xs text-muted-foreground">{a.address}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {apt && <OccupancyBadge occupancy={apt.occupancy} testId={`apartment-occupancy-${a.apartment_id}`} />}
             {offline ? (
               <Badge data-testid={`apartment-offline-${a.apartment_id}`} className="border-neutral-border bg-neutral-bg text-neutral-fg">
                 <WifiOff className="h-3 w-3" /> {a.enabled ? t("apartments.unreachable") : t("apartments.disabled")}
@@ -56,9 +58,11 @@ function ApartmentCard({ a }: { a: ApartmentSummary }) {
         {/* the data as one strip divided by 1 px lines (design lot 2) */}
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border bg-border">
           <Stat label={t("mode.label")} value={apt ? capitalizeFirst(t(`mode.${apt.mode}`)) : "—"} muted={offline} bg={apt ? MODE_BG[apt.mode] : undefined} fg={apt ? MODE_FG[apt.mode] : undefined} testId={`apartment-mode-${a.apartment_id}`} />
+          {/* the occupancy in the strip, on the band's colours (tappa 7): said once, not also as a pill above */}
+          <Stat label={t("overview.band.occupancy")} value={apt ? t(`occupancy.${apt.occupancy}`) : "—"} muted={offline} bg={apt ? OCCUPANCY_BG[apt.occupancy] : undefined} fg={apt ? OCCUPANCY_FG[apt.occupancy] : undefined} testId={`apartment-occupancy-${a.apartment_id}`} />
           <Stat label={t("apartments.kwhToday")} value={a.kwh_today !== null ? `${fmtNumber(a.kwh_today, 1)} kWh` : "—"} muted={offline} fg={a.kwh_today !== null ? "text-primary" : undefined} testId={`apartment-kwh-${a.apartment_id}`} />
           <Stat label={t("apartments.nextCheckin")} value={fmtShortDateTime(apt?.next_checkin, a.timezone)} muted={offline} testId={`apartment-checkin-${a.apartment_id}`} />
-          <Stat label={t("apartments.nextCheckout")} value={fmtShortDateTime(apt?.next_checkout, a.timezone)} muted={offline} testId={`apartment-checkout-${a.apartment_id}`} />
+          <Stat label={t("apartments.nextCheckout")} value={fmtShortDateTime(apt?.next_checkout, a.timezone)} muted={offline} wide testId={`apartment-checkout-${a.apartment_id}`} />
         </div>
         {/* the approvals in one place, as the card's action line, without pulsing (design lot 2) */}
         {pending > 0 && (
