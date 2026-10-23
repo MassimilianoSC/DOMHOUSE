@@ -527,10 +527,22 @@
     "noDevices": "Nessun dispositivo in questo appartamento",
     "liveOn": "In tempo reale",
     "liveOff": "Riconnessione…",
-    "checkin": "Check-in",
-    "checkout": "Check-out",
-    "booking": "Prenotazione",
-    "devicesOnline": "{online}/{total} dispositivi online",
+    "band": {
+      "title": "Come sta la casa adesso",
+      "holdUntil": "forzata fino alle {until}",
+      "occupancy": "Occupazione",
+      "nextCheckin": "Prossimo check-in",
+      "nextCheckout": "Prossimo check-out",
+      "nextNone": "Prossimo evento",
+      "windows": "Finestre",
+      "windowsClosed": "Tutte chiuse",
+      "windowsOneOpen": "1 aperta",
+      "windowsOpen": "{count} aperte",
+      "windowsNone": "Nessun sensore",
+      "energy": "Consumo di oggi",
+      "devices": "Dispositivi online",
+      "offline": "{count} offline"
+    },
     "otherRoom": "Senza stanza"
   },
   "instance": {
@@ -546,7 +558,9 @@
     "contract": "Contratto",
     "model": "Modello",
     "unreachable": "Sistema domotico non raggiungibile",
-    "lastEvent": "Ultimo evento {when}"
+    "lastEventLabel": "Ultimo evento",
+    "implementation": "Versione",
+    "details": "Dettagli tecnici"
   },
   "device": {
     "offline": "Dispositivo offline",
