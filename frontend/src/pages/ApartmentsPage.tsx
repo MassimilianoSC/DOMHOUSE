@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Bell, CalendarArrowDown, CalendarArrowUp, Plus, WifiOff, Zap } from "lucide-react";
+import { Plus, WifiOff } from "lucide-react";
 import type { ApartmentSummary } from "@/api/types";
 import { useAuth, useRole } from "@/auth/AuthProvider";
 import { DemoBadge } from "@/components/admin/apartmentForm";
@@ -13,30 +13,24 @@ import { capitalizeFirst, fmtNumber, fmtShortDateTime } from "@/lib/format";
 import { platformApartmentsUrl } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 
-function Stat({ icon, label, value, testId }: { icon: React.ReactNode; label: string; value: React.ReactNode; testId: string }) {
+/** One datum of the card's strip (design lot 2): label 12 px above the value, no icon; grey when the apartment is offline. */
+function Stat({ label, value, muted, testId }: { label: string; value: React.ReactNode; muted?: boolean; testId: string }) {
   return (
-    <div className="flex items-center gap-2.5" data-testid={testId}>
-      <span className="text-muted-foreground [&_svg]:size-4">{icon}</span>
-      <div className="min-w-0">
-        <div className="text-[13px] font-medium text-muted-foreground">{label}</div>
-        <div className="text-sm font-semibold tabular [overflow-wrap:anywhere]">{value}</div>
-      </div>
+    <div className="min-w-0 bg-card px-3 py-2" data-testid={testId}>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
+      <div className={cn("text-sm font-semibold tabular [overflow-wrap:anywhere]", muted && "text-muted-foreground")}>{value}</div>
     </div>
   );
 }
 
-function ApartmentCard({ a, index }: { a: ApartmentSummary; index: number }) {
+function ApartmentCard({ a }: { a: ApartmentSummary }) {
   const apt = a.apartment;
   const offline = !a.online;
+  const pending = a.pending_approvals ?? 0;
   return (
-    <Link
-      to={`/a/${a.apartment_id}`}
-      aria-label={t("apartments.open", { name: a.name })}
-      data-testid={`apartment-card-${a.apartment_id}`}
-      className="group block rounded-3xl focus-ring"
-      style={{ animationDelay: `${index * 60}ms` }}
-    >
-      <Card className={cn("h-full p-5 transition-colors group-hover:border-foreground/20", offline && "bg-muted/60 grayscale")}>
+    <Link to={`/a/${a.apartment_id}`} aria-label={t("apartments.open", { name: a.name })} data-testid={`apartment-card-${a.apartment_id}`} className="group block rounded-lg focus-ring">
+      {/* no grey filter when offline (design lot 2): the badge says it, the data turn grey */}
+      <Card className="flex h-full flex-col gap-4 p-5 transition-colors group-hover:border-foreground/20">
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -45,35 +39,32 @@ function ApartmentCard({ a, index }: { a: ApartmentSummary; index: number }) {
             </div>
             <p className="truncate text-xs text-muted-foreground">{a.address}</p>
           </div>
-          {offline ? (
-            <Badge data-testid={`apartment-offline-${a.apartment_id}`} className="border-neutral-border bg-neutral-bg text-neutral-fg">
-              <WifiOff className="h-3 w-3" /> {a.enabled ? t("apartments.unreachable") : t("apartments.disabled")}
-            </Badge>
-          ) : (
-            <Badge className="border-positive-border bg-positive-bg text-positive-fg" data-testid={`apartment-online-${a.apartment_id}`}>
-              <span className="h-1.5 w-1.5 rounded-full bg-positive" /> {t("apartments.online")}
-            </Badge>
-          )}
-        </div>
-        {apt && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <OccupancyBadge occupancy={apt.occupancy} testId={`apartment-occupancy-${a.apartment_id}`} />
-            <Badge className="border-primary/30 bg-primary/10 text-primary" data-testid={`apartment-mode-${a.apartment_id}`}>
-              {capitalizeFirst(t(`mode.${apt.mode}`))}
-            </Badge>
-            {(a.pending_approvals ?? 0) > 0 && (
-              <Badge className="border-primary bg-primary text-primary-foreground" data-testid={`apartment-approvals-${a.apartment_id}`}>
-                <Bell className="h-3 w-3" /> {a.pending_approvals}
+          <div className="flex flex-wrap items-center gap-2">
+            {apt && <OccupancyBadge occupancy={apt.occupancy} testId={`apartment-occupancy-${a.apartment_id}`} />}
+            {offline ? (
+              <Badge data-testid={`apartment-offline-${a.apartment_id}`} className="border-neutral-border bg-neutral-bg text-neutral-fg">
+                <WifiOff className="h-3 w-3" /> {a.enabled ? t("apartments.unreachable") : t("apartments.disabled")}
+              </Badge>
+            ) : (
+              <Badge className="border-positive-border bg-positive-bg text-positive-fg" data-testid={`apartment-online-${a.apartment_id}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-positive" /> {t("apartments.online")}
               </Badge>
             )}
           </div>
-        )}
-        <div className="mt-5 grid grid-cols-2 gap-4 border-t pt-4">
-          <Stat icon={<CalendarArrowDown />} label={t("apartments.nextCheckin")} value={fmtShortDateTime(apt?.next_checkin, a.timezone)} testId={`apartment-checkin-${a.apartment_id}`} />
-          <Stat icon={<CalendarArrowUp />} label={t("apartments.nextCheckout")} value={fmtShortDateTime(apt?.next_checkout, a.timezone)} testId={`apartment-checkout-${a.apartment_id}`} />
-          <Stat icon={<Zap />} label={t("apartments.kwhToday")} value={a.kwh_today !== null ? `${fmtNumber(a.kwh_today, 1)} kWh` : "—"} testId={`apartment-kwh-${a.apartment_id}`} />
-          <Stat icon={<Bell />} label={t("apartments.pendingApprovals")} value={a.pending_approvals ?? "—"} testId={`apartment-pending-${a.apartment_id}`} />
         </div>
+        {/* the data as one strip divided by 1 px lines (design lot 2) */}
+        <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border bg-border">
+          <Stat label={t("mode.label")} value={apt ? capitalizeFirst(t(`mode.${apt.mode}`)) : "—"} muted={offline} testId={`apartment-mode-${a.apartment_id}`} />
+          <Stat label={t("apartments.kwhToday")} value={a.kwh_today !== null ? `${fmtNumber(a.kwh_today, 1)} kWh` : "—"} muted={offline} testId={`apartment-kwh-${a.apartment_id}`} />
+          <Stat label={t("apartments.nextCheckin")} value={fmtShortDateTime(apt?.next_checkin, a.timezone)} muted={offline} testId={`apartment-checkin-${a.apartment_id}`} />
+          <Stat label={t("apartments.nextCheckout")} value={fmtShortDateTime(apt?.next_checkout, a.timezone)} muted={offline} testId={`apartment-checkout-${a.apartment_id}`} />
+        </div>
+        {/* the approvals in one place, as the card's action line, without pulsing (design lot 2) */}
+        {pending > 0 && (
+          <p className="mt-auto text-sm font-semibold text-warning-fg" data-testid={`apartment-approvals-${a.apartment_id}`}>
+            {pending === 1 ? t("apartments.pendingOne") : t("apartments.pendingMany", { count: pending })} →
+          </p>
+        )}
       </Card>
     </Link>
   );
@@ -109,7 +100,7 @@ export default function ApartmentsPage() {
       />
       {isLoading && (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {[0, 1].map((i) => <Skeleton key={i} className="h-60 rounded-3xl" />)}
+          {[0, 1].map((i) => <Skeleton key={i} className="h-52 rounded-lg" />)}
         </div>
       )}
       {data && data.length === 0 && (
@@ -119,7 +110,7 @@ export default function ApartmentsPage() {
         </Card>
       )}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {data?.map((a, i) => <ApartmentCard key={a.apartment_id} a={a} index={i} />)}
+        {data?.map((a) => <ApartmentCard key={a.apartment_id} a={a} />)}
       </div>
     </div>
   );
