@@ -124,7 +124,7 @@ export default function LoginPage() {
   const { status } = useAuth();
   if (status === "authenticated") return <Navigate to="/" replace />;
   return (
-    <div className="grid min-h-screen lg:grid-cols-[1.1fr_1fr]">
+    <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden flex-col justify-between overflow-hidden bg-[hsl(215_28%_14%)] p-12 text-[hsl(40_20%_96%)] lg:flex">
         <img src="/favicon.svg" alt="" className="relative h-12 w-12" />
         <div className="relative space-y-4">

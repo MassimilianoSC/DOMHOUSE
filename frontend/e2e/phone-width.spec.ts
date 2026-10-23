@@ -74,6 +74,12 @@ test.describe("la misura stessa (D-155): se smette di vedere uno sbordo, questa 
 });
 
 test.describe("telefono a 360 px: niente fuori dallo schermo (P-73)", () => {
+  test("pagina di accesso con gli utenti di prova", async ({ page }) => {
+    await page.goto("/login");
+    await expect(page.getByTestId("dev-login").getByRole("button").first()).toBeVisible();
+    expect(await overflowing(page)).toEqual([]);
+  });
+
   test("elenco degli appartamenti, la prima pagina dopo l'accesso", async ({ page }) => {
     await signIn(page);
     await firstApartment(page);
