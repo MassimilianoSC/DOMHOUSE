@@ -206,7 +206,11 @@ async def _support_user(request: Request, tenant_id: str) -> CurrentUser:
     if access is None or not await _is_platform_member(email, verified, name):
         raise _err(403, "support_expired", SUPPORT_EXPIRED)
     await _tenant_gate(get_repository(), tenant_id)
-    return CurrentUser(uid=uid, email=email, tenant_id=tenant_id, role="operator", display_name=access.operator_name or name,
+    # D-189: the manager's current name (the managers' list, D-178, or the account's); the copy taken when the access was
+    # opened stays in the access for the log, and is used only when there is no other
+    member = await get_repository().get_platform_member(normalize_email(email))
+    current = (member.display_name if member is not None and member.display_name else name) or access.operator_name
+    return CurrentUser(uid=uid, email=email, tenant_id=tenant_id, role="operator", display_name=current,
                        apartment_ids=None, issued_at=iat, support_access_id=access.access_id,
                        support_expires_at=access.expires_at)
 

@@ -165,3 +165,18 @@ def test_removing_the_manager_closes_their_accesses():
     a = run(repo.get_support_access(aid))
     assert a.closed_at is not None
     assert "support_access_closed" in [e.action for e in run(repo.list_audit(TID, 100)) if e.target.id == aid]
+
+
+def test_d189_inside_the_manager_has_the_current_name_and_the_access_keeps_its_copy():
+    """D-189: during a support access /app/me shows the manager's current name, not the copy taken at the opening; the
+    access (and the log) keeps the copy."""
+    before = run(call("GET", "/app/me", support=False)).json()["user"]["display_name"]
+    aid = open_access("Nome")
+    try:
+        assert run(call("PATCH", "/app/me", support=False, json={"display_name": "Nome Nuovo"})).status_code == 200
+        me = run(call("GET", "/app/me")).json()
+        assert me["support"]["access_id"] == aid and me["user"]["display_name"] == "Nome Nuovo"
+        assert run(get_repository().get_support_access(aid)).operator_name == before
+    finally:
+        close(aid)
+        run(call("PATCH", "/app/me", support=False, json={"display_name": before}))
