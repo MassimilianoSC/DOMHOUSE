@@ -27,6 +27,7 @@ bookings' people (the engine has none of them anyway: names, emails and phones s
 """
 import asyncio
 import json
+import re
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -64,8 +65,11 @@ Regole fisse, sempre:
    appartamenti. Per le regole rispondi che si scrive la richiesta nella pagina Regole dell'app, dove l'assistente
    propone la modifica e il gestore la conferma; per utenti e appartamenti, che si fa dall'app.
 Ora locale dell'appartamento: {now} (fuso {tz}). Modalità: comfort, eco, casa vuota (empty).
-Stato attuale dell'appartamento, dei dispositivi, decisioni recenti e programmazioni (letti adesso):
+Stato attuale dell'appartamento, dei dispositivi, decisioni recenti e programmazioni (letti adesso; tutti gli orari
+sono nell'ora locale dell'appartamento, AAAA-MM-GG HH:MM):
 {state}
+Gli orari qui sopra e quelli che scrivi in «quando» sono già nell'ora locale dell'appartamento: usali così come sono,
+non convertirli.
 Rispondi SOLO con un oggetto JSON, senza altro testo e senza blocchi di codice:
 {{"risposta": "<al massimo tre frasi per il gestore>", "azioni": [<zero o più azioni>]}}
 Ogni azione ha una di queste forme:
@@ -130,6 +134,23 @@ def clean_command(capability, action, params) -> tuple:
     if action in PARAMS:
         params = {k: v for k, v in params.items() if k in PARAMS[action]}
     return action, params
+
+
+_UTC_TIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|\+00:00)$")
+
+
+def local_times(value, tz: ZoneInfo):
+    """The state for the model with every time of the engine (UTC, «2026-10-22T13:00:00.000Z») in the apartment's
+    local time («2026-10-22 15:00»): the manager asks «alle 15» and the model must read 15, not 13 (prose test, 23 Oct)."""
+    if isinstance(value, dict):
+        return {k: local_times(v, tz) for k, v in value.items()}
+    if isinstance(value, list):
+        return [local_times(v, tz) for v in value]
+    if isinstance(value, datetime):
+        return value.astimezone(tz).strftime("%Y-%m-%d %H:%M")
+    if isinstance(value, str) and _UTC_TIME.match(value):
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(tz).strftime("%Y-%m-%d %H:%M")
+    return value
 
 
 def as_tool(action: dict) -> tuple[str, dict]:
@@ -323,12 +344,14 @@ class Assistant:
         """The request (D-182): the system prompt with the state, the recent decisions and the planned actions, then the
         question. The same function feeds scripts/measure_model.py."""
         from .core import utcnow
-        now = utcnow().astimezone(ZoneInfo(self.e.timezone)).strftime("%Y-%m-%d %H:%M")
-        state = json.dumps({"appartamento": self.tool("leggi_appartamento", {}, []),
-                            **self.tool("leggi_dispositivi", {}, []),
-                            "decisioni_recenti": self.tool("leggi_decisioni", {"quante": 10}, []).get("decisioni", []),
-                            "programmazioni": self.tool("leggi_programmazioni", {}, []).get("programmazioni", [])},
-                           ensure_ascii=False, default=str)
+        tz = ZoneInfo(self.e.timezone)
+        now = utcnow().astimezone(tz).strftime("%Y-%m-%d %H:%M")
+        state = json.dumps(local_times({
+            "appartamento": self.tool("leggi_appartamento", {}, []),
+            **self.tool("leggi_dispositivi", {}, []),
+            "decisioni_recenti": self.tool("leggi_decisioni", {"quante": 10}, []).get("decisioni", []),
+            "programmazioni": self.tool("leggi_programmazioni", {}, []).get("programmazioni", [])}, tz),
+            ensure_ascii=False, default=str)
         return [{"role": "system", "content": SYSTEM_PROMPT.format(now=now, tz=self.e.timezone, state=state)},
                 {"role": "user", "content": text}]
 

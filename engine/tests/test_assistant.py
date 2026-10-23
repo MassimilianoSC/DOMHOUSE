@@ -8,6 +8,7 @@ Run: python -m pytest engine/tests -q
 """
 import asyncio
 import json
+import re
 from datetime import timedelta
 
 import pytest
@@ -479,3 +480,22 @@ def test_every_command_with_all_the_fields_the_model_writes_today_runs():
     assert "Parametri non ammessi" not in (a["answer"] or "") and "Non fatto" not in (a["answer"] or "")
     assert a["status"] == "needs_approval" and len(e.approval_queue) == 2   # three together: one each, queued (D-162)
     assert a["answer"].count("Rispondi Sì o No qui sotto") == 3
+
+
+def test_every_time_in_the_prompt_is_the_apartments_local_time():
+    """Prose test, 23 Oct: the climate switched off yesterday at 15 (local) was read «13:00» by the model, because the
+    state carried the engine's UTC times. Decisions, planned actions and the rest reach the model in local time."""
+    from datetime import UTC, datetime
+    e = engine(Script())
+    e.log("rule:window_open_off", {"type": "device", "device_id": CLIMA}, "turn_off", "on", "off",
+          "Finestra della camera aperta da 5 minuti con il clima acceso", "applied", CORR,
+          ts=datetime(2026, 10, 22, 13, 0, tzinfo=UTC), emit=False)                 # 15:00 in Rome (summer time)
+    e.log("system", {"type": "apartment"}, "set_mode", "eco", "comfort", "Prova d'inverno", "applied", CORR,
+          ts=datetime(2026, 11, 2, 7, 30, tzinfo=UTC), emit=False)                  # 08:30 in Rome (winter time)
+    system = assistant.Assistant(e, None).messages("perché il clima si è spento ieri alle 15?")[0]["content"]
+    assert '"ts": "2026-10-22 15:00"' in system and '"ts": "2026-11-02 08:30"' in system
+    assert "13:00:00" not in system and not re.search(r'"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}[^"]*Z"', system)
+    assert "tutti gli orari\nsono nell'ora locale dell'appartamento" in system
+    assert "usali così come sono,\nnon convertirli." in system
+    assert assistant.local_times({"a": ["2026-10-22T13:00:00.000Z", "testo"]}, assistant.ZoneInfo("Europe/London")) == {
+        "a": ["2026-10-22 14:00", "testo"]}
