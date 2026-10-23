@@ -1,4 +1,4 @@
-from .base import (EMPTY_AI_USAGE, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (EMPTY_AI_USAGE, ai_stats_added, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
 
 
@@ -17,6 +17,7 @@ class InMemoryRepository:
         self.audit_people: dict[str, AuditPerson] = {}
         self.mail_counts: dict[str, int] = {}
         self.ai_usage: dict[str, dict] = {}            # P-60 step 9: month -> the assistant's spending
+        self.ai_stats: dict[str, dict] = {}            # decision 120: "<apartment>__<week>" -> the assistant's counters
         self.summaries: dict[str, dict] = {}           # P-60 step 11: "<apartment>__<week>" -> summary
         self.support_access: dict[str, SupportAccess] = {}
         self.actor_refs: dict[str, str] = {}             # uid -> pseudonym
@@ -158,6 +159,17 @@ class InMemoryRepository:
         u["input_tokens"] += input_tokens
         u["output_tokens"] += output_tokens
         return dict(u)
+
+    async def add_ai_stats(self, apartment_id, week, bounds, asks=0, timeouts=0, twins=0, quick=None, ask_id=None):
+        key = f"{apartment_id}__{week}"
+        d = ai_stats_added(self.ai_stats.get(key), apartment_id, week, bounds, asks, timeouts, twins, quick, ask_id)
+        if d is None:
+            return False
+        self.ai_stats[key] = d
+        return True
+
+    async def get_ai_stats(self, keys):
+        return {k: dict(self.ai_stats[k]) for k in keys if k in self.ai_stats}
 
     async def mark_ai_alert(self, month):
         u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))

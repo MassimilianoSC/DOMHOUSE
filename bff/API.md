@@ -77,6 +77,7 @@ per utente»).
 | 39 | `POST /app/apartments/{id}/rules/proposal/apply` | `apply` | come #38 | il `RuleSet` del motore dopo la modifica; 409 `rules_changed` «Le regole sono cambiate nel frattempo: rifai la richiesta»; 422 `bad_request`, `nothing_to_change`, `unknown_rule`, `rule_not_editable`, `unknown_param`, `param_out_of_range`, `invalid_range`; 502 `instance_unreachable` | «Applica» della proposta (o2) | – |
 | 40 | `POST /app/apartments/{id}/rules/copy/preview` | `copy_preview` (`routes/rules.py`) | admin, sugli appartamenti che vede (404 se uno qualsiasi è fuori lista o di un'altra organizzazione) | `{from, rules, targets}` (vedi «Copia delle regole»); 403 a chi non è admin; 422 `bad_request` (nessuna destinazione), `same_apartment`, `too_many` (oltre 100); 409 `apartment_disabled` (partenza); 502 `instance_unreachable` (partenza) | anteprima della copia (o2) | tutti |
 | 41 | `POST /app/apartments/{id}/rules/copy` | `copy_rules` | come #40 | `{from, results}`: l'esito per appartamento; 409 `rules_changed` se le regole di partenza sono cambiate dopo l'anteprima; 422 `bad_request` senza `based_on` e `from_based_on` | conferma della copia (o2) | tutti |
+| 42 | `GET /app/admin/assistant-stats?weeks=8` | `assistant_stats` (`routes/admin.py` → `bff/ai_stats.py`) | ADMIN | `{weeks: [{week, from, to, asks, timeouts, twins, quick: {timeout, model_unavailable, monthly_cap, json_invalid}}], threshold_percent: 10, over_threshold}`: i totali degli appartamenti dell'organizzazione, dalla settimana in corso (la prima) indietro, zeri compresi; 422 `bad_request` se `weeks` non è un numero fra 1 e 26 | scheda «Assistente» in Amministrazione (o2) | – |
 
 ## Piattaforma (P-36, D-61a / D-62 / D-64 / D-65)
 
@@ -354,6 +355,7 @@ scheduler. Regole in `bff/retention.py`:
 | `audit_people` | 24 mesi dall'ultima voce che cita la persona |
 | `actors`, `actor_refs` | 24 mesi dall'ultimo uso (rinnovo al più settimanale) |
 | `summaries` | 12 mesi da quando il riepilogo settimanale è stato fatto (D-150) |
+| `ai_stats` | 12 mesi dal lunedì della settimana (decisione 120, contatore dell'assistente) |
 
 Utenti, organizzazioni, appartamenti, gestori e indici di unicità non scadono. Per i documenti salvati prima del lotto
 11: `scripts/backfill_expire_at.py` (senza opzioni legge e conta, con `--apply` scrive solo dove manca). I consumi li
@@ -719,3 +721,23 @@ Fasi di un fallimento (lotto 30): le chiamate del BFF ad Agent Platform hanno un
 (nessun primo byte entro il tempo), `lettura della risposta`, oppure `credenziali o rete` (il gettone di accesso).
 Lo stesso nel motore verso il BFF (5 s per la connessione, poi il tempo della domanda), nel log del motore, e in
 `scripts/measure_model.py`, che per ogni risposta stampa anche i tempi di DNS, TCP e TLS.
+
+## Contatore dell'assistente (decisione 120, D-183 punto 129)
+
+Il BFF conta le domande all'assistente per appartamento e settimana (da lunedì a domenica nel fuso di Roma, nome
+`2026-W43`) nei documenti Firestore `ai_stats/{appartamento}__{settimana}`, che scadono 12 mesi dopo il lunedì (TTL
+`ai_stats`, comando del committente). Senza modifiche al contratto:
+
+- `asks`: ogni domanda una volta sola (l'`ask_id` resta nel documento), quando il sito legge dal proxy (#9, `ask` e
+  `ask/{id}`) il suo esito finale: `answered`, `needs_approval` o `failed`;
+- `quick`: le risposte rapide per causa, da `reason` «risposta_rapida:<causa>» (`timeout`, `model_unavailable`,
+  `monthly_cap`, `json_invalid`; D-182 punto 4);
+- `timeouts`: le domande a cui l'assistente completo non ha risposto in tempo (`risposta_rapida:timeout`, oppure
+  `failed` con `reason` `timeout`). Si contano sulla domanda e non nel passaggio, perché il motore smette di aspettare
+  prima che la chiamata al modello finisca;
+- `twins`: le richieste gemelle partite nel passaggio (D-182 strato 1).
+
+#42 somma gli appartamenti dell'organizzazione. `over_threshold` è vero quando in ciascuna delle ultime due settimane
+complete i `timeouts` superano il 10 % delle `asks`: è la misura di D-182 che riapre la scelta del modello. Il
+conteggio è al meglio: una scrittura fallita non tocca la risposta e lascia un avviso nel log («assistant stats not
+written»).

@@ -526,3 +526,23 @@ def test_weekly_summaries(repo):
     if isinstance(repo, FirestoreRepository):
         from datetime import UTC, datetime
         assert _expire(repo._col("summaries").document("a1__2026-W42")) == datetime(2027, 10, 19, 6, 0, tzinfo=UTC)
+
+
+def test_assistant_weekly_counters(repo):
+    """Decision 120 (D-183 point 129): ai_stats/{apartment}__{week}, an ask counted once, the causes, the twins; on
+    Firestore it expires 12 months after the week's Monday."""
+    bounds = ("2026-10-19", "2026-10-25")
+    assert run(repo.get_ai_stats(["a1__2026-W43"])) == {} and run(repo.get_ai_stats([])) == {}
+    assert run(repo.add_ai_stats("a1", "2026-W43", bounds, asks=1, timeouts=1, quick="timeout", ask_id="q1")) is True
+    assert run(repo.add_ai_stats("a1", "2026-W43", bounds, asks=1, timeouts=1, quick="timeout", ask_id="q1")) is False
+    assert run(repo.add_ai_stats("a1", "2026-W43", bounds, asks=1, ask_id="q2")) is True
+    assert run(repo.add_ai_stats("a1", "2026-W43", bounds, twins=1)) is True
+    d = run(repo.get_ai_stats(["a1__2026-W43", "a2__2026-W43"]))
+    assert list(d) == ["a1__2026-W43"]
+    d = d["a1__2026-W43"]
+    assert (d["asks"], d["timeouts"], d["twins"], d["quick"], d["ask_ids"]) == (2, 1, 1, {"timeout": 1}, ["q1", "q2"])
+    assert (d["apartment_id"], d["week"], d["from"], d["to"]) == ("a1", "2026-W43", "2026-10-19", "2026-10-25")
+    from bff.repository.firestore import FirestoreRepository
+    if isinstance(repo, FirestoreRepository):
+        from datetime import UTC, datetime
+        assert _expire(repo._col("ai_stats").document("a1__2026-W43")) == datetime(2027, 10, 19, tzinfo=UTC)

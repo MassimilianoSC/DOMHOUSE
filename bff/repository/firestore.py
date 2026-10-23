@@ -12,7 +12,7 @@ from google.cloud import firestore
 
 from .. import retention
 
-from .base import (EMPTY_AI_USAGE, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (EMPTY_AI_USAGE, ai_stats_added, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email, now_iso)
 
 
@@ -248,6 +248,29 @@ class FirestoreRepository:
             return {k: u[k] for k in EMPTY_AI_USAGE}
         async with self._lock("ai_usage"):
             return await txn(self.db.transaction())
+
+    # decision 120: ai_stats/{apartment}__{week}, raised in a transaction, expire 12 months after the week's Monday
+    async def add_ai_stats(self, apartment_id, week, bounds, asks=0, timeouts=0, twins=0, quick=None, ask_id=None):
+        ref = self._col("ai_stats").document(f"{apartment_id}__{week}")
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            d = ai_stats_added(snap.to_dict() if snap.exists else None, apartment_id, week, bounds, asks, timeouts,
+                               twins, quick, ask_id)
+            if d is None:
+                return False
+            d.pop(retention.FIELD, None)
+            tx.set(ref, {**d, retention.FIELD: retention.ai_stats(d)})
+            return True
+        async with self._lock(f"ai_stats:{apartment_id}"):
+            return await txn(self.db.transaction())
+
+    async def get_ai_stats(self, keys):
+        if not keys:
+            return {}
+        snaps = self.db.get_all([self._col("ai_stats").document(k) for k in keys])
+        return {snap.id: snap.to_dict() async for snap in snaps if snap.exists}
 
     async def mark_ai_alert(self, month):
         ref = self._col("ai_usage").document(month)

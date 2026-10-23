@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from .. import actors, audit, energy_report, energy_since, instances, push, support
+from .. import actors, ai_stats, audit, energy_report, energy_since, instances, push, support
 from ..auth import CurrentUser, Identity, get_tenant_apartment, resolve_identity, resolve_user, scope_out, still_sees
 from ..bookings import ForwardError, SimulatorTranslator, TranslationError, forward
 from ..config import get_settings
@@ -178,6 +178,12 @@ async def proxy(apartment_id: str, path: str, request: Request, user: CurrentUse
         info("instance unreachable", error=type(exc).__name__, path=path)
         return err(502, "instance_unreachable", "Istanza non raggiungibile")
     info("proxied", method=method, path=path, status=resp.status_code)
+    if top == "ask" and resp.status_code in (200, 201, 202) and "json" in resp.headers.get("content-type", ""):
+        try:
+            ask = resp.json()
+        except ValueError:
+            ask = None
+        await ai_stats.count_ask(apt.apartment_id, ask)    # decision 120: once per question, at its final state
     headers = {}
     if "content-type" in resp.headers:
         headers["Content-Type"] = resp.headers["content-type"]

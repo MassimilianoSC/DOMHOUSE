@@ -22,7 +22,7 @@ from email.utils import formataddr
 
 import httpx
 
-from . import instances, net_phase, vertex_native
+from . import ai_stats, instances, net_phase, vertex_native
 from .config import get_settings
 from .logs import info, warn
 from .repository import get_repository
@@ -148,6 +148,8 @@ async def _hedged(request: dict, apartment_id: str = "") -> tuple[dict, int]:
         done, _ = await asyncio.wait(tasks, timeout=s.ai_hedge_after_s)
         if not done:
             info("assistant model twin started", apartment_id=apartment_id, after_s=s.ai_hedge_after_s)   # D-182 point 4
+            if apartment_id:
+                await ai_stats.count_twin(apartment_id)              # decision 120: the twins of the week
             tasks.append(asyncio.create_task(call_model(dict(request))))
         error: BaseException | None = None
         running = list(tasks)

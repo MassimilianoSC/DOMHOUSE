@@ -161,6 +161,25 @@ class WebhookLog(BaseModel):
 WEBHOOK_LOG_LIMIT = 100
 EMPTY_AI_USAGE = {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0, "alerted": False}
 
+
+def ai_stats_added(doc: dict | None, apartment_id: str, week: str, bounds: tuple[str, str], asks: int, timeouts: int,
+                   twins: int, quick: str | None, ask_id: str | None) -> dict | None:
+    """Decision 120: the weekly counters after one addition (bff/ai_stats.py), or None when the ask was already counted.
+    Both repositories use it, the Firestore one inside a transaction."""
+    d = dict(doc) if doc else {"apartment_id": apartment_id, "week": week, "from": bounds[0], "to": bounds[1],
+                               "asks": 0, "timeouts": 0, "twins": 0, "quick": {}, "ask_ids": []}
+    if ask_id is not None:
+        if ask_id in d.get("ask_ids", []):
+            return None
+        d["ask_ids"] = [*d.get("ask_ids", []), ask_id]
+    d["asks"] = d.get("asks", 0) + asks
+    d["timeouts"] = d.get("timeouts", 0) + timeouts
+    d["twins"] = d.get("twins", 0) + twins
+    if quick:
+        d["quick"] = {**d.get("quick", {}), quick: d.get("quick", {}).get(quick, 0) + 1}
+    d["updated_at"] = now_iso()
+    return d
+
 # P-47: closed set; the PWA has a sentence for each one (a new action is agreed with o2 first)
 AuditAction = Literal[
     "invite_sent", "invite_resent", "invite_email_deferred", "role_changed", "scope_changed", "user_removed",
@@ -304,6 +323,11 @@ class Repository(Protocol):
     async def list_summaries(self, apartment_id: str, limit: int = 20) -> list[dict]: ...
 
     async def get_ai_usage(self, month: str) -> dict: ...
+    # decision 120 (D-183 point 129): the assistant's weekly counters, ai_stats/{apartment}__{week} (ai_stats_added);
+    # add is atomic and False when the ask_id was already counted; get returns the documents found, by key
+    async def add_ai_stats(self, apartment_id: str, week: str, bounds: tuple[str, str], asks: int = 0, timeouts: int = 0,
+                           twins: int = 0, quick: str | None = None, ask_id: str | None = None) -> bool: ...
+    async def get_ai_stats(self, keys: list[str]) -> dict[str, dict]: ...
     async def add_ai_usage(self, month: str, cost_eur: float, input_tokens: int, output_tokens: int) -> dict: ...
     async def mark_ai_alert(self, month: str) -> bool: ...
 

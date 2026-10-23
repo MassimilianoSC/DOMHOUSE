@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 
-from .. import accounts, actors, audit, instances, support
+from .. import accounts, actors, ai_stats, audit, instances, support
 from ..auth import CurrentUser, require_admin, scope_out
 from ..logs import warn
 from ..features import APP_FEATURES
@@ -241,6 +241,16 @@ def _check_features(features: list[str] | None) -> bool:
 @router.get("/apartments")
 async def list_apartments(user: CurrentUser = Depends(require_admin)):
     return [apt_out(a) for a in await get_repository().list_apartments(user.tenant_id)]
+
+
+@router.get("/assistant-stats")
+async def assistant_stats(weeks: str = "8", user: CurrentUser = Depends(require_admin)):
+    """Decision 120 (D-183 point 129): the organisation's questions to the assistant week by week, the current first,
+    zeros included, and the threshold (bff/ai_stats.py). weeks from 1 to 26."""
+    if not weeks.isdigit() or not 1 <= int(weeks) <= ai_stats.MAX_WEEKS:
+        return err(422, "bad_request", f"weeks deve essere un numero fra 1 e {ai_stats.MAX_WEEKS}")
+    apartments = await get_repository().list_apartments(user.tenant_id)
+    return await ai_stats.report([a.apartment_id for a in apartments], int(weeks))
 
 
 @router.post("/apartments", status_code=201)

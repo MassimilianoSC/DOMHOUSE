@@ -15,6 +15,7 @@ from datetime import UTC, datetime, timedelta
 FIELD = "expire_at"
 BOOKING_MONTHS = 12        # after the check-out (D-94)
 SUMMARY_MONTHS = 12        # the weekly summaries (D-150)
+AI_STATS_MONTHS = 12       # the assistant's weekly counters (decision 120, D-183 point 129)
 AUDIT_MONTHS = 24          # the administrative log
 SUPPORT_MONTHS = 24        # closed support accesses: from the end of the window (at most 24 h after opening)
 WEBHOOK_DAYS = 90          # received Italianway calls, besides the 100 per organisation
@@ -68,6 +69,11 @@ def summary(doc: dict) -> datetime:
     return add_months(parse(doc["generated_at"]), SUMMARY_MONTHS)
 
 
+def ai_stats(doc: dict) -> datetime:
+    """Decision 120: the assistant's counters of a week are kept 12 months after its Monday («from»)."""
+    return add_months(datetime.fromisoformat(doc["from"]).replace(tzinfo=UTC), AI_STATS_MONTHS)
+
+
 def pseudonym(_doc: dict | None = None) -> datetime:
     return add_months(now(), ACTOR_MONTHS)
 
@@ -84,4 +90,5 @@ COLLECTIONS = {
     "actors": pseudonym,
     "actor_refs": pseudonym,
     "summaries": summary,
+    "ai_stats": ai_stats,
 }
