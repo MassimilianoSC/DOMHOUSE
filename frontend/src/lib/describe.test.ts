@@ -81,6 +81,8 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     // senza sensore di temperatura, lotto 30 (91bc015, ea9cf71)
     expect(actionLabel("auto_regulation_off")).toBe("Regolazione automatica disattivata");
     expect(actionLabel("frost_inactive")).toBe("Antigelo non attivo");
+    // limiti del gestore fuori da quelli del dispositivo, D-174 (f586b7d)
+    expect(actionLabel("setpoint_limits_ignored")).toBe("Limiti del setpoint ignorati");
   });
 
   it("un'azione che il motore aggiungerà e il sito non conosce ancora: il codice, la pagina non si rompe", () => {

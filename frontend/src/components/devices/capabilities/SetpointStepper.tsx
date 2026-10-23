@@ -15,8 +15,11 @@ export function SetpointStepper(props: {
   testId: string;
 }) {
   const { value, min, max, disabled, onChange, testId } = props;
-  const dec = Math.max(min, Math.round((value - STEP) * 2) / 2);
-  const inc = Math.min(max, Math.round((value + STEP) * 2) / 2);
+  // Always inside min..max (D-174): a boiler the frost protection keeps at 8 °C under a minimum of 16 goes to 16 with
+  // «+», never to 8.5, which the engine refuses; the same for «−» above the maximum.
+  const clamp = (v: number) => Math.min(max, Math.max(min, v));
+  const dec = clamp(Math.round((value - STEP) * 2) / 2);
+  const inc = clamp(Math.round((value + STEP) * 2) / 2);
   return (
     <div className="flex items-center gap-2" data-testid={testId}>
       <Button

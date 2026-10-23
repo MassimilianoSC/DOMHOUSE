@@ -234,7 +234,8 @@
       "connector_down": "Collegamento ai dispositivi perso",
       "connector_up": "Collegamento ai dispositivi ripristinato",
       "auto_regulation_off": "Regolazione automatica disattivata",
-      "frost_inactive": "Antigelo non attivo"
+      "frost_inactive": "Antigelo non attivo",
+      "setpoint_limits_ignored": "Limiti del setpoint ignorati"
     },
     "title": "Decisioni",
     "subtitle": "Tutto ciò che il motore e i gestori hanno fatto, e perché",
