@@ -235,6 +235,7 @@ class ApartmentEngine:
         self.meters: dict[str, EnergyCounter] = {}
         # D-131, D-133: the apartment's settings (engine/config.py), the defaults when not given
         self.settings = {**DEFAULT_SETTINGS, **(settings or {})}
+        self.timezone = str(self.settings["TIMEZONE"])  # D-177: TIMEZONE, declared in /apartment.timezone
         if confirm_watts:
             self.settings["CONFIRM_ON_WATTS"], self.settings["CONFIRM_OFF_WATTS"] = confirm_watts
         self.power_waiters: dict[str, list[tuple[str, float, asyncio.Future]]] = {}   # meter -> commands watching it
@@ -2483,10 +2484,13 @@ class Registry:
         """model_for(apartment_id): the model client of a demonstration apartment (P-60 step 9, D-132 point 5: the BFF's
         demonstrations with the real assistant, within the cap); None keeps the keyword assistant. variants (P-72):
         apartment_id -> «vuoto» | «occupato», as the BFF last sent it (X-Demo-Variant); used when the apartment's
-        engine is built: at the first call and after «Ripristina» (reset)."""
+        engine is built: at the first call and after «Ripristina» (reset). timezones (D-177): apartment_id -> the time
+        zone the BFF sends (X-Demo-Timezone, the registry's copy), the demonstration's TIMEZONE; an engine already
+        built takes a new one at once."""
         self.sims: dict[str, ApartmentEngine] = {}
         self.model_for = model_for
         self.variants: dict[str, str] = {}
+        self.timezones: dict[str, str] = {}
 
     def reset(self, apartment_id: str) -> bool:
         """D-97: forget the apartment's simulated engine and stop its tasks; the next call builds it from the seed."""
@@ -2501,8 +2505,11 @@ class Registry:
     def get(self, apartment_id: str) -> ApartmentEngine:
         sim = self.sims.get(apartment_id)
         if sim is None:
+            tz = self.timezones.get(apartment_id)
             sim = self.sims[apartment_id] = ApartmentEngine(
                 apartment_id, model=self.model_for(apartment_id) if self.model_for else None,
-                variant=self.variants.get(apartment_id))
+                variant=self.variants.get(apartment_id), settings={"TIMEZONE": tz} if tz else None)
+        elif apartment_id in self.timezones:
+            sim.timezone = self.timezones[apartment_id]
         sim.ensure_started()
         return sim

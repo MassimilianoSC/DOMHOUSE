@@ -178,6 +178,8 @@ async def instance_headers(apt: Apartment, actor: str, correlation_id: str | Non
     }
     if is_mock(apt.instance_url) and (variant := demo_variant(apt.instance_url)) in DEMO_VARIANTS:
         headers["X-Demo-Variant"] = variant      # P-72: internal, only towards the built-in demonstration engine
+    if is_mock(apt.instance_url):
+        headers["X-Demo-Timezone"] = apt.timezone   # D-177: the built-in engine has no VM: its TIMEZONE is the copy
     return headers
 
 
@@ -307,6 +309,45 @@ async def _safe_json(coro):
         return None, {"error": type(exc).__name__}
 
 
+_tz_locks: dict[str, asyncio.Lock] = {}
+
+
+def _valid_timezone(name) -> bool:
+    from zoneinfo import ZoneInfo
+    if not isinstance(name, str) or not name or name.startswith("/") or ".." in name:
+        return False
+    try:
+        ZoneInfo(name)
+    except (ValueError, KeyError, OSError):
+        return False
+    return True
+
+
+async def sync_timezone(apt: Apartment, engine_apartment) -> None:
+    """D-177 (D-183 points 126-127): the apartment's time zone is the engine's (TIMEZONE, in /apartment.timezone); the
+    registry keeps a copy only as the fallback for when the engine does not answer. A different, valid one is saved
+    (apt too, for the caller) and written to the organisation's log by the system: timezone_changed {from, to}."""
+    tz = engine_apartment.get("timezone") if isinstance(engine_apartment, dict) else None
+    if tz == apt.timezone or not _valid_timezone(tz):
+        return
+    from . import audit
+    from .logs import info
+
+    lock = _tz_locks.setdefault(apt.apartment_id, asyncio.Lock())
+    async with lock:                         # two cards read at once: one save, one entry
+        repo = get_repository()
+        stored = await repo.get_apartment(apt.apartment_id)
+        apt.timezone = tz
+        if stored is None or stored.timezone == tz:
+            return
+        before = stored.timezone
+        stored.timezone = tz
+        await repo.upsert_apartment(stored)
+        info("apartment timezone from the engine", apartment_id=apt.apartment_id, **{"from": before, "to": tz})
+        await audit.record("timezone_changed", audit.SYSTEM, stored.tenant_id,
+                           audit.apartment_target(stored.apartment_id, stored.name), **{"from": before, "to": tz})
+
+
 async def summary(apt: Apartment, actor: str, tz_midnight_utc: str | None = None, timeout: float = 3.0) -> dict:
     """Aggregated card data; offline instances are reported, never fatal."""
     tenant = await get_repository().get_tenant(apt.tenant_id)
@@ -362,6 +403,8 @@ async def summary(apt: Apartment, actor: str, tz_midnight_utc: str | None = None
             continue
         if key == "apartment":
             out["apartment"] = body
+            await sync_timezone(apt, body)       # D-177: the engine's time zone, the copy only as a fallback
+            out["timezone"] = apt.timezone
         elif key == "approvals":
             out["pending_approvals"] = len(body.get("items", []))
         elif key == "energy":

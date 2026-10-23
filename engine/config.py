@@ -13,6 +13,8 @@
 The settings of the rules (D-131, D-133), optional, per apartment (on the VM in <apartment_id>.settings.env, written by
 engine-vm.sh set/unset): SETTINGS below, name -> (default, lowest, highest). A value that is not a number or is out of
 its range stops the engine at start, as a missing key does. The thresholds the app can change stay in /rules.
+TIMEZONE (D-177, Europe/Rome by default): the apartment's time zone, an IANA name; the engine declares it in
+/apartment.timezone and the BFF reads it from there; a name that is not a time zone stops the engine at start.
 
 With CONNECTOR=simulated also: MOCK_TIME_SCALE (real seconds per simulated minute: 60 = real time, the default here)
 and DOMOTICA_TEST_CONNECTOR_DOWN=1 (the connector reported down: conformance scenario C14). A connector receives a
@@ -67,13 +69,30 @@ CHOICES: dict[str, tuple[str, tuple[str, ...]]] = {
     # «multiple» (only two or more actions together, guests or not). No «never», on purpose
     "ASSISTANT_CONFIRM": ("ospiti", ("ospiti", "sempre", "multiple")),
 }
-DEFAULT_SETTINGS: dict[str, float | str] = {name: spec[0] for name, spec in (SETTINGS | CHOICES).items()}
+# settings that are a name, kept as written (not lowercased), name -> default
+TEXT_SETTINGS: dict[str, str] = {
+    # D-177: the apartment's time zone (IANA name); the one source of it, read by the BFF from /apartment
+    "TIMEZONE": "Europe/Rome",
+}
+DEFAULT_SETTINGS: dict[str, float | str] = {name: spec[0] for name, spec in (SETTINGS | CHOICES).items()} | TEXT_SETTINGS
 ENGINE_VARIABLES = {"APARTMENT_ID", "API_KEY", "CONNECTOR", "HOST", "PORT", "DATA_DIR", "CATALOG_PATH",
-                    "MOCK_TIME_SCALE", "MOCK_PING_S", "MODEL_BASE_URL", *SETTINGS, *CHOICES}
+                    "MOCK_TIME_SCALE", "MOCK_PING_S", "MODEL_BASE_URL", *SETTINGS, *CHOICES, *TEXT_SETTINGS}
 APARTMENT_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 CONNECTOR_RE = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
 MIN_KEY_LENGTH = 16
 DEFAULT_DATA_ROOT = "/data"      # DATA_DIR is <this>/<apartment_id> when not set; the tests point it elsewhere
+
+
+def valid_timezone(name: str) -> bool:
+    """An IANA time zone the system knows (Europe/Rome), never a path or an empty name."""
+    from zoneinfo import ZoneInfo
+    if not name or name.startswith("/") or ".." in name:
+        return False
+    try:
+        ZoneInfo(name)
+    except (ValueError, KeyError, OSError):
+        return False
+    return True
 
 
 class ConfigError(Exception):
@@ -162,6 +181,10 @@ def load_config(env: Mapping[str, str] | None = None) -> EngineConfig:
         if value not in allowed:
             problems.append(f"{name} must be one of: {', '.join(allowed)}")
         settings[name] = value
+    timezone = env.get("TIMEZONE", "").strip() or TEXT_SETTINGS["TIMEZONE"]
+    if not valid_timezone(timezone):
+        problems.append("TIMEZONE must be a time zone name, e.g. Europe/Rome")
+    settings["TIMEZONE"] = timezone
     model_base_url = env.get("MODEL_BASE_URL", "").strip() or None
     if model_base_url and not model_base_url.startswith(("https://", "http://")):
         problems.append("MODEL_BASE_URL must be the BFF's address, https://...")

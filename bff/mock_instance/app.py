@@ -3,6 +3,7 @@ connectors, any apartment at /{apartment_id}/api/v1. The code is the engine's (e
 import os
 
 from engine.api import create_contract_app
+from engine.config import valid_timezone
 from engine.connector.simulated import VARIANTS
 from engine.core import ALL_FEATURES, Registry
 
@@ -24,9 +25,13 @@ def create_mock_app(api_key: str, features: list[str] | None = None, ping_second
         """P-72 (D-154): the BFF sends the variant written in the apartment's link (mock://builtin?variante=…) as
         X-Demo-Variant; the registry keeps it for when the apartment's engine is built (first call, «Ripristina»)."""
         value = request.headers.get("X-Demo-Variant")
+        tz = request.headers.get("X-Demo-Timezone", "")
         parts = request.url.path.split("/")
-        if value in VARIANTS and "api" in parts:
+        if "api" in parts:
             apartment_id = parts[parts.index("api") - 1]
-            registry.variants[apartment_id] = value
+            if value in VARIANTS:
+                registry.variants[apartment_id] = value
+            if valid_timezone(tz):           # D-177: the demonstration's TIMEZONE is the registry's copy
+                registry.timezones[apartment_id] = tz
         return await call_next(request)
     return app

@@ -80,3 +80,31 @@ def test_a_restart_runs_or_misses_by_the_apartments_minutes(tmp_path):
                                   settings={"MISSED_AFTER_MINUTES": 60})
     assert second.schedule[item["schedule_id"]]["status"] == "planned"      # 45 minutes late: within 60, runs
     second.store.close()
+
+
+# ---- D-177: TIMEZONE -------------------------------------------------------------------------------------------------
+def test_timezone_a_setting_of_the_engine_checked_at_start_and_declared_in_apartment():
+    assert load_config(BASE).settings["TIMEZONE"] == "Europe/Rome"                    # the default
+    config = load_config({**BASE, "TIMEZONE": "Europe/London"})
+    assert config.settings["TIMEZONE"] == "Europe/London"                             # kept as written
+    assert "TIMEZONE" not in config.for_connector().env                               # never to the connector
+    for bad in ("Fake/Zone", "europe/nowhere", "../etc/passwd"):
+        with pytest.raises(ConfigError, match="TIMEZONE must be a time zone name"):
+            load_config({**BASE, "TIMEZONE": bad})
+    e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False, settings={"TIMEZONE": "Europe/London"})
+    assert e.apartment()["timezone"] == "Europe/London" and e.timezone == "Europe/London"
+
+
+def test_timezone_of_a_demonstration_from_the_bff_header():
+    from starlette.testclient import TestClient
+
+    from bff.mock_instance.app import create_mock_app
+    app = create_mock_app("k" * 16)
+    with TestClient(app) as client:
+        h = {"X-API-Key": "k" * 16, "X-Actor": "system:prova", "X-Correlation-Id": "2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10"}
+        r = client.get("/apt-prova-01/api/v1/apartment", headers={**h, "X-Demo-Timezone": "Europe/Lisbon"})
+        assert r.status_code == 200 and r.json()["timezone"] == "Europe/Lisbon"
+        r = client.get("/apt-prova-01/api/v1/apartment", headers={**h, "X-Demo-Timezone": "Fake/Zone"})
+        assert r.json()["timezone"] == "Europe/Lisbon"                                 # not a time zone: ignored
+        r = client.get("/apt-prova-01/api/v1/apartment", headers={**h, "X-Demo-Timezone": "Europe/Madrid"})
+        assert r.json()["timezone"] == "Europe/Madrid"                                 # an engine already built too

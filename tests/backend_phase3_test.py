@@ -134,8 +134,9 @@ class TestAdminApartments:
         r = plat("POST", PLAT_APTS, json={"apartment_id": "apt-bad-tz", "name": "Bad TZ",
                                           "instance_url": "mock://builtin", "timezone": "Fake/Zone"})
         assert r.status_code == 422
+        # D-177: the admin's PATCH accepts timezone and ignores it (the engine's TIMEZONE is the one source)
         r = requests.patch(f"{API}/app/admin/apartments/{self.APT_ID}", headers=hdr(ADMIN), json={"timezone": "Fake/Zone"})
-        assert r.status_code == 422 and r.json()["error"] == "invalid_timezone"
+        assert r.status_code == 200 and r.json()["timezone"] == "Europe/Rome"
 
     def test_patch_apartment(self):
         r = requests.patch(f"{API}/app/admin/apartments/{self.APT_ID}", headers=hdr(ADMIN), json={"name": "Renamed"})

@@ -55,7 +55,7 @@ per utente»).
 | 17 | `DELETE /app/admin/users/{uid}` | `delete_user` | ADMIN | 204; 409 `last_admin` come #16, atomico; l'account Firebase di un utente verificato o di un gestore non viene mai eliminato, solo sessioni revocate (F5) | `adminApi.deleteUser` | – |
 | 18 | `GET /app/admin/apartments` | `list_apartments` (`routes/admin.py`) → `apt_out` | ADMIN | `[Apartment + italianway_id]`, senza `instance_secret_name` (D-60) né `tenant_id`, `created_at`, `external_ids` (D-90); `last_check` = `{ok, checked_at, error}` o null, esito dell'ultima «Verifica connessione» (D-64); se l'errore riguarda la chiave dell'istanza `error` è «Chiave dell'istanza non configurata: contatta l'assistenza HQE» (D-90: il nome del segreto lo vede solo la piattaforma); `simulated` in sola lettura (D-97) | `adminApi.apartments` (`AdminApartments`, `AdminFeatures`) | `apartment_id`, `name`, `address`, `timezone`, `instance_url`, `port`, `enabled`, `italianway_id`, `enabled_features` |
 | 19 | `POST /app/admin/apartments` | `create_apartment` | ADMIN | sempre 403 `platform_only`, in ogni modalità (D-64, D-77: gli appartamenti li crea solo la piattaforma, anche in staging); il corpo non viene letto | `adminApi.createApartment` | – |
-| 20 | `PATCH /app/admin/apartments/{id}` | `patch_apartment` | ADMIN | `apt_out`; 403 `platform_only` se `instance_url` o `port` sono DIVERSI da quelli salvati, in ogni modalità (D-77; il form che li rimanda uguali funziona, e quei valori si ignorano); 403 `platform_only` se `italianway_id` è diverso da quello salvato, anche `null` o `""` (D-72: il valore uguale rimandato dal form si ignora; l'admin lo legge soltanto); 422 `invalid_timezone`, `invalid_feature`, `secret_name_not_allowed`; nome, indirizzo, fuso, `enabled` e funzioni restano all'admin; P-52: `energy_price_eur_kwh` (prezzo dell'appartamento, null = quello dell'organizzazione; 0–10 €/kWh, al massimo 4 decimali, altrimenti 422 `invalid_price`; nel registro `energy_price_changed`) | `adminApi.patchApartment` | – |
+| 20 | `PATCH /app/admin/apartments/{id}` | `patch_apartment` | ADMIN | `apt_out`; 403 `platform_only` se `instance_url` o `port` sono DIVERSI da quelli salvati, in ogni modalità (D-77; il form che li rimanda uguali funziona, e quei valori si ignorano); 403 `platform_only` se `italianway_id` è diverso da quello salvato, anche `null` o `""` (D-72: il valore uguale rimandato dal form si ignora; l'admin lo legge soltanto); 422 `invalid_feature`, `secret_name_not_allowed`; nome, indirizzo, `enabled` e funzioni restano all'admin; D-177: `timezone` si accetta e si ignora (il fuso è l'impostazione `TIMEZONE` del motore); P-52: `energy_price_eur_kwh` (prezzo dell'appartamento, null = quello dell'organizzazione; 0–10 €/kWh, al massimo 4 decimali, altrimenti 422 `invalid_price`; nel registro `energy_price_changed`) | `adminApi.patchApartment` | – |
 | 21 | `DELETE /app/admin/apartments/{id}` | `delete_apartment` | ADMIN | sempre 403 `platform_only`, in ogni modalità e prima di cercare l'appartamento: stessa risposta per un id proprio, inesistente o di un'altra organizzazione (D-65, D-77) | `adminApi.deleteApartment` | – |
 | 22 | `POST /app/admin/apartments/{id}/verify` | `verify_apartment` | ADMIN | `{apartment_id, reachable, health, version, error, contract_version, features, ok}`; `error` è un testo per l'utente (vedi «URL istanza»); salva `last_check` (`instances.verify`, la stessa della piattaforma); resta all'admin anche in real; segreto mancante o non leggibile in real → `error` «Chiave dell'istanza non trovata in Secret Manager: crea il segreto langbrain-api-key-<id>» / «…non leggibile dal server: manca il permesso su …» (D-67); D-90: all'admin, al posto dei due messaggi sul segreto, «Chiave dell'istanza non configurata: contatta l'assistenza HQE»; il dettaglio resta nella verifica e nel `last_check` della piattaforma | `adminApi.verify` | `ok`, `error`, `health`, `version`, `contract_version`, `features` |
 | 23 | `GET /app/admin/webhook-logs` | `webhook_logs` | ADMIN | `[WebhookLog]` (ultime 100); SOLO le chiamate attribuite alla propria organizzazione: quelle senza organizzazione (firma errata, codice sconosciuto o ambiguo) le vede solo la piattaforma (P-36 S1); le ultime 100 PER organizzazione; D-90: dati degli ospiti mai conservati, vedi «Messaggi di Italianway» | `adminApi.webhookLogs` (`AdminWebhookLogs`) | tutti tranne `source` e `tenant_id` |
@@ -145,7 +145,7 @@ dell'azione; email risolta per `user` e `manager`.
 | `role_changed` | #16 | `user` | `{from, to}` |
 | `scope_changed` | #16 | `user` | `{to: "all" \| [id]}` |
 | `user_removed` | #17 (anche invito revocato) | `user` | `{}` |
-| `apartment_updated` | #20, solo campi davvero cambiati | `apartment` | `{fields: [name, address, timezone, enabled]}` |
+| `apartment_updated` | #20, solo campi davvero cambiati | `apartment` | `{fields: [name, address, enabled]}` |
 | `features_changed` | #20, #25 | `apartment` \| `tenant` | `{to: [funzione] \| null}` |
 | `apartment_created`, `apartment_relinked`, `apartment_deleted` | piattaforma | `apartment` | `{}` |
 | `italianway_changed` | piattaforma (anche alla creazione con codice) | `apartment` | `{from, to}` |
@@ -157,6 +157,7 @@ dell'azione; email risolta per `user` e `manager`.
 | `energy_price_changed` | #20, #25 (P-52) | `apartment` \| `tenant` | `{from, to}` (€/kWh o null) |
 | `apartment_simulated_changed` | piattaforma, anche quando ricollega l'appartamento (D-97) | `apartment` | `{from, to}` |
 | `simulator_reset` | #35 | `apartment` | `{}` |
+| `timezone_changed` | D-177: il fuso dichiarato dal motore (`/apartment.timezone`) è diverso dalla copia in anagrafica; attore `system` | `apartment` | `{from, to}` (es. `{from: "Europe/Rome", to: "Europe/London"}`) |
 | `rules_changed` | #39, #41 (una voce per appartamento di destinazione) | `apartment` | `{source: "assistant", changes: [{rule_id, label, field, old, new}]}`; dalla copia `{source: "copy", from_apartment: {id, name}, changes: […]}` |
 
 | `tenant_suspended`, `tenant_reactivated` | piattaforma | `tenant` | `{reason}` / `{}` |
@@ -292,6 +293,14 @@ l'avvio del BFF e dopo il Ripristino (#35). Per cambiare variante a un dimostrat
 e premere «Ripristina». Senza variante vale la regola di prima: vuoto se l'identificativo dell'appartamento contiene
 «bologna», occupato altrimenti. Su un motore della VM con `CONNECTOR=simulated` la stessa scelta è l'impostazione
 `DEMO_VARIANT` (`auto`, `vuoto`, `occupato`; `auto` è la regola di prima), letta al primo avvio dell'appartamento.
+
+Fuso orario (D-177, D-183 punti 126-127): una sola fonte, il motore. Sulla VM è l'impostazione `TIMEZONE` (predefinito
+`Europe/Rome`, un nome di fuso; un nome che non è un fuso ferma il motore all'avvio), dichiarata in `/apartment.timezone`.
+Il BFF la legge a ogni lettura delle schede (#7, #8): se è diversa dalla copia in anagrafica salva la copia e scrive nel
+registro dell'organizzazione `timezone_changed` `{from, to}` con attore il sistema; ogni calcolo del BFF (mezzanotte
+dei consumi, riepiloghi, PDF) usa la copia, che resta il ripiego quando il motore non risponde. Il campo dell'anagrafica
+lo scrive la piattaforma solo alla creazione, come valore iniziale. Il motore simulato integrato non ha una VM: il BFF
+gli manda la copia con l'intestazione interna `X-Demo-Timezone` (mai verso un motore vero).
 
 ## Rendiconto dei consumi (P-52, D-92)
 

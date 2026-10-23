@@ -183,7 +183,7 @@ async def delete_user(uid: str, user: CurrentUser = Depends(require_admin)):
 class ApartmentPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
     address: str | None = None
-    timezone: str | None = None
+    timezone: str | None = None        # D-177: accepted and ignored (the engine's TIMEZONE is the one source)
     instance_url: str | None = None
     instance_secret_name: str | None = None
     port: int | None = Field(default=None, ge=1, le=65535)
@@ -255,8 +255,6 @@ async def patch_apartment(apartment_id: str, body: ApartmentPatch, user: Current
     apt = await repo.get_apartment(apartment_id)
     if not apt or apt.tenant_id != user.tenant_id:
         return err(404, "not_found", "Appartamento inesistente")
-    if body.timezone is not None and not _check_tz(body.timezone):
-        return err(422, "invalid_timezone", "Fuso orario non valido")
     if not _check_features(body.enabled_features):
         return err(422, "invalid_feature", "Funzione sconosciuta")
     if refused := _secret_name_refused(body.instance_secret_name):
@@ -272,7 +270,7 @@ async def patch_apartment(apartment_id: str, body: ApartmentPatch, user: Current
         return refused  # D-72: only the platform changes the code; the same value resent by the form is ignored
     data = body.model_dump(exclude_unset=True, exclude={"italianway_id", "enabled_features", "clear_features",
                                                         "instance_secret_name", "instance_url", "port",
-                                                        "energy_price_eur_kwh"})
+                                                        "energy_price_eur_kwh", "timezone"})
     price_before = apt.energy_price_eur_kwh
     if "energy_price_eur_kwh" in body.model_fields_set:
         apt.energy_price_eur_kwh = body.energy_price_eur_kwh
