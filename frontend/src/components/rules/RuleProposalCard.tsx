@@ -61,12 +61,9 @@ export function RuleProposalCard({ aptId, hasManualChanges, onApplied, onRulesCh
 
   return (
     <Card className="space-y-4 p-5" data-testid="rule-proposal">
-      <div className="flex items-start gap-3">
-        <span className="rounded-xl bg-accent/15 p-2 text-accent"><Sparkles className="h-5 w-5" /></span>
-        <div>
-          <h2 className="text-base font-semibold">{t("rules.proposal.title")}</h2>
-          <p className="text-sm text-muted-foreground">{t("rules.proposal.hint")}</p>
-        </div>
+      <div>
+        <h2 className="text-base font-semibold">{t("rules.proposal.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("rules.proposal.hint")}</p>
       </div>
       <div className="space-y-1">
         <textarea

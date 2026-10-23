@@ -154,7 +154,21 @@ export default function RulesPage() {
     <div className="mx-auto max-w-6xl space-y-8 pb-24">
       <PageHeader title={t("rules.title")} subtitle={t("rules.subtitle")} testId="rules-header" />
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="rules-error" />}
-      {/* D-151: the assistant proposes, the manager applies; whoever only reads does not see it */}
+      {q.data && <p className="text-xs text-muted-foreground" data-testid="rules-updated-at">{t("rules.updatedAt", { when: fmtDateTime(q.data.updated_at) })}</p>}
+      {q.isLoading ? (
+        <div className="space-y-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}</div>
+      ) : (
+        // one column up to 1024 px; above, two columns that fill top to bottom, so cards of different heights leave no
+        // ragged rows (design lot 2)
+        <div className="flex flex-col gap-4 lg:block lg:columns-2 lg:gap-4 [&>*]:break-inside-avoid lg:[&>*]:mb-4">
+          {rules.map((r) => (
+            <RuleCard key={r.rule_id} rule={r} draft={draft[r.rule_id]} canWrite={canWrite} onChange={(d) => setDraft((s) => ({ ...s, [r.rule_id]: d }))} />
+          ))}
+        </div>
+      )}
+      {rangeError && <p className="text-sm font-medium text-destructive" data-testid="rules-range-error">{rangeError}</p>}
+      {saveError ? <ErrorNotice error={saveError} testId="rules-save-error" /> : null}
+      {/* D-151: the assistant proposes (after the rules, design lot 2), the manager applies; whoever only reads does not see it */}
       {canWrite && q.data && (
         <RuleProposalCard
           aptId={aptId}
@@ -163,26 +177,17 @@ export default function RulesPage() {
           onRulesChanged={() => void q.refetch()}
         />
       )}
-      {q.data && <p className="text-xs text-muted-foreground" data-testid="rules-updated-at">{t("rules.updatedAt", { when: fmtDateTime(q.data.updated_at) })}</p>}
-      {q.isLoading ? (
-        <div className="grid gap-4 md:grid-cols-2">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}</div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2">
-          {rules.map((r) => (
-            <RuleCard key={r.rule_id} rule={r} draft={draft[r.rule_id]} canWrite={canWrite} onChange={(d) => setDraft((s) => ({ ...s, [r.rule_id]: d }))} />
-          ))}
-        </div>
-      )}
-      {rangeError && <p className="text-sm font-medium text-destructive" data-testid="rules-range-error">{rangeError}</p>}
-      {saveError ? <ErrorNotice error={saveError} testId="rules-save-error" /> : null}
       {/* D-151 point 6: the same rules on other apartments of the organization, admins only */}
       {isAdmin && canWrite && q.data && <CopyRulesCard aptId={aptId} hasManualChanges={patches.length > 0} />}
       {patches.length > 0 && (
-        <div className="fixed inset-x-0 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-30 mx-auto flex w-[calc(100%-2rem)] max-w-3xl flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-lg md:bottom-6" data-testid="rules-save-bar">
-          <span className="text-sm font-semibold">{t("rules.dirty", { count: patches.length })}</span>
-          <div className="flex gap-2">
-            <Button variant="ghost" onClick={() => { setDraft({}); setSaveError(null); }} disabled={saving} data-testid="rules-discard-btn">{t("rules.discard")}</Button>
-            <Button onClick={save} disabled={saving || hasErrors || Boolean(rangeError)} data-testid="rules-save-btn">{t("rules.save")}</Button>
+        // a full bar along the bottom edge, solid with a 1 px top border and a light shadow (design lot 2)
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-card px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 lg:px-10 shadow-[0_-4px_12px_hsl(var(--foreground)/0.06)] md:left-64" data-testid="rules-save-bar">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
+            <span className="text-sm font-semibold">{patches.length === 1 ? t("rules.dirtyOne") : t("rules.dirty", { count: patches.length })}</span>
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => { setDraft({}); setSaveError(null); }} disabled={saving} data-testid="rules-discard-btn">{t("rules.discard")}</Button>
+              <Button onClick={save} disabled={saving || hasErrors || Boolean(rangeError)} data-testid="rules-save-btn">{t("rules.save")}</Button>
+            </div>
           </div>
         </div>
       )}

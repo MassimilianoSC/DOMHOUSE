@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AlertTriangle, Copy } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { ApiError } from "@/api/bff";
 import { ruleCopyApi, type CopyPreview, type CopyResult, type CopyTarget, type Customized } from "@/api/ruleCopy";
 import type { RuleChange } from "@/api/ruleProposals";
@@ -110,12 +110,9 @@ export function CopyRulesCard({ aptId, hasManualChanges }: { aptId: string; hasM
 
   return (
     <Card className="space-y-4 p-5" data-testid="rules-copy">
-      <div className="flex items-start gap-3">
-        <span className="rounded-xl bg-accent/15 p-2 text-accent"><Copy className="h-5 w-5" /></span>
-        <div>
-          <h2 className="text-base font-semibold">{t("rules.copy.title")}</h2>
-          <p className="text-sm text-muted-foreground">{t("rules.copy.hint")}</p>
-        </div>
+      <div>
+        <h2 className="text-base font-semibold">{t("rules.copy.title")}</h2>
+        <p className="text-sm text-muted-foreground">{t("rules.copy.hint")}</p>
       </div>
 
       {!preview && !results && (

@@ -92,6 +92,7 @@
     "ecoAboveComfort": "La temperatura eco non può superare quella comfort",
     "coolNotAboveComfort": "La temperatura di raffrescamento deve essere più alta di quella comfort",
     "dirty": "{count} regole modificate",
+    "dirtyOne": "1 regola modificata",
     "save": "Salva le modifiche",
     "discard": "Annulla le modifiche",
     "saved": "Regole aggiornate",
@@ -349,6 +350,8 @@
     "command": "Comando",
     "schedule": "Programmazione",
     "rulesChanged": "Regole modificate",
+    "commandSent": "Comando inviato",
+    "scheduleCreated": "Azione programmata",
     "confirm": {
       "yes": "Sì",
       "no": "No",
