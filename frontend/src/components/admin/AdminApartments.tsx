@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlugZap } from "lucide-react";
+import { ChevronDown, ChevronUp, PlugZap } from "lucide-react";
 import { adminApi, type AdminApartment, type VerifyResult } from "@/api/admin";
 import { useRole } from "@/auth/AuthProvider";
 import { featureName } from "@/components/admin/AdminFeatures";
@@ -107,10 +107,70 @@ function PriceCard({ current }: { current: number | null }) {
           <Label htmlFor="org-price">{t("admin.price.label")}</Label>
           <Input id="org-price" inputMode="decimal" className="w-40" value={value} placeholder={t("admin.price.placeholder")} onChange={(e) => setText(e.target.value)} data-testid="admin-price-input" />
         </div>
-        <Button onClick={() => void save()} disabled={saving || parsed === undefined || parsed === current} data-testid="admin-price-save">{t("admin.price.save")}</Button>
+        <Button variant="outline" onClick={() => void save()} disabled={saving || parsed === undefined || parsed === current} data-testid="admin-price-save">{t("admin.price.save")}</Button>
       </div>
       {parsed === undefined && <p className="text-xs text-destructive" data-testid="admin-price-invalid">{t("admin.price.invalid")}</p>}
     </Card>
+  );
+}
+
+/**
+ * One apartment as a row (design lot 2): name, address, state, price and «Ultima verifica» in words, with the check;
+ * the code, the time zone, the link to the home system, the Italianway code and the functions behind «Dettagli tecnici».
+ */
+function ApartmentRow({ a, orgPrice, verify, onVerify, onToggle, onEdit }: { a: AdminApartment; orgPrice: number | null; verify: VerifyResult | "loading" | undefined; onVerify: () => void; onToggle: (v: boolean) => void; onEdit: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="space-y-3 px-5 py-4" data-testid={`admin-apartment-${a.apartment_id}`} data-enabled={a.enabled}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-56 space-y-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="text-base font-semibold [overflow-wrap:anywhere]">{a.name}</h3>
+            {a.simulated && <DemoBadge testId={`admin-apartment-demo-${a.apartment_id}`} />}
+            {!a.enabled && <Badge className="border-neutral-border bg-neutral-bg text-neutral-fg">{t("admin.apartments.disabled")}</Badge>}
+          </div>
+          <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{a.address || "—"}</p>
+          <p className="text-xs text-muted-foreground" data-testid={`admin-apartment-price-${a.apartment_id}`}>
+            {a.energy_price_eur_kwh != null ? t("admin.price.lineApt", { price: priceText(a.energy_price_eur_kwh) }) : t("admin.price.lineOrg", { price: priceText(orgPrice) })}
+          </p>
+          <p className="text-xs text-muted-foreground">{t("admin.apartments.lastCheck")}: <LastCheck check={a.last_check} testId={`admin-apartment-check-${a.apartment_id}`} /></p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Switch checked={a.enabled} aria-label={t("admin.apartments.enabled")} onCheckedChange={onToggle} data-testid={`admin-apartment-enabled-${a.apartment_id}`} />
+          <Button variant="outline" size="sm" onClick={onEdit} data-testid={`admin-apartment-edit-${a.apartment_id}`}>{t("common.edit")}</Button>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <Button size="sm" variant="outline" onClick={onVerify} disabled={verify === "loading"} data-testid={`admin-verify-btn-${a.apartment_id}`}>
+          <PlugZap /> {verify === "loading" ? t("common.loading") : t("admin.apartments.verify")}
+        </Button>
+        {verify && verify !== "loading" && <VerifyBadge r={verify} />}
+        <span className="text-xs text-muted-foreground" data-testid={`admin-verify-help-${a.apartment_id}`}>{t("admin.apartments.verifyHelp")}</span>
+        <button
+          type="button"
+          className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground focus-ring [&_svg]:size-3.5"
+          aria-expanded={open}
+          onClick={() => setOpen((o) => !o)}
+          data-testid={`admin-apartment-details-toggle-${a.apartment_id}`}
+        >
+          {open ? <ChevronUp aria-hidden /> : <ChevronDown aria-hidden />} {t("instance.details")}
+        </button>
+      </div>
+      {open && (
+        <dl className="grid gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-[auto_1fr]" data-testid={`admin-apartment-details-${a.apartment_id}`}>
+          <dt className="font-medium">{t("admin.apartments.code")}</dt>
+          <dd><CopyableId id={a.apartment_id} testId={`admin-apartment-id-${a.apartment_id}`} /></dd>
+          <dt className="font-medium">{t("admin.apartments.timezone")}</dt>
+          <dd>{a.timezone}</dd>
+          <dt className="font-medium">{t("admin.apartments.connection")}</dt>
+          <dd className="tabular [overflow-wrap:anywhere]">{a.instance_url}{a.port ? `:${a.port}` : ""}</dd>
+          <dt className="font-medium">{t("admin.apartments.italianway")}</dt>
+          <dd className="tabular">{a.italianway_id || "—"}</dd>
+          <dt className="font-medium">{t("admin.features.scope")}</dt>
+          <dd>{a.enabled_features === null ? t("admin.features.inherit") : a.enabled_features.map(featureName).join(", ") || t("admin.features.none")}</dd>
+        </dl>
+      )}
+    </div>
   );
 }
 
@@ -150,41 +210,13 @@ export function AdminApartments() {
       {!isPlatform && <p className="text-sm text-muted-foreground" data-testid="admin-apartments-note">{t("admin.apartments.createdByPlatform")}</p>}
       {tenant.data && <PriceCard current={orgPrice} />}
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="admin-apartments-error" />}
-      {q.isLoading ? <Skeleton className="h-48 rounded-2xl" /> : q.data?.map((a) => {
-        const v = verify[a.apartment_id];
-        return (
-          <Card key={a.apartment_id} className="space-y-3 p-5" data-testid={`admin-apartment-${a.apartment_id}`} data-enabled={a.enabled}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-semibold">{a.name}</h3>
-                  <CopyableId id={a.apartment_id} testId={`admin-apartment-id-${a.apartment_id}`} />
-                  {a.simulated && <DemoBadge testId={`admin-apartment-demo-${a.apartment_id}`} />}
-                  {!a.enabled && <Badge className="border-neutral-border bg-neutral-bg text-neutral-fg">{t("admin.apartments.disabled")}</Badge>}
-                </div>
-                <p className="text-sm text-muted-foreground">{a.address || "—"} · {a.timezone}</p>
-                <p className="tabular text-xs text-muted-foreground">{a.instance_url}{a.port ? `:${a.port}` : ""}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</p>
-                <p className="text-xs text-muted-foreground">{t("admin.apartments.lastCheck")}: <LastCheck check={a.last_check} testId={`admin-apartment-check-${a.apartment_id}`} /></p>
-                <p className="text-xs text-muted-foreground" data-testid={`admin-apartment-price-${a.apartment_id}`}>
-                  {a.energy_price_eur_kwh != null ? t("admin.price.lineApt", { price: priceText(a.energy_price_eur_kwh) }) : t("admin.price.lineOrg", { price: priceText(orgPrice) })}
-                </p>
-                <p className="text-xs text-muted-foreground">{t("admin.features.scope")}: {a.enabled_features === null ? t("admin.features.inherit") : a.enabled_features.map(featureName).join(", ") || t("admin.features.none")}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch checked={a.enabled} aria-label={t("admin.apartments.enabled")} onCheckedChange={(v) => toggle(a, v)} data-testid={`admin-apartment-enabled-${a.apartment_id}`} />
-                <Button variant="outline" size="sm" onClick={() => setEditing(a)} data-testid={`admin-apartment-edit-${a.apartment_id}`}>{t("common.edit")}</Button>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-3 border-t pt-3">
-              <Button size="sm" variant="secondary" onClick={() => check(a.apartment_id)} disabled={v === "loading"} data-testid={`admin-verify-btn-${a.apartment_id}`}>
-                <PlugZap /> {v === "loading" ? t("common.loading") : t("admin.apartments.verify")}
-              </Button>
-              {v && v !== "loading" && <VerifyBadge r={v} />}
-              <span className="text-xs text-muted-foreground" data-testid={`admin-verify-help-${a.apartment_id}`}>{t("admin.apartments.verifyHelp")}</span>
-            </div>
-          </Card>
-        );
-      })}
+      {q.isLoading ? <Skeleton className="h-48 rounded-2xl" /> : q.data && q.data.length > 0 && (
+        <Card className="divide-y p-0" data-testid="admin-apartments-list">
+          {q.data.map((a) => (
+            <ApartmentRow key={a.apartment_id} a={a} orgPrice={orgPrice} verify={verify[a.apartment_id]} onVerify={() => void check(a.apartment_id)} onToggle={(v) => void toggle(a, v)} onEdit={() => setEditing(a)} />
+          ))}
+        </Card>
+      )}
       {editing && <ApartmentDialog key={editing.apartment_id} apt={editing} orgPrice={orgPrice} onClose={() => setEditing(null)} onSaved={refresh} />}
     </div>
   );

@@ -816,6 +816,7 @@
       "instanceUrlHintMock": "In questo ambiente usa mock://builtin",
       "port": "Porta",
       "italianway": "ID Italianway",
+      "code": "Codice",
       "enabled": "Attivo",
       "disabled": "disattivato",
       "verify": "Verifica connessione",

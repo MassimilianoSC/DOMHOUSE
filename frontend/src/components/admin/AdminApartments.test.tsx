@@ -82,6 +82,19 @@ describe.each(["mock", "real"])("Amministrazione > Appartamenti, ambiente %s: li
     expect(screen.getByTestId("admin-verify-help-apt-001")).toHaveTextContent(t("admin.apartments.verifyHelp"));
   });
 
+  it("riga (design, lotto 2): collegamento, codice Italianway e funzioni solo dietro «Dettagli tecnici»", async () => {
+    renderAdmin();
+    const row = await screen.findByTestId("admin-apartment-apt-001");
+    expect(row).not.toHaveTextContent("10.198.0.2");
+    expect(screen.queryByTestId("admin-apartment-id-apt-001")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("admin-apartment-details-toggle-apt-001"));
+    const details = screen.getByTestId("admin-apartment-details-apt-001");
+    expect(details).toHaveTextContent("10.198.0.2");
+    expect(details).toHaveTextContent("IW-7");
+    expect(details).toHaveTextContent("Europe/Rome");
+    expect(screen.getByTestId("admin-apartment-id-apt-001")).toBeInTheDocument();
+  });
+
   it("modifica: collegamento e codice Italianway in sola lettura con la nota; si salvano solo nome, indirizzo, fuso e attivo", async () => {
     const dialog = await openEdit();
     expect(screen.queryByTestId("apt-form-apartment_id")).not.toBeInTheDocument();
