@@ -12,7 +12,7 @@ function Reading({ icon, label, value, sub, testId, tone }: { icon: ReactNode; l
       <div className="min-w-0">
         <div className="text-[13px] font-medium text-muted-foreground">{label}</div>
         <div className={cn("text-sm font-bold tabular", tone === "warn" && "text-primary")}>{value}</div>
-        {sub && <div className="truncate text-xs text-muted-foreground">{sub}</div>}
+        {sub && <div className="text-xs text-muted-foreground [overflow-wrap:anywhere]">{sub}</div>}
       </div>
     </div>
   );
