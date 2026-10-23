@@ -136,8 +136,8 @@ export function AdminUsers() {
             const scope = u.role !== "admin" ? scopeSummary(u.apartment_ids, apartments) : null;
             return (
               // two lines (design lot 2): email and state, then name, devices and apartments in grey; role and «⋯» at the end
-              <div key={u.uid} className="flex items-start gap-3 py-3" data-testid={`admin-user-${u.uid}`}>
-                <div className="min-w-0 flex-1">
+              <div key={u.uid} className="flex flex-wrap items-start gap-x-3 gap-y-2 py-3" data-testid={`admin-user-${u.uid}`}>
+                <div className="min-w-0 flex-1 basis-56">
                   <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
                     <span className="[overflow-wrap:anywhere]" data-testid={`admin-user-email-${u.uid}`}>{u.email}</span>
                     {u.pending && <Badge className="border-warning-border bg-warning-bg text-warning-fg" data-testid={`admin-user-pending-${u.uid}`}>{t("admin.users.pending")}</Badge>}
@@ -153,28 +153,30 @@ export function AdminUsers() {
                     )}
                   </div>
                 </div>
-                <NativeSelect value={u.role} disabled={self} aria-label={t("settings.role")} onChange={(e) => changeRole(u, e.target.value as Role)} className="h-9 w-auto" data-testid={`admin-user-role-${u.uid}`}>
-                  {ROLES.map((r) => <option key={r} value={r}>{t(`roles.${r}`)}</option>)}
-                </NativeSelect>
-                {!self ? (
-                  <RowMenu label={t("admin.users.menu", { email: u.email })} testId={`admin-user-menu-${u.uid}`}>
-                    {u.role !== "admin" && (
-                      <RowMenuItem onSelect={() => setScopeUser(u)} testId={`admin-user-scope-btn-${u.uid}`}>
-                        <Building2 /> {t("admin.users.scopeEdit")}
+                <div className="ml-auto flex items-center gap-1">
+                  <NativeSelect value={u.role} disabled={self} aria-label={t("settings.role")} onChange={(e) => changeRole(u, e.target.value as Role)} className="h-9 w-auto" data-testid={`admin-user-role-${u.uid}`}>
+                    {ROLES.map((r) => <option key={r} value={r}>{t(`roles.${r}`)}</option>)}
+                  </NativeSelect>
+                  {!self ? (
+                    <RowMenu label={t("admin.users.menu", { email: u.email })} testId={`admin-user-menu-${u.uid}`}>
+                      {u.role !== "admin" && (
+                        <RowMenuItem onSelect={() => setScopeUser(u)} testId={`admin-user-scope-btn-${u.uid}`}>
+                          <Building2 /> {t("admin.users.scopeEdit")}
+                        </RowMenuItem>
+                      )}
+                      {u.pending && (
+                        <RowMenuItem disabled={resending === u.uid} onSelect={() => void resend(u)} testId={`admin-user-resend-${u.uid}`}>
+                          <Mail /> {t("admin.users.resend")}
+                        </RowMenuItem>
+                      )}
+                      <RowMenuItem danger onSelect={() => void remove(u)} testId={`admin-user-delete-${u.uid}`}>
+                        <Trash2 /> {t("common.delete")}
                       </RowMenuItem>
-                    )}
-                    {u.pending && (
-                      <RowMenuItem disabled={resending === u.uid} onSelect={() => void resend(u)} testId={`admin-user-resend-${u.uid}`}>
-                        <Mail /> {t("admin.users.resend")}
-                      </RowMenuItem>
-                    )}
-                    <RowMenuItem danger onSelect={() => void remove(u)} testId={`admin-user-delete-${u.uid}`}>
-                      <Trash2 /> {t("common.delete")}
-                    </RowMenuItem>
-                  </RowMenu>
-                ) : (
-                  <span className="w-9 shrink-0" aria-hidden />
-                )}
+                    </RowMenu>
+                  ) : (
+                    <span className="w-9 shrink-0" aria-hidden />
+                  )}
+                </div>
               </div>
             );
           })}
