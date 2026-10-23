@@ -598,6 +598,16 @@ Esempio di risposta di #38 a «la finestra aperta spegne dopo 10 minuti e la pre
   è una decisione `set_climate` dell'attore `system` («Climatizzatore soggiorno: 19 °C, sotto 21 °C: scalda»). Un comando
   di una persona su quel clima lo toglie alla regolazione fino al prossimo cambio di modalità. Niente regolazione durante
   una forzatura o con una finestra aperta.
+- Dal lotto 31 (D-174, D-183 punti 124-125) i limiti di `setpoint_limits` (`min`, `max`) valgono per il clima e per la
+  caldaia e l'interruttore ha effetto. Il motore tiene i limiti di ogni dispositivo dal catalogo, che restano il
+  confine in ogni caso. Interruttore acceso: `setpoint_min` e `setpoint_max` del dispositivo sono i limiti del gestore
+  dentro quelli del dispositivo (caldaia del catalogo 7–23 con i limiti 16–24: 16–23); spento: quelli del dispositivo.
+  Al cambio delle regole il motore manda subito `device.state` con i limiti nuovi e riporta dentro il setpoint. Un
+  comando manuale fuori è 422 `setpoint_out_of_range` come prima, uno automatico è riportato dentro con la nota nella
+  decisione; le temperature delle modalità sono riportate dentro i limiti. Se i limiti del gestore non si
+  sovrappongono a quelli del dispositivo valgono quelli del dispositivo, con una decisione `setpoint_limits_ignored`
+  (attore `rule:setpoint_limits`) per episodio. L'antigelo di «casa vuota» usa solo i limiti del dispositivo: la
+  caldaia può stare a 8 °C anche con `setpoint_min` 16.
 
 ## Copia delle regole (P-60 passo 12, D-151 punto 22)
 
