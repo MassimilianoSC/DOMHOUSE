@@ -318,6 +318,11 @@ Risultato atteso: le impostazioni in vigore, oppure «tutte ai valori predefinit
   di agire: `ospiti` = con ospiti presenti per spegnere clima o caldaia o cambiare modalità, e per due o più azioni
   insieme (D-154, D-162); `sempre` = per ogni azione, programmazioni escluse; `multiple` = solo per due o più azioni
   insieme, anche con ospiti. Non esiste «mai».
+- `TIMEZONE` (predefinito `Europe/Rome`; D-177, lotto 31): fuso orario dell'appartamento; il BFF lo legge dal motore
+  (`/apartment.timezone`) e in anagrafica si vede ma non si modifica. Si cambia con
+  `sudo bash /opt/domhouse/engine-vm.sh set <apartment_id> TIMEZONE=Europe/London` (riavvio del motore). Un nome che
+  non è un fuso orario ferma il motore all'avvio e `engine-vm.sh` rimette il valore di prima. Al primo accesso dopo il
+  cambio il registro dell'organizzazione mostra «Fuso orario dell'appartamento «…» cambiato sul motore: … → …».
 
 Le impostazioni del server (nei manifesti, non sulla VM): `AI_MONTHLY_CAP_EUR` 20, `AI_ALERT_PERCENT` 80, i prezzi per
 milione di token 0.83, 4.13 e 0.08 € (da aggiornare il 1° gennaio 2027), `AI_DEMOS` per i dimostrativi; tutto in

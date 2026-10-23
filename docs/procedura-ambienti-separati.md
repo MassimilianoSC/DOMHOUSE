@@ -296,3 +296,29 @@ staging, M12 per la produzione). Nessuna chiave da creare né da conservare. **R
 località è `eu` o una regione europea (`europe-…`); `global` e `us` sono esclusi in tutti gli ambienti. Il server
 rifiuta di partire con una località diversa (messaggio nel log) e `scripts/publish.sh` controlla lo stesso valore nel
 manifesto prima di pubblicare.
+
+## M15. Contatori settimanali dell'assistente (decisione 120, lotto 31): scadenza automatica
+
+Il server scrive un documento per appartamento e settimana nella collezione `ai_stats` (domande, timeout, risposte
+rapide per causa, richieste gemelle), con il campo `expire_at` a 12 mesi dal lunedì. Perché Firestore li cancelli da
+solo serve la regola di scadenza sul campo, nei due database. Non scrive documenti: si può dare anche prima della
+pubblicazione del lotto 31.
+
+1. Attivazione (scrive su GCP: lo lancia il committente, D-116). Git Bash:
+
+```
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+for db in "(default)" staging; do gcloud firestore fields ttls update expire_at --collection-group=ai_stats --enable-ttl --database="$db" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --quiet; done
+```
+
+Cosa fa: attiva la cancellazione automatica dei contatori scaduti (campo `expire_at`, 12 mesi) nel database di
+produzione e in quello di staging.
+
+2. Verifica (sola lettura; può farla la memoria storica). Git Bash:
+
+```
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+for db in "(default)" staging; do gcloud firestore fields ttls list --database="$db" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="value(name,ttlConfig.state)" | grep ai_stats; done
+```
+
+Verifica: due righe con `ai_stats` e stato `ACTIVE` (`CREATING` per qualche minuto subito dopo l'attivazione).
