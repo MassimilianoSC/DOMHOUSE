@@ -2,6 +2,7 @@
 (timeout, truncated by max_tokens, endpoint error), the summary with median, p95 and the estimated cost."""
 import importlib.util
 import json
+import re
 from pathlib import Path
 
 import httpx
@@ -204,6 +205,21 @@ def test_correct_answers_against_the_expected_ones():
     assert ok("perché si è spento il clima?", json.loads(_answer("Per la finestra aperta.")))
     assert not ok("perché si è spento il clima?", json.loads(_answer("Lo riaccendo.", _cmd(mm.CLIMA, "climate", "set_climate",
                                                                                             on=True))))
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    rome = ZoneInfo("Europe/Rome")
+    morning, evening = datetime(2026, 10, 23, 11, 35, tzinfo=rome), datetime(2026, 10, 23, 19, 0, tzinfo=rome)
+
+    def plan(quando, **params):
+        return json.loads(_answer("Programmo.", {"tipo": "programma", "quando": quando, "device_id": mm.CLIMA,
+                                                 "capability": "climate", "action": "set_climate",
+                                                 "params": params or {"on": True, "setpoint": 22}}))
+    q = "Alle 18 metti il clima a 22 gradi"
+    assert ok(q, plan("2026-10-23T18:00:00"), now=morning)                    # today, 18:00 local
+    assert ok(q, plan("2026-10-24T18:00"), now=evening)                       # past 18: tomorrow
+    assert not ok(q, plan("2026-10-23T16:00:00"), now=morning)                # «converted» by two hours
+    assert not ok(q, plan("2026-10-23T18:00:00", on=True, setpoint=21), now=morning)
+    assert not ok(q, json.loads(_answer("Subito.", _cmd(mm.CLIMA, "climate", "set_climate", setpoint=22))), now=morning)
 
 
 def test_lite_and_flash_compared_with_correct_out_of_valid(monkeypatch, capsys):
@@ -249,9 +265,9 @@ def test_prose_five_decisions_and_the_answers_one_under_the_other(monkeypatch, c
 
     async def fake_post(url, json=None, headers=None, connect_s=None, read_s=None, network=None):
         sent.append((url, json))
-        who = "lite" if "lite" in url else "flash"
+        who, hour = ("lite", "15:00") if "lite" in url else ("flash", "13:00")
         return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": _answer(
-            f"Risposta del {who}: la finestra della camera era aperta da 5 minuti.")}]}, "finishReason": "STOP"}],
+            f"Risposta del {who}: alle {hour} la finestra della camera era aperta da 5 minuti.")}]}, "finishReason": "STOP"}],
             "usageMetadata": {"promptTokenCount": 1500, "candidatesTokenCount": 60, "totalTokenCount": 1560}})
     monkeypatch.setattr(net_phase, "post_traced", fake_post)
     monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
@@ -268,5 +284,8 @@ def test_prose_five_decisions_and_the_answers_one_under_the_other(monkeypatch, c
     for why in ("Finestra della camera aperta da 5 minuti con il clima acceso", "prenotazione bk-77812",
                 "prenotazione bk-90001", "19 °C, sotto 21 °C: scalda", "19,5 °C, sotto 21 °C: scalda"):
         assert why in system                                                # the five decisions reach the model
+    assert " 15:00" in system and not re.search(r'"\d{4}-\d{2}-\d{2}T[^"]*Z"', system)   # local times, not UTC
+    assert "gemini-3.5-flash-lite · " in out and out.count("orario giusto") == 1 and out.count("orario sbagliato") == 1
+    assert out.index("orario giusto") < out.index("Risposta del lite") < out.index("orario sbagliato")
     assert out.index("--- google/gemini-3.5-flash-lite") < out.index("Risposta del lite") \
         < out.index("--- google/gemini-3.8-flash") < out.index("Risposta del flash")

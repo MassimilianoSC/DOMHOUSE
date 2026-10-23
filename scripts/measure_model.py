@@ -29,8 +29,10 @@ yes/no, timeouts, median, p95, cost per answered question, valid JSON answers, c
 
 Correct (the committente's test 2, 23 Oct): each question has its expected answer (EXPECTED: device, action, value) and
 a valid JSON answer is correct when its actions are exactly that one («spegni il clima»: the living room's climate off;
-«metti eco»: the mode eco; «accendi la stufetta in camera»: the bedroom's socket on) or, for the two questions, no
-action (and for the temperature the living room's degrees in the sentence). Summary and table: «JSON corretti N su M
+«metti eco»: the mode eco; «accendi la stufetta in camera»: the bedroom's socket on; «Alle 18 metti il clima a 22
+gradi»: one planned action, the living room's climate at 22 at 18:00 local of today, of tomorrow when 18:00 is past)
+or, for the two questions, no action (and for the temperature the living room's degrees in the sentence). Six
+questions: -n 24 or 30 asks each the same number of times. Summary and table: «JSON corretti N su M
 validi». Compare models with --model twice, e.g. the lite and the 3.8 flash:
 
     GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python scripts/measure_model.py -n 20 --endpoint nativo \
@@ -39,7 +41,7 @@ validi». Compare models with --model twice, e.g. the lite and the 3.8 flash:
 --prosa (test 3): five decisions of a demonstration apartment (yesterday: check-out to eco at 11, pre-arrival to comfort
 at 14:30, the climate heating at 14:35, the window rule switching it off at 15:00; today the climate heating at 8) and
 the question «perché il clima si è spento ieri alle 15?», one call per model; the models' answers one under the other,
-to be read. -n is not used.
+to be read, each with «orario giusto» when it says 15 (15:00), else «orario sbagliato». -n is not used.
 
     GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python scripts/measure_model.py -n 20 --endpoint nativo \
         --location europe-west4 --model google/gemini-3.8-flash
@@ -64,6 +66,7 @@ Prices: the app's (AI_PRICE_*), output tokens = total - input, reasoning include
 import argparse
 import json
 import os
+import re
 import statistics
 import sys
 import time
@@ -72,7 +75,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 QUESTIONS = ["spegni il clima", "che temperatura c'è in soggiorno?", "perché si è spento il clima?", "metti eco",
-             "accendi la stufetta in camera"]
+             "accendi la stufetta in camera", "Alle 18 metti il clima a 22 gradi"]
 
 
 def measure_engine():
@@ -98,12 +101,36 @@ EXPECTED = {
     "perché si è spento il clima?": (None, "nessuna azione", None),
     "metti eco": (None, "modalità", "eco"),
     "accendi la stufetta in camera": (PRESA, "accendere", None),
+    "Alle 18 metti il clima a 22 gradi": (CLIMA, "programmare alle 18:00 locali di oggi (domani se passate)", "22"),
 }
+SCHEDULED = "Alle 18 metti il clima a 22 gradi"
 
 
-def json_answer_correct(question: str, data: dict, room_celsius: float | None = None) -> bool:
-    """A valid JSON answer against EXPECTED: exactly the expected action, or none for the two questions."""
+def _scheduled_at_18(action: dict, now) -> bool:
+    """A planned action at 18:00 local of today, or of tomorrow when 18:00 is past (the time as the prompt asks it)."""
+    from datetime import datetime, timedelta
+    try:
+        when = datetime.fromisoformat(str(action.get("quando", "")).strip().replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if when.tzinfo is not None:
+        when = when.astimezone(now.tzinfo)
+    day = now.date() if now.hour < 18 else now.date() + timedelta(days=1)
+    return when.date() == day and (when.hour, when.minute) == (18, 0)
+
+
+def json_answer_correct(question: str, data: dict, room_celsius: float | None = None, now=None) -> bool:
+    """A valid JSON answer against EXPECTED: exactly the expected action, or none for the two questions. now: the
+    apartment's local time (Europe/Rome), for the question with a time."""
     acts = data.get("azioni") or []
+    if question == SCHEDULED:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        now = now or datetime.now(ZoneInfo("Europe/Rome"))
+        a = acts[0] if len(acts) == 1 else {}
+        params = a.get("params") or {}
+        return (a.get("tipo") == "programma" and a.get("device_id") == CLIMA and a.get("action") == "set_climate"
+                and params.get("setpoint") == 22 and params.get("on") is not False and _scheduled_at_18(a, now))
     if question == "spegni il clima":
         return len(acts) == 1 and acts[0].get("tipo") == "comando" and acts[0].get("device_id") == CLIMA and (
             acts[0].get("action") == "turn_off"
@@ -390,7 +417,10 @@ def prose(a, project: str, token: str, models: list[str], reasoning: str, kind: 
         total += cost
         data = parse_json_answer(text)
         shown = data["risposta"] if data else (text.strip() or "(nessun testo)")
-        print(f"\n--- {model} · {took:.1f} s · {cause or 'ok'} · {cost:.5f} €"
+        cause = " ".join(cause.split()) if cause else cause          # one line, whatever the error's text holds
+        hour = ("" if cause else " · orario giusto" if re.search(r"\b15(?:[:.]00)?\b", shown)
+                else " · orario sbagliato")                             # the switch-off was at 15 local
+        print(f"\n--- {model} · {took:.1f} s · {cause or 'ok'} · {cost:.5f} €{hour}"
               + ("" if data or cause else " · JSON NON valido: testo così com'è"))
         print(shown)
         if data and data.get("azioni"):
