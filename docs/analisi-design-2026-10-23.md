@@ -422,3 +422,7 @@ Come è stata fatta: lo staging chiede email e password e o2 non ha un account l
 | 16 | Lettura a cinque secondi | Non misurabile da o2: serve una persona estranea davanti alla Panoramica | Da fare al committente o a un collega |
 
 Da correggere, in ordine: punto 8 (barra delle Regole con la tastiera), punto 13 (Simulatore su tablet), punto 4 (grigio su `secondary/60`), punto 3 (vuoto nel Simulatore). Sono piccoli e possono entrare nel primo commit del lotto 34.
+
+### Tema scuro: lotto a sé (o2, 23 ottobre, lotto 34)
+
+Al lotto 34 il tema scuro era parziale: c'erano solo le variabili `.dark` in `index.css`, mai accese, senza interruttore e senza classi `dark:` nei componenti (tolte nel lotto 32). Con la tavolozza calda del lotto 34 (D-194) quelle variabili non valevano più nulla e sono state tolte (commit 3acbb6b). Un tema scuro vero è un lotto a sé: foglio scuro caldo (bruno, non nero) dentro una cornice più scura, gli stessi colori di stato e di modalità ricalcolati per 4,5:1 sul fondo scuro, un interruttore in Impostazioni con la scelta «come il sistema», la barra di stato del telefono che segue il tema, e la prova a 360 px ripetuta nei due temi. Stima 8–12 ore.
