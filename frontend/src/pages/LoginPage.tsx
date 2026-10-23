@@ -29,7 +29,7 @@ function DevLogin() {
           type="button"
           onClick={() => void devLogin(u.email)}
           data-testid={`dev-login-${u.email}`}
-          className="flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 text-left transition-[background-color,transform] hover:bg-secondary active:scale-[0.99] focus-ring"
+          className="flex w-full items-center gap-3 rounded-lg border bg-card px-4 py-3 text-left transition-[background-color,transform] hover:bg-secondary active:scale-[0.99] focus-ring"
         >
           <span className="rounded-full bg-primary/10 p-2 text-primary">
             <UserRound className="h-4 w-4" />
@@ -126,20 +126,18 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden flex-col justify-between overflow-hidden bg-[hsl(215_28%_14%)] p-12 text-[hsl(40_20%_96%)] lg:flex">
+        {/* a solid panel with what the app is for, 36 px (design lot 2); the name sits with the mark above the card */}
         <img src="/favicon.svg" alt="" className="relative h-12 w-12" />
-        <div className="relative space-y-4">
-          <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl lg:text-6xl">{env.appName}</h1>
-          <p className="max-w-md text-lg opacity-80">{t("app.tagline")}</p>
-        </div>
+        <p className="relative max-w-md text-4xl font-bold leading-tight" data-testid="login-tagline">{t("app.tagline")}</p>
       </section>
       <section className="flex flex-col items-center justify-center gap-6 p-5">
-        {/* where the brand panel is hidden (phone, tablet), the mark and the name sit above the card (design review c.14) */}
-        <div className="flex items-center gap-3 lg:hidden" data-testid="login-brand">
+        {/* the mark and the name above the card at every width (design review c.14, lot 2) */}
+        <div className="flex items-center gap-3" data-testid="login-brand">
           <img src="/favicon.svg" alt="" className="h-10 w-10" />
           <span className="font-heading text-2xl font-extrabold">{env.appName}</span>
         </div>
         <Card className="w-full max-w-md p-5 sm:p-8">
-          <h2 className="text-2xl font-extrabold">{t("login.title")}</h2>
+          <h1 className="text-2xl font-bold">{t("login.title")}</h1>
           <p className="mb-6 mt-1 text-sm text-muted-foreground">{t("login.subtitle")}</p>
           {env.authMode === "dev" ? <DevLogin /> : <FirebaseLogin />}
         </Card>
