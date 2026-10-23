@@ -55,7 +55,7 @@ export function ModeSelector({ aptId, apartment, canWrite }: { aptId: string; ap
             data-testid={`mode-selector-${m}`}
             className={cn(
               "flex min-h-[40px] items-center gap-1.5 rounded-full px-4 text-sm font-bold transition-colors focus-ring disabled:cursor-not-allowed",
-              apartment.mode === m ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground",
+              apartment.mode === m ? "bg-card text-primary" : "text-muted-foreground hover:text-foreground",
             )}
           >
             {requested === m && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}

@@ -136,7 +136,7 @@ export default function LoginPage() {
         <p className="relative font-mono text-xs opacity-60">{t("login.footer")}</p>
       </section>
       <section className="flex items-center justify-center p-5">
-        <Card className="w-full max-w-md p-6 sm:p-8 animate-fade-up">
+        <Card className="w-full max-w-md p-6 sm:p-8">
           <h2 className="text-2xl font-extrabold">{t("login.title")}</h2>
           <p className="mb-6 mt-1 text-sm text-muted-foreground">{t("login.subtitle")}</p>
           {env.authMode === "dev" ? <DevLogin /> : <FirebaseLogin />}

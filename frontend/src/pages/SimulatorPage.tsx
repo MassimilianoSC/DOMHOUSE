@@ -28,7 +28,7 @@ const plusDays = (n: number, h: number) => {
 
 function Section({ icon, title, hint, children, testId }: { icon: React.ReactNode; title: string; hint: string; children: React.ReactNode; testId: string }) {
   return (
-    <Card className="space-y-4 p-5 animate-fade-up" data-testid={testId}>
+    <Card className="space-y-4 p-5" data-testid={testId}>
       <div className="flex items-start gap-3">
         <span className="rounded-xl bg-accent/15 p-2 text-accent">{icon}</span>
         <div>

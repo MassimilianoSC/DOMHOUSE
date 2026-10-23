@@ -152,7 +152,7 @@ export function AdminApartments() {
       {q.isLoading ? <Skeleton className="h-48 rounded-2xl" /> : q.data?.map((a) => {
         const v = verify[a.apartment_id];
         return (
-          <Card key={a.apartment_id} className="space-y-3 p-5 animate-fade-up" data-testid={`admin-apartment-${a.apartment_id}`} data-enabled={a.enabled}>
+          <Card key={a.apartment_id} className="space-y-3 p-5" data-testid={`admin-apartment-${a.apartment_id}`} data-enabled={a.enabled}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">

@@ -42,7 +42,7 @@ export function SegmentedControl<T extends string>({ value, options, onChange, t
           aria-selected={value === o.value}
           onClick={() => onChange(o.value)}
           data-testid={`${testId}-${o.value}`}
-          className={`min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-bold transition-colors focus-ring ${value === o.value ? "bg-card text-primary shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+          className={`min-h-[36px] shrink-0 whitespace-nowrap rounded-full px-4 text-sm font-bold transition-colors focus-ring ${value === o.value ? "bg-card text-primary" : "text-muted-foreground hover:text-foreground"}`}
         >
           {o.label}
         </button>

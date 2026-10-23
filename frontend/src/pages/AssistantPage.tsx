@@ -44,11 +44,11 @@ function Message({ aptId, m, canWrite, onOutcome }: { aptId: string; m: ChatMess
   return (
     <div className="space-y-2" data-testid={`ask-message-${m.ask_id}`} data-status={m.status}>
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground shadow-sm" data-testid={`ask-text-${m.ask_id}`}>{m.text}</div>
+        <div className="max-w-[85%] rounded-2xl rounded-br-md bg-primary px-4 py-2.5 text-sm text-primary-foreground" data-testid={`ask-text-${m.ask_id}`}>{m.text}</div>
       </div>
       <div className="flex gap-2">
         <span className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground" aria-hidden><Bot className="h-4 w-4" /></span>
-        <div className={cn("max-w-[85%] space-y-2 rounded-2xl rounded-tl-md border bg-card px-4 py-2.5 text-sm shadow-sm", m.status === "failed" && "border-negative-border")}>
+        <div className={cn("max-w-[85%] space-y-2 rounded-2xl rounded-tl-md border bg-card px-4 py-2.5 text-sm", m.status === "failed" && "border-negative-border")}>
           {pending ? (
             <span className="inline-flex items-center gap-2 text-muted-foreground" data-testid={`ask-pending-${m.ask_id}`}><Loader2 className="h-4 w-4 animate-spin" aria-hidden /> {t("assistant.thinking")}</span>
           ) : (
@@ -150,7 +150,7 @@ export default function AssistantPage() {
         <div ref={endRef} />
       </Card>
       <form
-        className="sticky bottom-20 flex gap-2 rounded-full border bg-card/95 p-1.5 shadow-lg backdrop-blur md:bottom-4"
+        className="sticky bottom-20 flex gap-2 rounded-full border bg-card p-1.5 shadow-lg md:bottom-4"
         onSubmit={(e) => {
           e.preventDefault();
           void send(text);

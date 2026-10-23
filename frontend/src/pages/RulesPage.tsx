@@ -41,7 +41,7 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
   const errs = paramErrors(rule, draft);
   const dirty = draft && (draft.enabled !== undefined || Object.keys(draft.params).length > 0);
   return (
-    <Card className={cn("space-y-4 p-5 animate-fade-up", dirty && "border-primary/50 ring-1 ring-primary/20")} data-testid={`rule-card-${rule.rule_id}`} data-enabled={eff.enabled}>
+    <Card className={cn("space-y-4 p-5", dirty && "border-primary/50 ring-1 ring-primary/20")} data-testid={`rule-card-${rule.rule_id}`} data-enabled={eff.enabled}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="text-base font-semibold">{rule.label}</h3>
@@ -178,7 +178,7 @@ export default function RulesPage() {
       {/* D-151 point 6: the same rules on other apartments of the organization, admins only */}
       {isAdmin && canWrite && q.data && <CopyRulesCard aptId={aptId} hasManualChanges={patches.length > 0} />}
       {patches.length > 0 && (
-        <div className="fixed inset-x-0 bottom-20 z-30 mx-auto flex w-[calc(100%-2rem)] max-w-3xl flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card/95 p-3 shadow-lg backdrop-blur md:bottom-6 animate-fade-up" data-testid="rules-save-bar">
+        <div className="fixed inset-x-0 bottom-20 z-30 mx-auto flex w-[calc(100%-2rem)] max-w-3xl flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card p-3 shadow-lg md:bottom-6" data-testid="rules-save-bar">
           <span className="text-sm font-semibold">{t("rules.dirty", { count: patches.length })}</span>
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => { setDraft({}); setSaveError(null); }} disabled={saving} data-testid="rules-discard-btn">{t("rules.discard")}</Button>

@@ -36,7 +36,7 @@ function Header({ aptId }: { aptId: string }) {
       badges={<>
         {apartment && <OccupancyBadge occupancy={apartment.occupancy} />}
         <span data-testid="stream-status" data-connected={connected} className={cn("flex items-center gap-1.5 text-xs font-semibold", connected ? "text-accent" : "text-muted-foreground")}>
-          <Radio className={cn("h-3.5 w-3.5", connected && "animate-pulse")} /> {connected ? t("overview.liveOn") : t("overview.liveOff")}
+          <Radio className="h-3.5 w-3.5" /> {connected ? t("overview.liveOn") : t("overview.liveOff")}
         </span>
       </>}
     >

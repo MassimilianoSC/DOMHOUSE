@@ -33,7 +33,7 @@ export function InstanceStatus({ health, contractVersion, features, compact }: P
     { icon: <Cpu className="h-3.5 w-3.5" />, text: `${t("instance.model")} ${health.model_provider.provider} · ${health.model_provider.status}`, id: "model" },
   ];
   return (
-    <div data-testid="instance-status" className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border bg-card/70 px-4 py-3 text-xs backdrop-blur", compact && "py-2")}>
+    <div data-testid="instance-status" className={cn("flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl border bg-card px-4 py-3 text-xs", compact && "py-2")}>
       <Badge data-testid="instance-health-status" className={STATUS_TONE[health.status]}>
         {t(`instance.status.${health.status}`)}
       </Badge>

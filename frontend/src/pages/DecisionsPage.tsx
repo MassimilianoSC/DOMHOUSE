@@ -40,7 +40,7 @@ function DecisionRow({ d, tz, ruleLabels }: { d: Decision; tz: string; ruleLabel
   const actor = describeActor(d.actor, ruleLabels);
   const target = d.target.type === "device" ? deviceLabel(d.target.device_id, devices) : t(`decisions.target.${d.target.type}`);
   return (
-    <li className="flex gap-3 py-4 animate-fade-up" data-testid={`decision-row-${d.decision_id}`} data-actor={actor.kind} data-outcome={d.outcome}>
+    <li className="flex gap-3 py-4" data-testid={`decision-row-${d.decision_id}`} data-actor={actor.kind} data-outcome={d.outcome}>
       <span className={cn("mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full", actor.kind === "user" ? "bg-primary/10 text-primary" : "bg-secondary text-muted-foreground")} aria-hidden>
         {ACTOR_ICON[actor.kind] ?? <Cpu className="h-4 w-4" />}
       </span>

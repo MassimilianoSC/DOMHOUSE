@@ -43,7 +43,7 @@ function Row({ aptId, item, tz, canWrite }: { aptId: string; item: ScheduleItem;
   };
 
   return (
-    <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between animate-fade-up" data-testid={`schedule-item-${item.schedule_id}`} data-status={item.status}>
+    <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid={`schedule-item-${item.schedule_id}`} data-status={item.status}>
       <div className="min-w-0 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-sm font-bold tabular" data-testid={`schedule-run-at-${item.schedule_id}`}>{fmtShortDateTime(item.run_at, tz)}</span>

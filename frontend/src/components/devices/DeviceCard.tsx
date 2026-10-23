@@ -30,7 +30,7 @@ export function DeviceCard({ aptId, device, rooms, tz, canWrite, canRename }: Pr
   return (
     <Card
       data-testid={`device-card-${device.device_id}`}
-      className={cn("flex flex-col gap-3 p-4 transition-shadow hover:shadow-md animate-fade-up", !device.online && "opacity-70")}
+      className={cn("flex flex-col gap-3 p-4 transition-colors hover:border-foreground/20", !device.online && "opacity-70")}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">

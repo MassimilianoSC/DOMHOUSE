@@ -36,11 +36,6 @@ module.exports = {
         },
       },
       borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
-      keyframes: {
-        "fade-up": { from: { opacity: "0", transform: "translateY(6px)" }, to: { opacity: "1", transform: "none" } },
-        glow: { "0%": { boxShadow: "0 0 0 0 hsl(var(--accent) / 0.45)" }, "100%": { boxShadow: "0 0 0 8px hsl(var(--accent) / 0)" } },
-      },
-      animation: { "fade-up": "fade-up 0.35s ease-out both", glow: "glow 1.2s ease-out" },
     },
   },
   plugins: [require("tailwindcss-animate")],

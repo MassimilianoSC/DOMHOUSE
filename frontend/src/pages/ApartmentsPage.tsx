@@ -36,7 +36,7 @@ function ApartmentCard({ a, index }: { a: ApartmentSummary; index: number }) {
       className="group block rounded-3xl focus-ring"
       style={{ animationDelay: `${index * 60}ms` }}
     >
-      <Card className={cn("h-full p-5 transition-[box-shadow,transform] duration-150 group-hover:-translate-y-0.5 group-hover:shadow-md animate-fade-up", offline && "bg-muted/60 grayscale")}>
+      <Card className={cn("h-full p-5 transition-colors group-hover:border-foreground/20", offline && "bg-muted/60 grayscale")}>
         <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
           <div className="min-w-0">
             <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -62,7 +62,7 @@ function ApartmentCard({ a, index }: { a: ApartmentSummary; index: number }) {
               {capitalizeFirst(t(`mode.${apt.mode}`))}
             </Badge>
             {(a.pending_approvals ?? 0) > 0 && (
-              <Badge className="animate-pulse border-primary bg-primary text-primary-foreground" data-testid={`apartment-approvals-${a.apartment_id}`}>
+              <Badge className="border-primary bg-primary text-primary-foreground" data-testid={`apartment-approvals-${a.apartment_id}`}>
                 <Bell className="h-3 w-3" /> {a.pending_approvals}
               </Badge>
             )}

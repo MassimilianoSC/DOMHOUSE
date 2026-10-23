@@ -56,7 +56,7 @@ function ApprovalCard({ aptId, a, canWrite, onDecided }: { aptId: string; a: App
   };
 
   return (
-    <Card className={cn("space-y-4 p-5 animate-fade-up", pending && "border-primary/40 shadow-md")} data-testid={`approval-card-${a.approval_id}`} data-status={a.status}>
+    <Card className={cn("space-y-4 p-5", pending && "border-primary/40")} data-testid={`approval-card-${a.approval_id}`} data-status={a.status}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <StatusBadge tone={STATUS_TONE[a.status]} data-testid={`approval-status-${a.approval_id}`}>{t(`approvals.status.${a.status}`)}</StatusBadge>

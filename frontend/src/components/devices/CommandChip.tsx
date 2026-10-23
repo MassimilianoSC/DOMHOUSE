@@ -30,7 +30,7 @@ export function CommandChip({ command, error, testId }: { command?: TrackedComma
   }
   if (command.status === "acked") {
     return (
-      <span data-testid={testId} data-status="acked" role="status" className={cn(chip("ok"), "animate-glow")}>
+      <span data-testid={testId} data-status="acked" role="status" className={chip("ok")}>
         <Check className="h-3.5 w-3.5" aria-hidden /> {t("command.acked")}
       </span>
     );
@@ -47,7 +47,7 @@ export function CommandChip({ command, error, testId }: { command?: TrackedComma
 
 function chip(kind: "busy" | "ok" | "err") {
   return cn(
-    "inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold animate-fade-up",
+    "inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
     kind === "busy" && "border-warning-border bg-warning-bg text-warning-fg",
     kind === "ok" && "border-positive-border bg-positive-bg text-positive-fg",
     kind === "err" && "border-negative-border bg-negative-bg text-negative-fg",
