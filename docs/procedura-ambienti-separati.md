@@ -219,11 +219,14 @@ gcloud firestore backups list --location=europe-west8 --project=domotica-poc-511
 ```
 
 Verifica: un backup di oggi o di ieri. Poi i dimostrativi si tolgono dall'app di produzione (area Piattaforma, «rimuovi
-appartamento»), secondo l'elenco di M1.
+appartamento»), secondo l'elenco di M1. **Dal 23 ottobre 2026 (D-188) questo passo si fa solo prima della consegna al
+cliente, insieme a M16.**
 
 ## M12. Pubblicazione della produzione (dal commit del lotto)
 
-Cosa fa: produzione con il database `(default)`, senza dimostrativi: un indirizzo `mock://` viene ora rifiutato.
+Cosa fa: produzione con il database `(default)`. Dal 23 ottobre 2026 (D-188) i dimostrativi restano anche in produzione fino
+alla consegna al cliente, per le prove dei collaboratori: un indirizzo `mock://` è accettato come nello staging (prima
+veniva rifiutato). La pulizia prima della consegna è il passo M16.
 
 ```bash
 # Git Bash
@@ -324,3 +327,13 @@ for db in "(default)" staging; do gcloud firestore fields ttls list --database="
 ```
 
 Verifica: due righe con `ai_stats` e stato `ACTIVE` (`CREATING` per qualche minuto subito dopo l'attivazione).
+
+## M16. Pulizia della produzione prima della consegna al cliente (D-188)
+
+Finché l'app non è consegnata, la produzione ospita i dimostrativi e gli utenti di prova dei collaboratori. Prima della
+consegna, nell'ordine: (1) M11, backup recente e rimozione dei dimostrativi dall'app; (2) rimozione degli utenti di prova
+(Amministrazione › Utenti, oppure Organizzazioni per i gestori) e delle organizzazioni di prova che non servono; (3) controllo,
+in sola lettura, che nel database `(default)` non restino dati di prova: appartamenti con `mock://`, decisioni e registri dei
+dimostrativi, contatori `ai_stats` dei dimostrativi, approvazioni e programmazioni di prova; la memoria storica prepara il
+comando di lettura e l'elenco di ciò che va cancellato, il committente lancia le cancellazioni (D-116); (4) verifica finale con
+`scripts/list_demos.py` (REPOSITORY=firestore, sola lettura): «0 dimostrativi».
