@@ -138,7 +138,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | E10 | Amministratore | Fai una domanda all'assistente su un appartamento, poi Amministrazione › «Assistente». | La tabella delle ultime 8 settimane con «Settimana», «Domande», «Timeout», «Risposte rapide», «% timeout»; la prima riga «(in corso)» conta la domanda; nessun errore; sul telefono la pagina non scorre di lato. | |
 | E11 | Amministratore | Amministrazione › «Assistente» in un'organizzazione senza domande. | «Nessuna domanda all'assistente nelle ultime settimane.» | |
 | E12 | Amministratore | Amministrazione › «Funzioni»: leggi l'elenco; poi «Appartamenti»: leggi la riga «Funzioni» di un appartamento con un'eccezione. | Sotto ogni funzione nessun codice inglese, solo il nome del menu («Panoramica», «Consumi», «Assistente»…); nella scheda dell'appartamento «Funzioni: Approvazioni, Consumi» con i nomi del menu, mai codici come approvals o energy. | |
-| E13 📱 | Amministratore | Amministrazione › «Utenti»: apri il menu «⋯» di un altro utente. | «Appartamenti», «Reinvia invito», «Elimina» in rosso; sulla tua riga il menu non c'è. Sul telefono ruolo e «⋯» stanno sotto l'email. | |
+| E13 📱 | Amministratore | Amministrazione › «Utenti»: apri il menu «⋯» di un altro utente. | «Appartamenti», «Reinvia», «Elimina» in rosso; sulla tua riga il menu non c'è. Sul telefono ruolo e «⋯» stanno sotto l'email. | |
 | E14 | Amministratore | Apri l'indirizzo `/admin?scheda=registro`, poi premi «indietro» del browser. | Si apre la scheda «Registro dell'organizzazione» (linguette sottolineate sotto il titolo); «indietro» riporta alla scheda o alla pagina di prima senza errori. | |
 
 ## F. Simulatore (solo amministratore, su un appartamento «Dimostrativo»)
