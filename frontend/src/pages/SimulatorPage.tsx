@@ -29,12 +29,9 @@ const plusDays = (n: number, h: number) => {
 function Section({ icon, title, hint, children, testId }: { icon: React.ReactNode; title: string; hint: string; children: React.ReactNode; testId: string }) {
   return (
     <Card className="space-y-4 p-5" data-testid={testId}>
-      <div className="flex items-start gap-3">
-        <span className="rounded-xl bg-accent/15 p-2 text-accent">{icon}</span>
-        <div>
-          <h2 className="text-base font-semibold">{title}</h2>
-          <p className="text-sm text-muted-foreground">{hint}</p>
-        </div>
+      <div>
+        <h2 className="flex items-center gap-2 text-base font-semibold [&_svg]:size-4 [&_svg]:text-muted-foreground">{icon} {title}</h2>
+        <p className="text-sm text-muted-foreground">{hint}</p>
       </div>
       {children}
     </Card>
@@ -145,7 +142,8 @@ export default function SimulatorPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title={t("simulator.title")} subtitle={t("simulator.subtitle")} testId="simulator-header" actions={<DemoBadge testId="simulator-demo-badge" />} />
-      <div className="grid gap-4 md:grid-cols-2">
+      {/* one column up to 1024 px; above, two columns filled top to bottom: no stretched card, no ragged row (part f) */}
+      <div className="flex flex-col gap-4 lg:block lg:columns-2 lg:gap-4 [&>*]:break-inside-avoid lg:[&>*]:mb-4">
         <Section icon={<DoorOpen className="h-5 w-5" />} title={t("simulator.windows")} hint={t("simulator.windowsHint")} testId="simulator-windows">
           {windows.length === 0 && <p className="text-sm text-muted-foreground">{t("simulator.noWindows")}</p>}
           {windows.map((d) => (
@@ -200,7 +198,7 @@ export default function SimulatorPage() {
           ))}
         </Section>
         <Section icon={<ShieldQuestion className="h-5 w-5" />} title={t("simulator.approval")} hint={t("simulator.approvalHint")} testId="simulator-approval">
-          <Button onClick={() => act("approval", (c) => api.state({ trigger: "approval" }, c), t("simulator.approvalTriggered"))} disabled={busy !== null} data-testid="sim-trigger-approval-btn">
+          <Button className="h-auto min-h-11 whitespace-normal py-2 text-left" onClick={() => act("approval", (c) => api.state({ trigger: "approval" }, c), t("simulator.approvalTriggered"))} disabled={busy !== null} data-testid="sim-trigger-approval-btn">
             <ShieldQuestion /> {t("simulator.triggerApproval")}
           </Button>
         </Section>

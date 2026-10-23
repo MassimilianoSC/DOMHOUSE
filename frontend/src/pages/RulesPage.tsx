@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock } from "lucide-react";
@@ -108,6 +108,7 @@ export default function RulesPage() {
   const q = useQuery({ queryKey: ["rules", aptId], queryFn: () => instanceApi(aptId).getRules() });
   const [draft, setDraft] = useState<Draft>({});
   const [saving, setSaving] = useState(false);
+  const barRef = useRef<HTMLDivElement>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
   const rules = useMemo(() => q.data?.rules ?? [], [q.data]);
 
@@ -150,6 +151,28 @@ export default function RulesPage() {
     }
   };
 
+  // Part f: with the keyboard open the save bar (two lines on a phone) covered the field being typed in. While the
+  // bar shows, the page scrolls with a bottom margin as tall as the bar, and the focused field is moved above it.
+  const barShown = patches.length > 0;
+  useEffect(() => {
+    const root = document.documentElement;
+    const bar = barRef.current;
+    if (!barShown || !bar) return;
+    const fit = () => {
+      root.style.scrollPaddingBottom = `${bar.offsetHeight + 16}px`;
+      const el = document.activeElement as HTMLElement | null;
+      if (el && el !== document.body && el.getBoundingClientRect().bottom > bar.getBoundingClientRect().top) el.scrollIntoView?.({ block: "nearest" });
+    };
+    fit();
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(fit) : null;
+    ro?.observe(bar);
+    window.visualViewport?.addEventListener("resize", fit);
+    return () => {
+      ro?.disconnect();
+      window.visualViewport?.removeEventListener("resize", fit);
+      root.style.scrollPaddingBottom = "";
+    };
+  }, [barShown]);
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-24">
       <PageHeader title={t("rules.title")} subtitle={t("rules.subtitle")} testId="rules-header" />
@@ -181,7 +204,7 @@ export default function RulesPage() {
       {isAdmin && canWrite && q.data && <CopyRulesCard aptId={aptId} hasManualChanges={patches.length > 0} />}
       {patches.length > 0 && (
         // a full bar along the bottom edge, solid with a 1 px top border and a light shadow (design lot 2)
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-card px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 lg:px-10 shadow-[0_-4px_12px_hsl(var(--foreground)/0.06)] md:left-64" data-testid="rules-save-bar">
+        <div ref={barRef} className="fixed inset-x-0 bottom-0 z-30 border-t bg-card px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 lg:px-10 shadow-[0_-4px_12px_hsl(var(--foreground)/0.06)] md:left-64" data-testid="rules-save-bar">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
             <span className="text-sm font-semibold">{patches.length === 1 ? t("rules.dirtyOne") : t("rules.dirty", { count: patches.length })}</span>
             <div className="flex gap-2">
