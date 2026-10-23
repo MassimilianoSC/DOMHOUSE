@@ -1133,114 +1133,248 @@ modifica, tu la controlli e la applichi. Niente cambia finché non premi «Appli
 
 ## 6. Amministratore: che cosa puoi fare in più
 
-L'amministratore fa tutto quello delle parti 4 e 5 su tutti gli appartamenti dell'organizzazione e in più ha la pagina
-«Amministrazione» («Utenti, appartamenti e funzioni della tua organizzazione»), la copia delle regole e il Simulatore.
+**La pagina «Amministrazione», la copia delle regole e il Simulatore.**
+
+L'amministratore fa tutto quello delle parti 4 e 5 su tutti gli appartamenti dell'organizzazione e in più ha:
+
+- **La pagina «Amministrazione»** («Utenti, appartamenti e funzioni della tua organizzazione»).
+- **La copia delle regole** su altri appartamenti.
+- **Il Simulatore** sugli appartamenti dimostrativi.
 
 ### Amministrazione: le sei schede
 
-«Appartamenti» (aperta all'inizio), «Utenti», «Funzioni», «Prenotazioni ricevute», «Registro dell'organizzazione»,
-«Assistente» (dal lotto 31).
-Riguardano solo la tua organizzazione. Chi non è amministratore non vede la pagina («Operazione riservata agli
-amministratori» se ci prova dal server).
+**Le schede della pagina, tutte riferite alla tua organizzazione.**
+
+| Scheda | A cosa serve |
+|---|---|
+| «Appartamenti» (aperta all'inizio) | Nome, indirizzo, attivo o no, prezzo, verifica della connessione |
+| «Utenti» | Invitare le persone, ruoli, appartamenti visibili |
+| «Funzioni» | Quali schermate sono attive |
+| «Prenotazioni ricevute» | Le prenotazioni arrivate da Italianway |
+| «Registro dell'organizzazione» | Chi ha fatto cosa |
+| «Assistente» (dal lotto 31) | Le domande all'assistente, settimana per settimana |
+
+> **Da sapere**
+>
+> Chi non è amministratore non vede la pagina («Operazione riservata agli amministratori» se ci prova dal server).
 
 ### Assistente: domande, timeout, risposte rapide
 
-«Le domande all'assistente nella tua organizzazione, settimana per settimana: quante, quante non hanno avuto risposta
-in tempo dall'assistente completo e quante hanno avuto una risposta rapida.» La tabella mostra le ultime 8 settimane
-(da lunedì a domenica, «dal 13 al 19 ottobre», «(in corso)» sulla prima) con «Settimana», «Domande», «Timeout»,
-«Risposte rapide» e «% timeout»; le righe sopra il 10 % sono in giallo. Sotto: «Risposte rapide per causa, nelle
-settimane mostrate: tempo scaduto … · assistente non raggiungibile … · limite mensile … · risposta non valida …».
-Con due settimane complete di fila sopra la soglia, in cima: «Timeout oltre il 10 % per due settimane di fila: va
-riaperta la scelta del modello dell'assistente.» Senza domande: «Nessuna domanda all'assistente nelle ultime
-settimane.» I numeri sono dell'intera organizzazione; sul telefono la tabella scorre di lato nel suo riquadro.
+**Quante domande all'assistente, quante senza risposta in tempo.**
 
-### Utenti: invitare, ruoli, appartamenti visibili, rimuovere
+La scheda spiega: «Le domande all'assistente nella tua organizzazione, settimana per settimana: quante, quante non
+hanno avuto risposta in tempo dall'assistente completo e quante hanno avuto una risposta rapida.»
 
-- **«Invita un utente»** («L'utente riceve un'email con il link all'app: entra con Google o sceglie una password. Il
-  ruolo decide cosa può fare.»): compila «Email», «Nome», «Ruolo» («Amministratore», «Operatore», «Sola lettura») e, per
-  operatore e sola lettura, «Appartamenti visibili» («Tutti gli appartamenti» oppure le caselle). Premi «Invita». Esiti:
-  «Invito inviato a …»; «Invito registrato, ma l'email a … non è partita. Riprova con «Reinvia».»; «Invito registrato.
-  L'invio email non è attivo: avvisa tu …». L'invito resta registrato anche se l'email non parte. Una persona può stare
-  in una sola organizzazione («È già un utente della tua organizzazione»); le persone di HQE non si possono invitare
-  («Questa email non può essere invitata»).
-- **Elenco**: email, nome, ruolo, «… dispositivi push» (i dispositivi con le notifiche accese), appartamenti visibili;
-  «in attesa del primo accesso» finché la persona non entra; «tu» accanto a te.
-- **«Reinvia»** su chi è in attesa: stessi esiti dell'invito. Le email hanno dei limiti: al massimo 3 ogni 10 minuti e
-  10 ogni 24 ore per destinatario, 50 ogni ora per organizzazione; oltre, l'invito resta e l'email non parte: riprova
-  più tardi. Se la persona è già entrata: «L'utente ha già effettuato l'accesso».
-- **Cambiare ruolo**: il selettore «Ruolo» accanto alla persona; compare «Ruolo aggiornato». La persona viene fatta
-  uscire da tutti i dispositivi entro circa un minuto e rientra con il ruolo nuovo. Non puoi cambiare il tuo («Non puoi
-  togliere a te stesso il ruolo di amministratore») e deve restare un amministratore («Deve restare almeno un
-  amministratore nell'organizzazione»). Chi diventa amministratore vede tutti gli appartamenti.
-- **Appartamenti visibili**: premi «Appartamenti» accanto a un operatore o a un lettore; si apre «Appartamenti di …»
-  («Scegli quali appartamenti vede questo utente. Gli amministratori vedono sempre tutti gli appartamenti.»): «Tutti gli
-  appartamenti» oppure le caselle, poi «Salva» («Appartamenti aggiornati»). Senza nessuna casella leggi «Nessun
-  appartamento scelto: l'utente non vedrà nessun appartamento finché non ne assegni almeno uno.» e devi confermare
-  «Nessun appartamento scelto: … non vedrà nessun appartamento finché non ne assegni almeno uno. Confermi?»: serve a
-  sospendere un accesso senza cancellare la persona. Caso tipico: il proprietario di un immobile, invitato come «Sola
-  lettura», che vede solo il suo appartamento. Un utente limitato vede, riceve notifiche e agisce solo sui suoi
-  appartamenti; se gli togli un appartamento mentre lo guarda, entro mezzo minuto la pagina smette di aggiornarsi e
-  compare «Appartamento non disponibile».
-- **«Elimina»** sulla persona chiede «Rimuovere l'utente …?» e mostra «Utente rimosso»: toglie accesso e notifiche; le
-  sue azioni restano nei registri per 24 mesi con il nome. Non puoi eliminare te stesso («Non puoi eliminare il tuo stesso
-  account»). Una persona rimossa non può più entrare nelle Impostazioni per cancellare da sola nome ed email: se serve,
-  lo chiede a HQE.
+| Cosa vedi | Cosa vuol dire |
+|---|---|
+| Le ultime 8 settimane, da lunedì a domenica («dal 13 al 19 ottobre»; «(in corso)» sulla prima) | Una riga per settimana |
+| «Settimana», «Domande», «Timeout», «Risposte rapide» e «% timeout» | Le colonne della tabella |
+| Righe in giallo | Settimane sopra il 10 % di timeout |
+| «Risposte rapide per causa, nelle settimane mostrate: tempo scaduto … · assistente non raggiungibile … · limite mensile … · risposta non valida …» | Il dettaglio delle risposte rapide, sotto la tabella |
+| «Timeout oltre il 10 % per due settimane di fila: va riaperta la scelta del modello dell'assistente.» | In cima, con due settimane complete di fila sopra la soglia |
+| «Nessuna domanda all'assistente nelle ultime settimane.» | Nessuna domanda |
 
-### Appartamenti: anagrafica, attivo, verifica connessione, prezzo
+- **I numeri** sono dell'intera organizzazione.
+- **Sul telefono** la tabella scorre di lato nel suo riquadro.
 
-- Ogni scheda mostra nome, «Indirizzo», «Fuso orario», «Indirizzo del sistema domotico», «ID Italianway», «Ultima
-  verifica» («mai eseguita», «riuscita il …», «non riuscita il …»), «Funzioni» (con i nomi del menu, per esempio
-  «Approvazioni, Consumi»), il prezzo che vale («Prezzo dell'energia: … (solo per questo appartamento)» o «Prezzo
-  dell'energia: … (dell'organizzazione)») e «Dimostrativo». L'identificativo
-  dell'appartamento si copia toccandolo. Non ci sono «Nuovo appartamento» né cestino: «I nuovi appartamenti li aggiunge
-  il gestore della piattaforma (HQE): per averne uno, scrivi all'assistenza.».
-- **«Modifica»** apre «Modifica appartamento»: «Nome», «Indirizzo», «Attivo», «Prezzo per kWh di questo
-  appartamento (€)» («Lascia vuoto per usare quello dell'organizzazione (…).»), poi «Salva» («Appartamento salvato»).
-  Il «Fuso orario» si vede ma non si cambia (dal lotto 31): «Impostato sul motore dell'appartamento. Se va cambiato,
-  scrivi all'assistenza.» Quando cambia sul motore, nel «Registro dell'organizzazione» compare «Fuso orario
-  dell'appartamento «…» cambiato sul motore: … → …».
-  «Collegamento al sistema domotico» e codice Italianway si vedono ma non si cambiano: «Il collegamento al sistema
-  domotico lo imposta il gestore della piattaforma (HQE). Se va cambiato, scrivi all'assistenza.», «Il codice Italianway
-  lo imposta il gestore della piattaforma (HQE). Se va cambiato, scrivi all'assistenza.». Un fuso non valido dà «Fuso
-  orario non valido». Il fuso salvato qui vale per gli orari mostrati e scritti dall'app; il motore dell'appartamento usa
-  il fuso con cui è stato configurato da HQE.
-- **«Attivo»** (nella scheda o in Modifica): spento, l'appartamento compare «Disattivato» nell'elenco, le operazioni
-  rispondono «Appartamento disattivato» e le prenotazioni non vengono inoltrate. Non spegne i dispositivi né gli
-  automatismi del sistema domotico.
-- **«Verifica connessione»**: controlla che il sistema domotico risponda; leggi «Connessione OK» o «Problema di
-  connessione» («Se la verifica non riesce, avvisa l'assistenza.») e «Ultima verifica». Un esito negativo è un risultato,
-  non un errore dell'app. Messaggi possibili: «Sistema domotico non raggiungibile», «Chiave del sistema domotico non configurata:
+### Utenti: invitare un collega
+
+**Mandare un invito con email, nome, ruolo e appartamenti visibili.**
+
+Il riquadro «Invita un utente» spiega: «L'utente riceve un'email con il link all'app: entra con Google o sceglie una
+password. Il ruolo decide cosa può fare.».
+
+1. **Compila «Email»**, «Nome» e «Ruolo» («Amministratore», «Operatore», «Sola lettura»).
+2. **Per operatore e sola lettura** scegli «Appartamenti visibili» («Tutti gli appartamenti» oppure le caselle).
+3. **Premi «Invita»** e leggi l'esito (tabella sotto).
+
+| Esito | Cosa vuol dire |
+|---|---|
+| «Invito inviato a …» | Tutto a posto |
+| «Invito registrato, ma l'email a … non è partita. Riprova con «Reinvia».» | L'invito c'è, l'email no: usa «Reinvia» |
+| «Invito registrato. L'invio email non è attivo: avvisa tu …» | L'invito c'è, l'email non è attiva: avvisa tu la persona |
+| «È già un utente della tua organizzazione» | Una persona può stare in una sola organizzazione |
+| «Questa email non può essere invitata» | Le persone di HQE non si possono invitare |
+
+> **Da sapere**
+>
+> L'invito resta registrato anche se l'email non parte.
+
+**L'elenco degli utenti:**
+
+- **Ogni riga**: email, nome, ruolo, «… dispositivi push» (i dispositivi con le notifiche accese), appartamenti
+  visibili.
+- **«in attesa del primo accesso»** finché la persona non entra; «tu» accanto a te.
+
+**«Reinvia»**, su chi è in attesa:
+
+- **Stessi esiti** dell'invito.
+- **Le email hanno dei limiti**: al massimo 3 ogni 10 minuti e 10 ogni 24 ore per destinatario, 50 ogni ora per
+  organizzazione; oltre, l'invito resta e l'email non parte: riprova più tardi.
+- **Se la persona è già entrata**: «L'utente ha già effettuato l'accesso».
+
+### Utenti: ruoli e appartamenti visibili
+
+**Cambiare il ruolo di una persona e quali appartamenti vede.**
+
+**Cambiare ruolo:**
+
+1. **Usa il selettore «Ruolo»** accanto alla persona; compare «Ruolo aggiornato».
+2. **La persona viene fatta uscire** da tutti i dispositivi entro circa un minuto e rientra con il ruolo nuovo.
+3. **Chi diventa amministratore** vede tutti gli appartamenti.
+
+> **Attenzione**
+>
+> - **Non puoi cambiare il tuo ruolo**: «Non puoi togliere a te stesso il ruolo di amministratore».
+> - **Deve restare un amministratore**: «Deve restare almeno un amministratore nell'organizzazione».
+
+**Appartamenti visibili:**
+
+1. **Premi «Appartamenti»** accanto a un operatore o a un lettore.
+2. **Si apre «Appartamenti di …»** («Scegli quali appartamenti vede questo utente. Gli amministratori vedono sempre
+   tutti gli appartamenti.»).
+3. **Scegli «Tutti gli appartamenti»** oppure le caselle, poi «Salva» («Appartamenti aggiornati»).
+4. **Senza nessuna casella** leggi «Nessun appartamento scelto: l'utente non vedrà nessun appartamento finché non ne
+   assegni almeno uno.».
+5. **Devi confermare** «Nessun appartamento scelto: … non vedrà nessun appartamento finché non ne assegni almeno uno.
+   Confermi?»: serve a sospendere un accesso senza cancellare la persona.
+
+> **Esempio**
+>
+> Caso tipico: il proprietario di un immobile, invitato come «Sola lettura», che vede solo il suo appartamento.
+
+> **Da sapere**
+>
+> - **Un utente limitato** vede, riceve notifiche e agisce solo sui suoi appartamenti.
+> - **Se gli togli un appartamento mentre lo guarda**, entro mezzo minuto la pagina smette di aggiornarsi e compare
+>   «Appartamento non disponibile».
+
+### Utenti: rimuovere una persona
+
+**Togliere accesso e notifiche a un utente.**
+
+1. **Premi «Elimina»** sulla persona: chiede «Rimuovere l'utente …?».
+2. **Conferma**: compare «Utente rimosso».
+3. **La persona perde** accesso e notifiche; le sue azioni restano nei registri per 24 mesi con il nome.
+
+> **Attenzione**
+>
+> - **Non puoi eliminare te stesso**: «Non puoi eliminare il tuo stesso account».
+> - **Una persona rimossa** non può più entrare nelle Impostazioni per cancellare da sola nome ed email: se serve, lo
+>   chiede a HQE.
+
+### Appartamenti: la scheda e «Modifica»
+
+**Nome, indirizzo, prezzo e dati tecnici di ogni appartamento.**
+
+| Cosa vedi nella scheda | Cosa vuol dire |
+|---|---|
+| Nome, «Indirizzo», «Fuso orario» | L'anagrafica |
+| «Indirizzo del sistema domotico», «ID Italianway» | Il collegamento tecnico e il codice delle prenotazioni |
+| «Ultima verifica» («mai eseguita», «riuscita il …», «non riuscita il …») | L'esito dell'ultima «Verifica connessione» |
+| «Funzioni» (con i nomi del menu, per esempio «Approvazioni, Consumi») | Le funzioni attive |
+| «Prezzo dell'energia: … (solo per questo appartamento)» o «Prezzo dell'energia: … (dell'organizzazione)» | Il prezzo che vale |
+| «Dimostrativo» | Appartamento finto per le prove |
+
+- **L'identificativo** dell'appartamento si copia toccandolo.
+- **Non ci sono «Nuovo appartamento» né cestino**: «I nuovi appartamenti li aggiunge il gestore della piattaforma
+  (HQE): per averne uno, scrivi all'assistenza.».
+
+**«Modifica»** apre «Modifica appartamento»:
+
+1. **Compila «Nome»**, «Indirizzo», «Attivo».
+2. **Compila «Prezzo per kWh di questo appartamento (€)»** («Lascia vuoto per usare quello dell'organizzazione
+   (…).»).
+3. **Premi «Salva»** («Appartamento salvato»).
+
+**Quello che si vede ma non si cambia:**
+
+| Campo | Cosa dice l'app |
+|---|---|
+| «Fuso orario» (dal lotto 31) | «Impostato sul motore dell'appartamento. Se va cambiato, scrivi all'assistenza.» |
+| «Collegamento al sistema domotico» | «Il collegamento al sistema domotico lo imposta il gestore della piattaforma (HQE). Se va cambiato, scrivi all'assistenza.» |
+| Codice Italianway | «Il codice Italianway lo imposta il gestore della piattaforma (HQE). Se va cambiato, scrivi all'assistenza.» |
+
+> **Da sapere**
+>
+> - **Quando il fuso cambia sul motore**, nel «Registro dell'organizzazione» compare «Fuso orario dell'appartamento
+>   «…» cambiato sul motore: … → …».
+> - **Un fuso non valido** dà «Fuso orario non valido».
+> - **Il fuso salvato qui** vale per gli orari mostrati e scritti dall'app; il motore dell'appartamento usa il fuso
+>   con cui è stato configurato da HQE.
+
+### Appartamenti: attivo, verifica connessione, prezzo
+
+**Spegnere un appartamento, provare il collegamento, impostare il prezzo.**
+
+**«Attivo»** (nella scheda o in Modifica):
+
+- **Spento**, l'appartamento compare «Disattivato» nell'elenco.
+- **Le operazioni** rispondono «Appartamento disattivato» e le prenotazioni non vengono inoltrate.
+- **Non spegne** i dispositivi né gli automatismi del sistema domotico.
+
+**«Verifica connessione»:**
+
+- **Controlla** che il sistema domotico risponda.
+- **Leggi** «Connessione OK» o «Problema di connessione» («Se la verifica non riesce, avvisa l'assistenza.») e
+  «Ultima verifica».
+- **Un esito negativo** è un risultato, non un errore dell'app.
+- **Messaggi possibili**: «Sistema domotico non raggiungibile», «Chiave del sistema domotico non configurata:
   contatta l'assistenza HQE».
-- **«Prezzo dell'energia»** (in cima): «Serve per l'importo in euro nei rendiconti Excel dei consumi. Vale per tutti
-  gli appartamenti; per un appartamento puoi impostarne uno diverso da «Modifica».». Compila «Prezzo per kWh (€)» (da 0
-  a 10, al massimo 4 decimali, virgola o punto; esempio 0,25) e premi «Salva» («Prezzo dell'energia salvato»). Campo
-  vuoto = prezzo tolto («non impostato»); zero è un prezzo valido. Errore: «Scrivi un numero da 0 a 10 con al massimo 4
-  decimali, per esempio 0,25.». Ogni cambio resta nel «Registro dell'organizzazione».
+
+**«Prezzo dell'energia»** (in cima): «Serve per l'importo in euro nei rendiconti Excel dei consumi. Vale per tutti gli
+appartamenti; per un appartamento puoi impostarne uno diverso da «Modifica».».
+
+1. **Compila «Prezzo per kWh (€)»**: da 0 a 10, al massimo 4 decimali, virgola o punto; esempio 0,25.
+2. **Premi «Salva»** («Prezzo dell'energia salvato»).
+
+> **Da sapere**
+>
+> - **Campo vuoto** = prezzo tolto («non impostato»); zero è un prezzo valido.
+> - **Errore**: «Scrivi un numero da 0 a 10 con al massimo 4 decimali, per esempio 0,25.».
+> - **Ogni cambio** resta nel «Registro dell'organizzazione».
 
 ### Funzioni
 
-«Funzioni dell'organizzazione …» («Disattiva qui una funzione per nasconderla in tutti gli appartamenti; ogni
-appartamento può avere un'eccezione.»): nove interruttori, Panoramica, Dispositivi, Comandi, Consumi, Programmazione,
-Regole, Approvazioni, Decisioni, Assistente, con i nomi del menu. Ogni cambio si salva subito
-(«Funzioni aggiornate»); «Ripristina tutte» riaccende tutto. Per ogni appartamento c'è lo stesso elenco con «eredita
-dall'organizzazione» oppure «eccezione per questo appartamento»; «Torna all'organizzazione» toglie l'eccezione.
-L'eccezione sostituisce la scelta dell'organizzazione e può anche riaccendere una funzione spenta per tutti. Riepiloghi
-non ha interruttore: c'è sempre. Una funzione che il sistema domotico non ha resta comunque non disponibile.
+**Accendere o spegnere le schermate, per tutti o per un appartamento.**
+
+«Funzioni dell'organizzazione …» spiega: «Disattiva qui una funzione per nasconderla in tutti gli appartamenti; ogni
+appartamento può avere un'eccezione.».
+
+| Cosa vedi | Cosa puoi fare | Cosa succede |
+|---|---|---|
+| Nove interruttori con i nomi del menu: Panoramica, Dispositivi, Comandi, Consumi, Programmazione, Regole, Approvazioni, Decisioni, Assistente | Accendere o spegnere una funzione per tutta l'organizzazione | Ogni cambio si salva subito («Funzioni aggiornate») |
+| «Ripristina tutte» | Riaccendere tutto | Tutte le funzioni tornano accese |
+| Lo stesso elenco per ogni appartamento, con «eredita dall'organizzazione» oppure «eccezione per questo appartamento» | Fare un'eccezione per un appartamento | L'eccezione sostituisce la scelta dell'organizzazione e può anche riaccendere una funzione spenta per tutti |
+| «Torna all'organizzazione» | Togliere l'eccezione | L'appartamento segue di nuovo l'organizzazione |
+
+> **Da sapere**
+>
+> - **Riepiloghi** non ha interruttore: c'è sempre.
+> - **Una funzione che il sistema domotico non ha** resta comunque non disponibile.
 
 ### Prenotazioni ricevute
 
-«Le ultime 100 comunicazioni di prenotazione arrivate da Italianway per i tuoi appartamenti, e se sono state trasmesse
-al motore che gestisce l'appartamento.» Si aggiorna ogni 30 secondi; le prove del Simulatore non passano da qui.
+**Le comunicazioni di Italianway per i tuoi appartamenti, e se sono passate al motore.**
 
-- In cima: «Ultime 24 ore: … ricevute, … trasmesse, … con problemi» (calcolato sulle 100 righe disponibili).
-- Ogni riga: una frase come «Prenotazione creata · Milano Centro · dal 1 dic 2026 al 3 dic 2026» (eventi: «Prenotazione
-  creata», «Prenotazione modificata», «Prenotazione cancellata», «Check-in», «Check-out»; se il messaggio non si legge,
-  «Evento ricevuto, formato non riconosciuto»), poi l'esito e la data di ricezione (fuso italiano). Senza righe:
-  «Nessuna prenotazione ricevuta».
-- «Dettagli tecnici» apre, per l'assistenza: «firma valida» o «firma non valida», «Codice di risposta», «Codice
-  Italianway», «Ospiti» (il numero), gli identificativi (l'«ID richiesta» si copia), «Inoltro a /bookings» o «non
-  inoltrato», «… tentativi», «Corpo grezzo». I dati personali degli ospiti sono oscurati. Non c'è un pulsante per
-  ritrasmettere.
+La scheda spiega: «Le ultime 100 comunicazioni di prenotazione arrivate da Italianway per i tuoi appartamenti, e se
+sono state trasmesse al motore che gestisce l'appartamento.»
+
+- **Si aggiorna** ogni 30 secondi; le prove del Simulatore non passano da qui.
+- **In cima**: «Ultime 24 ore: … ricevute, … trasmesse, … con problemi» (calcolato sulle 100 righe disponibili).
+- **Ogni riga**: una frase come «Prenotazione creata · Milano Centro · dal 1 dic 2026 al 3 dic 2026», poi l'esito e la
+  data di ricezione (fuso italiano).
+- **Gli eventi**: «Prenotazione creata», «Prenotazione modificata», «Prenotazione cancellata», «Check-in»,
+  «Check-out»; se il messaggio non si legge, «Evento ricevuto, formato non riconosciuto».
+- **Senza righe**: «Nessuna prenotazione ricevuta».
+
+**«Dettagli tecnici»**, per l'assistenza:
+
+- **La firma**: «firma valida» o «firma non valida».
+- **«Codice di risposta»**, «Codice Italianway», «Ospiti» (il numero).
+- **Gli identificativi** (l'«ID richiesta» si copia).
+- **«Inoltro a /bookings»** o «non inoltrato», «… tentativi», «Corpo grezzo».
+- **I dati personali degli ospiti** sono oscurati. Non c'è un pulsante per ritrasmettere.
 
 | Esito | Che cosa vuol dire |
 |---|---|
@@ -1253,199 +1387,400 @@ al motore che gestisce l'appartamento.» Si aggiorna ogni 30 secondi; le prove d
 
 ### Registro dell'organizzazione
 
-«Chi ha fatto cosa nella tua organizzazione: inviti, ruoli, appartamenti, funzioni e accessi di assistenza.» Ogni voce
-è una frase con la data, dalla più recente, 50 per volta («Carica altri»): per esempio «Anna Rossi ha cambiato il ruolo
-di bruno@… da «Sola lettura» a «Operatore»», «… ha copiato le regole da «…» all'appartamento …», «… ha modificato le
-regole dell'appartamento … su proposta dell'assistente», «… ha aperto un accesso di assistenza a … fino al …». Senza
-voci: «Nessuna attività registrata». Chi ha eliminato il proprio account compare come «Utente rimosso». Le modifiche
-delle regole fatte a mano sono nelle Decisioni, non qui. Conservazione 24 mesi. Prima si chiamava «Registro attività».
+**Chi ha fatto cosa nella tua organizzazione, con i nomi.**
+
+La scheda spiega: «Chi ha fatto cosa nella tua organizzazione: inviti, ruoli, appartamenti, funzioni e accessi di
+assistenza.»
+
+- **Ogni voce** è una frase con la data, dalla più recente, 50 per volta («Carica altri»).
+- **Senza voci**: «Nessuna attività registrata».
+- **Chi ha eliminato il proprio account** compare come «Utente rimosso».
+- **Le modifiche delle regole fatte a mano** sono nelle Decisioni, non qui.
+- **Conservazione** 24 mesi. Prima si chiamava «Registro attività».
+
+> **Esempio**
+>
+> - «Anna Rossi ha cambiato il ruolo di bruno@… da «Sola lettura» a «Operatore»»
+> - «… ha copiato le regole da «…» all'appartamento …»
+> - «… ha modificato le regole dell'appartamento … su proposta dell'assistente»
+> - «… ha aperto un accesso di assistenza a … fino al …»
 
 ### Copiare le regole su altri appartamenti
 
-Nel riquadro «Applica le stesse regole ad altri appartamenti», in fondo alla pagina «Regole» («Copia le regole salvate
-di questo appartamento (attive o spente e valori) sugli appartamenti che scegli. Prima vedi che cosa cambia in
-ciascuno, poi confermi.»):
+**Portare le regole di un appartamento su altri, con anteprima.**
 
-1. Salva o annulla prima le modifiche fatte a mano.
-2. Scegli gli appartamenti di destinazione o «Seleziona tutti» (al massimo 100 per volta, stessa organizzazione) e premi
-   «Vedi che cosa cambia» («Preparo l'anteprima…»). Senza altri appartamenti leggi «Nessun altro appartamento nella tua
-   organizzazione».
-3. Leggi «Che cosa cambia copiando le regole di «…»»: per ciascuno i valori che cambieranno, oppure «Già uguale, nessuna
-   modifica», «Appartamento disattivato: non verrà toccato», «Motore non raggiungibile: non verrà toccato», «Non
-   applicabile a questo appartamento». Se un appartamento ha valori personalizzati leggi «Ha regole personalizzate che
-   verranno sovrascritte: …». L'anteprima controlla anche che eco non superi comfort e che il raffrescamento sia sopra
-   comfort. Si copiano solo le regole modificabili e i valori che esistono nella destinazione.
-4. Premi «Copia su … appartamenti» (o «Copia su 1 appartamento»); «Annulla» abbandona. Leggi «Copia in corso…» e
-   «Esito della copia», appartamento per appartamento: «Regole copiate», «Regole cambiate dopo l'anteprima: non toccato»,
-   «Appartamento disattivato: non toccato», «Motore non raggiungibile: non toccato», «Già uguale, nessuna modifica».
-   «Chiudi» chiude gli esiti. Se le regole di partenza sono cambiate: «Le regole dell'appartamento di partenza sono
-   cambiate: rifai l'anteprima».
-5. Ogni appartamento toccato ha una riga nelle sue Decisioni e nel «Registro dell'organizzazione».
+Il riquadro «Applica le stesse regole ad altri appartamenti» è in fondo alla pagina «Regole»: «Copia le regole
+salvate di questo appartamento (attive o spente e valori) sugli appartamenti che scegli. Prima vedi che cosa cambia
+in ciascuno, poi confermi.».
 
-### Simulatore
+1. **Salva o annulla** prima le modifiche fatte a mano.
+2. **Scegli gli appartamenti di destinazione** o «Seleziona tutti» (al massimo 100 per volta, stessa
+   organizzazione).
+3. **Premi «Vedi che cosa cambia»** («Preparo l'anteprima…»).
+4. **Leggi «Che cosa cambia copiando le regole di «…»»**: per ciascuno i valori che cambieranno, oppure uno degli
+   esiti della tabella sotto.
+5. **Premi «Copia su … appartamenti»** (o «Copia su 1 appartamento»); «Annulla» abbandona.
+6. **Leggi «Copia in corso…»** e poi «Esito della copia», appartamento per appartamento.
+7. **«Chiudi»** chiude gli esiti.
 
-Gli appartamenti dimostrativi (etichetta «Dimostrativo» in ogni elenco) usano un sistema domotico simulato: servono per
-le prove e le dimostrazioni, anche accanto agli appartamenti veri. Su di loro gli amministratori vedono «Simulatore»
-(«Provoca eventi su questo appartamento dimostrativo: lo vedono solo gli amministratori.»); su un appartamento vero la
-voce non c'è e l'indirizzo dà «Pagina non trovata».
+**Gli esiti possibili nell'anteprima**, per ciascun appartamento:
 
-- **«Finestre»** («Apri una finestra: dopo i minuti della regola «finestra aperta» clima e caldaia si spengono»):
-  l'interruttore di ogni sensore mostra «aperta» o «chiusa» («Finestra aperta», «Finestra chiusa»). Senza sensori:
-  «Nessun sensore finestra».
-- **«Movimento»** («Simula il passaggio di una persona davanti al sensore: il motore registra l'ora del movimento, come
-  con un sensore vero»): «Simula movimento» per ogni sensore («Movimento simulato su …»), con «ultimo movimento …» o
-  «nessun movimento». Serve a provare «Mettere l'appartamento a vuoto dopo il check-out». Senza sensori: «Nessun
-  sensore di movimento».
-- **«Connettività dispositivi»** («Metti un dispositivo offline: i comandi vengono rifiutati e scatta l'avviso oltre la
-  soglia»): interruttore «online» / «offline» per ogni dispositivo («Dispositivo online», «Dispositivo offline»).
-  Tornare online prima della soglia annulla l'avviso.
-- **«Approvazione»** («Fa nascere una richiesta reale di approvazione dal motore»): «Richiedi un'approvazione» crea una
-  richiesta vera di spegnimento del primo apparecchio con misuratore («Approvazione generata»); se non ce n'è, «Nessun
-  apparecchio con misuratore da proporre nell'appartamento».
-- **«Evento prenotazione»** («Prenotazione di prova come se arrivasse da Italianway: fa lo stesso percorso di una
-  prenotazione vera fino al motore dell'appartamento. Ripetere lo stesso invio non la duplica.»): «Tipo evento»
-  («Prenotazione creata», «Prenotazione modificata», «Prenotazione annullata», «Check-in effettivo», «Check-out
-  effettivo»), «ID prenotazione», «Check-in», «Check-out», «Ospiti»; «Invia evento». Leggi «Evento prenotazione
-  inoltrato» e «… azioni programmate». Ripremendo «Invia evento» senza cambiare nulla leggi «Evento già elaborato
-  (idempotente)»: è lo stesso evento, non viene duplicato; cambiando un campo è un evento nuovo. Il check-out deve
-  venire dopo il check-in («Il check-out deve essere successivo al check-in»). Queste prove non compaiono in
-  «Prenotazioni ricevute».
-- **«Ripristina lo stato iniziale»** («Riporta l'appartamento dimostrativo com'era all'inizio, per ricominciare una
-  prova da capo.»): il pulsante «Ripristina…» chiede «Ripristinare lo stato iniziale di «…»?» e spiega «Tornano come
-  all'inizio: dispositivi e loro stati, modalità, forzatura, regole, approvazioni, programmazione, decisioni e comandi.
-  Vengono cancellati tutti i soggiorni di questo appartamento, anche quelli arrivati da Italianway. Restano: nome,
-  indirizzo e impostazioni dell'appartamento, prezzi, codice Italianway, utenti, registro attività ed elenco delle
-  prenotazioni ricevute. I consumi non cambiano. Vale solo per questo appartamento simulato e non si può annullare.».
-  Premi «Ripristina» o «Annulla»; compare «Stato iniziale ripristinato» e tutti i dispositivi aperti su
-  quell'appartamento si aggiornano. Con un sistema domotico vero segnato dimostrativo il pulsante è disattivato («Il
-  ripristino è disponibile solo con il motore simulato integrato.»).
+- **«Già uguale, nessuna modifica»**
+- **«Appartamento disattivato: non verrà toccato»**
+- **«Motore non raggiungibile: non verrà toccato»**
+- **«Non applicabile a questo appartamento»**
+- **«Ha regole personalizzate che verranno sovrascritte: …»**, se un appartamento ha valori personalizzati
+
+**Gli esiti possibili della copia**, appartamento per appartamento:
+
+- **«Regole copiate»**
+- **«Regole cambiate dopo l'anteprima: non toccato»**
+- **«Appartamento disattivato: non toccato»**
+- **«Motore non raggiungibile: non toccato»**
+- **«Già uguale, nessuna modifica»**
+
+> **Da sapere**
+>
+> - **Senza altri appartamenti** leggi «Nessun altro appartamento nella tua organizzazione».
+> - **L'anteprima controlla** anche che eco non superi comfort e che il raffrescamento sia sopra comfort.
+> - **Si copiano** solo le regole modificabili e i valori che esistono nella destinazione.
+> - **Se le regole di partenza sono cambiate**: «Le regole dell'appartamento di partenza sono cambiate: rifai
+>   l'anteprima».
+> - **Ogni appartamento toccato** ha una riga nelle sue Decisioni e nel «Registro dell'organizzazione».
+
+### Simulatore: finestre, movimento, connettività, approvazione
+
+**Provocare eventi su un appartamento dimostrativo.**
+
+Gli appartamenti dimostrativi (etichetta «Dimostrativo» in ogni elenco) usano un sistema domotico simulato: servono
+per le prove e le dimostrazioni, anche accanto agli appartamenti veri.
+
+- **Su di loro** gli amministratori vedono «Simulatore» («Provoca eventi su questo appartamento dimostrativo: lo
+  vedono solo gli amministratori.»).
+- **Su un appartamento vero** la voce non c'è e l'indirizzo dà «Pagina non trovata».
+
+| Riquadro | Cosa dice l'app | Cosa puoi fare | Cosa succede |
+|---|---|---|---|
+| «Finestre» | «Apri una finestra: dopo i minuti della regola «finestra aperta» clima e caldaia si spengono» | L'interruttore di ogni sensore mostra «aperta» o «chiusa» («Finestra aperta», «Finestra chiusa») | Senza sensori: «Nessun sensore finestra» |
+| «Movimento» | «Simula il passaggio di una persona davanti al sensore: il motore registra l'ora del movimento, come con un sensore vero» | «Simula movimento» per ogni sensore («Movimento simulato su …»), con «ultimo movimento …» o «nessun movimento» | Serve a provare «Mettere l'appartamento a vuoto dopo il check-out». Senza sensori: «Nessun sensore di movimento» |
+| «Connettività dispositivi» | «Metti un dispositivo offline: i comandi vengono rifiutati e scatta l'avviso oltre la soglia» | Interruttore «online» / «offline» per ogni dispositivo («Dispositivo online», «Dispositivo offline») | Tornare online prima della soglia annulla l'avviso |
+| «Approvazione» | «Fa nascere una richiesta reale di approvazione dal motore» | «Richiedi un'approvazione» crea una richiesta vera di spegnimento del primo apparecchio con misuratore («Approvazione generata») | Se non ce n'è, «Nessun apparecchio con misuratore da proporre nell'appartamento» |
+
+### Simulatore: evento prenotazione e ripristino
+
+**Simulare una prenotazione e riportare il dimostrativo all'inizio.**
+
+**«Evento prenotazione»** spiega: «Prenotazione di prova come se arrivasse da Italianway: fa lo stesso percorso di
+una prenotazione vera fino al motore dell'appartamento. Ripetere lo stesso invio non la duplica.».
+
+1. **Scegli «Tipo evento»**: «Prenotazione creata», «Prenotazione modificata», «Prenotazione annullata», «Check-in
+   effettivo», «Check-out effettivo».
+2. **Compila «ID prenotazione»**, «Check-in», «Check-out», «Ospiti».
+3. **Premi «Invia evento»**: leggi «Evento prenotazione inoltrato» e «… azioni programmate».
+
+> **Da sapere**
+>
+> - **Ripremendo «Invia evento» senza cambiare nulla** leggi «Evento già elaborato (idempotente)»: è lo stesso
+>   evento, non viene duplicato; cambiando un campo è un evento nuovo.
+> - **Il check-out deve venire dopo il check-in** («Il check-out deve essere successivo al check-in»).
+> - **Queste prove** non compaiono in «Prenotazioni ricevute».
+
+**«Ripristina lo stato iniziale»** spiega: «Riporta l'appartamento dimostrativo com'era all'inizio, per ricominciare
+una prova da capo.».
+
+1. **Premi «Ripristina…»**: chiede «Ripristinare lo stato iniziale di «…»?».
+2. **Leggi la spiegazione**: «Tornano come all'inizio: dispositivi e loro stati, modalità, forzatura, regole,
+   approvazioni, programmazione, decisioni e comandi. Vengono cancellati tutti i soggiorni di questo appartamento,
+   anche quelli arrivati da Italianway. Restano: nome, indirizzo e impostazioni dell'appartamento, prezzi, codice
+   Italianway, utenti, registro attività ed elenco delle prenotazioni ricevute. I consumi non cambiano. Vale solo
+   per questo appartamento simulato e non si può annullare.».
+3. **Premi «Ripristina»** o «Annulla»; compare «Stato iniziale ripristinato» e tutti i dispositivi aperti su
+   quell'appartamento si aggiornano.
+
+> **Attenzione**
+>
+> Con un sistema domotico vero segnato dimostrativo il pulsante è disattivato («Il ripristino è disponibile solo con
+> il motore simulato integrato.»).
 
 ### L'avviso di assistenza HQE
 
-Quando HQE apre un accesso di assistenza alla tua organizzazione, in cima a ogni pagina compare «L'assistenza HQE (…)
-ha accesso alla tua organizzazione fino al …, con i permessi di un operatore.» e «Motivo: …». «Chiudi accesso» chiede
-«Chiudere l'accesso di assistenza di …? Potrà rientrare solo con un nuovo accesso.» e mostra «Accesso di assistenza
-chiuso». «Nascondi l'avviso» nasconde solo il messaggio. L'avviso si aggiorna ogni 2 minuti. Durante l'accesso la
-persona di HQE vede e comanda come un operatore su tutti gli appartamenti, ma non gestisce utenti, appartamenti né
-funzioni. Apertura, chiusura e scadenza restano nel «Registro dell'organizzazione».
+**Quando HQE entra nella tua organizzazione, lo vedi in ogni pagina.**
 
+| Cosa vedi | Cosa puoi fare | Cosa succede |
+|---|---|---|
+| «L'assistenza HQE (…) ha accesso alla tua organizzazione fino al …, con i permessi di un operatore.» e «Motivo: …», in cima a ogni pagina | Leggere chi è entrato, fino a quando e perché | L'avviso si aggiorna ogni 2 minuti |
+| «Chiudi accesso» | Chiudere l'accesso | Chiede «Chiudere l'accesso di assistenza di …? Potrà rientrare solo con un nuovo accesso.» e mostra «Accesso di assistenza chiuso» |
+| «Nascondi l'avviso» | Nascondere il messaggio | Nasconde solo il messaggio |
+
+> **Da sapere**
+>
+> - **Durante l'accesso** la persona di HQE vede e comanda come un operatore su tutti gli appartamenti, ma non
+>   gestisce utenti, appartamenti né funzioni.
+> - **Apertura, chiusura e scadenza** restano nel «Registro dell'organizzazione».
 ## 7. Gestore della piattaforma HQE: Organizzazioni
 
+**La pagina «Organizzazioni»: organizzazioni, gestori, prenotazioni non attribuite, registro.**
+
 Chi ha il ruolo di gestore della piattaforma vede nel menu «Organizzazioni» («Le organizzazioni che usano l'app e i
-gestori della piattaforma»). Chi non ha il ruolo, aprendo l'indirizzo, vede «Pagina non trovata»; se il ruolo gli viene
-tolto mentre è nella pagina legge «Non hai più accesso a questa pagina: il ruolo di gestore della piattaforma ti è stato
-tolto.». La pagina ha quattro schede: «Elenco organizzazioni», «Gestori della piattaforma», «Prenotazioni non
-attribuite», «Registro della piattaforma». Un gestore senza organizzazione entra direttamente qui; se fa parte anche di
-un'organizzazione ha anche le pagine del suo ruolo lì, e se quella organizzazione è sospesa legge «La tua organizzazione
-«…» è sospesa: le sue pagine non sono disponibili finché non la riattivi da qui.».
+gestori della piattaforma»).
 
-### Elenco organizzazioni
+| Scheda | A cosa serve |
+|---|---|
+| «Elenco organizzazioni» | Creare, rinominare, sospendere, riattivare; appartamenti e accessi di assistenza |
+| «Gestori della piattaforma» | Le persone di HQE |
+| «Prenotazioni non attribuite» | Le prenotazioni che non corrispondono a nessun appartamento |
+| «Registro della piattaforma» | Cosa è successo in un'organizzazione o nella piattaforma |
 
-- Ogni scheda: nome, «Creata il …», «Primo amministratore» con «in attesa del primo accesso», «attivo» o «nessun
-  amministratore invitato», l'etichetta «Sospesa» e gli accessi di assistenza aperti. Senza organizzazioni: «Nessuna
-  organizzazione».
-- **«Nuova organizzazione»** («L'organizzazione nasce con il suo primo amministratore: riceve un'email per entrare, poi
-  invita gli altri utenti.»): «Nome dell'organizzazione», «Email del primo amministratore», «Nome del primo
-  amministratore (facoltativo)», «Crea». Esiti: «Organizzazione «…» creata. Invito inviato a …», «Organizzazione «…»
-  creata, ma l'email a … non è partita: usa «Reinvia invito».», «Organizzazione «…» creata. L'invio email non è attivo:
-  avvisa tu …». Errori: «Scrivi il nome dell'organizzazione», «Esiste già un'organizzazione con questo nome», «Questa
-  email non può essere invitata».
-- **«Reinvia invito»** finché il primo amministratore non è entrato («Invito inviato di nuovo a …», «L'email a … non è
-  partita: riprova più tardi.», «L'invio email non è attivo: avvisa tu …»; «L'amministratore ha già effettuato
-  l'accesso»).
-- **«Rinomina»** apre «Rinomina l'organizzazione»: «Nome dell'organizzazione», «Salva» («Nome aggiornato»). Solo HQE
-  cambia il nome.
-- **«Sospendi»** apre «Sospendere «…»?» («I suoi utenti escono dall'app e non possono rientrare finché non la riattivi;
-  le notifiche si fermano. Le prenotazioni continuano ad arrivare al motore degli appartamenti.»): compila «Motivo
-  (obbligatorio, resta nel registro attività)» e premi «Sospendi l'organizzazione» («Organizzazione «…» sospesa»). La
-  scheda mostra «Sospesa» e «Sospesa il …. Motivo: …». Gli utenti vedono «La tua organizzazione è sospesa: l'app non è
-  disponibile. Per informazioni contatta l'assistenza HQE.»; gli accessi di assistenza si chiudono; i dispositivi non
-  vengono spenti. Se è la tua organizzazione resti dentro Organizzazioni per poterla riattivare.
-- **«Riattiva»** chiede «Riattivare «…»? I suoi utenti potranno di nuovo entrare nell'app.» («Organizzazione «…»
-  riattivata»). Gli accessi di assistenza chiusi dalla sospensione non riaprono da soli.
+> **Da sapere**
+>
+> - **Chi non ha il ruolo**, aprendo l'indirizzo, vede «Pagina non trovata».
+> - **Se il ruolo gli viene tolto** mentre è nella pagina legge «Non hai più accesso a questa pagina: il ruolo di
+>   gestore della piattaforma ti è stato tolto.».
+> - **Un gestore senza organizzazione** entra direttamente qui; se fa parte anche di un'organizzazione ha anche le
+>   pagine del suo ruolo lì.
+> - **Se quella organizzazione è sospesa** legge «La tua organizzazione «…» è sospesa: le sue pagine non sono
+>   disponibili finché non la riattivi da qui.».
+
+### Elenco organizzazioni: la scheda e la creazione
+
+**Ogni organizzazione in una scheda; crearne una nuova.**
+
+| Cosa vedi nella scheda | Cosa vuol dire |
+|---|---|
+| Nome, «Creata il …» | L'anagrafica |
+| «Primo amministratore» con «in attesa del primo accesso», «attivo» o «nessun amministratore invitato» | Lo stato del primo amministratore |
+| «Sospesa» | L'organizzazione è sospesa |
+| Gli accessi di assistenza aperti | Chi di HQE è dentro, fino a quando |
+| «Nessuna organizzazione» | Non ce n'è nessuna |
+
+**«Nuova organizzazione»** spiega: «L'organizzazione nasce con il suo primo amministratore: riceve un'email per
+entrare, poi invita gli altri utenti.».
+
+1. **Compila «Nome dell'organizzazione»**, «Email del primo amministratore», «Nome del primo amministratore
+   (facoltativo)».
+2. **Premi «Crea»** e leggi l'esito.
+
+| Esito o errore | Cosa vuol dire |
+|---|---|
+| «Organizzazione «…» creata. Invito inviato a …» | Tutto a posto |
+| «Organizzazione «…» creata, ma l'email a … non è partita: usa «Reinvia invito».» | L'organizzazione c'è, l'email no |
+| «Organizzazione «…» creata. L'invio email non è attivo: avvisa tu …» | L'organizzazione c'è, l'invio email non è attivo |
+| «Scrivi il nome dell'organizzazione» | Manca il nome |
+| «Esiste già un'organizzazione con questo nome» | Nome duplicato |
+| «Questa email non può essere invitata» | L'email non è ammessa |
+
+**«Reinvia invito»**, finché il primo amministratore non è entrato:
+
+- **Esiti**: «Invito inviato di nuovo a …», «L'email a … non è partita: riprova più tardi.», «L'invio email non è
+  attivo: avvisa tu …».
+- **Se è già entrato**: «L'amministratore ha già effettuato l'accesso».
+
+### Elenco organizzazioni: rinominare, sospendere, riattivare
+
+**Le azioni sulla scheda di un'organizzazione.**
+
+**«Rinomina»:**
+
+- **Apre «Rinomina l'organizzazione»**: «Nome dell'organizzazione», «Salva» («Nome aggiornato»).
+- **Solo HQE** cambia il nome.
+
+**«Sospendi»:**
+
+1. **Apre «Sospendere «…»?»** («I suoi utenti escono dall'app e non possono rientrare finché non la riattivi; le
+   notifiche si fermano. Le prenotazioni continuano ad arrivare al motore degli appartamenti.»).
+2. **Compila «Motivo (obbligatorio, resta nel registro attività)»**.
+3. **Premi «Sospendi l'organizzazione»** («Organizzazione «…» sospesa»).
+4. **La scheda mostra** «Sospesa» e «Sospesa il …. Motivo: …».
+
+> **Da sapere**
+>
+> - **Gli utenti vedono** «La tua organizzazione è sospesa: l'app non è disponibile. Per informazioni contatta
+>   l'assistenza HQE.».
+> - **Gli accessi di assistenza** si chiudono; i dispositivi non vengono spenti.
+> - **Se è la tua organizzazione** resti dentro Organizzazioni per poterla riattivare.
+
+**«Riattiva»:**
+
+- **Chiede** «Riattivare «…»? I suoi utenti potranno di nuovo entrare nell'app.» («Organizzazione «…» riattivata»).
+- **Gli accessi di assistenza** chiusi dalla sospensione non riaprono da soli.
+
+**Le altre azioni:**
+
 - **«Accesso di assistenza»** e **«Entra come assistenza»**: parte 8.
 - **«Appartamenti»** nella scheda dell'organizzazione: la parte tecnica (sotto).
 
-### Appartamenti di un'organizzazione: la parte tecnica
+### Appartamenti di un'organizzazione: creare un appartamento
+
+**La parte tecnica: identificativo, collegamento, codice Italianway.**
 
 L'elenco mostra identificativo, nome, collegamento, porta, fuso, codice Italianway, stato, ultima verifica e
 «Dimostrativo»; senza appartamenti, «Nessun appartamento in questa organizzazione». Da qui non si aprono Panoramica,
 dispositivi o consumi.
 
-- **«Nuovo appartamento»** apre «Nuovo appartamento per …» («L'identificativo non si potrà più cambiare: usa minuscole,
-  numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l'amministratore
-  dell'organizzazione.»): «ID» (da 3 a 64 caratteri, minuscole, numeri e trattini, per esempio apt-milano-01, mai
-  riutilizzabile), «Nome» (fino a 120 caratteri), «Indirizzo del sistema domotico» (nell'ambiente di prova «In questo ambiente usa
-  mock://builtin»), «Porta» (da 1 a 65535, facoltativa), «Fuso orario» (Europe/Rome all'inizio; «Valore iniziale: dopo la creazione il
-  fuso orario si imposta sul motore.»), «ID Italianway» (fino
-  a 120 caratteri; «Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.»),
-  «Attivo», «Appartamento dimostrativo»; «Salva». Leggi «Appartamento … creato» e, con un sistema
-  domotico vero, «Prima di usarlo: crea la chiave del sistema domotico e poi premi Verifica connessione.»: la chiave la prepara il
-  responsabile tecnico fuori dall'app. Non c'è il campo Indirizzo: lo mette l'amministratore. Errori: «Identificativo
-  non disponibile», «Collegamento già usato da un altro appartamento», «Codice Italianway già in uso», «Fuso orario non
-  valido», «Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi
-  mock://builtin nel campo Indirizzo del sistema domotico».
-- **«Modifica collegamento»** apre «Collegamento di «…»» («Qui cambi il collegamento al sistema domotico e il codice
-  Italianway: nome, stato e funzioni dell'appartamento li gestisce l'amministratore dell'organizzazione.»): «Indirizzo del
-  sistema domotico», «Porta», «ID Italianway», «Salva» («Collegamento aggiornato»). Un indirizzo senza http diventa http; poi
-  verifica la connessione. Il codice Italianway deve essere unico su tutta la piattaforma.
-- **«Appartamento dimostrativo»** («Per prove e dimostrazioni: gli amministratori
-  dell'organizzazione vedono il Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»): con il
-  motore simulato integrato è sempre accesa («Con un indirizzo mock:// l'appartamento è sempre dimostrativo.»).
-  Passando a un sistema domotico vero l'appartamento torna reale, salvo lasciare accesa la casella. Nel sito vero, fino
-  alla consegna al cliente, i dimostrativi con il motore simulato integrato sono ammessi come nell'ambiente di prova
-  (dal 23 ottobre); un tale appartamento non può avere un codice Italianway («In produzione un
-  appartamento dimostrativo non può avere un codice Italianway»); un sistema domotico vero segnato dimostrativo può
-  averlo. Ogni cambio del tipo resta nel registro («… ha segnato l'appartamento … come dimostrativo»).
-- **Com'è il dimostrativo all'inizio**: nel campo «Indirizzo del sistema domotico» scrivi `mock://builtin?variante=vuoto`
-  (nessun ospite, casa fredda) oppure `mock://builtin?variante=occupato` (soggiorno in corso, comfort). Senza variante
-  parte vuoto se l'identificativo contiene «bologna», occupato altrimenti. Per cambiarla a un dimostrativo esistente salva il nuovo
-  collegamento e fai premere «Ripristina» nel Simulatore a un amministratore. Un valore sbagliato dà «Variante
-  sconosciuta: scrivi mock://builtin?variante=vuoto oppure mock://builtin?variante=occupato».
-- **«Verifica connessione»**: «Connessione OK» o «Problema di connessione», con «Ultima verifica» condivisa con
-  l'amministratore; il gestore legge anche i problemi della chiave («Chiave del sistema domotico non trovata in Secret Manager:
-  crea il segreto …», «Chiave del sistema domotico non leggibile dal server: manca il permesso su …»).
-- **«Elimina»** chiede «Eliminare l'appartamento … («…») dell'organizzazione …? Sparirà per tutti i suoi utenti.
-  Il suo sistema domotico non viene toccato.» e mostra «Appartamento … eliminato». L'identificativo non si può riusare.
+**«Nuovo appartamento»** apre «Nuovo appartamento per …» («L'identificativo non si potrà più cambiare: usa minuscole,
+numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l'amministratore
+dell'organizzazione.»).
+
+| Campo | Cosa scrivere |
+|---|---|
+| «ID» | Da 3 a 64 caratteri, minuscole, numeri e trattini, per esempio apt-milano-01; mai riutilizzabile |
+| «Nome» | Fino a 120 caratteri |
+| «Indirizzo del sistema domotico» | Nell'ambiente di prova «In questo ambiente usa mock://builtin» |
+| «Porta» | Da 1 a 65535, facoltativa |
+| «Fuso orario» | Europe/Rome all'inizio; «Valore iniziale: dopo la creazione il fuso orario si imposta sul motore.» |
+| «ID Italianway» | Fino a 120 caratteri; «Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.» |
+| «Attivo», «Appartamento dimostrativo» | Le due caselle |
+
+1. **Compila i campi** e premi «Salva».
+2. **Leggi «Appartamento … creato»** e, con un sistema domotico vero, «Prima di usarlo: crea la chiave del sistema
+   domotico e poi premi Verifica connessione.»: la chiave la prepara il responsabile tecnico fuori dall'app.
+
+> **Da sapere**
+>
+> Non c'è il campo Indirizzo: lo mette l'amministratore.
+
+**Errori possibili:**
+
+- «Identificativo non disponibile»
+- «Collegamento già usato da un altro appartamento»
+- «Codice Italianway già in uso»
+- «Fuso orario non valido»
+- «Indirizzo non valido: deve cominciare con http:// o https://»
+- «In questo ambiente di prova scrivi mock://builtin nel campo Indirizzo del sistema domotico»
+
+### Appartamenti di un'organizzazione: collegamento e dimostrativo
+
+**Cambiare il collegamento tecnico e segnare un appartamento come dimostrativo.**
+
+**«Modifica collegamento»** apre «Collegamento di «…»» («Qui cambi il collegamento al sistema domotico e il codice
+Italianway: nome, stato e funzioni dell'appartamento li gestisce l'amministratore dell'organizzazione.»):
+
+1. **Compila «Indirizzo del sistema domotico»**, «Porta», «ID Italianway».
+2. **Premi «Salva»** («Collegamento aggiornato»).
+3. **Un indirizzo senza http** diventa http; poi verifica la connessione.
+4. **Il codice Italianway** deve essere unico su tutta la piattaforma.
+
+**«Appartamento dimostrativo»** («Per prove e dimostrazioni: gli amministratori dell'organizzazione vedono il
+Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»):
+
+- **Con il motore simulato integrato** è sempre accesa («Con un indirizzo mock:// l'appartamento è sempre
+  dimostrativo.»).
+- **Passando a un sistema domotico vero** l'appartamento torna reale, salvo lasciare accesa la casella.
+- **Nel sito vero**, fino alla consegna al cliente, i dimostrativi con il motore simulato integrato sono ammessi
+  come nell'ambiente di prova (dal 23 ottobre).
+- **Un tale appartamento** non può avere un codice Italianway («In produzione un appartamento dimostrativo non può
+  avere un codice Italianway»); un sistema domotico vero segnato dimostrativo può averlo.
+- **Ogni cambio del tipo** resta nel registro («… ha segnato l'appartamento … come dimostrativo»).
+
+**Com'è il dimostrativo all'inizio:**
+
+| Nel campo «Indirizzo del sistema domotico» | Com'è all'inizio |
+|---|---|
+| `mock://builtin?variante=vuoto` | Nessun ospite, casa fredda |
+| `mock://builtin?variante=occupato` | Soggiorno in corso, comfort |
+| Senza variante | Parte vuoto se l'identificativo contiene «bologna», occupato altrimenti |
+
+> **Da sapere**
+>
+> - **Per cambiare la variante a un dimostrativo esistente** salva il nuovo collegamento e fai premere «Ripristina»
+>   nel Simulatore a un amministratore.
+> - **Un valore sbagliato** dà «Variante sconosciuta: scrivi mock://builtin?variante=vuoto oppure
+>   mock://builtin?variante=occupato».
+
+### Appartamenti di un'organizzazione: verifica ed eliminazione
+
+**Provare il collegamento ed eliminare un appartamento.**
+
+**«Verifica connessione»:**
+
+- **Leggi** «Connessione OK» o «Problema di connessione», con «Ultima verifica» condivisa con l'amministratore.
+- **Il gestore legge anche** i problemi della chiave: «Chiave del sistema domotico non trovata in Secret Manager:
+  crea il segreto …», «Chiave del sistema domotico non leggibile dal server: manca il permesso su …».
+
+**«Elimina»:**
+
+- **Chiede** «Eliminare l'appartamento … («…») dell'organizzazione …? Sparirà per tutti i suoi utenti. Il suo
+  sistema domotico non viene toccato.».
+- **Mostra** «Appartamento … eliminato». L'identificativo non si può riusare.
 
 ### Gestori della piattaforma
 
-«I gestori della piattaforma creano le organizzazioni e il loro primo amministratore. Aggiungi l'email di una persona:
-il ruolo vale quando entra nell'app con quella email, anche se oggi non ha ancora un account.» Compila «Email» e premi
-«Aggiungi gestore» («… è ora gestore della piattaforma: il ruolo vale quando entra con questa email.»); accanto a ogni
-gestore «già entrato» o «non ancora entrato». Non parte un'email. «Togli» chiede «Togliere il ruolo di gestore della
-piattaforma a …?» (o «Togliere il ruolo di gestore della piattaforma a te stesso? Perderai l'accesso a questa pagina.»)
-e mostra «Ruolo di gestore tolto a …»; chiude i suoi accessi di assistenza, non il suo eventuale ruolo in
-un'organizzazione. Deve restare almeno un gestore («È l'ultimo gestore della piattaforma: nomina prima qualcun altro»).
+**Aggiungere o togliere le persone di HQE.**
+
+La scheda spiega: «I gestori della piattaforma creano le organizzazioni e il loro primo amministratore. Aggiungi
+l'email di una persona: il ruolo vale quando entra nell'app con quella email, anche se oggi non ha ancora un
+account.»
+
+1. **Compila «Email»** e premi «Aggiungi gestore».
+2. **Leggi** «… è ora gestore della piattaforma: il ruolo vale quando entra con questa email.».
+3. **Accanto a ogni gestore** leggi «già entrato» o «non ancora entrato». Non parte un'email.
+
+**«Togli»:**
+
+- **Chiede** «Togliere il ruolo di gestore della piattaforma a …?» (o «Togliere il ruolo di gestore della piattaforma
+  a te stesso? Perderai l'accesso a questa pagina.»).
+- **Mostra** «Ruolo di gestore tolto a …».
+- **Chiude i suoi accessi di assistenza**, non il suo eventuale ruolo in un'organizzazione.
+- **Deve restare almeno un gestore** («È l'ultimo gestore della piattaforma: nomina prima qualcun altro»).
 
 ### Prenotazioni non attribuite
 
-«Prenotazioni arrivate da Italianway che non si possono assegnare a nessuna organizzazione: codice Italianway
-sconosciuto o collegato a più appartamenti, firma non valida, formato non riconosciuto. Gli amministratori delle
-organizzazioni non le vedono.» Le ultime 100, con le stesse frasi, esiti e «Dettagli tecnici» di «Prenotazioni
-ricevute»; al posto del nome dell'appartamento c'è «codice Italianway …». Serve a scoprire un codice sbagliato. Non c'è
-un pulsante per assegnarle o ritrasmetterle.
+**Le prenotazioni che non si possono assegnare a nessuna organizzazione.**
+
+La scheda spiega: «Prenotazioni arrivate da Italianway che non si possono assegnare a nessuna organizzazione: codice
+Italianway sconosciuto o collegato a più appartamenti, firma non valida, formato non riconosciuto. Gli amministratori
+delle organizzazioni non le vedono.»
+
+- **Le ultime 100**, con le stesse frasi, esiti e «Dettagli tecnici» di «Prenotazioni ricevute».
+- **Al posto del nome dell'appartamento** c'è «codice Italianway …».
+- **Serve** a scoprire un codice sbagliato.
+- **Non c'è un pulsante** per assegnarle o ritrasmetterle.
 
 ### Registro della piattaforma
 
-«Chi ha fatto cosa in un'organizzazione, oppure le azioni della piattaforma (gestori nominati e tolti).» Con «Registro
-di» scegli un'organizzazione oppure «Azioni della piattaforma»; «Carica altri» mostra le 50 successive. Delle persone
-delle organizzazioni vedi solo il ruolo («Un amministratore», «Un operatore», «Un lettore», «Un utente»), non il nome né
-l'email: per esempio «Un amministratore ha invitato un utente come «Sola lettura»». Le azioni dei gestori restano con il
-nome («… (gestore della piattaforma)»). Conservazione 24 mesi. Prima si chiamava «Registro attività».
+**Cosa è successo in un'organizzazione, con i soli ruoli.**
+
+La scheda spiega: «Chi ha fatto cosa in un'organizzazione, oppure le azioni della piattaforma (gestori nominati e
+tolti).»
+
+- **Con «Registro di»** scegli un'organizzazione oppure «Azioni della piattaforma»; «Carica altri» mostra le 50
+  successive.
+- **Delle persone delle organizzazioni** vedi solo il ruolo («Un amministratore», «Un operatore», «Un lettore»,
+  «Un utente»), non il nome né l'email.
+- **Le azioni dei gestori** restano con il nome («… (gestore della piattaforma)»).
+- **Conservazione** 24 mesi. Prima si chiamava «Registro attività».
+
+> **Esempio**
+>
+> «Un amministratore ha invitato un utente come «Sola lettura»»
 
 ### Email che riceve il gestore
 
-- Avviso sulla spesa dell'assistente: oggetto «DOMHOUSE: assistente all'… % del tetto mensile», con mese, spesa e
-  tetto; parte una volta al mese all'80 % del tetto condiviso (20 € al mese all'inizio), solo se l'invio email è
-  configurato. Raggiunto il tetto, l'assistente risponde «Limite mensile raggiunto, riprova dal mese prossimo». Il tetto
-  non si cambia dall'app.
-- Avvisi di monitoraggio del servizio, ai responsabili indicati nella configurazione: «BFF non raggiungibile» (server
-  dell'app fermo per 5 minuti, con l'email di chiusura quando torna), «BFF: scrittura non riuscita», «Motori: VM muta»,
-  «Motori: motore muto o giù», «Motori: righe di errore», «Motori: backup mancato», «Motori: disco della VM oltre
-  l'80 %». Non si impostano dalle preferenze personali.
+**Gli avvisi via email sulla spesa dell'assistente e sul servizio.**
+
+**Avviso sulla spesa dell'assistente:**
+
+- **Oggetto** «DOMHOUSE: assistente all'… % del tetto mensile», con mese, spesa e tetto.
+- **Parte** una volta al mese all'80 % del tetto condiviso (20 € al mese all'inizio), solo se l'invio email è
+  configurato.
+- **Raggiunto il tetto**, l'assistente risponde «Limite mensile raggiunto, riprova dal mese prossimo».
+- **Il tetto** non si cambia dall'app.
+
+**Avvisi di monitoraggio del servizio**, ai responsabili indicati nella configurazione:
+
+- **«BFF non raggiungibile»**: server dell'app fermo per 5 minuti, con l'email di chiusura quando torna.
+- **«BFF: scrittura non riuscita»**.
+- **«Motori: VM muta»**, «Motori: motore muto o giù».
+- **«Motori: righe di errore»**, «Motori: backup mancato».
+- **«Motori: disco della VM oltre l'80 %»**.
+
+> **Da sapere**
+>
+> Questi avvisi non si impostano dalle preferenze personali.
 
 ### Amministrazione e Organizzazioni a confronto
+
+**Le due pagine di gestione, scheda per scheda.**
 
 Chi è sia amministratore di un'organizzazione sia gestore della piattaforma vede tutte e due le voci.
 
@@ -1461,178 +1796,283 @@ Chi è sia amministratore di un'organizzazione sia gestore della piattaforma ved
 
 ## 8. Accesso di assistenza
 
+**Come HQE entra a tempo nei dati di un'organizzazione.**
+
 È il modo in cui HQE entra nei dati di un'organizzazione quando c'è un problema: a tempo, con un motivo, visibile
 all'amministratore. Non serve un'approvazione preventiva.
 
-1. Il gestore della piattaforma, in «Elenco organizzazioni», premi «Accesso di assistenza» sulla scheda: si apre
-   «Accesso di assistenza a «…»» («Per il tempo scelto lavori dentro l'organizzazione con i permessi di un operatore.
-   L'amministratore lo vede subito e può chiuderlo; apertura e chiusura restano nel registro attività.»). Scegli
-   «Durata» (da 1 a 24 ore, 2 all'inizio), scrivi «Motivo (obbligatorio, lo vede l'amministratore)» e premi «Apri
-   l'accesso». Leggi «Accesso di assistenza a «…» aperto fino al …»; la scheda mostra «Accesso di assistenza aperto fino
-   al …» o, per un collega, «Accesso di assistenza di … aperto fino al …». Un gestore può avere un solo accesso aperto per
-   organizzazione («Hai già un accesso di assistenza aperto in questa organizzazione»); con un'organizzazione sospesa
-   non si apre («L'organizzazione è sospesa»).
-2. Premi «Entra come assistenza» (solo chi ha aperto quell'accesso). L'app si svuota come a un cambio di utente e in
-   alto compare la fascia «Stai lavorando come assistenza in «…» fino alle …, con i permessi di un operatore.» con
-   «Termina». Vedi «Appartamenti» dell'organizzazione assistita e lavori come un operatore su tutti; il profilo mostra
-   l'organizzazione assistita, ma nome, password e notifiche restano i tuoi e le notifiche dell'organizzazione assistita
-   non ti arrivano.
-3. Intanto l'amministratore vede l'avviso descritto nella parte 6 e può premere «Chiudi accesso».
-4. Per finire premi «Termina», oppure «Chiudi accesso» dalla scheda in Organizzazioni («Accesso di assistenza chiuso»).
-   Alla scadenza, alla chiusura dell'amministratore, a una sospensione o se ti viene tolto il ruolo di gestore l'accesso
-   finisce da solo: leggi «L'accesso di assistenza a «…» è finito: ora vedi di nuovo la tua area.» e i dati
-   dell'organizzazione assistita vengono tolti dalla scheda. Se la chiusura non riesce leggi «Chiusura dell'accesso sul
-   server non riuscita: chiudilo da Organizzazioni.». Anche «Esci» chiude l'accesso.
-5. Tutto resta nel registro: «… ha aperto un accesso di assistenza a … fino al …», «… ha chiuso l'accesso di
-   assistenza a …», «L'accesso di assistenza a … è scaduto».
+### Aprire l'accesso
 
+**Il gestore della piattaforma apre l'accesso dalla scheda dell'organizzazione.**
+
+1. **In «Elenco organizzazioni»** premi «Accesso di assistenza» sulla scheda.
+2. **Si apre «Accesso di assistenza a «…»»** («Per il tempo scelto lavori dentro l'organizzazione con i permessi di
+   un operatore. L'amministratore lo vede subito e può chiuderlo; apertura e chiusura restano nel registro
+   attività.»).
+3. **Scegli «Durata»** (da 1 a 24 ore, 2 all'inizio).
+4. **Scrivi «Motivo (obbligatorio, lo vede l'amministratore)»** e premi «Apri l'accesso».
+5. **Leggi** «Accesso di assistenza a «…» aperto fino al …».
+6. **La scheda mostra** «Accesso di assistenza aperto fino al …» o, per un collega, «Accesso di assistenza di …
+   aperto fino al …».
+
+> **Attenzione**
+>
+> - **Un gestore può avere un solo accesso aperto** per organizzazione («Hai già un accesso di assistenza aperto in
+>   questa organizzazione»).
+> - **Con un'organizzazione sospesa** non si apre («L'organizzazione è sospesa»).
+
+### Entrare e lavorare come assistenza
+
+**Dentro l'organizzazione con i permessi di un operatore.**
+
+1. **Premi «Entra come assistenza»** (solo chi ha aperto quell'accesso).
+2. **L'app si svuota** come a un cambio di utente.
+3. **In alto compare la fascia** «Stai lavorando come assistenza in «…» fino alle …, con i permessi di un
+   operatore.» con «Termina».
+4. **Vedi «Appartamenti»** dell'organizzazione assistita e lavori come un operatore su tutti.
+5. **Il profilo mostra** l'organizzazione assistita, ma nome, password e notifiche restano i tuoi e le notifiche
+   dell'organizzazione assistita non ti arrivano.
+
+> **Da sapere**
+>
+> Intanto l'amministratore vede l'avviso descritto nella parte 6 e può premere «Chiudi accesso».
+
+### Chiudere l'accesso
+
+**Come finisce l'accesso: a mano, alla scadenza o per altri motivi.**
+
+- **Per finire** premi «Termina», oppure «Chiudi accesso» dalla scheda in Organizzazioni («Accesso di assistenza
+  chiuso»).
+- **Finisce da solo** alla scadenza, alla chiusura dell'amministratore, a una sospensione o se ti viene tolto il
+  ruolo di gestore.
+- **In quel caso leggi** «L'accesso di assistenza a «…» è finito: ora vedi di nuovo la tua area.» e i dati
+  dell'organizzazione assistita vengono tolti dalla scheda.
+- **Se la chiusura non riesce** leggi «Chiusura dell'accesso sul server non riuscita: chiudilo da Organizzazioni.».
+- **Anche «Esci»** chiude l'accesso.
+
+**Tutto resta nel registro:**
+
+- «… ha aperto un accesso di assistenza a … fino al …»
+- «… ha chiuso l'accesso di assistenza a …»
+- «L'accesso di assistenza a … è scaduto»
 ## 9. Passo per passo
+
+**Le situazioni di ogni giorno, dall'inizio alla fine.**
 
 ### Arriva un ospite
 
-1. La prenotazione arriva da Italianway (o dal Simulatore, nei dimostrativi). In «Programmazione» compare l'azione
-   «pre-arrivo» con origine «prenotazione»: comfort 2 ore prima del check-in (il numero di ore è nella regola
-   «Pre-arrivo»). Nelle Decisioni leggi «Prenotazione creata».
-2. All'ora del pre-arrivo il motore mette l'appartamento in «comfort»: la caldaia chiede la temperatura di comfort; il
-   climatizzatore, se nella stanza c'è un sensore, scalda o raffresca da solo. Nella scheda l'occupazione è «Prenotato».
-3. Quando Italianway comunica l'arrivo effettivo («Check-in» nelle Decisioni) l'occupazione diventa «Occupato». Da ora
-   l'assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità.
-4. Se vuoi scaldare prima o cambiare qualcosa, usa «Modalità» o i comandi in Panoramica, oppure l'assistente.
-5. Se la prenotazione viene annullata dopo il pre-arrivo, il motore rimette l'appartamento a «casa vuota» (salvo un
-   altro soggiorno in corso o un altro pre-arrivo già eseguito), lo scrive nelle Decisioni («Disdetta dopo il
-   pre-arrivo») e manda la notifica «Prenotazioni». Se c'è una forzatura, aspetta la sua fine.
+**Dalla prenotazione al check-in, con il pre-arrivo automatico.**
+
+1. **La prenotazione arriva** da Italianway (o dal Simulatore, nei dimostrativi). Nelle Decisioni leggi «Prenotazione
+   creata».
+2. **In «Programmazione»** compare l'azione «pre-arrivo» con origine «prenotazione»: comfort 2 ore prima del check-in
+   (il numero di ore è nella regola «Pre-arrivo»).
+3. **All'ora del pre-arrivo** il motore mette l'appartamento in «comfort»: la caldaia chiede la temperatura di
+   comfort; il climatizzatore, se nella stanza c'è un sensore, scalda o raffresca da solo.
+4. **Nella scheda** l'occupazione è «Prenotato».
+5. **Quando Italianway comunica l'arrivo effettivo** («Check-in» nelle Decisioni) l'occupazione diventa «Occupato».
+6. **Da ora** l'assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità.
+7. **Se vuoi scaldare prima** o cambiare qualcosa, usa «Modalità» o i comandi in Panoramica, oppure l'assistente.
+
+> **Da sapere**
+>
+> Se la prenotazione viene annullata dopo il pre-arrivo, il motore rimette l'appartamento a «casa vuota» (salvo un
+> altro soggiorno in corso o un altro pre-arrivo già eseguito), lo scrive nelle Decisioni («Disdetta dopo il
+> pre-arrivo») e manda la notifica «Prenotazioni». Se c'è una forzatura, aspetta la sua fine.
 
 ### L'ospite è partito
 
-1. All'orario di partenza della prenotazione più i «Minuti dopo il check-out» della regola «Risparmio al check-out» (30
-   all'inizio), in «Programmazione» c'è l'azione «check-out» verso «casa vuota».
-2. A quell'ora, se il sensore di movimento ha visto qualcuno dopo l'orario di partenza negli ultimi «Minuti di presenza
-   dopo il check-out» (30 all'inizio), il motore non va a casa vuota da solo: apre la richiesta «Mettere l'appartamento
-   a vuoto dopo il check-out» (nella frase del motore «a vuoto» vuol dire la modalità casa vuota), con il sensore,
-   i minuti dal movimento e l'orario di partenza, e manda la notifica «Approvazioni richieste».
-3. Premi «Approva» se l'ospite è davvero andato via, «Respingi» se è ancora dentro. Senza risposta entro 30 minuti la
-   richiesta viene approvata e l'appartamento va a casa vuota.
-4. Senza movimento l'appartamento passa a «casa vuota» da solo: clima spento, caldaia sull'antigelo. Con una forzatura
-   attiva il cambio aspetta la sua fine.
-5. In «Consumi» puoi scaricare «Excel del soggiorno» per riaddebitare l'energia.
+**Dal check-out al ritorno a casa vuota, con il controllo del movimento.**
+
+1. **All'orario di partenza** della prenotazione più i «Minuti dopo il check-out» della regola «Risparmio al
+   check-out» (30 all'inizio), in «Programmazione» c'è l'azione «check-out» verso «casa vuota».
+2. **A quell'ora**, se il sensore di movimento ha visto qualcuno dopo l'orario di partenza negli ultimi «Minuti di
+   presenza dopo il check-out» (30 all'inizio), il motore non va a casa vuota da solo.
+3. **Apre la richiesta** «Mettere l'appartamento a vuoto dopo il check-out» (nella frase del motore «a vuoto» vuol
+   dire la modalità casa vuota), con il sensore, i minuti dal movimento e l'orario di partenza, e manda la notifica
+   «Approvazioni richieste».
+4. **Premi «Approva»** se l'ospite è davvero andato via, «Respingi» se è ancora dentro.
+5. **Senza risposta entro 30 minuti** la richiesta viene approvata e l'appartamento va a casa vuota.
+6. **Senza movimento** l'appartamento passa a «casa vuota» da solo: clima spento, caldaia sull'antigelo.
+7. **In «Consumi»** puoi scaricare «Excel del soggiorno» per riaddebitare l'energia.
+
+> **Da sapere**
+>
+> Con una forzatura attiva il cambio aspetta la sua fine.
 
 ### Un dispositivo va offline
 
-1. In Panoramica il dispositivo mostra «Dispositivo offline» e «Visto …»; i suoi comandi sono disattivati («Il
-   dispositivo non è raggiungibile: i comandi sono disattivati»). Mentre guardi l'appartamento compare l'avviso «… è
-   offline».
-2. Se resta offline oltre i minuti della regola «Avviso dispositivo offline» (15 all'inizio), nelle Decisioni compare
-   «Dispositivo offline» e, a chi ha la categoria «Dispositivi e sistema domotico offline» attiva, arriva la notifica «…:
-   dispositivo offline», «… non risponde da oltre … minuti». Se torna prima, niente avviso. Con la regola spenta non
-   arriva nulla.
-3. Un comando a un dispositivo offline risponde «Il dispositivo non è raggiungibile; riprova quando torna online».
-4. Se è l'intero sistema domotico a non rispondere, la striscia di salute dice «Ferma» e «Sistema domotico non raggiungibile»,
-   compare l'avviso «Sistema domotico non raggiungibile» e, dopo la stessa soglia, la notifica «…: sistema domotico non
-   raggiungibile», «Il connettore domotico risulta fermo». Nelle Decisioni: «Collegamento ai dispositivi perso» e poi
-   «Collegamento ai dispositivi ripristinato». Non arriva una notifica di ritorno online.
-5. Nel riepilogo del lunedì un dispositivo ancora offline da più di 24 ore compare come «… è offline da più di 24 ore.».
-6. Se il problema continua, l'amministratore prova «Verifica connessione» in Amministrazione e avvisa l'assistenza.
+**Che cosa vedi e che cosa arriva quando un dispositivo non risponde.**
+
+1. **In Panoramica** il dispositivo mostra «Dispositivo offline» e «Visto …»; i suoi comandi sono disattivati («Il
+   dispositivo non è raggiungibile: i comandi sono disattivati»).
+2. **Mentre guardi l'appartamento** compare l'avviso «… è offline».
+3. **Se resta offline** oltre i minuti della regola «Avviso dispositivo offline» (15 all'inizio), nelle Decisioni
+   compare «Dispositivo offline».
+4. **A chi ha la categoria «Dispositivi e sistema domotico offline» attiva** arriva la notifica «…: dispositivo
+   offline», «… non risponde da oltre … minuti».
+5. **Se torna prima**, niente avviso. Con la regola spenta non arriva nulla.
+6. **Un comando a un dispositivo offline** risponde «Il dispositivo non è raggiungibile; riprova quando torna
+   online».
+7. **Nel riepilogo del lunedì** un dispositivo ancora offline da più di 24 ore compare come «… è offline da più di
+   24 ore.».
+8. **Se il problema continua**, l'amministratore prova «Verifica connessione» in Amministrazione e avvisa
+   l'assistenza.
+
+**Se è l'intero sistema domotico a non rispondere:**
+
+- **La striscia di salute** dice «Ferma» e «Sistema domotico non raggiungibile».
+- **Compare l'avviso** «Sistema domotico non raggiungibile».
+- **Dopo la stessa soglia** arriva la notifica «…: sistema domotico non raggiungibile», «Il connettore domotico
+  risulta fermo».
+- **Nelle Decisioni**: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi ripristinato».
+- **Non arriva** una notifica di ritorno online.
 
 ### Approvare una richiesta
 
-Vedi la parte 5, «Approvazioni: approvare o respingere». In breve: notifica o «Approvazioni» › «In attesa»; leggi
-descrizione, motivo e scadenza; nota facoltativa; «Approva» o «Respingi»; controlla l'esito in Panoramica e nelle
-Decisioni. Alle richieste dell'assistente puoi rispondere anche in chat con «Sì» o «No».
+**In breve: notifica, lettura, nota, decisione, controllo.**
+
+Vedi la parte 5, «Approvazioni: approvare o respingere». In breve:
+
+1. **Apri la notifica** o «Approvazioni» › «In attesa».
+2. **Leggi** descrizione, motivo e scadenza.
+3. **Scrivi** una nota facoltativa.
+4. **Premi «Approva»** o «Respingi».
+5. **Controlla l'esito** in Panoramica e nelle Decisioni.
+
+> **Da sapere**
+>
+> Alle richieste dell'assistente puoi rispondere anche in chat con «Sì» o «No».
 
 ### Chiedere qualcosa all'assistente
 
-1. Apri «Assistente» e scrivi, per esempio, «perché si è spento il clima?», «quanto abbiamo consumato ieri?», «spegni
-   la caldaia» o «alle 18 metti la casa in eco». Premi «Invia».
-2. Leggi la risposta. Per una domanda ottieni una spiegazione presa da stati, consumi e Decisioni. Per un comando leggi
-   l'esito scritto dal sistema: «Fatto: ….», «Comando inviato: …, l'esito arriva nell'app.», «Non riuscito: … (…).» o
-   «Programmato: ….». Se in fondo leggi «Risposta rapida: …», ha risposto il sistema da solo: un comando semplice è
-   stato eseguito, uno complesso no; in quel caso usa i pulsanti dell'app.
-3. Se con ospiti dentro chiedi di spegnere clima o caldaia o di cambiare modalità, o se programmi un'azione per un'ora
-   in cui ci saranno ospiti, rispondi «Sì» o «No» alla domanda in chat.
-4. Controlla in Panoramica o in Programmazione che sia successo davvero.
+**Una domanda o un comando in italiano, poi il controllo.**
+
+1. **Apri «Assistente»** e scrivi, per esempio, «perché si è spento il clima?», «quanto abbiamo consumato ieri?»,
+   «spegni la caldaia» o «alle 18 metti la casa in eco». Premi «Invia».
+2. **Per una domanda** ottieni una spiegazione presa da stati, consumi e Decisioni.
+3. **Per un comando** leggi l'esito scritto dal sistema: «Fatto: ….», «Comando inviato: …, l'esito arriva
+   nell'app.», «Non riuscito: … (…).» o «Programmato: ….».
+4. **Se in fondo leggi «Risposta rapida: …»**, ha risposto il sistema da solo: un comando semplice è stato eseguito,
+   uno complesso no; in quel caso usa i pulsanti dell'app.
+5. **Se con ospiti dentro** chiedi di spegnere clima o caldaia o di cambiare modalità, o se programmi un'azione per
+   un'ora in cui ci saranno ospiti, rispondi «Sì» o «No» alla domanda in chat.
+6. **Controlla** in Panoramica o in Programmazione che sia successo davvero.
 
 ### Cambiare le temperature delle modalità
 
-1. Apri «Regole» e trova «Limiti del setpoint». Sotto «Minimo (°C)» e «Massimo (°C)» ci sono «Temperatura in comfort
-   (°C)», «Temperatura in eco (°C)» e «Raffrescamento in comfort (°C)».
-2. Scrivi i valori entro i limiti di ogni campo: comfort da 16 a 26 (21 all'inizio), eco da 10 a 22 (18 all'inizio),
-   raffrescamento da 22 a 28 (25 all'inizio). Eco non può superare comfort; il raffrescamento deve essere più alto di
-   comfort: altrimenti leggi sotto il campo «La temperatura eco non può superare quella comfort» o «La temperatura di
-   raffrescamento deve essere più alta di quella comfort» e il salvataggio resta disattivato.
-3. Premi «Salva le modifiche» e leggi «Regole aggiornate».
-4. I nuovi valori agiscono dal prossimo cambio di modalità e, in comfort, dalla regolazione automatica del clima. Per
-   applicarli subito scegli di nuovo la modalità in Panoramica.
-5. In alternativa scrivi in «Chiedi all'assistente» «comfort 22» o «eco 17», premi «Proponi» e poi «Applica».
+**Regolare comfort, eco e raffrescamento nella regola «Limiti del setpoint».**
+
+1. **Apri «Regole»** e trova «Limiti del setpoint».
+2. **Sotto «Minimo (°C)» e «Massimo (°C)»** ci sono «Temperatura in comfort (°C)», «Temperatura in eco (°C)» e
+   «Raffrescamento in comfort (°C)».
+3. **Scrivi i valori** entro i limiti di ogni campo (tabella sotto).
+4. **Premi «Salva le modifiche»** e leggi «Regole aggiornate».
+5. **I nuovi valori agiscono** dal prossimo cambio di modalità e, in comfort, dalla regolazione automatica del
+   clima. Per applicarli subito scegli di nuovo la modalità in Panoramica.
+
+| Campo | Limiti | All'inizio |
+|---|---|---|
+| «Temperatura in comfort (°C)» | Da 16 a 26 | 21 |
+| «Temperatura in eco (°C)» | Da 10 a 22 | 18 |
+| «Raffrescamento in comfort (°C)» | Da 22 a 28 | 25 |
+
+> **Attenzione**
+>
+> Eco non può superare comfort; il raffrescamento deve essere più alto di comfort. Altrimenti leggi sotto il campo
+> «La temperatura eco non può superare quella comfort» o «La temperatura di raffrescamento deve essere più alta di
+> quella comfort» e il salvataggio resta disattivato.
+
+> **Da sapere**
+>
+> In alternativa scrivi in «Chiedi all'assistente» «comfort 22» o «eco 17», premi «Proponi» e poi «Applica».
 
 ### Invitare un collega
 
-1. Apri «Amministrazione» › «Utenti». In «Invita un utente» compila «Email», «Nome» e «Ruolo». Per operatore o sola
-   lettura scegli «Appartamenti visibili»: tutti oppure solo quelli che servono.
-2. Premi «Invita» e leggi l'esito: «Invito inviato a …» oppure un messaggio sull'email non partita (l'invito resta: usa
-   «Reinvia» più tardi).
-3. Il collega apre l'email «Invito a DOMHOUSE» (anche nello spam), entra con «Accedi con Google» o sceglie la password
-   con «Scegli la password» (link valido 1 ora; se scaduto, «Password dimenticata?»). Se serve conferma l'indirizzo e
-   accede di nuovo.
-4. Al primo accesso sparisce «in attesa del primo accesso». Il collega vede solo gli appartamenti assegnati; può
-   installare l'app e attivare le notifiche da «Impostazioni».
+**Dall'invito al primo accesso del collega.**
+
+1. **Apri «Amministrazione» › «Utenti»**. In «Invita un utente» compila «Email», «Nome» e «Ruolo».
+2. **Per operatore o sola lettura** scegli «Appartamenti visibili»: tutti oppure solo quelli che servono.
+3. **Premi «Invita»** e leggi l'esito: «Invito inviato a …» oppure un messaggio sull'email non partita (l'invito
+   resta: usa «Reinvia» più tardi).
+4. **Il collega apre l'email** «Invito a DOMHOUSE» (anche nello spam).
+5. **Entra** con «Accedi con Google» o sceglie la password con «Scegli la password» (link valido 1 ora; se scaduto,
+   «Password dimenticata?»). Se serve conferma l'indirizzo e accede di nuovo.
+6. **Al primo accesso** sparisce «in attesa del primo accesso».
+7. **Il collega vede** solo gli appartamenti assegnati; può installare l'app e attivare le notifiche da
+   «Impostazioni».
 
 ### Provare l'app con il Simulatore
 
-1. Apri un appartamento con l'etichetta «Dimostrativo» e la pagina «Simulatore» (solo amministratori).
+**Finestra, dispositivo offline, approvazione e prenotazione su un dimostrativo.**
+
+1. **Apri un appartamento** con l'etichetta «Dimostrativo» e la pagina «Simulatore» (solo amministratori).
 2. **Finestra**: in «Finestre» apri un sensore. Dopo i minuti della regola «Finestra aperta spegne il clima» clima e
    caldaia si spengono; nelle Decisioni leggi la regola. Richiudi la finestra.
-3. **Dispositivo offline**: in «Connettività dispositivi» metti un dispositivo «offline»: i comandi vengono rifiutati e
-   dopo i minuti della regola arriva l'avviso. Rimettilo «online».
+3. **Dispositivo offline**: in «Connettività dispositivi» metti un dispositivo «offline»: i comandi vengono rifiutati
+   e dopo i minuti della regola arriva l'avviso. Rimettilo «online».
 4. **Approvazione**: premi «Richiedi un'approvazione» e vai in «Approvazioni» per decidere.
 5. **Prenotazione**: in «Evento prenotazione» scegli «Prenotazione creata», un «ID prenotazione», «Check-in» e
-   «Check-out» futuri, «Ospiti» e premi «Invia evento»: leggi «… azioni programmate» e vai in «Programmazione». Poi invia
-   «Check-in effettivo» con lo stesso identificativo: l'occupazione diventa «Occupato». Per provare la partenza, invia
-   «Check-out effettivo» o aspetta l'ora del check-out più i minuti della regola; con «Simula movimento» in «Movimento»
-   provochi la richiesta «Mettere l'appartamento a vuoto dopo il check-out».
-6. **Ricominciare**: «Ripristina…» in fondo riporta l'appartamento allo stato iniziale.
+   «Check-out» futuri, «Ospiti» e premi «Invia evento»: leggi «… azioni programmate» e vai in «Programmazione».
+6. **Arrivo**: invia «Check-in effettivo» con lo stesso identificativo: l'occupazione diventa «Occupato».
+7. **Partenza**: invia «Check-out effettivo» o aspetta l'ora del check-out più i minuti della regola; con «Simula
+   movimento» in «Movimento» provochi la richiesta «Mettere l'appartamento a vuoto dopo il check-out».
+8. **Ricominciare**: «Ripristina…» in fondo riporta l'appartamento allo stato iniziale.
 
 ### Creare un'organizzazione e un appartamento (HQE)
 
-1. «Organizzazioni» › «Elenco organizzazioni» › «Nuova organizzazione»: «Nome dell'organizzazione», «Email del primo
-   amministratore», eventuale nome; «Crea». Leggi l'esito dell'invito.
-2. Il primo amministratore entra come nella parte 2. Finché non entra puoi usare «Reinvia invito».
-3. Nella scheda dell'organizzazione premi «Appartamenti» › «Nuovo appartamento»: «ID» definitivo, «Nome», «Indirizzo del
-   sistema domotico», eventuale «Porta», «Fuso orario», «ID Italianway» (deve essere quello giusto: decide dove vanno le
-   prenotazioni), «Attivo», «Appartamento dimostrativo»; «Salva».
-4. Con un sistema domotico vero leggi «Prima di usarlo: crea la chiave del sistema domotico e poi premi Verifica connessione.»:
-   la chiave la prepara il responsabile tecnico fuori dall'app. Poi premi «Verifica connessione» e vai avanti solo con
-   «Connessione OK».
-5. L'amministratore completa in «Amministrazione» › «Appartamenti»: «Indirizzo», prezzo, funzioni, e assegna
+**Dalla nuova organizzazione all'appartamento pronto per l'amministratore.**
+
+1. **«Organizzazioni» › «Elenco organizzazioni» › «Nuova organizzazione»**: «Nome dell'organizzazione», «Email del
+   primo amministratore», eventuale nome; «Crea». Leggi l'esito dell'invito.
+2. **Il primo amministratore entra** come nella parte 2. Finché non entra puoi usare «Reinvia invito».
+3. **Nella scheda dell'organizzazione** premi «Appartamenti» › «Nuovo appartamento».
+4. **Compila** «ID» definitivo, «Nome», «Indirizzo del sistema domotico», eventuale «Porta», «Fuso orario», «ID
+   Italianway» (deve essere quello giusto: decide dove vanno le prenotazioni), «Attivo», «Appartamento dimostrativo»;
+   «Salva».
+5. **Con un sistema domotico vero** leggi «Prima di usarlo: crea la chiave del sistema domotico e poi premi Verifica
+   connessione.»: la chiave la prepara il responsabile tecnico fuori dall'app.
+6. **Premi «Verifica connessione»** e vai avanti solo con «Connessione OK».
+7. **L'amministratore completa** in «Amministrazione» › «Appartamenti»: «Indirizzo», prezzo, funzioni, e assegna
    l'appartamento agli utenti.
-6. Per un dimostrativo l'amministratore prova il Simulatore. Nel sito vero, fino alla consegna al cliente, i dimostrativi
-   con il motore simulato integrato sono ammessi come nell'ambiente di prova.
+8. **Per un dimostrativo** l'amministratore prova il Simulatore.
+
+> **Da sapere**
+>
+> Nel sito vero, fino alla consegna al cliente, i dimostrativi con il motore simulato integrato sono ammessi come
+> nell'ambiente di prova.
 
 ### Quando qualcosa non funziona
 
-1. Leggi il testo esatto dell'avviso e cercalo nella parte 11. Un pulsante disattivato per chi ha sola lettura non è un
-   guasto.
-2. Se c'è «Riprova», usalo dopo aver risolto il problema indicato. Per un comando già approvato o con esito incerto
-   controlla prima Panoramica e Decisioni, per non ripetere l'azione alla cieca.
-3. Tocca «ID richiesta» («Copiato») e incollalo nella ricerca delle Decisioni: trovi subito l'operazione. All'accesso
-   copia invece il «Codice».
-4. Annota appartamento, azione e passi, cosa è comparso, data e ora, telefono o computer e browser; se puoi, una
+**Leggere l'avviso, copiare l'identificativo, annotare, segnalare.**
+
+1. **Leggi il testo esatto dell'avviso** e cercalo nella parte 11. Un pulsante disattivato per chi ha sola lettura
+   non è un guasto.
+2. **Se c'è «Riprova»**, usalo dopo aver risolto il problema indicato.
+3. **Per un comando già approvato** o con esito incerto controlla prima Panoramica e Decisioni, per non ripetere
+   l'azione alla cieca.
+4. **Tocca «ID richiesta»** («Copiato») e incollalo nella ricerca delle Decisioni: trovi subito l'operazione.
+   All'accesso copia invece il «Codice».
+5. **Annota** appartamento, azione e passi, cosa è comparso, data e ora, telefono o computer e browser; se puoi, una
    schermata (parte 13).
-5. Amministratore: prova «Verifica connessione» in Amministrazione e comunica «Ultima verifica». Per una prenotazione,
-   apri «Dettagli tecnici».
-6. Se serve, HQE apre un accesso di assistenza (parte 8).
+6. **Amministratore**: prova «Verifica connessione» in Amministrazione e comunica «Ultima verifica». Per una
+   prenotazione, apri «Dettagli tecnici».
+7. **Se serve**, HQE apre un accesso di assistenza (parte 8).
 
 ### Una giornata tipo dell'operatore
 
-1. Apri «Appartamenti»: controlla «Approvazioni in attesa», «Prossimo check-in», «Prossimo check-out», lo stato e il
-   consumo «Oggi».
-2. Apri l'appartamento: in Panoramica guarda «In tempo reale», la salute, l'occupazione, le finestre e i dispositivi
-   offline. Con «Riconnessione…» aspetta.
-3. In «Programmazione» controlla pre-arrivo, check-out e azioni manuali; aggiungi o sposta solo se serve.
-4. Per intervenire usa la modalità o la scheda del dispositivo; con «Forza per…» ricorda che i cambi programmati
+**Il giro di controllo quotidiano, pagina per pagina.**
+
+1. **Apri «Appartamenti»**: controlla «Approvazioni in attesa», «Prossimo check-in», «Prossimo check-out», lo stato e
+   il consumo «Oggi».
+2. **Apri l'appartamento**: in Panoramica guarda «In tempo reale», la salute, l'occupazione, le finestre e i
+   dispositivi offline. Con «Riconnessione…» aspetta.
+3. **In «Programmazione»** controlla pre-arrivo, check-out e azioni manuali; aggiungi o sposta solo se serve.
+4. **Per intervenire** usa la modalità o la scheda del dispositivo; con «Forza per…» ricorda che i cambi programmati
    aspettano la fine della forzatura.
-5. Controlla gli esiti; per capire un comportamento cerca nelle «Decisioni».
-6. Decidi le richieste in «Approvazioni». Usa l'«Assistente» per domande e comandi.
-7. Guarda «Consumi» e, il lunedì, «Riepiloghi» anche senza notifica.
+5. **Controlla gli esiti**; per capire un comportamento cerca nelle «Decisioni».
+6. **Decidi le richieste** in «Approvazioni». Usa l'«Assistente» per domande e comandi.
+7. **Guarda «Consumi»** e, il lunedì, «Riepiloghi» anche senza notifica.
 
 ## 10. Cosa fa il sistema da solo
 
