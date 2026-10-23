@@ -150,3 +150,35 @@ describe("Impostazioni > Sicurezza: cosa cancella «Elimina il mio account» (P-
     confirm.mockRestore();
   });
 });
+
+describe("gestore della piattaforma senza organizzazione (D-178)", () => {
+  const meBefore = state.auth.me;
+  afterEach(() => {
+    state.auth.me = meBefore;
+    vi.unstubAllGlobals();
+  });
+
+  it("salva il nome visualizzato ed esce da tutti i dispositivi, come chiunque", async () => {
+    state.auth.me = { user: { uid: "p1", email: "piattaforma@hqe.it", display_name: "", platform_manager: true }, role: null, tenant: null } as unknown as typeof state.auth.me;
+    const calls: { path: string; method: string; body: unknown }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      calls.push({ path: new URL(url).pathname, method: init?.method ?? "GET", body: init?.body ? JSON.parse(String(init.body)) : null });
+      return new Response(null, { status: 204 });
+    }));
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    render(<AccountSettings />);
+    type("account-name-input", "Sol Bianchi");
+    await act(async () => {
+      fireEvent.submit(screen.getByTestId("account-name-form"));
+    });
+    expect(calls).toContainEqual({ path: "/app/me", method: "PATCH", body: { display_name: "Sol Bianchi" } });
+    expect(state.auth.refreshMe).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith(t("account.nameSaved"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("account-logout-all"));
+    });
+    expect(state.auth.logoutEverywhere).toHaveBeenCalledTimes(1);
+    expect(toast.success).toHaveBeenCalledWith(t("account.logoutAllDone"));
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+});
