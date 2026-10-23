@@ -41,6 +41,8 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | A20 📱 | Qualsiasi | Pagina di accesso a 360 px e su computer. | Marchio e nome sopra la scheda a ogni larghezza; su computer il pannello scuro mostra «Riscaldamento, clima e consumi dei tuoi appartamenti». | |
 | A21 | Qualsiasi | Impostazioni su computer. | Ogni sezione ha il titolo a sinistra: «Profilo», «Password ed email», «Sicurezza», «Notifiche», «Installa l'app»; «Esci» sta in fondo dopo una riga. | |
 | A22 | Qualsiasi | Ricarica la Panoramica e guarda il primo istante. | Mentre arrivano i dati la pagina mostra già la sua forma (fascia, striscia, righe) invece di un rettangolo grigio. | |
+| A23 📱 | Qualsiasi | Guarda l'app a 360 px e su computer. | L'app è un foglio bianco caldo dentro una cornice color sabbia: sul telefono la cornice è sottile (circa 4 px) e la barra in alto sta sulla cornice; su computer il menu laterale sta sulla cornice e la voce attiva è bianca con un filo arancione a sinistra; i pulsanti principali sono marrone scuro. | |
+| A24 📱 | Qualsiasi | Con l'app installata sul telefono, guarda la barra di stato. | È color sabbia, non più arancione. | |
 
 ## B. Installazione 📱
 
@@ -118,7 +120,10 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D18 | Operatore (su un dimostrativo «occupato») | Assistente: scrivi «spegni la presa della camera». | La risposta sta a sinistra sotto «Assistente», senza bolla; compare «Comando inviato» e nessun badge «Risposto»; i codici stanno dietro «Dettagli». | |
 | D19 | Operatore | Programmazione. | «In programma» e «Storico» sono due riquadri a righe con l'orario a sinistra; sotto «Storico» c'è «Ultimi 7 giorni». | |
 | D20 | Operatore | Consumi. | Due caselle «Totale periodo» e «Ora con più consumo» (oppure «Giorno con più consumo»); il grafico si chiama «Consumo per ora (kWh)»; «Scarica Excel» ha il contorno. | |
-| D21 📱 | Qualsiasi | Elenco degli appartamenti: guarda una scheda. | In alto occupazione e «Online» o «Non raggiungibile»; la striscia ha «Modalità», «Consumo di oggi», «Prossimo check-in», «Prossimo check-out»; se ci sono approvazioni in attesa, in fondo la riga «1 approvazione in attesa →»; una scheda offline non è grigia. | |
+| D21 📱 | Qualsiasi | Elenco degli appartamenti: guarda una scheda. | In alto la pillola «Online» o «Non raggiungibile»; la striscia ha «Modalità» (nel colore della modalità), «Occupazione» (verde se occupato, ambra se prenotato, tortora se vuoto), «Consumo di oggi» in arancione, «Prossimo check-in», «Prossimo check-out»; se ci sono approvazioni in attesa, in fondo la riga «1 approvazione in attesa →»; una scheda offline non è grigia. | |
+| D22 | Operatore | Panoramica: cambia modalità con il selettore (Comfort, Eco, Casa vuota). | La casella «Modalità» della fascia e la scelta nel selettore prendono il colore della modalità: Comfort arancione chiaro, Eco verde salvia, Casa vuota azzurro ardesia. | |
+| D23 📱 | Operatore | Regole sul telefono: modifica l'ultimo valore della pagina con la tastiera aperta. | La barra «Salva le modifiche» in fondo non copre il campo in cui scrivi. | |
+| D24 | Operatore | Decisioni: leggi gli esiti. | Badge colorati: «Applicata» verde, «Respinta» e «Non riuscita» rosso mattone, «In attesa di approvazione» ambra, «Informativa» tortora. | |
 
 ## E. Amministrazione
 
@@ -154,6 +159,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | F6 | Con l'appartamento aperto anche su un secondo dispositivo, ripeti il ripristino dal primo. | Sul secondo la Panoramica si aggiorna da sola entro pochi secondi. | |
 | F7 | Nella sezione «Movimento» premi «Simula movimento» su «Sensore soggiorno». | «Movimento simulato su Sensore soggiorno»; entro pochi secondi accanto al nome «ultimo movimento» con l'ora di adesso; in Panoramica il sensore indica «Movimento rilevato». | |
 | F8 | Guarda «Ripristina…» e premilo; nella finestra di conferma guarda «Ripristina», poi premi «Annulla». | «Ripristina…» ha il contorno rosso; nella conferma «Ripristina» è rosso pieno; con «Annulla» non cambia nulla. | |
+| F9 | Simulatore: apri una finestra, poi guarda la fascia della Panoramica. | La casella «Finestre» diventa ambra con la stanza indicata; richiudendola torna verde con «Tutte chiuse». Il Simulatore a 768 px non sborda e non ha vuoti. | |
 
 ## G. Dopo ogni pubblicazione
 
