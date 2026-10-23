@@ -14,7 +14,6 @@ import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { describeAction } from "@/lib/describe";
 import { DEFAULT_TZ, fmtShortDateTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
 
 const STATUS_TONE: Record<ScheduleItem["status"], Tone> = {
@@ -43,31 +42,32 @@ function Row({ aptId, item, tz, canWrite }: { aptId: string; item: ScheduleItem;
   };
 
   return (
-    <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between" data-testid={`schedule-item-${item.schedule_id}`} data-status={item.status}>
-      <div className="min-w-0 space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-bold tabular" data-testid={`schedule-run-at-${item.schedule_id}`}>{fmtShortDateTime(item.run_at, tz)}</span>
-          <StatusBadge tone={STATUS_TONE[item.status]} data-testid={`schedule-status-${item.schedule_id}`}>{t(`schedule.status.${item.status}`)}</StatusBadge>
-        </div>
-        <div className="text-base font-semibold" data-testid={`schedule-action-${item.schedule_id}`}>{describeAction(item.action, devices)}</div>
-        <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-          <span>{t(`schedule.kind.${item.kind}`)} · {t(`schedule.source.${item.source}`)}</span>
-          {item.booking_id && <span className="tabular">{item.booking_id}</span>}
-          {item.source === "booking" && item.status === "planned" && <span>{t("schedule.bookingNote")}</span>}
+    // one row of a single list (design lot 2): the time in a fixed column, the action in ink, kind and source in grey,
+    // the state on the right; the booking code only in the tooltip
+    <li className="grid gap-x-4 gap-y-2 py-3 sm:grid-cols-[9.5rem_minmax(0,1fr)_auto] sm:items-center" data-testid={`schedule-item-${item.schedule_id}`} data-status={item.status}>
+      <span className="text-sm font-semibold tabular" data-testid={`schedule-run-at-${item.schedule_id}`}>{fmtShortDateTime(item.run_at, tz)}</span>
+      <div className="min-w-0">
+        <div className="text-sm font-semibold [overflow-wrap:anywhere]" data-testid={`schedule-action-${item.schedule_id}`}>{describeAction(item.action, devices)}</div>
+        <div className="text-[13px] text-muted-foreground">
+          <span title={item.booking_id ?? undefined}>{t(`schedule.kind.${item.kind}`)} · {t(`schedule.source.${item.source}`)}</span>
+          {item.source === "booking" && item.status === "planned" && <span> · {t("schedule.bookingNote")}</span>}
         </div>
       </div>
-      {canWrite && item.status === "planned" && (
-        <div className="flex shrink-0 gap-2">
-          <Button size="sm" variant="outline" onClick={() => setMoveOpen(true)} disabled={busy} data-testid={`schedule-move-btn-${item.schedule_id}`}>
-            <CalendarClock /> {t("schedule.move")}
-          </Button>
-          <Button size="sm" variant="destructive" onClick={cancel} disabled={busy} data-testid={`schedule-cancel-btn-${item.schedule_id}`}>
-            <Trash2 /> {t("schedule.cancel")}
-          </Button>
-          <ScheduleDialog aptId={aptId} tz={tz} open={moveOpen} onOpenChange={setMoveOpen} move={item} onDone={refresh} />
-        </div>
-      )}
-    </Card>
+      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+        <StatusBadge tone={STATUS_TONE[item.status]} data-testid={`schedule-status-${item.schedule_id}`}>{t(`schedule.status.${item.status}`)}</StatusBadge>
+        {canWrite && item.status === "planned" && (
+          <>
+            <Button size="sm" variant="outline" onClick={() => setMoveOpen(true)} disabled={busy} data-testid={`schedule-move-btn-${item.schedule_id}`}>
+              <CalendarClock /> {t("schedule.move")}
+            </Button>
+            <Button size="sm" variant="destructive" onClick={cancel} disabled={busy} data-testid={`schedule-cancel-btn-${item.schedule_id}`}>
+              <Trash2 /> {t("schedule.cancel")}
+            </Button>
+            <ScheduleDialog aptId={aptId} tz={tz} open={moveOpen} onOpenChange={setMoveOpen} move={item} onDone={refresh} />
+          </>
+        )}
+      </div>
+    </li>
   );
 }
 
@@ -98,15 +98,28 @@ export default function SchedulePage() {
       ) : (
         <>
           <section className="space-y-3" aria-label={t("schedule.planned")}>
-            <h2 className="text-base font-semibold">{t("schedule.planned")} <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{planned.length}</span></h2>
+            <h2 className="text-base font-semibold">{t("schedule.planned")} <span className="font-normal text-muted-foreground tabular">{planned.length}</span></h2>
             {planned.length === 0 ? (
               <Card className="p-10 text-center text-sm text-muted-foreground" data-testid="schedule-empty">{t("schedule.empty")}</Card>
-            ) : planned.map((i) => <Row key={i.schedule_id} aptId={aptId} item={i} tz={tz} canWrite={canWrite} />)}
+            ) : (
+              <Card className="px-4 sm:px-5">
+                <ul className="divide-y" data-testid="schedule-planned-list">
+                  {planned.map((i) => <Row key={i.schedule_id} aptId={aptId} item={i} tz={tz} canWrite={canWrite} />)}
+                </ul>
+              </Card>
+            )}
           </section>
           {history.length > 0 && (
-            <section className={cn("space-y-3")} aria-label={t("schedule.history")}>
-              <h2 className="text-base font-semibold text-muted-foreground">{t("schedule.history")}</h2>
-              {history.map((i) => <Row key={i.schedule_id} aptId={aptId} item={i} tz={tz} canWrite={false} />)}
+            <section className="space-y-3" aria-label={t("schedule.history")}>
+              <div>
+                <h2 className="text-base font-semibold">{t("schedule.history")}</h2>
+                <p className="text-sm text-muted-foreground">{t("schedule.historyHint")}</p>
+              </div>
+              <Card className="px-4 sm:px-5">
+                <ul className="divide-y" data-testid="schedule-history-list">
+                  {history.map((i) => <Row key={i.schedule_id} aptId={aptId} item={i} tz={tz} canWrite={false} />)}
+                </ul>
+              </Card>
             </section>
           )}
         </>
