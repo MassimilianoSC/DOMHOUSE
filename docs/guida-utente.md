@@ -1,7 +1,7 @@
 # Guida all'app DOMHOUSE
 
 Tutto quello che l'app sa fare, spiegato passo per passo e diviso per ruolo. Non servono conoscenze tecniche.
-*Versione del 23 ottobre 2026 (lotto 32).*
+*Versione del 23 ottobre 2026 (lotto 33).*
 
 > **Ambiente di prova**
 >
@@ -473,17 +473,33 @@ La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account�
 
 | Zona della pagina | Cosa vedi | Cosa vuol dire |
 |---|---|---|
-| In alto | Il nome, l'occupazione, «Check-in», «Check-out», «Prenotazione» e «…/… dispositivi online» | I dati principali dell'appartamento |
-| In alto | «In tempo reale» | La pagina si aggiorna da sola |
+| In alto | Il nome e «In tempo reale» | La pagina si aggiorna da sola |
 | In alto | «Riconnessione…» | Sta ricollegandosi: non prendere per buono un valore vecchio |
-| La striscia di salute | «In salute», «Degradata» o «Ferma» | Lo stato del sistema domotico |
-| La striscia di salute | «Connettore» «attivo» o «fermo», «… dispositivi connessi» | Il collegamento con i dispositivi |
-| La striscia di salute | «Modello» (lo stato dell'assistente), «Contratto» e «Ultimo evento …» | Gli altri dettagli della salute |
+| La striscia di salute | «In salute», «Degradata» o «Ferma», poi «… dispositivi connessi» | Lo stato del sistema domotico e il collegamento con i dispositivi |
+| La striscia di salute | «Dettagli tecnici» | Apre «Connettore» («attivo» o «fermo»), «Modello», «Versione» con il contratto e «Ultimo evento» |
 | La striscia di salute | «Sistema domotico non raggiungibile» | Il sistema domotico non risponde |
 | La striscia di salute | «Versione del contratto non compatibile» e «Il sistema domotico dichiara il contratto …: questa app supporta solo la versione 1.x. Contatta il supporto tecnico.» | La versione del sistema non è compatibile |
-| «Modalità» | La modalità attuale fra «comfort», «eco» e «casa vuota» | La modalità in corso |
-| «Forza per…» | «Forzatura … attiva fino alle …» e «ancora …» | C'è una forzatura in corso |
-| «Dispositivi» | I dispositivi raggruppati per stanza («Senza stanza» per quelli senza), con stato e letture | Vedi la tabella sotto |
+| La fascia di stato | Sei caselle: «Modalità», «Occupazione», «Prossimo check-in» o «Prossimo check-out», «Finestre», «Consumo di oggi», «Dispositivi online» | Come sta la casa adesso (tabella sotto) |
+| «Modalità» | La scelta fra Comfort, Eco e Casa vuota: quella in corso è scritta in bianco su fondo scuro | La modalità in corso |
+| «Forza per…» | «Forzatura … attiva fino alle …» e «ancora …», in un riquadro giallo chiaro | C'è una forzatura in corso |
+| «Dispositivi» | I dispositivi raggruppati per stanza («Senza stanza» per quelli senza); accanto al nome della stanza, in grigio, quanti sono | Vedi le tabelle sotto |
+
+**La fascia di stato, casella per casella:**
+
+| Casella | Cosa vedi |
+|---|---|
+| «Modalità» | Comfort, Eco o Casa vuota; durante una forzatura, sotto, «forzata fino alle …» |
+| «Occupazione» | «Vuoto», «Occupato» o «Prenotato» |
+| «Prossimo check-in» o «Prossimo check-out» | Il primo fra arrivo e partenza; senza nessuno dei due, «Prossimo evento» con un trattino |
+| «Finestre» | «Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore» |
+| «Consumo di oggi» | I kWh di oggi; un trattino se la funzione Consumi è spenta |
+| «Dispositivi online» | Per esempio «5/6» e, sotto, «1 offline» |
+
+> **Da sapere**
+>
+> - **Le caselle che chiedono attenzione** (una finestra aperta, un dispositivo offline) sono scritte in giallo.
+> - **Su computer** (da 1024 px) ogni stanza è un elenco con una riga per dispositivo; sul telefono e sul tablet
+>   ogni dispositivo è una scheda.
 
 **Che cosa mostra ogni dispositivo:**
 
@@ -492,18 +508,18 @@ La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account�
 | Prese e interruttori | «Acceso» o «Spento» |
 | Caldaia | «Riscaldamento abilitato» o «Riscaldamento disabilitato»; se il suo misuratore segna più di 30 W, «sta scaldando ora» |
 | Climatizzatore | Acceso o spento |
-| Climatizzatore, «Modo» | «caldo», «freddo», «deumidifica», «ventilazione» |
-| Climatizzatore, «Ventola» | «auto», «bassa», «media», «alta» |
+| Climatizzatore, «Modo» | Una tendina con Caldo, Freddo, Deumidifica, Ventilazione |
+| Climatizzatore, «Ventola» | Una tendina con Auto, Bassa, Media, Alta |
 | Climatizzatore, «Temperatura» | La temperatura desiderata con «da … a … °C» |
-| Misuratore di consumo | «Potenza» (in W, cioè quanto consuma adesso) e «Oggi» (kWh di oggi) |
-| Sensori | «Temperatura», «Umidità» |
+| Misuratore di consumo | Una riga «Potenza» con i W (quanto consuma adesso) e, sotto, «Oggi: … kWh» |
+| Sensori | Una riga «Temperatura» e una «Umidità», con il valore a destra (per esempio 16,9 °C) |
 | Contatto finestra | «Aperta» o «Chiusa» «da …» |
 | Sensore di movimento | «Movimento rilevato» o «Nessun movimento» (passando sopra leggi la data precisa) |
 
 **Casi particolari:**
 
-- **Un dispositivo che non risponde** mostra «Dispositivo offline», «Visto …» e «Il dispositivo non è
-  raggiungibile: i comandi sono disattivati».
+- **Un dispositivo che non risponde** ha il badge «Dispositivo offline» sotto il nome, con «Visto …» e, passando
+  sopra, «Il dispositivo non è raggiungibile: i comandi sono disattivati»; la scheda non è sbiadita.
 - **Una capacità che l'app non gestisce** è segnata «non supportata» («Capacità non gestita dall'app: …»).
 - **Senza dispositivi** leggi «Nessun dispositivo in questo appartamento».
 
@@ -540,8 +556,8 @@ La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account�
 
 | Cosa vedi | Cosa vuol dire |
 |---|---|
-| Il filtro «In attesa» | Le richieste aperte |
-| Il filtro «Tutte» | Anche quelle decise negli ultimi 7 giorni |
+| La pillola «In attesa» (la scelta è scritta in scuro) | Le richieste aperte |
+| La pillola «Tutte» | Anche quelle decise negli ultimi 7 giorni |
 | Chi la propone | «Motore AI», «Regola», «Assistente», «Modulo» |
 | La descrizione, «Perché il motore lo propone», «Azione proposta» | Che cosa chiede e perché |
 | Lo stato | «In attesa», «Approvata», «Respinta», «Scaduta» |
@@ -632,9 +648,11 @@ per 24 mesi.
 
 | Cosa vedi | Cosa puoi fare | Cosa succede |
 |---|---|---|
-| Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso» | Scegliere il periodo | «Soggiorno in corso» compare solo con ospiti dentro e una prenotazione conosciuta dall'app |
-| «Totale periodo» in «kWh» e «Ore di clima evitate» | Leggere il totale | «Ore di clima evitate» è oggi sempre «non calcolate». I numeri si aggiornano ogni minuto |
-| Il grafico «Consumo per ora» (oggi) o «Consumo per giorno» (periodi più lunghi) | Passare con il puntatore per leggere i valori | Le ore senza letture contano zero. Senza dati: «Nessun dato nel periodo» |
+| Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso» | Toccare una delle pillole: la scelta è scritta in scuro | «Soggiorno in corso» compare solo con ospiti dentro e una prenotazione conosciuta dall'app |
+| La casella «Totale periodo» in «kWh» | Leggere il totale | I numeri si aggiornano ogni minuto |
+| La casella «Ora con più consumo» (oggi) o «Giorno con più consumo» (periodi più lunghi) | Leggere il picco | Sotto il valore, «ore …» oppure la data |
+| La casella «Ore di clima evitate» | Leggere le ore | Compare solo quando il motore le calcola; oggi non compare |
+| Il grafico «Consumo per ora (kWh)» (oggi) o «Consumo per giorno (kWh)» (periodi più lunghi) | Passare con il puntatore: leggi «ore …» e i kWh | Le ore senza letture contano zero. Senza dati: «Nessun dato nel periodo» |
 | «Per dispositivo» | Leggere il consumo di ogni dispositivo | Lo stesso periodo, diviso per dispositivo |
 | «Consumi disponibili dal …», sotto il grafico | Sapere da quando ci sono misure | È la prima ora con un consumo maggiore di zero. Senza nessun dato la riga non compare |
 
@@ -644,9 +662,11 @@ per 24 mesi.
 
 **Con «Soggiorno in corso»:**
 
-- **Leggi** «Dal check-in del … a ora» e «… ospiti».
-- **Se c'è un soggiorno precedente** conosciuto dall'app, il riquadro «Soggiorno precedente» mostra date, ospiti,
-  kWh e la percentuale «rispetto al precedente».
+- **Leggi** «Dal check-in del … a ora» e «… ospiti», con il pulsante «Excel del soggiorno».
+- **Se c'è un soggiorno precedente** conosciuto dall'app, sotto le caselle compare una riga: la percentuale, poi
+  «rispetto al soggiorno precedente (… → …, … kWh)» e «… ospiti».
+- **Accanto** c'è il pulsante «Excel del soggiorno precedente».
+- **La percentuale è in rosso** solo se il consumo è aumentato.
 - **Il confronto** è fra i totali, senza correggere per durata o numero di ospiti; se il precedente era zero non c'è
   percentuale.
 - **Un soggiorno molto lungo** (oltre 31 giorni) può non mostrare il grafico: «Periodo non valido: massimo 31 giorni
@@ -777,8 +797,8 @@ lavora con un accesso di assistenza.
 
 **Scegliere comfort, eco o casa vuota con un tocco.**
 
-1. **Sotto «Modalità»** tocca «comfort», «eco» o «casa vuota».
-2. **La scelta si illumina** quando il sistema conferma (non c'è un avviso verde).
+1. **Sotto «Modalità»** tocca Comfort, Eco o Casa vuota.
+2. **La scelta diventa bianca su fondo scuro** quando il sistema conferma (non c'è un avviso verde).
 3. **Nelle Decisioni** compare «Modalità» con prima e dopo, per esempio «comfort → casa vuota».
 
 | Modalità | In breve (i dettagli nella parte 10) |
@@ -831,8 +851,8 @@ I comandi funzionano solo sui dispositivi online e con la funzione «Comandi» a
 | Caldaia | «Attiva …» / «Disattiva …» abilita o disabilita il riscaldamento | Leggi «Riscaldamento abilitato» / «Riscaldamento disabilitato» |
 | Caldaia e climatizzatore | «Diminuisci temperatura» e «Aumenta temperatura» accanto a «Temperatura», a passi di 0,5 °C, entro «da … a … °C» | Fuori dai limiti il comando è rifiutato («Il setpoint deve essere tra … e …») |
 | Climatizzatore | L'interruttore | Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all'inizio) |
-| Climatizzatore, «Modo» | Scegli «caldo», «freddo», «deumidifica», «ventilazione» | Il modo cambia |
-| Climatizzatore, «Ventola» | Scegli «auto», «bassa», «media», «alta» | La ventola cambia |
+| Climatizzatore, «Modo» | Scegli dalla tendina: Caldo, Freddo, Deumidifica, Ventilazione | Il modo cambia |
+| Climatizzatore, «Ventola» | Scegli dalla tendina: Auto, Bassa, Media, Alta | La ventola cambia |
 
 > **Da sapere**
 >
@@ -1162,6 +1182,14 @@ L'amministratore fa tutto quello delle parti 4 e 5 su tutti gli appartamenti del
 | «Registro dell'organizzazione» | Chi ha fatto cosa |
 | «Assistente» (dal lotto 31) | Le domande all'assistente, settimana per settimana |
 
+**Come sono fatte le schede:**
+
+- **Sono linguette sottolineate** su una riga sotto il titolo; sul telefono la riga scorre di lato.
+- **La scheda aperta resta nell'indirizzo** della pagina: ricaricando, o riaprendo un indirizzo salvato, torni alla
+  stessa scheda.
+- **L'indirizzo finisce** con `?scheda=utenti`, `?scheda=funzioni`, `?scheda=prenotazioni`, `?scheda=registro` o
+  `?scheda=assistente`.
+
 > **Da sapere**
 >
 > Chi non è amministratore non vede la pagina («Operazione riservata agli amministratori» se ci prova dal server).
@@ -1177,7 +1205,7 @@ hanno avuto risposta in tempo dall'assistente completo e quante hanno avuto una 
 |---|---|
 | Le ultime 8 settimane, da lunedì a domenica («dal 13 al 19 ottobre»; «(in corso)» sulla prima) | Una riga per settimana |
 | «Settimana», «Domande», «Timeout», «Risposte rapide» e «% timeout» | Le colonne della tabella |
-| Righe in giallo | Settimane sopra il 10 % di timeout |
+| «% timeout» in giallo con un pallino | Settimane sopra il 10 % di timeout: si colora solo quel numero |
 | «Risposte rapide per causa, nelle settimane mostrate: tempo scaduto … · assistente non raggiungibile … · limite mensile … · risposta non valida …» | Il dettaglio delle risposte rapide, sotto la tabella |
 | «Timeout oltre il 10 % per due settimane di fila: va riaperta la scelta del modello dell'assistente.» | In cima, con due settimane complete di fila sopra la soglia |
 | «Nessuna domanda all'assistente nelle ultime settimane.» | Nessuna domanda |
@@ -1208,13 +1236,17 @@ password. Il ruolo decide cosa può fare.».
 >
 > L'invito resta registrato anche se l'email non parte.
 
-**L'elenco degli utenti:**
+**L'elenco degli utenti, una riga per persona:**
 
-- **Ogni riga**: email, nome, ruolo, «… dispositivi push» (i dispositivi con le notifiche accese), appartamenti
-  visibili.
-- **«in attesa del primo accesso»** finché la persona non entra; «tu» accanto a te.
+- **Prima linea**: l'email, con il badge «in attesa del primo accesso» finché la persona non entra, oppure «tu».
+- **Seconda linea, in grigio**: nome, «… dispositivi push» (i dispositivi con le notifiche accese) e gli
+  appartamenti visibili.
+- **A destra**: la tendina del ruolo e il menu «⋯» («Altre azioni per …»).
+- **Nel menu «⋯»**: «Appartamenti» (non per gli amministratori), «Reinvia» (solo per chi è in attesa) ed «Elimina»
+  in rosso.
+- **Sulla tua riga** il menu non c'è.
 
-**«Reinvia»**, su chi è in attesa:
+**«Reinvia»**, nel menu «⋯» di chi è in attesa:
 
 - **Stessi esiti** dell'invito.
 - **Le email hanno dei limiti**: al massimo 3 ogni 10 minuti e 10 ogni 24 ore per destinatario, 50 ogni ora per
@@ -1238,7 +1270,7 @@ password. Il ruolo decide cosa può fare.».
 
 **Appartamenti visibili:**
 
-1. **Premi «Appartamenti»** accanto a un operatore o a un lettore.
+1. **Apri il menu «⋯»** di un operatore o di un lettore e scegli «Appartamenti».
 2. **Si apre «Appartamenti di …»** («Scegli quali appartamenti vede questo utente. Gli amministratori vedono sempre
    tutti gli appartamenti.»).
 3. **Scegli «Tutti gli appartamenti»** oppure le caselle, poi «Salva» («Appartamenti aggiornati»).
@@ -1261,7 +1293,7 @@ password. Il ruolo decide cosa può fare.».
 
 **Togliere accesso e notifiche a un utente.**
 
-1. **Premi «Elimina»** sulla persona: chiede «Rimuovere l'utente …?».
+1. **Apri il menu «⋯»** della persona e scegli «Elimina» (in rosso): chiede «Rimuovere l'utente …?».
 2. **Conferma**: compare «Utente rimosso».
 3. **La persona perde** accesso e notifiche; le sue azioni restano nei registri per 24 mesi con il nome.
 
@@ -1275,16 +1307,18 @@ password. Il ruolo decide cosa può fare.».
 
 **Nome, indirizzo, prezzo e dati tecnici di ogni appartamento.**
 
-| Cosa vedi nella scheda | Cosa vuol dire |
-|---|---|
-| Nome, «Indirizzo», «Fuso orario» | L'anagrafica |
-| «Indirizzo del sistema domotico», «ID Italianway» | Il collegamento tecnico e il codice delle prenotazioni |
-| «Ultima verifica» («mai eseguita», «riuscita il …», «non riuscita il …») | L'esito dell'ultima «Verifica connessione» |
-| «Funzioni» (con i nomi del menu, per esempio «Approvazioni, Consumi») | Le funzioni attive |
-| «Prezzo dell'energia: … (solo per questo appartamento)» o «Prezzo dell'energia: … (dell'organizzazione)» | Il prezzo che vale |
-| «Dimostrativo» | Appartamento finto per le prove |
+Gli appartamenti stanno in un solo riquadro, una riga per appartamento.
 
-- **L'identificativo** dell'appartamento si copia toccandolo.
+| Cosa vedi nella riga | Cosa vuol dire |
+|---|---|
+| Il nome con i badge «Dimostrativo» e «disattivato», poi l'indirizzo | L'anagrafica; «Dimostrativo» è un appartamento finto per le prove |
+| «Prezzo dell'energia: … (solo per questo appartamento)» o «Prezzo dell'energia: … (dell'organizzazione)» | Il prezzo che vale |
+| «Ultima verifica» («mai eseguita», «riuscita il …», «non riuscita il …») | L'esito dell'ultima «Verifica connessione» |
+| L'interruttore «Attivo» e «Modifica», a destra | Spegnere l'appartamento; cambiare nome, indirizzo e prezzo |
+| «Verifica connessione» con la nota «Se la verifica non riesce, avvisa l'assistenza.» | Provare il collegamento |
+| «Dettagli tecnici» | Apre «Codice», «Fuso orario», «Collegamento al sistema domotico», «ID Italianway» e «Funzioni» (con i nomi del menu, per esempio «Approvazioni, Consumi») |
+
+- **Il «Codice»** dell'appartamento, in «Dettagli tecnici», si copia toccandolo (compare «Copiato»).
 - **Non ci sono «Nuovo appartamento» né cestino**: «I nuovi appartamenti li aggiunge il gestore della piattaforma
   (HQE): per averne uno, scrivi all'assistenza.».
 
@@ -1315,9 +1349,10 @@ password. Il ruolo decide cosa può fare.».
 
 **Spegnere un appartamento, provare il collegamento, impostare il prezzo.**
 
-**«Attivo»** (nella scheda o in Modifica):
+**«Attivo»** (l'interruttore nella riga, o in Modifica):
 
-- **Spento**, l'appartamento compare «Disattivato» nell'elenco.
+- **Spento**, l'appartamento ha il badge «disattivato» in Amministrazione e «Disattivato» nell'elenco
+  «Appartamenti».
 - **Le operazioni** rispondono «Appartamento disattivato» e le prenotazioni non vengono inoltrate.
 - **Non spegne** i dispositivi né gli automatismi del sistema domotico.
 
@@ -1351,10 +1386,24 @@ appartamento può avere un'eccezione.».
 
 | Cosa vedi | Cosa puoi fare | Cosa succede |
 |---|---|---|
-| Nove interruttori con i nomi del menu: Panoramica, Dispositivi, Comandi, Consumi, Programmazione, Regole, Approvazioni, Decisioni, Assistente | Accendere o spegnere una funzione per tutta l'organizzazione | Ogni cambio si salva subito («Funzioni aggiornate») |
+| Nove interruttori in colonna, con i nomi del menu e una riga di spiegazione sotto ciascuno (tabella sotto) | Accendere o spegnere una funzione per tutta l'organizzazione | Ogni cambio si salva subito («Funzioni aggiornate») |
 | «Ripristina tutte» | Riaccendere tutto | Tutte le funzioni tornano accese |
-| Lo stesso elenco per ogni appartamento, con «eredita dall'organizzazione» oppure «eccezione per questo appartamento» | Fare un'eccezione per un appartamento | L'eccezione sostituisce la scelta dell'organizzazione e può anche riaccendere una funzione spenta per tutti |
+| Lo stesso elenco per ogni appartamento, compatto e senza spiegazioni, con «eredita dall'organizzazione» oppure «eccezione per questo appartamento» | Fare un'eccezione per un appartamento | L'eccezione sostituisce la scelta dell'organizzazione e può anche riaccendere una funzione spenta per tutti |
 | «Torna all'organizzazione» | Togliere l'eccezione | L'appartamento segue di nuovo l'organizzazione |
+
+**Che cosa spiega l'app sotto ogni funzione:**
+
+| Funzione | Spiegazione nell'app |
+|---|---|
+| Panoramica | «La fascia di stato della casa, la modalità e la forzatura.» |
+| Dispositivi | «L'elenco dei dispositivi per stanza, con le letture.» |
+| Comandi | «Accendere, spegnere e regolare i dispositivi dall'app.» |
+| Consumi | «Consumi per ora, giorno e dispositivo, e il rendiconto in Excel.» |
+| Programmazione | «Le azioni pianificate dal motore e dal gestore.» |
+| Regole | «Gli automatismi del motore e i loro valori.» |
+| Approvazioni | «Le azioni che il motore esegue solo con il consenso del gestore.» |
+| Decisioni | «Il registro di ciò che il motore ha deciso e perché.» |
+| Assistente | «Le richieste a parole all'assistente.» |
 
 > **Da sapere**
 >
@@ -1539,6 +1588,9 @@ gestori della piattaforma»).
 | «Prenotazioni non attribuite» | Le prenotazioni che non corrispondono a nessun appartamento |
 | «Registro della piattaforma» | Cosa è successo in un'organizzazione o nella piattaforma |
 
+Le schede sono linguette sottolineate su una riga sotto il titolo. La scheda aperta resta nell'indirizzo della
+pagina, che finisce con `?scheda=gestori`, `?scheda=non-attribuite` o `?scheda=registro`.
+
 > **Da sapere**
 >
 > - **Chi non ha il ruolo**, aprendo l'indirizzo, vede «Pagina non trovata».
@@ -1559,6 +1611,8 @@ gestori della piattaforma»).
 | «Primo amministratore» con «in attesa del primo accesso», «attivo» o «nessun amministratore invitato» | Lo stato del primo amministratore |
 | «Sospesa» | L'organizzazione è sospesa |
 | Gli accessi di assistenza aperti | Chi di HQE è dentro, fino a quando |
+| I pulsanti «Appartamenti» (con la freccia) e «Accesso di assistenza», oppure «Entra come assistenza» e «Chiudi accesso» | Le azioni più frequenti |
+| Il menu «⋯» («Altre azioni per …») | «Rinomina», «Reinvia invito» (finché il primo amministratore non è entrato), «Sospendi» in rosso oppure «Riattiva» |
 | «Nessuna organizzazione» | Non ce n'è nessuna |
 
 **«Nuova organizzazione»** spiega: «L'organizzazione nasce con il suo primo amministratore: riceve un'email per
@@ -1577,7 +1631,7 @@ entrare, poi invita gli altri utenti.».
 | «Esiste già un'organizzazione con questo nome» | Nome duplicato |
 | «Questa email non può essere invitata» | L'email non è ammessa |
 
-**«Reinvia invito»**, finché il primo amministratore non è entrato:
+**«Reinvia invito»**, nel menu «⋯», finché il primo amministratore non è entrato:
 
 - **Esiti**: «Invito inviato di nuovo a …», «L'email a … non è partita: riprova più tardi.», «L'invio email non è
   attivo: avvisa tu …».
@@ -1585,14 +1639,14 @@ entrare, poi invita gli altri utenti.».
 
 ### Elenco organizzazioni: rinominare, sospendere, riattivare
 
-**Le azioni sulla scheda di un'organizzazione.**
+**Le azioni sulla scheda di un'organizzazione, dal menu «⋯».**
 
 **«Rinomina»:**
 
 - **Apre «Rinomina l'organizzazione»**: «Nome dell'organizzazione», «Salva» («Nome aggiornato»).
 - **Solo HQE** cambia il nome.
 
-**«Sospendi»:**
+**«Sospendi»** (in rosso):
 
 1. **Apre «Sospendere «…»?»** («I suoi utenti escono dall'app e non possono rientrare finché non la riattivi; le
    notifiche si fermano. Le prenotazioni continuano ad arrivare al motore degli appartamenti.»).
@@ -1607,23 +1661,24 @@ entrare, poi invita gli altri utenti.».
 > - **Gli accessi di assistenza** si chiudono; i dispositivi non vengono spenti.
 > - **Se è la tua organizzazione** resti dentro Organizzazioni per poterla riattivare.
 
-**«Riattiva»:**
+**«Riattiva»** (al posto di «Sospendi» in un'organizzazione sospesa):
 
 - **Chiede** «Riattivare «…»? I suoi utenti potranno di nuovo entrare nell'app.» («Organizzazione «…» riattivata»).
 - **Gli accessi di assistenza** chiusi dalla sospensione non riaprono da soli.
 
 **Le altre azioni:**
 
-- **«Accesso di assistenza»** e **«Entra come assistenza»**: parte 8.
-- **«Appartamenti»** nella scheda dell'organizzazione: la parte tecnica (sotto).
+- **«Accesso di assistenza»** e **«Entra come assistenza»**, pulsanti sulla scheda: parte 8.
+- **«Appartamenti»**, il pulsante con la freccia: apre la parte tecnica (sotto) dentro la scheda.
 
 ### Appartamenti di un'organizzazione: creare un appartamento
 
 **La parte tecnica: identificativo, collegamento, codice Italianway.**
 
-L'elenco mostra identificativo, nome, collegamento, porta, fuso, codice Italianway, stato, ultima verifica e
-«Dimostrativo»; senza appartamenti, «Nessun appartamento in questa organizzazione». Da qui non si aprono Panoramica,
-dispositivi o consumi.
+Ogni riga mostra il nome con i badge «Dimostrativo» e «disattivato», il codice copiabile e, in grigio,
+collegamento, porta, fuso e codice Italianway; poi «Ultima verifica». I pulsanti «Modifica collegamento» e
+«Verifica connessione» hanno il contorno, «Elimina» è rosso. Senza appartamenti leggi «Nessun appartamento in
+questa organizzazione». Da qui non si aprono Panoramica, dispositivi o consumi.
 
 **«Nuovo appartamento»** apre «Nuovo appartamento per …» («L'identificativo non si potrà più cambiare: usa minuscole,
 numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l'amministratore
@@ -2071,10 +2126,10 @@ Vedi la parte 5, «Approvazioni: approvare o respingere». In breve:
 
 **Il giro di controllo quotidiano, pagina per pagina.**
 
-1. **Apri «Appartamenti»**: controlla «Approvazioni in attesa», «Prossimo check-in», «Prossimo check-out», lo stato e
-   il consumo «Oggi».
-2. **Apri l'appartamento**: in Panoramica guarda «In tempo reale», la salute, l'occupazione, le finestre e i
-   dispositivi offline. Con «Riconnessione…» aspetta.
+1. **Apri «Appartamenti»**: controlla la riga «… approvazioni in attesa», «Prossimo check-in», «Prossimo check-out»,
+   lo stato e «Consumo di oggi».
+2. **Apri l'appartamento**: in Panoramica guarda «In tempo reale», la salute e la fascia di stato («Occupazione»,
+   «Finestre», «Dispositivi online»). Con «Riconnessione…» aspetta.
 3. **In «Programmazione»** controlla pre-arrivo, check-out e azioni manuali; aggiungi o sposta solo se serve.
 4. **Per intervenire** usa la modalità o la scheda del dispositivo; con «Forza per…» ricorda che i cambi programmati
    aspettano la fine della forzatura.
