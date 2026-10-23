@@ -11,14 +11,15 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { t } from "@/i18n";
 import { capitalizeFirst, fmtNumber, fmtShortDateTime } from "@/lib/format";
 import { platformApartmentsUrl } from "@/lib/routes";
+import { MODE_BG, MODE_FG } from "@/lib/modeColours";
 import { cn } from "@/lib/utils";
 
 /** One datum of the card's strip (design lot 2): label 12 px above the value, no icon; grey when the apartment is offline. */
-function Stat({ label, value, muted, testId }: { label: string; value: React.ReactNode; muted?: boolean; testId: string }) {
+function Stat({ label, value, muted, bg, fg, testId }: { label: string; value: React.ReactNode; muted?: boolean; bg?: string; fg?: string; testId: string }) {
   return (
-    <div className="min-w-0 bg-card px-3 py-2" data-testid={testId}>
-      <div className="text-xs font-medium text-muted-foreground">{label}</div>
-      <div className={cn("text-sm font-semibold tabular [overflow-wrap:anywhere]", muted && "text-muted-foreground")}>{value}</div>
+    <div className={cn("min-w-0 px-3 py-2", !muted && bg ? bg : "bg-card")} data-testid={testId}>
+      <div className={cn("text-xs font-medium", !muted && fg ? fg : "text-muted-foreground")}>{label}</div>
+      <div className={cn("text-sm font-semibold tabular [overflow-wrap:anywhere]", muted ? "text-muted-foreground" : fg)}>{value}</div>
     </div>
   );
 }
@@ -54,8 +55,8 @@ function ApartmentCard({ a }: { a: ApartmentSummary }) {
         </div>
         {/* the data as one strip divided by 1 px lines (design lot 2) */}
         <div className="grid grid-cols-2 gap-px overflow-hidden rounded-md border bg-border">
-          <Stat label={t("mode.label")} value={apt ? capitalizeFirst(t(`mode.${apt.mode}`)) : "—"} muted={offline} testId={`apartment-mode-${a.apartment_id}`} />
-          <Stat label={t("apartments.kwhToday")} value={a.kwh_today !== null ? `${fmtNumber(a.kwh_today, 1)} kWh` : "—"} muted={offline} testId={`apartment-kwh-${a.apartment_id}`} />
+          <Stat label={t("mode.label")} value={apt ? capitalizeFirst(t(`mode.${apt.mode}`)) : "—"} muted={offline} bg={apt ? MODE_BG[apt.mode] : undefined} fg={apt ? MODE_FG[apt.mode] : undefined} testId={`apartment-mode-${a.apartment_id}`} />
+          <Stat label={t("apartments.kwhToday")} value={a.kwh_today !== null ? `${fmtNumber(a.kwh_today, 1)} kWh` : "—"} muted={offline} fg={a.kwh_today !== null ? "text-primary" : undefined} testId={`apartment-kwh-${a.apartment_id}`} />
           <Stat label={t("apartments.nextCheckin")} value={fmtShortDateTime(apt?.next_checkin, a.timezone)} muted={offline} testId={`apartment-checkin-${a.apartment_id}`} />
           <Stat label={t("apartments.nextCheckout")} value={fmtShortDateTime(apt?.next_checkout, a.timezone)} muted={offline} testId={`apartment-checkout-${a.apartment_id}`} />
         </div>

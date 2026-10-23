@@ -7,6 +7,7 @@ import { Badge, Dialog, DialogContent, DialogDescription, DialogTitle } from "@/
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { capitalizeFirst, fmtRemaining, fmtTime } from "@/lib/format";
+import { MODE_BG, MODE_FG } from "@/lib/modeColours";
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
 
@@ -55,7 +56,7 @@ export function ModeSelector({ aptId, apartment, canWrite }: { aptId: string; ap
             data-testid={`mode-selector-${m}`}
             className={cn(
               "flex min-h-[40px] items-center gap-1.5 rounded-full px-4 text-sm font-bold transition-colors focus-ring disabled:cursor-not-allowed",
-              apartment.mode === m ? "bg-foreground text-background" : "text-muted-foreground hover:text-foreground",
+              apartment.mode === m ? cn(MODE_BG[m], MODE_FG[m]) : "text-muted-foreground hover:text-foreground",
             )}
           >
             {requested === m && <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />}
