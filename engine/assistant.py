@@ -70,11 +70,15 @@ Rispondi SOLO con un oggetto JSON, senza altro testo e senza blocchi di codice:
 {{"risposta": "<al massimo tre frasi per il gestore>", "azioni": [<zero o più azioni>]}}
 Ogni azione ha una di queste forme:
 {{"tipo": "modalita", "modalita": "comfort" | "eco" | "empty"}}
-{{"tipo": "comando", "device_id": "<id>", "capability": "switch" | "climate" | "heating",
- "action": "turn_on" | "turn_off" | "set_climate" | "set_heating",
- "params": {{"on": true | false, "mode": "cool" | "heat" | "dry" | "fan", "setpoint": <numero>, "fan": "auto" | "low" | "mid" | "high"}}}}
+{{"tipo": "comando", "device_id": "<id di una presa>", "capability": "switch", "action": "turn_on" | "turn_off"}}
+{{"tipo": "comando", "device_id": "<id di un clima>", "capability": "climate", "action": "set_climate",
+ "params": {{solo i campi da cambiare fra "on": true | false, "mode": "cool" | "heat" | "dry" | "fan", "setpoint": <numero>, "fan": "auto" | "low" | "mid" | "high"}}}}
+{{"tipo": "comando", "device_id": "<id di una caldaia>", "capability": "heating", "action": "set_heating",
+ "params": {{solo i campi da cambiare fra "on": true | false, "setpoint": <numero>}}}}
+{{"tipo": "comando", "device_id": "<id di un clima o di una caldaia>", "capability": "climate" | "heating", "action": "turn_off"}}
 {{"tipo": "programma", "quando": "<data e ora locale AAAA-MM-GGTHH:MM:SS>", "modalita": "comfort" | "eco" | "empty"}}
-{{"tipo": "programma", "quando": "<data e ora locale>", "device_id": "<id>", "capability": "...", "action": "...", "params": {{...}}}}
+{{"tipo": "programma", "quando": "<data e ora locale>", e device_id, capability, action, params come in un comando}}
+Nessun campo con valore null.
 Per una domanda senza azioni, «azioni» è vuoto."""
 
 
@@ -105,6 +109,27 @@ def parse_answer(text: str | None) -> dict | None:
         if "params" in a and not isinstance(a["params"], dict):
             return None
     return {"risposta": data["risposta"], "azioni": actions}
+
+
+def clean_command(capability, action, params) -> tuple:
+    """(action, params) of a model's command in the form the engine checks (staging, 23 Oct: «accendi la stufetta»
+    came with "on": true and mode, setpoint, fan null on a socket's turn_on, refused as «Parametri non ammessi»).
+    Null fields and fields the action does not take are dropped; turn_on of a climate or a boiler is set_climate /
+    set_heating with on true. A contradiction (turn_on with "on": false, turn_off with "on": true) is refused."""
+    from .core import PARAMS, MockError
+    if not isinstance(params, dict):
+        return action, params                        # the engine's check refuses it as before
+    params = {k: v for k, v in params.items() if v is not None}
+    if action in ("turn_on", "turn_off"):
+        if "on" in params and params["on"] is not (action == "turn_on"):
+            raise MockError(422, "invalid_params", "Comando contraddittorio: accensione e spegnimento insieme")
+        if action == "turn_on" and capability in ("climate", "heating"):
+            action, params = ("set_climate" if capability == "climate" else "set_heating"), {**params, "on": True}
+        else:
+            params = {}
+    if action in PARAMS:
+        params = {k: v for k, v in params.items() if k in PARAMS[action]}
+    return action, params
 
 
 def as_tool(action: dict) -> tuple[str, dict]:
@@ -437,8 +462,8 @@ class Assistant:
                 return {"registrata": f"modalità {mode}"}
             if name == "comanda_dispositivo":
                 device = e.get_device(args.get("device_id", ""))
-                body = {"capability": args.get("capability"), "action": args.get("action"),
-                        "params": args.get("params") or {}}
+                action, params = clean_command(args.get("capability"), args.get("action"), args.get("params") or {})
+                body = {"capability": args.get("capability"), "action": action, "params": params}
                 e.validate_command(device, body)
                 proposals.append({"type": "command", "device_id": device["device_id"], "body": body})
                 return {"registrato": f"comando {body['action']} a {device['label']}"}
@@ -448,8 +473,8 @@ class Assistant:
                     action = {"type": "apartment_mode", "mode": args["modalita"]}
                 else:
                     device = e.get_device(args.get("device_id", ""))
-                    body = {"capability": args.get("capability"), "action": args.get("action"),
-                            "params": args.get("params") or {}}
+                    action, params = clean_command(args.get("capability"), args.get("action"), args.get("params") or {})
+                    body = {"capability": args.get("capability"), "action": action, "params": params}
                     e.validate_command(device, body)
                     action = {"type": "device_command", "device_id": device["device_id"], **body}
                 proposals.append({"type": "schedule", "run_at": when, "action": action})

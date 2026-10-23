@@ -428,3 +428,54 @@ def test_d182_the_quick_assistant_keeps_the_confirmations(no_time):
     assert a["status"] == "needs_approval" and e.pending_approval()["source"] == "assistant"
     assert "Spengo climatizzatore soggiorno con ospiti presenti?" in a["answer"] and e.commands == {}
 
+
+
+# ---- staging, 23 Oct: the model's command with fields the action does not take -----------------------------------
+def test_a_socket_command_with_null_or_extra_fields_runs():
+    """«accendi la stufetta in camera»: the model wrote "on": true and mode, setpoint, fan null on a socket's turn_on;
+    the engine drops what the action does not take and runs it (it said «Parametri non ammessi» before)."""
+    script = Script(js("Accendo la stufetta.", cmd(PRESA, "switch", "turn_on", on=True, mode=None, setpoint=None,
+                                                   fan=None)))
+    e = engine(script)
+    a = ask(e, "accendi la stufetta in camera")
+    assert a["answer"] == "Accendo la stufetta.\nFatto: accendere presa stufetta camera."
+    assert e.devices[PRESA]["capabilities"]["switch"]["on"] is True
+    system = script.sent[0]["messages"][0]["content"]                           # each form with only its fields
+    assert '"capability": "switch", "action": "turn_on" | "turn_off"}' in system and "Nessun campo con valore null" in system
+
+
+def test_climate_and_boiler_commands_keep_only_their_fields_and_a_contradiction_is_refused():
+    assert assistant.clean_command("climate", "set_climate", {"on": True, "setpoint": 22, "fan": None, "extra": 1}) == (
+        "set_climate", {"on": True, "setpoint": 22})
+    assert assistant.clean_command("heating", "set_heating", {"on": True, "mode": "heat", "setpoint": 20}) == (
+        "set_heating", {"on": True, "setpoint": 20})
+    assert assistant.clean_command("climate", "turn_on", {"mode": "cool"}) == ("set_climate", {"mode": "cool", "on": True})
+    assert assistant.clean_command("heating", "turn_off", {"on": False, "setpoint": None}) == ("turn_off", {})
+    with pytest.raises(core.MockError) as exc:
+        assistant.clean_command("switch", "turn_on", {"on": False})
+    assert exc.value.status == 422 and "contraddittorio" in exc.value.message
+
+
+@pytest.mark.parametrize("params", [
+    {"on": False, "mode": "cool", "setpoint": 24, "fan": "auto"},           # every field of the old prompt, filled
+    {"on": False, "mode": None, "setpoint": None, "fan": None},             # every field, null
+])
+def test_switching_off_the_climate_with_the_old_prompts_fields_asks_the_guests_first(params):
+    """Staging, 23 Oct, test 7 («spegni il clima» on demo-occupato): the model's JSON with all the fields of the form
+    the prompt used to show; now the engine keeps what turn_off takes (nothing) and asks first, as with guests in."""
+    e = engine(Script(js("Spengo il clima.", cmd(CLIMA, "climate", "turn_off", **params))), occupied=True)
+    a = ask(e, "spegni il clima")
+    assert a["status"] == "needs_approval" and "Parametri non ammessi" not in a["answer"]
+    assert e.pending_approval()["description"] == "Spegnere climatizzatore soggiorno"
+
+
+def test_every_command_with_all_the_fields_the_model_writes_today_runs():
+    """End to end with the JSON the real model writes from the prompt it had (each command with all four params)."""
+    full = {"mode": "heat", "setpoint": 21, "fan": "auto"}
+    e = engine(Script(js("Fatto tutto.", cmd(PRESA, "switch", "turn_on", on=True, **full),
+                         cmd(CLIMA, "climate", "set_climate", on=True, **full),
+                         cmd("dev-caldaia", "heating", "set_heating", on=True, **full))), ASSISTANT_CONFIRM="ospiti")
+    a = ask(e, "accendi la stufetta, il clima a 21 e la caldaia a 21")
+    assert "Parametri non ammessi" not in (a["answer"] or "") and "Non fatto" not in (a["answer"] or "")
+    assert a["status"] == "needs_approval" and len(e.approval_queue) == 2   # three together: one each, queued (D-162)
+    assert a["answer"].count("Rispondi Sì o No qui sotto") == 3
