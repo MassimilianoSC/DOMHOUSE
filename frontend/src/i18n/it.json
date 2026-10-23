@@ -796,6 +796,7 @@
       "scopeCount": "{count} appartamenti",
       "scopeNoneWarning": "Nessun appartamento scelto: l'utente non vedrà nessun appartamento finché non ne assegni almeno uno.",
       "scopeNoneConfirm": "Nessun appartamento scelto: {email} non vedrà nessun appartamento finché non ne assegni almeno uno. Confermi?",
+      "menu": "Altre azioni per {email}",
       "scopeEdit": "Appartamenti",
       "scopeDialogTitle": "Appartamenti di {email}",
       "scopeDialogHint": "Scegli quali appartamenti vede questo utente. Gli amministratori vedono sempre tutti gli appartamenti.",

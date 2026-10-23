@@ -5,6 +5,11 @@ import type { MockInstance } from "vitest";
 import { t } from "@/i18n";
 import { AdminUsers } from "./AdminUsers";
 
+// The «⋯» menu of a row (design lot 2) opens from the keyboard: jsdom has no real pointer events for Radix.
+const openMenu = (id: string) => act(async () => {
+  fireEvent.keyDown(screen.getByTestId(id), { key: "Enter" });
+});
+
 // Amministrazione > Utenti with per-apartment permissions (P-18, API shape D-43: "all" or a list, [] = none).
 const s = vi.hoisted(() => ({
   users: [] as unknown[],
@@ -110,7 +115,8 @@ describe("Utenti: elenco e modifica degli appartamenti", () => {
 
   it("«Appartamenti» apre la scelta con la lista attuale; «Tutti» e Salva → PATCH con «all» e avviso", async () => {
     await renderUsers();
-    await click(screen.getByTestId("admin-user-scope-btn-u-owner"));
+    await openMenu("admin-user-menu-u-owner");
+    await click(await screen.findByTestId("admin-user-scope-btn-u-owner"));
     const dialog = await screen.findByTestId("scope-dialog-u-owner");
     expect(within(dialog).getByTestId("scope-edit-u-owner-apt-rimini-01")).toBeChecked();
     expect(within(dialog).getByTestId("scope-edit-u-owner-apt-bologna-01")).not.toBeChecked();
@@ -124,7 +130,8 @@ describe("Utenti: elenco e modifica degli appartamenti", () => {
   it("togliere l'ultimo appartamento chiede conferma; annullando non salva", async () => {
     confirm.mockReturnValue(false);
     await renderUsers();
-    await click(screen.getByTestId("admin-user-scope-btn-u-owner"));
+    await openMenu("admin-user-menu-u-owner");
+    await click(await screen.findByTestId("admin-user-scope-btn-u-owner"));
     const dialog = await screen.findByTestId("scope-dialog-u-owner");
     fireEvent.click(within(dialog).getByTestId("scope-edit-u-owner-apt-rimini-01"));
     expect(within(dialog).getByTestId("scope-edit-u-owner-none-warning")).toBeInTheDocument();
@@ -136,7 +143,8 @@ describe("Utenti: elenco e modifica degli appartamenti", () => {
 
   it("confermando «nessuno» salva la lista vuota", async () => {
     await renderUsers();
-    await click(screen.getByTestId("admin-user-scope-btn-u-owner"));
+    await openMenu("admin-user-menu-u-owner");
+    await click(await screen.findByTestId("admin-user-scope-btn-u-owner"));
     const dialog = await screen.findByTestId("scope-dialog-u-owner");
     fireEvent.click(within(dialog).getByTestId("scope-edit-u-owner-apt-rimini-01"));
     await click(within(dialog).getByTestId("scope-dialog-save"));

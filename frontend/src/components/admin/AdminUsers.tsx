@@ -8,6 +8,7 @@ import { ApartmentScopePicker, isNoneScope, scopeSummary } from "@/components/ad
 import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { Button } from "@/components/ui/button";
 import { Badge, Card, Dialog, DialogContent, DialogDescription, DialogTitle, Input, Label, NativeSelect, Skeleton } from "@/components/ui/primitives";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 
@@ -129,43 +130,54 @@ export function AdminUsers() {
       </Card>
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="admin-users-error" />}
       {q.isLoading ? <Skeleton className="h-48 rounded-2xl" /> : (
-        <Card className="divide-y px-5" data-testid="admin-users-list">
-          {q.data?.map((u) => (
-            <div key={u.uid} className="flex flex-wrap items-center gap-3 py-3" data-testid={`admin-user-${u.uid}`}>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
-                  <span data-testid={`admin-user-email-${u.uid}`}>{u.email}</span>
-                  {u.pending && <Badge className="border-warning-border bg-warning-bg text-warning-fg" data-testid={`admin-user-pending-${u.uid}`}>{t("admin.users.pending")}</Badge>}
-                  {u.uid === me?.user.uid && <Badge>{t("admin.users.you")}</Badge>}
+        <Card className="divide-y px-4 sm:px-5" data-testid="admin-users-list">
+          {q.data?.map((u) => {
+            const self = u.uid === me?.user.uid;
+            const scope = u.role !== "admin" ? scopeSummary(u.apartment_ids, apartments) : null;
+            return (
+              // two lines (design lot 2): email and state, then name, devices and apartments in grey; role and «⋯» at the end
+              <div key={u.uid} className="flex items-start gap-3 py-3" data-testid={`admin-user-${u.uid}`}>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                    <span className="[overflow-wrap:anywhere]" data-testid={`admin-user-email-${u.uid}`}>{u.email}</span>
+                    {u.pending && <Badge className="border-warning-border bg-warning-bg text-warning-fg" data-testid={`admin-user-pending-${u.uid}`}>{t("admin.users.pending")}</Badge>}
+                    {self && <Badge>{t("admin.users.you")}</Badge>}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {u.display_name || "—"} · {t("admin.users.devices", { count: u.push_tokens })}
+                    {scope && (
+                      <>
+                        {" · "}
+                        <span title={scope.names.join(", ") || undefined} data-testid={`admin-user-scope-${u.uid}`}>{scope.text}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {u.display_name || "—"} · {t("admin.users.devices", { count: u.push_tokens })}
-                  {u.role !== "admin" && (
-                    <>
-                      {" · "}
-                      <span title={scopeSummary(u.apartment_ids, apartments).names.join(", ") || undefined} data-testid={`admin-user-scope-${u.uid}`}>
-                        {scopeSummary(u.apartment_ids, apartments).text}
-                      </span>
-                    </>
-                  )}
-                </div>
+                <NativeSelect value={u.role} disabled={self} aria-label={t("settings.role")} onChange={(e) => changeRole(u, e.target.value as Role)} className="h-9 w-auto" data-testid={`admin-user-role-${u.uid}`}>
+                  {ROLES.map((r) => <option key={r} value={r}>{t(`roles.${r}`)}</option>)}
+                </NativeSelect>
+                {!self ? (
+                  <RowMenu label={t("admin.users.menu", { email: u.email })} testId={`admin-user-menu-${u.uid}`}>
+                    {u.role !== "admin" && (
+                      <RowMenuItem onSelect={() => setScopeUser(u)} testId={`admin-user-scope-btn-${u.uid}`}>
+                        <Building2 /> {t("admin.users.scopeEdit")}
+                      </RowMenuItem>
+                    )}
+                    {u.pending && (
+                      <RowMenuItem disabled={resending === u.uid} onSelect={() => void resend(u)} testId={`admin-user-resend-${u.uid}`}>
+                        <Mail /> {t("admin.users.resend")}
+                      </RowMenuItem>
+                    )}
+                    <RowMenuItem danger onSelect={() => void remove(u)} testId={`admin-user-delete-${u.uid}`}>
+                      <Trash2 /> {t("common.delete")}
+                    </RowMenuItem>
+                  </RowMenu>
+                ) : (
+                  <span className="w-9 shrink-0" aria-hidden />
+                )}
               </div>
-              <NativeSelect value={u.role} disabled={u.uid === me?.user.uid} aria-label={t("settings.role")} onChange={(e) => changeRole(u, e.target.value as Role)} className="w-auto" data-testid={`admin-user-role-${u.uid}`}>
-                {ROLES.map((r) => <option key={r} value={r}>{t(`roles.${r}`)}</option>)}
-              </NativeSelect>
-              {u.role !== "admin" && (
-                <Button variant="outline" size="sm" onClick={() => setScopeUser(u)} data-testid={`admin-user-scope-btn-${u.uid}`}>
-                  <Building2 /> {t("admin.users.scopeEdit")}
-                </Button>
-              )}
-              {u.pending && (
-                <Button variant="outline" size="sm" disabled={resending === u.uid} onClick={() => resend(u)} data-testid={`admin-user-resend-${u.uid}`}>
-                  <Mail /> {t("admin.users.resend")}
-                </Button>
-              )}
-              <Button variant="destructive" size="icon" disabled={u.uid === me?.user.uid} aria-label={t("common.delete")} onClick={() => remove(u)} data-testid={`admin-user-delete-${u.uid}`}><Trash2 /></Button>
-            </div>
-          ))}
+            );
+          })}
         </Card>
       )}
       {scopeUser && <ScopeDialog key={scopeUser.uid} user={scopeUser} apartments={apartments} onClose={() => setScopeUser(null)} onSaved={() => void refresh()} />}
