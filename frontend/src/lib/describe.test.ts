@@ -111,3 +111,10 @@ describe("modalità «casa vuota» (D-158)", () => {
     expect(decisionValue("")).toBe("—");
   });
 });
+
+describe("antimuffa: la descrizione dice l'avviso (D-175)", () => {
+  it("registra un avviso nelle Decisioni, non deumidifica", () => {
+    expect(t("rules.desc.mold_protection")).toBe("Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.");
+    expect(t("rules.desc.mold_protection")).not.toMatch(/^Con la casa vuota deumidifica/);
+  });
+});

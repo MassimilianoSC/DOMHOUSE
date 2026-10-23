@@ -111,7 +111,7 @@
       "window_open_off": "Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.",
       "setpoint_limits": "Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c'è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.",
       "frost_protection": "Con la casa vuota mantiene almeno questa temperatura.",
-      "mold_protection": "Con la casa vuota deumidifica sopra questa soglia.",
+      "mold_protection": "Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.",
       "prearrival": "Porta la casa in comfort prima dell'arrivo degli ospiti.",
       "checkout_eco": "Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.",
       "compressor_min_off": "Pausa minima tra spegnimento e riaccensione del compressore.",
