@@ -120,7 +120,9 @@ di un'organizzazione).
 | Cosa vedi | Cosa vuol dire |
 |---|---|
 | L'indirizzo dell'ambiente di prova | [https://domotica-poc-511707.web.app](https://domotica-poc-511707.web.app) |
-| «Accedi» e, sotto, «Area riservata ai gestori degli appartamenti» | Il titolo della pagina di accesso |
+| Il marchio e il nome «DOMHOUSE» sopra la scheda | Ci sono a ogni larghezza di schermo |
+| Su computer, a sinistra, un pannello scuro con «Riscaldamento, clima e consumi dei tuoi appartamenti» | Che cosa fa l'app |
+| «Accedi» e, sotto, «Area riservata ai gestori degli appartamenti» | Il titolo della scheda di accesso |
 | «Accesso di sviluppo» con «Modalità sviluppo: scegli un utente di prova, nessuna password richiesta.» | Esiste solo nell'ambiente di sviluppo tecnico: nell'ambiente di prova e in quello vero non c'è |
 
 > **Attenzione**
@@ -201,6 +203,8 @@ la frase «Aggiungi l'app alla schermata Home: si apre a schermo intero e riceve
 >
 > - **La pagina aperta** è evidenziata.
 > - **Se le schede di una pagina** non stanno nello schermo, la loro barra scorre in orizzontale.
+> - **Mentre i dati arrivano** la pagina mostra già la sua forma (fascia, striscia, righe) in grigio chiaro, al
+>   posto di un rettangolo grigio.
 
 ### Capire gli esiti: avvisi verdi, rossi e «ID richiesta»
 
@@ -226,30 +230,31 @@ la frase «Aggiungi l'app alla schermata Home: si apre a schermo intero e riceve
 
 ### Impostazioni: i riquadri
 
-**La pagina personale: profilo, account, password, sicurezza, notifiche, installazione.**
+**La pagina personale: profilo, password, sicurezza, notifiche, installazione.**
 
-La pagina «Impostazioni» è uguale per tutti i ruoli e ha questi riquadri.
+La pagina «Impostazioni» è uguale per tutti i ruoli e ha questi riquadri. Su computer ogni riquadro ha il titolo
+a sinistra e il contenuto a destra.
 
 | Riquadro | Cosa vedi | Cosa puoi fare |
 |---|---|---|
-| «Profilo» | «Email», «Ruolo», «Piattaforma» (solo se sei gestore della piattaforma), «Organizzazione», «Appartamenti» | Solo leggere |
-| «Account» | «Nome visualizzato» e «Salva» | Cambiare il nome che vedono i colleghi |
+| «Profilo» | «Email», «Ruolo», «Piattaforma» (solo se sei gestore della piattaforma), «Organizzazione», «Appartamenti», «Lingua» («Italiano») | Solo leggere |
+| «Profilo», sotto una riga | «Nome visualizzato» e «Salva» | Cambiare il nome che vedono i colleghi |
 | «Password ed email» | Solo per chi entra con email e password | Cambiare password ed email di accesso |
 | «Sicurezza» | «Esci da tutti i dispositivi» ed «Elimina il mio account» | Chiudere tutte le sessioni; eliminare l'account |
 | «Notifiche» | Quattro interruttori per categoria e l'attivazione sul dispositivo | Scegliere quali avvisi ricevere sul telefono |
 | «Installa l'app» | Le istruzioni per iPhone, Android e computer (vedi sopra) | Installare l'app |
-| «Lingua» | «Italiano», unica lingua disponibile | Niente: il selettore è disattivato |
-| «Esci», in fondo | Il pulsante per uscire | Tornare alla pagina «Accedi» |
+| «Esci», in fondo, dopo una riga | Il pulsante per uscire | Tornare alla pagina «Accedi» |
 
 **«Profilo»:**
 
 - **«Appartamenti»** dice quali appartamenti vedi: «tutti gli appartamenti», i nomi, «… appartamenti» oppure
   «nessun appartamento».
+- **«Lingua»** dice «Italiano», l'unica lingua disponibile: non c'è nulla da scegliere.
 - **Durante un accesso di assistenza** il profilo mostra l'organizzazione assistita.
 
-**«Account»:**
+**«Nome visualizzato»**, in fondo al «Profilo»:
 
-- **«Nome visualizzato»** (al massimo 80 caratteri) e «Salva»; compare «Nome aggiornato».
+- **Il campo** (al massimo 80 caratteri) e «Salva»; compare «Nome aggiornato».
 - **È il nome** che vedono i colleghi nelle Decisioni, nelle approvazioni, nei registri e in fondo al menu.
 
 ### Impostazioni: password ed email
@@ -300,7 +305,7 @@ Il riquadro «Password ed email» c'è solo per chi entra con email e password.
 > - **Nell'ambiente di prova** l'eliminazione toglie le autorizzazioni di prova e conserva l'identità di accesso
 >   condivisa con il sito vero; nel sito vero cancella anche quella.
 
-### Impostazioni: notifiche, lingua e uscita
+### Impostazioni: notifiche e uscita
 
 **Scegliere per categoria quali avvisi ricevere sul telefono.**
 
@@ -328,7 +333,7 @@ Il riquadro «Notifiche» ha quattro interruttori:
 
 > **Da sapere**
 >
-> Un gestore della piattaforma che non fa parte di nessuna organizzazione vede i riquadri «Account» e «Sicurezza»,
+> Un gestore della piattaforma che non fa parte di nessuna organizzazione vede i riquadri «Profilo» e «Sicurezza»,
 > ma il salvataggio del nome e «Esci da tutti i dispositivi» rispondono «Account non abilitato: mancano tenant o
 > ruolo»; «Elimina il mio account» funziona.
 
@@ -441,20 +446,20 @@ Chi ha il ruolo «Sola lettura» vede le stesse pagine dell'operatore.
 
 **La prima schermata: una scheda per ogni appartamento, con stato e dati.**
 
-La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account» e una scheda per appartamento.
+La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda per appartamento.
 
 | Cosa vedi | Cosa vuol dire |
 |---|---|
-| Nome, indirizzo e stato | «Online», «Non raggiungibile» oppure «Disattivato» (scheda grigia) |
+| In alto: nome e indirizzo; a destra l'occupazione e lo stato | «Online», «Non raggiungibile» oppure «Disattivato» |
 | «Dimostrativo» accanto al nome | Un appartamento finto usato per le prove |
 | L'occupazione | «Vuoto» (nessuno), «Occupato» (ospiti dentro, dopo il check-in effettivo), «Prenotato» (c'è una prenotazione ma non è stato comunicato l'arrivo) |
-| La modalità | «Comfort», «Eco», «Casa vuota» |
-| Una campanella con il numero | Ci sono richieste aperte |
+| La striscia dei dati: «Modalità» | Comfort, Eco o Casa vuota |
+| «Consumo di oggi» | Il consumo di oggi in kWh, non un importo |
 | «Prossimo check-in», «Prossimo check-out» | I prossimi arrivo e partenza |
-| «Oggi» | Il consumo di oggi in kWh, non un importo |
-| «Approvazioni in attesa» | Le richieste che aspettano una risposta |
+| In fondo, «1 approvazione in attesa» o «… approvazioni in attesa» con una freccia | Le richieste che aspettano una risposta; la riga non c'è se non ce ne sono |
 
 - **I dati si aggiornano** ogni 20 secondi; un valore mancante è un trattino.
+- **Una scheda offline** non è grigia: lo dicono il badge e i dati scritti in grigio.
 - **Tocca una scheda** per aprire l'appartamento («Apri …»).
 
 **Quando l'elenco è vuoto o l'appartamento non si apre:**
@@ -493,7 +498,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account�
 | «Prossimo check-in» o «Prossimo check-out» | Il primo fra arrivo e partenza; senza nessuno dei due, «Prossimo evento» con un trattino |
 | «Finestre» | «Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore» |
 | «Consumo di oggi» | I kWh di oggi; un trattino se la funzione Consumi è spenta |
-| «Dispositivi online» | Per esempio «5/6» e, sotto, «1 offline» |
+| «Dispositivi online» | Quanti rispondono, per esempio 5/6; sotto, «… offline» se qualcuno manca |
 
 > **Da sapere**
 >
@@ -511,7 +516,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account�
 | Climatizzatore, «Modo» | Una tendina con Caldo, Freddo, Deumidifica, Ventilazione |
 | Climatizzatore, «Ventola» | Una tendina con Auto, Bassa, Media, Alta |
 | Climatizzatore, «Temperatura» | La temperatura desiderata con «da … a … °C» |
-| Misuratore di consumo | Una riga «Potenza» con i W (quanto consuma adesso) e, sotto, «Oggi: … kWh» |
+| Misuratore di consumo | Una riga «Potenza» con i W (quanto consuma adesso) e, sotto, «Oggi» con i kWh di oggi |
 | Sensori | Una riga «Temperatura» e una «Umidità», con il valore a destra (per esempio 16,9 °C) |
 | Contatto finestra | «Aperta» o «Chiusa» «da …» |
 | Sensore di movimento | «Movimento rilevato» o «Nessun movimento» (passando sopra leggi la data precisa) |
@@ -558,12 +563,14 @@ La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account�
 |---|---|
 | La pillola «In attesa» (la scelta è scritta in scuro) | Le richieste aperte |
 | La pillola «Tutte» | Anche quelle decise negli ultimi 7 giorni |
-| Chi la propone | «Motore AI», «Regola», «Assistente», «Modulo» |
-| La descrizione, «Perché il motore lo propone», «Azione proposta» | Che cosa chiede e perché |
-| Lo stato | «In attesa», «Approvata», «Respinta», «Scaduta» |
+| In alto: lo stato, poi chi la propone e la data | «In attesa», «Approvata», «Respinta», «Scaduta»; «Motore AI», «Regola», «Assistente», «Modulo» |
+| La descrizione, in grande | Che cosa chiede |
+| «Perché il motore lo propone», con il testo sotto | Il motivo, senza riquadro |
+| «Azione proposta» seguita dall'azione in grassetto | Che cosa partirà |
 | «… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta» | Quanto tempo resta per decidere |
-| «Alla scadenza verrà respinta», «Alla scadenza verrà eseguita» o «Alla scadenza resta in attesa» | Cosa succede se nessuno decide |
-| «Approvata da … …» o «Respinta da … …» con la nota | Chi ha deciso, quando, e la nota |
+| Accanto: «Alla scadenza verrà respinta», «Alla scadenza verrà eseguita» o «Alla scadenza resta in attesa» | Cosa succede se nessuno decide |
+| Sotto una riga: «Nota (facoltativa)» e i pulsanti | Solo nelle richieste in attesa, per chi può decidere |
+| In fondo: «Approvata da … …» o «Respinta da … …» con la nota, poi l'«ID richiesta» | Solo nelle richieste già decise o scadute |
 | «Nessuna approvazione in attesa» o «Nessuna approvazione negli ultimi 7 giorni» | Non c'è nulla |
 
 > **Da sapere**
@@ -578,20 +585,21 @@ La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account�
 «Decisioni» («Tutto ciò che il motore e i gestori hanno fatto, e perché») è lo storico dell'appartamento, conservato
 per 24 mesi.
 
-| Ogni riga mostra | Valori possibili |
+| Ogni voce mostra | Valori possibili |
 |---|---|
-| La data | Quando è successo |
-| Chi ha deciso | «Motore AI», «Regola «…»», «Gestore» |
-| Chi ha deciso | «Assistente», «Sistema»; una persona che ha eliminato l'account compare come «utente rimosso» |
-| Su cosa | «appartamento», «dispositivo», «regole», «programmazione» |
+| Prima linea, in nero: il tipo di azione e i valori prima → dopo | Per esempio «Modalità» con «comfort → casa vuota» |
 | Il tipo di azione, in italiano | Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata» |
 | Altri esempi di tipo | «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo» |
-| Il valore prima e dopo, il motivo | Che cosa è cambiato e perché |
-| L'esito | «Applicata», «Respinta», «in attesa di approvazione», «Non riuscita», «Informativa» |
-| L'«ID richiesta» | L'identificativo dell'operazione |
+| A destra della prima linea: l'esito, a parole | «Applicata» e «Informativa» in grigio; «Respinta» e «Non riuscita» in rosso; «in attesa di approvazione» in giallo |
+| Seconda linea, in grigio: la data · chi ha deciso · su cosa | «Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; «appartamento», «dispositivo», «regole», «programmazione» |
+| Chi ha deciso, se ha eliminato l'account | «utente rimosso» |
+| Sotto: il motivo | Perché è successo |
+| L'«ID richiesta» copiabile | L'identificativo dell'operazione |
+| «Dettagli» | Apre «Comando» e «Approvazione» con i codici tecnici; c'è solo se ci sono |
 
 - **Passando sopra il tipo** compare il codice tecnico.
 - **Un'azione nuova** non ancora tradotta mostra il codice.
+- **Non ci sono icone**: chi ha deciso si legge nella seconda linea.
 
 **Tipi da conoscere:**
 
@@ -615,6 +623,9 @@ per 24 mesi.
 
 - **«Chi»**, **«Dispositivo»** («Tutti i dispositivi») e **«Periodo»** («Tutto lo storico», «Ultimi 7 giorni»,
   «Ultimi 30 giorni», «Ultimi 90 giorni»). Si combinano.
+- **Sul telefono** le tre tendine si aprono con il pulsante «Filtri», che diventa «Filtri (…)» con il numero dei
+  filtri attivi.
+- **La ricerca** occupa una riga intera.
 - **«Carica altri»** mostra le righe precedenti.
 - **Se nulla corrisponde**: «Nessuna decisione per i filtri scelti».
 
@@ -743,17 +754,17 @@ nelle 4 settimane prima»):
 
 **Le azioni pianificate dal motore e dal gestore, future e passate.**
 
-«Programmazione» («Azioni pianificate dal motore e dal gestore») ha due elenchi, «In programma» e «Storico (ultimi
-7 giorni)», con aggiornamento ogni 30 secondi.
+«Programmazione» («Azioni pianificate dal motore e dal gestore») ha due riquadri a righe, «In programma» e
+«Storico» (con sotto «Ultimi 7 giorni»), con aggiornamento ogni 30 secondi.
 
 | Ogni riga mostra | Valori possibili |
 |---|---|
-| L'orario | Ora dell'appartamento |
-| L'azione | Che cosa farà |
-| L'origine | «prenotazione», «gestore», «assistente» |
-| Il tipo | «pre-arrivo», «check-out», «casa vuota», «manuale» |
-| Lo stato | «In programma», «Eseguita», «Annullata», «Non riuscita» |
+| A sinistra, l'orario | Ora dell'appartamento |
+| Poi l'azione | Che cosa farà |
+| Sotto, in grigio, tipo e origine | «pre-arrivo», «check-out», «casa vuota», «manuale» · «prenotazione», «gestore», «assistente» |
+| A destra, lo stato e i pulsanti | «In programma», «Eseguita», «Annullata», «Non riuscita» |
 
+- **Passando sopra tipo e origine** leggi il codice della prenotazione, se l'azione nasce da una prenotazione.
 - **Senza azioni**: «Nessuna azione in programma».
 - **Le azioni nate da una prenotazione** hanno la nota «Ricalcolata a ogni modifica della prenotazione».
 
@@ -769,6 +780,9 @@ nelle 4 settimane prima»):
 | «Ultima modifica …» | Quando è stata cambiata |
 | «Non modificabile» («Questa regola è fissata dal motore: puoi solo vederla») | La regola «Pausa minima del compressore» si può solo vedere |
 
+- **Fino a 1024 px** (telefono e tablet) le regole stanno in una colonna; su schermi più larghi in due.
+- **Sotto l'elenco**, per chi può modificare, ci sono «Chiedi all'assistente» e, per gli amministratori, «Applica
+  le stesse regole ad altri appartamenti».
 - **Le regole**, i loro valori e che cosa fanno davvero sono nella parte 10.
 - **Gli operatori e gli amministratori** possono anche modificarle (parte 5).
 
@@ -894,7 +908,8 @@ I comandi funzionano solo sui dispositivi online e con la funzione «Comandi» a
    scadenza.
 3. **Se vuoi, scrivi** una «Nota (facoltativa)» («Perché approvi o respingi…», al massimo 500 caratteri).
 4. **Premi «Approva»** (compare «Azione approvata») o «Respingi» («Azione respinta»).
-5. **La richiesta passa** a «Approvata» o «Respinta» con «… da … …» e la nota; la successiva in coda si apre.
+5. **La richiesta passa** a «Approvata» o «Respinta» con «… da … …», la nota e, in fondo, l'«ID richiesta»; la
+   successiva in coda si apre.
 6. **Controlla l'esito vero** in Panoramica e nelle Decisioni: un'azione approvata può non partire se nel frattempo
    il dispositivo è diventato irraggiungibile.
 
@@ -956,8 +971,8 @@ Nelle Decisioni compare «Approvazione scaduta».
 **Accendere, spegnere e regolare le regole entro i limiti.**
 
 1. **Cambia gli interruttori** e i campi numerici delle regole modificabili (tabella sotto).
-2. **In basso compare** «… regole modificate» con «Salva le modifiche» e «Annulla le modifiche» (riporta i campi ai
-   valori salvati).
+2. **Lungo il fondo dello schermo compare una barra** con «1 regola modificata» o «… regole modificate», «Salva le
+   modifiche» e «Annulla le modifiche» (riporta i campi ai valori salvati).
 3. **Premi «Salva le modifiche»** e leggi «Regole aggiornate»; la modifica è nelle Decisioni («Regole aggiornate»).
 
 | Campo numerico | Regola |
@@ -990,7 +1005,7 @@ Nelle Decisioni compare «Approvazione scaduta».
 
 **Descrivere a parole la modifica: l'assistente la prepara, tu la applichi.**
 
-In alto nella pagina Regole c'è «Chiedi all'assistente»: «Scrivi che cosa vuoi cambiare: l'assistente prepara la
+Sotto l'elenco delle regole c'è «Chiedi all'assistente»: «Scrivi che cosa vuoi cambiare: l'assistente prepara la
 modifica, tu la controlli e la applichi. Niente cambia finché non premi «Applica».».
 
 1. **Scrivi in italiano** (esempio «la finestra aperta spegne dopo 10 minuti»; al massimo 500 caratteri, contatore
@@ -1032,13 +1047,17 @@ modifica, tu la controlli e la applichi. Niente cambia finché non premi «Appli
 
 **Una chat per chiedere lo stato, i consumi o un comando.**
 
-«Assistente» («Chiedi in italiano: spegnere, impostare una temperatura, programmare un'azione»).
+«Assistente» («Chiedi in italiano: spegnere, impostare una temperatura, programmare un'azione») è un solo
+riquadro: la conversazione e, in fondo, il campo per scrivere.
 
 1. **Scrivi nel campo** («Es. «Spegni il clima del soggiorno»», al massimo 500 caratteri) e premi «Invia», oppure
    tocca un suggerimento.
-2. **Leggi** «Sto elaborando…», poi la risposta con lo stato «Risposto», «Richiede approvazione» o «Non riuscita».
-3. **Se dopo 30 secondi** non c'è risposta leggi «Nessuna risposta dall'assistente: riprova».
-4. **Controlla sempre** in Panoramica.
+2. **La tua domanda** compare a destra, in una bolla colorata.
+3. **Leggi** «Sto elaborando…», poi la risposta a sinistra sotto il nome «Assistente», senza bolla né icona.
+4. **Un badge compare solo se serve**: «Richiede approvazione» (poi «Approvata», «Respinta» o «Scaduta») oppure
+   «Non riuscita». Una risposta normale non ha badge.
+5. **Se dopo 30 secondi** non c'è risposta leggi «Nessuna risposta dall'assistente: riprova».
+6. **Controlla sempre** in Panoramica.
 
 **I suggerimenti pronti:**
 
@@ -1064,7 +1083,8 @@ modifica, tu la controlli e la applichi. Niente cambia finché non premi «Appli
 | «Comando inviato: …, l'esito arriva nell'app.» | La conferma non è ancora arrivata |
 | «Non riuscito: … (…).» o «Non fatto: … (…).» | Non eseguito, con il motivo |
 | «Programmato: ….» | Un'azione a orario |
-| Le etichette «Comando» e «Programmazione» sotto la risposta | Gli identificativi |
+| «Comando inviato», «Azione programmata» o «Regole modificate» sotto la risposta | Che cosa è stato fatto, a parole |
+| «Dettagli» | Apre i codici («Comando», «Programmazione»), il motivo tecnico di un errore e l'«ID richiesta» |
 
 > **Da sapere**
 >
@@ -1675,10 +1695,13 @@ entrare, poi invita gli altri utenti.».
 
 **La parte tecnica: identificativo, collegamento, codice Italianway.**
 
-Ogni riga mostra il nome con i badge «Dimostrativo» e «disattivato», il codice copiabile e, in grigio,
-collegamento, porta, fuso e codice Italianway; poi «Ultima verifica». I pulsanti «Modifica collegamento» e
-«Verifica connessione» hanno il contorno, «Elimina» è rosso. Senza appartamenti leggi «Nessun appartamento in
-questa organizzazione». Da qui non si aprono Panoramica, dispositivi o consumi.
+**L'elenco, una riga per appartamento:**
+
+- **Il nome** con i badge «Dimostrativo» e «disattivato» e il codice copiabile.
+- **In grigio**: collegamento, porta, fuso e codice Italianway; poi «Ultima verifica».
+- **I pulsanti** «Modifica collegamento» e «Verifica connessione» hanno il contorno; «Elimina» è rosso.
+- **Senza appartamenti** leggi «Nessun appartamento in questa organizzazione».
+- **Da qui** non si aprono Panoramica, dispositivi o consumi.
 
 **«Nuovo appartamento»** apre «Nuovo appartamento per …» («L'identificativo non si potrà più cambiare: usa minuscole,
 numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l'amministratore
@@ -2563,6 +2586,39 @@ Per ogni problema annota:
 ## 14. Novità
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
+
+### 23 ottobre 2026 (lotto 33)
+
+**Pagine riordinate: fascia di stato, righe al posto delle schede, codici dietro «Dettagli».**
+
+- **Panoramica**: sotto il titolo la fascia di stato con «Modalità», «Occupazione», «Prossimo check-in» o «Prossimo
+  check-out», «Finestre», «Consumo di oggi», «Dispositivi online»; via la riga con check-in, check-out e
+  prenotazione.
+- **Salute**: «In salute» e «… dispositivi connessi» in vista; connettore, modello e versione dietro «Dettagli
+  tecnici».
+- **Dispositivi**: su computer un elenco per stanza, una riga per dispositivo; letture a righe; «Modo» e
+  «Ventola» del clima sono tendine; «Dispositivo offline» è un badge, la scheda non è più sbiadita.
+- **Consumi**: le caselle «Totale periodo» e «Ora con più consumo» o «Giorno con più consumo»; «Ore di clima
+  evitate» solo quando c'è; il confronto con il soggiorno precedente su una riga, con «Excel del soggiorno
+  precedente».
+- **Appartamenti**: il sottotitolo dice solo «… appartamenti»; dati in una striscia con «Consumo di oggi»; in
+  fondo «1 approvazione in attesa» o «… approvazioni in attesa» con la freccia; via la campanella.
+- **Decisioni**: azione e valori, esito a parole a destra (rosso, giallo o grigio), poi data · chi · dispositivo,
+  motivo e «ID richiesta»; codici dietro «Dettagli»; sul telefono le tendine dietro «Filtri».
+- **Approvazioni**: stato, fonte e data in alto; «Perché il motore lo propone» senza riquadro; «ID richiesta» solo
+  nelle richieste decise; via il bordo arancione.
+- **Programmazione**: «In programma» e «Storico» con «Ultimi 7 giorni» sono riquadri a righe.
+- **Regole**: prima le regole, poi «Chiedi all'assistente» e la copia su altri appartamenti; barra «Salva le
+  modifiche» lungo il fondo; «1 regola modificata» al singolare.
+- **Assistente**: un solo riquadro; la risposta sotto il nome «Assistente», senza bolla; «Risposto» non compare
+  più; «Comando inviato», «Azione programmata», «Regole modificate» al posto dei codici, che stanno in «Dettagli».
+- **Impostazioni**: «Nome visualizzato» e «Lingua» dentro «Profilo»; via i riquadri «Account» e «Lingua»; su
+  computer il titolo di ogni riquadro a sinistra.
+- **Amministrazione e Organizzazioni**: linguette sottolineate e scheda aperta nell'indirizzo; appartamenti e
+  utenti come righe; menu «⋯» con le azioni meno frequenti; una spiegazione sotto ogni funzione.
+- **Accesso**: marchio e nome sopra la scheda; su computer il pannello scuro con «Riscaldamento, clima e consumi
+  dei tuoi appartamenti».
+- **Caricamento**: mentre arrivano i dati le pagine mostrano già la loro forma.
 
 ### 23 ottobre 2026 (lotto 32)
 
