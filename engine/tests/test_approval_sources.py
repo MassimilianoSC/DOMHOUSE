@@ -251,3 +251,31 @@ def test_a_simulated_movement_is_recorded_and_gives_f1_as_in_the_checklist(monke
     a = e.pending_approval()
     assert a and a["description"] == "Mettere l'appartamento a vuoto dopo il check-out"
     assert a["reason"].startswith("Movimento rilevato ") and "«Sensore soggiorno»" in a["reason"] and e.mode == "comfort"
+
+
+def test_d189_the_keyword_assistant_asks_first_only_to_switch_the_boiler_off(monkeypatch):
+    """D-189: without a model (demonstrations without MODEL_BASE_URL), with guests in, «caldaia» asked an approval
+    whatever the phrase; now only switching it off does; switching it on, or at a temperature, is a command."""
+    async def no_wait(_s):
+        return None
+
+    def ask(e, text):
+        async def main():
+            monkeypatch.setattr(core.asyncio, "sleep", no_wait)
+            a = e.create_ask({"text": text}, "prova@hqe.it", "2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10")
+            await asyncio.gather(*list(e.tasks))
+            return e.asks[a["ask_id"]]
+        return asyncio.run(main())
+    for text, setpoint in (("accendi la caldaia", None), ("porta la caldaia a 20 gradi", 20)):
+        e = engine()
+        real = e.apartment
+        e.apartment = lambda: {**real(), "occupancy": "occupied"}
+        a = ask(e, text)
+        assert a["status"] == "answered" and a["approval_id"] is None and approvals_of(e) == [], (text, a)
+        cmd = e.commands[a["actions"][0]["command_id"]]
+        assert cmd["device_id"] == CALDAIA and cmd["action"] == "set_heating" and cmd["params"].get("setpoint") == setpoint
+    e = engine()
+    real = e.apartment
+    e.apartment = lambda: {**real(), "occupancy": "occupied"}
+    a = ask(e, "spegni la caldaia")
+    assert a["status"] == "needs_approval" and a["approval_id"] and a["answer"].startswith("Spegnere la caldaia")

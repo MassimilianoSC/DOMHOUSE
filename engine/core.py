@@ -2232,8 +2232,10 @@ class ApartmentEngine:
         num = re.search(r"(\d{1,2}(?:[.,]\d)?)\s*(?:gradi|°)", text)
         setpoint = float(num.group(1).replace(",", ".")) if num else None
         at = re.search(r"\balle\s+(\d{1,2})(?:[:.](\d{2}))?\b", text)
+        off = re.search(r"\b(spegni|disattiva)\b", text)
         try:
-            if "caldaia" in text and self.apartment()["occupancy"] == "occupied":
+            # D-189: with guests in only switching the boiler off asks first; switching it on or a temperature does not
+            if "caldaia" in text and off and self.apartment()["occupancy"] == "occupied":
                 pending = self.pending_approval()
                 if pending:
                     ask.update(status="answered", approval_id=pending["approval_id"],
@@ -2274,6 +2276,18 @@ class ApartmentEngine:
                                           decision_actor="assistant", reasoning=f"Richiesta all'assistente: «{ask['text']}»")
                 ask.update(status="answered", actions=[{"type": "command", "command_id": cmd["command_id"]}],
                            answer=f"Ho spento {d['label'].lower()}.")
+            elif "caldaia" in text:                       # D-189: the boiler on, at a temperature if given
+                d = self._match_device(text, "heating")
+                if d is None:
+                    raise MockError(422, "no_heating", "Nessuna caldaia nell'appartamento")
+                params = {"on": True, **({"setpoint": setpoint} if setpoint is not None else {})}
+                cmd = self.create_command(d["device_id"], {"capability": "heating", "action": "set_heating",
+                                                           "params": params}, actor, corr, decision_actor="assistant",
+                                          reasoning=f"Richiesta all'assistente: «{ask['text']}»")
+                done = cmd["params"].get("setpoint")
+                ask.update(status="answered", actions=[{"type": "command", "command_id": cmd["command_id"]}],
+                           answer=(f"Ho acceso {d['label'].lower()} a {fmt_num(done)} °C." if done is not None
+                                   else f"Ho acceso {d['label'].lower()}."))
             elif "gradi" in text or "temperatura" in text:
                 d = self._match_device(text, "climate")
                 if setpoint is None:
