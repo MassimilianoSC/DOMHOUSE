@@ -9,7 +9,7 @@ import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { PageHeader, SegmentedControl } from "@/components/layout/PageHeader";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
-import { Card, Input, Skeleton, StatusBadge, type Tone } from "@/components/ui/primitives";
+import { Card, Input, Label, Skeleton, StatusBadge, type Tone } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { describeAction, personLabel } from "@/lib/describe";
@@ -33,7 +33,7 @@ function Countdown({ until, id }: { until: string; id: string }) {
   const ms = new Date(until).getTime() - now;
   const urgent = ms < 5 * 60_000;
   return (
-    <span className={cn("inline-flex items-center gap-1 text-sm font-bold tabular", urgent ? "text-destructive" : "text-foreground")} data-testid={`approval-countdown-${id}`} aria-live="polite">
+    <span className={cn("inline-flex items-center gap-1 text-sm font-semibold tabular", urgent ? "text-negative" : "text-foreground")} data-testid={`approval-countdown-${id}`} aria-live="polite">
       <Hourglass className="h-3.5 w-3.5" aria-hidden /> {ms > 0 ? t("approvals.remaining", { time: fmtCountdown(ms) }) : t("approvals.expired")}
     </span>
   );
@@ -56,27 +56,32 @@ function ApprovalCard({ aptId, a, canWrite, onDecided }: { aptId: string; a: App
   };
 
   return (
-    <Card className={cn("space-y-4 p-5", pending && "border-primary/40")} data-testid={`approval-card-${a.approval_id}`} data-status={a.status}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusBadge tone={STATUS_TONE[a.status]} data-testid={`approval-status-${a.approval_id}`}>{t(`approvals.status.${a.status}`)}</StatusBadge>
-          <span className="text-xs text-muted-foreground">{t(`approvals.source.${a.source}`)} · {fmtDateTime(a.created_at, tz)}</span>
-        </div>
-        {pending && a.expires_at && <Countdown until={a.expires_at} id={a.approval_id} />}
+    // design lot 2: what, why, the action proposed, the time left, the buttons; the request ID only once decided
+    <Card className="space-y-4 p-5" data-testid={`approval-card-${a.approval_id}`} data-status={a.status}>
+      <div className="flex flex-wrap items-center gap-2">
+        <StatusBadge tone={STATUS_TONE[a.status]} data-testid={`approval-status-${a.approval_id}`}>{t(`approvals.status.${a.status}`)}</StatusBadge>
+        <span className="text-xs text-muted-foreground">{t(`approvals.source.${a.source}`)} · {fmtDateTime(a.created_at, tz)}</span>
       </div>
       <h3 className="text-lg font-semibold leading-snug" data-testid={`approval-description-${a.approval_id}`}>{a.description}</h3>
-      <div className="rounded-xl bg-secondary/60 p-3">
-        <div className="text-[13px] font-medium text-muted-foreground">{t("approvals.why")}</div>
-        <p className="mt-1 text-sm" data-testid={`approval-reason-${a.approval_id}`}>{a.reason}</p>
+      <div className="space-y-0.5">
+        <div className="text-sm font-medium">{t("approvals.why")}</div>
+        <p className="text-sm text-muted-foreground" data-testid={`approval-reason-${a.approval_id}`}>{a.reason}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-        <span><span className="text-muted-foreground">{t("approvals.proposed")}:</span> <strong data-testid={`approval-action-${a.approval_id}`}>{describeAction(a.proposed_action, devices)}</strong></span>
-        {pending && <span className="text-xs text-muted-foreground">{t(`approvals.onExpiry.${a.expires_action}`)}</span>}
-        <CopyableId id={a.correlation_id} testId={`approval-correlation-${a.approval_id}`} className="text-muted-foreground" />
-      </div>
+      <p className="text-sm">
+        <span className="text-muted-foreground">{t("approvals.proposed")}:</span> <strong data-testid={`approval-action-${a.approval_id}`}>{describeAction(a.proposed_action, devices)}</strong>
+      </p>
+      {pending && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {a.expires_at && <Countdown until={a.expires_at} id={a.approval_id} />}
+          <span className="text-xs text-muted-foreground">{t(`approvals.onExpiry.${a.expires_action}`)}</span>
+        </div>
+      )}
       {pending && canWrite ? (
         <div className="space-y-3 border-t pt-4">
-          <Input value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder={t("approvals.notePlaceholder")} aria-label={t("approvals.note")} data-testid={`approval-note-${a.approval_id}`} />
+          <div className="space-y-1">
+            <Label htmlFor={`approval-note-${a.approval_id}`}>{t("approvals.note")}</Label>
+            <Input id={`approval-note-${a.approval_id}`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder={t("approvals.notePlaceholder")} data-testid={`approval-note-${a.approval_id}`} />
+          </div>
           <div className="flex gap-2">
             <Button className="flex-1" onClick={() => decide("approve")} disabled={busy !== null} data-testid={`approve-action-btn-${a.approval_id}`}>
               <Check /> {t("approvals.approve")}
@@ -86,12 +91,18 @@ function ApprovalCard({ aptId, a, canWrite, onDecided }: { aptId: string; a: App
             </Button>
           </div>
         </div>
-      ) : a.decided_by ? (
-        <p className="text-xs text-muted-foreground" data-testid={`approval-decided-${a.approval_id}`}>
-          {t("approvals.decidedBy", { decision: t(`approvals.status.${a.status}`), who: personLabel(a.decided_by), when: fmtDateTime(a.decided_at, tz) })}
-          {a.note ? ` · «${a.note}»` : ""}
-        </p>
       ) : null}
+      {!pending && (
+        <div className="space-y-1 border-t pt-3">
+          {a.decided_by && (
+            <p className="text-xs text-muted-foreground" data-testid={`approval-decided-${a.approval_id}`}>
+              {t("approvals.decidedBy", { decision: t(`approvals.status.${a.status}`), who: personLabel(a.decided_by), when: fmtDateTime(a.decided_at, tz) })}
+              {a.note ? ` · «${a.note}»` : ""}
+            </p>
+          )}
+          <CopyableId id={a.correlation_id} testId={`approval-correlation-${a.approval_id}`} className="text-muted-foreground" />
+        </div>
+      )}
     </Card>
   );
 }
