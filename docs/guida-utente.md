@@ -1,7 +1,7 @@
 # Guida all'app DOMHOUSE
 
 Tutto quello che l'app sa fare, spiegato passo per passo e diviso per ruolo. Non servono conoscenze tecniche.
-*Versione del 23 ottobre 2026 (lotto 34).*
+*Versione del 23 ottobre 2026 (lotto 35).*
 
 > **Ambiente di prova**
 >
@@ -690,6 +690,8 @@ per 24 mesi.
 
 «Rendiconto in Excel» è per tutti i ruoli: «Consumi del mese scelto: riepilogo, giorno per giorno, ora per ora e per
 dispositivo, con l'importo in euro se è impostato il prezzo per kWh.».
+
+> **Da sapere:** sul telefono la tendina del mese e «Scarica Excel» stanno sotto la descrizione, a tutta larghezza; da tablet in su stanno accanto.
 
 1. **Scegli «Mese del rendiconto»** (gli ultimi 12, compreso quello in corso).
 2. **Premi «Scarica Excel»**.
@@ -2591,6 +2593,10 @@ Per ogni problema annota:
 ## 14. Novità
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
+
+### 23 ottobre 2026 (lotto 35)
+
+- **Consumi sul telefono**: nella scheda «Rendiconto in Excel» il testo va a capo normalmente anche sui telefoni larghi; la tendina del mese e «Scarica Excel» stanno sotto la descrizione. Stessa correzione nella riga del confronto con il soggiorno precedente, nelle righe «Rimuovi» dei gestori della piattaforma e nella barra dell'accesso di assistenza.
 
 ### 23 ottobre 2026 (lotto 34)
 
