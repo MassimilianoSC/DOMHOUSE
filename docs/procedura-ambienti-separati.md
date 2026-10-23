@@ -205,8 +205,10 @@ si collega al motore della VM (indirizzo `http://10.198.0.2:8100/api/v1`, id `de
 
 ## M10. Frase per il cliente, prima del cambio (condizione D-136)
 
-La manda il committente. Proposta: «Da <data> gli appartamenti dimostrativi si trovano su https://domhouse-staging.web.app,
-con le stesse credenziali; l'app di sempre resta per gli appartamenti veri.»
+Non necessaria il 23 ottobre 2026: i dati in produzione sono tutti di prova, inventati dal committente, e Flatsharing non
+ha ancora visto l'app. Resta per quando il cliente la vedrà per la prima volta. Proposta di allora: «Gli appartamenti
+dimostrativi si trovano su https://domhouse-staging.web.app, con le stesse credenziali; l'app di sempre resta per gli
+appartamenti veri.»
 
 ## M11. Prima di togliere i dimostrativi dalla produzione: un backup recente (sola lettura)
 
