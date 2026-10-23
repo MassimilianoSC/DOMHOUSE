@@ -125,7 +125,7 @@ export default function LoginPage() {
   if (status === "authenticated") return <Navigate to="/" replace />;
   return (
     <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
-      <section className="relative hidden flex-col justify-between overflow-hidden bg-[hsl(215_28%_14%)] p-12 text-[hsl(40_20%_96%)] lg:flex">
+      <section className="relative hidden flex-col justify-between overflow-hidden bg-foreground p-12 text-background lg:flex">
         {/* a solid panel with what the app is for, 36 px (design lot 2); the name sits with the mark above the card */}
         <img src="/favicon.svg" alt="" className="relative h-12 w-12" />
         <p className="relative max-w-md text-4xl font-bold leading-tight" data-testid="login-tagline">{t("app.tagline")}</p>

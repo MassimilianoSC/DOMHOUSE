@@ -4,78 +4,72 @@
 
 @layer base {
   :root {
-    --background: 40 20% 97%;
-    --foreground: 215 28% 17%;
+    /* Lot 34, «foglio incorniciato» (D-192, D-194): a warm sand frame around a warm white sheet, a dark brown ink,
+       taupe greys, warm status colours with a full background, one colour per mode; the brand orange only on data,
+       charts, the chat bubbles, the mark and the active menu entry's thread. */
+    --frame: 28 46% 85%; /* #EAD7C6 */
+    --background: 40 100% 99%; /* the sheet, #FFFDF9 */
+    --foreground: 24 14% 15%; /* ink #2A2420 */
     --card: 0 0% 100%;
-    --card-foreground: 215 28% 17%;
+    --card-foreground: 24 14% 15%;
     --popover: 0 0% 100%;
-    --popover-foreground: 215 28% 17%;
-    --primary: 18 72% 44%;
-    --primary-foreground: 40 20% 98%;
-    --secondary: 35 30% 92%;
-    --secondary-foreground: 215 28% 17%;
-    --muted: 35 15% 91%;
-    --muted-foreground: 215 16% 40%;
-    --accent: 158 45% 38%;
+    --popover-foreground: 24 14% 15%;
+    --primary: 18 72% 44%; /* brand orange #C1501F: data, charts, chat bubbles, mark */
+    --primary-foreground: 40 100% 99%;
+    --secondary: 32 32% 91%; /* taupe surface #EFE8E0 */
+    --secondary-foreground: 24 14% 15%;
+    --muted: 32 28% 92%;
+    --muted-foreground: 28 9% 37%; /* taupe text, 6:1 on the sheet */
+    --accent: 153 41% 34%; /* sage: switches on */
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 35 18% 86%;
-    --input: 35 18% 86%;
+    --destructive: 4 58% 42%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 24% 85%;
+    --input: 30 22% 80%;
     --ring: 18 72% 44%;
     --radius: 0.75rem;
     --chart-1: 18 72% 44%;
-    --chart-2: 158 45% 38%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 215 28% 30%;
-    --chart-5: 340 65% 50%;
-    /* Status (lotto 32, design review b.2): one pale pair per meaning, the same everywhere; --positive is the green
-       for text (#247b50, 5.2:1 on white: --accent is 4.1:1 and fails as text). */
-    --positive: 150 55% 31%;
-    --positive-bg: 141 76% 92%;
-    --positive-fg: 155 85% 21%;
-    --positive-border: 141 55% 80%;
-    --warning-bg: 48 100% 96%;
-    --warning-fg: 26 83% 31%;
-    --warning-border: 48 96% 76%;
-    --negative: 358 69% 46%;
-    --negative-bg: 8 100% 96%;
-    --negative-fg: 359 65% 31%;
-    --negative-border: 4 90% 88%;
-    --neutral-bg: 35 20% 93%;
-    --neutral-fg: 215 16% 33%;
-    --neutral-border: 35 14% 82%;
+    --chart-2: 153 41% 34%;
+    --chart-3: 33 88% 42%;
+    --chart-4: 208 31% 35%;
+    --chart-5: 4 58% 42%;
+    /* Status: warm, with a full background; fg is the text on bg (>= 4.5:1 on bg and on white). */
+    --positive: 153 41% 31%; /* sage #2F6F52 */
+    --positive-bg: 141 32% 91%; /* #E2F0E7 */
+    --positive-fg: 153 41% 27%;
+    --positive-border: 141 28% 80%;
+    --warning-bg: 38 84% 90%; /* amber #FBEBD0 */
+    --warning-fg: 33 88% 30%; /* #9A5A0A, a shade darker for text */
+    --warning-border: 38 70% 76%;
+    --negative: 4 58% 42%; /* brick #A8352C */
+    --negative-bg: 11 76% 92%; /* #FADFD9 */
+    --negative-fg: 4 58% 36%;
+    --negative-border: 8 60% 82%;
+    --neutral-bg: 32 32% 92%; /* taupe #F1EBE4 */
+    --neutral-fg: 28 9% 33%;
+    --neutral-border: 30 18% 80%;
+    /* One colour per mode, in the band, the selector and the apartment cards. */
+    --mode-comfort-bg: 24 71% 88%; /* #F6DCCB */
+    --mode-comfort-fg: 18 75% 32%; /* #9C3F16, darker for 4.5:1 */
+    --mode-eco-bg: 141 32% 91%;
+    --mode-eco-fg: 153 41% 27%;
+    --mode-empty-bg: 208 33% 91%; /* slate #E1E9F0 */
+    --mode-empty-fg: 208 31% 32%; /* #3D5A73 */
   }
-  .dark {
-    --background: 215 28% 9%;
-    --foreground: 40 15% 94%;
-    --card: 215 24% 13%;
-    --card-foreground: 40 15% 94%;
-    --popover: 215 24% 13%;
-    --popover-foreground: 40 15% 94%;
-    --primary: 18 80% 56%;
-    --primary-foreground: 215 28% 9%;
-    --secondary: 215 20% 18%;
-    --secondary-foreground: 40 15% 94%;
-    --muted: 215 18% 20%;
-    --muted-foreground: 215 12% 65%;
-    --accent: 158 50% 46%;
-    --accent-foreground: 215 28% 9%;
-    --destructive: 0 72% 55%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 215 18% 22%;
-    --input: 215 18% 22%;
-    --ring: 18 80% 56%;
-  }
+  /* No dark theme: it was never switched on and was incomplete; it is a lot of its own (design report, lot 34). */
   * {
     @apply border-border;
   }
   body {
-    /* a flat ground: no texture on a working screen (design review c.0) */
-    @apply bg-background text-foreground font-sans antialiased;
+    /* the warm frame around the sheet (lot 34); a flat ground, no texture (design review c.0) */
+    @apply bg-frame text-foreground font-sans antialiased;
   }
   h1, h2, h3 {
     @apply font-heading;
+  }
+  /* figures in columns line up everywhere (lot 34: one family, Manrope, with tabular figures) */
+  body {
+    font-variant-numeric: tabular-nums;
   }
   ::selection {
     background: hsl(var(--primary) / 0.2);

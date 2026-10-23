@@ -5,7 +5,7 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        heading: ['"Plus Jakarta Sans"', "sans-serif"],
+        heading: ["Manrope", "sans-serif"],
         sans: ["Manrope", "sans-serif"],
         mono: ['"JetBrains Mono"', "monospace"],
       },
@@ -14,6 +14,7 @@ module.exports = {
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
+        frame: "hsl(var(--frame))",
         foreground: "hsl(var(--foreground))",
         primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
         secondary: { DEFAULT: "hsl(var(--secondary))", foreground: "hsl(var(--secondary-foreground))" },
@@ -27,6 +28,12 @@ module.exports = {
         warning: { bg: "hsl(var(--warning-bg))", fg: "hsl(var(--warning-fg))", border: "hsl(var(--warning-border))" },
         negative: { DEFAULT: "hsl(var(--negative))", bg: "hsl(var(--negative-bg))", fg: "hsl(var(--negative-fg))", border: "hsl(var(--negative-border))" },
         neutral: { bg: "hsl(var(--neutral-bg))", fg: "hsl(var(--neutral-fg))", border: "hsl(var(--neutral-border))" },
+        // one colour per mode (lot 34)
+        mode: {
+          comfort: { bg: "hsl(var(--mode-comfort-bg))", fg: "hsl(var(--mode-comfort-fg))" },
+          eco: { bg: "hsl(var(--mode-eco-bg))", fg: "hsl(var(--mode-eco-fg))" },
+          empty: { bg: "hsl(var(--mode-empty-bg))", fg: "hsl(var(--mode-empty-fg))" },
+        },
         chart: {
           1: "hsl(var(--chart-1))",
           2: "hsl(var(--chart-2))",
@@ -35,7 +42,7 @@ module.exports = {
           5: "hsl(var(--chart-5))",
         },
       },
-      borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" },
+      borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)", sheet: "1rem" },
     },
   },
   plugins: [require("tailwindcss-animate")],

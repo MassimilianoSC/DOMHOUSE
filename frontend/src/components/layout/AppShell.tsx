@@ -28,7 +28,7 @@ function useNav() {
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
     "flex min-h-[44px] items-center gap-3 rounded-xl px-3 text-sm font-semibold transition-colors focus-ring [&_svg]:size-[18px]",
-    isActive ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+    isActive ? "relative bg-background text-foreground before:absolute before:inset-y-2.5 before:left-0 before:w-[3px] before:rounded-full before:bg-primary" : "text-muted-foreground hover:bg-background/60 hover:text-foreground",
   );
 
 function Links({ items, prefix, onNavigate }: { items: NavItem[]; prefix: string; onNavigate?: () => void }) {
@@ -124,7 +124,7 @@ function MenuContent({ prefix, onNavigate }: { prefix: "sidebar" | "drawer"; onN
 /** Computer: the fixed sidebar. */
 function Sidebar() {
   return (
-    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto border-r bg-background p-4 md:flex" aria-label={t("nav.mainMenu")}>
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col overflow-y-auto bg-frame p-4 md:flex" aria-label={t("nav.mainMenu")}>
       <MenuContent prefix="sidebar" />
     </aside>
   );
@@ -141,7 +141,7 @@ function MobileMenu() {
   useEffect(() => setOpen(false), [pathname]); // any change of page closes it, whatever caused it
   return (
     <DialogPrimitive.Root open={open} onOpenChange={setOpen}>
-      <header className="pt-safe sticky top-0 z-40 border-b bg-background md:hidden">
+      <header className="pt-safe sticky top-0 z-40 bg-frame md:hidden">
         <div className="flex h-14 items-center gap-2 px-2">
           <DialogPrimitive.Trigger asChild>
             <Button variant="ghost" size="icon" aria-label={t("nav.openMenu")} data-testid="mobile-menu-btn">
@@ -184,7 +184,9 @@ export function AppShell() {
         {/* P-67: the computer's band, on top of the content and sticky; the phone has its own in the header */}
         <EnvBanner className="sticky top-0 z-30 hidden md:flex" testId="env-banner" />
         <MobileMenu />
-        <main className="main-safe min-w-0 flex-1 px-4 pt-5 sm:px-6 lg:px-10 lg:pt-8">
+        {/* lot 34, «foglio incorniciato»: the page is a warm white sheet inset in the sand frame, 12 px on a computer and
+            only 4 px on a phone, so the frame never takes room from the content */}
+        <main className="main-safe mx-1 mb-1 min-w-0 flex-1 rounded-sheet border border-[hsl(var(--frame))] bg-background px-4 pt-5 shadow-[0_1px_2px_hsl(24_30%_30%/0.06)] sm:px-6 md:my-3 md:mr-3 md:ml-0 lg:px-10 lg:pt-8">
           <SupportBar />
           <AdminSupportNotice />
           <Outlet key={orgKey} />
