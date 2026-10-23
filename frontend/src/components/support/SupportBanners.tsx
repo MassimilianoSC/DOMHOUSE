@@ -69,7 +69,7 @@ export function SupportBar() {
   return (
     <div role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-warning-border bg-warning-bg px-4 py-3 text-sm font-medium text-warning-fg" data-testid="support-bar">
       <LifeBuoy className="h-4 w-4 shrink-0" aria-hidden />
-      <span className="min-w-0 flex-1">{t("support.bar", { name: me?.tenant?.name ?? "", until: fmtTime(support.expires_at) })}</span>
+      <span className="min-w-0 flex-1 basis-48">{t("support.bar", { name: me?.tenant?.name ?? "", until: fmtTime(support.expires_at) })}</span>
       <Button size="sm" variant="outline" onClick={() => void end()} disabled={busy} data-testid="support-end-btn">{t("support.end")}</Button>
     </div>
   );

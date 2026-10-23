@@ -68,7 +68,7 @@ export function PlatformManagers() {
         <Card className="divide-y px-5" data-testid="platform-managers-list">
           {q.data?.map((m) => (
             <div key={m.email} className="flex flex-wrap items-center gap-3 py-3" data-testid={`platform-manager-${m.email}`}>
-              <div className="min-w-0 flex-1">
+              <div className="min-w-0 flex-1 basis-56">
                 <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
                   <span>{m.email}</span>
                   {same(me?.user.email, m.email) && <Badge>{t("admin.users.you")}</Badge>}

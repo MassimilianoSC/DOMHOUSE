@@ -81,12 +81,14 @@ function MonthlyReport({ aptId, tz }: { aptId: string; tz: string }) {
   const { busy, download } = useReportDownload(aptId);
   return (
     <Card className="flex flex-wrap items-end gap-3 p-5" data-testid="energy-export">
-      <div className="min-w-0 flex-1 space-y-1">
+      {/* a real basis (lot 35): with flex-1 alone the text never made the controls wrap and went one word per line */}
+      <div className="min-w-0 flex-1 basis-64 space-y-1">
         <h2 className="text-base font-semibold">{t("energy.exportTitle")}</h2>
         <p className="text-xs text-muted-foreground">{t("energy.exportHint")}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <NativeSelect className="w-auto" aria-label={t("energy.exportMonth")} value={month} onChange={(e) => setMonth(e.target.value)} data-testid="energy-export-month">
+      {/* under the text on a phone, across the whole card; beside it from 640 px at their own width */}
+      <div className="flex grow flex-wrap items-center gap-2 sm:grow-0">
+        <NativeSelect className="min-w-0 flex-1 sm:w-auto sm:flex-none" aria-label={t("energy.exportMonth")} value={month} onChange={(e) => setMonth(e.target.value)} data-testid="energy-export-month">
           {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
         </NativeSelect>
         <Button variant="outline" onClick={() => void download({ month })} disabled={busy} data-testid="energy-export-btn"><Download /> {t("energy.exportBtn")}</Button>
@@ -101,7 +103,7 @@ function StayComparison({ current, previous, prev, tz, aptId }: { current: numbe
   const up = delta !== null && delta > 0;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm" data-testid="energy-stay-comparison" data-delta={delta ?? ""}>
-      <p className="min-w-0 flex-1">
+      <p className="min-w-0 flex-1 basis-56">
         <span className={up ? "font-semibold text-negative-fg tabular" : "font-semibold tabular"} data-testid="energy-stay-delta">
           {delta === null ? "—" : `${delta > 0 ? "+" : ""}${delta}%`}
         </span>{" "}
