@@ -54,6 +54,26 @@ spec:
               value: "true"
             - name: AI_LOCATION            # D-180: the model in the EU, eu or europe-… (deploy.sh and the BFF check)
               value: "eu"
+            - name: AI_MODEL               # D-187: gemini-3.5-flash, native endpoint eu, reasoning off, no tools
+              value: "google/gemini-3.5-flash"
+            - name: AI_PRICE_IN_EUR_PER_M  # D-187: € per million tokens (1 $ = 1 €), from the price lists; to be
+              value: "1.50"             # confirmed on the official one (D-143)
+            - name: AI_PRICE_OUT_EUR_PER_M # output, reasoning included (none with AI_THINKING_BUDGET 0)
+              value: "9.00"
+            - name: AI_PRICE_CACHED_EUR_PER_M
+              value: "0.15"
+            - name: AI_THINKING_BUDGET     # D-182/D-187: reasoning off on both models
+              value: "0"
+            - name: AI_TWIN_MODEL          # D-187: the twin on another model, failures independent
+              value: "google/gemini-3.5-flash-lite"
+            - name: AI_HEDGE_AFTER_S       # D-187: the twin after 3 s of silence (at once on a quick error)
+              value: "3"
+            - name: AI_TWIN_PRICE_IN_EUR_PER_M
+              value: "0.30"
+            - name: AI_TWIN_PRICE_OUT_EUR_PER_M
+              value: "2.50"
+            - name: AI_TWIN_PRICE_CACHED_EUR_PER_M
+              value: "0.03"
             - name: AI_DEMOS               # P-60 step 9 (D-132): demonstration apartments with the real assistant;
               value: "true"             # needs roles/aiplatform.user on the BFF's account
             - name: GCP_PROJECT_ID
