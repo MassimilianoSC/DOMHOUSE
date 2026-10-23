@@ -689,6 +689,11 @@ proposte vale solo quando ce ne sono: prima, il modello ha fino a circa 26 s; l'
 oltre i 27 s della domanda, e un comando non ancora confermato si annuncia con «Comando inviato: …, l'esito arriva
 nell'app».
 
+Dal 23 ottobre (D-186) i due manifesti dicono `AI_MODEL` `google/gemini-3.5-flash-lite` con i suoi prezzi
+(`AI_PRICE_IN_EUR_PER_M` 0.30, `AI_PRICE_OUT_EUR_PER_M` 2.50, `AI_PRICE_CACHED_EUR_PER_M` 0.03, da confermare sul listino
+ufficiale, D-143); la richiesta gemella usa lo stesso modello; i valori predefiniti del codice (quelli di sviluppo)
+restano quelli del 3.8 flash.
+
 Modello e chiamata (D-182): `gemini-3.8-flash` (`AI_MODEL`), località `eu`, endpoint nativo di Vertex (`AI_API`
 `nativo`, predefinito; `openai` torna all'endpoint compatibile): `generateContent` su
 `aiplatform.eu.rep.googleapis.com/v1/projects/<progetto>/locations/eu/publishers/google/models/gemini-3.8-flash`.
