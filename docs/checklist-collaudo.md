@@ -32,10 +32,12 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | A12 | Operatore di prova | «Elimina il mio account» e conferma. | «Account eliminato»; per rientrare serve un nuovo invito. | |
 | A13 | Unico amministratore | «Elimina il mio account». | L'eliminazione è rifiutata con un messaggio che chiede di nominare un altro amministratore. | |
 | A14 | Qualsiasi | Impostazioni > Notifiche. | C'è «Attiva su questo dispositivo» (le notifiche sono attive anche nell'ambiente di prova); nessuna scritta «Modalità sviluppo» né «FCM». | |
-| A14b | Qualsiasi | Impostazioni > Notifiche: conta le voci e cambiane una. | Quattro voci: «Approvazioni richieste», «Dispositivi e istanza offline», «Prenotazioni», «Riepilogo»; nessuna «Decisioni del motore»; cambiarne una dà «Preferenze salvate». | |
+| A14b | Qualsiasi | Impostazioni > Notifiche: conta le voci e cambiane una. | Quattro voci: «Approvazioni richieste», «Dispositivi e sistema domotico offline», «Prenotazioni», «Riepilogo»; nessuna «Decisioni del motore»; cambiarne una dà «Preferenze salvate». | |
 | A15 📱 | Amministratore | Guarda il titolo della scheda del browser e la pagina di accesso; poi invita un tuo indirizzo nuovo. | Ovunque compare il nome **DOMHOUSE**; l'email d'invito ha l'oggetto «Invito a DOMHOUSE». | |
 | A17 | Gestore della piattaforma senza organizzazione | Impostazioni: cambia il nome visualizzato e salva; poi «Esci da tutti i dispositivi». | «Nome aggiornato» senza errori e il nome compare nel menu; l'uscita riesce; il riquadro Notifiche non c'è. | |
 | A16 | Qualsiasi | Chiudi la finestra di Google senza scegliere un account; poi prova una password sbagliata. | Nessun messaggio nel primo caso; nel secondo «Accesso non riuscito: controlla email e password» con sotto «Codice: auth/invalid-credential», che un tocco copia. | |
+| A18 | Qualsiasi | Impostazioni › «Profilo»: leggi le righe. | «Email», «Ruolo», «Organizzazione», «Appartamenti» (e «Piattaforma» per il gestore della piattaforma); non c'è più la riga «Ambiente». | |
+| A19 📱 | Qualsiasi | Telefono con schermo largo 360 px (o finestra del browser ristretta a 360 px): la pagina di accesso prima di entrare, poi «Regole» di un appartamento. | Nessuno scorrimento orizzontale in nessuna delle due pagine; nella scheda «Pausa minima del compressore» il badge e l'interruttore stanno sotto il titolo, non di fianco. | |
 
 ## B. Installazione 📱
 
@@ -92,9 +94,9 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D9 | Operatore | Programmazione: «Nuova azione» fra 10 minuti, poi «Sposta», poi «Annulla azione». | «Azione programmata», «Orario aggiornato», «Azione annullata». | |
 | D10 | Operatore | Regole: cambia un valore fuori dai limiti, poi uno valido e salva. | Prima l'errore sotto il campo, poi «Regole aggiornate». | |
 | D10b | Operatore | Regole › «Limiti del setpoint»: i tre campi «Temperatura in comfort (°C)», «Temperatura in eco (°C)», «Raffrescamento in comfort (°C)» con i limiti 16–26, 10–22, 22–28; metti eco a 22 con comfort a 21. | Subito, prima di salvare, «La temperatura eco non può superare quella comfort» e «Salva le modifiche» disattivato. | |
-| D10c | Qualsiasi (su un dimostrativo senza sensore nella stanza del clima o della caldaia) | Decisioni. | Compaiono «Regolazione automatica disattivata» (clima in comfort senza sensore) e, a casa vuota, «Antigelo non attivo», una volta per episodio; la notifica «… antigelo non attivo» arriva nella categoria «Dispositivi e istanza offline». | |
+| D10c | Qualsiasi (su un dimostrativo senza sensore nella stanza del clima o della caldaia) | Decisioni. | Compaiono «Regolazione automatica disattivata» (clima in comfort senza sensore) e, a casa vuota, «Antigelo non attivo», una volta per episodio; la notifica «… antigelo non attivo» arriva nella categoria «Dispositivi e sistema domotico offline». | |
 | D11 | Operatore (su un dimostrativo «vuoto», vedi D6b) | Assistente: «accendi la stufetta in camera». | Entro 30 secondi: «Fatto: accendere presa stufetta camera.»; in Panoramica la presa risulta accesa; nelle Decisioni l'autore è l'assistente. | |
-| D11b | Operatore (su un dimostrativo «occupato») | Assistente: «spegni il clima». | La risposta finisce con «Spengo climatizzatore soggiorno con ospiti presenti? Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni.» e sotto ci sono i pulsanti «Sì» e «No» con «scade alle …»; il clima resta acceso. Premi «Sì»: resta «Approvato: il comando parte, l'esito arriva nell'app» e il badge della risposta diventa «approvata» (mai «Già decisa» né «richiede approvazione»); ricaricando la pagina «Approvata da te alle …»; in Approvazioni la richiesta risulta approvata da te, con l'ora, e nelle Decisioni compare con il tuo nome. | |
+| D11b | Operatore (su un dimostrativo «occupato») | Assistente: «spegni il clima». | La risposta finisce con «Spengo climatizzatore soggiorno con ospiti presenti? Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni.» e sotto ci sono i pulsanti «Sì» e «No» con «scade alle …»; il clima resta acceso. Premi «Sì»: resta «Approvato: il comando parte, l'esito arriva nell'app» e il badge della risposta diventa «Approvata» (mai «Già decisa» né «Richiede approvazione»); ricaricando la pagina «Approvata da te alle …»; in Approvazioni la richiesta risulta approvata da te, con l'ora, e nelle Decisioni compare con il tuo nome. | |
 | D11e | Sola lettura (stesso dimostrativo, nuova richiesta da un operatore) | Apri l'Assistente mentre c'è una domanda aperta. | La domanda si vede senza i pulsanti «Sì» e «No». | |
 | D11c | Operatore (su un dimostrativo) | Dal Simulatore apri una finestra e aspetta che il clima si spenga (5 minuti); poi Assistente: «perché si è spento il clima?». | Una risposta che cita la finestra aperta, presa dalle Decisioni. | |
 | D11d | Sola lettura | Apri la pagina Assistente. | Nessun campo per scrivere: il ruolo non fa domande. | |
@@ -105,6 +107,8 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D12 | Operatore (su un dimostrativo) | Regole › «Limiti del setpoint»: spegni l'interruttore della regola e salva; poi riaccendilo e salva. | Da spento, in Panoramica la caldaia accetta da 7 a 23 °C (i limiti del dispositivo); da acceso, da 16 a 23 (il minimo del gestore dentro quelli del dispositivo). | |
 | D12b | Operatore (su un dimostrativo «vuoto», caldaia a 8 °C per l'antigelo, regola accesa con minimo 16) | In Panoramica premi «+» sulla caldaia. | Il valore passa a 16 senza errori; «−» è disattivato finché il valore è sotto il minimo. | |
 | D12c | Operatore | Regole › «Antimuffa a casa vuota». | La descrizione dice «Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.» | |
+| D13 | Qualsiasi | Approvazioni: leggi lo stato di una richiesta aperta e di una già decisa. | Lo stato ha l'iniziale maiuscola: «In attesa», poi «Approvata», «Respinta» o «Scaduta». | |
+| D14 | Operatore | Regole: guarda il pulsante «Proponi». | È il pulsante principale della pagina, quasi nero. | |
 
 ## E. Amministrazione
 
@@ -123,6 +127,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | E9 | Amministratore | Apri «Modifica» su un appartamento: il fuso orario. | Si vede ma non si cambia, con la nota «Impostato sul motore dell'appartamento. Se va cambiato, scrivi all'assistenza.»; il salvataggio funziona come prima. | |
 | E10 | Amministratore | Fai una domanda all'assistente su un appartamento, poi Amministrazione › «Assistente». | La tabella delle ultime 8 settimane con «Settimana», «Domande», «Timeout», «Risposte rapide», «% timeout»; la prima riga «(in corso)» conta la domanda; nessun errore; sul telefono la pagina non scorre di lato. | |
 | E11 | Amministratore | Amministrazione › «Assistente» in un'organizzazione senza domande. | «Nessuna domanda all'assistente nelle ultime settimane.» | |
+| E12 | Amministratore | Amministrazione › «Funzioni»: leggi l'elenco; poi «Appartamenti»: leggi la riga «Funzioni» di un appartamento con un'eccezione. | Sotto ogni funzione nessun codice inglese, solo il nome del menu («Panoramica», «Consumi», «Assistente»…); nella scheda dell'appartamento «Funzioni: Approvazioni, Consumi» con i nomi del menu, mai codici come approvals o energy. | |
 
 ## F. Simulatore (solo amministratore, su un appartamento «Dimostrativo»)
 
@@ -136,6 +141,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | F5 | Metti un dispositivo offline e cambia la modalità; poi in fondo al Simulatore «Ripristina…»: leggi la conferma, prima «Annulla», poi di nuovo e «Ripristina». | Con «Annulla» non cambia nulla; con «Ripristina» compare «Stato iniziale ripristinato», il dispositivo torna online e la modalità iniziale; nel Registro attività la voce del ripristino. | |
 | F6 | Con l'appartamento aperto anche su un secondo dispositivo, ripeti il ripristino dal primo. | Sul secondo la Panoramica si aggiorna da sola entro pochi secondi. | |
 | F7 | Nella sezione «Movimento» premi «Simula movimento» su «Sensore soggiorno». | «Movimento simulato su Sensore soggiorno»; entro pochi secondi accanto al nome «ultimo movimento» con l'ora di adesso; in Panoramica il sensore indica «Movimento rilevato». | |
+| F8 | Guarda «Ripristina…» e premilo; nella finestra di conferma guarda «Ripristina», poi premi «Annulla». | «Ripristina…» ha il contorno rosso; nella conferma «Ripristina» è rosso pieno; con «Annulla» non cambia nulla. | |
 
 ## G. Dopo ogni pubblicazione
 
@@ -155,7 +161,7 @@ Servono due account: A riceve, B fa scattare gli eventi dal Simulatore. Preferen
 | H2 | Android | Telefono bloccato, app chiusa. B: Simulatore > «Richiedi un'approvazione». | Arriva UNA notifica «<appartamento>: approvazione richiesta»; toccandola si apre Approvazioni di quell'appartamento. | |
 | H3 | Android | App aperta su un'altra pagina, stesso evento. | Un solo avviso in alto con «Apri», nessun doppione. | |
 | H4 | Android | B: Simulatore, mettere offline un dispositivo e aspettare i minuti della regola. | Notifica «<appartamento>: dispositivo offline»; il tocco apre la Panoramica. Se il dispositivo torna online prima, nessuna notifica. | |
-| H5 | Android | Spegnere la preferenza «Dispositivi e istanza offline», ripetere H4. | Nessuna notifica. | |
+| H5 | Android | Spegnere la preferenza «Dispositivi e sistema domotico offline», ripetere H4. | Nessuna notifica. | |
 | H5b | Android | Su un dimostrativo senza forzatura attiva. B, Simulatore › Evento prenotazione: (1) «Check-out effettivo», ID `bk-77812` (libera l'appartamento: finché c'è un ospite il motore non rimette a vuoto); (2) «Prenotazione creata», ID `bk-prova-d121`, check-in fra 30 minuti, check-out domani, 2 ospiti; (3) «Prenotazione annullata», stesso ID e stesse date. Alla fine «Ripristina lo stato iniziale». | Dopo (2), entro un secondo: modalità Comfort, pre-arrivo eseguito in Programmazione. Dopo (3), entro due secondi: modalità Vuoto; nelle Decisioni «Prenotazione bk-prova-d121 annullata dopo il pre-arrivo: appartamento rimesso a vuoto»; ad A la notifica «<appartamento>: prenotazione annullata, appartamento rimesso a vuoto», il tocco apre le Decisioni. | |
 | H5c | Android | Spegnere la preferenza «Prenotazioni» (in Impostazioni > Notifiche risulta attiva dall'inizio), ripetere H5b. | Nessuna notifica; la decisione c'è comunque. | |
 | H6 | Android | «Disattiva», poi un nuovo evento. | «Notifiche disattivate su questo dispositivo»; nessuna notifica. | |
@@ -165,7 +171,7 @@ Servono due account: A riceve, B fa scattare gli eventi dal Simulatore. Preferen
 | H10 | iPhone | Impostazioni di iOS > Notifiche > spegnerle per l'app, poi riaprire l'app. | La scheda segnala che le notifiche sono state tolte. | |
 | H11 | Computer, Chrome o Edge | Attivare; con la scheda chiusa e il browser aperto, un evento; poi clic sulla notifica. | Notifica di sistema; il clic porta in primo piano l'app o la apre. | |
 | H12 | Computer | Bloccare le notifiche dal lucchetto della barra degli indirizzi. | La scheda lo segnala. | |
-| H13 | Qualsiasi | Istanza giù dal Simulatore. | UNA sola notifica «istanza non raggiungibile» finché non torna su. | |
+| H13 | Qualsiasi | Sistema domotico giù dal Simulatore. | UNA sola notifica «sistema domotico non raggiungibile» finché non torna su. | |
 | H15 | Telefono con notifiche attive per l'utente A | A preme «Esci»; poi da B, Simulatore > «Richiedi un'approvazione». | A non riceve nulla. | |
 | H16 | Stesso telefono | Entra B. | In Impostazioni > Notifiche le notifiche risultano da attivare; nessuna notifica di A arriva a B. | |
 | H16b | Stesso telefono | B esce; rientra A. | Compare «Notifiche riattivate su questo dispositivo, come prima della tua uscita.»; da un amministratore, Simulatore > «Richiedi un'approvazione»: la notifica arriva ad A. | |
@@ -196,7 +202,7 @@ Servono un account **gestore della piattaforma** e un **amministratore** normale
 | I11 | Gestore | In un'organizzazione, «Nuovo appartamento» con un codice Italianway di prova; poi l'amministratore di quell'organizzazione apre l'appartamento. | Il gestore inserisce e modifica il codice; l'amministratore lo vede ma non lo cambia. | |
 | I12 | Gestore | In un'altra organizzazione crea un appartamento con lo stesso codice Italianway. | Il codice è rifiutato perché già in uso. | |
 | I13 | Gestore | «Nuova organizzazione» indicando come amministratore l'email di un gestore della piattaforma. | L'invito è rifiutato con un messaggio che non dice perché; nessuna organizzazione creata. | |
-| I14 | Gestore | In un'organizzazione, «Nuovo appartamento» con `mock://builtin`. | La casella «Istanza simulata (appartamento dimostrativo)» è accesa e non si toglie; l'appartamento compare «Dimostrativo». | |
+| I14 | Gestore | In un'organizzazione, «Nuovo appartamento» con `mock://builtin`. | La casella «Appartamento dimostrativo» è accesa e non si toglie; l'appartamento compare «Dimostrativo». | |
 
 ## J. Registro, sospensione, assistenza, privacy
 

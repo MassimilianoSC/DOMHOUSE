@@ -137,8 +137,8 @@ schermata Home: si apre a schermo intero e riceve le notifiche.».
 - Dove c'è «Riprova», premilo dopo aver risolto il problema indicato.
 - Le eliminazioni chiedono sempre conferma.
 - Se apri un indirizzo che non esiste leggi «Pagina non trovata» e «L'indirizzo non corrisponde a nessuna schermata.».
-  Se apri una pagina di una funzione spenta leggi «Funzione non disponibile su questa istanza» e «Questa sezione non è
-  attiva per l'appartamento o l'istanza non la implementa ancora.».
+  Se apri una pagina di una funzione spenta leggi «Funzione non disponibile per questo appartamento» e «Questa sezione non è
+  attiva per l'appartamento, oppure il suo sistema domotico non la offre ancora.».
 - I messaggi comuni a tutte le pagine («Server non raggiungibile», «Operazione non riuscita», «Errore …», «Richiesta non
   accettata dal server: ricarica la pagina e riprova.», «Sessione non valida o scaduta») sono spiegati nella parte 11.
 
@@ -148,7 +148,7 @@ La pagina «Impostazioni» è uguale per tutti i ruoli e ha questi riquadri.
 
 - **«Profilo»**: «Email», «Ruolo», «Piattaforma» (solo se sei gestore della piattaforma), «Organizzazione»,
   «Appartamenti» (quali appartamenti vedi: «tutti gli appartamenti», i nomi, «… appartamenti» oppure «nessun
-  appartamento»), «Ambiente». Durante un accesso di assistenza il profilo mostra l'organizzazione assistita.
+  appartamento»). Durante un accesso di assistenza il profilo mostra l'organizzazione assistita.
 - **«Account»**: «Nome visualizzato» (al massimo 80 caratteri) e «Salva»; compare «Nome aggiornato». È il nome che
   vedono i colleghi nelle Decisioni, nelle approvazioni, nei registri e in fondo al menu.
 - **«Password ed email»** (solo per chi entra con email e password):
@@ -170,8 +170,8 @@ La pagina «Impostazioni» è uguale per tutti i ruoli e ha questi riquadri.
   l'eliminazione toglie le autorizzazioni di prova e conserva l'identità di accesso condivisa con il sito vero; nel sito
   vero cancella anche quella.
 - **«Notifiche»**: quali avvisi ricevere sul telefono, per categoria, con quattro interruttori: «Approvazioni
-  richieste» («Quando il motore chiede il tuo consenso»), «Dispositivi e istanza offline» («Dispositivo offline oltre la
-  soglia della regola, istanza non raggiungibile, antigelo non attivo»), «Prenotazioni» («Avvisi sulle prenotazioni che
+  richieste» («Quando il motore chiede il tuo consenso»), «Dispositivi e sistema domotico offline» («Dispositivo offline oltre la
+  soglia della regola, sistema domotico non raggiungibile, antigelo non attivo»), «Prenotazioni» («Avvisi sulle prenotazioni che
   cambiano il programma dell'appartamento») e «Riepilogo» («Ogni lunedì, solo se la settimana ha qualcosa da
   segnalare»). Sono tutti attivi dall'inizio; ogni cambio mostra «Preferenze salvate» e, se non riesce, l'interruttore
   torna com'era. Le scelte valgono per le notifiche sul telefono: gli avvisi dentro l'app compaiono comunque. Sotto c'è
@@ -222,9 +222,9 @@ Le notifiche che puoi ricevere, con il nome dell'appartamento davanti:
 | Categoria | Notifica | Quando arriva | Dove porta |
 |---|---|---|---|
 | «Approvazioni richieste» | «…: approvazione richiesta», con la proposta oppure «Il motore chiede il tuo consenso» | Quando il motore apre una richiesta (non per quelle in coda dietro un'altra) | «Approvazioni» |
-| «Dispositivi e istanza offline» | «…: dispositivo offline», «… non risponde da oltre … minuti» | Dopo i minuti della regola «Avviso dispositivo offline» (15 all'inizio); regola spenta, niente avviso | «Panoramica» |
-| «Dispositivi e istanza offline» | «…: istanza non raggiungibile», «Il connettore domotico risulta fermo» | Sistema domotico fermo oltre la stessa soglia; una volta per episodio | «Panoramica» |
-| «Dispositivi e istanza offline» | «…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo» | A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio | «Decisioni» |
+| «Dispositivi e sistema domotico offline» | «…: dispositivo offline», «… non risponde da oltre … minuti» | Dopo i minuti della regola «Avviso dispositivo offline» (15 all'inizio); regola spenta, niente avviso | «Panoramica» |
+| «Dispositivi e sistema domotico offline» | «…: sistema domotico non raggiungibile», «Il connettore domotico risulta fermo» | Sistema domotico fermo oltre la stessa soglia; una volta per episodio | «Panoramica» |
+| «Dispositivi e sistema domotico offline» | «…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo» | A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio | «Decisioni» |
 | «Prenotazioni» | «…: prenotazione annullata, appartamento rimesso a vuoto» | Disdetta dopo che l'appartamento era già stato preparato per l'arrivo | «Decisioni» |
 | «Riepilogo» | «…: riepilogo della settimana», con la prima segnalazione e «E altre … voci.» | Il lunedì mattina, solo se la settimana ha qualcosa da segnalare | Il riepilogo di quella settimana |
 
@@ -262,7 +262,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account�
 
 - Nome, indirizzo e stato: «Online», «Non raggiungibile» oppure «Disattivato» (scheda grigia).
 - L'etichetta «Dimostrativo» accanto al nome degli appartamenti finti usati per le prove.
-- L'occupazione: «vuoto» (nessuno), «occupato» (ospiti dentro, dopo il check-in effettivo), «prenotato» (c'è una
+- L'occupazione: «Vuoto» (nessuno), «Occupato» (ospiti dentro, dopo il check-in effettivo), «Prenotato» (c'è una
   prenotazione ma non è stato comunicato l'arrivo).
 - La modalità («Comfort», «Eco», «Casa vuota») e, se ci sono richieste aperte, una campanella con il numero.
 - Quattro dati: «Prossimo check-in», «Prossimo check-out», «Oggi» (consumo di oggi in kWh, non un importo) e
@@ -284,8 +284,8 @@ una propria organizzazione vede il pulsante «Appartamento», che apre Organizza
   online».
 - **La striscia di salute**: «In salute», «Degradata» o «Ferma»; «Connettore» «attivo» o «fermo», «… dispositivi
   connessi», «Modello» (lo stato dell'assistente), «Contratto» e «Ultimo evento …». Se il sistema domotico non risponde
-  compare «Istanza non raggiungibile». Se la versione del sistema non è compatibile leggi «Versione del contratto non
-  compatibile» e «L'istanza dichiara il contratto …: questa app supporta solo la versione 1.x. Contatta il supporto
+  compare «Sistema domotico non raggiungibile». Se la versione del sistema non è compatibile leggi «Versione del contratto non
+  compatibile» e «Il sistema domotico dichiara il contratto …: questa app supporta solo la versione 1.x. Contatta il supporto
   tecnico.».
 - **«Modalità»**: la modalità attuale fra «comfort», «eco» e «casa vuota».
 - **«Forza per…»**: se c'è una forzatura in corso leggi «Forzatura … attiva fino alle …» e «ancora …».
@@ -298,24 +298,24 @@ una propria organizzazione vede il pulsante «Appartamento», che apre Organizza
   leggi la data precisa).
 - Un dispositivo che non risponde mostra «Dispositivo offline», «Visto …» e «Il dispositivo non è raggiungibile: i
   comandi sono disattivati». Una capacità che l'app non gestisce è segnata «non supportata» («Capacità non gestita
-  dall'app: …»). Senza dispositivi leggi «Nessun dispositivo su questa istanza».
+  dall'app: …»). Senza dispositivi leggi «Nessun dispositivo in questo appartamento».
 - **Sotto ogni comando** compare l'esito: «in corso», «eseguito», «errore» o «nessuna risposta», con il motivo
   («dispositivo offline», «rifiutato dal dispositivo», «bloccato da una regola», «bloccato da un'azione prioritaria»,
   «fuori dai limiti», «nessuna conferma», «errore interno») e un «ID richiesta» copiabile. Un climatizzatore comandato
   a infrarosso può risultare «non verificato» («Lo split non conferma l'esecuzione: lo stato mostrato è quello
   richiesto»).
 - Mentre guardi un appartamento possono comparire avvisi in alto: «Nuova approvazione richiesta», «… è offline»,
-  «Istanza domotica non raggiungibile», «Istanza domotica di nuovo raggiungibile». Compaiono anche se hai spento la
+  «Sistema domotico non raggiungibile», «Sistema domotico di nuovo raggiungibile». Compaiono anche se hai spento la
   categoria nelle notifiche.
 
 ### Approvazioni: che cosa vedi
 
 «Approvazioni» («Azioni che il motore esegue solo con il tuo consenso») elenca le richieste. Il filtro «In attesa»
 mostra quelle aperte; «Tutte» anche quelle decise negli ultimi 7 giorni. Ogni scheda mostra chi la propone («Motore
-AI», «Regola», «Assistente», «Modulo»), la descrizione, «Perché il motore lo propone», «Azione proposta», lo stato («in
-attesa», «approvata», «respinta», «scaduta»), «… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta», la frase su
+AI», «Regola», «Assistente», «Modulo»), la descrizione, «Perché il motore lo propone», «Azione proposta», lo stato («In
+attesa», «Approvata», «Respinta», «Scaduta»), «… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta», la frase su
 cosa succede alla scadenza («Alla scadenza verrà respinta», «Alla scadenza verrà eseguita» o «Alla scadenza resta in
-attesa») e, dopo la decisione, «approvata da … …» o «respinta da … …» con la nota. Se non c'è nulla: «Nessuna
+attesa») e, dopo la decisione, «Approvata da … …» o «Respinta da … …» con la nota. Se non c'è nulla: «Nessuna
 approvazione in attesa» o «Nessuna approvazione negli ultimi 7 giorni». La pagina si aggiorna ogni 30 secondi. C'è una
 sola richiesta aperta per volta: le altre aspettano in coda e si aprono dopo.
 
@@ -326,8 +326,8 @@ per 24 mesi. Ogni riga mostra data, chi ha deciso («Motore AI», «Regola «…
 persona che ha eliminato l'account compare come «utente rimosso»), su cosa («appartamento», «dispositivo», «regole»,
 «programmazione»), il tipo di azione in italiano (per esempio «Modalità», «Forzatura scaduta», «Programma: spostata»,
 «Prenotazione annullata», «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica
-disattivata», «Antigelo non attivo»), il valore prima e dopo, il motivo, l'esito («applicata», «respinta», «in attesa
-di approvazione», «non riuscita», «informativa») e l'«ID richiesta». Passando sopra il tipo compare il codice tecnico;
+disattivata», «Antigelo non attivo»), il valore prima e dopo, il motivo, l'esito («Applicata», «Respinta», «in attesa
+di approvazione», «Non riuscita», «Informativa») e l'«ID richiesta». Passando sopra il tipo compare il codice tecnico;
 un'azione nuova non ancora tradotta mostra il codice.
 
 - **Filtri**: «Chi», «Dispositivo» («Tutti i dispositivi»), «Periodo» («Tutto lo storico», «Ultimi 7 giorni», «Ultimi
@@ -400,8 +400,8 @@ un'azione nuova non ancora tradotta mostra il codice.
 
 «Programmazione» («Azioni pianificate dal motore e dal gestore»): «In programma» e «Storico (ultimi 7 giorni)», con
 aggiornamento ogni 30 secondi. Ogni riga ha l'orario (ora dell'appartamento), l'azione, l'origine («prenotazione»,
-«gestore», «assistente»), il tipo («pre-arrivo», «check-out», «casa vuota», «manuale») e lo stato («in programma»,
-«eseguita», «annullata», «non riuscita»). Senza azioni: «Nessuna azione in programma». Le azioni nate da una
+«gestore», «assistente»), il tipo («pre-arrivo», «check-out», «casa vuota», «manuale») e lo stato («In programma»,
+«Eseguita», «Annullata», «Non riuscita»). Senza azioni: «Nessuna azione in programma». Le azioni nate da una
 prenotazione hanno la nota «Ricalcolata a ogni modifica della prenotazione».
 
 ### Regole: che cosa vedi
@@ -473,8 +473,8 @@ finestra è ancora aperta oltre la soglia, il clima si spegne subito.
 1. Apri la notifica oppure «Approvazioni» › «In attesa».
 2. Leggi la descrizione, «Perché il motore lo propone», «Azione proposta», il tempo rimasto e la frase sulla scadenza.
 3. Se vuoi, scrivi una «Nota (facoltativa)» («Perché approvi o respingi…», al massimo 500 caratteri).
-4. Premi «Approva» (compare «Azione approvata») o «Respingi» («Azione respinta»). La richiesta passa a «approvata» o
-   «respinta» con «… da … …» e la nota; la successiva in coda si apre.
+4. Premi «Approva» (compare «Azione approvata») o «Respingi» («Azione respinta»). La richiesta passa a «Approvata» o
+   «Respinta» con «… da … …» e la nota; la successiva in coda si apre.
 5. Controlla l'esito vero in Panoramica e nelle Decisioni: un'azione approvata può non partire se nel frattempo il
    dispositivo è diventato irraggiungibile. Se una richiesta è già stata decisa da un collega leggi «L'approvazione è già
    stata decisa».
@@ -539,7 +539,7 @@ Il riquadro «Applica le stesse regole ad altri appartamenti» è riservato agli
 1. Scrivi nel campo («Es. «Spegni il clima del soggiorno»», al massimo 500 caratteri) e premi «Invia», oppure tocca un
    suggerimento: «Spegni il clima del soggiorno», «Porta il soggiorno a 21 gradi», «Alle 18 metti il clima a 22 gradi»,
    «Spegni la caldaia».
-2. Leggi «Sto elaborando…», poi la risposta con lo stato «risposto», «richiede approvazione» o «non riuscita». Se dopo
+2. Leggi «Sto elaborando…», poi la risposta con lo stato «Risposto», «Richiede approvazione» o «Non riuscita». Se dopo
    30 secondi non c'è risposta leggi «Nessuna risposta dall'assistente: riprova».
 3. L'assistente legge stati, dispositivi, consumi (fino a 31 giorni per volta), programmazioni e Decisioni (le ultime
    50) e risponde a domande come «perché si è spento il clima?». Non riceve mai dati personali degli ospiti. Se non sa,
@@ -647,9 +647,10 @@ settimane.» I numeri sono dell'intera organizzazione; sul telefono la tabella s
 
 ### Appartamenti: anagrafica, attivo, verifica connessione, prezzo
 
-- Ogni scheda mostra nome, «Indirizzo», «Fuso orario», «URL istanza», «ID Italianway», «Ultima verifica» («mai
-  eseguita», «riuscita il …», «non riuscita il …»), «Funzioni», il prezzo che vale («Prezzo dell'energia: … (solo per
-  questo appartamento)» o «Prezzo dell'energia: … (dell'organizzazione)») e «Dimostrativo». L'identificativo
+- Ogni scheda mostra nome, «Indirizzo», «Fuso orario», «Indirizzo del sistema domotico», «ID Italianway», «Ultima
+  verifica» («mai eseguita», «riuscita il …», «non riuscita il …»), «Funzioni» (con i nomi del menu, per esempio
+  «Approvazioni, Consumi»), il prezzo che vale («Prezzo dell'energia: … (solo per questo appartamento)» o «Prezzo
+  dell'energia: … (dell'organizzazione)») e «Dimostrativo». L'identificativo
   dell'appartamento si copia toccandolo. Non ci sono «Nuovo appartamento» né cestino: «I nuovi appartamenti li aggiunge
   il gestore della piattaforma (HQE): per averne uno, scrivi all'assistenza.».
 - **«Modifica»** apre «Modifica appartamento»: «Nome», «Indirizzo», «Attivo», «Prezzo per kWh di questo
@@ -667,7 +668,7 @@ settimane.» I numeri sono dell'intera organizzazione; sul telefono la tabella s
   automatismi del sistema domotico.
 - **«Verifica connessione»**: controlla che il sistema domotico risponda; leggi «Connessione OK» o «Problema di
   connessione» («Se la verifica non riesce, avvisa l'assistenza.») e «Ultima verifica». Un esito negativo è un risultato,
-  non un errore dell'app. Messaggi possibili: «Istanza non raggiungibile», «Chiave dell'istanza non configurata:
+  non un errore dell'app. Messaggi possibili: «Sistema domotico non raggiungibile», «Chiave del sistema domotico non configurata:
   contatta l'assistenza HQE».
 - **«Prezzo dell'energia»** (in cima): «Serve per l'importo in euro nei rendiconti Excel dei consumi. Vale per tutti
   gli appartamenti; per un appartamento puoi impostarne uno diverso da «Modifica».». Compila «Prezzo per kWh (€)» (da 0
@@ -679,7 +680,7 @@ settimane.» I numeri sono dell'intera organizzazione; sul telefono la tabella s
 
 «Funzioni dell'organizzazione …» («Disattiva qui una funzione per nasconderla in tutti gli appartamenti; ogni
 appartamento può avere un'eccezione.»): nove interruttori, Panoramica, Dispositivi, Comandi, Consumi, Programmazione,
-Regole, Approvazioni, Decisioni, Assistente, ciascuno con sotto il nome tecnico. Ogni cambio si salva subito
+Regole, Approvazioni, Decisioni, Assistente, con i nomi del menu. Ogni cambio si salva subito
 («Funzioni aggiornate»); «Ripristina tutte» riaccende tutto. Per ogni appartamento c'è lo stesso elenco con «eredita
 dall'organizzazione» oppure «eccezione per questo appartamento»; «Torna all'organizzazione» toglie l'eccezione.
 L'eccezione sostituisce la scelta dell'organizzazione e può anche riaccendere una funzione spenta per tutti. Riepiloghi
@@ -833,38 +834,38 @@ dispositivi o consumi.
 - **«Nuovo appartamento»** apre «Nuovo appartamento per …» («L'identificativo non si potrà più cambiare: usa minuscole,
   numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l'amministratore
   dell'organizzazione.»): «ID» (da 3 a 64 caratteri, minuscole, numeri e trattini, per esempio apt-milano-01, mai
-  riutilizzabile), «Nome» (fino a 120 caratteri), «URL istanza» (nell'ambiente di prova «In questo ambiente usa
+  riutilizzabile), «Nome» (fino a 120 caratteri), «Indirizzo del sistema domotico» (nell'ambiente di prova «In questo ambiente usa
   mock://builtin»), «Porta» (da 1 a 65535, facoltativa), «Fuso orario» (Europe/Rome all'inizio; «Valore iniziale: dopo la creazione il
   fuso orario si imposta sul motore.»), «ID Italianway» (fino
   a 120 caratteri; «Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.»),
-  «Attivo», «Istanza simulata (appartamento dimostrativo)»; «Salva». Leggi «Appartamento … creato» e, con un sistema
-  domotico vero, «Prima di usarlo: crea la chiave dell'istanza e poi premi Verifica connessione.»: la chiave la prepara il
+  «Attivo», «Appartamento dimostrativo»; «Salva». Leggi «Appartamento … creato» e, con un sistema
+  domotico vero, «Prima di usarlo: crea la chiave del sistema domotico e poi premi Verifica connessione.»: la chiave la prepara il
   responsabile tecnico fuori dall'app. Non c'è il campo Indirizzo: lo mette l'amministratore. Errori: «Identificativo
   non disponibile», «Collegamento già usato da un altro appartamento», «Codice Italianway già in uso», «Fuso orario non
   valido», «Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi
-  mock://builtin nel campo URL istanza».
+  mock://builtin nel campo Indirizzo del sistema domotico».
 - **«Modifica collegamento»** apre «Collegamento di «…»» («Qui cambi il collegamento al sistema domotico e il codice
-  Italianway: nome, stato e funzioni dell'appartamento li gestisce l'amministratore dell'organizzazione.»): «URL
-  istanza», «Porta», «ID Italianway», «Salva» («Collegamento aggiornato»). Un indirizzo senza http diventa http; poi
+  Italianway: nome, stato e funzioni dell'appartamento li gestisce l'amministratore dell'organizzazione.»): «Indirizzo del
+  sistema domotico», «Porta», «ID Italianway», «Salva» («Collegamento aggiornato»). Un indirizzo senza http diventa http; poi
   verifica la connessione. Il codice Italianway deve essere unico su tutta la piattaforma.
-- **«Istanza simulata (appartamento dimostrativo)»** («Per prove e dimostrazioni: gli amministratori
+- **«Appartamento dimostrativo»** («Per prove e dimostrazioni: gli amministratori
   dell'organizzazione vedono il Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»): con il
-  motore simulato integrato è sempre accesa («Con il motore simulato integrato (mock://) l'istanza è sempre simulata.»).
+  motore simulato integrato è sempre accesa («Con un indirizzo mock:// l'appartamento è sempre dimostrativo.»).
   Passando a un sistema domotico vero l'appartamento torna reale, salvo lasciare accesa la casella. Nel sito vero, fino
   alla consegna al cliente, i dimostrativi con il motore simulato integrato sono ammessi come nell'ambiente di prova
   (dal 23 ottobre); un tale appartamento non può avere un codice Italianway («In produzione un
   appartamento dimostrativo non può avere un codice Italianway»); un sistema domotico vero segnato dimostrativo può
-  averlo. Ogni cambio del tipo resta nel registro («… ha segnato l'appartamento … come istanza simulata»).
-- **Com'è il dimostrativo all'inizio**: nel campo «URL istanza» scrivi `mock://builtin?variante=vuoto` (nessun ospite,
-  casa fredda) oppure `mock://builtin?variante=occupato` (soggiorno in corso, comfort). Senza variante parte vuoto se
-  l'identificativo contiene «bologna», occupato altrimenti. Per cambiarla a un dimostrativo esistente salva il nuovo
+  averlo. Ogni cambio del tipo resta nel registro («… ha segnato l'appartamento … come dimostrativo»).
+- **Com'è il dimostrativo all'inizio**: nel campo «Indirizzo del sistema domotico» scrivi `mock://builtin?variante=vuoto`
+  (nessun ospite, casa fredda) oppure `mock://builtin?variante=occupato` (soggiorno in corso, comfort). Senza variante
+  parte vuoto se l'identificativo contiene «bologna», occupato altrimenti. Per cambiarla a un dimostrativo esistente salva il nuovo
   collegamento e fai premere «Ripristina» nel Simulatore a un amministratore. Un valore sbagliato dà «Variante
   sconosciuta: scrivi mock://builtin?variante=vuoto oppure mock://builtin?variante=occupato».
 - **«Verifica connessione»**: «Connessione OK» o «Problema di connessione», con «Ultima verifica» condivisa con
-  l'amministratore; il gestore legge anche i problemi della chiave («Chiave dell'istanza non trovata in Secret Manager:
-  crea il segreto …», «Chiave dell'istanza non leggibile dal server: manca il permesso su …»).
+  l'amministratore; il gestore legge anche i problemi della chiave («Chiave del sistema domotico non trovata in Secret Manager:
+  crea il segreto …», «Chiave del sistema domotico non leggibile dal server: manca il permesso su …»).
 - **«Elimina»** chiede «Eliminare l'appartamento … («…») dell'organizzazione …? Sparirà per tutti i suoi utenti.
-  L'istanza domotica non viene toccata.» e mostra «Appartamento … eliminato». L'identificativo non si può riusare.
+  Il suo sistema domotico non viene toccato.» e mostra «Appartamento … eliminato». L'identificativo non si può riusare.
 
 ### Gestori della piattaforma
 
@@ -952,8 +953,8 @@ all'amministratore. Non serve un'approvazione preventiva.
    «pre-arrivo» con origine «prenotazione»: comfort 2 ore prima del check-in (il numero di ore è nella regola
    «Pre-arrivo»). Nelle Decisioni leggi «Prenotazione creata».
 2. All'ora del pre-arrivo il motore mette l'appartamento in «comfort»: la caldaia chiede la temperatura di comfort; il
-   climatizzatore, se nella stanza c'è un sensore, scalda o raffresca da solo. Nella scheda l'occupazione è «prenotato».
-3. Quando Italianway comunica l'arrivo effettivo («Check-in» nelle Decisioni) l'occupazione diventa «occupato». Da ora
+   climatizzatore, se nella stanza c'è un sensore, scalda o raffresca da solo. Nella scheda l'occupazione è «Prenotato».
+3. Quando Italianway comunica l'arrivo effettivo («Check-in» nelle Decisioni) l'occupazione diventa «Occupato». Da ora
    l'assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità.
 4. Se vuoi scaldare prima o cambiare qualcosa, usa «Modalità» o i comandi in Panoramica, oppure l'assistente.
 5. Se la prenotazione viene annullata dopo il pre-arrivo, il motore rimette l'appartamento a «casa vuota» (salvo un
@@ -980,12 +981,12 @@ all'amministratore. Non serve un'approvazione preventiva.
    dispositivo non è raggiungibile: i comandi sono disattivati»). Mentre guardi l'appartamento compare l'avviso «… è
    offline».
 2. Se resta offline oltre i minuti della regola «Avviso dispositivo offline» (15 all'inizio), nelle Decisioni compare
-   «Dispositivo offline» e, a chi ha la categoria «Dispositivi e istanza offline» attiva, arriva la notifica «…:
+   «Dispositivo offline» e, a chi ha la categoria «Dispositivi e sistema domotico offline» attiva, arriva la notifica «…:
    dispositivo offline», «… non risponde da oltre … minuti». Se torna prima, niente avviso. Con la regola spenta non
    arriva nulla.
 3. Un comando a un dispositivo offline risponde «Il dispositivo non è raggiungibile; riprova quando torna online».
-4. Se è l'intero sistema domotico a non rispondere, la striscia di salute dice «Ferma» e «Istanza non raggiungibile»,
-   compare l'avviso «Istanza domotica non raggiungibile» e, dopo la stessa soglia, la notifica «…: istanza non
+4. Se è l'intero sistema domotico a non rispondere, la striscia di salute dice «Ferma» e «Sistema domotico non raggiungibile»,
+   compare l'avviso «Sistema domotico non raggiungibile» e, dopo la stessa soglia, la notifica «…: sistema domotico non
    raggiungibile», «Il connettore domotico risulta fermo». Nelle Decisioni: «Collegamento ai dispositivi perso» e poi
    «Collegamento ai dispositivi ripristinato». Non arriva una notifica di ritorno online.
 5. Nel riepilogo del lunedì un dispositivo ancora offline da più di 24 ore compare come «… è offline da più di 24 ore.».
@@ -1044,7 +1045,7 @@ Decisioni. Alle richieste dell'assistente puoi rispondere anche in chat con «S�
 4. **Approvazione**: premi «Richiedi un'approvazione» e vai in «Approvazioni» per decidere.
 5. **Prenotazione**: in «Evento prenotazione» scegli «Prenotazione creata», un «ID prenotazione», «Check-in» e
    «Check-out» futuri, «Ospiti» e premi «Invia evento»: leggi «… azioni programmate» e vai in «Programmazione». Poi invia
-   «Check-in effettivo» con lo stesso identificativo: l'occupazione diventa «occupato». Per provare la partenza, invia
+   «Check-in effettivo» con lo stesso identificativo: l'occupazione diventa «Occupato». Per provare la partenza, invia
    «Check-out effettivo» o aspetta l'ora del check-out più i minuti della regola; con «Simula movimento» in «Movimento»
    provochi la richiesta «Mettere l'appartamento a vuoto dopo il check-out».
 6. **Ricominciare**: «Ripristina…» in fondo riporta l'appartamento allo stato iniziale.
@@ -1054,16 +1055,16 @@ Decisioni. Alle richieste dell'assistente puoi rispondere anche in chat con «S�
 1. «Organizzazioni» › «Elenco organizzazioni» › «Nuova organizzazione»: «Nome dell'organizzazione», «Email del primo
    amministratore», eventuale nome; «Crea». Leggi l'esito dell'invito.
 2. Il primo amministratore entra come nella parte 2. Finché non entra puoi usare «Reinvia invito».
-3. Nella scheda dell'organizzazione premi «Appartamenti» › «Nuovo appartamento»: «ID» definitivo, «Nome», «URL
-   istanza», eventuale «Porta», «Fuso orario», «ID Italianway» (deve essere quello giusto: decide dove vanno le
-   prenotazioni), «Attivo», «Istanza simulata (appartamento dimostrativo)»; «Salva».
-4. Con un sistema domotico vero leggi «Prima di usarlo: crea la chiave dell'istanza e poi premi Verifica connessione.»:
+3. Nella scheda dell'organizzazione premi «Appartamenti» › «Nuovo appartamento»: «ID» definitivo, «Nome», «Indirizzo del
+   sistema domotico», eventuale «Porta», «Fuso orario», «ID Italianway» (deve essere quello giusto: decide dove vanno le
+   prenotazioni), «Attivo», «Appartamento dimostrativo»; «Salva».
+4. Con un sistema domotico vero leggi «Prima di usarlo: crea la chiave del sistema domotico e poi premi Verifica connessione.»:
    la chiave la prepara il responsabile tecnico fuori dall'app. Poi premi «Verifica connessione» e vai avanti solo con
    «Connessione OK».
 5. L'amministratore completa in «Amministrazione» › «Appartamenti»: «Indirizzo», prezzo, funzioni, e assegna
    l'appartamento agli utenti.
-6. Per un dimostrativo l'amministratore prova il Simulatore. Nel sito vero non si creano dimostrativi con il motore
-   simulato integrato.
+6. Per un dimostrativo l'amministratore prova il Simulatore. Nel sito vero, fino alla consegna al cliente, i dimostrativi
+   con il motore simulato integrato sono ammessi come nell'ambiente di prova.
 
 ### Quando qualcosa non funziona
 
@@ -1133,7 +1134,7 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 - **Senza un sensore utilizzabile** (manca o è offline) la caldaia non si accende mai da sola: la temperatura chiesta da
   una modalità (comfort, eco o antigelo) la lascia spenta, con una decisione per episodio, «…: sensore di temperatura
   mancante, regolazione automatica disattivata» (in comfort ed eco) oppure «…: sensore di temperatura mancante, antigelo
-  non attivo» (a casa vuota, tipo «Antigelo non attivo», con notifica nella categoria «Dispositivi e istanza offline»).
+  non attivo» (a casa vuota, tipo «Antigelo non attivo», con notifica nella categoria «Dispositivi e sistema domotico offline»).
   Un comando di una persona o programmato viene invece eseguito così com'è, senza regolazione («…: …; segue il comando
   manuale senza regolazione»). Quando il sensore torna leggi «…: sensore di nuovo disponibile, regolazione ripresa».
 - Il climatizzatore in comfort segue il sensore della sua stanza (sopra). Senza sensore nella stanza lo comandi solo tu.
@@ -1150,7 +1151,7 @@ Tutte partono attive. Sette si modificano dall'app, una no.
   pre-arrivo già eseguito.
 - Un cambio di modalità programmato durante una forzatura aspetta la sua fine («Azione rimandata»). Dopo un riavvio del
   sistema, un'azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).
-- L'occupazione «occupato» richiede il check-in effettivo comunicato da Italianway; la sola prenotazione dà «prenotato».
+- L'occupazione «Occupato» richiede il check-in effettivo comunicato da Italianway; la sola prenotazione dà «Prenotato».
 
 ### Approvazioni automatiche
 
@@ -1242,8 +1243,8 @@ dell'email di chi comanda.
 | «Operazione riservata agli amministratori», «Operazione riservata ai gestori della piattaforma» | Serve un ruolo più alto | Chiedi a chi ha quel ruolo |
 | «Appartamento inesistente», «Appartamento non disponibile» | L'appartamento non esiste o non è fra i tuoi | «Torna agli appartamenti»; chiedi l'assegnazione a un amministratore |
 | «Appartamento disattivato» | L'amministratore ha spento «Attivo» | Chiedi all'amministratore |
-| «Funzione non disponibile su questa istanza» | La funzione è spenta o il sistema domotico non la ha | Chiedi all'amministratore (scheda «Funzioni») |
-| «Istanza non raggiungibile» | Il sistema domotico dell'appartamento non risponde | Aspetta; se continua, «Verifica connessione» e assistenza |
+| «Funzione non disponibile per questo appartamento» | La funzione è spenta o il sistema domotico non la ha | Chiedi all'amministratore (scheda «Funzioni») |
+| «Sistema domotico non raggiungibile» | Il sistema domotico dell'appartamento non risponde | Aspetta; se continua, «Verifica connessione» e assistenza |
 | «Versione del contratto non compatibile» | Il sistema domotico è di una versione non supportata | Contatta il supporto tecnico |
 | «Pagina non trovata» | L'indirizzo non esiste, oppure non hai il ruolo per quella pagina | Torna al menu |
 
@@ -1283,7 +1284,7 @@ dell'email di chi comanda.
 | «Limite di … domande al giorno raggiunto per questo appartamento: riprova domani.» | Limite giornaliero dell'assistente | Usa i comandi dell'app |
 | «Limite mensile raggiunto, riprova dal mese prossimo» | Tetto di spesa del servizio raggiunto | Usa i comandi dell'app; HQE riceve un'email |
 | «Nessun altro appartamento nella tua organizzazione», «Scegli almeno un appartamento di destinazione», «Al massimo 100 appartamenti alla volta», «Solo gli amministratori possono copiare le regole» | Condizioni della copia delle regole | Correggi la scelta |
-| «Il simulatore è riservato agli amministratori», «Questo appartamento non è un'istanza simulata» | Il Simulatore non è disponibile qui | Solo amministratori, solo dimostrativi |
+| «Il simulatore è riservato agli amministratori», «Questo appartamento non è un dimostrativo» | Il Simulatore non è disponibile qui | Solo amministratori, solo dimostrativi |
 | «Il check-out deve essere successivo al check-in» | Date della prenotazione di prova invertite | Correggi le date |
 | «Nessun apparecchio con misuratore da proporre nell'appartamento» | Nessun apparecchio adatto alla prova | Usa un altro dimostrativo |
 | «Il ripristino è disponibile solo con il motore simulato integrato.» | Il ripristino non è possibile su un sistema vero | Nessuna azione |
@@ -1299,13 +1300,13 @@ dell'email di chi comanda.
 | «Ruolo non aggiornato, riprova tra poco», «Rimozione non riuscita, riprova tra poco», «Eliminazione non riuscita, riprova tra poco» | Errore passeggero | Riprova |
 | «Fuso orario non valido», «Funzione sconosciuta», «Appartamento inesistente: …» | Dati non validi | Correggi |
 | «Prezzo non valido: da 0 a 10 € al kWh, al massimo 4 decimali» | Prezzo fuori formato | Scrivi per esempio 0,25 |
-| «Chiave dell'istanza non configurata: contatta l'assistenza HQE» | Manca la chiave del sistema domotico | Avvisa l'assistenza |
+| «Chiave del sistema domotico non configurata: contatta l'assistenza HQE» | Manca la chiave del sistema domotico | Avvisa l'assistenza |
 | «Scrivi il nome dell'organizzazione», «Esiste già un'organizzazione con questo nome», «Organizzazione inesistente» | Nome mancante, duplicato o organizzazione non trovata | Correggi |
 | «L'organizzazione è già sospesa», «L'organizzazione non è sospesa», «Scrivi il motivo della sospensione» | Stato o motivo non coerenti | Rileggi la scheda |
 | «La durata va da 1 a 24 ore», «Scrivi il motivo dell'accesso di assistenza», «L'organizzazione è sospesa», «Hai già un accesso di assistenza aperto in questa organizzazione», «Accesso non aperto: riprova tra poco» | Condizioni dell'accesso di assistenza | Correggi o riprova |
 | «Accesso di assistenza inesistente» | L'accesso è già chiuso | Niente da fare |
 | «Identificativo non disponibile», «Collegamento già usato da un altro appartamento», «Codice Italianway già in uso» | Valori già usati o non riusabili | Scegli valori diversi |
-| «Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi mock://builtin nel campo URL istanza» | Collegamento scritto male o non ammesso | Correggi il collegamento |
+| «Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi mock://builtin nel campo Indirizzo del sistema domotico» | Collegamento scritto male o non ammesso | Correggi il collegamento |
 | «Ha già il ruolo di gestore della piattaforma», «Non è un gestore della piattaforma», «È l'ultimo gestore della piattaforma: nomina prima qualcun altro» | Condizioni sui gestori | Rileggi l'elenco |
 
 ### Nelle Impostazioni e nelle notifiche
@@ -1333,10 +1334,10 @@ dell'email di chi comanda.
 | Approvazione | Una richiesta che aspetta il sì o il no di una persona prima di un'azione; alla scadenza segue quanto scritto nella scheda. |
 | Avviso nell'app | Messaggio temporaneo in alto nella pagina aperta; non è una notifica sul telefono. |
 | Capacità | Una cosa che un dispositivo sa fare o misurare: interruttore, clima, riscaldamento, temperatura, umidità, contatto, movimento, potenza. |
-| Casa vuota | La modalità per l'appartamento senza ospiti: clima spento, caldaia sull'antigelo. Nella scheda, «vuoto» indica invece l'occupazione. |
+| Casa vuota | La modalità per l'appartamento senza ospiti: clima spento, caldaia sull'antigelo. Nella scheda, «Vuoto» indica invece l'occupazione. |
 | Check-in, check-out | Arrivo e partenza previsti dalla prenotazione; l'arrivo e la partenza effettivi sono comunicazioni a parte di Italianway. |
 | Codice Italianway | Il codice con cui il sistema di prenotazioni Italianway riconosce una struttura: decide a quale appartamento arrivano le prenotazioni. Lo inserisce solo HQE. |
-| Collegamento al sistema domotico | L'indirizzo («URL istanza») del sistema che comanda davvero i dispositivi; nell'ambiente di prova `mock://builtin`. |
+| Collegamento al sistema domotico | L'indirizzo (campo «Indirizzo del sistema domotico») del sistema che comanda davvero i dispositivi; nell'ambiente di prova `mock://builtin`. |
 | Comfort | La modalità con gli ospiti: caldaia e clima alla temperatura di comfort; raffrescamento sopra la temperatura di raffrescamento. |
 | Connettore | Il collegamento con cui il sistema domotico legge e comanda i dispositivi; «Connettore» «attivo» o «fermo» nella striscia di salute. |
 | Decisione | Una riga dello storico: chi ha fatto o proposto cosa, su cosa, perché, con quale esito. |
@@ -1347,14 +1348,14 @@ dell'email di chi comanda.
 | Gestore della piattaforma | Chi gestisce il servizio per tutte le organizzazioni (HQE): crea organizzazioni e collega gli appartamenti. |
 | ID richiesta | L'identificativo copiabile di un'operazione, per cercarla nelle Decisioni o aiutare l'assistenza. |
 | Isteresi | La piccola differenza di temperatura (0,5 °C) che evita accensioni e spegnimenti continui intorno alla soglia. |
-| Istanza | Il sistema domotico che gestisce un appartamento, vero o simulato. |
+| Istanza | Nome tecnico del sistema domotico che gestisce un appartamento, vero o dimostrativo; l'app dice sempre «sistema domotico». |
 | kWh | L'energia consumata in un periodo; l'importo dipende dal prezzo per kWh. |
 | Mediana | Il valore centrale dei consumi delle stesse notti nelle settimane prima, usato dal riepilogo. |
 | Modalità | La scelta complessiva dell'appartamento: «comfort», «eco», «casa vuota». |
 | Motore | La parte automatica del sistema domotico: applica regole, modalità, programmi e comandi. |
 | Non verificato | Lo stato mostrato è quello richiesto, senza una conferma del misuratore. |
 | Notifica push | Avviso del telefono o del browser che arriva anche ad app chiusa. |
-| Occupazione | Lo stato della prenotazione: «vuoto», «occupato», «prenotato». |
+| Occupazione | Lo stato della prenotazione: «Vuoto», «Occupato», «Prenotato». |
 | Offline | Dispositivo o collegamento non raggiungibile; non vuol dire spento. |
 | Organizzazione | Un'azienda che usa l'app, con i suoi utenti e i suoi appartamenti (oggi Flatsharing). |
 | Pausa del compressore | L'attesa di protezione (3 minuti) prima di riaccendere il climatizzatore. |
@@ -1383,6 +1384,23 @@ Per ogni problema annota:
 Manda tutto a **operations@hqe.it**, l'indirizzo dell'assistenza HQE.
 
 ## 14. Novità
+
+### 23 ottobre 2026 (lotto 32)
+
+- **Dimostrativi anche nel sito vero**: fino alla consegna al cliente, gli appartamenti dimostrativi con il motore
+  simulato integrato sono ammessi anche nel sito vero, non solo nell'ambiente di prova.
+- **«Sistema domotico» al posto di «istanza»**, ovunque nell'app: «Sistema domotico non raggiungibile», «Dispositivi e
+  sistema domotico offline», «Indirizzo del sistema domotico», «Appartamento dimostrativo», «Funzione non disponibile
+  per questo appartamento», «Nessun dispositivo in questo appartamento».
+- **Stati con l'iniziale maiuscola**: «In attesa», «Approvata», «Respinta», «Scaduta», «Applicata», «Non riuscita»,
+  «In programma», «Eseguita», «Risposto», «Richiede approvazione», «Vuoto», «Occupato», «Prenotato», come «In salute»
+  e «Online».
+- **Interfaccia ripulita**: pulsante principale scuro, meno effetti, testi più leggibili sul telefono. Via la riga
+  «Ambiente» dalle Impostazioni, il piè di pagina della pagina di accesso e i codici inglesi in Amministrazione ›
+  Funzioni: le funzioni si leggono con i nomi del menu.
+- **Nome del gestore**: si aggiorna subito, anche durante un accesso di assistenza.
+- **Simulatore**: l'evento prenotazione chiede almeno 1 ospite.
+- **Contatore dell'assistente**: conta i timeout anche quando la domanda era già stata contata.
 
 ### 23 ottobre 2026 (lotto 31)
 
