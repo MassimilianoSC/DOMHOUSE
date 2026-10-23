@@ -42,8 +42,8 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
   const dirty = draft && (draft.enabled !== undefined || Object.keys(draft.params).length > 0);
   return (
     <Card className={cn("space-y-4 p-5", dirty && "border-primary/50 ring-1 ring-primary/20")} data-testid={`rule-card-${rule.rule_id}`} data-enabled={eff.enabled}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1 basis-48">
           <h3 className="text-base font-semibold">{rule.label}</h3>
           <p className="text-sm text-muted-foreground">{tOr(`rules.desc.${rule.rule_id}`, "")}</p>
         </div>
