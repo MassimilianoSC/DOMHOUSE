@@ -2076,102 +2076,198 @@ Vedi la parte 5, «Approvazioni: approvare o respingere». In breve:
 
 ## 10. Cosa fa il sistema da solo
 
+**Modalità, regole, termostato, prenotazioni e conservazione dei dati.**
+
 ### Le tre modalità e le loro temperature
+
+**Che cosa fanno caldaia e climatizzatore in ogni modalità.**
 
 | Modalità | Caldaia | Climatizzatore |
 |---|---|---|
-| «comfort» | Abilitata alla «Temperatura in comfort (°C)» (21 all'inizio); il termostato la accende e spegne intorno a quel valore. | Con un sensore di temperatura nella stessa stanza: scalda alla temperatura di comfort quando la stanza è sotto, raffresca alla «Raffrescamento in comfort (°C)» (25 all'inizio) quando è sopra, fra le due lo lascia com'è; al cambio di modalità e poi ogni minuto. Senza sensore nella stanza non lo tocca e scrive una volta «Regolazione automatica disattivata». |
+| «comfort» | Abilitata alla «Temperatura in comfort (°C)» (21 all'inizio); il termostato la accende e spegne intorno a quel valore. | Con un sensore di temperatura nella stessa stanza: regolazione automatica (sotto). Senza sensore nella stanza non lo tocca e scrive una volta «Regolazione automatica disattivata». |
 | «eco» | Abilitata alla «Temperatura in eco (°C)» (18 all'inizio). | Spento. |
 | «casa vuota» | Abilitata alla temperatura dell'«Antigelo a casa vuota» (8 °C all'inizio). | Spento. |
 
-Le tre temperature si regolano per appartamento nella regola «Limiti del setpoint» (parte 9). I valori chiesti restano
-sempre entro i limiti del dispositivo e, con la regola accesa, entro il minimo e il massimo che hai scelto; i pulsanti
-«−» e «+» della temperatura non escono mai dai limiti (una caldaia a 8 °C con minimo 16 passa a 16 con un tocco). La regolazione automatica del clima ogni minuto rispetta l'isteresi (0,5 °C) e
-il tempo minimo fra due cambi (5 minuti), non agisce durante una forzatura né con una finestra aperta e regola finestra
-attiva, e non va mai contro un comando di una persona: un clima che hai comandato tu resta com'è fino al prossimo
-cambio di modalità. Ogni cambio automatico è una decisione con la temperatura letta, per esempio «…: 19 °C, sotto
-21 °C: scalda».
+**La regolazione automatica del clima in comfort:**
 
-### Le otto regole
+- **Scalda** alla temperatura di comfort quando la stanza è sotto.
+- **Raffresca** alla «Raffrescamento in comfort (°C)» (25 all'inizio) quando è sopra.
+- **Fra le due** lo lascia com'è.
+- **Quando**: al cambio di modalità e poi ogni minuto.
+- **Rispetta** l'isteresi (0,5 °C) e il tempo minimo fra due cambi (5 minuti).
+- **Non agisce** durante una forzatura né con una finestra aperta e regola finestra attiva.
+- **Non va mai contro un comando di una persona**: un clima che hai comandato tu resta com'è fino al prossimo cambio
+  di modalità.
+- **Ogni cambio automatico** è una decisione con la temperatura letta, per esempio «…: 19 °C, sotto 21 °C: scalda».
+
+> **Da sapere**
+>
+> - **Le tre temperature** si regolano per appartamento nella regola «Limiti del setpoint» (parte 9).
+> - **I valori chiesti** restano sempre entro i limiti del dispositivo e, con la regola accesa, entro il minimo e il
+>   massimo che hai scelto.
+> - **I pulsanti «−» e «+»** della temperatura non escono mai dai limiti (una caldaia a 8 °C con minimo 16 passa a
+>   16 con un tocco).
+
+### Le otto regole: descrizione e valori
+
+**Ogni regola come la descrive l'app, con valori di partenza e limiti.**
 
 Tutte partono attive. Sette si modificano dall'app, una no.
 
-| Regola | Descrizione nell'app | Valori di partenza e limiti | Che cosa fa davvero |
-|---|---|---|---|
-| «Finestra aperta spegne il clima» | «Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.» | «Minuti»: 5, da 1 a 30 | Spegne clima e riscaldamento di tutto l'appartamento, non solo della stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte. |
-| «Limiti del setpoint» | «Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c'è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.» | «Minimo (°C)»: 16, da 7 a 20; «Massimo (°C)»: 24, da 20 a 28; «Temperatura in comfort (°C)»: 21, da 16 a 26; «Temperatura in eco (°C)»: 18, da 10 a 22; «Raffrescamento in comfort (°C)»: 25, da 22 a 28 | Acceso (dal lotto 31): clima e caldaia restano fra il minimo e il massimo che scegli, sempre dentro i limiti del dispositivo; un comando fuori intervallo è rifiutato, i comandi automatici vengono riportati dentro. Spento: valgono solo i limiti del dispositivo. Se i tuoi limiti sono tutti fuori da quelli del dispositivo valgono quelli del dispositivo e nelle Decisioni compare «Limiti del setpoint ignorati». L'antigelo a casa vuota non segue questi limiti. Le tre temperature guidano le modalità. |
-| «Antigelo a casa vuota» | «Con la casa vuota mantiene almeno questa temperatura.» | «Temperatura (°C)»: 8, da 5 a 12 | A casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più 0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve un sensore: senza, «Antigelo non attivo». |
-| «Antimuffa a casa vuota» | «Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.» | «Umidità (%)»: 65, da 50 a 80 | Scrive «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione. |
-| «Pre-arrivo» | «Porta la casa in comfort prima dell'arrivo degli ospiti.» | «Ore prima del check-in»: 2, da 0 a 6 | Ogni prenotazione creata o modificata programma il comfort. Cambiare le ore vale per le prenotazioni che arrivano o cambiano dopo: le azioni già in programma non vengono ricalcolate. |
-| «Risparmio al check-out» | «Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.» | «Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180 | Programma casa vuota dopo la partenza. Con movimento recente apre la richiesta «Mettere l'appartamento a vuoto dopo il check-out»; senza risposta la approva. |
-| «Pausa minima del compressore» | «Pausa minima tra spegnimento e riaccensione del compressore.» | «Minuti»: 3; «Non modificabile» (chi gestisce il sistema può impostare da 1 a 15) | Dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico viene rimandato, uno di una persona o dell'assistente può essere rifiutato se manca più di qualche secondo. |
-| «Avviso dispositivo offline» | «Avvisa quando un dispositivo resta offline oltre i minuti indicati.» | «Minuti»: 15, da 5 a 120 | Dopo la soglia scrive «Dispositivo offline» nelle Decisioni e manda la notifica; la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto. |
+| Regola | Descrizione nell'app | Valori di partenza e limiti |
+|---|---|---|
+| «Finestra aperta spegne il clima» | «Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.» | «Minuti»: 5, da 1 a 30 |
+| «Limiti del setpoint» | «Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c'è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.» | Vedi la tabella sotto |
+| «Antigelo a casa vuota» | «Con la casa vuota mantiene almeno questa temperatura.» | «Temperatura (°C)»: 8, da 5 a 12 |
+| «Antimuffa a casa vuota» | «Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.» | «Umidità (%)»: 65, da 50 a 80 |
+| «Pre-arrivo» | «Porta la casa in comfort prima dell'arrivo degli ospiti.» | «Ore prima del check-in»: 2, da 0 a 6 |
+| «Risparmio al check-out» | «Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.» | «Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180 |
+| «Pausa minima del compressore» | «Pausa minima tra spegnimento e riaccensione del compressore.» | «Minuti»: 3; «Non modificabile» (chi gestisce il sistema può impostare da 1 a 15) |
+| «Avviso dispositivo offline» | «Avvisa quando un dispositivo resta offline oltre i minuti indicati.» | «Minuti»: 15, da 5 a 120 |
+
+**I valori di «Limiti del setpoint»:**
+
+| Campo | All'inizio | Limiti |
+|---|---|---|
+| «Minimo (°C)» | 16 | Da 7 a 20 |
+| «Massimo (°C)» | 24 | Da 20 a 28 |
+| «Temperatura in comfort (°C)» | 21 | Da 16 a 26 |
+| «Temperatura in eco (°C)» | 18 | Da 10 a 22 |
+| «Raffrescamento in comfort (°C)» | 25 | Da 22 a 28 |
+
+### Le otto regole: che cosa fanno davvero
+
+**L'effetto reale di ogni regola, oltre la descrizione.**
+
+- **«Finestra aperta spegne il clima»**: spegne clima e riscaldamento di tutto l'appartamento, non solo della
+  stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte.
+- **«Antigelo a casa vuota»**: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
+  0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve
+  un sensore: senza, «Antigelo non attivo».
+- **«Antimuffa a casa vuota»**: scrive «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa
+  vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione.
+- **«Pre-arrivo»**: ogni prenotazione creata o modificata programma il comfort. Cambiare le ore vale per le
+  prenotazioni che arrivano o cambiano dopo: le azioni già in programma non vengono ricalcolate.
+- **«Risparmio al check-out»**: programma casa vuota dopo la partenza. Con movimento recente apre la richiesta
+  «Mettere l'appartamento a vuoto dopo il check-out»; senza risposta la approva.
+- **«Pausa minima del compressore»**: dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico
+  viene rimandato, uno di una persona o dell'assistente può essere rifiutato se manca più di qualche secondo.
+- **«Avviso dispositivo offline»**: dopo la soglia scrive «Dispositivo offline» nelle Decisioni e manda la notifica;
+  la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto.
+
+**«Limiti del setpoint»** (con effetto dal lotto 31):
+
+- **Acceso**: clima e caldaia restano fra il minimo e il massimo che scegli, sempre dentro i limiti del dispositivo;
+  un comando fuori intervallo è rifiutato, i comandi automatici vengono riportati dentro.
+- **Spento**: valgono solo i limiti del dispositivo.
+- **Se i tuoi limiti sono tutti fuori** da quelli del dispositivo valgono quelli del dispositivo e nelle Decisioni
+  compare «Limiti del setpoint ignorati».
+- **L'antigelo a casa vuota** non segue questi limiti.
+- **Le tre temperature** guidano le modalità.
 
 ### Caldaia e clima, con e senza sensore
 
-- «Riscaldamento abilitato» vuol dire che la caldaia può scaldare. Il termostato del sistema accende e spegne davvero la
-  caldaia intorno alla temperatura voluta, con un'isteresi di 0,5 °C e almeno 5 minuti fra due cambi, usando il sensore
-  di temperatura collegato. Con il misuratore sopra 30 W leggi «sta scaldando ora».
-- **Senza un sensore utilizzabile** (manca o è offline) la caldaia non si accende mai da sola: la temperatura chiesta da
-  una modalità (comfort, eco o antigelo) la lascia spenta, con una decisione per episodio, «…: sensore di temperatura
-  mancante, regolazione automatica disattivata» (in comfort ed eco) oppure «…: sensore di temperatura mancante, antigelo
-  non attivo» (a casa vuota, tipo «Antigelo non attivo», con notifica nella categoria «Dispositivi e sistema domotico offline»).
-  Un comando di una persona o programmato viene invece eseguito così com'è, senza regolazione («…: …; segue il comando
-  manuale senza regolazione»). Quando il sensore torna leggi «…: sensore di nuovo disponibile, regolazione ripresa».
-- Il climatizzatore in comfort segue il sensore della sua stanza (sopra). Senza sensore nella stanza lo comandi solo tu.
-- Un comando tuo su caldaia o clima toglie quel dispositivo alla regolazione della modalità fino al prossimo cambio di
-  modalità, anche dopo un riavvio del sistema.
+**Il termostato della caldaia e cosa succede senza sensore.**
+
+- **«Riscaldamento abilitato»** vuol dire che la caldaia può scaldare.
+- **Il termostato del sistema** accende e spegne davvero la caldaia intorno alla temperatura voluta, con un'isteresi
+  di 0,5 °C e almeno 5 minuti fra due cambi, usando il sensore di temperatura collegato.
+- **Con il misuratore sopra 30 W** leggi «sta scaldando ora».
+- **Il climatizzatore in comfort** segue il sensore della sua stanza (sopra). Senza sensore nella stanza lo comandi
+  solo tu.
+- **Un comando tuo** su caldaia o clima toglie quel dispositivo alla regolazione della modalità fino al prossimo
+  cambio di modalità, anche dopo un riavvio del sistema.
+
+> **Attenzione**
+>
+> **Senza un sensore utilizzabile** (manca o è offline) la caldaia non si accende mai da sola.
+> - **La temperatura chiesta da una modalità** (comfort, eco o antigelo) la lascia spenta, con una decisione per
+>   episodio: «…: sensore di temperatura mancante, regolazione automatica disattivata» (in comfort ed eco).
+> - **A casa vuota**: «…: sensore di temperatura mancante, antigelo non attivo» (tipo «Antigelo non attivo», con
+>   notifica nella categoria «Dispositivi e sistema domotico offline»).
+> - **Un comando di una persona o programmato** viene invece eseguito così com'è, senza regolazione («…: …; segue il
+>   comando manuale senza regolazione»).
+> - **Quando il sensore torna** leggi «…: sensore di nuovo disponibile, regolazione ripresa».
 
 ### Prenotazioni: pre-arrivo, check-out, disdette
 
-- Ogni prenotazione creata o modificata da Italianway programma il pre-arrivo in comfort e, dopo il check-out, il
-  ritorno a casa vuota. Le azioni hanno origine «prenotazione» e si ricalcolano a ogni modifica («Ricalcolata a ogni
-  modifica della prenotazione»).
-- Una disdetta annulla le azioni aperte. Se il pre-arrivo era già stato eseguito, programma il ritorno a casa vuota
-  («Disdetta dopo il pre-arrivo») e manda la notifica «Prenotazioni», salvo un altro soggiorno in corso o un altro
-  pre-arrivo già eseguito.
-- Un cambio di modalità programmato durante una forzatura aspetta la sua fine («Azione rimandata»). Dopo un riavvio del
-  sistema, un'azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).
-- L'occupazione «Occupato» richiede il check-in effettivo comunicato da Italianway; la sola prenotazione dà «Prenotato».
+**Come le prenotazioni muovono le modalità.**
+
+- **Ogni prenotazione creata o modificata** da Italianway programma il pre-arrivo in comfort e, dopo il check-out,
+  il ritorno a casa vuota.
+- **Le azioni** hanno origine «prenotazione» e si ricalcolano a ogni modifica («Ricalcolata a ogni modifica della
+  prenotazione»).
+- **Una disdetta** annulla le azioni aperte.
+- **Se il pre-arrivo era già stato eseguito**, programma il ritorno a casa vuota («Disdetta dopo il pre-arrivo») e
+  manda la notifica «Prenotazioni», salvo un altro soggiorno in corso o un altro pre-arrivo già eseguito.
+- **Un cambio di modalità programmato durante una forzatura** aspetta la sua fine («Azione rimandata»).
+- **Dopo un riavvio del sistema**, un'azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).
+- **L'occupazione «Occupato»** richiede il check-in effettivo comunicato da Italianway; la sola prenotazione dà
+  «Prenotato».
 
 ### Approvazioni automatiche
 
-- «Mettere l'appartamento a vuoto dopo il check-out»: dopo la partenza, se c'è stato movimento. Senza risposta viene
-  approvata.
-- «Spegnere …» con il nome dell'apparecchio, «… consuma … W da oltre … minuti con l'appartamento vuoto»: a casa vuota,
-  senza forzatura, un apparecchio spegnibile con misuratore (mai la caldaia) consuma oltre 300 W per più di 15 minuti
-  (valori impostati da chi gestisce il sistema). Senza risposta viene respinta e l'apparecchio resta acceso, salvo
-  impostazione diversa; dopo un no, nessuna nuova richiesta finché il consumo non scende e risale.
-- Le richieste dell'assistente, senza risposta, vengono respinte.
-- Una sola richiesta aperta per volta: le altre aspettano in coda. La scadenza è 30 minuti all'inizio (chi gestisce il
-  sistema può impostare da 5 a 720).
+**Le richieste che il motore apre da solo e cosa succede senza risposta.**
+
+| Richiesta | Quando | Senza risposta |
+|---|---|---|
+| «Mettere l'appartamento a vuoto dopo il check-out» | Dopo la partenza, se c'è stato movimento | Viene approvata |
+| «Spegnere …» con il nome dell'apparecchio, «… consuma … W da oltre … minuti con l'appartamento vuoto» | A casa vuota, senza forzatura, un apparecchio spegnibile con misuratore (mai la caldaia) consuma oltre 300 W per più di 15 minuti (valori impostati da chi gestisce il sistema) | Viene respinta e l'apparecchio resta acceso, salvo impostazione diversa |
+| Le richieste dell'assistente | Con ospiti dentro, o per più azioni insieme | Vengono respinte |
+
+> **Da sapere**
+>
+> - **Dopo un no** a «Spegnere …», nessuna nuova richiesta finché il consumo non scende e risale.
+> - **Una sola richiesta aperta per volta**: le altre aspettano in coda.
+> - **La scadenza** è 30 minuti all'inizio (chi gestisce il sistema può impostare da 5 a 720).
 
 ### Comandi confermati dal consumo
 
-L'accensione o lo spegnimento di un climatizzatore comandato a infrarosso è confermata dal suo misuratore entro una
-decina di secondi: consumo su di almeno 20 W per l'accensione, sotto 15 W per lo spegnimento. Se il misuratore è
-offline il comando risulta «non verificato» e nelle Decisioni compare «Comando non verificato: misuratore offline».
-Una conferma di invio non prova sempre l'effetto fisico: in caso di dubbio guarda le letture del dispositivo.
+**Il misuratore conferma accensione e spegnimento del clima a infrarosso.**
+
+- **L'accensione o lo spegnimento** di un climatizzatore comandato a infrarosso è confermata dal suo misuratore entro
+  una decina di secondi.
+- **Le soglie**: consumo su di almeno 20 W per l'accensione, sotto 15 W per lo spegnimento.
+- **Se il misuratore è offline** il comando risulta «non verificato» e nelle Decisioni compare «Comando non
+  verificato: misuratore offline».
+
+> **Attenzione**
+>
+> Una conferma di invio non prova sempre l'effetto fisico: in caso di dubbio guarda le letture del dispositivo.
 
 ### Il riepilogo settimanale
 
-Ogni lunedì dalle 8 (ora dell'appartamento) il sistema prepara, per ogni appartamento attivo, il riepilogo della
-settimana da lunedì a domenica: consumi per notte con ospiti e per notte vuota confrontati con la mediana delle 4
-settimane prima («Alto» solo con almeno il 30 % in più e almeno 5 kWh di eccedenza), dispositivi offline da più di 24
-ore, approvazioni scadute senza risposta, finestre aperte almeno 3 volte con il clima spento dalla regola. Se c'è
-almeno una segnalazione arriva la notifica «Riepilogo». Una settimana senza novità ha il riepilogo «Settimana senza
-novità» e non manda avvisi.
+**Ogni lunedì, per ogni appartamento attivo, il riepilogo della settimana.**
+
+- **Quando**: ogni lunedì dalle 8 (ora dell'appartamento), per la settimana da lunedì a domenica.
+- **Consumi**: per notte con ospiti e per notte vuota, confrontati con la mediana delle 4 settimane prima («Alto»
+  solo con almeno il 30 % in più e almeno 5 kWh di eccedenza).
+- **Segnalazioni**: dispositivi offline da più di 24 ore, approvazioni scadute senza risposta, finestre aperte
+  almeno 3 volte con il clima spento dalla regola.
+- **Notifica**: se c'è almeno una segnalazione arriva la notifica «Riepilogo».
+- **Settimana senza novità**: il riepilogo dice «Settimana senza novità» e non manda avvisi.
 
 ### Valori impostati fuori dall'app
 
-Alcuni valori li imposta il responsabile tecnico del sistema domotico, non l'app: la pausa del compressore (3 minuti, da
-1 a 15) e la breve attesa finale (7 secondi); l'isteresi del termostato (0,5 °C) e il tempo minimo fra due cambi (5
-minuti); le soglie di conferma dal misuratore (20 W e 15 W); la scadenza delle approvazioni (30 minuti) e le soglie del
-consumo a casa vuota (300 W, 15 minuti); il ritardo oltre il quale un'azione programmata viene saltata dopo un riavvio
-(30 minuti); quando l'assistente chiede conferma (con ospiti, sempre, oppure solo per più azioni insieme); il numero di
-domande al giorno all'assistente (50) e il tetto mensile di spesa (20 €).
+**I valori che imposta il responsabile tecnico del sistema domotico.**
+
+| Valore | Impostazione |
+|---|---|
+| Pausa del compressore | 3 minuti, da 1 a 15 |
+| Breve attesa finale | 7 secondi |
+| Isteresi del termostato | 0,5 °C |
+| Tempo minimo fra due cambi | 5 minuti |
+| Soglie di conferma dal misuratore | 20 W e 15 W |
+| Scadenza delle approvazioni | 30 minuti |
+| Soglie del consumo a casa vuota | 300 W, 15 minuti |
+| Ritardo oltre il quale un'azione programmata viene saltata dopo un riavvio | 30 minuti |
+| Quando l'assistente chiede conferma | Con ospiti, sempre, oppure solo per più azioni insieme |
+| Domande al giorno all'assistente | 50 |
+| Tetto mensile di spesa | 20 € |
 
 ### Per quanto tempo l'app conserva i dati
+
+**I termini di conservazione, oltre i quali i dati si cancellano da soli.**
 
 *Decisione del 17 ottobre 2026.* Oltre questi termini i dati si cancellano da soli, entro circa un giorno.
 
@@ -2185,13 +2281,17 @@ domande al giorno all'assistente (50) e il tetto mensile di spesa (20 €).
 | Registro dell'organizzazione, registro della piattaforma e accessi di assistenza | 24 mesi |
 | Prenotazioni ricevute da Italianway (senza dati personali degli ospiti) | 90 giorni, e al massimo le ultime 100 |
 
-Utenti, organizzazioni e appartamenti restano finché non vengono tolti. Chi elimina il proprio account viene cancellato
-subito. I dati personali degli ospiti non vengono salvati; il sistema domotico riceve un codice anonimo al posto
-dell'email di chi comanda.
-
+- **Utenti, organizzazioni e appartamenti** restano finché non vengono tolti.
+- **Chi elimina il proprio account** viene cancellato subito.
+- **I dati personali degli ospiti** non vengono salvati; il sistema domotico riceve un codice anonimo al posto
+  dell'email di chi comanda.
 ## 11. Problemi e messaggi
 
+**Ogni messaggio dell'app: che cosa significa e che cosa fare.**
+
 ### All'accesso
+
+**I messaggi della pagina «Accedi».**
 
 | Cosa vedi | Cosa significa | Cosa fare |
 |---|---|---|
@@ -2212,6 +2312,8 @@ dell'email di chi comanda.
 
 ### In tutte le pagine
 
+**I messaggi comuni a tutta l'app.**
+
 | Cosa vedi | Cosa significa | Cosa fare |
 |---|---|---|
 | «Server non raggiungibile» | L'app non raggiunge il server | Controlla la rete e premi «Riprova» |
@@ -2231,6 +2333,8 @@ dell'email di chi comanda.
 
 ### Sui comandi e in Panoramica
 
+**Gli esiti dei comandi ai dispositivi.**
+
 | Cosa vedi | Cosa significa | Cosa fare |
 |---|---|---|
 | «Il dispositivo non è raggiungibile; riprova quando torna online», «dispositivo offline» | Il dispositivo è offline | Aspetta che torni online |
@@ -2238,12 +2342,16 @@ dell'email di chi comanda.
 | «Il setpoint deve essere tra … e …», «fuori dai limiti» | Temperatura fuori dai limiti | Scegli un valore nell'intervallo «da … a … °C» |
 | «rifiutato dal dispositivo» | Il dispositivo non ha accettato il comando | Riprova; controlla il dispositivo |
 | «bloccato da una regola», «bloccato da un'azione prioritaria» | Una regola (per esempio finestra aperta o pausa del compressore) o un'azione più importante ha bloccato il comando | Leggi il motivo nelle Decisioni; riprova dopo |
-| «nessuna conferma», «non verificato», «nessuna risposta» | Il comando è partito ma non è stato confermato | Controlla le letture del dispositivo |
+| «nessuna conferma», «nessuna risposta» | Il comando è partito ma non è stato confermato | Controlla le letture del dispositivo |
+| «non verificato» | Il comando è partito ma non è stato confermato | Controlla le letture del dispositivo |
 | «errore interno» | Un errore del sistema domotico | Copia l'«ID richiesta» e segnala |
 | «Modalità non valida» | Modalità non riconosciuta | Scegli «comfort», «eco» o «casa vuota» |
-| «Il nome deve avere da 1 a 60 caratteri», «Stanza inesistente», «Dispositivo inesistente» | Dati della rinomina non validi | Correggi nome o stanza |
+| «Il nome deve avere da 1 a 60 caratteri», «Stanza inesistente» | Dati della rinomina non validi | Correggi nome o stanza |
+| «Dispositivo inesistente» | Dati della rinomina non validi | Correggi nome o stanza |
 
 ### In Approvazioni, Programmazione, Regole, Assistente e Simulatore
+
+**I messaggi delle pagine dell'appartamento.**
 
 | Cosa vedi | Cosa significa | Cosa fare |
 |---|---|---|
@@ -2252,19 +2360,24 @@ dell'email di chi comanda.
 | «L'orario deve essere nel futuro» | L'orario scelto è passato | Scegli un orario futuro |
 | «Azione programmata inesistente», «L'azione è già stata eseguita o annullata» | La voce non è più in programma | Rileggi l'elenco |
 | «Valore fuori dai limiti (…–…)», ««…»: … deve essere tra … e …» | Un valore della regola è fuori dai limiti | Correggi il valore |
-| «Il minimo non può superare il massimo», «La temperatura eco non può superare quella comfort», «La temperatura di raffrescamento deve essere più alta di quella comfort» | Le temperature non sono coerenti | Correggi i valori |
+| «Il minimo non può superare il massimo» | Le temperature non sono coerenti | Correggi i valori |
+| «La temperatura eco non può superare quella comfort», «La temperatura di raffrescamento deve essere più alta di quella comfort» | Le temperature non sono coerenti | Correggi i valori |
 | «La regola «…» non è modificabile» | Regola fissata dal sistema | Non si cambia dall'app |
 | «Salva o annulla prima le modifiche fatte a mano» | Hai modifiche non salvate nella pagina Regole | «Salva le modifiche» o «Annulla le modifiche», poi «Applica» |
 | «Le regole sono cambiate nel frattempo: rifai la richiesta», «Le regole dell'appartamento di partenza sono cambiate: rifai l'anteprima» | Qualcuno ha cambiato le regole | Rifai la proposta o l'anteprima |
 | «Le regole sono già così: non c'è niente da cambiare» | La proposta non cambia nulla | Niente da fare |
-| «Al massimo 500 caratteri», «Scrivi che cosa vuoi cambiare», «Scrivi una richiesta», «text obbligatorio, massimo 500 caratteri» | Testo vuoto o troppo lungo | Scrivi una frase più corta |
+| «Al massimo 500 caratteri», «Scrivi che cosa vuoi cambiare» | Testo vuoto o troppo lungo | Scrivi una frase più corta |
+| «Scrivi una richiesta», «text obbligatorio, massimo 500 caratteri» | Testo vuoto o troppo lungo | Scrivi una frase più corta |
 | «Hai già chiesto 20 proposte oggi per questo appartamento: riprova domani o cambia le regole a mano» | Limite giornaliero delle proposte | Cambia la regola a mano o riprova domani |
 | «L'assistente non ha risposto in tempo: riprova con una frase più breve, oppure cambia la regola a mano qui sotto.» | Il modello non ha risposto in tempo | Riprova con una frase più breve |
-| «Nessuna risposta dall'assistente: riprova», «Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app.», «L'assistente non è disponibile ora, riprova più tardi», «Non sono riuscito a rispondere: riprova.» | L'assistente non ha risposto | Riprova o usa i comandi dell'app |
-| «Risposta rapida: l'assistente completo non ha risposto in tempo.», «… non è raggiungibile ora.», «… ha raggiunto il limite mensile.» (in fondo alla risposta) | Ha risposto il sistema da solo: solo un comando semplice è stato eseguito | Per comandi complessi usa i pulsanti dell'app; riprova più tardi per le domande |
+| «Nessuna risposta dall'assistente: riprova», «Non sono riuscito a rispondere in tempo: riprova, oppure fai dall'app.» | L'assistente non ha risposto | Riprova o usa i comandi dell'app |
+| «L'assistente non è disponibile ora, riprova più tardi», «Non sono riuscito a rispondere: riprova.» | L'assistente non ha risposto | Riprova o usa i comandi dell'app |
+| «Risposta rapida: l'assistente completo non ha risposto in tempo.» (in fondo alla risposta) | Ha risposto il sistema da solo: solo un comando semplice è stato eseguito | Per comandi complessi usa i pulsanti dell'app; riprova più tardi per le domande |
+| «… non è raggiungibile ora.», «… ha raggiunto il limite mensile.» (le altre due varianti della risposta rapida) | Ha risposto il sistema da solo: solo un comando semplice è stato eseguito | Per comandi complessi usa i pulsanti dell'app; riprova più tardi per le domande |
 | «Limite di … domande al giorno raggiunto per questo appartamento: riprova domani.» | Limite giornaliero dell'assistente | Usa i comandi dell'app |
 | «Limite mensile raggiunto, riprova dal mese prossimo» | Tetto di spesa del servizio raggiunto | Usa i comandi dell'app; HQE riceve un'email |
-| «Nessun altro appartamento nella tua organizzazione», «Scegli almeno un appartamento di destinazione», «Al massimo 100 appartamenti alla volta», «Solo gli amministratori possono copiare le regole» | Condizioni della copia delle regole | Correggi la scelta |
+| «Nessun altro appartamento nella tua organizzazione», «Scegli almeno un appartamento di destinazione» | Condizioni della copia delle regole | Correggi la scelta |
+| «Al massimo 100 appartamenti alla volta», «Solo gli amministratori possono copiare le regole» | Condizioni della copia delle regole | Correggi la scelta |
 | «Il simulatore è riservato agli amministratori», «Questo appartamento non è un dimostrativo» | Il Simulatore non è disponibile qui | Solo amministratori, solo dimostrativi |
 | «Il check-out deve essere successivo al check-in» | Date della prenotazione di prova invertite | Correggi le date |
 | «Nessun apparecchio con misuratore da proporre nell'appartamento» | Nessun apparecchio adatto alla prova | Usa un altro dimostrativo |
@@ -2272,29 +2385,43 @@ dell'email di chi comanda.
 
 ### In Amministrazione e Organizzazioni
 
+**I messaggi delle pagine di gestione.**
+
 | Cosa vedi | Cosa significa | Cosa fare |
 |---|---|---|
 | «È già un utente della tua organizzazione», «Questa email non può essere invitata» | La persona è già dentro, oppure è di HQE | Non invitare; per HQE serve la procedura tecnica |
 | «Gli amministratori vedono sempre tutti gli appartamenti» | Non si limitano gli appartamenti di un amministratore | Cambia ruolo se serve |
 | «Utente inesistente», «L'utente ha già effettuato l'accesso» | Il reinvio non è possibile | Rileggi l'elenco |
-| «Non puoi togliere a te stesso il ruolo di amministratore», «Non puoi eliminare il tuo stesso account», «Deve restare almeno un amministratore nell'organizzazione» | Protezioni sul proprio ruolo e sull'ultimo amministratore | Chiedi a un altro amministratore |
-| «Ruolo non aggiornato, riprova tra poco», «Rimozione non riuscita, riprova tra poco», «Eliminazione non riuscita, riprova tra poco» | Errore passeggero | Riprova |
-| «Fuso orario non valido», «Funzione sconosciuta», «Appartamento inesistente: …» | Dati non validi | Correggi |
+| «Non puoi togliere a te stesso il ruolo di amministratore», «Non puoi eliminare il tuo stesso account» | Protezioni sul proprio ruolo | Chiedi a un altro amministratore |
+| «Deve restare almeno un amministratore nell'organizzazione» | Protezione sull'ultimo amministratore | Chiedi a un altro amministratore |
+| «Ruolo non aggiornato, riprova tra poco», «Rimozione non riuscita, riprova tra poco» | Errore passeggero | Riprova |
+| «Eliminazione non riuscita, riprova tra poco» | Errore passeggero | Riprova |
+| «Fuso orario non valido», «Funzione sconosciuta» | Dati non validi | Correggi |
+| «Appartamento inesistente: …» | Dati non validi | Correggi |
 | «Prezzo non valido: da 0 a 10 € al kWh, al massimo 4 decimali» | Prezzo fuori formato | Scrivi per esempio 0,25 |
 | «Chiave del sistema domotico non configurata: contatta l'assistenza HQE» | Manca la chiave del sistema domotico | Avvisa l'assistenza |
-| «Scrivi il nome dell'organizzazione», «Esiste già un'organizzazione con questo nome», «Organizzazione inesistente» | Nome mancante, duplicato o organizzazione non trovata | Correggi |
-| «L'organizzazione è già sospesa», «L'organizzazione non è sospesa», «Scrivi il motivo della sospensione» | Stato o motivo non coerenti | Rileggi la scheda |
-| «La durata va da 1 a 24 ore», «Scrivi il motivo dell'accesso di assistenza», «L'organizzazione è sospesa», «Hai già un accesso di assistenza aperto in questa organizzazione», «Accesso non aperto: riprova tra poco» | Condizioni dell'accesso di assistenza | Correggi o riprova |
+| «Scrivi il nome dell'organizzazione», «Esiste già un'organizzazione con questo nome» | Nome mancante o duplicato | Correggi |
+| «Organizzazione inesistente» | Organizzazione non trovata | Correggi |
+| «L'organizzazione è già sospesa», «L'organizzazione non è sospesa» | Stato non coerente | Rileggi la scheda |
+| «Scrivi il motivo della sospensione» | Manca il motivo | Rileggi la scheda |
+| «La durata va da 1 a 24 ore», «Scrivi il motivo dell'accesso di assistenza» | Condizioni dell'accesso di assistenza | Correggi o riprova |
+| «L'organizzazione è sospesa», «Hai già un accesso di assistenza aperto in questa organizzazione» | Condizioni dell'accesso di assistenza | Correggi o riprova |
+| «Accesso non aperto: riprova tra poco» | Condizioni dell'accesso di assistenza | Correggi o riprova |
 | «Accesso di assistenza inesistente» | L'accesso è già chiuso | Niente da fare |
-| «Identificativo non disponibile», «Collegamento già usato da un altro appartamento», «Codice Italianway già in uso» | Valori già usati o non riusabili | Scegli valori diversi |
+| «Identificativo non disponibile», «Collegamento già usato da un altro appartamento» | Valori già usati o non riusabili | Scegli valori diversi |
+| «Codice Italianway già in uso» | Valori già usati o non riusabili | Scegli valori diversi |
 | «Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi mock://builtin nel campo Indirizzo del sistema domotico» | Collegamento scritto male o non ammesso | Correggi il collegamento |
-| «Ha già il ruolo di gestore della piattaforma», «Non è un gestore della piattaforma», «È l'ultimo gestore della piattaforma: nomina prima qualcun altro» | Condizioni sui gestori | Rileggi l'elenco |
+| «Ha già il ruolo di gestore della piattaforma», «Non è un gestore della piattaforma» | Condizioni sui gestori | Rileggi l'elenco |
+| «È l'ultimo gestore della piattaforma: nomina prima qualcun altro» | Condizioni sui gestori | Rileggi l'elenco |
 
 ### Nelle Impostazioni e nelle notifiche
 
+**I messaggi di account, password e notifiche.**
+
 | Cosa vedi | Cosa significa | Cosa fare |
 |---|---|---|
-| «La password deve avere almeno … caratteri», «Le due password non coincidono», «Password troppo debole: usa almeno 8 caratteri» | La nuova password non va bene | Scegline una più lunga e ripetila uguale |
+| «La password deve avere almeno … caratteri», «Le due password non coincidono» | La nuova password non va bene | Scegline una più lunga e ripetila uguale |
+| «Password troppo debole: usa almeno 8 caratteri» | La nuova password non va bene | Scegline una più lunga e ripetila uguale |
 | «Password attuale non corretta» | Hai sbagliato la password attuale | Riprova |
 | «Questa email è già usata da un altro account» | Il nuovo indirizzo è di un altro account | Usa un altro indirizzo |
 | «Per sicurezza esci e accedi di nuovo, poi riprova» | L'operazione richiede un accesso recente | «Esci», accedi e riprova |
@@ -2305,6 +2432,8 @@ dell'email di chi comanda.
 | «Notifiche non riattivate: il browser non ne dà più il permesso. Puoi riattivarle da Impostazioni › Notifiche.» | Al rientro il browser non permette più le notifiche | Consenti le notifiche e premi «Attiva su questo dispositivo» |
 
 ## 12. Parole usate in questa guida
+
+**Il significato delle parole ricorrenti, in ordine alfabetico.**
 
 | Parola | Che cosa vuol dire |
 |---|---|
@@ -2354,96 +2483,117 @@ dell'email di chi comanda.
 
 ## 13. Segnalare un problema
 
+**Che cosa annotare e a chi mandarlo.**
+
 Per ogni problema annota:
 
-1. cosa stavi facendo, passo per passo;
-2. cosa ti aspettavi e cosa è successo, con il testo esatto dell'avviso;
-3. l'«ID richiesta», se compare (o il «Codice» della pagina di accesso);
-4. dispositivo e browser (per esempio «iPhone, Safari» o «PC, Chrome»), data e ora;
-5. una schermata, se possibile.
+1. **Cosa stavi facendo**, passo per passo.
+2. **Cosa ti aspettavi e cosa è successo**, con il testo esatto dell'avviso.
+3. **L'«ID richiesta»**, se compare (o il «Codice» della pagina di accesso).
+4. **Dispositivo e browser** (per esempio «iPhone, Safari» o «PC, Chrome»), data e ora.
+5. **Una schermata**, se possibile.
 
-Manda tutto a **operations@hqe.it**, l'indirizzo dell'assistenza HQE.
+> **Da sapere**
+>
+> Manda tutto a **operations@hqe.it**, l'indirizzo dell'assistenza HQE.
 
 ## 14. Novità
 
+**Che cosa è cambiato, aggiornamento per aggiornamento.**
+
 ### 23 ottobre 2026 (lotto 32)
+
+**Dimostrativi nel sito vero, «sistema domotico» ovunque, interfaccia ripulita.**
 
 - **Dimostrativi anche nel sito vero**: fino alla consegna al cliente, gli appartamenti dimostrativi con il motore
   simulato integrato sono ammessi anche nel sito vero, non solo nell'ambiente di prova.
-- **«Sistema domotico» al posto di «istanza»**, ovunque nell'app: «Sistema domotico non raggiungibile», «Dispositivi e
-  sistema domotico offline», «Indirizzo del sistema domotico», «Appartamento dimostrativo», «Funzione non disponibile
-  per questo appartamento», «Nessun dispositivo in questo appartamento».
+- **«Sistema domotico» al posto di «istanza»**, ovunque nell'app: «Sistema domotico non raggiungibile», «Dispositivi
+  e sistema domotico offline», «Indirizzo del sistema domotico».
+- **E anche**: «Appartamento dimostrativo», «Funzione non disponibile per questo appartamento», «Nessun dispositivo in
+  questo appartamento».
 - **Stati con l'iniziale maiuscola**: «In attesa», «Approvata», «Respinta», «Scaduta», «Applicata», «Non riuscita»,
-  «In programma», «Eseguita», «Risposto», «Richiede approvazione», «Vuoto», «Occupato», «Prenotato», come «In salute»
-  e «Online».
-- **Interfaccia ripulita**: pulsante principale scuro, meno effetti, testi più leggibili sul telefono. Via la riga
-  «Ambiente» dalle Impostazioni, il piè di pagina della pagina di accesso e i codici inglesi in Amministrazione ›
-  Funzioni: le funzioni si leggono con i nomi del menu.
+  «In programma», «Eseguita».
+- **E anche**: «Risposto», «Richiede approvazione», «Vuoto», «Occupato», «Prenotato», come «In salute» e «Online».
+- **Interfaccia ripulita**: pulsante principale scuro, meno effetti, testi più leggibili sul telefono.
+- **Via** la riga «Ambiente» dalle Impostazioni, il piè di pagina della pagina di accesso e i codici inglesi in
+  Amministrazione › Funzioni: le funzioni si leggono con i nomi del menu.
 - **Nome del gestore**: si aggiorna subito, anche durante un accesso di assistenza.
 - **Simulatore**: l'evento prenotazione chiede almeno 1 ospite.
 - **Contatore dell'assistente**: conta i timeout anche quando la domanda era già stata contata.
 
 ### 23 ottobre 2026 (lotto 31)
 
+**Limiti del setpoint con effetto, fuso orario sul motore, scheda Assistente.**
+
 - **«Limiti del setpoint» con effetto**: acceso, clima e caldaia restano fra il minimo e il massimo scelti, dentro i
-  limiti del dispositivo; spento, valgono solo quelli del dispositivo; l'antigelo non li segue. I pulsanti «−» e «+»
-  della temperatura non escono mai dai limiti.
+  limiti del dispositivo; spento, valgono solo quelli del dispositivo; l'antigelo non li segue.
+- **I pulsanti «−» e «+»** della temperatura non escono mai dai limiti.
 - **Antimuffa**: la descrizione dice quello che fa davvero, un avviso al giorno nelle Decisioni.
 - **Fuso orario sul motore**: in Amministrazione si vede e non si modifica; quando cambia, il registro
   dell'organizzazione lo annota.
 - **Amministrazione › Assistente**: le domande all'assistente settimana per settimana (da lunedì a domenica), quante
-  senza risposta in tempo dall'assistente completo, quante con una risposta rapida e per quale causa; le righe sopra
-  il 10 % sono in giallo; con due settimane complete di fila sopra la soglia compare l'avviso che va riaperta la
-  scelta del modello.
+  senza risposta in tempo dall'assistente completo, quante con una risposta rapida e per quale causa.
+- **Nella stessa scheda** le righe sopra il 10 % sono in giallo; con due settimane complete di fila sopra la soglia
+  compare l'avviso che va riaperta la scelta del modello.
 - **Gestore della piattaforma senza organizzazione**: salva il nome ed esce da tutti i dispositivi senza errori.
 
 ### 22 ottobre 2026 (lotto 30)
 
+**Temperature delle modalità regolabili, clima regolato in continuo, assistente più solido.**
+
 - **Temperature delle modalità regolabili** per appartamento, nella regola «Limiti del setpoint»: «Temperatura in
-  comfort (°C)», «Temperatura in eco (°C)», «Raffrescamento in comfort (°C)»; i valori incoerenti vengono segnalati anche
-  prima del salvataggio.
-- **Clima in comfort regolato in continuo**: con il sensore della stanza il climatizzatore scalda o raffresca da solo,
-  ogni minuto, mai contro un comando di una persona; senza sensore «Regolazione automatica disattivata».
+  comfort (°C)», «Temperatura in eco (°C)», «Raffrescamento in comfort (°C)».
+- **I valori incoerenti** vengono segnalati anche prima del salvataggio.
+- **Clima in comfort regolato in continuo**: con il sensore della stanza il climatizzatore scalda o raffresca da
+  solo, ogni minuto, mai contro un comando di una persona; senza sensore «Regolazione automatica disattivata».
 - **Caldaia senza sensore**: non si accende più da sola; a casa vuota «Antigelo non attivo» con notifica.
 - **Programmazioni dell'assistente con ospiti**: conferma in chat se all'ora programmata ci saranno ospiti.
 - **Assistente più solido**: il modello propone le azioni in una forma controllata e il sistema le verifica una per
-  una; se il modello non risponde, una «Risposta rapida» esegue solo i comandi semplici e inequivocabili. Il modello
-  lavora soltanto in Europa.
+  una.
+- **Risposta rapida**: se il modello non risponde, una «Risposta rapida» esegue solo i comandi semplici e
+  inequivocabili. Il modello lavora soltanto in Europa.
 - **Il tuo nome nel menu**, in grassetto, con sotto l'email.
 - **Notifiche: quattro voci**: tolta «Decisioni del motore».
 - **Due registri con nomi diversi**: «Registro dell'organizzazione» e «Registro della piattaforma».
-- **Proposte delle regole**: l'assistente capisce «comfort 22», «eco 17», «raffrescamento 26»; «temperatura 22» da sola
-  chiede quale temperatura.
+- **Proposte delle regole**: l'assistente capisce «comfort 22», «eco 17», «raffrescamento 26»; «temperatura 22» da
+  sola chiede quale temperatura.
 - **Simulatore**: ripremere «Invia evento» senza cambiare nulla mostra «Evento già elaborato (idempotente)».
 - **«Casa vuota»**: la modalità si chiama così (prima «vuoto»); «vuoto» è l'occupazione.
-- **Assistente**: dopo «Sì» o «No» la chat dice com'è andata; riaprendo, «Approvata da te alle …» o «Respinta da te alle
-  …»; «Già decisa» solo se ha deciso un'altra persona.
+- **Assistente**: dopo «Sì» o «No» la chat dice com'è andata; riaprendo, «Approvata da te alle …» o «Respinta da te
+  alle …»; «Già decisa» solo se ha deciso un'altra persona.
 
 ### 20 e 21 ottobre 2026
 
-- Regole complete (otto regole con interruttore e valori); caldaia con «Riscaldamento abilitato» / «Riscaldamento
-  disabilitato», «sta scaldando ora» e termostato automatico; avviso prima di forzare con finestra aperta.
-- Decisioni con il tipo di azione in italiano e i tipi «Collegamento ai dispositivi perso», «Collegamento ai
+**Regole complete, decisioni in italiano, consumi veri, riepilogo settimanale.**
+
+- **Regole complete** (otto regole con interruttore e valori).
+- **Caldaia** con «Riscaldamento abilitato» / «Riscaldamento disabilitato», «sta scaldando ora» e termostato
+  automatico; avviso prima di forzare con finestra aperta.
+- **Decisioni** con il tipo di azione in italiano e i tipi «Collegamento ai dispositivi perso», «Collegamento ai
   dispositivi ripristinato», «Comando non verificato: misuratore offline».
-- Comandi del climatizzatore confermati dal misuratore; approvazioni automatiche «Mettere l'appartamento a vuoto dopo il
-  check-out» e «Spegnere …»; notifiche «Prenotazioni».
-- Consumi veri ora per ora con «Consumi disponibili dal …»; Simulatore con «Misuratore clima» e «Simula movimento».
-- Riepilogo settimanale ogni lunedì con la pagina «Riepiloghi» e la notifica «Riepilogo».
-- Assistente vero che legge stati, consumi e Decisioni; ambiente di prova separato con la fascia gialla.
-- Regole proposte dall'assistente nella pagina Regole; copia delle regole su altri appartamenti; «Minuti di presenza
-  dopo il check-out».
-- Schede degli appartamenti tutte nello schermo del telefono.
+- **Comandi del climatizzatore** confermati dal misuratore.
+- **Approvazioni automatiche** «Mettere l'appartamento a vuoto dopo il check-out» e «Spegnere …»; notifiche
+  «Prenotazioni».
+- **Consumi veri** ora per ora con «Consumi disponibili dal …»; Simulatore con «Misuratore clima» e «Simula
+  movimento».
+- **Riepilogo settimanale** ogni lunedì con la pagina «Riepiloghi» e la notifica «Riepilogo».
+- **Assistente vero** che legge stati, consumi e Decisioni; ambiente di prova separato con la fascia gialla.
+- **Regole proposte dall'assistente** nella pagina Regole; copia delle regole su altri appartamenti; «Minuti di
+  presenza dopo il check-out».
+- **Schede degli appartamenti** tutte nello schermo del telefono.
 
 ### 16 ottobre 2026
 
-- Organizzazioni: più organizzazioni separate, gestite dal gestore della piattaforma (HQE); codice Italianway e nome
-  dell'organizzazione solo da HQE; nuovi appartamenti solo da HQE, anche nell'ambiente di prova.
-- Cambio di ruolo con uscita da tutti i dispositivi entro un minuto; notifiche su dispositivo condiviso al sicuro;
-  notifiche riattivate al rientro.
-- «Elimina il mio account» cancella davvero l'accesso; non per l'ultimo amministratore né per l'ultimo gestore.
-- Nome dell'app DOMHOUSE; barra laterale con i ruoli; menu a tre righe sul telefono.
-- «Prenotazioni ricevute» e «Prenotazioni non attribuite»; registro attività; sospensione delle organizzazioni; accesso
-  di assistenza a tempo.
-- Privacy: «utente rimosso», codice anonimo al sistema domotico, nessun dato personale degli ospiti; conservazione dei
-  dati a termine.
-- Appartamenti dimostrativi con etichetta, Simulatore e ripristino; rendiconti Excel mensili e per soggiorno.
+**Organizzazioni, ruoli, privacy e dimostrativi.**
+
+- **Organizzazioni**: più organizzazioni separate, gestite dal gestore della piattaforma (HQE); codice Italianway e
+  nome dell'organizzazione solo da HQE; nuovi appartamenti solo da HQE, anche nell'ambiente di prova.
+- **Cambio di ruolo** con uscita da tutti i dispositivi entro un minuto; notifiche su dispositivo condiviso al
+  sicuro; notifiche riattivate al rientro.
+- **«Elimina il mio account»** cancella davvero l'accesso; non per l'ultimo amministratore né per l'ultimo gestore.
+- **Nome dell'app DOMHOUSE**; barra laterale con i ruoli; menu a tre righe sul telefono.
+- **«Prenotazioni ricevute» e «Prenotazioni non attribuite»**; registro attività; sospensione delle organizzazioni;
+  accesso di assistenza a tempo.
+- **Privacy**: «utente rimosso», codice anonimo al sistema domotico, nessun dato personale degli ospiti;
+  conservazione dei dati a termine.
+- **Appartamenti dimostrativi** con etichetta, Simulatore e ripristino; rendiconti Excel mensili e per soggiorno.

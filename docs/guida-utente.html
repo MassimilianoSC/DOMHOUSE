@@ -367,7 +367,8 @@
 <li><a href="#10-cosa-fa-il-sistema-da-solo-e1beaad1">10. Cosa fa il sistema da solo</a>
 <ol>
 <li><a href="#le-tre-modalita-e-le-loro-temperature-ff713f66">Le tre modalità e le loro temperature</a></li>
-<li><a href="#le-otto-regole-50d4de49">Le otto regole</a></li>
+<li><a href="#le-otto-regole-descrizione-e-valori-85b8eebc">Le otto regole: descrizione e valori</a></li>
+<li><a href="#le-otto-regole-che-cosa-fanno-davvero-dd709d4a">Le otto regole: che cosa fanno davvero</a></li>
 <li><a href="#caldaia-e-clima-con-e-senza-sensore-4b201c1b">Caldaia e clima, con e senza sensore</a></li>
 <li><a href="#prenotazioni-pre-arrivo-check-out-disdette-0dd0ede6">Prenotazioni: pre-arrivo, check-out, disdette</a></li>
 <li><a href="#approvazioni-automatiche-3ba76e4c">Approvazioni automatiche</a></li>
@@ -3496,118 +3497,292 @@ aspettano la fine della forzatura.</p>
 </section>
 <section aria-labelledby="10-cosa-fa-il-sistema-da-solo-e1beaad1">
 <h2 id="10-cosa-fa-il-sistema-da-solo-e1beaad1">10. Cosa fa il sistema da solo</h2>
+<p class="lead"><strong>Modalità, regole, termostato, prenotazioni e conservazione dei dati.</strong></p>
 <h3 id="le-tre-modalita-e-le-loro-temperature-ff713f66">Le tre modalità e le loro temperature</h3>
+<p class="lead"><strong>Che cosa fanno caldaia e climatizzatore in ogni modalità.</strong></p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Modalità</th><th scope="col" class="align-left">Caldaia</th><th scope="col" class="align-left">Climatizzatore</th></tr></thead>
 <tbody>
-<tr><td data-label="Modalità" class="align-left">«comfort»</td><td data-label="Caldaia" class="align-left">Abilitata alla «Temperatura in comfort (°C)» (21 all&#x27;inizio); il termostato la accende e spegne intorno a quel valore.</td><td data-label="Climatizzatore" class="align-left">Con un sensore di temperatura nella stessa stanza: scalda alla temperatura di comfort quando la stanza è sotto, raffresca alla «Raffrescamento in comfort (°C)» (25 all&#x27;inizio) quando è sopra, fra le due lo lascia com&#x27;è; al cambio di modalità e poi ogni minuto. Senza sensore nella stanza non lo tocca e scrive una volta «Regolazione automatica disattivata».</td></tr>
+<tr><td data-label="Modalità" class="align-left">«comfort»</td><td data-label="Caldaia" class="align-left">Abilitata alla «Temperatura in comfort (°C)» (21 all&#x27;inizio); il termostato la accende e spegne intorno a quel valore.</td><td data-label="Climatizzatore" class="align-left">Con un sensore di temperatura nella stessa stanza: regolazione automatica (sotto). Senza sensore nella stanza non lo tocca e scrive una volta «Regolazione automatica disattivata».</td></tr>
 <tr><td data-label="Modalità" class="align-left">«eco»</td><td data-label="Caldaia" class="align-left">Abilitata alla «Temperatura in eco (°C)» (18 all&#x27;inizio).</td><td data-label="Climatizzatore" class="align-left">Spento.</td></tr>
 <tr><td data-label="Modalità" class="align-left">«casa vuota»</td><td data-label="Caldaia" class="align-left">Abilitata alla temperatura dell&#x27;«Antigelo a casa vuota» (8 °C all&#x27;inizio).</td><td data-label="Climatizzatore" class="align-left">Spento.</td></tr>
 </tbody></table></div>
-<p>Le tre temperature si regolano per appartamento nella regola «Limiti del setpoint» (parte 9). I valori chiesti restano
-sempre entro i limiti del dispositivo e, con la regola accesa, entro il minimo e il massimo che hai scelto; i pulsanti
-«−» e «+» della temperatura non escono mai dai limiti (una caldaia a 8 °C con minimo 16 passa a 16 con un tocco). La regolazione automatica del clima ogni minuto rispetta l&#x27;isteresi (0,5 °C) e
-il tempo minimo fra due cambi (5 minuti), non agisce durante una forzatura né con una finestra aperta e regola finestra
-attiva, e non va mai contro un comando di una persona: un clima che hai comandato tu resta com&#x27;è fino al prossimo
-cambio di modalità. Ogni cambio automatico è una decisione con la temperatura letta, per esempio «…: 19 °C, sotto
-21 °C: scalda».</p>
-<h3 id="le-otto-regole-50d4de49">Le otto regole</h3>
-<p>Tutte partono attive. Sette si modificano dall&#x27;app, una no.</p>
-<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
-<thead><tr><th scope="col" class="align-left">Regola</th><th scope="col" class="align-left">Descrizione nell&#x27;app</th><th scope="col" class="align-left">Valori di partenza e limiti</th><th scope="col" class="align-left">Che cosa fa davvero</th></tr></thead>
-<tbody>
-<tr><td data-label="Regola" class="align-left">«Finestra aperta spegne il clima»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 5, da 1 a 30</td><td data-label="Che cosa fa davvero" class="align-left">Spegne clima e riscaldamento di tutto l&#x27;appartamento, non solo della stanza. Sospesa durante una forzatura; alla fine riparte. L&#x27;antigelo è più forte.</td></tr>
-<tr><td data-label="Regola" class="align-left">«Limiti del setpoint»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c&#x27;è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minimo (°C)»: 16, da 7 a 20; «Massimo (°C)»: 24, da 20 a 28; «Temperatura in comfort (°C)»: 21, da 16 a 26; «Temperatura in eco (°C)»: 18, da 10 a 22; «Raffrescamento in comfort (°C)»: 25, da 22 a 28</td><td data-label="Che cosa fa davvero" class="align-left">Acceso (dal lotto 31): clima e caldaia restano fra il minimo e il massimo che scegli, sempre dentro i limiti del dispositivo; un comando fuori intervallo è rifiutato, i comandi automatici vengono riportati dentro. Spento: valgono solo i limiti del dispositivo. Se i tuoi limiti sono tutti fuori da quelli del dispositivo valgono quelli del dispositivo e nelle Decisioni compare «Limiti del setpoint ignorati». L&#x27;antigelo a casa vuota non segue questi limiti. Le tre temperature guidano le modalità.</td></tr>
-<tr><td data-label="Regola" class="align-left">«Antigelo a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota mantiene almeno questa temperatura.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Temperatura (°C)»: 8, da 5 a 12</td><td data-label="Che cosa fa davvero" class="align-left">A casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più 0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve un sensore: senza, «Antigelo non attivo».</td></tr>
-<tr><td data-label="Regola" class="align-left">«Antimuffa a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota, se l&#x27;umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Umidità (%)»: 65, da 50 a 80</td><td data-label="Che cosa fa davvero" class="align-left">Scrive «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione.</td></tr>
-<tr><td data-label="Regola" class="align-left">«Pre-arrivo»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Porta la casa in comfort prima dell&#x27;arrivo degli ospiti.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Ore prima del check-in»: 2, da 0 a 6</td><td data-label="Che cosa fa davvero" class="align-left">Ogni prenotazione creata o modificata programma il comfort. Cambiare le ore vale per le prenotazioni che arrivano o cambiano dopo: le azioni già in programma non vengono ricalcolate.</td></tr>
-<tr><td data-label="Regola" class="align-left">«Risparmio al check-out»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180</td><td data-label="Che cosa fa davvero" class="align-left">Programma casa vuota dopo la partenza. Con movimento recente apre la richiesta «Mettere l&#x27;appartamento a vuoto dopo il check-out»; senza risposta la approva.</td></tr>
-<tr><td data-label="Regola" class="align-left">«Pausa minima del compressore»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Pausa minima tra spegnimento e riaccensione del compressore.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 3; «Non modificabile» (chi gestisce il sistema può impostare da 1 a 15)</td><td data-label="Che cosa fa davvero" class="align-left">Dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico viene rimandato, uno di una persona o dell&#x27;assistente può essere rifiutato se manca più di qualche secondo.</td></tr>
-<tr><td data-label="Regola" class="align-left">«Avviso dispositivo offline»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Avvisa quando un dispositivo resta offline oltre i minuti indicati.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 15, da 5 a 120</td><td data-label="Che cosa fa davvero" class="align-left">Dopo la soglia scrive «Dispositivo offline» nelle Decisioni e manda la notifica; la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto.</td></tr>
-</tbody></table></div>
-<h3 id="caldaia-e-clima-con-e-senza-sensore-4b201c1b">Caldaia e clima, con e senza sensore</h3>
+<p><strong>La regolazione automatica del clima in comfort:</strong></p>
 <ul>
 <li>
-<p>«Riscaldamento abilitato» vuol dire che la caldaia può scaldare. Il termostato del sistema accende e spegne davvero la
-caldaia intorno alla temperatura voluta, con un&#x27;isteresi di 0,5 °C e almeno 5 minuti fra due cambi, usando il sensore
-di temperatura collegato. Con il misuratore sopra 30 W leggi «sta scaldando ora».</p>
+<p><strong>Scalda</strong> alla temperatura di comfort quando la stanza è sotto.</p>
 </li>
 <li>
-<p><strong>Senza un sensore utilizzabile</strong> (manca o è offline) la caldaia non si accende mai da sola: la temperatura chiesta da
-una modalità (comfort, eco o antigelo) la lascia spenta, con una decisione per episodio, «…: sensore di temperatura
-mancante, regolazione automatica disattivata» (in comfort ed eco) oppure «…: sensore di temperatura mancante, antigelo
-non attivo» (a casa vuota, tipo «Antigelo non attivo», con notifica nella categoria «Dispositivi e sistema domotico offline»).
-Un comando di una persona o programmato viene invece eseguito così com&#x27;è, senza regolazione («…: …; segue il comando
-manuale senza regolazione»). Quando il sensore torna leggi «…: sensore di nuovo disponibile, regolazione ripresa».</p>
+<p><strong>Raffresca</strong> alla «Raffrescamento in comfort (°C)» (25 all&#x27;inizio) quando è sopra.</p>
 </li>
 <li>
-<p>Il climatizzatore in comfort segue il sensore della sua stanza (sopra). Senza sensore nella stanza lo comandi solo tu.</p>
+<p><strong>Fra le due</strong> lo lascia com&#x27;è.</p>
 </li>
 <li>
-<p>Un comando tuo su caldaia o clima toglie quel dispositivo alla regolazione della modalità fino al prossimo cambio di
-modalità, anche dopo un riavvio del sistema.</p>
+<p><strong>Quando</strong>: al cambio di modalità e poi ogni minuto.</p>
+</li>
+<li>
+<p><strong>Rispetta</strong> l&#x27;isteresi (0,5 °C) e il tempo minimo fra due cambi (5 minuti).</p>
+</li>
+<li>
+<p><strong>Non agisce</strong> durante una forzatura né con una finestra aperta e regola finestra attiva.</p>
+</li>
+<li>
+<p><strong>Non va mai contro un comando di una persona</strong>: un clima che hai comandato tu resta com&#x27;è fino al prossimo cambio
+di modalità.</p>
+</li>
+<li>
+<p><strong>Ogni cambio automatico</strong> è una decisione con la temperatura letta, per esempio «…: 19 °C, sotto 21 °C: scalda».</p>
 </li>
 </ul>
-<h3 id="prenotazioni-pre-arrivo-check-out-disdette-0dd0ede6">Prenotazioni: pre-arrivo, check-out, disdette</h3>
+<blockquote class="note-info">
+<p><strong>Da sapere</strong></p>
 <ul>
 <li>
-<p>Ogni prenotazione creata o modificata da Italianway programma il pre-arrivo in comfort e, dopo il check-out, il
-ritorno a casa vuota. Le azioni hanno origine «prenotazione» e si ricalcolano a ogni modifica («Ricalcolata a ogni
-modifica della prenotazione»).</p>
+<p><strong>Le tre temperature</strong> si regolano per appartamento nella regola «Limiti del setpoint» (parte 9).</p>
 </li>
 <li>
-<p>Una disdetta annulla le azioni aperte. Se il pre-arrivo era già stato eseguito, programma il ritorno a casa vuota
-(«Disdetta dopo il pre-arrivo») e manda la notifica «Prenotazioni», salvo un altro soggiorno in corso o un altro
-pre-arrivo già eseguito.</p>
+<p><strong>I valori chiesti</strong> restano sempre entro i limiti del dispositivo e, con la regola accesa, entro il minimo e il
+massimo che hai scelto.</p>
 </li>
 <li>
-<p>Un cambio di modalità programmato durante una forzatura aspetta la sua fine («Azione rimandata»). Dopo un riavvio del
-sistema, un&#x27;azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).</p>
+<p><strong>I pulsanti «−» e «+»</strong> della temperatura non escono mai dai limiti (una caldaia a 8 °C con minimo 16 passa a
+16 con un tocco).</p>
+</li>
+</ul>
+</blockquote>
+<h3 id="le-otto-regole-descrizione-e-valori-85b8eebc">Le otto regole: descrizione e valori</h3>
+<p class="lead"><strong>Ogni regola come la descrive l&#x27;app, con valori di partenza e limiti.</strong></p>
+<p>Tutte partono attive. Sette si modificano dall&#x27;app, una no.</p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Regola</th><th scope="col" class="align-left">Descrizione nell&#x27;app</th><th scope="col" class="align-left">Valori di partenza e limiti</th></tr></thead>
+<tbody>
+<tr><td data-label="Regola" class="align-left">«Finestra aperta spegne il clima»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 5, da 1 a 30</td></tr>
+<tr><td data-label="Regola" class="align-left">«Limiti del setpoint»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c&#x27;è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.»</td><td data-label="Valori di partenza e limiti" class="align-left">Vedi la tabella sotto</td></tr>
+<tr><td data-label="Regola" class="align-left">«Antigelo a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota mantiene almeno questa temperatura.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Temperatura (°C)»: 8, da 5 a 12</td></tr>
+<tr><td data-label="Regola" class="align-left">«Antimuffa a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota, se l&#x27;umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Umidità (%)»: 65, da 50 a 80</td></tr>
+<tr><td data-label="Regola" class="align-left">«Pre-arrivo»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Porta la casa in comfort prima dell&#x27;arrivo degli ospiti.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Ore prima del check-in»: 2, da 0 a 6</td></tr>
+<tr><td data-label="Regola" class="align-left">«Risparmio al check-out»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180</td></tr>
+<tr><td data-label="Regola" class="align-left">«Pausa minima del compressore»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Pausa minima tra spegnimento e riaccensione del compressore.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 3; «Non modificabile» (chi gestisce il sistema può impostare da 1 a 15)</td></tr>
+<tr><td data-label="Regola" class="align-left">«Avviso dispositivo offline»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Avvisa quando un dispositivo resta offline oltre i minuti indicati.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 15, da 5 a 120</td></tr>
+</tbody></table></div>
+<p><strong>I valori di «Limiti del setpoint»:</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Campo</th><th scope="col" class="align-left">All&#x27;inizio</th><th scope="col" class="align-left">Limiti</th></tr></thead>
+<tbody>
+<tr><td data-label="Campo" class="align-left">«Minimo (°C)»</td><td data-label="All&#x27;inizio" class="align-left">16</td><td data-label="Limiti" class="align-left">Da 7 a 20</td></tr>
+<tr><td data-label="Campo" class="align-left">«Massimo (°C)»</td><td data-label="All&#x27;inizio" class="align-left">24</td><td data-label="Limiti" class="align-left">Da 20 a 28</td></tr>
+<tr><td data-label="Campo" class="align-left">«Temperatura in comfort (°C)»</td><td data-label="All&#x27;inizio" class="align-left">21</td><td data-label="Limiti" class="align-left">Da 16 a 26</td></tr>
+<tr><td data-label="Campo" class="align-left">«Temperatura in eco (°C)»</td><td data-label="All&#x27;inizio" class="align-left">18</td><td data-label="Limiti" class="align-left">Da 10 a 22</td></tr>
+<tr><td data-label="Campo" class="align-left">«Raffrescamento in comfort (°C)»</td><td data-label="All&#x27;inizio" class="align-left">25</td><td data-label="Limiti" class="align-left">Da 22 a 28</td></tr>
+</tbody></table></div>
+<h3 id="le-otto-regole-che-cosa-fanno-davvero-dd709d4a">Le otto regole: che cosa fanno davvero</h3>
+<p class="lead"><strong>L&#x27;effetto reale di ogni regola, oltre la descrizione.</strong></p>
+<ul>
+<li>
+<p><strong>«Finestra aperta spegne il clima»</strong>: spegne clima e riscaldamento di tutto l&#x27;appartamento, non solo della
+stanza. Sospesa durante una forzatura; alla fine riparte. L&#x27;antigelo è più forte.</p>
 </li>
 <li>
-<p>L&#x27;occupazione «Occupato» richiede il check-in effettivo comunicato da Italianway; la sola prenotazione dà «Prenotato».</p>
+<p><strong>«Antigelo a casa vuota»</strong>: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
+0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve
+un sensore: senza, «Antigelo non attivo».</p>
+</li>
+<li>
+<p><strong>«Antimuffa a casa vuota»</strong>: scrive «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa
+vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione.</p>
+</li>
+<li>
+<p><strong>«Pre-arrivo»</strong>: ogni prenotazione creata o modificata programma il comfort. Cambiare le ore vale per le
+prenotazioni che arrivano o cambiano dopo: le azioni già in programma non vengono ricalcolate.</p>
+</li>
+<li>
+<p><strong>«Risparmio al check-out»</strong>: programma casa vuota dopo la partenza. Con movimento recente apre la richiesta
+«Mettere l&#x27;appartamento a vuoto dopo il check-out»; senza risposta la approva.</p>
+</li>
+<li>
+<p><strong>«Pausa minima del compressore»</strong>: dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico
+viene rimandato, uno di una persona o dell&#x27;assistente può essere rifiutato se manca più di qualche secondo.</p>
+</li>
+<li>
+<p><strong>«Avviso dispositivo offline»</strong>: dopo la soglia scrive «Dispositivo offline» nelle Decisioni e manda la notifica;
+la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto.</p>
+</li>
+</ul>
+<p><strong>«Limiti del setpoint»</strong> (con effetto dal lotto 31):</p>
+<ul>
+<li>
+<p><strong>Acceso</strong>: clima e caldaia restano fra il minimo e il massimo che scegli, sempre dentro i limiti del dispositivo;
+un comando fuori intervallo è rifiutato, i comandi automatici vengono riportati dentro.</p>
+</li>
+<li>
+<p><strong>Spento</strong>: valgono solo i limiti del dispositivo.</p>
+</li>
+<li>
+<p><strong>Se i tuoi limiti sono tutti fuori</strong> da quelli del dispositivo valgono quelli del dispositivo e nelle Decisioni
+compare «Limiti del setpoint ignorati».</p>
+</li>
+<li>
+<p><strong>L&#x27;antigelo a casa vuota</strong> non segue questi limiti.</p>
+</li>
+<li>
+<p><strong>Le tre temperature</strong> guidano le modalità.</p>
+</li>
+</ul>
+<h3 id="caldaia-e-clima-con-e-senza-sensore-4b201c1b">Caldaia e clima, con e senza sensore</h3>
+<p class="lead"><strong>Il termostato della caldaia e cosa succede senza sensore.</strong></p>
+<ul>
+<li>
+<p><strong>«Riscaldamento abilitato»</strong> vuol dire che la caldaia può scaldare.</p>
+</li>
+<li>
+<p><strong>Il termostato del sistema</strong> accende e spegne davvero la caldaia intorno alla temperatura voluta, con un&#x27;isteresi
+di 0,5 °C e almeno 5 minuti fra due cambi, usando il sensore di temperatura collegato.</p>
+</li>
+<li>
+<p><strong>Con il misuratore sopra 30 W</strong> leggi «sta scaldando ora».</p>
+</li>
+<li>
+<p><strong>Il climatizzatore in comfort</strong> segue il sensore della sua stanza (sopra). Senza sensore nella stanza lo comandi
+solo tu.</p>
+</li>
+<li>
+<p><strong>Un comando tuo</strong> su caldaia o clima toglie quel dispositivo alla regolazione della modalità fino al prossimo
+cambio di modalità, anche dopo un riavvio del sistema.</p>
+</li>
+</ul>
+<blockquote class="note-warning">
+<p><strong>Attenzione</strong></p>
+<p><strong>Senza un sensore utilizzabile</strong> (manca o è offline) la caldaia non si accende mai da sola.</p>
+<ul>
+<li>
+<p><strong>La temperatura chiesta da una modalità</strong> (comfort, eco o antigelo) la lascia spenta, con una decisione per
+episodio: «…: sensore di temperatura mancante, regolazione automatica disattivata» (in comfort ed eco).</p>
+</li>
+<li>
+<p><strong>A casa vuota</strong>: «…: sensore di temperatura mancante, antigelo non attivo» (tipo «Antigelo non attivo», con
+notifica nella categoria «Dispositivi e sistema domotico offline»).</p>
+</li>
+<li>
+<p><strong>Un comando di una persona o programmato</strong> viene invece eseguito così com&#x27;è, senza regolazione («…: …; segue il
+comando manuale senza regolazione»).</p>
+</li>
+<li>
+<p><strong>Quando il sensore torna</strong> leggi «…: sensore di nuovo disponibile, regolazione ripresa».</p>
+</li>
+</ul>
+</blockquote>
+<h3 id="prenotazioni-pre-arrivo-check-out-disdette-0dd0ede6">Prenotazioni: pre-arrivo, check-out, disdette</h3>
+<p class="lead"><strong>Come le prenotazioni muovono le modalità.</strong></p>
+<ul>
+<li>
+<p><strong>Ogni prenotazione creata o modificata</strong> da Italianway programma il pre-arrivo in comfort e, dopo il check-out,
+il ritorno a casa vuota.</p>
+</li>
+<li>
+<p><strong>Le azioni</strong> hanno origine «prenotazione» e si ricalcolano a ogni modifica («Ricalcolata a ogni modifica della
+prenotazione»).</p>
+</li>
+<li>
+<p><strong>Una disdetta</strong> annulla le azioni aperte.</p>
+</li>
+<li>
+<p><strong>Se il pre-arrivo era già stato eseguito</strong>, programma il ritorno a casa vuota («Disdetta dopo il pre-arrivo») e
+manda la notifica «Prenotazioni», salvo un altro soggiorno in corso o un altro pre-arrivo già eseguito.</p>
+</li>
+<li>
+<p><strong>Un cambio di modalità programmato durante una forzatura</strong> aspetta la sua fine («Azione rimandata»).</p>
+</li>
+<li>
+<p><strong>Dopo un riavvio del sistema</strong>, un&#x27;azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).</p>
+</li>
+<li>
+<p><strong>L&#x27;occupazione «Occupato»</strong> richiede il check-in effettivo comunicato da Italianway; la sola prenotazione dà
+«Prenotato».</p>
 </li>
 </ul>
 <h3 id="approvazioni-automatiche-3ba76e4c">Approvazioni automatiche</h3>
+<p class="lead"><strong>Le richieste che il motore apre da solo e cosa succede senza risposta.</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Richiesta</th><th scope="col" class="align-left">Quando</th><th scope="col" class="align-left">Senza risposta</th></tr></thead>
+<tbody>
+<tr><td data-label="Richiesta" class="align-left">«Mettere l&#x27;appartamento a vuoto dopo il check-out»</td><td data-label="Quando" class="align-left">Dopo la partenza, se c&#x27;è stato movimento</td><td data-label="Senza risposta" class="align-left">Viene approvata</td></tr>
+<tr><td data-label="Richiesta" class="align-left">«Spegnere …» con il nome dell&#x27;apparecchio, «… consuma … W da oltre … minuti con l&#x27;appartamento vuoto»</td><td data-label="Quando" class="align-left">A casa vuota, senza forzatura, un apparecchio spegnibile con misuratore (mai la caldaia) consuma oltre 300 W per più di 15 minuti (valori impostati da chi gestisce il sistema)</td><td data-label="Senza risposta" class="align-left">Viene respinta e l&#x27;apparecchio resta acceso, salvo impostazione diversa</td></tr>
+<tr><td data-label="Richiesta" class="align-left">Le richieste dell&#x27;assistente</td><td data-label="Quando" class="align-left">Con ospiti dentro, o per più azioni insieme</td><td data-label="Senza risposta" class="align-left">Vengono respinte</td></tr>
+</tbody></table></div>
+<blockquote class="note-info">
+<p><strong>Da sapere</strong></p>
 <ul>
 <li>
-<p>«Mettere l&#x27;appartamento a vuoto dopo il check-out»: dopo la partenza, se c&#x27;è stato movimento. Senza risposta viene
-approvata.</p>
+<p><strong>Dopo un no</strong> a «Spegnere …», nessuna nuova richiesta finché il consumo non scende e risale.</p>
 </li>
 <li>
-<p>«Spegnere …» con il nome dell&#x27;apparecchio, «… consuma … W da oltre … minuti con l&#x27;appartamento vuoto»: a casa vuota,
-senza forzatura, un apparecchio spegnibile con misuratore (mai la caldaia) consuma oltre 300 W per più di 15 minuti
-(valori impostati da chi gestisce il sistema). Senza risposta viene respinta e l&#x27;apparecchio resta acceso, salvo
-impostazione diversa; dopo un no, nessuna nuova richiesta finché il consumo non scende e risale.</p>
+<p><strong>Una sola richiesta aperta per volta</strong>: le altre aspettano in coda.</p>
 </li>
 <li>
-<p>Le richieste dell&#x27;assistente, senza risposta, vengono respinte.</p>
-</li>
-<li>
-<p>Una sola richiesta aperta per volta: le altre aspettano in coda. La scadenza è 30 minuti all&#x27;inizio (chi gestisce il
-sistema può impostare da 5 a 720).</p>
+<p><strong>La scadenza</strong> è 30 minuti all&#x27;inizio (chi gestisce il sistema può impostare da 5 a 720).</p>
 </li>
 </ul>
+</blockquote>
 <h3 id="comandi-confermati-dal-consumo-feae3093">Comandi confermati dal consumo</h3>
-<p>L&#x27;accensione o lo spegnimento di un climatizzatore comandato a infrarosso è confermata dal suo misuratore entro una
-decina di secondi: consumo su di almeno 20 W per l&#x27;accensione, sotto 15 W per lo spegnimento. Se il misuratore è
-offline il comando risulta «non verificato» e nelle Decisioni compare «Comando non verificato: misuratore offline».
-Una conferma di invio non prova sempre l&#x27;effetto fisico: in caso di dubbio guarda le letture del dispositivo.</p>
+<p class="lead"><strong>Il misuratore conferma accensione e spegnimento del clima a infrarosso.</strong></p>
+<ul>
+<li>
+<p><strong>L&#x27;accensione o lo spegnimento</strong> di un climatizzatore comandato a infrarosso è confermata dal suo misuratore entro
+una decina di secondi.</p>
+</li>
+<li>
+<p><strong>Le soglie</strong>: consumo su di almeno 20 W per l&#x27;accensione, sotto 15 W per lo spegnimento.</p>
+</li>
+<li>
+<p><strong>Se il misuratore è offline</strong> il comando risulta «non verificato» e nelle Decisioni compare «Comando non
+verificato: misuratore offline».</p>
+</li>
+</ul>
+<blockquote class="note-warning">
+<p><strong>Attenzione</strong></p>
+<p>Una conferma di invio non prova sempre l&#x27;effetto fisico: in caso di dubbio guarda le letture del dispositivo.</p>
+</blockquote>
 <h3 id="il-riepilogo-settimanale-61c479bc">Il riepilogo settimanale</h3>
-<p>Ogni lunedì dalle 8 (ora dell&#x27;appartamento) il sistema prepara, per ogni appartamento attivo, il riepilogo della
-settimana da lunedì a domenica: consumi per notte con ospiti e per notte vuota confrontati con la mediana delle 4
-settimane prima («Alto» solo con almeno il 30 % in più e almeno 5 kWh di eccedenza), dispositivi offline da più di 24
-ore, approvazioni scadute senza risposta, finestre aperte almeno 3 volte con il clima spento dalla regola. Se c&#x27;è
-almeno una segnalazione arriva la notifica «Riepilogo». Una settimana senza novità ha il riepilogo «Settimana senza
-novità» e non manda avvisi.</p>
+<p class="lead"><strong>Ogni lunedì, per ogni appartamento attivo, il riepilogo della settimana.</strong></p>
+<ul>
+<li>
+<p><strong>Quando</strong>: ogni lunedì dalle 8 (ora dell&#x27;appartamento), per la settimana da lunedì a domenica.</p>
+</li>
+<li>
+<p><strong>Consumi</strong>: per notte con ospiti e per notte vuota, confrontati con la mediana delle 4 settimane prima («Alto»
+solo con almeno il 30 % in più e almeno 5 kWh di eccedenza).</p>
+</li>
+<li>
+<p><strong>Segnalazioni</strong>: dispositivi offline da più di 24 ore, approvazioni scadute senza risposta, finestre aperte
+almeno 3 volte con il clima spento dalla regola.</p>
+</li>
+<li>
+<p><strong>Notifica</strong>: se c&#x27;è almeno una segnalazione arriva la notifica «Riepilogo».</p>
+</li>
+<li>
+<p><strong>Settimana senza novità</strong>: il riepilogo dice «Settimana senza novità» e non manda avvisi.</p>
+</li>
+</ul>
 <h3 id="valori-impostati-fuori-dall-app-5bd547f5">Valori impostati fuori dall&#x27;app</h3>
-<p>Alcuni valori li imposta il responsabile tecnico del sistema domotico, non l&#x27;app: la pausa del compressore (3 minuti, da
-1 a 15) e la breve attesa finale (7 secondi); l&#x27;isteresi del termostato (0,5 °C) e il tempo minimo fra due cambi (5
-minuti); le soglie di conferma dal misuratore (20 W e 15 W); la scadenza delle approvazioni (30 minuti) e le soglie del
-consumo a casa vuota (300 W, 15 minuti); il ritardo oltre il quale un&#x27;azione programmata viene saltata dopo un riavvio
-(30 minuti); quando l&#x27;assistente chiede conferma (con ospiti, sempre, oppure solo per più azioni insieme); il numero di
-domande al giorno all&#x27;assistente (50) e il tetto mensile di spesa (20 €).</p>
+<p class="lead"><strong>I valori che imposta il responsabile tecnico del sistema domotico.</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Valore</th><th scope="col" class="align-left">Impostazione</th></tr></thead>
+<tbody>
+<tr><td data-label="Valore" class="align-left">Pausa del compressore</td><td data-label="Impostazione" class="align-left">3 minuti, da 1 a 15</td></tr>
+<tr><td data-label="Valore" class="align-left">Breve attesa finale</td><td data-label="Impostazione" class="align-left">7 secondi</td></tr>
+<tr><td data-label="Valore" class="align-left">Isteresi del termostato</td><td data-label="Impostazione" class="align-left">0,5 °C</td></tr>
+<tr><td data-label="Valore" class="align-left">Tempo minimo fra due cambi</td><td data-label="Impostazione" class="align-left">5 minuti</td></tr>
+<tr><td data-label="Valore" class="align-left">Soglie di conferma dal misuratore</td><td data-label="Impostazione" class="align-left">20 W e 15 W</td></tr>
+<tr><td data-label="Valore" class="align-left">Scadenza delle approvazioni</td><td data-label="Impostazione" class="align-left">30 minuti</td></tr>
+<tr><td data-label="Valore" class="align-left">Soglie del consumo a casa vuota</td><td data-label="Impostazione" class="align-left">300 W, 15 minuti</td></tr>
+<tr><td data-label="Valore" class="align-left">Ritardo oltre il quale un&#x27;azione programmata viene saltata dopo un riavvio</td><td data-label="Impostazione" class="align-left">30 minuti</td></tr>
+<tr><td data-label="Valore" class="align-left">Quando l&#x27;assistente chiede conferma</td><td data-label="Impostazione" class="align-left">Con ospiti, sempre, oppure solo per più azioni insieme</td></tr>
+<tr><td data-label="Valore" class="align-left">Domande al giorno all&#x27;assistente</td><td data-label="Impostazione" class="align-left">50</td></tr>
+<tr><td data-label="Valore" class="align-left">Tetto mensile di spesa</td><td data-label="Impostazione" class="align-left">20 €</td></tr>
+</tbody></table></div>
 <h3 id="per-quanto-tempo-l-app-conserva-i-dati-067572ea">Per quanto tempo l&#x27;app conserva i dati</h3>
+<p class="lead"><strong>I termini di conservazione, oltre i quali i dati si cancellano da soli.</strong></p>
 <p><em>Decisione del 17 ottobre 2026.</em> Oltre questi termini i dati si cancellano da soli, entro circa un giorno.</p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Dati</th><th scope="col" class="align-left">Per quanto tempo</th></tr></thead>
@@ -3620,13 +3795,24 @@ domande al giorno all&#x27;assistente (50) e il tetto mensile di spesa (20 €).
 <tr><td data-label="Dati" class="align-left">Registro dell&#x27;organizzazione, registro della piattaforma e accessi di assistenza</td><td data-label="Per quanto tempo" class="align-left">24 mesi</td></tr>
 <tr><td data-label="Dati" class="align-left">Prenotazioni ricevute da Italianway (senza dati personali degli ospiti)</td><td data-label="Per quanto tempo" class="align-left">90 giorni, e al massimo le ultime 100</td></tr>
 </tbody></table></div>
-<p>Utenti, organizzazioni e appartamenti restano finché non vengono tolti. Chi elimina il proprio account viene cancellato
-subito. I dati personali degli ospiti non vengono salvati; il sistema domotico riceve un codice anonimo al posto
+<ul>
+<li>
+<p><strong>Utenti, organizzazioni e appartamenti</strong> restano finché non vengono tolti.</p>
+</li>
+<li>
+<p><strong>Chi elimina il proprio account</strong> viene cancellato subito.</p>
+</li>
+<li>
+<p><strong>I dati personali degli ospiti</strong> non vengono salvati; il sistema domotico riceve un codice anonimo al posto
 dell&#x27;email di chi comanda.</p>
+</li>
+</ul>
 </section>
 <section aria-labelledby="11-problemi-e-messaggi-03f0bf3d">
 <h2 id="11-problemi-e-messaggi-03f0bf3d">11. Problemi e messaggi</h2>
+<p class="lead"><strong>Ogni messaggio dell&#x27;app: che cosa significa e che cosa fare.</strong></p>
 <h3 id="all-accesso-ae82f70e">All&#x27;accesso</h3>
+<p class="lead"><strong>I messaggi della pagina «Accedi».</strong></p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
@@ -3646,6 +3832,7 @@ dell&#x27;email di chi comanda.</p>
 <tr><td data-label="Cosa vedi" class="align-left">«Indirizzo email non valido»</td><td data-label="Cosa significa" class="align-left">L&#x27;email scritta non è un indirizzo</td><td data-label="Cosa fare" class="align-left">Correggi l&#x27;indirizzo</td></tr>
 </tbody></table></div>
 <h3 id="in-tutte-le-pagine-d7aed8ac">In tutte le pagine</h3>
+<p class="lead"><strong>I messaggi comuni a tutta l&#x27;app.</strong></p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
@@ -3665,6 +3852,7 @@ dell&#x27;email di chi comanda.</p>
 <tr><td data-label="Cosa vedi" class="align-left">«Pagina non trovata»</td><td data-label="Cosa significa" class="align-left">L&#x27;indirizzo non esiste, oppure non hai il ruolo per quella pagina</td><td data-label="Cosa fare" class="align-left">Torna al menu</td></tr>
 </tbody></table></div>
 <h3 id="sui-comandi-e-in-panoramica-6ccb6446">Sui comandi e in Panoramica</h3>
+<p class="lead"><strong>Gli esiti dei comandi ai dispositivi.</strong></p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
@@ -3673,12 +3861,15 @@ dell&#x27;email di chi comanda.</p>
 <tr><td data-label="Cosa vedi" class="align-left">«Il setpoint deve essere tra … e …», «fuori dai limiti»</td><td data-label="Cosa significa" class="align-left">Temperatura fuori dai limiti</td><td data-label="Cosa fare" class="align-left">Scegli un valore nell&#x27;intervallo «da … a … °C»</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«rifiutato dal dispositivo»</td><td data-label="Cosa significa" class="align-left">Il dispositivo non ha accettato il comando</td><td data-label="Cosa fare" class="align-left">Riprova; controlla il dispositivo</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«bloccato da una regola», «bloccato da un&#x27;azione prioritaria»</td><td data-label="Cosa significa" class="align-left">Una regola (per esempio finestra aperta o pausa del compressore) o un&#x27;azione più importante ha bloccato il comando</td><td data-label="Cosa fare" class="align-left">Leggi il motivo nelle Decisioni; riprova dopo</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«nessuna conferma», «non verificato», «nessuna risposta»</td><td data-label="Cosa significa" class="align-left">Il comando è partito ma non è stato confermato</td><td data-label="Cosa fare" class="align-left">Controlla le letture del dispositivo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«nessuna conferma», «nessuna risposta»</td><td data-label="Cosa significa" class="align-left">Il comando è partito ma non è stato confermato</td><td data-label="Cosa fare" class="align-left">Controlla le letture del dispositivo</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«non verificato»</td><td data-label="Cosa significa" class="align-left">Il comando è partito ma non è stato confermato</td><td data-label="Cosa fare" class="align-left">Controlla le letture del dispositivo</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«errore interno»</td><td data-label="Cosa significa" class="align-left">Un errore del sistema domotico</td><td data-label="Cosa fare" class="align-left">Copia l&#x27;«ID richiesta» e segnala</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Modalità non valida»</td><td data-label="Cosa significa" class="align-left">Modalità non riconosciuta</td><td data-label="Cosa fare" class="align-left">Scegli «comfort», «eco» o «casa vuota»</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Il nome deve avere da 1 a 60 caratteri», «Stanza inesistente», «Dispositivo inesistente»</td><td data-label="Cosa significa" class="align-left">Dati della rinomina non validi</td><td data-label="Cosa fare" class="align-left">Correggi nome o stanza</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il nome deve avere da 1 a 60 caratteri», «Stanza inesistente»</td><td data-label="Cosa significa" class="align-left">Dati della rinomina non validi</td><td data-label="Cosa fare" class="align-left">Correggi nome o stanza</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Dispositivo inesistente»</td><td data-label="Cosa significa" class="align-left">Dati della rinomina non validi</td><td data-label="Cosa fare" class="align-left">Correggi nome o stanza</td></tr>
 </tbody></table></div>
 <h3 id="in-approvazioni-programmazione-regole-assistente-e-simulatore-3fa34b3c">In Approvazioni, Programmazione, Regole, Assistente e Simulatore</h3>
+<p class="lead"><strong>I messaggi delle pagine dell&#x27;appartamento.</strong></p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
@@ -3687,49 +3878,66 @@ dell&#x27;email di chi comanda.</p>
 <tr><td data-label="Cosa vedi" class="align-left">«L&#x27;orario deve essere nel futuro»</td><td data-label="Cosa significa" class="align-left">L&#x27;orario scelto è passato</td><td data-label="Cosa fare" class="align-left">Scegli un orario futuro</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Azione programmata inesistente», «L&#x27;azione è già stata eseguita o annullata»</td><td data-label="Cosa significa" class="align-left">La voce non è più in programma</td><td data-label="Cosa fare" class="align-left">Rileggi l&#x27;elenco</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Valore fuori dai limiti (…–…)», ««…»: … deve essere tra … e …»</td><td data-label="Cosa significa" class="align-left">Un valore della regola è fuori dai limiti</td><td data-label="Cosa fare" class="align-left">Correggi il valore</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Il minimo non può superare il massimo», «La temperatura eco non può superare quella comfort», «La temperatura di raffrescamento deve essere più alta di quella comfort»</td><td data-label="Cosa significa" class="align-left">Le temperature non sono coerenti</td><td data-label="Cosa fare" class="align-left">Correggi i valori</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il minimo non può superare il massimo»</td><td data-label="Cosa significa" class="align-left">Le temperature non sono coerenti</td><td data-label="Cosa fare" class="align-left">Correggi i valori</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«La temperatura eco non può superare quella comfort», «La temperatura di raffrescamento deve essere più alta di quella comfort»</td><td data-label="Cosa significa" class="align-left">Le temperature non sono coerenti</td><td data-label="Cosa fare" class="align-left">Correggi i valori</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«La regola «…» non è modificabile»</td><td data-label="Cosa significa" class="align-left">Regola fissata dal sistema</td><td data-label="Cosa fare" class="align-left">Non si cambia dall&#x27;app</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Salva o annulla prima le modifiche fatte a mano»</td><td data-label="Cosa significa" class="align-left">Hai modifiche non salvate nella pagina Regole</td><td data-label="Cosa fare" class="align-left">«Salva le modifiche» o «Annulla le modifiche», poi «Applica»</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Le regole sono cambiate nel frattempo: rifai la richiesta», «Le regole dell&#x27;appartamento di partenza sono cambiate: rifai l&#x27;anteprima»</td><td data-label="Cosa significa" class="align-left">Qualcuno ha cambiato le regole</td><td data-label="Cosa fare" class="align-left">Rifai la proposta o l&#x27;anteprima</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Le regole sono già così: non c&#x27;è niente da cambiare»</td><td data-label="Cosa significa" class="align-left">La proposta non cambia nulla</td><td data-label="Cosa fare" class="align-left">Niente da fare</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Al massimo 500 caratteri», «Scrivi che cosa vuoi cambiare», «Scrivi una richiesta», «text obbligatorio, massimo 500 caratteri»</td><td data-label="Cosa significa" class="align-left">Testo vuoto o troppo lungo</td><td data-label="Cosa fare" class="align-left">Scrivi una frase più corta</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Al massimo 500 caratteri», «Scrivi che cosa vuoi cambiare»</td><td data-label="Cosa significa" class="align-left">Testo vuoto o troppo lungo</td><td data-label="Cosa fare" class="align-left">Scrivi una frase più corta</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Scrivi una richiesta», «text obbligatorio, massimo 500 caratteri»</td><td data-label="Cosa significa" class="align-left">Testo vuoto o troppo lungo</td><td data-label="Cosa fare" class="align-left">Scrivi una frase più corta</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Hai già chiesto 20 proposte oggi per questo appartamento: riprova domani o cambia le regole a mano»</td><td data-label="Cosa significa" class="align-left">Limite giornaliero delle proposte</td><td data-label="Cosa fare" class="align-left">Cambia la regola a mano o riprova domani</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«L&#x27;assistente non ha risposto in tempo: riprova con una frase più breve, oppure cambia la regola a mano qui sotto.»</td><td data-label="Cosa significa" class="align-left">Il modello non ha risposto in tempo</td><td data-label="Cosa fare" class="align-left">Riprova con una frase più breve</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Nessuna risposta dall&#x27;assistente: riprova», «Non sono riuscito a rispondere in tempo: riprova, oppure fai dall&#x27;app.», «L&#x27;assistente non è disponibile ora, riprova più tardi», «Non sono riuscito a rispondere: riprova.»</td><td data-label="Cosa significa" class="align-left">L&#x27;assistente non ha risposto</td><td data-label="Cosa fare" class="align-left">Riprova o usa i comandi dell&#x27;app</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Risposta rapida: l&#x27;assistente completo non ha risposto in tempo.», «… non è raggiungibile ora.», «… ha raggiunto il limite mensile.» (in fondo alla risposta)</td><td data-label="Cosa significa" class="align-left">Ha risposto il sistema da solo: solo un comando semplice è stato eseguito</td><td data-label="Cosa fare" class="align-left">Per comandi complessi usa i pulsanti dell&#x27;app; riprova più tardi per le domande</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Nessuna risposta dall&#x27;assistente: riprova», «Non sono riuscito a rispondere in tempo: riprova, oppure fai dall&#x27;app.»</td><td data-label="Cosa significa" class="align-left">L&#x27;assistente non ha risposto</td><td data-label="Cosa fare" class="align-left">Riprova o usa i comandi dell&#x27;app</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«L&#x27;assistente non è disponibile ora, riprova più tardi», «Non sono riuscito a rispondere: riprova.»</td><td data-label="Cosa significa" class="align-left">L&#x27;assistente non ha risposto</td><td data-label="Cosa fare" class="align-left">Riprova o usa i comandi dell&#x27;app</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Risposta rapida: l&#x27;assistente completo non ha risposto in tempo.» (in fondo alla risposta)</td><td data-label="Cosa significa" class="align-left">Ha risposto il sistema da solo: solo un comando semplice è stato eseguito</td><td data-label="Cosa fare" class="align-left">Per comandi complessi usa i pulsanti dell&#x27;app; riprova più tardi per le domande</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«… non è raggiungibile ora.», «… ha raggiunto il limite mensile.» (le altre due varianti della risposta rapida)</td><td data-label="Cosa significa" class="align-left">Ha risposto il sistema da solo: solo un comando semplice è stato eseguito</td><td data-label="Cosa fare" class="align-left">Per comandi complessi usa i pulsanti dell&#x27;app; riprova più tardi per le domande</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Limite di … domande al giorno raggiunto per questo appartamento: riprova domani.»</td><td data-label="Cosa significa" class="align-left">Limite giornaliero dell&#x27;assistente</td><td data-label="Cosa fare" class="align-left">Usa i comandi dell&#x27;app</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Limite mensile raggiunto, riprova dal mese prossimo»</td><td data-label="Cosa significa" class="align-left">Tetto di spesa del servizio raggiunto</td><td data-label="Cosa fare" class="align-left">Usa i comandi dell&#x27;app; HQE riceve un&#x27;email</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Nessun altro appartamento nella tua organizzazione», «Scegli almeno un appartamento di destinazione», «Al massimo 100 appartamenti alla volta», «Solo gli amministratori possono copiare le regole»</td><td data-label="Cosa significa" class="align-left">Condizioni della copia delle regole</td><td data-label="Cosa fare" class="align-left">Correggi la scelta</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Nessun altro appartamento nella tua organizzazione», «Scegli almeno un appartamento di destinazione»</td><td data-label="Cosa significa" class="align-left">Condizioni della copia delle regole</td><td data-label="Cosa fare" class="align-left">Correggi la scelta</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Al massimo 100 appartamenti alla volta», «Solo gli amministratori possono copiare le regole»</td><td data-label="Cosa significa" class="align-left">Condizioni della copia delle regole</td><td data-label="Cosa fare" class="align-left">Correggi la scelta</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Il simulatore è riservato agli amministratori», «Questo appartamento non è un dimostrativo»</td><td data-label="Cosa significa" class="align-left">Il Simulatore non è disponibile qui</td><td data-label="Cosa fare" class="align-left">Solo amministratori, solo dimostrativi</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Il check-out deve essere successivo al check-in»</td><td data-label="Cosa significa" class="align-left">Date della prenotazione di prova invertite</td><td data-label="Cosa fare" class="align-left">Correggi le date</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Nessun apparecchio con misuratore da proporre nell&#x27;appartamento»</td><td data-label="Cosa significa" class="align-left">Nessun apparecchio adatto alla prova</td><td data-label="Cosa fare" class="align-left">Usa un altro dimostrativo</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Il ripristino è disponibile solo con il motore simulato integrato.»</td><td data-label="Cosa significa" class="align-left">Il ripristino non è possibile su un sistema vero</td><td data-label="Cosa fare" class="align-left">Nessuna azione</td></tr>
 </tbody></table></div>
 <h3 id="in-amministrazione-e-organizzazioni-bcc2c37a">In Amministrazione e Organizzazioni</h3>
+<p class="lead"><strong>I messaggi delle pagine di gestione.</strong></p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
 <tr><td data-label="Cosa vedi" class="align-left">«È già un utente della tua organizzazione», «Questa email non può essere invitata»</td><td data-label="Cosa significa" class="align-left">La persona è già dentro, oppure è di HQE</td><td data-label="Cosa fare" class="align-left">Non invitare; per HQE serve la procedura tecnica</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Gli amministratori vedono sempre tutti gli appartamenti»</td><td data-label="Cosa significa" class="align-left">Non si limitano gli appartamenti di un amministratore</td><td data-label="Cosa fare" class="align-left">Cambia ruolo se serve</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Utente inesistente», «L&#x27;utente ha già effettuato l&#x27;accesso»</td><td data-label="Cosa significa" class="align-left">Il reinvio non è possibile</td><td data-label="Cosa fare" class="align-left">Rileggi l&#x27;elenco</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Non puoi togliere a te stesso il ruolo di amministratore», «Non puoi eliminare il tuo stesso account», «Deve restare almeno un amministratore nell&#x27;organizzazione»</td><td data-label="Cosa significa" class="align-left">Protezioni sul proprio ruolo e sull&#x27;ultimo amministratore</td><td data-label="Cosa fare" class="align-left">Chiedi a un altro amministratore</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Ruolo non aggiornato, riprova tra poco», «Rimozione non riuscita, riprova tra poco», «Eliminazione non riuscita, riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Errore passeggero</td><td data-label="Cosa fare" class="align-left">Riprova</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Fuso orario non valido», «Funzione sconosciuta», «Appartamento inesistente: …»</td><td data-label="Cosa significa" class="align-left">Dati non validi</td><td data-label="Cosa fare" class="align-left">Correggi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Non puoi togliere a te stesso il ruolo di amministratore», «Non puoi eliminare il tuo stesso account»</td><td data-label="Cosa significa" class="align-left">Protezioni sul proprio ruolo</td><td data-label="Cosa fare" class="align-left">Chiedi a un altro amministratore</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Deve restare almeno un amministratore nell&#x27;organizzazione»</td><td data-label="Cosa significa" class="align-left">Protezione sull&#x27;ultimo amministratore</td><td data-label="Cosa fare" class="align-left">Chiedi a un altro amministratore</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Ruolo non aggiornato, riprova tra poco», «Rimozione non riuscita, riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Errore passeggero</td><td data-label="Cosa fare" class="align-left">Riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Eliminazione non riuscita, riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Errore passeggero</td><td data-label="Cosa fare" class="align-left">Riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Fuso orario non valido», «Funzione sconosciuta»</td><td data-label="Cosa significa" class="align-left">Dati non validi</td><td data-label="Cosa fare" class="align-left">Correggi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Appartamento inesistente: …»</td><td data-label="Cosa significa" class="align-left">Dati non validi</td><td data-label="Cosa fare" class="align-left">Correggi</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Prezzo non valido: da 0 a 10 € al kWh, al massimo 4 decimali»</td><td data-label="Cosa significa" class="align-left">Prezzo fuori formato</td><td data-label="Cosa fare" class="align-left">Scrivi per esempio 0,25</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Chiave del sistema domotico non configurata: contatta l&#x27;assistenza HQE»</td><td data-label="Cosa significa" class="align-left">Manca la chiave del sistema domotico</td><td data-label="Cosa fare" class="align-left">Avvisa l&#x27;assistenza</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Scrivi il nome dell&#x27;organizzazione», «Esiste già un&#x27;organizzazione con questo nome», «Organizzazione inesistente»</td><td data-label="Cosa significa" class="align-left">Nome mancante, duplicato o organizzazione non trovata</td><td data-label="Cosa fare" class="align-left">Correggi</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«L&#x27;organizzazione è già sospesa», «L&#x27;organizzazione non è sospesa», «Scrivi il motivo della sospensione»</td><td data-label="Cosa significa" class="align-left">Stato o motivo non coerenti</td><td data-label="Cosa fare" class="align-left">Rileggi la scheda</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«La durata va da 1 a 24 ore», «Scrivi il motivo dell&#x27;accesso di assistenza», «L&#x27;organizzazione è sospesa», «Hai già un accesso di assistenza aperto in questa organizzazione», «Accesso non aperto: riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Condizioni dell&#x27;accesso di assistenza</td><td data-label="Cosa fare" class="align-left">Correggi o riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Scrivi il nome dell&#x27;organizzazione», «Esiste già un&#x27;organizzazione con questo nome»</td><td data-label="Cosa significa" class="align-left">Nome mancante o duplicato</td><td data-label="Cosa fare" class="align-left">Correggi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Organizzazione inesistente»</td><td data-label="Cosa significa" class="align-left">Organizzazione non trovata</td><td data-label="Cosa fare" class="align-left">Correggi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«L&#x27;organizzazione è già sospesa», «L&#x27;organizzazione non è sospesa»</td><td data-label="Cosa significa" class="align-left">Stato non coerente</td><td data-label="Cosa fare" class="align-left">Rileggi la scheda</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Scrivi il motivo della sospensione»</td><td data-label="Cosa significa" class="align-left">Manca il motivo</td><td data-label="Cosa fare" class="align-left">Rileggi la scheda</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«La durata va da 1 a 24 ore», «Scrivi il motivo dell&#x27;accesso di assistenza»</td><td data-label="Cosa significa" class="align-left">Condizioni dell&#x27;accesso di assistenza</td><td data-label="Cosa fare" class="align-left">Correggi o riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«L&#x27;organizzazione è sospesa», «Hai già un accesso di assistenza aperto in questa organizzazione»</td><td data-label="Cosa significa" class="align-left">Condizioni dell&#x27;accesso di assistenza</td><td data-label="Cosa fare" class="align-left">Correggi o riprova</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Accesso non aperto: riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Condizioni dell&#x27;accesso di assistenza</td><td data-label="Cosa fare" class="align-left">Correggi o riprova</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Accesso di assistenza inesistente»</td><td data-label="Cosa significa" class="align-left">L&#x27;accesso è già chiuso</td><td data-label="Cosa fare" class="align-left">Niente da fare</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Identificativo non disponibile», «Collegamento già usato da un altro appartamento», «Codice Italianway già in uso»</td><td data-label="Cosa significa" class="align-left">Valori già usati o non riusabili</td><td data-label="Cosa fare" class="align-left">Scegli valori diversi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Identificativo non disponibile», «Collegamento già usato da un altro appartamento»</td><td data-label="Cosa significa" class="align-left">Valori già usati o non riusabili</td><td data-label="Cosa fare" class="align-left">Scegli valori diversi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Codice Italianway già in uso»</td><td data-label="Cosa significa" class="align-left">Valori già usati o non riusabili</td><td data-label="Cosa fare" class="align-left">Scegli valori diversi</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi mock://builtin nel campo Indirizzo del sistema domotico»</td><td data-label="Cosa significa" class="align-left">Collegamento scritto male o non ammesso</td><td data-label="Cosa fare" class="align-left">Correggi il collegamento</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Ha già il ruolo di gestore della piattaforma», «Non è un gestore della piattaforma», «È l&#x27;ultimo gestore della piattaforma: nomina prima qualcun altro»</td><td data-label="Cosa significa" class="align-left">Condizioni sui gestori</td><td data-label="Cosa fare" class="align-left">Rileggi l&#x27;elenco</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Ha già il ruolo di gestore della piattaforma», «Non è un gestore della piattaforma»</td><td data-label="Cosa significa" class="align-left">Condizioni sui gestori</td><td data-label="Cosa fare" class="align-left">Rileggi l&#x27;elenco</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«È l&#x27;ultimo gestore della piattaforma: nomina prima qualcun altro»</td><td data-label="Cosa significa" class="align-left">Condizioni sui gestori</td><td data-label="Cosa fare" class="align-left">Rileggi l&#x27;elenco</td></tr>
 </tbody></table></div>
 <h3 id="nelle-impostazioni-e-nelle-notifiche-306f090d">Nelle Impostazioni e nelle notifiche</h3>
+<p class="lead"><strong>I messaggi di account, password e notifiche.</strong></p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
-<tr><td data-label="Cosa vedi" class="align-left">«La password deve avere almeno … caratteri», «Le due password non coincidono», «Password troppo debole: usa almeno 8 caratteri»</td><td data-label="Cosa significa" class="align-left">La nuova password non va bene</td><td data-label="Cosa fare" class="align-left">Scegline una più lunga e ripetila uguale</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«La password deve avere almeno … caratteri», «Le due password non coincidono»</td><td data-label="Cosa significa" class="align-left">La nuova password non va bene</td><td data-label="Cosa fare" class="align-left">Scegline una più lunga e ripetila uguale</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Password troppo debole: usa almeno 8 caratteri»</td><td data-label="Cosa significa" class="align-left">La nuova password non va bene</td><td data-label="Cosa fare" class="align-left">Scegline una più lunga e ripetila uguale</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Password attuale non corretta»</td><td data-label="Cosa significa" class="align-left">Hai sbagliato la password attuale</td><td data-label="Cosa fare" class="align-left">Riprova</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Questa email è già usata da un altro account»</td><td data-label="Cosa significa" class="align-left">Il nuovo indirizzo è di un altro account</td><td data-label="Cosa fare" class="align-left">Usa un altro indirizzo</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Per sicurezza esci e accedi di nuovo, poi riprova»</td><td data-label="Cosa significa" class="align-left">L&#x27;operazione richiede un accesso recente</td><td data-label="Cosa fare" class="align-left">«Esci», accedi e riprova</td></tr>
@@ -3742,6 +3950,7 @@ dell&#x27;email di chi comanda.</p>
 </section>
 <section aria-labelledby="12-parole-usate-in-questa-guida-444da206">
 <h2 id="12-parole-usate-in-questa-guida-444da206">12. Parole usate in questa guida</h2>
+<p class="lead"><strong>Il significato delle parole ricorrenti, in ordine alfabetico.</strong></p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Parola</th><th scope="col" class="align-left">Che cosa vuol dire</th></tr></thead>
 <tbody>
@@ -3792,48 +4001,61 @@ dell&#x27;email di chi comanda.</p>
 </section>
 <section aria-labelledby="13-segnalare-un-problema-c20ae451">
 <h2 id="13-segnalare-un-problema-c20ae451">13. Segnalare un problema</h2>
+<p class="lead"><strong>Che cosa annotare e a chi mandarlo.</strong></p>
 <p>Per ogni problema annota:</p>
 <ol>
 <li>
-<p>cosa stavi facendo, passo per passo;</p>
+<p><strong>Cosa stavi facendo</strong>, passo per passo.</p>
 </li>
 <li>
-<p>cosa ti aspettavi e cosa è successo, con il testo esatto dell&#x27;avviso;</p>
+<p><strong>Cosa ti aspettavi e cosa è successo</strong>, con il testo esatto dell&#x27;avviso.</p>
 </li>
 <li>
-<p>l&#x27;«ID richiesta», se compare (o il «Codice» della pagina di accesso);</p>
+<p><strong>L&#x27;«ID richiesta»</strong>, se compare (o il «Codice» della pagina di accesso).</p>
 </li>
 <li>
-<p>dispositivo e browser (per esempio «iPhone, Safari» o «PC, Chrome»), data e ora;</p>
+<p><strong>Dispositivo e browser</strong> (per esempio «iPhone, Safari» o «PC, Chrome»), data e ora.</p>
 </li>
 <li>
-<p>una schermata, se possibile.</p>
+<p><strong>Una schermata</strong>, se possibile.</p>
 </li>
 </ol>
+<blockquote class="note-info">
+<p><strong>Da sapere</strong></p>
 <p>Manda tutto a <strong>operations@hqe.it</strong>, l&#x27;indirizzo dell&#x27;assistenza HQE.</p>
+</blockquote>
 </section>
 <section aria-labelledby="14-novita-710a48f5">
 <h2 id="14-novita-710a48f5">14. Novità</h2>
+<p class="lead"><strong>Che cosa è cambiato, aggiornamento per aggiornamento.</strong></p>
 <h3 id="23-ottobre-2026-lotto-32-29ee2934">23 ottobre 2026 (lotto 32)</h3>
+<p class="lead"><strong>Dimostrativi nel sito vero, «sistema domotico» ovunque, interfaccia ripulita.</strong></p>
 <ul>
 <li>
 <p><strong>Dimostrativi anche nel sito vero</strong>: fino alla consegna al cliente, gli appartamenti dimostrativi con il motore
 simulato integrato sono ammessi anche nel sito vero, non solo nell&#x27;ambiente di prova.</p>
 </li>
 <li>
-<p><strong>«Sistema domotico» al posto di «istanza»</strong>, ovunque nell&#x27;app: «Sistema domotico non raggiungibile», «Dispositivi e
-sistema domotico offline», «Indirizzo del sistema domotico», «Appartamento dimostrativo», «Funzione non disponibile
-per questo appartamento», «Nessun dispositivo in questo appartamento».</p>
+<p><strong>«Sistema domotico» al posto di «istanza»</strong>, ovunque nell&#x27;app: «Sistema domotico non raggiungibile», «Dispositivi
+e sistema domotico offline», «Indirizzo del sistema domotico».</p>
+</li>
+<li>
+<p><strong>E anche</strong>: «Appartamento dimostrativo», «Funzione non disponibile per questo appartamento», «Nessun dispositivo in
+questo appartamento».</p>
 </li>
 <li>
 <p><strong>Stati con l&#x27;iniziale maiuscola</strong>: «In attesa», «Approvata», «Respinta», «Scaduta», «Applicata», «Non riuscita»,
-«In programma», «Eseguita», «Risposto», «Richiede approvazione», «Vuoto», «Occupato», «Prenotato», come «In salute»
-e «Online».</p>
+«In programma», «Eseguita».</p>
 </li>
 <li>
-<p><strong>Interfaccia ripulita</strong>: pulsante principale scuro, meno effetti, testi più leggibili sul telefono. Via la riga
-«Ambiente» dalle Impostazioni, il piè di pagina della pagina di accesso e i codici inglesi in Amministrazione ›
-Funzioni: le funzioni si leggono con i nomi del menu.</p>
+<p><strong>E anche</strong>: «Risposto», «Richiede approvazione», «Vuoto», «Occupato», «Prenotato», come «In salute» e «Online».</p>
+</li>
+<li>
+<p><strong>Interfaccia ripulita</strong>: pulsante principale scuro, meno effetti, testi più leggibili sul telefono.</p>
+</li>
+<li>
+<p><strong>Via</strong> la riga «Ambiente» dalle Impostazioni, il piè di pagina della pagina di accesso e i codici inglesi in
+Amministrazione › Funzioni: le funzioni si leggono con i nomi del menu.</p>
 </li>
 <li>
 <p><strong>Nome del gestore</strong>: si aggiorna subito, anche durante un accesso di assistenza.</p>
@@ -3846,11 +4068,14 @@ Funzioni: le funzioni si leggono con i nomi del menu.</p>
 </li>
 </ul>
 <h3 id="23-ottobre-2026-lotto-31-c5c88374">23 ottobre 2026 (lotto 31)</h3>
+<p class="lead"><strong>Limiti del setpoint con effetto, fuso orario sul motore, scheda Assistente.</strong></p>
 <ul>
 <li>
 <p><strong>«Limiti del setpoint» con effetto</strong>: acceso, clima e caldaia restano fra il minimo e il massimo scelti, dentro i
-limiti del dispositivo; spento, valgono solo quelli del dispositivo; l&#x27;antigelo non li segue. I pulsanti «−» e «+»
-della temperatura non escono mai dai limiti.</p>
+limiti del dispositivo; spento, valgono solo quelli del dispositivo; l&#x27;antigelo non li segue.</p>
+</li>
+<li>
+<p><strong>I pulsanti «−» e «+»</strong> della temperatura non escono mai dai limiti.</p>
 </li>
 <li>
 <p><strong>Antimuffa</strong>: la descrizione dice quello che fa davvero, un avviso al giorno nelle Decisioni.</p>
@@ -3861,24 +4086,29 @@ dell&#x27;organizzazione lo annota.</p>
 </li>
 <li>
 <p><strong>Amministrazione › Assistente</strong>: le domande all&#x27;assistente settimana per settimana (da lunedì a domenica), quante
-senza risposta in tempo dall&#x27;assistente completo, quante con una risposta rapida e per quale causa; le righe sopra
-il 10 % sono in giallo; con due settimane complete di fila sopra la soglia compare l&#x27;avviso che va riaperta la
-scelta del modello.</p>
+senza risposta in tempo dall&#x27;assistente completo, quante con una risposta rapida e per quale causa.</p>
+</li>
+<li>
+<p><strong>Nella stessa scheda</strong> le righe sopra il 10 % sono in giallo; con due settimane complete di fila sopra la soglia
+compare l&#x27;avviso che va riaperta la scelta del modello.</p>
 </li>
 <li>
 <p><strong>Gestore della piattaforma senza organizzazione</strong>: salva il nome ed esce da tutti i dispositivi senza errori.</p>
 </li>
 </ul>
 <h3 id="22-ottobre-2026-lotto-30-c86c6882">22 ottobre 2026 (lotto 30)</h3>
+<p class="lead"><strong>Temperature delle modalità regolabili, clima regolato in continuo, assistente più solido.</strong></p>
 <ul>
 <li>
 <p><strong>Temperature delle modalità regolabili</strong> per appartamento, nella regola «Limiti del setpoint»: «Temperatura in
-comfort (°C)», «Temperatura in eco (°C)», «Raffrescamento in comfort (°C)»; i valori incoerenti vengono segnalati anche
-prima del salvataggio.</p>
+comfort (°C)», «Temperatura in eco (°C)», «Raffrescamento in comfort (°C)».</p>
 </li>
 <li>
-<p><strong>Clima in comfort regolato in continuo</strong>: con il sensore della stanza il climatizzatore scalda o raffresca da solo,
-ogni minuto, mai contro un comando di una persona; senza sensore «Regolazione automatica disattivata».</p>
+<p><strong>I valori incoerenti</strong> vengono segnalati anche prima del salvataggio.</p>
+</li>
+<li>
+<p><strong>Clima in comfort regolato in continuo</strong>: con il sensore della stanza il climatizzatore scalda o raffresca da
+solo, ogni minuto, mai contro un comando di una persona; senza sensore «Regolazione automatica disattivata».</p>
 </li>
 <li>
 <p><strong>Caldaia senza sensore</strong>: non si accende più da sola; a casa vuota «Antigelo non attivo» con notifica.</p>
@@ -3888,8 +4118,11 @@ ogni minuto, mai contro un comando di una persona; senza sensore «Regolazione a
 </li>
 <li>
 <p><strong>Assistente più solido</strong>: il modello propone le azioni in una forma controllata e il sistema le verifica una per
-una; se il modello non risponde, una «Risposta rapida» esegue solo i comandi semplici e inequivocabili. Il modello
-lavora soltanto in Europa.</p>
+una.</p>
+</li>
+<li>
+<p><strong>Risposta rapida</strong>: se il modello non risponde, una «Risposta rapida» esegue solo i comandi semplici e
+inequivocabili. Il modello lavora soltanto in Europa.</p>
 </li>
 <li>
 <p><strong>Il tuo nome nel menu</strong>, in grassetto, con sotto l&#x27;email.</p>
@@ -3901,8 +4134,8 @@ lavora soltanto in Europa.</p>
 <p><strong>Due registri con nomi diversi</strong>: «Registro dell&#x27;organizzazione» e «Registro della piattaforma».</p>
 </li>
 <li>
-<p><strong>Proposte delle regole</strong>: l&#x27;assistente capisce «comfort 22», «eco 17», «raffrescamento 26»; «temperatura 22» da sola
-chiede quale temperatura.</p>
+<p><strong>Proposte delle regole</strong>: l&#x27;assistente capisce «comfort 22», «eco 17», «raffrescamento 26»; «temperatura 22» da
+sola chiede quale temperatura.</p>
 </li>
 <li>
 <p><strong>Simulatore</strong>: ripremere «Invia evento» senza cambiare nulla mostra «Evento già elaborato (idempotente)».</p>
@@ -3911,67 +4144,76 @@ chiede quale temperatura.</p>
 <p><strong>«Casa vuota»</strong>: la modalità si chiama così (prima «vuoto»); «vuoto» è l&#x27;occupazione.</p>
 </li>
 <li>
-<p><strong>Assistente</strong>: dopo «Sì» o «No» la chat dice com&#x27;è andata; riaprendo, «Approvata da te alle …» o «Respinta da te alle
-…»; «Già decisa» solo se ha deciso un&#x27;altra persona.</p>
+<p><strong>Assistente</strong>: dopo «Sì» o «No» la chat dice com&#x27;è andata; riaprendo, «Approvata da te alle …» o «Respinta da te
+alle …»; «Già decisa» solo se ha deciso un&#x27;altra persona.</p>
 </li>
 </ul>
 <h3 id="20-e-21-ottobre-2026-1697c04d">20 e 21 ottobre 2026</h3>
+<p class="lead"><strong>Regole complete, decisioni in italiano, consumi veri, riepilogo settimanale.</strong></p>
 <ul>
 <li>
-<p>Regole complete (otto regole con interruttore e valori); caldaia con «Riscaldamento abilitato» / «Riscaldamento
-disabilitato», «sta scaldando ora» e termostato automatico; avviso prima di forzare con finestra aperta.</p>
+<p><strong>Regole complete</strong> (otto regole con interruttore e valori).</p>
 </li>
 <li>
-<p>Decisioni con il tipo di azione in italiano e i tipi «Collegamento ai dispositivi perso», «Collegamento ai
+<p><strong>Caldaia</strong> con «Riscaldamento abilitato» / «Riscaldamento disabilitato», «sta scaldando ora» e termostato
+automatico; avviso prima di forzare con finestra aperta.</p>
+</li>
+<li>
+<p><strong>Decisioni</strong> con il tipo di azione in italiano e i tipi «Collegamento ai dispositivi perso», «Collegamento ai
 dispositivi ripristinato», «Comando non verificato: misuratore offline».</p>
 </li>
 <li>
-<p>Comandi del climatizzatore confermati dal misuratore; approvazioni automatiche «Mettere l&#x27;appartamento a vuoto dopo il
-check-out» e «Spegnere …»; notifiche «Prenotazioni».</p>
+<p><strong>Comandi del climatizzatore</strong> confermati dal misuratore.</p>
 </li>
 <li>
-<p>Consumi veri ora per ora con «Consumi disponibili dal …»; Simulatore con «Misuratore clima» e «Simula movimento».</p>
+<p><strong>Approvazioni automatiche</strong> «Mettere l&#x27;appartamento a vuoto dopo il check-out» e «Spegnere …»; notifiche
+«Prenotazioni».</p>
 </li>
 <li>
-<p>Riepilogo settimanale ogni lunedì con la pagina «Riepiloghi» e la notifica «Riepilogo».</p>
+<p><strong>Consumi veri</strong> ora per ora con «Consumi disponibili dal …»; Simulatore con «Misuratore clima» e «Simula
+movimento».</p>
 </li>
 <li>
-<p>Assistente vero che legge stati, consumi e Decisioni; ambiente di prova separato con la fascia gialla.</p>
+<p><strong>Riepilogo settimanale</strong> ogni lunedì con la pagina «Riepiloghi» e la notifica «Riepilogo».</p>
 </li>
 <li>
-<p>Regole proposte dall&#x27;assistente nella pagina Regole; copia delle regole su altri appartamenti; «Minuti di presenza
-dopo il check-out».</p>
+<p><strong>Assistente vero</strong> che legge stati, consumi e Decisioni; ambiente di prova separato con la fascia gialla.</p>
 </li>
 <li>
-<p>Schede degli appartamenti tutte nello schermo del telefono.</p>
+<p><strong>Regole proposte dall&#x27;assistente</strong> nella pagina Regole; copia delle regole su altri appartamenti; «Minuti di
+presenza dopo il check-out».</p>
+</li>
+<li>
+<p><strong>Schede degli appartamenti</strong> tutte nello schermo del telefono.</p>
 </li>
 </ul>
 <h3 id="16-ottobre-2026-2072b69c">16 ottobre 2026</h3>
+<p class="lead"><strong>Organizzazioni, ruoli, privacy e dimostrativi.</strong></p>
 <ul>
 <li>
-<p>Organizzazioni: più organizzazioni separate, gestite dal gestore della piattaforma (HQE); codice Italianway e nome
-dell&#x27;organizzazione solo da HQE; nuovi appartamenti solo da HQE, anche nell&#x27;ambiente di prova.</p>
+<p><strong>Organizzazioni</strong>: più organizzazioni separate, gestite dal gestore della piattaforma (HQE); codice Italianway e
+nome dell&#x27;organizzazione solo da HQE; nuovi appartamenti solo da HQE, anche nell&#x27;ambiente di prova.</p>
 </li>
 <li>
-<p>Cambio di ruolo con uscita da tutti i dispositivi entro un minuto; notifiche su dispositivo condiviso al sicuro;
-notifiche riattivate al rientro.</p>
+<p><strong>Cambio di ruolo</strong> con uscita da tutti i dispositivi entro un minuto; notifiche su dispositivo condiviso al
+sicuro; notifiche riattivate al rientro.</p>
 </li>
 <li>
-<p>«Elimina il mio account» cancella davvero l&#x27;accesso; non per l&#x27;ultimo amministratore né per l&#x27;ultimo gestore.</p>
+<p><strong>«Elimina il mio account»</strong> cancella davvero l&#x27;accesso; non per l&#x27;ultimo amministratore né per l&#x27;ultimo gestore.</p>
 </li>
 <li>
-<p>Nome dell&#x27;app DOMHOUSE; barra laterale con i ruoli; menu a tre righe sul telefono.</p>
+<p><strong>Nome dell&#x27;app DOMHOUSE</strong>; barra laterale con i ruoli; menu a tre righe sul telefono.</p>
 </li>
 <li>
-<p>«Prenotazioni ricevute» e «Prenotazioni non attribuite»; registro attività; sospensione delle organizzazioni; accesso
-di assistenza a tempo.</p>
+<p><strong>«Prenotazioni ricevute» e «Prenotazioni non attribuite»</strong>; registro attività; sospensione delle organizzazioni;
+accesso di assistenza a tempo.</p>
 </li>
 <li>
-<p>Privacy: «utente rimosso», codice anonimo al sistema domotico, nessun dato personale degli ospiti; conservazione dei
-dati a termine.</p>
+<p><strong>Privacy</strong>: «utente rimosso», codice anonimo al sistema domotico, nessun dato personale degli ospiti;
+conservazione dei dati a termine.</p>
 </li>
 <li>
-<p>Appartamenti dimostrativi con etichetta, Simulatore e ripristino; rendiconti Excel mensili e per soggiorno.</p>
+<p><strong>Appartamenti dimostrativi</strong> con etichetta, Simulatore e ripristino; rendiconti Excel mensili e per soggiorno.</p>
 </li>
 </ul>
 </section>
