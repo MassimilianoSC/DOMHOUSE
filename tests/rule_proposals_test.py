@@ -321,3 +321,11 @@ def test_d182_the_proposal_is_the_json_of_the_text():
     assert rp.from_answer(ans({"content": "Posso cambiare solo le regole."})) == (None, "Posso cambiare solo le regole.")
     assert rp.from_answer(ans({"tool_calls": [{"function": {"name": "proponi_modifiche", "arguments": json.dumps(rows)}}]}))[1] == "Dieci."
 
+
+
+def test_d187_the_explanation_uses_the_rules_names_not_their_codes():
+    """D-187: the proposal's explanation never cites the rules' internal codes: the prompt asks for the Italian names."""
+    from engine import core as engine_core
+    e = engine_core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
+    assert "4. Nella spiegazione non citare i codici interni delle regole (rule_id): usa i loro nomi in italiano." in \
+        rp.prompt(e.ruleset())

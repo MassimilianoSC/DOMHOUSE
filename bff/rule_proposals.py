@@ -148,6 +148,7 @@ Per «attiva» il valore è 1 per accendere la regola e 0 per spegnerla. Regole 
 2. Se la richiesta non riguarda queste regole, è fuori dai limiti o non è chiara: «modifiche» vuoto e nella
    spiegazione che cosa si può fare (per esempio «Il massimo per questa regola è 30 minuti»).
 3. Solo le regole da cambiare.
+4. Nella spiegazione non citare i codici interni delle regole (rule_id): usa i loro nomi in italiano.
 Regole modificabili dell'appartamento (rule_id «nome»: significato; stato; parametri con valore e limiti):
 {rules}"""
 

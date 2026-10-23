@@ -61,6 +61,7 @@ Regole fisse, sempre:
    azione. Di' solo che cosa hai chiesto di fare.
 3. Non inventare stati, valori o motivi: se lo stato qui sotto non li dice, rispondi «Non lo so» e rimanda all'app.
 4. Per le domande «perché …?» usa le decisioni recenti qui sotto e spiega con quelle.
+   Non citare codici interni delle regole (come window_open_off): usa i loro nomi in italiano, come nello stato.
 5. Puoi cambiare la modalità, comandare un dispositivo e programmare un'azione; non puoi cambiare regole, utenti o
    appartamenti. Per le regole rispondi che si scrive la richiesta nella pagina Regole dell'app, dove l'assistente
    propone la modifica e il gestore la conferma; per utenti e appartamenti, che si fa dall'app.
@@ -349,7 +350,7 @@ class Assistant:
         state = json.dumps(local_times({
             "appartamento": self.tool("leggi_appartamento", {}, []),
             **self.tool("leggi_dispositivi", {}, []),
-            "decisioni_recenti": self.tool("leggi_decisioni", {"quante": 10}, []).get("decisioni", []),
+            "decisioni_recenti": self.rule_names(self.tool("leggi_decisioni", {"quante": 10}, []).get("decisioni", [])),
             "programmazioni": self.tool("leggi_programmazioni", {}, []).get("programmazioni", [])}, tz),
             ensure_ascii=False, default=str)
         return [{"role": "system", "content": SYSTEM_PROMPT.format(now=now, tz=self.e.timezone, state=state)},
@@ -429,6 +430,18 @@ class Assistant:
             ask["answer"] = f"{self.state_text()} Per i comandi usa i pulsanti dell'app.\n{footer}"
         if ask["status"] == "pending":
             ask["status"] = "answered"
+
+    def rule_names(self, decisions: list[dict]) -> list[dict]:
+        """D-187: a decision of a rule shows its Italian name («regola «Finestra aperta spegne il clima»»), never its
+        internal code (rule:window_open_off): the model then has no code to cite."""
+        names = {r["rule_id"]: r["label"] for r in self.e.rules}
+        out = []
+        for d in decisions:
+            actor = d.get("actor") or ""
+            if actor.startswith("rule:"):
+                d = {**d, "actor": f"regola «{names.get(actor[5:], actor[5:])}»"}
+            out.append(d)
+        return out
 
     def state_text(self) -> str:
         """The apartment in plain words: mode, occupancy, what is on, the temperatures."""

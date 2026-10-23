@@ -499,3 +499,31 @@ def test_every_time_in_the_prompt_is_the_apartments_local_time():
     assert "usali così come sono,\nnon convertirli." in system
     assert assistant.local_times({"a": ["2026-10-22T13:00:00.000Z", "testo"]}, assistant.ZoneInfo("Europe/London")) == {
         "a": ["2026-10-22 14:00", "testo"]}
+
+
+def test_d187_the_rules_by_their_italian_names_never_their_codes():
+    """D-187: no internal codes of the rules (seen in the 3.6 flash): a rule's decision shows its Italian name and the
+    prompt asks for the names."""
+    e = engine(Script())
+    e.log("rule:window_open_off", {"type": "device", "device_id": CLIMA}, "turn_off", "on", "off",
+          "Finestra della camera aperta da 5 minuti con il clima acceso", "applied", CORR, emit=False)
+    system = assistant.Assistant(e, None).messages("perché si è spento il clima?")[0]["content"]
+    assert '"actor": "regola «Finestra aperta spegne il clima»"' in system and "rule:window_open_off" not in system
+    assert "Non citare codici interni delle regole (come window_open_off): usa i loro nomi in italiano" in system
+
+
+def test_e23_a_scheduled_command_with_every_field_at_the_local_hour():
+    """E-23 with the JSON the models write from today's prompt: «alle 18 metti il clima a 22 gradi» as a planned action
+    with every field (params on, mode, setpoint, fan); it is planned at 18:00 of the apartment, not two hours off."""
+    tz = assistant.ZoneInfo("Europe/Rome")
+    day = (core.utcnow() + timedelta(days=1)).astimezone(tz).date()
+    quando = f"{day.isoformat()}T18:00:00"
+    action = {"tipo": "programma", "quando": quando, "device_id": CLIMA, "capability": "climate",
+              "action": "set_climate", "params": {"on": True, "mode": "heat", "setpoint": 22, "fan": "auto"}}
+    e = engine(Script(js("Programmo il clima a 22 gradi per le 18.", action)))
+    a = ask(e, "domani alle 18 metti il clima a 22 gradi")
+    assert a["status"] == "answered" and a["actions"][0]["type"] == "schedule", a["answer"]
+    item = e.schedule[a["actions"][0]["schedule_id"]]
+    run_at = core.parse_dt(item["run_at"]).astimezone(tz)
+    assert (run_at.date(), run_at.hour, run_at.minute) == (day, 18, 0)
+    assert item["action"]["params"]["setpoint"] == 22 and "Non fatto" not in a["answer"]
