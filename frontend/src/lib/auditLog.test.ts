@@ -152,12 +152,12 @@ describe("prezzo dell'energia nel registro (P-52)", () => {
   });
 });
 
-describe("istanza simulata e ripristino nel registro (D-97)", () => {
+describe("appartamento dimostrativo e ripristino nel registro (D-97)", () => {
   const apt = { type: "apartment" as const, id: "apt-001", label: "Milano Centro" };
 
   it("segnato come simulato o reale", () => {
-    expect(sentence({ action: "apartment_simulated_changed", target: apt, details: { from: false, to: true } })).toBe("Anna Rossi ha segnato l'appartamento «Milano Centro» come istanza simulata");
-    expect(sentence({ action: "apartment_simulated_changed", target: apt, details: { from: true, to: false } })).toBe("Anna Rossi ha segnato l'appartamento «Milano Centro» come istanza reale");
+    expect(sentence({ action: "apartment_simulated_changed", target: apt, details: { from: false, to: true } })).toBe("Anna Rossi ha segnato l'appartamento «Milano Centro» come dimostrativo");
+    expect(sentence({ action: "apartment_simulated_changed", target: apt, details: { from: true, to: false } })).toBe("Anna Rossi ha segnato l'appartamento «Milano Centro» come reale");
   });
 
   it("ripristino dello stato iniziale", () => {

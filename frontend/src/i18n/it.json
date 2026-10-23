@@ -73,10 +73,10 @@
       "assistant": "assistente"
     },
     "status": {
-      "planned": "in programma",
-      "done": "eseguita",
-      "cancelled": "annullata",
-      "failed": "non riuscita"
+      "planned": "In programma",
+      "done": "Eseguita",
+      "cancelled": "Annullata",
+      "failed": "Non riuscita"
     }
   },
   "rules": {
@@ -192,10 +192,10 @@
       "assistant": "Assistente"
     },
     "status": {
-      "pending": "in attesa",
-      "approved": "approvata",
-      "rejected": "respinta",
-      "expired": "scaduta"
+      "pending": "In attesa",
+      "approved": "Approvata",
+      "rejected": "Respinta",
+      "expired": "Scaduta"
     }
   },
   "decisions": {
@@ -263,11 +263,11 @@
       "schedule": "programmazione"
     },
     "outcome": {
-      "applied": "applicata",
-      "rejected": "respinta",
+      "applied": "Applicata",
+      "rejected": "Respinta",
       "pending_approval": "in attesa di approvazione",
-      "failed": "non riuscita",
-      "informational": "informativa"
+      "failed": "Non riuscita",
+      "informational": "Informativa"
     }
   },
   "energy": {
@@ -362,15 +362,15 @@
       "boiler": "Spegni la caldaia"
     },
     "outcome": {
-      "approved": "approvata",
-      "rejected": "respinta",
-      "expired": "scaduta"
+      "approved": "Approvata",
+      "rejected": "Respinta",
+      "expired": "Scaduta"
     },
     "status": {
-      "pending": "in corso",
-      "answered": "risposto",
-      "needs_approval": "richiede approvazione",
-      "failed": "non riuscita"
+      "pending": "In corso",
+      "answered": "Risposto",
+      "needs_approval": "Richiede approvazione",
+      "failed": "Non riuscita"
     }
   },
   "login": {
@@ -402,8 +402,7 @@
     "resetSent": "Se {email} ha un account, riceverai a breve un'email con il link. Controlla anche lo spam.",
     "backToLogin": "Torna all'accesso",
     "verifySent": "Conferma il tuo indirizzo: abbiamo inviato un link a {email}. Aprilo e poi accedi di nuovo.",
-    "verifyFailed": "Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto.",
-    "footer": "contract 1.x · PWA"
+    "verifyFailed": "Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto."
   },
   "account": {
     "title": "Account",
@@ -477,9 +476,9 @@
     "apartmentMenu": "Menu appartamento"
   },
   "occupancy": {
-    "vacant": "vuoto",
-    "occupied": "occupato",
-    "reserved": "prenotato"
+    "vacant": "Vuoto",
+    "occupied": "Occupato",
+    "reserved": "Prenotato"
   },
   "mode": {
     "label": "Modalità",
@@ -525,7 +524,7 @@
   },
   "overview": {
     "devices": "Dispositivi",
-    "noDevices": "Nessun dispositivo su questa istanza",
+    "noDevices": "Nessun dispositivo in questo appartamento",
     "liveOn": "In tempo reale",
     "liveOff": "Riconnessione…",
     "checkin": "Check-in",
@@ -546,7 +545,7 @@
     "connected": "{count} dispositivi connessi",
     "contract": "Contratto",
     "model": "Modello",
-    "unreachable": "Istanza non raggiungibile",
+    "unreachable": "Sistema domotico non raggiungibile",
     "lastEvent": "Ultimo evento {when}"
   },
   "device": {
@@ -620,12 +619,12 @@
     }
   },
   "features": {
-    "unavailable": "Funzione non disponibile su questa istanza",
-    "unavailableHint": "Questa sezione non è attiva per l'appartamento o l'istanza non la implementa ancora."
+    "unavailable": "Funzione non disponibile per questo appartamento",
+    "unavailableHint": "Questa sezione non è attiva per l'appartamento, oppure il suo sistema domotico non la offre ancora."
   },
   "contract": {
     "incompatibleTitle": "Versione del contratto non compatibile",
-    "incompatible": "L'istanza dichiara il contratto {version}: questa app supporta solo la versione 1.x. Contatta il supporto tecnico."
+    "incompatible": "Il sistema domotico dichiara il contratto {version}: questa app supporta solo la versione 1.x. Contatta il supporto tecnico."
   },
   "phase": {
     "soon": "In arrivo",
@@ -647,7 +646,6 @@
     "installHint": "Aggiungi l'app alla schermata Home: si apre a schermo intero e riceve le notifiche.",
     "installBtn": "Installa",
     "installed": "App installata su questo dispositivo",
-    "env": "Ambiente",
     "notifications": {
       "title": "Notifiche",
       "devMode": "Modalità sviluppo: avvisi come toast nell'app",
@@ -670,8 +668,8 @@
       "saved": "Preferenze salvate",
       "approvals": "Approvazioni richieste",
       "approvalsHint": "Quando il motore chiede il tuo consenso",
-      "offline": "Dispositivi e istanza offline",
-      "offlineHint": "Dispositivo offline oltre la soglia della regola, istanza non raggiungibile, antigelo non attivo",
+      "offline": "Dispositivi e sistema domotico offline",
+      "offlineHint": "Dispositivo offline oltre la soglia della regola, sistema domotico non raggiungibile, antigelo non attivo",
       "bookings": "Prenotazioni",
       "bookingsHint": "Avvisi sulle prenotazioni che cambiano il programma dell'appartamento",
       "summary": "Riepilogo",
@@ -681,8 +679,8 @@
   "notify": {
     "approvalPending": "Nuova approvazione richiesta",
     "deviceOffline": "{name} è offline",
-    "instanceDown": "Istanza domotica non raggiungibile",
-    "instanceUp": "Istanza domotica di nuovo raggiungibile",
+    "instanceDown": "Sistema domotico non raggiungibile",
+    "instanceUp": "Sistema domotico di nuovo raggiungibile",
     "open": "Apri",
     "resumed": "Notifiche riattivate su questo dispositivo, come prima della tua uscita.",
     "resumeNoPermission": "Notifiche non riattivate: il browser non ne dà più il permesso. Puoi riattivarle da Impostazioni › Notifiche."
@@ -796,7 +794,7 @@
       "name": "Nome",
       "address": "Indirizzo",
       "timezone": "Fuso orario",
-      "instanceUrl": "URL istanza",
+      "instanceUrl": "Indirizzo del sistema domotico",
       "instanceUrlPlaceholder": "https://domotica.esempio.it",
       "instanceUrlHint": "Per un appartamento dimostrativo scrivi mock://builtin; per uno vero, l'indirizzo del suo motore",
       "instanceUrlHintMock": "In questo ambiente usa mock://builtin",
@@ -922,9 +920,9 @@
     "tabTenants": "Elenco organizzazioni",
     "tabManagers": "Gestori della piattaforma",
     "tabUnattributed": "Prenotazioni non attribuite",
-    "simulated": "Istanza simulata (appartamento dimostrativo)",
+    "simulated": "Appartamento dimostrativo",
     "simulatedHint": "Per prove e dimostrazioni: gli amministratori dell'organizzazione vedono il Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».",
-    "simulatedLocked": "Con il motore simulato integrato (mock://) l'istanza è sempre simulata.",
+    "simulatedLocked": "Con un indirizzo mock:// l'appartamento è sempre dimostrativo.",
     "suspend": "Sospendi",
     "reactivate": "Riattiva",
     "suspendedBadge": "Sospesa",
@@ -951,14 +949,14 @@
     "aptAddTitle": "Nuovo appartamento per {name}",
     "aptAddHint": "L'identificativo non si potrà più cambiare: usa minuscole, numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l'amministratore dell'organizzazione.",
     "aptCreated": "Appartamento {id} creato",
-    "aptKeyFirst": "Prima di usarlo: crea la chiave dell'istanza e poi premi Verifica connessione.",
+    "aptKeyFirst": "Prima di usarlo: crea la chiave del sistema domotico e poi premi Verifica connessione.",
     "aptEditConnection": "Modifica collegamento",
     "aptEditTitle": "Collegamento di «{name}»",
     "aptEditHint": "Qui cambi il collegamento al sistema domotico e il codice Italianway: nome, stato e funzioni dell'appartamento li gestisce l'amministratore dell'organizzazione.",
     "italianwayHint": "Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.",
     "aptSaved": "Collegamento aggiornato",
     "aptDelete": "Elimina",
-    "aptDeleteConfirm": "Eliminare l'appartamento {id} («{name}») dell'organizzazione {tenant}? Sparirà per tutti i suoi utenti. L'istanza domotica non viene toccata.",
+    "aptDeleteConfirm": "Eliminare l'appartamento {id} («{name}») dell'organizzazione {tenant}? Sparirà per tutti i suoi utenti. Il suo sistema domotico non viene toccato.",
     "aptDeleted": "Appartamento {id} eliminato",
     "aptEmpty": "Nessun appartamento in questa organizzazione",
     "unattributedHint": "Prenotazioni arrivate da Italianway che non si possono assegnare a nessuna organizzazione: codice Italianway sconosciuto o collegato a più appartamenti, firma non valida, formato non riconosciuto. Gli amministratori delle organizzazioni non le vedono."
@@ -1019,8 +1017,8 @@
     "notOpened": "L'accesso di assistenza a {target} non è stato aperto (errore)",
     "whereTenant": "dell'organizzazione {target}",
     "whereApartment": "dell'appartamento {target}",
-    "simulatedOn": "{actor} ha segnato l'appartamento {target} come istanza simulata",
-    "simulatedOff": "{actor} ha segnato l'appartamento {target} come istanza reale",
+    "simulatedOn": "{actor} ha segnato l'appartamento {target} come dimostrativo",
+    "simulatedOff": "{actor} ha segnato l'appartamento {target} come reale",
     "priceSet": "{actor} ha impostato il prezzo dell'energia {where} a {to} €/kWh",
     "priceChanged": "{actor} ha cambiato il prezzo dell'energia {where} da {from} a {to} €/kWh",
     "priceRemoved": "{actor} ha tolto il prezzo dell'energia {where}",
@@ -1055,7 +1053,7 @@
       "manager_removed": "{actor} ha tolto a {target} il ruolo di gestore della piattaforma",
       "account_deleted": "{actor} ha eliminato il proprio account",
       "energy_price_changed": "{actor} ha cambiato il prezzo dell'energia di {target}",
-      "apartment_simulated_changed": "{actor} ha cambiato il tipo di istanza dell'appartamento {target}",
+      "apartment_simulated_changed": "{actor} ha cambiato l'appartamento {target} fra dimostrativo e reale",
       "simulator_reset": "{actor} ha ripristinato lo stato iniziale dell'appartamento simulato {target}",
       "rules_changed": "{actor} ha modificato le regole dell'appartamento {target}",
       "timezone_changed": "Fuso orario dell'appartamento {target} cambiato sul motore: {from} → {to}"

@@ -92,9 +92,9 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
 });
 
 describe("modalità «casa vuota» (D-158)", () => {
-  it("la modalità empty si chiama «casa vuota»; l'occupazione resta «vuoto»", () => {
+  it("la modalità empty si chiama «casa vuota»; l'occupazione resta «Vuoto», con la maiuscola dei badge di stato", () => {
     expect(t("mode.empty")).toBe("casa vuota");
-    expect(t("occupancy.vacant")).toBe("vuoto");
+    expect(t("occupancy.vacant")).toBe("Vuoto");
   });
 
   it("maiuscola solo sulla prima lettera: «Casa vuota», non «Casa Vuota»", () => {

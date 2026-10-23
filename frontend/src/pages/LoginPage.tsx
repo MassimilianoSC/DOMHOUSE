@@ -131,7 +131,6 @@ export default function LoginPage() {
           <h1 className="text-4xl font-extrabold leading-tight sm:text-5xl lg:text-6xl">{env.appName}</h1>
           <p className="max-w-md text-lg opacity-80">{t("app.tagline")}</p>
         </div>
-        <p className="relative tabular text-xs opacity-60">{t("login.footer")}</p>
       </section>
       <section className="flex flex-col items-center justify-center gap-6 p-5">
         {/* where the brand panel is hidden (phone, tablet), the mark and the name sit above the card (design review c.14) */}

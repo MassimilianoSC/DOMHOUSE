@@ -7,14 +7,17 @@ import { Card, Skeleton, Switch } from "@/components/ui/primitives";
 import { t, tOr } from "@/i18n";
 import { runAction } from "@/lib/actions";
 
+/** A feature by the name of its menu entry («Consumi», «Assistente»), never by its code. */
+export const featureName = (f: string) => tOr(`nav.${f === "ask" ? "assistant" : f === "apartment" ? "overview" : f}`, f);
+
 function FeatureGrid({ all, value, inherited, onToggle, testId }: { all: AppFeature[]; value: string[] | null; inherited?: string[] | null; onToggle: (f: AppFeature, on: boolean) => void; testId: string }) {
   const effective = value ?? inherited ?? all;
   return (
     <div className="grid gap-2 sm:grid-cols-3" data-testid={testId}>
       {all.map((f) => (
         <label key={f} className="flex items-center justify-between gap-2 rounded-xl bg-secondary/60 px-3 py-2 text-sm font-semibold">
-          <span>{tOr(`nav.${f === "ask" ? "assistant" : f === "apartment" ? "overview" : f}`, f)} <span className="tabular text-xs text-muted-foreground">{f}</span></span>
-          <Switch checked={effective.includes(f)} onCheckedChange={(on) => onToggle(f, on)} aria-label={f} data-testid={`${testId}-${f}`} />
+          <span>{featureName(f)}</span>
+          <Switch checked={effective.includes(f)} onCheckedChange={(on) => onToggle(f, on)} aria-label={featureName(f)} data-testid={`${testId}-${f}`} />
         </label>
       ))}
     </div>

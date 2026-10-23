@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlugZap } from "lucide-react";
 import { adminApi, type AdminApartment, type VerifyResult } from "@/api/admin";
 import { useRole } from "@/auth/AuthProvider";
+import { featureName } from "@/components/admin/AdminFeatures";
 import { DemoBadge, Field, LastCheck, VerifyBadge } from "@/components/admin/apartmentForm";
 import { ErrorNotice } from "@/components/apartment/ErrorNotice";
 import { Button } from "@/components/ui/button";
@@ -167,7 +168,7 @@ export function AdminApartments() {
                 <p className="text-xs text-muted-foreground" data-testid={`admin-apartment-price-${a.apartment_id}`}>
                   {a.energy_price_eur_kwh != null ? t("admin.price.lineApt", { price: priceText(a.energy_price_eur_kwh) }) : t("admin.price.lineOrg", { price: priceText(orgPrice) })}
                 </p>
-                <p className="text-xs text-muted-foreground">{t("admin.features.scope")}: {a.enabled_features === null ? t("admin.features.inherit") : a.enabled_features.join(", ") || t("admin.features.none")}</p>
+                <p className="text-xs text-muted-foreground">{t("admin.features.scope")}: {a.enabled_features === null ? t("admin.features.inherit") : a.enabled_features.map(featureName).join(", ") || t("admin.features.none")}</p>
               </div>
               <div className="flex items-center gap-2">
                 <Switch checked={a.enabled} aria-label={t("admin.apartments.enabled")} onCheckedChange={(v) => toggle(a, v)} data-testid={`admin-apartment-enabled-${a.apartment_id}`} />
