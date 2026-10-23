@@ -3,221 +3,386 @@
 Tutto quello che l'app sa fare, spiegato passo per passo e diviso per ruolo. Non servono conoscenze tecniche.
 *Versione del 22 ottobre 2026 (lotto 30), ambiente di prova.*
 
-> **Ambiente di prova.** Oggi gli appartamenti sono simulati: nessun dispositivo reale viene acceso o spento. In alto
-> su ogni pagina una fascia gialla dice «Ambiente di prova» · «i dati sono separati da quelli veri». Gli appartamenti
-> simulati ripartono dallo stato iniziale ogni volta che il server dell'app viene riavviato, per esempio a un
-> aggiornamento.
+> **Ambiente di prova**
+>
+> Oggi gli appartamenti sono simulati: nessun dispositivo reale viene acceso o spento.
+> - **In alto su ogni pagina** una fascia gialla dice «Ambiente di prova» · «i dati sono separati da quelli veri».
+> - **Gli appartamenti simulati** ripartono dallo stato iniziale ogni volta che il server dell'app viene riavviato,
+>   per esempio a un aggiornamento.
 
 ## Come leggere questa guida
 
-- I testi fra «virgolette basse» sono quelli esatti che vedi nell'app: pulsanti, etichette, messaggi.
-- Dove dentro le virgolette trovi tre puntini «…», l'app mette un nome, una data, un numero o un indirizzo email.
-- «Tocca» e «premi» vogliono dire la stessa cosa: sul telefono tocchi, sul computer fai clic.
-- La guida è divisa per ruolo. Chi ha **sola lettura** legge la parte 4. L'**operatore** legge le parti 4 e 5.
-  L'**amministratore** legge le parti 4, 5 e 6. Il **gestore della piattaforma** (HQE) legge la parte 7. Le parti 1 e 2
-  e tutte quelle dalla 9 in poi valgono per tutti.
-- Alcune pagine dell'appartamento («Approvazioni», «Decisioni», «Consumi», «Programmazione», «Regole», «Assistente»)
-  compaiono solo se la funzione è attiva per quell'appartamento (lo decide l'amministratore nella scheda «Funzioni»).
-  «Riepiloghi» c'è sempre.
+**Le convenzioni della guida: virgolette, puntini, ruoli, pagine facoltative.**
+
+- **I testi fra «virgolette basse»** sono quelli esatti che vedi nell'app: pulsanti, etichette, messaggi.
+- **I tre puntini «…» dentro le virgolette** stanno al posto di un nome, una data, un numero o un indirizzo email
+  che l'app mette lì.
+- **«Tocca» e «premi»** vogliono dire la stessa cosa: sul telefono tocchi, sul computer fai clic.
+
+**La guida è divisa per ruolo:**
+
+| Ruolo | Parti da leggere |
+|---|---|
+| **Sola lettura** | La parte 4 |
+| **Operatore** | Le parti 4 e 5 |
+| **Amministratore** | Le parti 4, 5 e 6 |
+| **Gestore della piattaforma** (HQE) | La parte 7 |
+| Tutti | Le parti 1 e 2 e tutte quelle dalla 9 in poi |
+
+> **Da sapere**
+>
+> - **Alcune pagine dell'appartamento** compaiono solo se la funzione è attiva per quell'appartamento (lo decide
+>   l'amministratore nella scheda «Funzioni»): «Approvazioni», «Decisioni», «Consumi», «Programmazione», «Regole»,
+>   «Assistente».
+> - **«Riepiloghi»** c'è sempre.
 
 ## 1. Che cos'è DOMHOUSE
 
+**L'app per controllare riscaldamento, clima e consumi degli appartamenti in affitto breve.**
+
 DOMHOUSE è l'app con cui chi gestisce appartamenti in affitto breve controlla riscaldamento, clima e consumi di ogni
-appartamento, anche da lontano. Ogni **appartamento** ha dei **dispositivi** (caldaia, climatizzatore, prese,
-sensori di temperatura, umidità, finestre, movimento e misuratori di consumo) collegati a un **sistema domotico**
-che li legge e li comanda. Dentro il sistema domotico lavora un **motore**: la parte automatica che applica le
-**regole** (per esempio «finestra aperta spegne il clima»), prepara la casa prima dell'arrivo degli ospiti e la
-mette a riposo dopo la partenza, seguendo le **prenotazioni** che arrivano dal sistema Italianway.
+appartamento, anche da lontano.
 
-L'appartamento ha sempre una **modalità**: «comfort» quando ci sono o stanno per arrivare gli ospiti, «eco» per
-consumare meno, «casa vuota» quando non c'è nessuno. Chi lavora nell'app può cambiarla a mano, **forzarla** per un
-po' di tempo (una **forzatura** blocca gli automatismi per 30 minuti, 2 ore o 6 ore) oppure **programmarla** a un
-orario. Tutto quello che succede, fatto da una persona o dal motore, finisce nelle **Decisioni**, lo storico
-dell'appartamento. Quando il motore non vuole decidere da solo (per esempio spegnere un apparecchio che consuma a casa
-vuota) apre un'**approvazione**: una richiesta che aspetta il tuo sì o il tuo no. L'**assistente** è una chat in
-italiano a cui puoi chiedere lo stato, i consumi o un comando. Il **Simulatore** serve a provare tutto questo su
-appartamenti finti, detti «Dimostrativo».
+### Le parole chiave
 
-Le persone che usano l'app appartengono a un'**organizzazione** (oggi Flatsharing) e hanno un **ruolo**: sola lettura,
-operatore o amministratore. Sopra le organizzazioni c'è il **gestore della piattaforma** (HQE), che le crea e collega gli
-appartamenti ai sistemi domotici.
+**Gli elementi di cui parla tutta la guida, uno per riga.**
+
+- **Appartamento**: ha dei dispositivi collegati a un sistema domotico.
+- **Dispositivi**: caldaia, climatizzatore, prese, sensori di temperatura, umidità, finestre, movimento e misuratori
+  di consumo.
+- **Sistema domotico**: legge e comanda i dispositivi.
+- **Motore**: la parte automatica che lavora dentro il sistema domotico. Applica le regole, prepara la casa prima
+  dell'arrivo degli ospiti e la mette a riposo dopo la partenza, seguendo le prenotazioni.
+- **Regole**: automatismi già previsti, per esempio «finestra aperta spegne il clima».
+- **Prenotazioni**: arrivano dal sistema Italianway.
+- **Modalità**: l'appartamento ne ha sempre una: «comfort» quando ci sono o stanno per arrivare gli ospiti, «eco»
+  per consumare meno, «casa vuota» quando non c'è nessuno. Chi lavora nell'app può cambiarla a mano.
+- **Forzatura**: blocca gli automatismi per 30 minuti, 2 ore o 6 ore, tenendo la modalità attuale.
+- **Programmazione**: una modalità cambiata a un orario scelto.
+- **Decisioni**: lo storico dell'appartamento, dove finisce tutto quello che succede, fatto da una persona o dal
+  motore.
+- **Approvazione**: una richiesta che aspetta il tuo sì o il tuo no, aperta dal motore quando non vuole decidere da
+  solo (per esempio spegnere un apparecchio che consuma a casa vuota).
+- **Assistente**: una chat in italiano a cui puoi chiedere lo stato, i consumi o un comando.
+- **Simulatore**: serve a provare tutto questo su appartamenti finti, detti «Dimostrativo».
+- **Organizzazione**: le persone che usano l'app ne fanno parte (oggi Flatsharing) e hanno un ruolo: sola lettura,
+  operatore o amministratore.
+- **Gestore della piattaforma** (HQE): sta sopra le organizzazioni, le crea e collega gli appartamenti ai sistemi
+  domotici.
 
 ### Chi fa cosa nel servizio
 
+**Chi installa, chi attiva e chi configura un appartamento nuovo.**
+
 *Decisione del 16 ottobre 2026.*
 
-1. **Flatsharing**, il gestore degli appartamenti, installa sensori e dispositivi nell'appartamento e lo comunica a HQE.
+1. **Flatsharing**, il gestore degli appartamenti, installa sensori e dispositivi nell'appartamento e lo comunica a
+   HQE.
 2. **HQE** prepara il sistema domotico dell'appartamento e lo attiva nell'app da «Organizzazioni», inserendo anche il
    codice Italianway (il codice con cui arrivano le prenotazioni).
-3. Da quel momento l'appartamento compare nell'elenco di Flatsharing. L'amministratore di Flatsharing gli dà nome e
-   indirizzo, sceglie le funzioni attive e decide chi può vederlo.
+3. **L'appartamento compare** nell'elenco di Flatsharing. L'amministratore di Flatsharing gli dà nome e indirizzo,
+   sceglie le funzioni attive e decide chi può vederlo.
 
-L'amministratore **non può creare da solo un appartamento, né cambiarne il collegamento al sistema domotico o il codice
-Italianway**: lo fa solo HQE. È una garanzia: nessuno può collegare un appartamento a un sistema che non è il suo, né
-ricevere le prenotazioni di una struttura altrui. Vale anche nell'ambiente di prova. Il gestore della piattaforma, da
-solo, non vede dispositivi, consumi, decisioni né utenti delle organizzazioni: può entrarci solo con un **accesso di
-assistenza** a tempo, che l'amministratore vede e può chiudere (parte 8).
+> **Attenzione**
+>
+> L'amministratore **non può creare da solo un appartamento, né cambiarne il collegamento al sistema domotico o il
+> codice Italianway**: lo fa solo HQE. È una garanzia: nessuno può collegare un appartamento a un sistema che non è
+> il suo, né ricevere le prenotazioni di una struttura altrui. Vale anche nell'ambiente di prova.
+
+> **Da sapere**
+>
+> Il gestore della piattaforma, da solo, non vede dispositivi, consumi, decisioni né utenti delle organizzazioni:
+> può entrarci solo con un **accesso di assistenza** a tempo, che l'amministratore vede e può chiudere (parte 8).
 
 ## 2. Primi passi, uguali per tutti
 
 ### Ricevere l'invito ed entrare
 
+**Si entra solo su invito, con Google o con una password.**
+
 Non ci si registra da soli: si entra sempre con un invito di un amministratore (o di HQE per il primo amministratore
 di un'organizzazione).
 
-1. Ricevi un'email con oggetto «Invito a DOMHOUSE». Dentro ci sono il nome dell'organizzazione, il tuo ruolo e chi ti
-   ha invitato. Controlla anche lo spam.
-2. Se la tua email è un account Google (per esempio Gmail): premi «Apri l'app», poi «Accedi con Google» e scegli quello
-   stesso indirizzo.
-3. Altrimenti premi «Scegli la password» nell'email e scegli una password. Il link vale 1 ora. Poi apri l'app, compila
-   «Email» e «Password» e premi «Accedi».
-4. Se il link è scaduto, nella pagina di accesso premi «Password dimenticata?» (vedi sotto).
-5. Al primo accesso, se il tuo indirizzo non risulta confermato, l'app mostra «Conferma il tuo indirizzo: abbiamo inviato
-   un link a …. Aprilo e poi accedi di nuovo.» e ti fa uscire: apri il link nell'email e accedi di nuovo.
-6. Entrato, vedi «Appartamenti» (oppure «Organizzazioni» se sei un gestore della piattaforma senza organizzazione).
+1. **Ricevi un'email** con oggetto «Invito a DOMHOUSE». Dentro ci sono il nome dell'organizzazione, il tuo ruolo e
+   chi ti ha invitato. Controlla anche lo spam.
+2. **Se la tua email è un account Google** (per esempio Gmail): premi «Apri l'app», poi «Accedi con Google» e scegli
+   quello stesso indirizzo.
+3. **Altrimenti premi «Scegli la password»** nell'email e scegli una password. Il link vale 1 ora.
+4. **Poi apri l'app**, compila «Email» e «Password» e premi «Accedi».
+5. **Se il link è scaduto**, nella pagina di accesso premi «Password dimenticata?» (vedi sotto).
+6. **Al primo accesso**, se il tuo indirizzo non risulta confermato, l'app mostra «Conferma il tuo indirizzo: abbiamo
+   inviato un link a …. Aprilo e poi accedi di nuovo.» e ti fa uscire: apri il link nell'email e accedi di nuovo.
+7. **Entrato**, vedi «Appartamenti» (oppure «Organizzazioni» se sei un gestore della piattaforma senza
+   organizzazione).
 
-Indirizzo dell'ambiente di prova: [https://domotica-poc-511707.web.app](https://domotica-poc-511707.web.app). La pagina
-di accesso si chiama «Accedi» e sotto dice «Area riservata ai gestori degli appartamenti».
+**La pagina di accesso:**
 
-Se l'accesso non riesce, l'avviso in alto dice cosa fare e sotto mostra un «Codice» copiabile: toccalo (compare
-«Copiato») e mandalo all'assistenza HQE insieme alla segnalazione. Quel codice non è l'«ID richiesta» delle altre
-pagine. Se chiudi tu la finestra di Google, non compare nulla. I messaggi possibili sono nella parte 11.
+| Cosa vedi | Cosa vuol dire |
+|---|---|
+| L'indirizzo dell'ambiente di prova | [https://domotica-poc-511707.web.app](https://domotica-poc-511707.web.app) |
+| «Accedi» e, sotto, «Area riservata ai gestori degli appartamenti» | Il titolo della pagina di accesso |
+| «Accesso di sviluppo» con «Modalità sviluppo: scegli un utente di prova, nessuna password richiesta.» | Esiste solo nell'ambiente di sviluppo tecnico: nell'ambiente di prova e in quello vero non c'è |
 
-Solo nell'ambiente di sviluppo tecnico esiste un «Accesso di sviluppo» con la frase «Modalità sviluppo: scegli un
-utente di prova, nessuna password richiesta.»: nell'ambiente di prova e in quello vero non c'è.
+> **Attenzione**
+>
+> Se l'accesso non riesce, l'avviso in alto dice cosa fare e sotto mostra un «Codice» copiabile.
+> - **Toccalo** (compare «Copiato») e mandalo all'assistenza HQE insieme alla segnalazione.
+> - **Quel codice non è** l'«ID richiesta» delle altre pagine.
+> - **Se chiudi tu** la finestra di Google, non compare nulla.
+> - **I messaggi possibili** sono nella parte 11.
 
 ### Password dimenticata
 
-1. Nella pagina «Accedi» premi «Password dimenticata?».
-2. Leggi «Inserisci la tua email: ti mandiamo un link per scegliere una nuova password.», compila «Email» e premi
-   «Invia il link». «Torna all'accesso» riporta al modulo.
-3. Leggi «Se … ha un account, riceverai a breve un'email con il link. Controlla anche lo spam.». La frase è la stessa
-   anche se l'indirizzo non è registrato: è voluto.
-4. Apri il link nell'email e scegli la nuova password, poi accedi.
+**Scegliere una nuova password dalla pagina di accesso.**
+
+1. **Nella pagina «Accedi»** premi «Password dimenticata?».
+2. **Leggi** «Inserisci la tua email: ti mandiamo un link per scegliere una nuova password.».
+3. **Compila «Email»** e premi «Invia il link». «Torna all'accesso» riporta al modulo.
+4. **Leggi** «Se … ha un account, riceverai a breve un'email con il link. Controlla anche lo spam.».
+5. **Apri il link** nell'email e scegli la nuova password, poi accedi.
+
+> **Da sapere**
+>
+> La frase del passo 4 è la stessa anche se l'indirizzo non è registrato: è voluto.
 
 ### Installare l'app sul telefono o sul computer
 
-L'app si aggiunge alla schermata Home e si apre a schermo intero come un'app normale. La voce «Installa l'app» è in
-fondo alla barra laterale (sul telefono nel menu a tre righe) e in Impostazioni, con la frase «Aggiungi l'app alla
-schermata Home: si apre a schermo intero e riceve le notifiche.».
+**L'app si aggiunge alla schermata Home e si apre a schermo intero.**
 
-1. **Su Android con Chrome:** premi «Installa l'app» e poi «Installa» nella finestra del browser; oppure apri il menu di
-   Chrome e scegli «Installa app» (l'app lo spiega così: «Su Android: apri il menu di Chrome e scegli «Installa app».»).
-2. **Su iPhone e iPad:** apri il sito con Safari, tocca Condividi e poi «Aggiungi alla schermata Home». L'app lo spiega
-   così: «Su iPhone: apri il sito in Safari, tocca Condividi e poi «Aggiungi alla schermata Home». Le notifiche push
-   funzionano solo dall'app installata.».
-3. **Su computer:** con Chrome o Edge premi «Installa l'app» oppure l'icona «Installa» nella barra degli indirizzi.
-   L'app lo spiega così: «Usa Chrome o Edge: nella barra degli indirizzi compare l'icona «Installa». Su Android apri il
-   menu di Chrome e scegli «Installa app».».
-4. Quando l'app è installata, in Impostazioni compare «App installata su questo dispositivo» e la voce «Installa
-   l'app» sparisce dal menu. Il pulsante «Installa» compare solo se il browser lo permette; con altri browser restano le
-   istruzioni scritte. Installare l'app non attiva da sola le notifiche: vedi «Notifiche sul telefono».
+La voce «Installa l'app» è in fondo alla barra laterale (sul telefono nel menu a tre righe) e in Impostazioni, con
+la frase «Aggiungi l'app alla schermata Home: si apre a schermo intero e riceve le notifiche.».
+
+| Dispositivo | Cosa fare | Cosa dice l'app |
+|---|---|---|
+| Android con Chrome | Premi «Installa l'app» e poi «Installa» nella finestra del browser; oppure apri il menu di Chrome e scegli «Installa app». | «Su Android: apri il menu di Chrome e scegli «Installa app».» |
+| iPhone e iPad | Apri il sito con Safari, tocca Condividi e poi «Aggiungi alla schermata Home». | «Su iPhone: apri il sito in Safari, tocca Condividi e poi «Aggiungi alla schermata Home». Le notifiche push funzionano solo dall'app installata.» |
+| Computer | Con Chrome o Edge premi «Installa l'app» oppure l'icona «Installa» nella barra degli indirizzi. | «Usa Chrome o Edge: nella barra degli indirizzi compare l'icona «Installa». Su Android apri il menu di Chrome e scegli «Installa app».» |
+
+> **Da sapere**
+>
+> - **Quando l'app è installata**, in Impostazioni compare «App installata su questo dispositivo» e la voce
+>   «Installa l'app» sparisce dal menu.
+> - **Il pulsante «Installa»** compare solo se il browser lo permette; con altri browser restano le istruzioni
+>   scritte.
+> - **Installare l'app non attiva da sola le notifiche**: vedi «Notifiche sul telefono».
 
 ### Muoversi nell'app
 
-- **Su computer** c'è la barra laterale a sinistra con le pagine generali («Appartamenti», «Amministrazione» per gli
-  amministratori, «Organizzazioni» per i gestori della piattaforma, «Impostazioni», «Esci») e, quando sei dentro un
-  appartamento, le sue pagine («Panoramica», «Approvazioni», «Decisioni», «Consumi», «Riepiloghi», «Programmazione»,
-  «Regole», «Assistente», «Simulatore» solo per gli amministratori sui dimostrativi).
-- **Sul telefono** premi il pulsante con le tre righe in alto a sinistra («Apri il menu»): si apre il menu con le stesse
-  pagine. Si chiude con la X («Chiudi il menu»), toccando fuori, con il tasto Esc o scegliendo una pagina. Se le schede
-  di una pagina non stanno nello schermo, la loro barra scorre in orizzontale.
-- La pagina aperta è evidenziata. In fondo al menu c'è **il tuo nome** in grassetto (quello scelto nelle Impostazioni)
-  con sotto l'email in piccolo; se non hai scelto un nome, solo l'email. Sotto ci sono i tuoi ruoli, per esempio
-  «Amministratore · Flatsharing» e, se sei anche di HQE, «Gestore della piattaforma».
-- Nell'ambiente di prova, sopra il contenuto, resta sempre la fascia gialla «Ambiente di prova» · «i dati sono separati
-  da quelli veri».
+**Dove sono le pagine: barra laterale sul computer, menu sul telefono.**
+
+| Dove | Cosa vedi | Cosa puoi fare |
+|---|---|---|
+| Su computer | La barra laterale a sinistra con le pagine generali e, quando sei dentro un appartamento, le sue pagine | Tocca una pagina per aprirla |
+| Sul telefono | Il pulsante con le tre righe in alto a sinistra («Apri il menu») | Si apre il menu con le stesse pagine. Si chiude con la X («Chiudi il menu»), toccando fuori, con il tasto Esc o scegliendo una pagina |
+| In fondo al menu | **Il tuo nome** in grassetto (quello scelto nelle Impostazioni) con sotto l'email in piccolo; se non hai scelto un nome, solo l'email. Sotto ci sono i tuoi ruoli, per esempio «Amministratore · Flatsharing» e, se sei anche di HQE, «Gestore della piattaforma» | Solo leggere |
+| Sopra il contenuto, nell'ambiente di prova | La fascia gialla «Ambiente di prova» · «i dati sono separati da quelli veri» | Solo leggere |
+
+**Le pagine generali:**
+
+| Pagina | Chi la vede |
+|---|---|
+| «Appartamenti» | Tutti |
+| «Amministrazione» | Gli amministratori |
+| «Organizzazioni» | I gestori della piattaforma |
+| «Impostazioni» | Tutti |
+| «Esci» | Tutti |
+
+**Le pagine di un appartamento:**
+
+| Pagina | Chi la vede |
+|---|---|
+| «Panoramica» | Tutti |
+| «Approvazioni», «Decisioni», «Consumi» | Tutti, se la funzione è attiva per l'appartamento |
+| «Riepiloghi» | Tutti, sempre |
+| «Programmazione», «Regole», «Assistente» | Tutti, se la funzione è attiva per l'appartamento |
+| «Simulatore» | Solo gli amministratori sui dimostrativi |
+
+> **Da sapere**
+>
+> - **La pagina aperta** è evidenziata.
+> - **Se le schede di una pagina** non stanno nello schermo, la loro barra scorre in orizzontale.
 
 ### Capire gli esiti: avvisi verdi, rossi e «ID richiesta»
 
-- Un'azione riuscita mostra un avviso verde in alto (per esempio «Azione approvata», «Regole aggiornate»).
-- Un errore mostra un avviso rosso con il messaggio e, se c'è, il pulsante «ID richiesta»: toccalo per copiare
-  l'identificativo completo (compare «Copiato»). Il pulsante ne mostra solo l'inizio; passandoci sopra con il puntatore
-  leggi il valore intero. Comunicalo all'assistenza insieme alla segnalazione e usalo nella ricerca delle Decisioni.
-- Dove c'è «Riprova», premilo dopo aver risolto il problema indicato.
-- Le eliminazioni chiedono sempre conferma.
-- Se apri un indirizzo che non esiste leggi «Pagina non trovata» e «L'indirizzo non corrisponde a nessuna schermata.».
-  Se apri una pagina di una funzione spenta leggi «Funzione non disponibile per questo appartamento» e «Questa sezione non è
-  attiva per l'appartamento, oppure il suo sistema domotico non la offre ancora.».
-- I messaggi comuni a tutte le pagine («Server non raggiungibile», «Operazione non riuscita», «Errore …», «Richiesta non
-  accettata dal server: ricarica la pagina e riprova.», «Sessione non valida o scaduta») sono spiegati nella parte 11.
+**Come l'app dice se un'azione è riuscita o no.**
 
-### Impostazioni
+| Cosa vedi | Cosa vuol dire | Cosa fare |
+|---|---|---|
+| Un avviso verde in alto (per esempio «Azione approvata», «Regole aggiornate») | L'azione è riuscita | Niente |
+| Un avviso rosso con il messaggio | C'è stato un errore | Leggi il messaggio; se c'è «ID richiesta», copialo |
+| Il pulsante «ID richiesta» nell'avviso rosso | L'identificativo completo dell'operazione | Toccalo per copiarlo (compare «Copiato»); comunicalo all'assistenza insieme alla segnalazione e usalo nella ricerca delle Decisioni |
+| «Riprova» | Il problema indicato si può risolvere | Premilo dopo aver risolto il problema |
+| Una richiesta di conferma | Le eliminazioni chiedono sempre conferma | Conferma o annulla |
+| «Pagina non trovata» e «L'indirizzo non corrisponde a nessuna schermata.» | Hai aperto un indirizzo che non esiste | Torna al menu |
+| «Funzione non disponibile per questo appartamento» e «Questa sezione non è attiva per l'appartamento, oppure il suo sistema domotico non la offre ancora.» | Hai aperto la pagina di una funzione spenta | Chiedi all'amministratore |
+
+> **Da sapere**
+>
+> - **Il pulsante «ID richiesta»** ne mostra solo l'inizio; passandoci sopra con il puntatore leggi il valore
+>   intero.
+> - **I messaggi comuni a tutte le pagine** sono spiegati nella parte 11: «Server non raggiungibile»,
+>   «Operazione non riuscita», «Errore …», «Richiesta non accettata dal server: ricarica la pagina e riprova.»,
+>   «Sessione non valida o scaduta».
+
+### Impostazioni: i riquadri
+
+**La pagina personale: profilo, account, password, sicurezza, notifiche, installazione.**
 
 La pagina «Impostazioni» è uguale per tutti i ruoli e ha questi riquadri.
 
-- **«Profilo»**: «Email», «Ruolo», «Piattaforma» (solo se sei gestore della piattaforma), «Organizzazione»,
-  «Appartamenti» (quali appartamenti vedi: «tutti gli appartamenti», i nomi, «… appartamenti» oppure «nessun
-  appartamento»). Durante un accesso di assistenza il profilo mostra l'organizzazione assistita.
-- **«Account»**: «Nome visualizzato» (al massimo 80 caratteri) e «Salva»; compare «Nome aggiornato». È il nome che
-  vedono i colleghi nelle Decisioni, nelle approvazioni, nei registri e in fondo al menu.
-- **«Password ed email»** (solo per chi entra con email e password):
-  «Cambia password» chiede «Password attuale», «Nuova password» e «Ripeti la nuova password» (almeno 8 caratteri);
-  compare «Password cambiata». «Email di accesso» spiega «Oggi accedi con …. Il nuovo indirizzo diventa attivo quando
-  apri il link che ti mandiamo lì.»: compila «Nuova email» e «Password attuale», premi «Cambia email» e apri il link
-  nella nuova casella; intanto leggi «Link inviato a …: aprilo per completare il cambio». Chi entra con Google legge
-  «Accedi con Google: password ed email si gestiscono dal tuo account Google.». Il ruolo di gestore della piattaforma è
-  legato all'email: dopo un cambio di email va riassegnato da HQE.
-- **«Sicurezza»**: «Esci da tutti i dispositivi» («Chiude la sessione su tutti i telefoni e computer, compreso questo.
-  Su ogni dispositivo dovrai accedere di nuovo.») chiede «Uscire da tutti i dispositivi?» e conferma con «Sei uscito da
-  tutti i dispositivi». «Elimina il mio account» («Elimina il tuo account e il tuo accesso all'app. L'operazione non si
-  può annullare.») chiede conferma con «Eliminare definitivamente il tuo account?» e spiega: «Vengono cancellati il tuo
-  accesso, il tuo nome, la tua email e le tue preferenze di notifica. Resta quello che hai fatto (decisioni,
-  approvazioni, registro attività), ma al posto del tuo nome comparirà «utente rimosso». Per rientrare servirà un nuovo
-  invito.». Compare «Account eliminato». Non è permesso all'ultimo amministratore («Sei l'unico amministratore: nomina
-  un altro amministratore prima di eliminare il tuo account») né all'ultimo gestore della piattaforma («Sei l'ultimo
-  gestore della piattaforma: nomina un altro gestore prima di eliminare il tuo account»). Nell'ambiente di prova
-  l'eliminazione toglie le autorizzazioni di prova e conserva l'identità di accesso condivisa con il sito vero; nel sito
-  vero cancella anche quella.
-- **«Notifiche»**: quali avvisi ricevere sul telefono, per categoria, con quattro interruttori: «Approvazioni
-  richieste» («Quando il motore chiede il tuo consenso»), «Dispositivi e sistema domotico offline» («Dispositivo offline oltre la
-  soglia della regola, sistema domotico non raggiungibile, antigelo non attivo»), «Prenotazioni» («Avvisi sulle prenotazioni che
-  cambiano il programma dell'appartamento») e «Riepilogo» («Ogni lunedì, solo se la settimana ha qualcosa da
-  segnalare»). Sono tutti attivi dall'inizio; ogni cambio mostra «Preferenze salvate» e, se non riesce, l'interruttore
-  torna com'era. Le scelte valgono per le notifiche sul telefono: gli avvisi dentro l'app compaiono comunque. Sotto c'è
-  l'attivazione sul dispositivo (vedi «Notifiche sul telefono»). Il riquadro non compare a un gestore della piattaforma
-  senza organizzazione: le notifiche sono legate agli appartamenti.
-- **«Installa l'app»** con le istruzioni per iPhone, Android e computer (vedi sopra).
-- **«Lingua»**: «Italiano», unica lingua disponibile; il selettore è disattivato.
-- In fondo **«Esci»**: torni alla pagina «Accedi», i tuoi dati e le conversazioni con l'assistente vengono tolti da
-  quel dispositivo e le notifiche su quel dispositivo si spengono. Se rientri tu, si riaccendono da sole.
+| Riquadro | Cosa vedi | Cosa puoi fare |
+|---|---|---|
+| «Profilo» | «Email», «Ruolo», «Piattaforma» (solo se sei gestore della piattaforma), «Organizzazione», «Appartamenti» | Solo leggere |
+| «Account» | «Nome visualizzato» e «Salva» | Cambiare il nome che vedono i colleghi |
+| «Password ed email» | Solo per chi entra con email e password | Cambiare password ed email di accesso |
+| «Sicurezza» | «Esci da tutti i dispositivi» ed «Elimina il mio account» | Chiudere tutte le sessioni; eliminare l'account |
+| «Notifiche» | Quattro interruttori per categoria e l'attivazione sul dispositivo | Scegliere quali avvisi ricevere sul telefono |
+| «Installa l'app» | Le istruzioni per iPhone, Android e computer (vedi sopra) | Installare l'app |
+| «Lingua» | «Italiano», unica lingua disponibile | Niente: il selettore è disattivato |
+| «Esci», in fondo | Il pulsante per uscire | Tornare alla pagina «Accedi» |
 
-Un gestore della piattaforma che non fa parte di nessuna organizzazione vede i riquadri «Account» e «Sicurezza», ma il
-salvataggio del nome e «Esci da tutti i dispositivi» rispondono «Account non abilitato: mancano tenant o ruolo»;
-«Elimina il mio account» funziona.
+**«Profilo»:**
+
+- **«Appartamenti»** dice quali appartamenti vedi: «tutti gli appartamenti», i nomi, «… appartamenti» oppure
+  «nessun appartamento».
+- **Durante un accesso di assistenza** il profilo mostra l'organizzazione assistita.
+
+**«Account»:**
+
+- **«Nome visualizzato»** (al massimo 80 caratteri) e «Salva»; compare «Nome aggiornato».
+- **È il nome** che vedono i colleghi nelle Decisioni, nelle approvazioni, nei registri e in fondo al menu.
+
+### Impostazioni: password ed email
+
+**Cambiare la password o l'indirizzo con cui entri.**
+
+Il riquadro «Password ed email» c'è solo per chi entra con email e password.
+
+1. **«Cambia password»** chiede «Password attuale», «Nuova password» e «Ripeti la nuova password» (almeno 8
+   caratteri); compare «Password cambiata».
+2. **«Email di accesso»** spiega «Oggi accedi con …. Il nuovo indirizzo diventa attivo quando apri il link che ti
+   mandiamo lì.».
+3. **Per cambiare email** compila «Nuova email» e «Password attuale», premi «Cambia email» e apri il link nella nuova
+   casella.
+4. **Intanto leggi** «Link inviato a …: aprilo per completare il cambio».
+
+> **Da sapere**
+>
+> - **Chi entra con Google** legge «Accedi con Google: password ed email si gestiscono dal tuo account Google.».
+> - **Il ruolo di gestore della piattaforma** è legato all'email: dopo un cambio di email va riassegnato da HQE.
+
+### Impostazioni: sicurezza
+
+**Uscire da tutti i dispositivi o eliminare il proprio account.**
+
+**«Esci da tutti i dispositivi»:**
+
+1. **La spiegazione**: «Chiude la sessione su tutti i telefoni e computer, compreso questo. Su ogni dispositivo
+   dovrai accedere di nuovo.».
+2. **Chiede** «Uscire da tutti i dispositivi?».
+3. **Conferma** con «Sei uscito da tutti i dispositivi».
+
+**«Elimina il mio account»:**
+
+1. **La spiegazione**: «Elimina il tuo account e il tuo accesso all'app. L'operazione non si può annullare.».
+2. **Chiede conferma** con «Eliminare definitivamente il tuo account?».
+3. **Spiega**: «Vengono cancellati il tuo accesso, il tuo nome, la tua email e le tue preferenze di notifica. Resta
+   quello che hai fatto (decisioni, approvazioni, registro attività), ma al posto del tuo nome comparirà «utente
+   rimosso». Per rientrare servirà un nuovo invito.».
+4. **Alla fine** compare «Account eliminato».
+
+> **Attenzione**
+>
+> - **L'ultimo amministratore** non può eliminare l'account: «Sei l'unico amministratore: nomina un altro
+>   amministratore prima di eliminare il tuo account».
+> - **L'ultimo gestore della piattaforma** nemmeno: «Sei l'ultimo gestore della piattaforma: nomina un altro
+>   gestore prima di eliminare il tuo account».
+> - **Nell'ambiente di prova** l'eliminazione toglie le autorizzazioni di prova e conserva l'identità di accesso
+>   condivisa con il sito vero; nel sito vero cancella anche quella.
+
+### Impostazioni: notifiche, lingua e uscita
+
+**Scegliere per categoria quali avvisi ricevere sul telefono.**
+
+Il riquadro «Notifiche» ha quattro interruttori:
+
+| Interruttore | Spiegazione nell'app |
+|---|---|
+| «Approvazioni richieste» | «Quando il motore chiede il tuo consenso» |
+| «Dispositivi e sistema domotico offline» | «Dispositivo offline oltre la soglia della regola, sistema domotico non raggiungibile, antigelo non attivo» |
+| «Prenotazioni» | «Avvisi sulle prenotazioni che cambiano il programma dell'appartamento» |
+| «Riepilogo» | «Ogni lunedì, solo se la settimana ha qualcosa da segnalare» |
+
+- **Sono tutti attivi** dall'inizio.
+- **Ogni cambio** mostra «Preferenze salvate»; se non riesce, l'interruttore torna com'era.
+- **Le scelte valgono** per le notifiche sul telefono: gli avvisi dentro l'app compaiono comunque.
+- **Sotto** c'è l'attivazione sul dispositivo (vedi «Notifiche sul telefono»).
+- **Il riquadro non compare** a un gestore della piattaforma senza organizzazione: le notifiche sono legate agli
+  appartamenti.
+
+**«Esci», in fondo:**
+
+- **Torni** alla pagina «Accedi».
+- **I tuoi dati** e le conversazioni con l'assistente vengono tolti da quel dispositivo.
+- **Le notifiche** su quel dispositivo si spengono. Se rientri tu, si riaccendono da sole.
+
+> **Da sapere**
+>
+> Un gestore della piattaforma che non fa parte di nessuna organizzazione vede i riquadri «Account» e «Sicurezza»,
+> ma il salvataggio del nome e «Esci da tutti i dispositivi» rispondono «Account non abilitato: mancano tenant o
+> ruolo»; «Elimina il mio account» funziona.
 
 ### Notifiche sul telefono
 
+**Attivare le notifiche push su ogni dispositivo che usi.**
+
 Le notifiche arrivano anche ad app chiusa, se le attivi su quel dispositivo.
 
-1. In «Impostazioni» › «Notifiche», riquadro «Notifiche push su questo dispositivo», premi «Attiva su questo
-   dispositivo» e consenti le notifiche quando il telefono o il browser lo chiede. Compare «Notifiche attive su questo
-   dispositivo». «Dispositivi registrati: …» conta i tuoi dispositivi con le notifiche accese.
-2. Se rifiuti il permesso leggi «Permesso non concesso: su questo dispositivo le notifiche restano spente.». Se le
-   notifiche sono bloccate dal telefono o dal browser leggi «Le notifiche per questo sito sono bloccate. Per riceverle
-   consenti le notifiche nelle impostazioni del browser o del telefono, poi torna qui.». Se le hai tolte dopo averle
-   attivate leggi «Le notifiche su questo dispositivo sono state tolte dalle impostazioni del browser o del telefono.
-   Premi «Attiva su questo dispositivo» per riattivarle.».
-3. **Su iPhone e iPad** le notifiche arrivano solo all'app installata: aprendo il sito da Safari la scheda dice «Su
-   iPhone e iPad le notifiche arrivano solo all'app installata: aggiungila alla schermata Home (vedi «Installa l'app»
-   qui sotto), aprila dall'icona e attivale da qui.».
-4. Se il browser non può ricevere notifiche leggi «Questo browser non può ricevere notifiche push: gli avvisi compaiono
-   in alto nello schermo mentre l'app è aperta sulla pagina di un appartamento.».
-5. «Disattiva» le ferma su quel dispositivo: «Notifiche disattivate su questo dispositivo».
-6. Toccando una notifica si apre l'app sulla pagina giusta: «Approvazioni», la «Panoramica» dell'appartamento, le
-   «Decisioni» (prenotazione annullata, antigelo non attivo) o il riepilogo della settimana. Se l'app è già aperta, la
-   notifica compare come avviso in alto con il pulsante «Apri» (su iPhone arriva comunque come notifica del telefono);
-   se stai già guardando quell'appartamento non compare un secondo avviso. Se non sei collegato, prima devi accedere e
-   poi aprire la pagina da solo.
-7. La scheda ricorda: «Quando esci da questo dispositivo le notifiche si spengono; quando rientri tu, si riaccendono da
-   sole.». Al rientro leggi «Notifiche riattivate su questo dispositivo, come prima della tua uscita.» oppure, se il
-   browser non dà più il permesso, «Notifiche non riattivate: il browser non ne dà più il permesso. Puoi riattivarle da
-   Impostazioni › Notifiche.». Non si riaccendono se le avevi spente tu con «Disattiva». Un'altra persona che accede
-   dallo stesso telefono non riceve le tue notifiche e non vede nulla della tua sessione; un calo di rete non le spegne.
-8. In un ambiente senza notifiche sul telefono la scheda dice «Notifiche sul telefono non attive in questo ambiente» e
-   «Gli avvisi compaiono in alto nello schermo mentre l'app è aperta sulla pagina di un appartamento.».
+1. **Apri** «Impostazioni» › «Notifiche», riquadro «Notifiche push su questo dispositivo».
+2. **Premi «Attiva su questo dispositivo»** e consenti le notifiche quando il telefono o il browser lo chiede.
+3. **Leggi** «Notifiche attive su questo dispositivo». «Dispositivi registrati: …» conta i tuoi dispositivi con le
+   notifiche accese.
+4. **Per fermarle** su quel dispositivo premi «Disattiva»: leggi «Notifiche disattivate su questo dispositivo».
 
-Le notifiche che puoi ricevere, con il nome dell'appartamento davanti:
+**Se qualcosa non va:**
+
+| Cosa vedi | Quando |
+|---|---|
+| «Permesso non concesso: su questo dispositivo le notifiche restano spente.» | Hai rifiutato il permesso |
+| «Le notifiche per questo sito sono bloccate. Per riceverle consenti le notifiche nelle impostazioni del browser o del telefono, poi torna qui.» | Le notifiche sono bloccate dal telefono o dal browser |
+| «Le notifiche su questo dispositivo sono state tolte dalle impostazioni del browser o del telefono. Premi «Attiva su questo dispositivo» per riattivarle.» | Le hai tolte dopo averle attivate |
+| «Su iPhone e iPad le notifiche arrivano solo all'app installata: aggiungila alla schermata Home (vedi «Installa l'app» qui sotto), aprila dall'icona e attivale da qui.» | Su iPhone e iPad hai aperto il sito da Safari: le notifiche arrivano solo all'app installata |
+| «Questo browser non può ricevere notifiche push: gli avvisi compaiono in alto nello schermo mentre l'app è aperta sulla pagina di un appartamento.» | Il browser non può ricevere notifiche |
+| «Notifiche sul telefono non attive in questo ambiente» e «Gli avvisi compaiono in alto nello schermo mentre l'app è aperta sulla pagina di un appartamento.» | L'ambiente non ha le notifiche sul telefono |
+
+### Cosa succede quando tocchi una notifica
+
+**Ogni notifica apre la pagina giusta; uscita e rientro.**
+
+- **Toccando una notifica** si apre l'app sulla pagina giusta: «Approvazioni», la «Panoramica» dell'appartamento,
+  le «Decisioni» (prenotazione annullata, antigelo non attivo) o il riepilogo della settimana.
+- **Se l'app è già aperta**, la notifica compare come avviso in alto con il pulsante «Apri» (su iPhone arriva
+  comunque come notifica del telefono).
+- **Se stai già guardando quell'appartamento** non compare un secondo avviso.
+- **Se non sei collegato**, prima devi accedere e poi aprire la pagina da solo.
+
+**Uscita e rientro:**
+
+- **La scheda ricorda**: «Quando esci da questo dispositivo le notifiche si spengono; quando rientri tu, si
+  riaccendono da sole.».
+- **Al rientro leggi** «Notifiche riattivate su questo dispositivo, come prima della tua uscita.».
+- **Se il browser non dà più il permesso** leggi «Notifiche non riattivate: il browser non ne dà più il permesso.
+  Puoi riattivarle da Impostazioni › Notifiche.».
+- **Non si riaccendono** se le avevi spente tu con «Disattiva».
+- **Un'altra persona** che accede dallo stesso telefono non riceve le tue notifiche e non vede nulla della tua
+  sessione.
+- **Un calo di rete** non le spegne.
+
+### Le notifiche che puoi ricevere
+
+**L'elenco delle notifiche: quando arrivano e dove portano.**
+
+Tutte hanno il nome dell'appartamento davanti.
 
 | Categoria | Notifica | Quando arriva | Dove porta |
 |---|---|---|---|
@@ -228,16 +393,25 @@ Le notifiche che puoi ricevere, con il nome dell'appartamento davanti:
 | «Prenotazioni» | «…: prenotazione annullata, appartamento rimesso a vuoto» | Disdetta dopo che l'appartamento era già stato preparato per l'arrivo | «Decisioni» |
 | «Riepilogo» | «…: riepilogo della settimana», con la prima segnalazione e «E altre … voci.» | Il lunedì mattina, solo se la settimana ha qualcosa da segnalare | Il riepilogo di quella settimana |
 
-Le notifiche arrivano solo per gli appartamenti che vedi. Un gestore della piattaforma in accesso di assistenza non
-riceve quelle dell'organizzazione assistita.
+> **Da sapere**
+>
+> - **Le notifiche arrivano** solo per gli appartamenti che vedi.
+> - **Un gestore della piattaforma** in accesso di assistenza non riceve quelle dell'organizzazione assistita.
 
 ### Uscire
 
-«Esci» è nel menu e in fondo alle Impostazioni. Chiude la sessione su quel dispositivo, toglie dalla scheda i tuoi
-dati e le conversazioni con l'assistente e spegne le notifiche su quel dispositivo. Se eri in un accesso di assistenza,
-lo chiude. Per chiudere tutte le sessioni usa «Esci da tutti i dispositivi» nelle Impostazioni.
+**«Esci» chiude la sessione su quel dispositivo.**
 
+«Esci» è nel menu e in fondo alle Impostazioni.
+
+- **Chiude la sessione** su quel dispositivo.
+- **Toglie dalla scheda** i tuoi dati e le conversazioni con l'assistente.
+- **Spegne le notifiche** su quel dispositivo.
+- **Se eri in un accesso di assistenza**, lo chiude.
+- **Per chiudere tutte le sessioni** usa «Esci da tutti i dispositivi» nelle Impostazioni.
 ## 3. Chi può fare cosa
+
+**I quattro ruoli e l'accesso di assistenza, a confronto.**
 
 | Ruolo | Pagine che vede | Che cosa può fare |
 |---|---|---|
@@ -247,348 +421,715 @@ lo chiude. Per chiudere tutte le sessioni usa «Esci da tutti i dispositivi» ne
 | «Gestore della piattaforma» (HQE) | «Organizzazioni», «Impostazioni» e, se fa parte anche di un'organizzazione, le pagine del suo ruolo lì | Crea le organizzazioni e i loro primi amministratori, nomina altri gestori, crea e collega gli appartamenti, sospende e riattiva, apre accessi di assistenza. Da solo non vede dispositivi, consumi, decisioni né utenti. |
 | Accesso di assistenza | «Appartamenti», «Organizzazioni», «Impostazioni» e tutte le pagine dell'appartamento | Un gestore della piattaforma dentro un'organizzazione per 1–24 ore, con i permessi di un operatore, su tutti i suoi appartamenti. |
 
-Gli operatori e chi ha sola lettura vedono solo gli appartamenti che l'amministratore ha assegnato loro (oppure tutti,
-se così impostato). Gli amministratori vedono sempre tutti.
+> **Da sapere**
+>
+> - **Gli operatori e chi ha sola lettura** vedono solo gli appartamenti che l'amministratore ha assegnato loro
+>   (oppure tutti, se così impostato).
+> - **Gli amministratori** vedono sempre tutti.
 
 ## 4. Sola lettura: che cosa vedi
 
-Chi ha il ruolo «Sola lettura» vede le stesse pagine dell'operatore. I pulsanti che cambiano qualcosa sono disattivati
-e, passandoci sopra, compare «Il tuo ruolo consente solo la lettura». Questa parte descrive che cosa c'è in ogni pagina:
-vale anche per operatori e amministratori.
+**Le pagine come le vede chi può solo leggere: valgono per tutti.**
+
+Chi ha il ruolo «Sola lettura» vede le stesse pagine dell'operatore.
+
+- **I pulsanti che cambiano qualcosa** sono disattivati e, passandoci sopra, compare «Il tuo ruolo consente solo la
+  lettura».
+- **Questa parte descrive** che cosa c'è in ogni pagina: vale anche per operatori e amministratori.
 
 ### Appartamenti: che cosa vedi
 
+**La prima schermata: una scheda per ogni appartamento, con stato e dati.**
+
 La prima schermata, «Appartamenti», mostra «… appartamenti nel tuo account» e una scheda per appartamento.
 
-- Nome, indirizzo e stato: «Online», «Non raggiungibile» oppure «Disattivato» (scheda grigia).
-- L'etichetta «Dimostrativo» accanto al nome degli appartamenti finti usati per le prove.
-- L'occupazione: «Vuoto» (nessuno), «Occupato» (ospiti dentro, dopo il check-in effettivo), «Prenotato» (c'è una
-  prenotazione ma non è stato comunicato l'arrivo).
-- La modalità («Comfort», «Eco», «Casa vuota») e, se ci sono richieste aperte, una campanella con il numero.
-- Quattro dati: «Prossimo check-in», «Prossimo check-out», «Oggi» (consumo di oggi in kWh, non un importo) e
-  «Approvazioni in attesa». I dati si aggiornano ogni 20 secondi; un valore mancante è un trattino.
-- Tocca una scheda per aprire l'appartamento («Apri …»).
+| Cosa vedi | Cosa vuol dire |
+|---|---|
+| Nome, indirizzo e stato | «Online», «Non raggiungibile» oppure «Disattivato» (scheda grigia) |
+| «Dimostrativo» accanto al nome | Un appartamento finto usato per le prove |
+| L'occupazione | «Vuoto» (nessuno), «Occupato» (ospiti dentro, dopo il check-in effettivo), «Prenotato» (c'è una prenotazione ma non è stato comunicato l'arrivo) |
+| La modalità | «Comfort», «Eco», «Casa vuota» |
+| Una campanella con il numero | Ci sono richieste aperte |
+| «Prossimo check-in», «Prossimo check-out» | I prossimi arrivo e partenza |
+| «Oggi» | Il consumo di oggi in kWh, non un importo |
+| «Approvazioni in attesa» | Le richieste che aspettano una risposta |
 
-Se non c'è nessun appartamento la pagina lo dice: «Nessun appartamento configurato» con «Per un nuovo appartamento
-scrivi all'assistenza HQE.» (amministratori) o «Per un nuovo appartamento rivolgiti a un amministratore della tua
-organizzazione.» (operatori e lettori). Se l'amministratore non ti ha assegnato appartamenti leggi «Nessun
-appartamento assegnato al tuo account» e «Chiedi a un amministratore di assegnartene uno.»: il tuo account esiste
-ancora. Se apri l'indirizzo di un appartamento che non puoi vedere leggi «Appartamento non disponibile», «Non esiste o
-non è tra quelli assegnati al tuo account.» e il pulsante «Torna agli appartamenti». Un gestore della piattaforma con
-una propria organizzazione vede il pulsante «Appartamento», che apre Organizzazioni (parte 7).
+- **I dati si aggiornano** ogni 20 secondi; un valore mancante è un trattino.
+- **Tocca una scheda** per aprire l'appartamento («Apri …»).
+
+**Quando l'elenco è vuoto o l'appartamento non si apre:**
+
+| Cosa vedi | Cosa vuol dire | Cosa fare |
+|---|---|---|
+| «Nessun appartamento configurato» con «Per un nuovo appartamento scrivi all'assistenza HQE.» | Non c'è nessun appartamento (messaggio per gli amministratori) | Scrivi all'assistenza HQE |
+| «Nessun appartamento configurato» con «Per un nuovo appartamento rivolgiti a un amministratore della tua organizzazione.» | Non c'è nessun appartamento (messaggio per operatori e lettori) | Rivolgiti a un amministratore |
+| «Nessun appartamento assegnato al tuo account» e «Chiedi a un amministratore di assegnartene uno.» | L'amministratore non ti ha assegnato appartamenti: il tuo account esiste ancora | Chiedi a un amministratore |
+| «Appartamento non disponibile», «Non esiste o non è tra quelli assegnati al tuo account.» e il pulsante «Torna agli appartamenti» | Hai aperto l'indirizzo di un appartamento che non puoi vedere | Premi «Torna agli appartamenti» |
+| Il pulsante «Appartamento» | Sei un gestore della piattaforma con una propria organizzazione | Apre Organizzazioni (parte 7) |
 
 ### Panoramica: che cosa vedi
 
-- **In alto**: il nome, l'occupazione, «In tempo reale» (la pagina si aggiorna da sola) oppure «Riconnessione…» (sta
-  ricollegandosi: non prendere per buono un valore vecchio), «Check-in», «Check-out», «Prenotazione» e «…/… dispositivi
-  online».
-- **La striscia di salute**: «In salute», «Degradata» o «Ferma»; «Connettore» «attivo» o «fermo», «… dispositivi
-  connessi», «Modello» (lo stato dell'assistente), «Contratto» e «Ultimo evento …». Se il sistema domotico non risponde
-  compare «Sistema domotico non raggiungibile». Se la versione del sistema non è compatibile leggi «Versione del contratto non
-  compatibile» e «Il sistema domotico dichiara il contratto …: questa app supporta solo la versione 1.x. Contatta il supporto
-  tecnico.».
-- **«Modalità»**: la modalità attuale fra «comfort», «eco» e «casa vuota».
-- **«Forza per…»**: se c'è una forzatura in corso leggi «Forzatura … attiva fino alle …» e «ancora …».
-- **«Dispositivi»**, raggruppati per stanza («Senza stanza» per quelli senza): per ogni dispositivo lo stato e le
-  letture. Prese e interruttori: «Acceso» o «Spento». Caldaia: «Riscaldamento abilitato» o «Riscaldamento disabilitato»
-  e, se il suo misuratore segna più di 30 W, «sta scaldando ora». Climatizzatore: acceso o spento, «Modo» («caldo»,
-  «freddo», «deumidifica», «ventilazione»), «Ventola» («auto», «bassa», «media», «alta»), «Temperatura» desiderata con
-  «da … a … °C». Sensori: «Potenza» (in W, cioè quanto consuma adesso), «Oggi» (kWh di oggi), «Temperatura», «Umidità»,
-  contatto finestra «Aperta» o «Chiusa» «da …», movimento «Movimento rilevato» o «Nessun movimento» (passando sopra
-  leggi la data precisa).
-- Un dispositivo che non risponde mostra «Dispositivo offline», «Visto …» e «Il dispositivo non è raggiungibile: i
-  comandi sono disattivati». Una capacità che l'app non gestisce è segnata «non supportata» («Capacità non gestita
-  dall'app: …»). Senza dispositivi leggi «Nessun dispositivo in questo appartamento».
-- **Sotto ogni comando** compare l'esito: «in corso», «eseguito», «errore» o «nessuna risposta», con il motivo
-  («dispositivo offline», «rifiutato dal dispositivo», «bloccato da una regola», «bloccato da un'azione prioritaria»,
-  «fuori dai limiti», «nessuna conferma», «errore interno») e un «ID richiesta» copiabile. Un climatizzatore comandato
-  a infrarosso può risultare «non verificato» («Lo split non conferma l'esecuzione: lo stato mostrato è quello
-  richiesto»).
-- Mentre guardi un appartamento possono comparire avvisi in alto: «Nuova approvazione richiesta», «… è offline»,
-  «Sistema domotico non raggiungibile», «Sistema domotico di nuovo raggiungibile». Compaiono anche se hai spento la
-  categoria nelle notifiche.
+**Lo stato dell'appartamento in tempo reale: salute, modalità, dispositivi.**
+
+| Zona della pagina | Cosa vedi | Cosa vuol dire |
+|---|---|---|
+| In alto | Il nome, l'occupazione, «Check-in», «Check-out», «Prenotazione» e «…/… dispositivi online» | I dati principali dell'appartamento |
+| In alto | «In tempo reale» | La pagina si aggiorna da sola |
+| In alto | «Riconnessione…» | Sta ricollegandosi: non prendere per buono un valore vecchio |
+| La striscia di salute | «In salute», «Degradata» o «Ferma» | Lo stato del sistema domotico |
+| La striscia di salute | «Connettore» «attivo» o «fermo», «… dispositivi connessi», «Modello» (lo stato dell'assistente), «Contratto» e «Ultimo evento …» | I dettagli della salute |
+| La striscia di salute | «Sistema domotico non raggiungibile» | Il sistema domotico non risponde |
+| La striscia di salute | «Versione del contratto non compatibile» e «Il sistema domotico dichiara il contratto …: questa app supporta solo la versione 1.x. Contatta il supporto tecnico.» | La versione del sistema non è compatibile |
+| «Modalità» | La modalità attuale fra «comfort», «eco» e «casa vuota» | La modalità in corso |
+| «Forza per…» | «Forzatura … attiva fino alle …» e «ancora …» | C'è una forzatura in corso |
+| «Dispositivi» | I dispositivi raggruppati per stanza («Senza stanza» per quelli senza), con stato e letture | Vedi la tabella sotto |
+
+**Che cosa mostra ogni dispositivo:**
+
+| Dispositivo | Cosa vedi |
+|---|---|
+| Prese e interruttori | «Acceso» o «Spento» |
+| Caldaia | «Riscaldamento abilitato» o «Riscaldamento disabilitato»; se il suo misuratore segna più di 30 W, «sta scaldando ora» |
+| Climatizzatore | Acceso o spento; «Modo» («caldo», «freddo», «deumidifica», «ventilazione»); «Ventola» («auto», «bassa», «media», «alta»); «Temperatura» desiderata con «da … a … °C» |
+| Misuratore di consumo | «Potenza» (in W, cioè quanto consuma adesso) e «Oggi» (kWh di oggi) |
+| Sensori | «Temperatura», «Umidità» |
+| Contatto finestra | «Aperta» o «Chiusa» «da …» |
+| Sensore di movimento | «Movimento rilevato» o «Nessun movimento» (passando sopra leggi la data precisa) |
+
+**Casi particolari:**
+
+- **Un dispositivo che non risponde** mostra «Dispositivo offline», «Visto …» e «Il dispositivo non è
+  raggiungibile: i comandi sono disattivati».
+- **Una capacità che l'app non gestisce** è segnata «non supportata» («Capacità non gestita dall'app: …»).
+- **Senza dispositivi** leggi «Nessun dispositivo in questo appartamento».
+
+### Panoramica: l'esito sotto ogni comando
+
+**Come leggere se un comando è riuscito, e perché no.**
+
+- **Gli stati**: «in corso», «eseguito», «errore» o «nessuna risposta».
+- **Il motivo**, se c'è (tabella sotto), e un «ID richiesta» copiabile.
+- **Un climatizzatore comandato a infrarosso** può risultare «non verificato» («Lo split non conferma l'esecuzione:
+  lo stato mostrato è quello richiesto»).
+
+| Motivo | Cosa vuol dire |
+|---|---|
+| «dispositivo offline» | Il dispositivo è offline |
+| «rifiutato dal dispositivo» | Il dispositivo non ha accettato il comando |
+| «bloccato da una regola» | Una regola (per esempio finestra aperta o pausa del compressore) ha bloccato il comando |
+| «bloccato da un'azione prioritaria» | Un'azione più importante ha bloccato il comando |
+| «fuori dai limiti» | Temperatura fuori dai limiti |
+| «nessuna conferma» | Il comando è partito ma non è stato confermato |
+| «errore interno» | Un errore del sistema domotico |
+
+> **Da sapere**
+>
+> Mentre guardi un appartamento possono comparire avvisi in alto: «Nuova approvazione richiesta», «… è offline»,
+> «Sistema domotico non raggiungibile», «Sistema domotico di nuovo raggiungibile». Compaiono anche se hai spento la
+> categoria nelle notifiche.
 
 ### Approvazioni: che cosa vedi
 
-«Approvazioni» («Azioni che il motore esegue solo con il tuo consenso») elenca le richieste. Il filtro «In attesa»
-mostra quelle aperte; «Tutte» anche quelle decise negli ultimi 7 giorni. Ogni scheda mostra chi la propone («Motore
-AI», «Regola», «Assistente», «Modulo»), la descrizione, «Perché il motore lo propone», «Azione proposta», lo stato («In
-attesa», «Approvata», «Respinta», «Scaduta»), «… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta», la frase su
-cosa succede alla scadenza («Alla scadenza verrà respinta», «Alla scadenza verrà eseguita» o «Alla scadenza resta in
-attesa») e, dopo la decisione, «Approvata da … …» o «Respinta da … …» con la nota. Se non c'è nulla: «Nessuna
-approvazione in attesa» o «Nessuna approvazione negli ultimi 7 giorni». La pagina si aggiorna ogni 30 secondi. C'è una
-sola richiesta aperta per volta: le altre aspettano in coda e si aprono dopo.
+**Le richieste che il motore esegue solo con il tuo consenso.**
+
+«Approvazioni» («Azioni che il motore esegue solo con il tuo consenso») elenca le richieste.
+
+| Cosa vedi | Cosa vuol dire |
+|---|---|
+| Il filtro «In attesa» | Le richieste aperte |
+| Il filtro «Tutte» | Anche quelle decise negli ultimi 7 giorni |
+| Chi la propone | «Motore AI», «Regola», «Assistente», «Modulo» |
+| La descrizione, «Perché il motore lo propone», «Azione proposta» | Che cosa chiede e perché |
+| Lo stato | «In attesa», «Approvata», «Respinta», «Scaduta» |
+| «… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta» | Quanto tempo resta per decidere |
+| «Alla scadenza verrà respinta», «Alla scadenza verrà eseguita» o «Alla scadenza resta in attesa» | Cosa succede se nessuno decide |
+| «Approvata da … …» o «Respinta da … …» con la nota | Chi ha deciso, quando, e la nota |
+| «Nessuna approvazione in attesa» o «Nessuna approvazione negli ultimi 7 giorni» | Non c'è nulla |
+
+> **Da sapere**
+>
+> - **La pagina si aggiorna** ogni 30 secondi.
+> - **C'è una sola richiesta aperta per volta**: le altre aspettano in coda e si aprono dopo.
 
 ### Decisioni: che cosa vedi
 
+**Lo storico dell'appartamento: chi ha fatto cosa, perché, con quale esito.**
+
 «Decisioni» («Tutto ciò che il motore e i gestori hanno fatto, e perché») è lo storico dell'appartamento, conservato
-per 24 mesi. Ogni riga mostra data, chi ha deciso («Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; una
-persona che ha eliminato l'account compare come «utente rimosso»), su cosa («appartamento», «dispositivo», «regole»,
-«programmazione»), il tipo di azione in italiano (per esempio «Modalità», «Forzatura scaduta», «Programma: spostata»,
-«Prenotazione annullata», «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica
-disattivata», «Antigelo non attivo»), il valore prima e dopo, il motivo, l'esito («Applicata», «Respinta», «in attesa
-di approvazione», «Non riuscita», «Informativa») e l'«ID richiesta». Passando sopra il tipo compare il codice tecnico;
-un'azione nuova non ancora tradotta mostra il codice.
+per 24 mesi.
 
-- **Filtri**: «Chi», «Dispositivo» («Tutti i dispositivi»), «Periodo» («Tutto lo storico», «Ultimi 7 giorni», «Ultimi
-  30 giorni», «Ultimi 90 giorni»). Si combinano. «Carica altri» mostra le righe precedenti. Se nulla corrisponde:
-  «Nessuna decisione per i filtri scelti».
-- **Ricerca**: scrivi nel campo «Cerca parole o un ID richiesta…». Cerca nel motivo, nell'azione, in chi ha deciso, nel
-  dispositivo, nei valori e nei codici, a blocchi di 1.000 decisioni dalle più recenti: leggi «Ricerca in corso…», poi
-  «Risultati: … · cercato fino al … (… decisioni esaminate)». Premi «Cerca più indietro» per continuare; alla fine leggi
-  «Risultati: … · cercato in tutto lo storico disponibile (… decisioni esaminate)». Oltre 3.000 risultati compare
-  «Raggiunti … risultati: restringi la ricerca con Periodo, Chi o Dispositivo.». Le decisioni nuove non entrano in una
-  ricerca già iniziata: cancella la parola per vedere l'elenco aggiornato.
-- **Ricerca per «ID richiesta»**: incolla l'identificativo completo copiato da un errore: la ricerca ignora i filtri e
-  guarda tutto lo storico in un colpo solo («Ricerca per ID richiesta in tutto lo storico · risultati: …»). Un pezzo
-  dell'identificativo fa invece una ricerca di parole.
-- **Tipi da conoscere**: «Collegamento ai dispositivi perso» (il sistema non parla più con i dispositivi: i comandi
-  vengono rifiutati finché non torna) e «Collegamento ai dispositivi ripristinato»; «Comando non verificato: misuratore
-  offline» (il comando al climatizzatore è partito ma il misuratore che lo conferma non risponde); «Finestra: regola
-  sospesa» (durante una forzatura). Le accensioni e gli spegnimenti ordinari del termostato della caldaia non sono tutti
-  registrati: trovi quelli dell'antigelo e i problemi del sensore.
+| Ogni riga mostra | Valori possibili |
+|---|---|
+| La data | Quando è successo |
+| Chi ha deciso | «Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; una persona che ha eliminato l'account compare come «utente rimosso» |
+| Su cosa | «appartamento», «dispositivo», «regole», «programmazione» |
+| Il tipo di azione, in italiano | Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata», «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo» |
+| Il valore prima e dopo, il motivo | Che cosa è cambiato e perché |
+| L'esito | «Applicata», «Respinta», «in attesa di approvazione», «Non riuscita», «Informativa» |
+| L'«ID richiesta» | L'identificativo dell'operazione |
 
-### Consumi: che cosa vedi e che cosa scarichi
+- **Passando sopra il tipo** compare il codice tecnico.
+- **Un'azione nuova** non ancora tradotta mostra il codice.
+
+**Tipi da conoscere:**
+
+| Tipo | Cosa vuol dire |
+|---|---|
+| «Collegamento ai dispositivi perso» | Il sistema non parla più con i dispositivi: i comandi vengono rifiutati finché non torna |
+| «Collegamento ai dispositivi ripristinato» | Il collegamento è tornato |
+| «Comando non verificato: misuratore offline» | Il comando al climatizzatore è partito ma il misuratore che lo conferma non risponde |
+| «Finestra: regola sospesa» | La regola della finestra è sospesa durante una forzatura |
+
+> **Da sapere**
+>
+> Le accensioni e gli spegnimenti ordinari del termostato della caldaia non sono tutti registrati: trovi quelli
+> dell'antigelo e i problemi del sensore.
+
+### Decisioni: filtri e ricerca
+
+**Trovare una decisione per periodo, autore, dispositivo o parola.**
+
+**I filtri:**
+
+- **«Chi»**, **«Dispositivo»** («Tutti i dispositivi») e **«Periodo»** («Tutto lo storico», «Ultimi 7 giorni»,
+  «Ultimi 30 giorni», «Ultimi 90 giorni»). Si combinano.
+- **«Carica altri»** mostra le righe precedenti.
+- **Se nulla corrisponde**: «Nessuna decisione per i filtri scelti».
+
+**La ricerca per parole:**
+
+1. **Scrivi** nel campo «Cerca parole o un ID richiesta…».
+2. **La ricerca guarda** nel motivo, nell'azione, in chi ha deciso, nel dispositivo, nei valori e nei codici, a
+   blocchi di 1.000 decisioni dalle più recenti.
+3. **Leggi** «Ricerca in corso…», poi «Risultati: … · cercato fino al … (… decisioni esaminate)».
+4. **Premi «Cerca più indietro»** per continuare.
+5. **Alla fine leggi** «Risultati: … · cercato in tutto lo storico disponibile (… decisioni esaminate)».
+
+> **Da sapere**
+>
+> - **Oltre 3.000 risultati** compare «Raggiunti … risultati: restringi la ricerca con Periodo, Chi o
+>   Dispositivo.».
+> - **Le decisioni nuove** non entrano in una ricerca già iniziata: cancella la parola per vedere l'elenco
+>   aggiornato.
+
+**La ricerca per «ID richiesta»:**
+
+- **Incolla l'identificativo completo** copiato da un errore: la ricerca ignora i filtri e guarda tutto lo storico in
+  un colpo solo («Ricerca per ID richiesta in tutto lo storico · risultati: …»).
+- **Un pezzo dell'identificativo** fa invece una ricerca di parole.
+
+### Consumi: che cosa vedi
+
+**I kWh misurati ora per ora, per periodo e per dispositivo.**
 
 «Consumi» («Energia elettrica misurata dai dispositivi») mostra i kWh misurati dai misuratori, ora per ora.
 
-- Scegli il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso», che
-  compare solo con ospiti dentro e una prenotazione conosciuta dall'app. Leggi «Totale periodo» in «kWh» e «Ore di clima
-  evitate», oggi sempre «non calcolate». I numeri si aggiornano ogni minuto.
-- Il grafico «Consumo per ora» (oggi) o «Consumo per giorno» (periodi più lunghi), con i valori al passaggio del
-  puntatore, e «Per dispositivo». Le ore senza letture contano zero. Senza dati: «Nessun dato nel periodo».
-- Sotto il grafico, «Consumi disponibili dal …» dice da quando ci sono misure: è la prima ora con un consumo maggiore di
-  zero. Senza nessun dato la riga non compare. Nei dimostrativi i consumi prima dell'avvio sono un profilo di esempio
-  dal 1° gennaio 2026.
-- Con «Soggiorno in corso» leggi «Dal check-in del … a ora» e «… ospiti» e, se c'è un soggiorno precedente conosciuto
-  dall'app, il riquadro «Soggiorno precedente» con date, ospiti, kWh e la percentuale «rispetto al precedente». Il
-  confronto è fra i totali, senza correggere per durata o numero di ospiti; se il precedente era zero non c'è
-  percentuale. Un soggiorno molto lungo (oltre 31 giorni) può non mostrare il grafico: «Periodo non valido: massimo 31
-  giorni per richiesta».
-- **«Rendiconto in Excel»** (per tutti i ruoli): «Consumi del mese scelto: riepilogo, giorno per giorno, ora per ora e
-  per dispositivo, con l'importo in euro se è impostato il prezzo per kWh.». Scegli «Mese del rendiconto» (gli ultimi
-  12, compreso quello in corso) e premi «Scarica Excel». Il file ha i fogli «Riepilogo», «Giornaliero», «Orario» e
-  «Dispositivi». L'importo è kWh per il prezzo dell'appartamento o dell'organizzazione; senza prezzo il file dice
-  «prezzo non impostato». Nel soggiorno in corso e nel confronto c'è «Excel del soggiorno»: il rendiconto dall'ora
-  esatta di arrivo a quella di partenza (o a ora), con identificativo del soggiorno, numero di ospiti e stato, senza
-  nomi o contatti degli ospiti; al massimo un anno. In testa al file «Consumi disponibili dal» dice da quando ci sono
-  misure: le ore precedenti restano vuote (non a zero); «…: ore precedenti vuote», «…: nessun dato nel periodo» e
-  «Periodo in corso: i dati arrivano fino al momento della generazione» spiegano i buchi; senza nessuna misura compare
-  «Nessun consumo misurato finora».
+| Cosa vedi | Cosa puoi fare | Cosa succede |
+|---|---|---|
+| Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso» | Scegliere il periodo | «Soggiorno in corso» compare solo con ospiti dentro e una prenotazione conosciuta dall'app |
+| «Totale periodo» in «kWh» e «Ore di clima evitate» | Leggere il totale | «Ore di clima evitate» è oggi sempre «non calcolate». I numeri si aggiornano ogni minuto |
+| Il grafico «Consumo per ora» (oggi) o «Consumo per giorno» (periodi più lunghi) | Passare con il puntatore per leggere i valori | Le ore senza letture contano zero. Senza dati: «Nessun dato nel periodo» |
+| «Per dispositivo» | Leggere il consumo di ogni dispositivo | Lo stesso periodo, diviso per dispositivo |
+| «Consumi disponibili dal …», sotto il grafico | Sapere da quando ci sono misure | È la prima ora con un consumo maggiore di zero. Senza nessun dato la riga non compare |
+
+> **Da sapere**
+>
+> Nei dimostrativi i consumi prima dell'avvio sono un profilo di esempio dal 1° gennaio 2026.
+
+**Con «Soggiorno in corso»:**
+
+- **Leggi** «Dal check-in del … a ora» e «… ospiti».
+- **Se c'è un soggiorno precedente** conosciuto dall'app, il riquadro «Soggiorno precedente» mostra date, ospiti,
+  kWh e la percentuale «rispetto al precedente».
+- **Il confronto** è fra i totali, senza correggere per durata o numero di ospiti; se il precedente era zero non c'è
+  percentuale.
+- **Un soggiorno molto lungo** (oltre 31 giorni) può non mostrare il grafico: «Periodo non valido: massimo 31 giorni
+  per richiesta».
+
+### Consumi: il rendiconto in Excel
+
+**Scaricare i consumi di un mese o di un soggiorno in Excel.**
+
+«Rendiconto in Excel» è per tutti i ruoli: «Consumi del mese scelto: riepilogo, giorno per giorno, ora per ora e per
+dispositivo, con l'importo in euro se è impostato il prezzo per kWh.».
+
+1. **Scegli «Mese del rendiconto»** (gli ultimi 12, compreso quello in corso).
+2. **Premi «Scarica Excel»**.
+3. **Apri il file**: ha i fogli «Riepilogo», «Giornaliero», «Orario» e «Dispositivi».
+
+- **L'importo** è kWh per il prezzo dell'appartamento o dell'organizzazione; senza prezzo il file dice «prezzo non
+  impostato».
+- **«Excel del soggiorno»** (nel soggiorno in corso e nel confronto) è il rendiconto dall'ora esatta di arrivo a
+  quella di partenza (o a ora), con identificativo del soggiorno, numero di ospiti e stato, senza nomi o contatti
+  degli ospiti; al massimo un anno.
+
+**Come il file spiega i buchi nei dati:**
+
+| Cosa leggi nel file | Cosa vuol dire |
+|---|---|
+| «Consumi disponibili dal», in testa | Da quando ci sono misure: le ore precedenti restano vuote (non a zero) |
+| «…: ore precedenti vuote», «…: nessun dato nel periodo» | Spiegano un buco nei dati |
+| «Periodo in corso: i dati arrivano fino al momento della generazione» | Il periodo non è ancora finito |
+| «Nessun consumo misurato finora» | Non c'è nessuna misura |
 
 ### Riepiloghi: che cosa vedi
 
-«Riepiloghi» («Il riepilogo di ogni settimana, pronto il lunedì mattina») c'è sempre, anche senza la funzione Consumi.
+**Il riepilogo di ogni settimana, pronto il lunedì mattina.**
 
-- L'elenco delle settimane, dalla più recente: «Settimana dal … al …» con «… segnalazioni», «1 segnalazione» o
-  «Nessuna novità». Finché non ce n'è nessuno: «Nessun riepilogo ancora. Ogni lunedì mattina arriva quello della
-  settimana appena finita.». L'elenco mostra al massimo 20 settimane; i riepiloghi restano conservati 12 mesi.
-- Apri una settimana: «Riepilogo della settimana», «calcolato il …», le frasi già pronte oppure «Settimana senza
-  novità». «Tutti i riepiloghi» torna all'elenco.
-- Il riquadro «Consumi a parità di occupazione» («kWh per notte confrontati con la mediana delle stesse notti nelle 4
-  settimane prima»): «Notti con ospiti» e «Notti vuote» con «… notti», «… per notte», «mediana prima …», lo stato «Nella
-  norma», «Alto», «Confronto non disponibile» o «Nessuna notte», e «Per dispositivo». «Alto» vuol dire almeno il 30 %
-  sopra il valore tipico delle 4 settimane prima e almeno 5 kWh in più. Nelle prime 5 settimane di misure vere leggi
-  «dati insufficienti: servono 5 settimane di consumi veri», con «, disponibili dal …».
-- Le segnalazioni: «… è offline da più di 24 ore.» (offline, non semplicemente spento), «Approvazione scaduta senza
-  risposta: ….», «… aperta … volte con il clima spento dalla regola.» (almeno 3 volte nella settimana).
-- Il riepilogo si prepara ogni lunedì dalle 8 del mattino, ora dell'appartamento; il controllo passa ogni ora, quindi
-  può arrivare un po' dopo le 8. Se il sistema domotico non risponde, riprova al giro dopo. La notifica «Riepilogo» parte
-  solo se c'è almeno una segnalazione: apri la pagina anche senza notifica.
+«Riepiloghi» («Il riepilogo di ogni settimana, pronto il lunedì mattina») c'è sempre, anche senza la funzione
+Consumi.
+
+| Cosa vedi | Cosa vuol dire |
+|---|---|
+| «Settimana dal … al …» con «… segnalazioni», «1 segnalazione» o «Nessuna novità» | L'elenco delle settimane, dalla più recente |
+| «Nessun riepilogo ancora. Ogni lunedì mattina arriva quello della settimana appena finita.» | Non c'è ancora nessun riepilogo |
+| «Riepilogo della settimana», «calcolato il …», le frasi già pronte oppure «Settimana senza novità» | Una settimana aperta |
+| «Tutti i riepiloghi» | Torna all'elenco |
+
+- **L'elenco mostra** al massimo 20 settimane; i riepiloghi restano conservati 12 mesi.
+
+**Il riquadro «Consumi a parità di occupazione»** («kWh per notte confrontati con la mediana delle stesse notti
+nelle 4 settimane prima»):
+
+- **«Notti con ospiti» e «Notti vuote»** con «… notti», «… per notte», «mediana prima …».
+- **Lo stato**: «Nella norma», «Alto», «Confronto non disponibile» o «Nessuna notte».
+- **«Per dispositivo»**: il dettaglio per dispositivo.
+- **«Alto»** vuol dire almeno il 30 % sopra il valore tipico delle 4 settimane prima e almeno 5 kWh in più.
+- **Nelle prime 5 settimane** di misure vere leggi «dati insufficienti: servono 5 settimane di consumi veri», con
+  «, disponibili dal …».
+
+**Le segnalazioni:**
+
+| Segnalazione | Quando compare |
+|---|---|
+| «… è offline da più di 24 ore.» | Un dispositivo offline (non semplicemente spento) da più di 24 ore |
+| «Approvazione scaduta senza risposta: ….» | Una richiesta scaduta senza risposta |
+| «… aperta … volte con il clima spento dalla regola.» | Una finestra aperta almeno 3 volte nella settimana |
+
+> **Da sapere**
+>
+> - **Il riepilogo si prepara** ogni lunedì dalle 8 del mattino, ora dell'appartamento; il controllo passa ogni
+>   ora, quindi può arrivare un po' dopo le 8.
+> - **Se il sistema domotico non risponde**, riprova al giro dopo.
+> - **La notifica «Riepilogo»** parte solo se c'è almeno una segnalazione: apri la pagina anche senza notifica.
 
 ### Programmazione: che cosa vedi
 
-«Programmazione» («Azioni pianificate dal motore e dal gestore»): «In programma» e «Storico (ultimi 7 giorni)», con
-aggiornamento ogni 30 secondi. Ogni riga ha l'orario (ora dell'appartamento), l'azione, l'origine («prenotazione»,
-«gestore», «assistente»), il tipo («pre-arrivo», «check-out», «casa vuota», «manuale») e lo stato («In programma»,
-«Eseguita», «Annullata», «Non riuscita»). Senza azioni: «Nessuna azione in programma». Le azioni nate da una
-prenotazione hanno la nota «Ricalcolata a ogni modifica della prenotazione».
+**Le azioni pianificate dal motore e dal gestore, future e passate.**
+
+«Programmazione» («Azioni pianificate dal motore e dal gestore») ha due elenchi, «In programma» e «Storico (ultimi
+7 giorni)», con aggiornamento ogni 30 secondi.
+
+| Ogni riga mostra | Valori possibili |
+|---|---|
+| L'orario | Ora dell'appartamento |
+| L'azione | Che cosa farà |
+| L'origine | «prenotazione», «gestore», «assistente» |
+| Il tipo | «pre-arrivo», «check-out», «casa vuota», «manuale» |
+| Lo stato | «In programma», «Eseguita», «Annullata», «Non riuscita» |
+
+- **Senza azioni**: «Nessuna azione in programma».
+- **Le azioni nate da una prenotazione** hanno la nota «Ricalcolata a ogni modifica della prenotazione».
 
 ### Regole: che cosa vedi
 
-«Regole» («Automatismi del motore: attiva, disattiva e regola i parametri entro i limiti») mostra le otto regole con
-interruttore, descrizione, valori e limiti «da … a …», e «Ultima modifica …». La regola «Pausa minima del compressore»
-è segnata «Non modificabile» («Questa regola è fissata dal motore: puoi solo vederla»). Le regole, i loro valori e che
-cosa fanno davvero sono nella parte 10. Gli operatori e gli amministratori possono anche modificarle (parte 5).
+**Le otto regole del motore, con interruttore, valori e limiti.**
+
+«Regole» («Automatismi del motore: attiva, disattiva e regola i parametri entro i limiti») mostra le otto regole.
+
+| Cosa vedi | Cosa vuol dire |
+|---|---|
+| Interruttore, descrizione, valori e limiti «da … a …» | Ogni regola con i suoi parametri |
+| «Ultima modifica …» | Quando è stata cambiata |
+| «Non modificabile» («Questa regola è fissata dal motore: puoi solo vederla») | La regola «Pausa minima del compressore» si può solo vedere |
+
+- **Le regole**, i loro valori e che cosa fanno davvero sono nella parte 10.
+- **Gli operatori e gli amministratori** possono anche modificarle (parte 5).
 
 ### Assistente per chi ha sola lettura
 
-La pagina «Assistente» compare anche a chi ha sola lettura, se la funzione è attiva, ma non si possono inviare
-richieste e non si vedono le domande dei colleghi: il server le rifiuta. Resta visibile solo una conversazione
-eventualmente già presente in quella scheda del browser.
+**La chat si vede, ma non si può scrivere.**
+
+- **La pagina «Assistente»** compare anche a chi ha sola lettura, se la funzione è attiva.
+- **Non si possono inviare richieste** e non si vedono le domande dei colleghi: il server le rifiuta.
+- **Resta visibile** solo una conversazione eventualmente già presente in quella scheda del browser.
 
 ### Il tuo account
 
-Anche con sola lettura gestisci tutto quello che riguarda te: nome, password, email, notifiche, installazione, uscita
-da tutti i dispositivi ed eliminazione dell'account (parte 2, «Impostazioni»).
+**Anche in sola lettura gestisci tutto quello che riguarda te.**
 
+- **Nome, password, email**, notifiche, installazione, uscita da tutti i dispositivi ed eliminazione dell'account:
+  vedi la parte 2, «Impostazioni».
 ## 5. Operatore: che cosa puoi fare
 
-L'operatore vede tutto quello della parte 4 e in più comanda. Le stesse cose le fa anche l'amministratore e chi lavora
-con un accesso di assistenza.
+**Tutto quello della parte 4, più i comandi.**
 
-### Panoramica: modalità, forzature e dispositivi
+L'operatore vede tutto quello della parte 4 e in più comanda. Le stesse cose le fa anche l'amministratore e chi
+lavora con un accesso di assistenza.
 
-**Cambiare modalità.** Sotto «Modalità» tocca «comfort», «eco» o «casa vuota». La scelta si illumina quando il
-sistema conferma (non c'è un avviso verde) e nelle Decisioni compare «Modalità» con prima e dopo, per esempio «comfort →
-casa vuota». Che cosa fa ogni modalità è nella parte 10: in breve, comfort scalda alla temperatura di comfort, eco
-abbassa la caldaia e spegne il clima, casa vuota spegne il clima e tiene solo l'antigelo. I comandi partono solo ai
-dispositivi online; il cambio di modalità non garantisce che ogni singolo comando riesca: controlla gli esiti sotto i
-dispositivi e le Decisioni. Un cambio di modalità fatto a mano non chiede conferma, anche con ospiti dentro.
+### Panoramica: cambiare modalità
 
-**Forzare per un po'.** Sotto «Forza per…» premi «30 min», «2 h» o «6 h». Compare «Forzatura … attiva fino alle …» con
-«ancora …» e il pulsante «Annulla forzatura». La forzatura tiene la modalità attuale e sospende gli automatismi del
-comfort: la regola della finestra aperta non spegne il clima (nelle Decisioni «Finestra: regola sospesa», con l'ora in
-cui riparte), la regolazione automatica del clima si ferma, un cambio di modalità programmato (per esempio il check-out)
-aspetta la fine della forzatura (nelle Decisioni «Azione rimandata», «rimandata per la forzatura»). L'antigelo resta
-attivo. Se c'è una finestra aperta, prima di partire l'app avvisa con «Finestra aperta» e «Finestra aperta in …: durante
-la forzatura il clima resta acceso.» (o «Finestre aperte in …: …»): scegli «Forza comunque» o «Annulla». Alla fine
-(«Forzatura scaduta» nelle Decisioni) o con «Annulla forzatura» («Forzatura annullata») le regole ripartono: se la
-finestra è ancora aperta oltre la soglia, il clima si spegne subito.
+**Scegliere comfort, eco o casa vuota con un tocco.**
 
-**Comandare i dispositivi** (solo online e con la funzione «Comandi» attiva):
+1. **Sotto «Modalità»** tocca «comfort», «eco» o «casa vuota».
+2. **La scelta si illumina** quando il sistema conferma (non c'è un avviso verde).
+3. **Nelle Decisioni** compare «Modalità» con prima e dopo, per esempio «comfort → casa vuota».
 
-- Prese e interruttori: tocca l'interruttore («Accendi …» / «Spegni …»); lo stato diventa «Acceso» o «Spento».
-- Caldaia: «Attiva …» / «Disattiva …» abilita o disabilita il riscaldamento («Riscaldamento abilitato» /
-  «Riscaldamento disabilitato»). Abilitato vuol dire «può scaldare»: è il termostato del sistema che accende e spegne
-  davvero la caldaia intorno alla temperatura voluta, usando il sensore della stanza. Senza un sensore utilizzabile la
-  caldaia segue il tuo comando così com'è, senza regolazione (parte 10).
-- Temperatura desiderata di caldaia e climatizzatore: «Diminuisci temperatura» e «Aumenta temperatura» accanto a
-  «Temperatura», a passi di 0,5 °C, entro «da … a … °C». Fuori dai limiti il comando è rifiutato («Il setpoint deve
-  essere tra … e …»).
-- Climatizzatore: interruttore, «Modo» («caldo», «freddo», «deumidifica», «ventilazione») e «Ventola» («auto»,
-  «bassa», «media», «alta»). Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all'inizio):
-  un comando automatico viene rimandato, uno tuo può essere rifiutato se manca più di qualche secondo.
-- Dopo ogni comando leggi l'esito: «in corso», «eseguito», «errore» o «nessuna risposta», con il motivo. Un
-  climatizzatore a infrarosso viene confermato dal suo misuratore entro una decina di secondi (consumo su di almeno
-  20 W per l'accensione, sotto 15 W per lo spegnimento); se il misuratore non risponde l'esito è «non verificato».
-- Un comando tuo su un climatizzatore o sulla caldaia toglie quel dispositivo alla regolazione automatica della modalità
-  fino al prossimo cambio di modalità: il sistema non va mai contro il comando di una persona.
-- «Azioni per …» (menu con i tre puntini) › «Rinomina o sposta» apre «Modifica dispositivo» («Cambia il nome visibile o
-  la stanza. La configurazione del dispositivo non viene toccata.»): «Nome» (da 1 a 60 caratteri), «Stanza» (una stanza
-  esistente), «Salva» o «Annulla»; compare «Dispositivo aggiornato». Funziona anche con la funzione Comandi spenta.
+| Modalità | In breve (i dettagli nella parte 10) |
+|---|---|
+| comfort | Scalda alla temperatura di comfort |
+| eco | Abbassa la caldaia e spegne il clima |
+| casa vuota | Spegne il clima e tiene solo l'antigelo |
+
+> **Attenzione**
+>
+> - **I comandi partono** solo ai dispositivi online.
+> - **Il cambio di modalità non garantisce** che ogni singolo comando riesca: controlla gli esiti sotto i
+>   dispositivi e le Decisioni.
+> - **Un cambio di modalità fatto a mano** non chiede conferma, anche con ospiti dentro.
+
+### Panoramica: forzare per un po'
+
+**Bloccare gli automatismi per 30 minuti, 2 ore o 6 ore.**
+
+1. **Sotto «Forza per…»** premi «30 min», «2 h» o «6 h».
+2. **Se c'è una finestra aperta**, prima di partire l'app avvisa con «Finestra aperta» e «Finestra aperta in …:
+   durante la forzatura il clima resta acceso.» (o «Finestre aperte in …: …»): scegli «Forza comunque» o «Annulla».
+3. **Compare** «Forzatura … attiva fino alle …» con «ancora …» e il pulsante «Annulla forzatura».
+
+**Che cosa fa la forzatura:**
+
+- **Tiene la modalità attuale** e sospende gli automatismi del comfort.
+- **La regola della finestra aperta** non spegne il clima (nelle Decisioni «Finestra: regola sospesa», con l'ora in
+  cui riparte).
+- **La regolazione automatica del clima** si ferma.
+- **Un cambio di modalità programmato** (per esempio il check-out) aspetta la fine della forzatura (nelle Decisioni
+  «Azione rimandata», «rimandata per la forzatura»).
+- **L'antigelo** resta attivo.
+
+**Quando finisce:**
+
+- **Alla scadenza** («Forzatura scaduta» nelle Decisioni) o con «Annulla forzatura» («Forzatura annullata») le
+  regole ripartono.
+- **Se la finestra è ancora aperta** oltre la soglia, il clima si spegne subito.
+
+### Panoramica: comandare i dispositivi
+
+**Accendere, spegnere e regolare i dispositivi online.**
+
+I comandi funzionano solo sui dispositivi online e con la funzione «Comandi» attiva.
+
+| Dispositivo | Cosa puoi fare | Cosa succede |
+|---|---|---|
+| Prese e interruttori | Tocca l'interruttore («Accendi …» / «Spegni …») | Lo stato diventa «Acceso» o «Spento» |
+| Caldaia | «Attiva …» / «Disattiva …» abilita o disabilita il riscaldamento | Leggi «Riscaldamento abilitato» / «Riscaldamento disabilitato» |
+| Caldaia e climatizzatore | «Diminuisci temperatura» e «Aumenta temperatura» accanto a «Temperatura», a passi di 0,5 °C, entro «da … a … °C» | Fuori dai limiti il comando è rifiutato («Il setpoint deve essere tra … e …») |
+| Climatizzatore | L'interruttore, «Modo» («caldo», «freddo», «deumidifica», «ventilazione») e «Ventola» («auto», «bassa», «media», «alta») | Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all'inizio) |
+
+> **Da sapere**
+>
+> - **Abilitato vuol dire «può scaldare»**: è il termostato del sistema che accende e spegne davvero la caldaia
+>   intorno alla temperatura voluta, usando il sensore della stanza.
+> - **Senza un sensore utilizzabile** la caldaia segue il tuo comando così com'è, senza regolazione (parte 10).
+> - **Pausa del compressore**: un comando automatico viene rimandato, uno tuo può essere rifiutato se manca più di
+>   qualche secondo.
+
+**Dopo ogni comando:**
+
+- **Leggi l'esito**: «in corso», «eseguito», «errore» o «nessuna risposta», con il motivo.
+- **Un climatizzatore a infrarosso** viene confermato dal suo misuratore entro una decina di secondi (consumo su di
+  almeno 20 W per l'accensione, sotto 15 W per lo spegnimento); se il misuratore non risponde l'esito è «non
+  verificato».
+- **Un comando tuo** su un climatizzatore o sulla caldaia toglie quel dispositivo alla regolazione automatica della
+  modalità fino al prossimo cambio di modalità: il sistema non va mai contro il comando di una persona.
+
+### Panoramica: rinominare o spostare un dispositivo
+
+**Cambiare il nome visibile o la stanza di un dispositivo.**
+
+1. **Apri «Azioni per …»** (menu con i tre puntini) › «Rinomina o sposta».
+2. **Si apre «Modifica dispositivo»** («Cambia il nome visibile o la stanza. La configurazione del dispositivo non
+   viene toccata.»).
+3. **Compila «Nome»** (da 1 a 60 caratteri) e «Stanza» (una stanza esistente).
+4. **Premi «Salva»** o «Annulla»; compare «Dispositivo aggiornato».
+
+> **Da sapere**
+>
+> Funziona anche con la funzione Comandi spenta.
 
 ### Approvazioni: approvare o respingere
 
-1. Apri la notifica oppure «Approvazioni» › «In attesa».
-2. Leggi la descrizione, «Perché il motore lo propone», «Azione proposta», il tempo rimasto e la frase sulla scadenza.
-3. Se vuoi, scrivi una «Nota (facoltativa)» («Perché approvi o respingi…», al massimo 500 caratteri).
-4. Premi «Approva» (compare «Azione approvata») o «Respingi» («Azione respinta»). La richiesta passa a «Approvata» o
-   «Respinta» con «… da … …» e la nota; la successiva in coda si apre.
-5. Controlla l'esito vero in Panoramica e nelle Decisioni: un'azione approvata può non partire se nel frattempo il
-   dispositivo è diventato irraggiungibile. Se una richiesta è già stata decisa da un collega leggi «L'approvazione è già
-   stata decisa».
+**Dire sì o no a una richiesta del motore.**
 
-Alla scadenza (30 minuti all'inizio): le richieste dell'assistente vengono respinte; «Mettere l'appartamento a vuoto
-dopo il check-out» viene eseguita; «Spegnere …» di un apparecchio che consuma a casa vuota viene respinta, salvo
-un'impostazione diversa dell'appartamento. Nelle Decisioni compare «Approvazione scaduta».
+1. **Apri la notifica** oppure «Approvazioni» › «In attesa».
+2. **Leggi** la descrizione, «Perché il motore lo propone», «Azione proposta», il tempo rimasto e la frase sulla
+   scadenza.
+3. **Se vuoi, scrivi** una «Nota (facoltativa)» («Perché approvi o respingi…», al massimo 500 caratteri).
+4. **Premi «Approva»** (compare «Azione approvata») o «Respingi» («Azione respinta»).
+5. **La richiesta passa** a «Approvata» o «Respinta» con «… da … …» e la nota; la successiva in coda si apre.
+6. **Controlla l'esito vero** in Panoramica e nelle Decisioni: un'azione approvata può non partire se nel frattempo
+   il dispositivo è diventato irraggiungibile.
 
-### Programmazione: aggiungere, spostare, annullare
+> **Da sapere**
+>
+> Se una richiesta è già stata decisa da un collega leggi «L'approvazione è già stata decisa».
 
-- **«Nuova azione»** apre «Programma un'azione» («L'azione verrà eseguita dal motore all'orario indicato (ora di …).»).
-  Compila «Quando» (un orario futuro, nel fuso dell'appartamento) e «Cosa fare»: «Cambia modalità» con «Modalità»
-  («comfort», «eco», «casa vuota») oppure «Comando a un dispositivo» con «Dispositivo» e «Comando»: per le prese
-  «Accendi» o «Spegni»; per clima e caldaia «Spegni» oppure «Imposta temperatura» con «Temperatura (°C)», che accende
-  anche l'apparecchio. Premi «Salva»: compare «Azione programmata». Un orario passato dà «L'orario deve essere nel
-  futuro». Un cambio di modalità programmato durante una forzatura aspetta la sua fine.
-- **«Sposta»** su una voce in programma apre «Sposta l'azione»: cambia «Quando» e premi «Salva» («Orario aggiornato»).
-  Il modulo parte da un'ora dopo adesso, non dall'orario salvato: controlla la data. Si possono spostare anche le azioni
-  nate da una prenotazione; una modifica della prenotazione può ricalcolarle.
-- **«Annulla azione»** chiede «Annullare questa azione programmata?» e mostra «Azione annullata»; la voce resta nello
-  storico. Solo per le azioni ancora «in programma»; una voce già eseguita o annullata risponde «L'azione è già stata
-  eseguita o annullata».
+**Alla scadenza** (30 minuti all'inizio):
 
-### Regole: cambiare i valori e chiedere una proposta
+| Richiesta | Che cosa succede alla scadenza |
+|---|---|
+| Le richieste dell'assistente | Vengono respinte |
+| «Mettere l'appartamento a vuoto dopo il check-out» | Viene eseguita |
+| «Spegnere …» di un apparecchio che consuma a casa vuota | Viene respinta, salvo un'impostazione diversa dell'appartamento |
 
-- **A mano**: cambia gli interruttori e i campi numerici delle regole modificabili («Minuti», «Minimo (°C)», «Massimo
-  (°C)», «Temperatura in comfort (°C)», «Temperatura in eco (°C)», «Raffrescamento in comfort (°C)», «Temperatura (°C)»,
-  «Umidità (%)», «Ore prima del check-in», «Minuti dopo il check-out», «Minuti di presenza dopo il check-out»). In basso
-  compare «… regole modificate» con «Salva le modifiche» e «Annulla le modifiche» (riporta i campi ai valori salvati).
-  Un valore fuori dai limiti è segnalato sotto il campo («Valore fuori dai limiti (…–…)»), così come «Il minimo non può
-  superare il massimo», «La temperatura eco non può superare quella comfort» e «La temperatura di raffrescamento deve
-  essere più alta di quella comfort»: finché c'è un errore il salvataggio resta disattivato. Dopo «Salva le modifiche»
-  leggi «Regole aggiornate»; la modifica è nelle Decisioni («Regole aggiornate»). I nuovi limiti minimo e massimo si
-  applicano subito ai climatizzatori. Le nuove temperature delle modalità valgono dal prossimo cambio di modalità e, in
-  comfort, dalla regolazione automatica del clima.
-- **«Chiedi all'assistente»** (in alto nella pagina Regole): «Scrivi che cosa vuoi cambiare: l'assistente prepara la
-  modifica, tu la controlli e la applichi. Niente cambia finché non premi «Applica».». Scrivi in italiano (esempio
-  «la finestra aperta spegne dopo 10 minuti»; al massimo 500 caratteri, contatore «…/… caratteri») e premi «Proponi».
-  Leggi «Preparo la proposta…», poi «Modifiche proposte»: regola, campo, valore prima e dopo (per esempio «Finestra
-  aperta spegne il clima, Minuti da 5 a 10», «Stato» «attiva» o «spenta») e la spiegazione. Premi «Applica» («Regole
-  aggiornate come proposto») o «Scarta». Se la richiesta non riguarda le regole o è fuori dai limiti, l'assistente lo
-  dice e non propone nulla. Frasi semplici capite subito: «finestra 10 minuti», «antigelo 10 gradi», «spegni la regola
-  dell'antimuffa», «presenza al check-out 45 minuti», «setpoint da 18 a 25», «comfort 22», «eco 17», «raffrescamento 26».
-  «temperatura 22» da sola fa chiedere «È la temperatura comfort, eco, di raffrescamento o un limite (minimo o massimo)?
-  Scrivilo, per esempio «comfort 22» o «massimo 24».». Per le frasi più articolate risponde il modello; se non risponde
-  in tempo leggi «L'assistente non ha risposto in tempo: riprova con una frase più breve, oppure cambia la regola a mano
-  qui sotto.». Una proposta non mostra mai valori che il salvataggio rifiuterebbe (eco non sopra comfort, raffrescamento
-  sopra comfort). Al massimo 20 richieste al giorno per appartamento, per tutti gli utenti insieme («Hai già chiesto 20
-  proposte oggi per questo appartamento: riprova domani o cambia le regole a mano»). Se hai modifiche a mano non salvate,
-  «Applica» è disattivato: «Salva o annulla prima le modifiche fatte a mano». Se nel frattempo qualcuno ha cambiato le
-  regole leggi «Le regole sono cambiate nel frattempo: rifai la richiesta»; se sono già così, «Le regole sono già così:
-  non c'è niente da cambiare». La modifica applicata è nelle Decisioni e nel «Registro dell'organizzazione» con il tuo
-  nome («… ha modificato le regole dell'appartamento … su proposta dell'assistente»); quello che hai scritto non viene
-  conservato.
+Nelle Decisioni compare «Approvazione scaduta».
 
-Il riquadro «Applica le stesse regole ad altri appartamenti» è riservato agli amministratori (parte 6).
+### Programmazione: aggiungere un'azione
+
+**Programmare una modalità o un comando a un orario.**
+
+«Nuova azione» apre «Programma un'azione» («L'azione verrà eseguita dal motore all'orario indicato (ora di …).»).
+
+1. **Compila «Quando»**: un orario futuro, nel fuso dell'appartamento.
+2. **Scegli «Cosa fare»**: «Cambia modalità» oppure «Comando a un dispositivo».
+3. **Con «Cambia modalità»** scegli «Modalità»: «comfort», «eco», «casa vuota».
+4. **Con «Comando a un dispositivo»** scegli «Dispositivo» e «Comando» (tabella sotto).
+5. **Premi «Salva»**: compare «Azione programmata».
+
+| Dispositivo | Comandi possibili |
+|---|---|
+| Prese | «Accendi» o «Spegni» |
+| Clima e caldaia | «Spegni» oppure «Imposta temperatura» con «Temperatura (°C)», che accende anche l'apparecchio |
+
+> **Attenzione**
+>
+> - **Un orario passato** dà «L'orario deve essere nel futuro».
+> - **Un cambio di modalità programmato** durante una forzatura aspetta la sua fine.
+
+### Programmazione: spostare o annullare un'azione
+
+**Cambiare l'orario di un'azione in programma, o annullarla.**
+
+**«Sposta»**, su una voce in programma:
+
+- **Apre «Sposta l'azione»**: cambia «Quando» e premi «Salva» («Orario aggiornato»).
+- **Il modulo parte** da un'ora dopo adesso, non dall'orario salvato: controlla la data.
+- **Si possono spostare** anche le azioni nate da una prenotazione; una modifica della prenotazione può
+  ricalcolarle.
+
+**«Annulla azione»:**
+
+- **Chiede** «Annullare questa azione programmata?» e mostra «Azione annullata»; la voce resta nello storico.
+- **Vale solo** per le azioni ancora «in programma»; una voce già eseguita o annullata risponde «L'azione è già
+  stata eseguita o annullata».
+
+### Regole: cambiare i valori a mano
+
+**Accendere, spegnere e regolare le regole entro i limiti.**
+
+1. **Cambia gli interruttori** e i campi numerici delle regole modificabili (tabella sotto).
+2. **In basso compare** «… regole modificate» con «Salva le modifiche» e «Annulla le modifiche» (riporta i campi ai
+   valori salvati).
+3. **Premi «Salva le modifiche»** e leggi «Regole aggiornate»; la modifica è nelle Decisioni («Regole aggiornate»).
+
+| Campo numerico | Regola |
+|---|---|
+| «Minuti» | «Finestra aperta spegne il clima», «Avviso dispositivo offline» |
+| «Minimo (°C)», «Massimo (°C)» | «Limiti del setpoint» |
+| «Temperatura in comfort (°C)», «Temperatura in eco (°C)» | «Limiti del setpoint» |
+| «Raffrescamento in comfort (°C)» | «Limiti del setpoint» |
+| «Temperatura (°C)» | «Antigelo a casa vuota» |
+| «Umidità (%)» | «Antimuffa a casa vuota» |
+| «Ore prima del check-in» | «Pre-arrivo» |
+| «Minuti dopo il check-out», «Minuti di presenza dopo il check-out» | «Risparmio al check-out» |
+
+**Gli errori segnalati sotto il campo** (finché c'è un errore il salvataggio resta disattivato):
+
+| Messaggio | Quando |
+|---|---|
+| «Valore fuori dai limiti (…–…)» | Un valore fuori dai limiti |
+| «Il minimo non può superare il massimo» | Minimo sopra il massimo |
+| «La temperatura eco non può superare quella comfort» | Eco sopra comfort |
+| «La temperatura di raffrescamento deve essere più alta di quella comfort» | Raffrescamento non sopra comfort |
+
+> **Da sapere**
+>
+> - **I nuovi limiti minimo e massimo** si applicano subito ai climatizzatori.
+> - **Le nuove temperature delle modalità** valgono dal prossimo cambio di modalità e, in comfort, dalla regolazione
+>   automatica del clima.
+
+### Regole: chiedere una proposta all'assistente
+
+**Descrivere a parole la modifica: l'assistente la prepara, tu la applichi.**
+
+In alto nella pagina Regole c'è «Chiedi all'assistente»: «Scrivi che cosa vuoi cambiare: l'assistente prepara la
+modifica, tu la controlli e la applichi. Niente cambia finché non premi «Applica».».
+
+1. **Scrivi in italiano** (esempio «la finestra aperta spegne dopo 10 minuti»; al massimo 500 caratteri, contatore
+   «…/… caratteri») e premi «Proponi».
+2. **Leggi** «Preparo la proposta…», poi «Modifiche proposte».
+3. **Controlla** regola, campo, valore prima e dopo (per esempio «Finestra aperta spegne il clima, Minuti da 5 a
+   10», «Stato» «attiva» o «spenta») e la spiegazione.
+4. **Premi «Applica»** («Regole aggiornate come proposto») o «Scarta».
+
+> **Esempio**
+>
+> - **Frasi semplici capite subito**: «finestra 10 minuti», «antigelo 10 gradi», «spegni la regola dell'antimuffa»,
+>   «presenza al check-out 45 minuti».
+> - **Anche**: «setpoint da 18 a 25», «comfort 22», «eco 17», «raffrescamento 26».
+> - **«temperatura 22» da sola** fa chiedere «È la temperatura comfort, eco, di raffrescamento o un limite (minimo
+>   o massimo)? Scrivilo, per esempio «comfort 22» o «massimo 24».».
+
+**Cosa può succedere:**
+
+| Cosa vedi | Cosa vuol dire |
+|---|---|
+| L'assistente dice che non propone nulla | La richiesta non riguarda le regole o è fuori dai limiti |
+| «L'assistente non ha risposto in tempo: riprova con una frase più breve, oppure cambia la regola a mano qui sotto.» | Per le frasi più articolate risponde il modello, e non ha risposto in tempo |
+| «Hai già chiesto 20 proposte oggi per questo appartamento: riprova domani o cambia le regole a mano» | Al massimo 20 richieste al giorno per appartamento, per tutti gli utenti insieme |
+| «Applica» disattivato con «Salva o annulla prima le modifiche fatte a mano» | Hai modifiche a mano non salvate |
+| «Le regole sono cambiate nel frattempo: rifai la richiesta» | Qualcuno ha cambiato le regole nel frattempo |
+| «Le regole sono già così: non c'è niente da cambiare» | Le regole sono già come chiesto |
+
+> **Da sapere**
+>
+> - **Una proposta non mostra mai** valori che il salvataggio rifiuterebbe (eco non sopra comfort, raffrescamento
+>   sopra comfort).
+> - **La modifica applicata** è nelle Decisioni e nel «Registro dell'organizzazione» con il tuo nome («… ha
+>   modificato le regole dell'appartamento … su proposta dell'assistente»); quello che hai scritto non viene
+>   conservato.
+> - **Il riquadro «Applica le stesse regole ad altri appartamenti»** è riservato agli amministratori (parte 6).
 
 ### Assistente: chiedere e comandare in italiano
 
+**Una chat per chiedere lo stato, i consumi o un comando.**
+
 «Assistente» («Chiedi in italiano: spegnere, impostare una temperatura, programmare un'azione»).
 
-1. Scrivi nel campo («Es. «Spegni il clima del soggiorno»», al massimo 500 caratteri) e premi «Invia», oppure tocca un
-   suggerimento: «Spegni il clima del soggiorno», «Porta il soggiorno a 21 gradi», «Alle 18 metti il clima a 22 gradi»,
-   «Spegni la caldaia».
-2. Leggi «Sto elaborando…», poi la risposta con lo stato «Risposto», «Richiede approvazione» o «Non riuscita». Se dopo
-   30 secondi non c'è risposta leggi «Nessuna risposta dall'assistente: riprova».
-3. L'assistente legge stati, dispositivi, consumi (fino a 31 giorni per volta), programmazioni e Decisioni (le ultime
-   50) e risponde a domande come «perché si è spento il clima?». Non riceve mai dati personali degli ospiti. Se non sa,
-   risponde «Non lo so: guarda nell'app.». Ogni domanda è a sé: non ricorda la chat precedente.
-4. Può fare solo quello che fa un operatore: cambiare modalità, comandare prese, clima e caldaia, programmare. Non tocca
-   regole (rimanda alla pagina Regole), utenti e appartamenti. L'esito lo scrive il sistema, non il modello: «Fatto: ….»
-   solo quando il dispositivo ha confermato; «Comando inviato: …, l'esito arriva nell'app.» se la conferma non è ancora
-   arrivata; «Non riuscito: … (…).» o «Non fatto: … (…).» con il motivo; «Programmato: ….» per un'azione a orario.
-   Sotto la risposta compaiono le etichette «Comando» e «Programmazione» con gli identificativi. Controlla sempre in
-   Panoramica. Il modello propone le azioni in una forma controllata e il sistema le verifica una per una prima di
-   eseguirle (limiti, conferme, regole): un'azione non ammessa non parte e viene detta con «Non fatto: … (…).».
-5. **Con ospiti dentro**, spegnere il clima o la caldaia e cambiare modalità non avviene da solo: l'assistente chiede in
-   chat, per esempio «Spengo climatizzatore soggiorno con ospiti presenti? Rispondi Sì o No qui sotto, oppure dalla
-   pagina Approvazioni.», con i pulsanti «Sì» e «No», «Scade alle …» e il link «Vai alle approvazioni». È la stessa
-   richiesta della pagina Approvazioni: la tua risposta compare lì e nelle Decisioni con il tuo nome; senza risposta
-   entro 30 minuti è respinta. Due o più azioni in una stessa richiesta («spegni clima e caldaia») chiedono una conferma
-   ciascuna, in coda, anche senza ospiti; se davanti c'è un'altra approvazione da decidere leggi «In attesa: prima va
-   decisa l'approvazione aperta.». Dopo il clic leggi «Approvato: il comando parte, l'esito arriva nell'app» o
-   «Respinto» e poi «Ora: …» per la successiva. Riaprendo la conversazione leggi «Approvata da te alle …», «Respinta da
-   te alle …», «Già decisa: approvata», «Già decisa: respinta» (un collega ha deciso) o «Scaduta». Chi gestisce il
-   sistema domotico può impostare la conferma in altro modo: sempre, oppure solo per più azioni insieme.
-6. **Programmare con ospiti** (dal lotto 30): se chiedi un'azione a un orario in cui, secondo le prenotazioni, ci
-   saranno ospiti e l'azione tocca il loro comfort (cambio di modalità, clima o caldaia spenti), l'assistente chiede
-   «Programmo …, con ospiti presenti a quell'ora? Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni.»; in
-   Approvazioni la richiesta si legge «Programmare …». Con «Sì» l'azione compare in Programmazione all'ora chiesta, con
-   origine «assistente»; con «No» o senza risposta non viene programmata. Accendere qualcosa non chiede conferma; il
-   controllo si fa quando chiedi, non all'ora dell'azione. L'orario deve essere almeno 30 secondi avanti; senza fuso è
-   l'ora dell'appartamento.
-7. «Svuota conversazione» pulisce la vista («Nessuna conversazione in questa sessione»): non cancella le richieste né
-   le Decisioni. La conversazione resta solo in quella scheda del browser (ultime 50 richieste per appartamento) e sparisce
-   quando esci.
-8. Limiti: 50 domande al giorno per appartamento («Limite di … domande al giorno raggiunto per questo appartamento:
-   riprova domani.») e un tetto di spesa mensile per tutto il servizio («Limite mensile raggiunto, riprova dal mese
-   prossimo»).
-9. **Risposta rapida** (dal lotto 30). Se l'assistente completo non risponde in tempo, non è raggiungibile o ha
-   raggiunto il limite mensile, risponde il sistema da solo. Esegue il comando solo se la frase è inequivocabile: un
-   verbo e un solo dispositivo (per tipo, stanza o nome) oppure una modalità, senza «non», condizioni od orari. Per
-   esempio «Spegni la caldaia» o «Porta il soggiorno a 21 gradi» partono; «non spegnere il clima», «alle 18 …», «se
-   fa freddo …», «spegni tutto», «spegni il clima e la presa» non fanno nulla: leggi lo stato e un rimando ai pulsanti
-   dell'app. Con ospiti dentro chiede conferma come sempre. In fondo alla risposta leggi «Risposta rapida:
-   l'assistente completo non ha risposto in tempo.» (oppure «… non è raggiungibile ora.» o «… ha raggiunto il limite
-   mensile.»). Se invece leggi «L'assistente non è disponibile ora, riprova più tardi», il sistema ha scartato una
-   risposta arrivata da fuori Europa (una protezione: il modello lavora solo in Europa): riprova.
+1. **Scrivi nel campo** («Es. «Spegni il clima del soggiorno»», al massimo 500 caratteri) e premi «Invia», oppure
+   tocca un suggerimento.
+2. **Leggi** «Sto elaborando…», poi la risposta con lo stato «Risposto», «Richiede approvazione» o «Non riuscita».
+3. **Se dopo 30 secondi** non c'è risposta leggi «Nessuna risposta dall'assistente: riprova».
+4. **Controlla sempre** in Panoramica.
 
-Sui dimostrativi senza il modello configurato risponde un riconoscitore semplice: capisce «spegni …», «… a 21 gradi» e
-«alle 18 …» (se l'ora è già passata, programma per domani); se nomini la caldaia con ospiti dentro chiede l'approvazione
-per spegnerla («Spegnere la caldaia con ospiti presenti richiede la tua approvazione.», oppure «C'è già un'approvazione
-in attesa: decidi prima quella.»); altrimenti risponde «Non ho capito. Posso spegnere, impostare una temperatura o
-programmare un'azione.» o «Indica la temperatura, ad esempio «porta il soggiorno a 21 gradi».».
+**I suggerimenti pronti:**
+
+- **Spegnere**: «Spegni il clima del soggiorno», «Spegni la caldaia».
+- **Regolare**: «Porta il soggiorno a 21 gradi».
+- **Programmare**: «Alle 18 metti il clima a 22 gradi».
+
+**Che cosa sa e che cosa può fare:**
+
+- **Legge** stati, dispositivi, consumi (fino a 31 giorni per volta), programmazioni e Decisioni (le ultime 50).
+- **Risponde** a domande come «perché si è spento il clima?».
+- **Non riceve mai** dati personali degli ospiti.
+- **Se non sa**, risponde «Non lo so: guarda nell'app.».
+- **Ogni domanda è a sé**: non ricorda la chat precedente.
+- **Può fare solo quello che fa un operatore**: cambiare modalità, comandare prese, clima e caldaia, programmare.
+- **Non tocca** regole (rimanda alla pagina Regole), utenti e appartamenti.
+
+**L'esito lo scrive il sistema, non il modello:**
+
+| Cosa leggi | Cosa vuol dire |
+|---|---|
+| «Fatto: ….» | Solo quando il dispositivo ha confermato |
+| «Comando inviato: …, l'esito arriva nell'app.» | La conferma non è ancora arrivata |
+| «Non riuscito: … (…).» o «Non fatto: … (…).» | Non eseguito, con il motivo |
+| «Programmato: ….» | Un'azione a orario |
+| Le etichette «Comando» e «Programmazione» sotto la risposta | Gli identificativi |
+
+> **Da sapere**
+>
+> Il modello propone le azioni in una forma controllata e il sistema le verifica una per una prima di eseguirle
+> (limiti, conferme, regole): un'azione non ammessa non parte e viene detta con «Non fatto: … (…).».
+
+### Assistente: conferme con ospiti dentro
+
+**Con ospiti presenti l'assistente chiede un sì o un no in chat.**
+
+1. **Spegnere il clima o la caldaia** e cambiare modalità non avviene da solo: l'assistente chiede in chat, per
+   esempio «Spengo climatizzatore soggiorno con ospiti presenti? Rispondi Sì o No qui sotto, oppure dalla pagina
+   Approvazioni.».
+2. **Rispondi** con i pulsanti «Sì» e «No»; vedi «Scade alle …» e il link «Vai alle approvazioni».
+3. **È la stessa richiesta** della pagina Approvazioni: la tua risposta compare lì e nelle Decisioni con il tuo nome;
+   senza risposta entro 30 minuti è respinta.
+4. **Dopo il clic** leggi «Approvato: il comando parte, l'esito arriva nell'app» o «Respinto» e poi «Ora: …» per la
+   successiva.
+
+| Riaprendo la conversazione leggi | Cosa vuol dire |
+|---|---|
+| «Approvata da te alle …», «Respinta da te alle …» | Hai deciso tu |
+| «Già decisa: approvata», «Già decisa: respinta» | Un collega ha deciso |
+| «Scaduta» | Nessuno ha risposto in tempo |
+
+> **Da sapere**
+>
+> - **Due o più azioni in una stessa richiesta** («spegni clima e caldaia») chiedono una conferma ciascuna, in coda,
+>   anche senza ospiti.
+> - **Se davanti c'è un'altra approvazione** da decidere leggi «In attesa: prima va decisa l'approvazione aperta.».
+> - **Chi gestisce il sistema domotico** può impostare la conferma in altro modo: sempre, oppure solo per più azioni
+>   insieme.
+
+**Programmare con ospiti** (dal lotto 30):
+
+1. **Se chiedi un'azione a un orario** in cui, secondo le prenotazioni, ci saranno ospiti e l'azione tocca il loro
+   comfort (cambio di modalità, clima o caldaia spenti), l'assistente chiede «Programmo …, con ospiti presenti a
+   quell'ora? Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni.».
+2. **In Approvazioni** la richiesta si legge «Programmare …».
+3. **Con «Sì»** l'azione compare in Programmazione all'ora chiesta, con origine «assistente»; con «No» o senza
+   risposta non viene programmata.
+
+> **Da sapere**
+>
+> - **Accendere qualcosa** non chiede conferma.
+> - **Il controllo si fa** quando chiedi, non all'ora dell'azione.
+> - **L'orario** deve essere almeno 30 secondi avanti; senza fuso è l'ora dell'appartamento.
+
+### Assistente: conversazione, limiti e risposta rapida
+
+**Quanto dura la chat, quante domande al giorno, cosa succede se il modello tace.**
+
+**La conversazione:**
+
+- **«Svuota conversazione»** pulisce la vista («Nessuna conversazione in questa sessione»): non cancella le richieste
+  né le Decisioni.
+- **La conversazione resta** solo in quella scheda del browser (ultime 50 richieste per appartamento) e sparisce
+  quando esci.
+
+**I limiti:**
+
+- **50 domande al giorno** per appartamento: «Limite di … domande al giorno raggiunto per questo appartamento:
+  riprova domani.».
+- **Un tetto di spesa mensile** per tutto il servizio: «Limite mensile raggiunto, riprova dal mese prossimo».
+
+**La risposta rapida** (dal lotto 30):
+
+- **Quando**: se l'assistente completo non risponde in tempo, non è raggiungibile o ha raggiunto il limite mensile,
+  risponde il sistema da solo.
+- **Esegue il comando** solo se la frase è inequivocabile: un verbo e un solo dispositivo (per tipo, stanza o nome)
+  oppure una modalità, senza «non», condizioni od orari.
+- **Con ospiti dentro** chiede conferma come sempre.
+- **In fondo alla risposta** leggi «Risposta rapida: l'assistente completo non ha risposto in tempo.» (oppure «… non
+  è raggiungibile ora.» o «… ha raggiunto il limite mensile.»).
+
+> **Esempio**
+>
+> - **Partono**: «Spegni la caldaia», «Porta il soggiorno a 21 gradi».
+> - **Non fanno nulla**: «non spegnere il clima», «alle 18 …», «se fa freddo …», «spegni tutto», «spegni il clima e
+>   la presa». Leggi lo stato e un rimando ai pulsanti dell'app.
+
+> **Attenzione**
+>
+> Se invece leggi «L'assistente non è disponibile ora, riprova più tardi», il sistema ha scartato una risposta
+> arrivata da fuori Europa (una protezione: il modello lavora solo in Europa): riprova.
+
+**Sui dimostrativi senza il modello configurato** risponde un riconoscitore semplice:
+
+- **Capisce** «spegni …», «… a 21 gradi» e «alle 18 …» (se l'ora è già passata, programma per domani).
+- **Se nomini la caldaia con ospiti dentro** chiede l'approvazione per spegnerla: «Spegnere la caldaia con ospiti
+  presenti richiede la tua approvazione.», oppure «C'è già un'approvazione in attesa: decidi prima quella.».
+- **Altrimenti** risponde «Non ho capito. Posso spegnere, impostare una temperatura o programmare un'azione.» o
+  «Indica la temperatura, ad esempio «porta il soggiorno a 21 gradi».».
 
 ## 6. Amministratore: che cosa puoi fare in più
 
