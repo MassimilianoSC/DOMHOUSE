@@ -57,11 +57,11 @@ def test_every_question_once_with_the_quick_answers_and_the_timeouts():
         await ai_stats.count_ask(APT, ask("a4", reason="risposta_rapida:monthly_cap"))
         await ai_stats.count_ask(APT, ask("a5", status="failed", reason="timeout"))
         await ai_stats.count_ask(APT, ask("a6", status="needs_approval"))
-        await ai_stats.count_ask(APT, ask("a7", status="pending"))                 # not final: later
+        await ai_stats.count_ask(APT, ask("a7", status="pending"))                 # a question at its first view
         await ai_stats.count_ask(APT, {"status": "answered"})                     # no ask_id: nothing
     run(main())
     d = stats(APT, "2026-W43")
-    assert (d["asks"], d["timeouts"], d["twins"]) == (6, 2, 0)
+    assert (d["asks"], d["timeouts"], d["twins"]) == (7, 2, 0)
     assert d["quick"] == {"timeout": 1, "json_invalid": 1, "monthly_cap": 1}
     assert (d["from"], d["to"]) == ("2026-10-19", "2026-10-25")
 
@@ -176,3 +176,29 @@ def test_a_quick_answer_for_timeout_on_a_demonstration_counts_a_timeout(monkeypa
     assert final["status"] == "answered" and final["reason"] == "risposta_rapida:timeout", final
     d = stats("apt-bologna-01", ai_stats.week_of(datetime.now(UTC)))
     assert (d["asks"], d["timeouts"], d["quick"]) == (1, 1, {"timeout": 1})
+
+
+
+def test_staging_ask_03ed_the_timeout_read_after_the_question_still_counts():
+    """Staging, 23 Oct: ask-03ed was counted as a question but not as a timeout nor a quick answer. The question counts at
+    its first view (pending); its timeout and its quick answer when the final state arrives, once each."""
+    async def main():
+        await ai_stats.count_ask(APT, ask("ask-03ed", status="pending"))
+        await ai_stats.count_ask(APT, ask("ask-03ed", status="pending"))
+        await ai_stats.count_ask(APT, ask("ask-03ed", reason="risposta_rapida:timeout"))
+        await ai_stats.count_ask(APT, ask("ask-03ed", reason="risposta_rapida:timeout"))      # read again: nothing new
+    run(main())
+    d = stats(APT, "2026-W43")
+    assert (d["asks"], d["timeouts"], d["quick"]) == (1, 1, {"timeout": 1})
+    assert d["ask_ids"] == d["timeout_ids"] == d["quick_ids"] == ["ask-03ed"]
+
+
+def test_a_document_of_before_is_not_counted_twice():
+    """A week written before this change counted each question with its timeout at once: reading one of them again
+    after the update adds nothing."""
+    from bff.repository.base import ai_stats_added
+    old = {"apartment_id": APT, "week": "2026-W43", "from": "2026-10-19", "to": "2026-10-25", "asks": 1, "timeouts": 1,
+           "twins": 0, "quick": {"timeout": 1}, "ask_ids": ["a1"]}
+    assert ai_stats_added(old, APT, "2026-W43", ("2026-10-19", "2026-10-25"), 1, 1, 0, "timeout", "a1") is None
+    d = ai_stats_added(old, APT, "2026-W43", ("2026-10-19", "2026-10-25"), 1, 1, 0, "timeout", "a2")
+    assert (d["asks"], d["timeouts"], d["quick"]) == (2, 2, {"timeout": 2})

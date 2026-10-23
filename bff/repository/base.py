@@ -164,14 +164,30 @@ EMPTY_AI_USAGE = {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens
 
 def ai_stats_added(doc: dict | None, apartment_id: str, week: str, bounds: tuple[str, str], asks: int, timeouts: int,
                    twins: int, quick: str | None, ask_id: str | None) -> dict | None:
-    """Decision 120: the weekly counters after one addition (bff/ai_stats.py), or None when the ask was already counted.
-    Both repositories use it, the Firestore one inside a transaction."""
+    """Decision 120: the weekly counters after one addition (bff/ai_stats.py), or None when nothing is new. With an
+    ask_id each count is once per question, apart: the question (ask_ids), its timeout (timeout_ids), its quick answer
+    (quick_ids), so a timeout read after the question was counted still counts (staging, 23 Oct: ask-03ed). Both
+    repositories use it, the Firestore one inside a transaction."""
     d = dict(doc) if doc else {"apartment_id": apartment_id, "week": week, "from": bounds[0], "to": bounds[1],
-                               "asks": 0, "timeouts": 0, "twins": 0, "quick": {}, "ask_ids": []}
+                               "asks": 0, "timeouts": 0, "twins": 0, "quick": {}, "ask_ids": [], "timeout_ids": [],
+                               "quick_ids": []}
+    for ids in ("timeout_ids", "quick_ids"):         # a document of before: its questions were counted all at once
+        d.setdefault(ids, list(d.get("ask_ids", [])))
     if ask_id is not None:
-        if ask_id in d.get("ask_ids", []):
+        new = False
+        for field, wanted, ids in (("asks", asks, "ask_ids"), ("timeouts", timeouts, "timeout_ids"),
+                                   ("quick", 1 if quick else 0, "quick_ids")):
+            if wanted and ask_id not in d.get(ids, []):
+                d[ids] = [*d.get(ids, []), ask_id]
+                new = True
+            elif field == "quick":
+                quick = None
+            elif field == "timeouts":
+                timeouts = 0
+            else:
+                asks = 0
+        if not new:
             return None
-        d["ask_ids"] = [*d.get("ask_ids", []), ask_id]
     d["asks"] = d.get("asks", 0) + asks
     d["timeouts"] = d.get("timeouts", 0) + timeouts
     d["twins"] = d.get("twins", 0) + twins

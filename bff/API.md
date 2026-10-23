@@ -741,8 +741,10 @@ Il BFF conta le domande all'assistente per appartamento e settimana (da lunedì 
 `2026-W43`) nei documenti Firestore `ai_stats/{appartamento}__{settimana}`, che scadono 12 mesi dopo il lunedì (TTL
 `ai_stats`, comando del committente). Senza modifiche al contratto:
 
-- `asks`: ogni domanda una volta sola (l'`ask_id` resta nel documento), quando il sito legge dal proxy (#9, `ask` e
-  `ask/{id}`) il suo esito finale: `answered`, `needs_approval` o `failed`;
+- `asks`: ogni domanda una volta sola (l'`ask_id` resta nel documento), la prima volta che passa dal proxy (#9, `ask`
+  e `ask/{id}`), anche ancora in corso; timeout e risposta rapida si contano quando il sito legge l'esito finale
+  (`answered`, `needs_approval` o `failed`), una volta ciascuno, anche se la domanda era già contata (`timeout_ids`,
+  `quick_ids`; staging, 23 ottobre);
 - `quick`: le risposte rapide per causa, da `reason` «risposta_rapida:<causa>» (`timeout`, `model_unavailable`,
   `monthly_cap`, `json_invalid`; D-182 punto 4);
 - `timeouts`: le domande a cui l'assistente completo non ha risposto in tempo (`risposta_rapida:timeout`, oppure

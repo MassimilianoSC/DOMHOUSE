@@ -1,8 +1,9 @@
 """The assistant's weekly counters (lot 31, decision 120, D-183 point 129): per apartment and week (Monday to Sunday in
 Europe/Rome, «2026-W43»), in Firestore ai_stats/{apartment}__{week}, kept 12 months (TTL, bff/retention.py).
 
-- asks: every question once (its ask_id is remembered in the document), when the site reads its final state through
-  the proxy (answered, needs_approval or failed);
+- asks: every question once (its ask_id is remembered in the document), at the first read through the proxy (POST
+  ask, GET ask/{id}); its timeout and its quick answer when the site reads its final state (answered, needs_approval,
+  failed), also when the question was already counted;
 - quick: the answers of the quick assistant by cause, from the ask's reason «risposta_rapida:<cause>» (D-182 point 4);
 - timeouts: the questions the full assistant did not answer in time (reason «risposta_rapida:timeout», or failed with
   reason «timeout»): the engine gives up before the model call ends, so the gateway alone would miss them;
@@ -55,10 +56,13 @@ def _when(created_at) -> datetime:
 
 
 async def count_ask(apartment_id: str, ask) -> None:
-    """A question's final state as the engine gave it (AskStatus): counted once per ask_id."""
-    if not isinstance(ask, dict) or ask.get("status") not in FINAL or not ask.get("ask_id"):
+    """A question as the engine gave it (AskStatus), at every read through the proxy: the question counted at its first
+    view, its timeout and its quick answer when its state is final (each once per ask_id, even after the question was
+    counted: staging, 23 Oct, ask-03ed)."""
+    if not isinstance(ask, dict) or not ask.get("ask_id") or ask.get("status") not in (*FINAL, "pending"):
         return
-    reason = str(ask.get("reason") or "")
+    final = ask["status"] in FINAL
+    reason = str(ask.get("reason") or "") if final else ""
     quick = reason[len(QUICK_PREFIX):] if reason.startswith(QUICK_PREFIX) else None
     timeout = quick == "timeout" or (ask["status"] == "failed" and reason == "timeout")
     week = week_of(_when(ask.get("created_at")))
