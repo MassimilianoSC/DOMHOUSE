@@ -34,11 +34,11 @@ function DevLogin() {
           <span className="rounded-full bg-primary/10 p-2 text-primary">
             <UserRound className="h-4 w-4" />
           </span>
-          <span className="min-w-0 flex-1">
+          <span className="min-w-[4.5rem] flex-1">
             <span className="block truncate text-sm font-bold">{u.display_name}</span>
             <span className="block truncate text-xs text-muted-foreground">{u.email}</span>
           </span>
-          <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-bold">{u.role ? t(`roles.${u.role}`) : t("roles.platform")}</span>
+          <span className="rounded-full bg-secondary px-2.5 py-1 text-center text-xs font-bold">{u.role ? t(`roles.${u.role}`) : t("roles.platform")}</span>
         </button>
       ))}
     </div>
@@ -139,7 +139,7 @@ export default function LoginPage() {
           <img src="/favicon.svg" alt="" className="h-10 w-10" />
           <span className="font-heading text-2xl font-extrabold">{env.appName}</span>
         </div>
-        <Card className="w-full max-w-md p-6 sm:p-8">
+        <Card className="w-full max-w-md p-5 sm:p-8">
           <h2 className="text-2xl font-extrabold">{t("login.title")}</h2>
           <p className="mb-6 mt-1 text-sm text-muted-foreground">{t("login.subtitle")}</p>
           {env.authMode === "dev" ? <DevLogin /> : <FirebaseLogin />}
