@@ -288,3 +288,17 @@ def test_reset_in_one_loop_stops_the_engine_tasks_and_touches_no_other_apartment
     assert (status, loop_cancelled, pending_cancelled) == (204, True, True)
     assert same_kept and other_kept and mode == "eco"
     assert "RES-KEEP-apt-rimini-01" in rimini and "RES-KEEP-apt-altra-01" in altra
+
+
+def test_d189_the_simulator_wants_at_least_one_guest():
+    """D-189: the Simulator's «Ospiti» field has its minimum on the server too (the contract sets none): 0, a negative
+    number or not a whole number is refused before reaching the engine; no value stays allowed (the contract's null)."""
+    base = {"event_id": "evt-ospiti", "type": "booking_created", "booking_id": "bk-ospiti",
+            "checkin_at": "2026-11-02T14:00:00.000Z", "checkout_at": "2026-11-04T10:00:00.000Z", "ts": "2026-10-23T10:00:00.000Z"}
+    for bad in (0, -2, 1.5, "2", True):
+        r = run(call("POST", "/app/apartments/apt-rimini-01/simulator/booking", json={**base, "guests": bad}))
+        assert r.status_code == 422 and r.json()["error"] == "untranslatable", (bad, r.text)
+        assert r.json()["message"] == "Gli ospiti devono essere almeno 1"
+    from bff.bookings.translator import SimulatorTranslator
+    assert SimulatorTranslator().translate({**base, "apartment_id": "a", "source": "simulator", "guests": 1})[1].guests == 1
+    assert SimulatorTranslator().translate({**base, "apartment_id": "a", "source": "simulator"})[1].guests is None

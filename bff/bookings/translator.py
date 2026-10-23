@@ -57,6 +57,9 @@ class SimulatorTranslator:
         ext = payload.get("apartment_external_id") or payload.get("apartment_id")
         if not ext:
             raise TranslationError("apartment_id mancante")
+        guests = payload.get("guests")
+        if guests is not None and (isinstance(guests, bool) or not isinstance(guests, int) or guests < 1):
+            raise TranslationError("Gli ospiti devono essere almeno 1")   # D-189: the contract sets no minimum, we do
         try:
             ev = BookingEvent(**{k: v for k, v in payload.items() if k in BookingEvent.model_fields})
         except ValidationError as exc:
