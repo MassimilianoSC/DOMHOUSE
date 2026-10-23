@@ -176,3 +176,97 @@ def test_a_location_outside_europe_is_said_diagnosis_only(monkeypatch, capsys):
     assert mm.main() == 0
     out = capsys.readouterr().out
     assert "global è escluso dagli ambienti (D-180" in out and "(global: escluso dagli ambienti, D-180; solo diagnosi)" in out
+
+
+# ---- the committente's tests before replacing D-182 (23 Oct): (2) correct out of valid, (3) prose --------------------
+def _answer(risposta, *azioni):
+    return json.dumps({"risposta": risposta, "azioni": list(azioni)}, ensure_ascii=False)
+
+
+def _cmd(device_id, capability, action, **params):
+    return {"tipo": "comando", "device_id": device_id, "capability": capability, "action": action, "params": params}
+
+
+def test_correct_answers_against_the_expected_ones():
+    mm = _script()
+    ok = mm.json_answer_correct
+    assert ok("spegni il clima", json.loads(_answer("Spengo.", _cmd(mm.CLIMA, "climate", "turn_off"))))
+    assert ok("spegni il clima", json.loads(_answer("Spengo.", _cmd(mm.CLIMA, "climate", "set_climate", on=False))))
+    assert not ok("spegni il clima", json.loads(_answer("Spengo.", _cmd(mm.PRESA, "switch", "turn_off"))))
+    assert not ok("spegni il clima", json.loads(_answer("Spengo.", _cmd(mm.CLIMA, "climate", "turn_off"),
+                                                        {"tipo": "modalita", "modalita": "eco"})))   # one too many
+    assert ok("accendi la stufetta in camera", json.loads(_answer("Accendo.", _cmd(mm.PRESA, "switch", "turn_on"))))
+    assert not ok("accendi la stufetta in camera", json.loads(_answer("Accendo.", _cmd(mm.PRESA, "switch", "turn_off"))))
+    assert ok("metti eco", json.loads(_answer("Eco.", {"tipo": "modalita", "modalita": "eco"})))
+    assert not ok("metti eco", json.loads(_answer("Comfort.", {"tipo": "modalita", "modalita": "comfort"})))
+    assert ok("che temperatura c'è in soggiorno?", json.loads(_answer("In soggiorno ci sono 21,4 °C.")), 21.4)
+    assert not ok("che temperatura c'è in soggiorno?", json.loads(_answer("Non lo so.")), 21.4)
+    assert ok("perché si è spento il clima?", json.loads(_answer("Per la finestra aperta.")))
+    assert not ok("perché si è spento il clima?", json.loads(_answer("Lo riaccendo.", _cmd(mm.CLIMA, "climate", "set_climate",
+                                                                                            on=True))))
+
+
+def test_lite_and_flash_compared_with_correct_out_of_valid(monkeypatch, capsys):
+    mm = _script()
+    from bff import net_phase
+    room = mm.room_celsius(mm.measure_engine())
+    right = {"spegni il clima": _answer("Spengo il clima.", _cmd(mm.CLIMA, "climate", "turn_off", on=False, mode=None)),
+             "che temperatura c'è in soggiorno?": _answer(f"In soggiorno ci sono {room:g} °C.".replace(".", ",", 1)),
+             "perché si è spento il clima?": _answer("Per la finestra aperta."),
+             "metti eco": _answer("Metto eco.", {"tipo": "modalita", "modalita": "eco"}),
+             "accendi la stufetta in camera": _answer("Accendo.", _cmd(mm.PRESA, "switch", "turn_on"))}
+    sent = []
+
+    async def fake_post(url, json=None, headers=None, connect_s=None, read_s=None, network=None):
+        sent.append((url, json))
+        question = json["contents"][-1]["parts"][0]["text"]
+        text = right[question]
+        if "3.8" in url and question == "metti eco":                       # the 3.8 flash gets this one wrong
+            text = _answer("Metto comfort.", {"tipo": "modalita", "modalita": "comfort"})
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": text}]}, "finishReason": "STOP"}],
+                                         "usageMetadata": {"promptTokenCount": 1000, "candidatesTokenCount": 40,
+                                                           "totalTokenCount": 1040}})
+    monkeypatch.setattr(net_phase, "post_traced", fake_post)
+    monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
+    monkeypatch.setenv("GCP_PROJECT_ID", "p")
+    monkeypatch.setattr("sys.argv", ["measure_model.py", "-n", "5", "--endpoint", "nativo", "--location", "eu",
+                                     "--no-tools", "--reasoning", "0", "--model", "google/gemini-3.5-flash-lite",
+                                     "--model", "google/gemini-3.8-flash"])
+    assert mm.main() == 0
+    out = capsys.readouterr().out
+    assert len(sent) == 10 and sent[0][1]["generationConfig"]["thinkingConfig"] == {"thinkingBudget": 0}
+    assert "tools" not in sent[0][1] and "gemini-3.5-flash-lite:generateContent" in sent[0][0]
+    assert "JSON corretti 5 su 5 validi" in out and "JSON corretti 4 su 5 validi" in out
+    assert "NON corretto (atteso: modalità, eco; azioni: " in out
+    assert "| google/gemini-3.5-flash-lite | nativo eu | no (JSON nel testo) | 0 | " in out and "| 5 su 5 | 5 su 5 |" in out
+    assert "| 5 su 5 | 4 su 5 |" in out
+
+
+def test_prose_five_decisions_and_the_answers_one_under_the_other(monkeypatch, capsys):
+    mm = _script()
+    from bff import net_phase
+    sent = []
+
+    async def fake_post(url, json=None, headers=None, connect_s=None, read_s=None, network=None):
+        sent.append((url, json))
+        who = "lite" if "lite" in url else "flash"
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": _answer(
+            f"Risposta del {who}: la finestra della camera era aperta da 5 minuti.")}]}, "finishReason": "STOP"}],
+            "usageMetadata": {"promptTokenCount": 1500, "candidatesTokenCount": 60, "totalTokenCount": 1560}})
+    monkeypatch.setattr(net_phase, "post_traced", fake_post)
+    monkeypatch.setattr(ai_gateway, "_token", lambda: "tok")
+    monkeypatch.setenv("GCP_PROJECT_ID", "p")
+    monkeypatch.setattr("sys.argv", ["measure_model.py", "--prosa", "--endpoint", "nativo", "--location", "eu",
+                                     "--reasoning", "0", "--model", "google/gemini-3.5-flash-lite",
+                                     "--model", "google/gemini-3.8-flash"])
+    assert mm.main() == 0
+    out = capsys.readouterr().out
+    assert len(sent) == 2                                                   # one call per model, -n not used
+    body = sent[0][1]
+    assert body["contents"][-1]["parts"][0]["text"] == "perché il clima si è spento ieri alle 15?" and "tools" not in body
+    system = body["systemInstruction"]["parts"][0]["text"]
+    for why in ("Finestra della camera aperta da 5 minuti con il clima acceso", "prenotazione bk-77812",
+                "prenotazione bk-90001", "19 °C, sotto 21 °C: scalda", "19,5 °C, sotto 21 °C: scalda"):
+        assert why in system                                                # the five decisions reach the model
+    assert out.index("--- google/gemini-3.5-flash-lite") < out.index("Risposta del lite") \
+        < out.index("--- google/gemini-3.8-flash") < out.index("Risposta del flash")

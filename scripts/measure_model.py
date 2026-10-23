@@ -25,7 +25,21 @@ tools as tools/input_schema; --reasoning low|medium|high = output_config.effort,
 
 --no-tools (D-179 test 1): no tools declared; the prompt asks the answer and the actions as a JSON object in the text,
 which the script validates (shape and allowed values) and counts. The summary ends with a table: model, endpoint, tools
-yes/no, timeouts, median, p95, cost per answered question, valid JSON answers.
+yes/no, timeouts, median, p95, cost per answered question, valid JSON answers, correct JSON answers.
+
+Correct (the committente's test 2, 23 Oct): each question has its expected answer (EXPECTED: device, action, value) and
+a valid JSON answer is correct when its actions are exactly that one («spegni il clima»: the living room's climate off;
+«metti eco»: the mode eco; «accendi la stufetta in camera»: the bedroom's socket on) or, for the two questions, no
+action (and for the temperature the living room's degrees in the sentence). Summary and table: «JSON corretti N su M
+validi». Compare models with --model twice, e.g. the lite and the 3.8 flash:
+
+    GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python scripts/measure_model.py -n 20 --endpoint nativo \
+        --location eu --no-tools --reasoning 0 --model google/gemini-3.5-flash-lite --model google/gemini-3.8-flash
+
+--prosa (test 3): five decisions of a demonstration apartment (yesterday: check-out to eco at 11, pre-arrival to comfort
+at 14:30, the climate heating at 14:35, the window rule switching it off at 15:00; today the climate heating at 8) and
+the question «perché il clima si è spento ieri alle 15?», one call per model; the models' answers one under the other,
+to be read. -n is not used.
 
     GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python scripts/measure_model.py -n 20 --endpoint nativo \
         --location europe-west4 --model google/gemini-3.8-flash
@@ -61,13 +75,94 @@ QUESTIONS = ["spegni il clima", "che temperatura c'è in soggiorno?", "perché s
              "accendi la stufetta in camera"]
 
 
-def request_messages(question: str) -> tuple[list[dict], list[dict]]:
-    """(messages, tools) exactly as the engine's assistant builds its first call."""
-    from engine import assistant, core
+def measure_engine():
+    from engine import core
     from engine.connector.simulated import SimulatedConnector
 
-    e = core.ApartmentEngine("apt-misura-01", SimulatedConnector(), seed=False)
+    return core.ApartmentEngine("apt-misura-01", SimulatedConnector(), seed=False)
+
+
+def request_messages(question: str, engine=None) -> tuple[list[dict], list[dict]]:
+    """(messages, tools) exactly as the engine's assistant builds its first call."""
+    from engine import assistant
+
+    e = engine or measure_engine()
     return assistant.Assistant(e, None).messages(question), assistant.TOOLS     # the engine's own request (D-182)
+
+
+CLIMA, PRESA, SENSORE = "dev-clima-soggiorno", "dev-presa-camera", "dev-ambiente-soggiorno"
+# test 2: question -> the expected answer (device, action, value), as the summary prints it
+EXPECTED = {
+    "spegni il clima": (CLIMA, "spegnere", None),
+    "che temperatura c'è in soggiorno?": (SENSORE, "nessuna azione", "i gradi del soggiorno nella risposta"),
+    "perché si è spento il clima?": (None, "nessuna azione", None),
+    "metti eco": (None, "modalità", "eco"),
+    "accendi la stufetta in camera": (PRESA, "accendere", None),
+}
+
+
+def json_answer_correct(question: str, data: dict, room_celsius: float | None = None) -> bool:
+    """A valid JSON answer against EXPECTED: exactly the expected action, or none for the two questions."""
+    acts = data.get("azioni") or []
+    if question == "spegni il clima":
+        return len(acts) == 1 and acts[0].get("tipo") == "comando" and acts[0].get("device_id") == CLIMA and (
+            acts[0].get("action") == "turn_off"
+            or (acts[0].get("action") == "set_climate" and (acts[0].get("params") or {}).get("on") is False))
+    if question == "accendi la stufetta in camera":
+        return len(acts) == 1 and acts[0].get("tipo") == "comando" and acts[0].get("device_id") == PRESA and (
+            acts[0].get("action") == "turn_on")
+    if question == "metti eco":
+        return len(acts) == 1 and acts[0].get("tipo") == "modalita" and acts[0].get("modalita") == "eco"
+    if question == "che temperatura c'è in soggiorno?":
+        return not acts and (room_celsius is None or str(int(room_celsius)) in data.get("risposta", ""))
+    return not acts
+
+
+def room_celsius(engine) -> float | None:
+    return ((engine.devices.get(SENSORE) or {}).get("capabilities", {}).get("temperature") or {}).get("celsius")
+
+
+PROSE_QUESTION = "perché il clima si è spento ieri alle 15?"
+
+
+def prose_engine():
+    """test 3: the demonstration apartment with five decisions, in the engine's own words."""
+    import uuid
+    from datetime import datetime, timedelta
+    from zoneinfo import ZoneInfo
+
+    e = measure_engine()
+    tz = ZoneInfo(e.timezone)
+    today = datetime.now(tz).date()
+
+    def at(days_ago, hour, minute=0):
+        day = today - timedelta(days=days_ago)
+        return datetime(day.year, day.month, day.day, hour, minute, tzinfo=tz)
+    clima = {"type": "device", "device_id": CLIMA}
+    for ts, actor, target, action, old, new, why in (
+            (at(1, 11), "system", {"type": "apartment"}, "set_mode", "comfort", "eco",
+             "Azione programmata (check-out), prenotazione bk-90001"),
+            (at(1, 14, 30), "system", {"type": "apartment"}, "set_mode", "eco", "comfort",
+             "Azione programmata (pre-arrivo), prenotazione bk-77812"),
+            (at(1, 14, 35), "system", clima, "set_climate", "off", "on", "Climatizzatore soggiorno: 19 °C, sotto 21 °C: scalda"),
+            (at(1, 15), "rule:window_open_off", clima, "turn_off", "on", "off",
+             "Finestra della camera aperta da 5 minuti con il clima acceso"),
+            (at(0, 8), "system", clima, "set_climate", "off", "on", "Climatizzatore soggiorno: 19,5 °C, sotto 21 °C: scalda")):
+        e.log(actor, target, action, old, new, why, "applied", str(uuid.uuid4()), ts=ts, emit=False)
+    return e
+
+
+def parse_json_answer(text: str | None) -> dict | None:
+    """The answer's JSON object when it is the one asked (json_answer_valid), else None."""
+    return json.loads(_json_raw(text)) if json_answer_valid(text) else None
+
+
+def _json_raw(text: str | None) -> str:
+    raw = (text or "").strip()
+    if raw.startswith("```"):
+        raw = raw.strip("`").split("\n", 1)[-1] if "\n" in raw else ""
+        raw = raw.rsplit("```", 1)[0].strip()
+    return raw
 
 
 PARAMS_FIELDS = {"type": "object", "properties": {
@@ -161,12 +256,8 @@ _ACTION_KEYS = {"modalita": {"tipo", "modalita"}, "comando": {"tipo", "device_id
 
 def json_answer_valid(text: str | None) -> bool:
     """The no-tools test (1): the answer is the JSON object asked, with actions of the three forms and allowed values."""
-    raw = (text or "").strip()
-    if raw.startswith("```"):
-        raw = raw.strip("`").split("\n", 1)[-1] if "\n" in raw else ""
-        raw = raw.rsplit("```", 1)[0].strip()
     try:
-        data = json.loads(raw)
+        data = json.loads(_json_raw(text))
     except ValueError:
         return False
     if not isinstance(data, dict) or not isinstance(data.get("risposta"), str) or not isinstance(data.get("azioni"), list):
@@ -265,6 +356,49 @@ def one_call(url: str, token: str, body: dict, timeout: float, connect: float = 
     return took, classify(answer), answer.get("usage") or {}, text_of(kind, answer)
 
 
+def call_body(kind: str, model: str, messages: list[dict], tools, max_tokens: int, reasoning: str) -> dict:
+    if kind == "nativo":
+        return native_body(messages, tools, max_tokens, reasoning)
+    if kind == "anthropic":
+        return anthropic_body(messages, tools, max_tokens, reasoning)
+    body = {"model": model, "messages": messages, "temperature": 0.2, "max_tokens": max_tokens}
+    if tools:
+        body["tools"] = tools
+    if reasoning != "default":
+        body["reasoning_effort"] = reasoning
+    return body
+
+
+def model_url(kind: str, project: str, location: str, model: str, openai_url: str) -> str:
+    if kind == "nativo":
+        return native_url(project, location, model)
+    if kind == "anthropic":
+        return anthropic_url(project, location, model)
+    return openai_url
+
+
+def prose(a, project: str, token: str, models: list[str], reasoning: str, kind: str, openai_url: str) -> int:
+    """test 3: one call per model with the five decisions; the answers one under the other."""
+    messages, _ = request_messages(PROSE_QUESTION, prose_engine())
+    print(f"\n=== Prova di prosa: «{PROSE_QUESTION}» (cinque decisioni del dimostrativo; ragionamento {reasoning})")
+    total = 0.0
+    for model in models:
+        body = call_body(kind, model, messages, None, a.max_tokens, reasoning)
+        took, cause, usage, text = one_call(model_url(kind, project, a.location, model, openai_url), token, body,
+                                            a.timeout, a.connect_timeout, {}, kind)
+        cost = cost_of(usage, a.price_in, a.price_out, a.price_cached) if usage else 0.0
+        total += cost
+        data = parse_json_answer(text)
+        shown = data["risposta"] if data else (text.strip() or "(nessun testo)")
+        print(f"\n--- {model} · {took:.1f} s · {cause or 'ok'} · {cost:.5f} €"
+              + ("" if data or cause else " · JSON NON valido: testo così com'è"))
+        print(shown)
+        if data and data.get("azioni"):
+            print(f"(azioni proposte: {json.dumps(data['azioni'], ensure_ascii=False)})")
+    print(f"\nCosto stimato totale: {total:.4f} €")
+    return 0
+
+
 def p95(values: list[float]) -> float:
     ordered = sorted(values)
     return ordered[min(len(ordered) - 1, max(0, round(0.95 * len(ordered)) - 1))]
@@ -282,6 +416,8 @@ def main() -> int:
     ap.add_argument("--connect-timeout", type=float, default=float(os.environ.get("AI_CONNECT_TIMEOUT_S", "5")))
     ap.add_argument("--endpoint", choices=("openai", "nativo", "anthropic"), default="openai")
     ap.add_argument("--no-tools", action="store_true")
+    ap.add_argument("--prosa", action="store_true", help="test 3: «perché il clima si è spento ieri alle 15?», "
+                                                         "one answer per model, to be read")
     ap.add_argument("--rep-host", action="store_true",
                     help="with --endpoint openai: Google's host for the location (aiplatform.eu.rep.googleapis.com for eu) "
                          "instead of aiplatform.googleapis.com, which the BFF uses today")
@@ -320,6 +456,9 @@ def main() -> int:
     if excluded:
         print(f"Attenzione: {a.location} è escluso dagli ambienti (D-180: eu o europe-…); questa misura serve solo "
               f"alla diagnosi.")
+    if a.prosa:
+        return prose(a, project, token, models, reasonings[0], kind, url)
+    room = room_celsius(measure_engine())
     rows, total_cost = [], 0.0
     for model in models:
         for reasoning in reasonings:
@@ -329,23 +468,15 @@ def main() -> int:
             elif kind == "anthropic":
                 url = anthropic_url(project, a.location, model)
             print(f"\n== {label}")
-            times, causes, cost, valid = [], {}, 0.0, 0
+            times, causes, cost, valid, correct = [], {}, 0.0, 0, 0
             for i in range(a.n):
-                messages, tools = request_messages(QUESTIONS[i % len(QUESTIONS)])
+                question = QUESTIONS[i % len(QUESTIONS)]
+                messages, tools = request_messages(question)
                 if a.no_tools:
                     tools = None
                     if "Rispondi SOLO con un oggetto JSON" not in messages[0]["content"]:     # the engine asks it already
                         messages[0] = {"role": "system", "content": messages[0]["content"] + JSON_INSTRUCTIONS}
-                if kind == "nativo":
-                    body = native_body(messages, tools, a.max_tokens, reasoning)
-                elif kind == "anthropic":
-                    body = anthropic_body(messages, tools, a.max_tokens, reasoning)
-                else:
-                    body = {"model": model, "messages": messages, "temperature": 0.2, "max_tokens": a.max_tokens}
-                    if tools:
-                        body["tools"] = tools
-                    if reasoning != "default":
-                        body["reasoning_effort"] = reasoning
+                body = call_body(kind, model, messages, tools, a.max_tokens, reasoning)
                 network: dict = {}
                 took, cause, usage, text = one_call(url, token, body, a.timeout, a.connect_timeout, network, kind)
                 if usage:
@@ -356,9 +487,18 @@ def main() -> int:
                        f"TLS {network['tls'] * 1000:.0f} ms") if "tls" in network else ""
                 checked = ""
                 if a.no_tools and not cause:
-                    ok_json = json_answer_valid(text)
-                    valid += ok_json
-                    checked = "  JSON valido" if ok_json else "  JSON NON valido"
+                    data = parse_json_answer(text)
+                    valid += data is not None
+                    if data is None:
+                        checked = "  JSON NON valido"
+                    elif json_answer_correct(question, data, room):
+                        correct += 1
+                        checked = "  JSON valido, corretto"
+                    else:
+                        device, action, value = EXPECTED[question]
+                        expected = ", ".join(str(x) for x in (device, action, value) if x)
+                        checked = f"  JSON valido, NON corretto (atteso: {expected}; azioni: " \
+                                  f"{json.dumps(data.get('azioni'), ensure_ascii=False)})"
                 print(f"  {i + 1:2d}. {took:5.1f} s  {cause or 'ok'}{checked}"
                       + (f"  (ragionamento {reasoning_tokens} token)" if reasoning_tokens else "") + net)
                 if cause:
@@ -366,25 +506,28 @@ def main() -> int:
                 else:
                     times.append(took)
             total_cost += cost
-            rows.append((model, label, times, causes, cost, valid))
+            rows.append((model, label, times, causes, cost, valid, correct))
     print("\n=== Riepilogo (tempi delle sole risposte riuscite)")
-    for model, label, times, causes, cost, valid in rows:
+    for model, label, times, causes, cost, valid, correct in rows:
         ok = len(times)
         stats = (f"min {min(times):.1f} s, mediana {statistics.median(times):.1f} s, p95 {p95(times):.1f} s, "
                  f"max {max(times):.1f} s") if times else "nessuna risposta riuscita"
         failed = "; ".join(f"{k}: {v}" for k, v in sorted(causes.items())) or "nessuno"
         print(f"{label}\n  riuscite {ok} su {a.n} · {stats}\n  fallimenti: {failed}\n  costo stimato {cost:.4f} €"
-              + (f"\n  risposte JSON valide {valid} su {ok}" if a.no_tools else ""))
+              + (f"\n  risposte JSON valide {valid} su {ok}\n  JSON corretti {correct} su {valid} validi"
+                 if a.no_tools else ""))
     print(f"\nCosto stimato totale: {total_cost:.4f} €")
-    print(f"\n=== Tabella\n| modello | endpoint | strumenti | timeout su {a.n} | mediana | p95 | costo per domanda | JSON valide |")
-    print("|---|---|---|---|---|---|---|---|")
-    for model, label, times, causes, cost, valid in rows:
+    print(f"\n=== Tabella\n| modello | endpoint | strumenti | timeout su {a.n} | mediana | p95 | costo per domanda | JSON valide | JSON corretti |")
+    print("|---|---|---|---|---|---|---|---|---|")
+    for model, label, times, causes, cost, valid, correct in rows:
         timeouts = sum(v for k, v in causes.items() if k.startswith("timeout"))
         med = f"{statistics.median(times):.1f} s" if times else "–"
         top = f"{p95(times):.1f} s" if times else "–"
         per = f"{cost / len(times):.5f} €" if times else "–"
         js = f"{valid} su {len(times)}" if a.no_tools else "–"
-        print(f"| {model} | {kind} {a.location}{excluded} | {tools_label} | {timeouts} | {med} | {top} | {per} | {js} |")
+        right = f"{correct} su {valid}" if a.no_tools else "–"
+        print(f"| {model} | {kind} {a.location}{excluded} | {tools_label} | {timeouts} | {med} | {top} | {per} | {js} "
+              f"| {right} |")
     return 0
 
 
