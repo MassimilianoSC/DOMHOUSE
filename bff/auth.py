@@ -1,5 +1,6 @@
 import asyncio
 import dataclasses
+import threading
 import time
 from dataclasses import dataclass
 
@@ -85,23 +86,33 @@ async def _tenant_gate(repo, tenant_id: str, allow_suspended: bool = False) -> s
 
 
 _firebase_app = None
+_firebase_app_lock = threading.Lock()     # D-198: called from worker threads; initialize_app refuses a second call
 
 
 def firebase_app():
     global _firebase_app
     import firebase_admin
 
-    if _firebase_app is None:
-        _firebase_app = firebase_admin.get_app() if firebase_admin._apps else firebase_admin.initialize_app(
-            options={"projectId": get_settings().firebase_project_id}
-        )
-    return _firebase_app
+    with _firebase_app_lock:
+        if _firebase_app is None:
+            _firebase_app = firebase_admin.get_app() if firebase_admin._apps else firebase_admin.initialize_app(
+                options={"projectId": get_settings().firebase_project_id}
+            )
+        return _firebase_app
+
+
+class TokenCheckUnavailable(Exception):
+    """The token could not be checked (Google's keys unreachable): says nothing about the token."""
 
 
 def _verify_firebase_token(token: str) -> dict:
+    """Blocking: firebase-admin downloads Google's public keys when its copy has expired. Run it in a thread."""
     from firebase_admin import auth as fb_auth
 
-    return fb_auth.verify_id_token(token, app=firebase_app())
+    try:
+        return fb_auth.verify_id_token(token, app=firebase_app())
+    except fb_auth.CertificateFetchError as exc:
+        raise TokenCheckUnavailable(type(exc).__name__) from None
 
 
 def env_claims(claims: dict | None) -> dict:
@@ -175,7 +186,13 @@ async def _verified_claims(request: Request) -> dict:
     if not token:
         raise _err(401, "unauthorized", "Accesso richiesto")
     try:
-        claims = _verify_firebase_token(token)
+        # D-198: off the event loop, which serves every request of this process; 503 and not 401 when it cannot be done,
+        # so the site keeps the session and tries again
+        claims = await asyncio.wait_for(asyncio.to_thread(_verify_firebase_token, token),
+                                        timeout=get_settings().token_check_timeout_s)
+    except (TimeoutError, TokenCheckUnavailable) as exc:
+        warn("token check not available", error=type(exc).__name__)
+        raise _err(503, "auth_unavailable", "Controllo dell'accesso non disponibile: riprova tra poco")
     except Exception:
         raise _err(401, "unauthorized", "Sessione non valida o scaduta")
     if await asyncio.to_thread(accounts.token_revoked, claims["uid"], float(claims.get("iat", 0))):

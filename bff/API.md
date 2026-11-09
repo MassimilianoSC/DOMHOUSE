@@ -17,6 +17,8 @@ esterni. Nessuna route chiamata dalla PWA manca nel BFF, nessun campo letto dall
 | USER | `resolve_user`: token valido, qualsiasi ruolo; i dati sono sempre limitati al tenant dell'utente e, per operatori e lettori, ai suoi appartamenti (vedi «Appartamenti per utente») |
 | ADMIN | `require_admin` (dipendenza dell'intero router `/app/admin`) |
 
+Quando il token non si riesce a controllare (tempo massimo `TOKEN_CHECK_TIMEOUT_S`, 10 s, o chiavi pubbliche di Google non raggiungibili) tutte le route autenticate rispondono 503 `auth_unavailable` «Controllo dell'accesso non disponibile: riprova tra poco»: è un intoppo, la sessione resta valida (D-198). Token sbagliato o scaduto: 401 come sempre.
+
 Mock: il motore simulato (`/mock/...`, solo con `INSTANCE_MODE=mock`) risponde solo alla chiamata del BFF in
 loopback; una richiesta che arriva da internet (con `X-Forwarded-For`) riceve 404, e la chiave è casuale per processo (F2).
 
