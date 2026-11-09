@@ -90,3 +90,28 @@ def test_two_threads_never_initialize_firebase_twice(monkeypatch):
     for t in threads:
         t.join()
     assert len(made) == 1
+
+
+def slow_google(monkeypatch):
+    monkeypatch.setattr(auth, "get_settings", lambda: dataclasses.replace(get_settings(), token_check_timeout_s=0.05))
+    monkeypatch.setattr(auth, "_verify_firebase_token", lambda token: dict(CLAIMS))
+    monkeypatch.setattr(accounts, "token_revoked", lambda uid, issued_at: time.sleep(0.5))
+
+
+def test_the_revocation_check_has_a_limit_and_answers_try_again(monkeypatch):
+    """D-198: Google's Auth API not answering is not «session over»; firebase-admin alone would wait up to 120 s."""
+    slow_google(monkeypatch)
+    assert refused()["status"] == 503 and refused()["error"] == "auth_unavailable"
+
+
+def test_an_open_stream_survives_a_slow_revocation_check(monkeypatch):
+    slow_google(monkeypatch)
+    assert asyncio.run(auth._revoked_or_not_known("u1", 1.0)) is False
+
+
+def test_a_revoked_session_is_still_over(monkeypatch):
+    monkeypatch.setattr(auth, "_verify_firebase_token", lambda token: dict(CLAIMS))
+    monkeypatch.setattr(accounts, "token_revoked", lambda uid, issued_at: True)
+    assert refused()["status"] == 401
+    assert asyncio.run(auth._revoked_or_not_known("u1", 1.0)) is True
+

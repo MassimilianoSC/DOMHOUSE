@@ -180,6 +180,21 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
                        apartment_ids=stored.apartment_ids, issued_at=float(claims.get("iat", 0)))
 
 
+async def _revoked(uid: str, issued_at: float) -> bool:
+    """accounts.token_revoked within the time limit of the token check (D-198); TimeoutError when Google does not answer."""
+    return await asyncio.wait_for(asyncio.to_thread(accounts.token_revoked, uid, issued_at),
+                                  timeout=get_settings().token_check_timeout_s)
+
+
+async def _revoked_or_not_known(uid: str, issued_at: float) -> bool:
+    """For a stream already open: if Google does not answer it stays open, and the next check asks again."""
+    try:
+        return await _revoked(uid, issued_at)
+    except TimeoutError:
+        warn("session check not available", error="TimeoutError")
+        return False
+
+
 async def _verified_claims(request: Request) -> dict:
     header = request.headers.get("Authorization", "")
     token = header[7:] if header.lower().startswith("bearer ") else None
@@ -195,7 +210,12 @@ async def _verified_claims(request: Request) -> dict:
         raise _err(503, "auth_unavailable", "Controllo dell'accesso non disponibile: riprova tra poco")
     except Exception:
         raise _err(401, "unauthorized", "Sessione non valida o scaduta")
-    if await asyncio.to_thread(accounts.token_revoked, claims["uid"], float(claims.get("iat", 0))):
+    try:
+        revoked = await _revoked(claims["uid"], float(claims.get("iat", 0)))
+    except TimeoutError:
+        warn("token check not available", error="TimeoutError")
+        raise _err(503, "auth_unavailable", "Controllo dell'accesso non disponibile: riprova tra poco")
+    if revoked:
         raise _err(401, "unauthorized", "Sessione non valida o scaduta")
     return claims
 
@@ -394,7 +414,7 @@ async def still_sees(user: CurrentUser, apartment_id: str) -> bool:
     if await tenant_status(repo, user.tenant_id) != "active":   # P-50: a suspension closes open streams too
         return False
     # P-36 point 10: "Esci da tutti i dispositivi" (or a role change) revokes the sessions; an open stream must end too
-    if user.issued_at and await asyncio.to_thread(accounts.token_revoked, user.uid, user.issued_at):
+    if user.issued_at and await _revoked_or_not_known(user.uid, user.issued_at):
         return False
     return dataclasses.replace(user, role=stored.role, apartment_ids=stored.apartment_ids).can_see(apartment_id)
 
@@ -409,7 +429,7 @@ async def _support_still_open(repo, user: CurrentUser) -> bool:
         return False
     if await tenant_status(repo, user.tenant_id) != "active" or await repo.get_platform_member(user.email) is None:
         return False
-    return not (user.issued_at and await asyncio.to_thread(accounts.token_revoked, user.uid, user.issued_at))
+    return not (user.issued_at and await _revoked_or_not_known(user.uid, user.issued_at))
 
 
 async def get_tenant_apartment(user: CurrentUser, apartment_id: str):
