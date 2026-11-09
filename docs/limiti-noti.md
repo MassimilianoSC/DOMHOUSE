@@ -43,7 +43,7 @@
 
 | Limite | Cosa succede | Stato |
 |---|---|---|
-| **Copia dell'app bloccata (E-29)** | Il 9 novembre la copia salvata in Chrome non è partita e il sito non si apriva; chiudere e riaprire Chrome l'ha risolto | Causa da capire |
+| **Copia dell'app bloccata (E-29)** | Il 9 novembre la copia salvata in Chrome non è partita e il sito non si apriva; chiudere e riaprire Chrome l'ha risolto. Probabile blocco di Chrome, non dimostrato; in teoria può capitare a chiunque; un caso solo finora | Decisione dopo il lotto 36: togliere il gestore `fetch` dalla copia salvata (o2, circa 2 ore; senza rete l'app non si aprirebbe) |
 | **Avvio senza tempo massimo (E-29)** | Se l'avvio si inceppa, la pagina può restare in caricamento senza errori | In lavorazione (lotto 37) |
 
 ## Dispositivi (dal laboratorio di Youssouf)
