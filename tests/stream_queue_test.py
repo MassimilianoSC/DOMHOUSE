@@ -179,3 +179,17 @@ def test_a_browser_gone_after_the_first_step_leaves_nothing(apt, monkeypatch):
         await body.aclose()
         return hub
     assert asyncio.run(main()).subscribers == set()
+
+
+def test_the_replay_buffer_has_a_limit_too(apt, monkeypatch):
+    """D-198: an event costs about 800 bytes in memory: an hour of a busy apartment is megabytes, a storm has no limit."""
+    from bff import sse_hub
+    monkeypatch.setattr(sse_hub, "get_settings", lambda: dataclasses.replace(get_settings(), hub_buffer_max=3))
+    hub = InstanceHub(apt, [])
+
+    async def main():
+        for n in range(5):
+            await hub._publish(event(n))
+    asyncio.run(main())
+    assert [e.id for e in hub.buffer] == ["2", "3", "4"] and [e.id for e in hub.replay_after("3")] == ["4"]
+

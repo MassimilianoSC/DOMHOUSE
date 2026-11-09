@@ -10,6 +10,7 @@ from dataclasses import dataclass
 import httpx
 
 from . import instances
+from .config import get_settings
 from .logs import info, warn
 from .repository import Apartment
 
@@ -68,7 +69,8 @@ class InstanceHub:
     def __init__(self, apt: Apartment, hooks: list[EventHook]):
         self.apt = apt
         self.hooks = hooks
-        self.buffer: deque[SseEvent] = deque()
+        # D-198: an hour at most, and a number at most: 60 events a minute are 3 MB per apartment, and a storm has no limit
+        self.buffer: deque[SseEvent] = deque(maxlen=get_settings().hub_buffer_max)
         self.subscribers: set[asyncio.Queue] = set()
         self.last_id: str | None = None
         self.connected = False
