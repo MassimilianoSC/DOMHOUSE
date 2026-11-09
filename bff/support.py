@@ -6,7 +6,6 @@ The manager enters by sending X-Support-Tenant: <tenant_id> (auth.resolve_user);
 and the stream closes at the exact expiry. Nothing is ever written for the manager in the organisation: no user record,
 no push token, no preferences (their own account routes ignore the header).
 """
-import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -17,14 +16,6 @@ from .repository.base import AuditActor, AuditPerson, AuditTarget, now_iso
 
 MAX_HOURS = 24
 CLAIM_S = 30.0               # D-201: a claim of this module, left by a process that died, frees itself after this
-_locks: dict[tuple[int, str], asyncio.Lock] = {}
-
-
-def _lock(key: str) -> asyncio.Lock:
-    """One opening at a time per organisation and manager in this process (one BFF instance, D-35): a double click
-    cannot open two accesses."""
-    k = (id(asyncio.get_running_loop()), key)
-    return _locks.setdefault(k, asyncio.Lock())
 
 
 def parse(ts: str) -> datetime:
@@ -116,9 +107,13 @@ async def active_in(tenant_id: str) -> list[SupportAccess]:
 
 
 async def open_access(tenant_id: str, tenant_name: str, identity, hours: int, reason: str) -> SupportAccess | None:
-    """None when this manager already has an active access here. The log entry is written FIRST and must succeed:
-    no access is ever open without its trace."""
-    async with _lock(f"{tenant_id}:{identity.uid}"):
+    """None when this manager already has an active access here, or is opening one right now: a double click cannot open
+    two, on any instance (D-201). The claim is released at the end, because after closing it may open again. The log entry
+    is written FIRST and must succeed: no access is ever open without its trace."""
+    repo, claim = get_repository(), f"support_open:{tenant_id}:{identity.uid}"
+    if await repo.claim_work(claim, runtime.BOOT_ID, CLAIM_S) != "mine":
+        return None
+    try:
         if await active_for(tenant_id, identity.uid):
             return None
         opened = now_iso()
@@ -130,12 +125,14 @@ async def open_access(tenant_id: str, tenant_name: str, identity, hours: int, re
         await audit.record("support_access_opened", who, tenant_id, target(a, tenant_name),
                            strict=True, hours=hours, expires_at=expires, reason=reason)
         try:
-            return await get_repository().add_support_access(a)
+            return await repo.add_support_access(a)
         except Exception:
             # D-91 (F4): the log already says "opened": it must also say that it never was
             warn("support: access logged as opened but not saved", access_id=a.access_id)
             await audit.record("support_access_closed", audit.SYSTEM, tenant_id, target(a, tenant_name), not_opened=True)
             raise
+    finally:
+        await repo.release_work(claim)
 
 
 async def close(a: SupportAccess, who: audit.Who, by: str) -> bool:

@@ -215,3 +215,44 @@ def test_an_expiry_already_written_only_sets_its_flag():
     run(support.note_expiry(run(repo.get_support_access(aid))))
     assert expiry_entries(aid) == 0 and run(repo.get_support_access(aid)).expiry_logged
 
+
+def test_two_instances_opening_the_same_access_open_one(monkeypatch):
+    """A second event loop stands for the other instance: it shares nothing in memory with the first but the repository.
+    It opens while the first is in the middle of its own opening."""
+    from bff import audit, support
+
+    real, other = audit.record, []
+
+    async def with_the_other_instance(action, *a, **kw):
+        if action == "support_access_opened" and not other:
+            other.append("in corso")
+            other[0] = await asyncio.to_thread(asyncio.run, support.open_access(TID, "Altra", ME, 1, "Secondo"))
+        return await real(action, *a, **kw)
+    monkeypatch.setattr(audit, "record", with_the_other_instance)
+    first = run(support.open_access(TID, "Altra", ME, 1, "Primo"))
+    mine = [a for a in run(support.active_in(TID)) if a.operator_uid == ME.uid]
+    for a in mine:
+        close(a.access_id)
+    assert first is not None and other == [None] and [a.access_id for a in mine] == [first.access_id]
+
+
+def test_after_closing_the_same_manager_can_open_again():
+    aid = open_access("Prima volta")
+    close(aid)
+    again = open_access("Seconda volta")
+    assert again != aid
+    close(again)
+
+
+def test_an_opening_left_by_a_process_that_died_blocks_only_until_its_claim_expires():
+    from bff import support
+
+    repo, claim = get_repository(), f"support_open:{TID}:{ME.uid}"
+    run(repo.claim_work(claim, "altra-istanza", 30))
+    assert run(support.open_access(TID, "Altra", ME, 1, "Occupato")) is None
+    run(repo.release_work(claim))
+    run(repo.claim_work(claim, "processo-morto", 0))            # the process died: its claim has run out
+    opened = run(support.open_access(TID, "Altra", ME, 1, "Libero"))
+    assert opened is not None
+    close(opened.access_id)
+
