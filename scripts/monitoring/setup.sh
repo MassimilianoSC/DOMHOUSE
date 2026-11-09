@@ -84,11 +84,24 @@ fi
 echo "Progetto ${P} · BFF ${HOST} · avvisi a ${EMAIL}${DRY_RUN:+ · PROVA A SECCO}"
 
 # The check must call a page that answers from outside, as the uptime regions will (E-12): tried before every change.
+# Several tries, about 60 s in all: a server at minimum 0 instances is off and needs more than one try to start.
+REACH_TRIES="${REACH_TRIES:-5}"
+REACH_WAIT_S="${REACH_WAIT_S:-3}"
 reachable() {
   command -v curl >/dev/null || stop "Manca curl: serve per provare https://${HOST}${CHECK_PATH} da fuori."
-  curl -fsS --max-time 10 "https://${HOST}${CHECK_PATH}" 2>/dev/null | grep -qF "${MATCH}" \
-    || stop "https://${HOST}${CHECK_PATH} non risponde ${MATCH} da fuori: pubblica prima una versione del BFF che ha ${CHECK_PATH}, poi ripeti."
-  echo "https://${HOST}${CHECK_PATH} risponde ${MATCH} da fuori"
+  local try body
+  for ((try = 1; try <= REACH_TRIES; try++)); do
+    body="$(curl -fsS --max-time 10 "https://${HOST}${CHECK_PATH}" 2>/dev/null || true)"
+    case "${body}" in *"${MATCH}"*)
+      echo "https://${HOST}${CHECK_PATH} risponde ${MATCH} da fuori"
+      return 0 ;;
+    esac
+    if [ "${try}" -lt "${REACH_TRIES}" ]; then
+      echo "https://${HOST}${CHECK_PATH} non risponde ancora (tentativo ${try} di ${REACH_TRIES}): un server spento impiega qualche secondo ad avviarsi."
+      sleep "${REACH_WAIT_S}"
+    fi
+  done
+  stop "https://${HOST}${CHECK_PATH} non ha risposto ${MATCH} dopo ${REACH_TRIES} tentativi. Guarda lo stato del servizio e i suoi log in Cloud Run, poi ripeti; passa questi messaggi alla memoria storica."
 }
 
 # --- 1. Email channel ------------------------------------------------------------------------------------------

@@ -196,6 +196,13 @@ exit 0
 """
 
 
+SETUP_CURL = """#!/usr/bin/env bash
+echo x >> "$STUB_DIR/curl.log"
+[ "$(wc -l < "$STUB_DIR/curl.log")" -le "$(cat "$STUB_DIR/curl_fails" 2>/dev/null || echo 0)" ] && exit 28
+echo '{"status":"ok"}'
+"""
+
+
 def _posix(path: Path) -> str:
     """A Windows path as Git Bash wants it in PATH: /c/Users/..."""
     s = path.as_posix()
@@ -208,15 +215,16 @@ def setup(tmp_path):
     if not bash:
         pytest.skip("bash non disponibile")
     (tmp_path / "gcloud").write_text(SETUP_GCLOUD, encoding="utf-8", newline="\n")
-    (tmp_path / "curl").write_text("#!/usr/bin/env bash\necho '{\"status\":\"ok\"}'\n", encoding="utf-8", newline="\n")
+    (tmp_path / "curl").write_text(SETUP_CURL, encoding="utf-8", newline="\n")
     (tmp_path / "messages").write_text(" ".join(f'"{m}"' for m in _messages()), encoding="utf-8")
 
-    def run(dry=False):
+    def run(dry=False, env=""):
         (tmp_path / "calls.log").write_text("", encoding="utf-8")
+        (tmp_path / "curl.log").write_text("", encoding="utf-8")
         here = _posix(tmp_path)                                  # "C:/..." in PATH would split at the colon: the real gcloud
         cmd = (f'export PATH="{here}:$PATH" STUB_DIR="{here}"; chmod +x "{here}/gcloud" "{here}/curl"; '
                f'[ "$(command -v gcloud)" = "{here}/gcloud" ] || exit 99; '
-               f'{"DRY_RUN=1 " if dry else ""}GCP_PROJECT_ID=p EMAIL=a@b.it bash "{_posix(MONITORING)}/setup.sh"')
+               f'{"DRY_RUN=1 " if dry else ""}{env} GCP_PROJECT_ID=p EMAIL=a@b.it bash "{_posix(MONITORING)}/setup.sh"')
         out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=120)
         return out, (tmp_path / "calls.log").read_text(encoding="utf-8")
     run.dir = tmp_path
@@ -239,6 +247,23 @@ def test_setup_corrects_a_wrong_429_filter(setup):
     out, calls = setup()
     assert out.returncode == 0, out.stdout + out.stderr
     assert calls.count("policies update") == 1 and "no available instance" in policy.read_text(encoding="utf-8")
+
+
+def test_setup_waits_for_a_server_that_is_starting(setup):
+    """A server at minimum 0 answered 200 in 10.01 s on 9 November, just after curl had given up."""
+    (setup.dir / "curl_fails").write_text("2", encoding="utf-8")
+    out, _ = setup(env="REACH_WAIT_S=0")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "tentativo 1 di 5" in out.stdout and "tentativo 2 di 5" in out.stdout and "tentativo 3 di 5" not in out.stdout
+    assert (setup.dir / "curl.log").read_text(encoding="utf-8").count("x") == 3
+
+
+def test_setup_stops_without_guessing_the_cause(setup):
+    (setup.dir / "curl_fails").write_text("99", encoding="utf-8")
+    out, _ = setup(env="REACH_WAIT_S=0")
+    assert out.returncode != 0 and "dopo 5 tentativi" in out.stderr
+    assert "pubblica prima" not in out.stderr and "stato del servizio" in out.stderr
+    assert (setup.dir / "curl.log").read_text(encoding="utf-8").count("x") == 5
 
 
 def test_setup_dry_run_creates_no_429_alert(setup):
