@@ -92,7 +92,7 @@ def summary_push(apt, summary: dict):
 
 async def round_once(now: datetime | None = None) -> int:
     """One round over every enabled apartment; returns the number of summaries made."""
-    from .push import notify_once
+    from .push import claim_notification, deliver
     repo = get_repository()
     made = 0
     for apt in await repo.list_apartments():
@@ -114,11 +114,17 @@ async def round_once(now: datetime | None = None) -> int:
         if summary is None:
             await repo.release_work(claim)
             continue
+        push_key, message = f"push:{claim}", None
+        if summary["notable"]:                     # D-150 point 4: the push only with something to say
+            # claimed before saving: a process that dies from here on loses no notification. The lease outlasts the next
+            # round, so that if the summary was not saved the recovery finds it made again
+            message = await claim_notification(push_key, apt.tenant_id, "summary", *summary_push(apt, summary),
+                                               lease_s=ROUND_S + SUMMARY_LEASE_S)
         await repo.put_summary(summary)
         made += 1
         info("weekly summary made", apartment_id=apt.apartment_id, week=summary["week"], items=len(summary["items"]))
-        if summary["notable"]:                     # D-150 point 4: the push only with something to say
-            await notify_once(f"push:{claim}", apt.tenant_id, "summary", *summary_push(apt, summary))
+        if message:
+            await deliver(push_key, message)
         await repo.finish_work(claim)
     return made
 

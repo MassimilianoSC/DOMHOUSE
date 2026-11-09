@@ -118,6 +118,42 @@ def test_two_instances_make_each_summary_once(engine):
     assert len(engine.sent) == 1
 
 
+@pytest.mark.parametrize("dies", ["before_saving", "after_saving"])
+def test_a_process_that_dies_around_the_save_loses_no_notification(engine, monkeypatch, dies):
+    """«Doppio raro piuttosto che perso» (D-201): the notification goes out, once, and the summary is there."""
+    class Died(Exception):
+        pass
+    repo, state = get_repository(), type("S", (), {"dead": True})
+    real_put, real_deliver = repo.put_summary, push.deliver
+
+    async def put(summary):
+        if state.dead and dies == "before_saving" and summary["apartment_id"] == BOLOGNA:
+            raise Died()
+        return await real_put(summary)
+
+    async def send(key, payload):
+        if state.dead and dies == "after_saving":
+            raise Died()
+        return await real_deliver(key, payload)
+    monkeypatch.setattr(repo, "put_summary", put)
+    monkeypatch.setattr(push, "deliver", send)
+    monkeypatch.setattr(summary_job, "ROUND_S", 0)
+    monkeypatch.setattr(summary_job, "SUMMARY_LEASE_S", 0.1)
+
+    with pytest.raises(Died):
+        run(summary_job.round_once(AFTER))
+    assert engine.sent == []
+    state.dead = False
+
+    async def later():
+        await asyncio.sleep(0.15)
+        assert await push.recover_once() == 1
+    run(later())
+    run(summary_job.round_once(AFTER + timedelta(hours=1)))
+    assert [d["link"] for _, _, d in engine.sent] == [f"/a/{BOLOGNA}/riepiloghi/{WEEK}"]
+    assert run(repo.get_summary(BOLOGNA, WEEK))["week"] == WEEK
+
+
 def test_a_summary_being_made_elsewhere_is_left_alone_until_its_claim_expires(engine):
     repo = get_repository()
     claim = f"summary:{RIMINI}:{WEEK}"

@@ -115,18 +115,24 @@ def event_key(apt: Apartment, ev: SseEvent, ts: str | None) -> str:
     return f"push:{apt.apartment_id}:{ev.id}:{ts}"
 
 
-async def notify_once(key: str, tenant_id: str, pref: str, data: dict[str, str], headers: dict[str, str]) -> int:
-    """D-201: one notification however many instances saw the event: whoever claims it first sends it. The claim holds the
-    message, so if the process dies before sending it recover_once sends it (see «Notifiche push» in bff/API.md)."""
+async def claim_notification(key: str, tenant_id: str, pref: str, data: dict[str, str], headers: dict[str, str],
+                             lease_s: float | None = None) -> dict | None:
+    """The claim holding the message, or None when it is not ours to send. From here on a process that dies loses nothing:
+    when the lease runs out recover_once sends it (see «Notifiche push» in bff/API.md)."""
     if not get_settings().fcm_enabled:
-        return 0
+        return None
     payload = {"tenant_id": tenant_id, "pref": pref, "data": data, "headers": headers}
-    if await get_repository().claim_work(key, runtime.BOOT_ID, get_settings().notification_lease_s, payload) != "mine":
-        return 0
-    return await _deliver(key, payload)
+    lease = get_settings().notification_lease_s if lease_s is None else lease_s
+    return payload if await get_repository().claim_work(key, runtime.BOOT_ID, lease, payload) == "mine" else None
 
 
-async def _deliver(key: str, payload: dict) -> int:
+async def notify_once(key: str, tenant_id: str, pref: str, data: dict[str, str], headers: dict[str, str]) -> int:
+    """D-201: one notification however many instances saw the event: whoever claims it first sends it."""
+    payload = await claim_notification(key, tenant_id, pref, data, headers)
+    return await deliver(key, payload) if payload else 0
+
+
+async def deliver(key: str, payload: dict) -> int:
     try:
         sent = await send_to_tenant(payload["tenant_id"], payload["pref"], payload["data"], payload["headers"])
     except Exception as exc:                       # still claimed: when its lease runs out recover_once tries again
@@ -149,7 +155,7 @@ async def recover_once(now: float | None = None) -> int:
         if await repo.claim_work(key, runtime.BOOT_ID, get_settings().notification_lease_s) != "mine":
             continue                                   # another instance got there first
         info("push recovered", key=key, attempts=item["attempts"])
-        await _deliver(key, item["payload"])
+        await deliver(key, item["payload"])
         recovered += 1
     return recovered
 
