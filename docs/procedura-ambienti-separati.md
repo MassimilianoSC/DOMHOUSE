@@ -347,4 +347,6 @@ comando di lettura e l'elenco di ciò che va cancellato, il committente lancia l
 - **Dopo la pubblicazione** lo script ricontrolla la versione appena creata.
 - **Se un valore è diverso dal previsto** si ferma con la scritta FERMO, dice valore atteso e trovato, e non pubblica il sito: il server è già online con quei valori. Copia i messaggi e passali alla memoria storica.
 
+**Controllo e allarmi prima della produzione:** subito prima di pubblicare in produzione si lancia `scripts/monitoring/setup.sh`, che ricrea il controllo di raggiungibilità e le regole. Il monitoraggio avvisa anche quando Cloud Run rifiuta le richieste perché non ha un'istanza disponibile (al massimo un'email ogni mezz'ora). Lo script usa i componenti `alpha` e `beta` di gcloud: alla prima esecuzione gcloud chiede di installarli, rispondi sì.
+
 > **Attenzione:** fino alla fine del lotto 35 non si pubblica nessun commit successivo a `8a49489` senza il via della memoria storica. Quei commit portano il tempo massimo a 300 s, e prima della chiusura degli stream lato server e della modifica del sito gli aggiornamenti in diretta cadrebbero ogni 5 minuti.

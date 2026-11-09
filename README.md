@@ -202,6 +202,11 @@ in `/data/<apartment_id>` (`engine.db`, SQLite) e la chiave in un file fuori dal
 | `APP_ENV` | dev \| staging \| prod | ambiente; il simulatore non dipende più da qui ma dal campo «istanza simulata» dell'appartamento (D-97) |
 | `AUTH_MODE` | dev \| firebase | in `firebase` il token ID deve avere i claim `tenant_id` e `role` |
 | `INSTANCE_MODE` | mock \| real | `real` usa `instance_url` dell'appartamento e la chiave da Secret Manager |
+| `STREAM_MAX_S` | secondi, predefinito 240 | durata massima di uno stream verso il browser; poi chiusura normale e il sito lo riapre (lotto 35, sotto il timeout di 300 s del servizio) |
+| `STREAM_QUEUE_MAX` | eventi, predefinito 500 | eventi in attesa per ogni browser; oltre, si chiude solo quello stream |
+| `HUB_BUFFER_MAX` | eventi, predefinito 2000 | eventi in memoria per appartamento per la ripresa dello stream |
+| `STATUS_LOG_S` | secondi, predefinito 60 | ogni quanto il server scrive la riga `process status` (stream aperti, richieste attive, ritardo dell'event loop) |
+| `TOKEN_CHECK_TIMEOUT_S` | secondi, predefinito 10 | tempo massimo del controllo del token; oltre, 503 `auth_unavailable` |
 | `REPOSITORY` | memory \| firestore | Firestore: collezioni `tenants`, `users`, `apartments`, `bookings`, `webhook_logs` |
 | `FCM_ENABLED` | true \| false | push FCM; con `false` l'app mostra toast |
 | `GCP_PROJECT_ID`, `GCP_REGION`, `FIREBASE_PROJECT_ID` | | placeholder `your-gcp-project-id`, `europe-west8` |
