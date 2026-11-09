@@ -83,6 +83,7 @@ class InstanceHub:
         self.connected = False
         self.task: asyncio.Task | None = None
         self.link: tuple | None = None               # the link the running task is connected to (push.align_hubs_once)
+        self.base: str | None = None                 # the engine's whole address, port included: the id belongs to it
         self.cursor_id: str | None = None            # the last id written to stream_cursors, and when
         self.cursor_at = 0.0
 
@@ -140,7 +141,7 @@ class InstanceHub:
         except Exception as exc:                     # from now on, as if it had never been saved
             warn("stream cursor not read", apartment_id=apt.apartment_id, error=type(exc).__name__)
             return
-        if not saved or saved["instance_url"] != apt.instance_url:
+        if not saved or saved["instance_url"] != self.base:
             return
         self.last_id = saved["last_id"]
         age = int(time.time() - saved["saved_at"])
@@ -150,7 +151,7 @@ class InstanceHub:
 
     async def _run(self) -> None:
         apt = self.apt                               # D-201: one link for the whole life of a hub; a new link is a new hub
-        self.link = link_of(apt)
+        self.link, self.base = link_of(apt), instances.base_url(apt)
         await self._resume_from_cursor(apt)
         backoff = 1.0
         while True:
@@ -207,11 +208,11 @@ class HubManager:
         now = time.time() if now is None else now
         saved = 0
         for hub in list(self.hubs.values()):
-            if not hub.connected or hub.last_id is None or hub.link is None:
+            if not hub.connected or hub.last_id is None or hub.base is None:
                 continue
             if hub.last_id == hub.cursor_id and now - hub.cursor_at < CURSOR_REFRESH_S:
                 continue
-            await get_repository().put_stream_cursor(hub.apt.apartment_id, hub.last_id, hub.link[0], now)
+            await get_repository().put_stream_cursor(hub.apt.apartment_id, hub.last_id, hub.base, now)
             hub.cursor_id, hub.cursor_at = hub.last_id, now
             saved += 1
         return saved

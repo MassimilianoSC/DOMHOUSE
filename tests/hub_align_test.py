@@ -243,7 +243,7 @@ def test_a_new_connection_resumes_from_the_saved_id(world):
 
 
 def run_put(url, age, last_id="40"):
-    asyncio.run(get_repository().put_stream_cursor(APT, last_id, url, time.time() - age))
+    asyncio.run(get_repository().put_stream_cursor(APT, last_id, url + "/api/v1", time.time() - age))
 
 
 def test_the_id_of_another_engine_is_ignored(world):
@@ -251,6 +251,16 @@ def test_the_id_of_another_engine_is_ignored(world):
 
     async def scenario():
         world.apartments.append(apartment())
+        await align()
+    play(scenario)
+    assert world.connections[0][1] is None
+
+
+def test_the_id_of_the_same_address_on_another_port_is_ignored(world):
+    run_put(URL_A, age=5)
+
+    async def scenario():
+        world.apartments.append(apartment(port=8443))
         await align()
     play(scenario)
     assert world.connections[0][1] is None
@@ -310,7 +320,7 @@ def test_the_id_is_saved_when_it_changes_and_again_after_a_long_while(world):
         t0 = 1_000_000.0
         assert await hub_manager.save_cursors(t0) == 1
         saved = await repo.get_stream_cursor(APT)
-        assert (saved["last_id"], saved["instance_url"], saved["saved_at"]) == ("41", URL_A, t0)
+        assert (saved["last_id"], saved["instance_url"], saved["saved_at"]) == ("41", URL_A + "/api/v1", t0)
         assert await hub_manager.save_cursors(t0 + 30) == 0     # nothing new
         hub_manager.hubs[APT].last_id = "42"
         assert await hub_manager.save_cursors(t0 + 60) == 1
