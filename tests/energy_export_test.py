@@ -292,3 +292,18 @@ def test_the_date_only_moves_back(engine):
     apt = run(get_repository().get_apartment(APT))
     assert run(energy_since.search_and_save(apt, "actor", datetime(2026, 10, 21, tzinfo=UTC))) == "2024-06-01T00:00:00.000Z"
     assert run(get_repository().get_apartment(APT)).energy_since == "2024-06-01T00:00:00.000Z"
+
+
+def test_the_workbook_is_built_off_the_event_loop(engine, monkeypatch):
+    """D-198: every other request of the process waits while it is on the event loop."""
+    import threading
+
+    from bff import energy_report
+    real, seen = energy_report.workbook, []
+
+    def spy(*args):
+        seen.append(threading.current_thread())
+        return real(*args)
+    monkeypatch.setattr(energy_report, "workbook", spy)
+    assert run(get(f"/app/apartments/{APT}/energy/export", month="2025-10")).status_code == 200
+    assert len(seen) == 1 and seen[0] is not threading.main_thread()

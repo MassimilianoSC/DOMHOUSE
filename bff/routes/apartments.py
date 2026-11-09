@@ -305,7 +305,7 @@ async def energy_export(apartment_id: str, month: str | None = None, booking_id:
                                   timezone=apt.timezone, start=start, end=end, in_progress=in_progress, price=price,
                                   title=title, period=period, stay=stay,
                                   energy_since=await energy_since.known(apt, actor, wait=True))   # D-130
-    content = energy_report.workbook(report, usage, now)
+    content = await asyncio.to_thread(energy_report.workbook, report, usage, now)   # D-198: 29 ms a month, 141 ms a year
     disposition = f'attachment; filename="{name}"; filename*=UTF-8\'\'{quote(name)}'
     return Response(content=content, media_type=energy_report.XLSX, headers={"Content-Disposition": disposition})
 
