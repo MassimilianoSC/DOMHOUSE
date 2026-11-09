@@ -20,6 +20,14 @@ export function useInstanceMode() {
   return { mock: mode === "mock", real: mode === "real" };
 }
 
+/** The help line under the engine's address. Production refuses mock:// (D-202), so only the other environments suggest it. */
+export function useInstanceUrlHint() {
+  const { mock } = useInstanceMode();
+  const prod = useAuth().me?.env.app_env === "prod";
+  if (prod) return t("admin.apartments.instanceUrlHintProd");
+  return t(mock ? "admin.apartments.instanceUrlHintMock" : "admin.apartments.instanceUrlHint");
+}
+
 /** The built-in simulated engine (D-28): with it the instance is always simulated (D-97). */
 export const isBuiltinMock = (url: string) => url.trim().toLowerCase().startsWith("mock://");
 

@@ -825,6 +825,7 @@
       "instanceUrlPlaceholder": "https://domotica.esempio.it",
       "instanceUrlHint": "Per un appartamento dimostrativo scrivi mock://builtin; per uno vero, l'indirizzo del suo motore",
       "instanceUrlHintMock": "In questo ambiente usa mock://builtin",
+      "instanceUrlHintProd": "Scrivi l'indirizzo del motore dell'appartamento; i dimostrativi si provano in staging",
       "port": "Porta",
       "italianway": "ID Italianway",
       "code": "Codice",

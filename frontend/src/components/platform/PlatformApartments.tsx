@@ -4,7 +4,7 @@ import { PlugZap, Plus, Trash2, Waypoints } from "lucide-react";
 import { toast } from "sonner";
 import type { VerifyResult } from "@/api/admin";
 import { platformApi, type PlatformApartment } from "@/api/platform";
-import { APARTMENT_ID_RE, DemoBadge, defaultInstanceUrl, Field, isBuiltinMock, LastCheck, SimulatedField, useInstanceMode, VerifyBadge } from "@/components/admin/apartmentForm";
+import { APARTMENT_ID_RE, DemoBadge, defaultInstanceUrl, Field, isBuiltinMock, LastCheck, SimulatedField, useInstanceMode, useInstanceUrlHint, VerifyBadge } from "@/components/admin/apartmentForm";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
@@ -18,6 +18,7 @@ const toPort = (v: string) => (v.trim() ? Number(v) : null);
 /** New apartment: the platform chooses the id (unique on the whole platform) and the connection (D-64, D-66). */
 function CreateDialog({ tenantId, tenantName, onClose, onCreated }: { tenantId: string; tenantName: string; onClose: () => void; onCreated: () => void }) {
   const { mock, real } = useInstanceMode();
+  const urlHint = useInstanceUrlHint();
   const [f, setF] = useState({ apartment_id: "", name: "", instance_url: defaultInstanceUrl(mock), port: "", timezone: "Europe/Rome", enabled: true, italianway_id: "", simulated: false });
   const [saving, setSaving] = useState(false);
   const save = async () => {
@@ -27,7 +28,7 @@ function CreateDialog({ tenantId, tenantName, onClose, onCreated }: { tenantId: 
     setSaving(false);
     if (res) {
       // In production the instance key langbrain-api-key-<id> is created by HQE outside the app (R1); a demonstration
-      // apartment (mock://, D-188: also in production) has no key to create.
+      // apartment (mock://, D-202: staging and development only, production refuses it) has no key to create.
       if (real && !isBuiltinMock(body.instance_url)) toast.info(t("platform.aptKeyFirst"), { duration: 15000 });
       onCreated();
       onClose();
@@ -41,7 +42,7 @@ function CreateDialog({ tenantId, tenantName, onClose, onCreated }: { tenantId: 
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field id="apartment_id" label={t("admin.apartments.id")} value={f.apartment_id} onChange={(v) => setF({ ...f, apartment_id: v })} placeholder={t("admin.apartments.idPlaceholder")} hint={t("admin.apartments.idHint")} />
           <Field id="name" label={t("admin.apartments.name")} value={f.name} onChange={(v) => setF({ ...f, name: v })} />
-          <Field id="instance_url" label={t("admin.apartments.instanceUrl")} value={f.instance_url} onChange={(v) => setF({ ...f, instance_url: v })} placeholder={t("admin.apartments.instanceUrlPlaceholder")} hint={t(mock ? "admin.apartments.instanceUrlHintMock" : "admin.apartments.instanceUrlHint")} />
+          <Field id="instance_url" label={t("admin.apartments.instanceUrl")} value={f.instance_url} onChange={(v) => setF({ ...f, instance_url: v })} placeholder={t("admin.apartments.instanceUrlPlaceholder")} hint={urlHint} />
           <Field id="port" label={t("admin.apartments.port")} value={f.port} onChange={(v) => setF({ ...f, port: v })} type="number" />
           <Field id="timezone" label={t("admin.apartments.timezone")} value={f.timezone} onChange={(v) => setF({ ...f, timezone: v })} hint={t("admin.apartments.timezoneInitial")} />
           <Field id="italianway_id" label={t("admin.apartments.italianway")} value={f.italianway_id} onChange={(v) => setF({ ...f, italianway_id: v })} hint={t("platform.italianwayHint")} />
@@ -62,7 +63,7 @@ function CreateDialog({ tenantId, tenantName, onClose, onCreated }: { tenantId: 
 
 /** Connection only: name and enabled belong to the organization admin (D-64), so they are not in this form. */
 function ConnectionDialog({ tenantId, apt, onClose, onSaved }: { tenantId: string; apt: PlatformApartment; onClose: () => void; onSaved: () => void }) {
-  const { mock } = useInstanceMode();
+  const urlHint = useInstanceUrlHint();
   const [url, setUrl] = useState(apt.instance_url);
   const [port, setPort] = useState(apt.port ? String(apt.port) : "");
   const [code, setCode] = useState(apt.italianway_id ?? "");
@@ -91,7 +92,7 @@ function ConnectionDialog({ tenantId, apt, onClose, onSaved }: { tenantId: strin
         <DialogTitle>{t("platform.aptEditTitle", { name: apt.name })}</DialogTitle>
         <DialogDescription>{t("platform.aptEditHint")}</DialogDescription>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <Field id="instance_url" label={t("admin.apartments.instanceUrl")} value={url} onChange={setUrl} placeholder={t("admin.apartments.instanceUrlPlaceholder")} hint={t(mock ? "admin.apartments.instanceUrlHintMock" : "admin.apartments.instanceUrlHint")} />
+          <Field id="instance_url" label={t("admin.apartments.instanceUrl")} value={url} onChange={setUrl} placeholder={t("admin.apartments.instanceUrlPlaceholder")} hint={urlHint} />
           <Field id="port" label={t("admin.apartments.port")} value={port} onChange={setPort} type="number" />
           <Field id="italianway_id" label={t("admin.apartments.italianway")} value={code} onChange={setCode} hint={t("platform.italianwayHint")} />
           <SimulatedField url={url} value={simulated} onChange={setTouched} />

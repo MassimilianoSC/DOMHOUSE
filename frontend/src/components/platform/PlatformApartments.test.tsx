@@ -11,6 +11,7 @@ import { PlatformApartments } from "./PlatformApartments";
 // id, owns the connection, verifies and deletes; name and enabled stay with the organization admin.
 const s = vi.hoisted(() => ({
   mode: "real",
+  appEnv: "prod",
   apartments: vi.fn(),
   createApartment: vi.fn(async (_tid: string, body: { apartment_id: string }) => ({ ...body })),
   patchConnection: vi.fn(async (_tid: string, _aid: string, _body: Record<string, unknown>) => ({})),
@@ -21,7 +22,7 @@ const s = vi.hoisted(() => ({
 vi.mock("@/api/platform", () => ({
   platformApi: { apartments: s.apartments, createApartment: s.createApartment, patchConnection: s.patchConnection, verifyApartment: s.verifyApartment, deleteApartment: s.deleteApartment },
 }));
-vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ me: { env: { instance_mode: s.mode } }, refreshMe: vi.fn() }) }));
+vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ me: { env: { instance_mode: s.mode, app_env: s.appEnv } }, refreshMe: vi.fn() }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warning: vi.fn() } }));
 
 const APTS = [
@@ -51,6 +52,7 @@ const type = (testId: string, value: string) => fireEvent.change(screen.getByTes
 beforeEach(() => {
   vi.clearAllMocks();
   s.mode = "real";
+  s.appEnv = "prod";
   s.apartments.mockResolvedValue(APTS);
   confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
 });
@@ -87,7 +89,28 @@ describe("Piattaforma > Appartamenti di un'organizzazione", () => {
     await waitFor(() => expect(s.apartments).toHaveBeenCalledTimes(2));
   });
 
-  it("dimostrativo in produzione (D-188): mock://builtin scritto a mano, nessun promemoria della chiave", async () => {
+  it("produzione (D-202): la creazione non suggerisce mock://builtin", async () => {
+    await open();
+    await click(screen.getByTestId("platform-apt-add-btn-t-1"));
+    const field = screen.getByTestId("apt-form-instance_url").closest("div");
+    expect(field).toHaveTextContent(t("admin.apartments.instanceUrlHintProd"));
+    expect(field).not.toHaveTextContent("mock://");
+  });
+
+  it.each([
+    ["prod", "real", "admin.apartments.instanceUrlHintProd"],
+    ["staging", "real", "admin.apartments.instanceUrlHint"],
+    ["dev", "mock", "admin.apartments.instanceUrlHintMock"],
+  ] as const)("modifica del collegamento (D-202), ambiente %s: la riga di aiuto giusta", async (appEnv, mode, hint) => {
+    s.appEnv = appEnv;
+    s.mode = mode;
+    await open();
+    await click(screen.getByTestId("platform-apt-edit-apt-001"));
+    expect(screen.getByTestId("apt-form-instance_url").closest("div")).toHaveTextContent(t(hint));
+  });
+
+  it("dimostrativo in staging con motori veri (D-202): la riga suggerisce mock://builtin, nessun promemoria della chiave", async () => {
+    s.appEnv = "staging";
     await open();
     await click(screen.getByTestId("platform-apt-add-btn-t-1"));
     expect(screen.getByTestId("apt-form-instance_url").closest("div")).toHaveTextContent(t("admin.apartments.instanceUrlHint"));
@@ -101,6 +124,7 @@ describe("Piattaforma > Appartamenti di un'organizzazione", () => {
 
   it("nuovo appartamento in staging (mock): parte da mock://builtin, nessun promemoria della chiave", async () => {
     s.mode = "mock";
+    s.appEnv = "staging";
     await open();
     await click(screen.getByTestId("platform-apt-add-btn-t-1"));
     expect(screen.getByTestId("apt-form-instance_url")).toHaveValue("mock://builtin");
