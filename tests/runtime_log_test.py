@@ -208,3 +208,21 @@ def test_the_user_is_not_in_the_person_free_lines_even_inside_a_request(lines):
         runtime.stream_closed(stream_id, APT, "max_duration")
     asyncio.run(go())
     assert "uid-di-una-persona" not in json.dumps(lines)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="add_signal_handler esiste solo su Linux, dove gira il servizio")
+def test_with_uvicorns_real_handler_both_see_sigterm(lines):
+    """On Linux uvicorn 0.25 listens with loop.add_signal_handler before the application starts: the signal must reach it
+    (its shutdown) and also our line."""
+    async def go():
+        loop = asyncio.get_running_loop()
+        heard = asyncio.Event()
+        loop.add_signal_handler(signal.SIGTERM, heard.set)        # what uvicorn does, before the lifespan
+        put_back = runtime.watch_sigterm()
+        os.kill(os.getpid(), signal.SIGTERM)
+        await asyncio.wait_for(heard.wait(), timeout=5)
+        put_back()
+        loop.remove_signal_handler(signal.SIGTERM)
+    asyncio.run(go())
+    assert only(lines, "process got SIGTERM")["boot_id"] == runtime.BOOT_ID
+
