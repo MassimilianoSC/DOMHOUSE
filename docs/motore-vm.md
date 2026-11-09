@@ -564,6 +564,115 @@ Verifica: G3, con `{"status":"ok","app_env":"staging"}` e `INSTANCE_MODE` `value
 
 ---
 
+## G2. Broker MQTT dei dispositivi (D-196, D-199, lotto 38)
+
+Il broker è un solo container per tutta la VM (`domhouse-broker`). I dispositivi entrano dalla porta 8883 con TLS; i connector dalla porta interna 1883, che non è pubblicata. Cartelle: `/opt/domhouse/_broker`, `/etc/domhouse/_broker`, `/data/_broker`.
+
+**Prima di partire servono:** il certificato (nome `mqtt.<dominio>`), l'indirizzo della VM e la regola del firewall sulla 8883. Il broker non si installa senza un certificato valido.
+
+`lab-01` e `shelly-lab-1` sono nomi di esempio: si sostituiscono con l'appartamento e il dispositivo veri prima di lanciare i comandi.
+
+### B1. Copiare i file sulla VM (scrive sulla VM)
+
+Cosa fa: copia nella cartella `~/broker-files` gli script e la configurazione.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command="mkdir -p ~/broker-files"
+gcloud compute scp scripts/broker-vm.sh scripts/broker_accounts.py scripts/engine-vm.sh engine/broker/compose.yaml engine/broker/mosquitto.conf engine/compose.broker.yaml langbrain-dev:broker-files/ \
+  --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+```
+
+Verifica: il comando elenca i 6 file copiati, tutti al 100 %.
+
+### B2. Installare il broker (scrive sulla VM)
+
+Cosa fa: aggiorna il controllo ogni 5 minuti della VM, installa il broker e lo avvia. Il certificato deve già essere in `/etc/domhouse/_broker/tls`, con i nomi `fullchain.pem` e `privkey.pem`.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --command='sudo install -m 755 ~/broker-files/engine-vm.sh /opt/domhouse/engine-vm.sh && sudo bash ~/broker-files/broker-vm.sh install eclipse-mosquitto:2@sha256:75d6662dee52c947dc9dd9c29f1d8d7ffef78ddaf38001caa09755681e8bbc98'
+```
+
+Verifica: l'ultima riga è `broker sano: healthy, porta TLS 8883 risponde`.
+
+### B3. Creare i conti di un appartamento (scrive su Secret Manager)
+
+Cosa fa: crea i due segreti in `europe-west8`, con password casuali che non compaiono a video, e li rende leggibili dalla VM.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 bash scripts/broker-secrets.sh add-apartment lab-01
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 bash scripts/broker-secrets.sh add-device lab-01 shelly-lab-1
+```
+
+Verifica: compaiono `langbrain-shelly-lab-01 creato`, `langbrain-shelly-lab-01-devices creato` e `nuova versione … scritta`. Nessuna password a video.
+
+### B4. Portare i conti sul broker (scrive sulla VM)
+
+Cosa fa: la VM legge i segreti e scrive solo gli hash. Il broker li ricarica senza riavviarsi.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --command='sudo bash /opt/domhouse/broker-vm.sh add-apartment lab-01'
+```
+
+Verifica: `lab-01: connector e 1 dispositivi`, poi `changed` e `utenti e permessi ricaricati`.
+
+Per aggiungere o togliere un dispositivo: `broker-secrets.sh add-device` o `remove-device` come in B3, poi lo stesso comando con `sync` al posto di `add-apartment lab-01`.
+
+### B5. Allarmi del broker (scrive su Google Cloud)
+
+Cosa fa: aggiunge le due politiche nuove. Quelle che esistono già non vengono toccate.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 bash scripts/monitoring/engine-alerts.sh
+```
+
+Verifica: `«Motori: broker MQTT giù»: creata`, `«Motori: certificato del broker in scadenza»: creata`, le altre `esiste già`.
+
+### B6. Controllare il broker (sola lettura)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --command='sudo bash /opt/domhouse/broker-vm.sh status'
+```
+
+Verifica: compare `broker ok cert_days=<numero>`.
+
+### Cosa si salva
+
+1. **Utenti:** la fonte sono i segreti; `sync` riscrive gli hash in qualunque momento.
+2. **Certificato:** si riemette.
+3. **`/data/_broker`:** sessioni e messaggi conservati. È già nello snapshot del disco delle 23:00; se si perde, i relè si ricollegano e il connector rilegge lo stato.
+4. **Non serve un backup nuovo.** Dopo un ripristino da snapshot il certificato potrebbe essere scaduto: va rinnovato.
+
+### Numeri misurati (`tests/broker_load.py`, 9 novembre)
+
+Broker limitato a 0,5 CPU, il valore sostenuto di una e2-small, su questo PC. Messaggi da 1 KB con QoS 1.
+
+| Situazione | Memoria del broker | Esito |
+|---|---|---|
+| Vuoto, con 5000 conti caricati | 12 MB | |
+| 100 dispositivi con TLS | 16 MB | |
+| 1000 dispositivi | 47 MB | |
+| 2000 dispositivi | 82 MB | |
+| 5000 dispositivi | 186 MB | Circa 35 KB a collegamento |
+| 5000 dispositivi, 3000 messaggi al secondo | 186 MB | 44.984 su 44.984 consegnati, 99 % entro 2,6 ms, 0,1 CPU |
+| Connector via, 50.000 messaggi in arrivo | 188 MB | La memoria non cresce; alla ripresa ne arrivano 977, il resto è scartato |
+| Ricarica con 5000 collegati | | Nessuno cade |
+| Riavvio del broker | | 3,3 s; tutti i 5000 di nuovo collegati in 15 s |
+
 ## H. Non ancora qui
 
 - Allarmi dai log dei container (D-104): passo 10 del piano. Il backup applicativo c'è (sezione E), insieme allo

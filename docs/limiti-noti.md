@@ -52,6 +52,23 @@
 | **Pagina di accesso** | Se l'avvio non riesce resta il modulo; il messaggio compare solo sulle pagine protette, e tentare l'accesso dà l'errore normale | Accettato |
 | **Correzione E-29 non provata del tutto** | Non provata con Firebase vero, su Safari o su un telefono vero | Da verificare |
 
+## Broker MQTT (dal 9 novembre, non ancora installato)
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Certificato pubblico su uno Shelly Gen4** | Nessuna fonte elenca le autorità incluse nel firmware | Da verificare con la prova su un Gen4 (bloccante) |
+| **Prefisso con la barra** | La documentazione non conferma che `topic_prefix` accetti `/` né che valga per le richieste RPC | Da verificare sulla stessa prova; se non vale, i permessi vanno adattati |
+| **Keep-alive e dimensione dei messaggi Shelly** | Non noti: per ora nessun limite sul keep-alive e pacchetti fino a 256 KB | Da fissare dopo la prova |
+| **Coda per dispositivo** | 1000 messaggi o 1 MB, oltre si scarta; alla riconnessione il connector rilegge lo stato | Accettato |
+| **Memoria del broker** | Limite di 400 MB configurato, mai raggiunto nelle prove | Da provare |
+| **Numeri misurati sul PC** | 186 MB con 5000 dispositivi; non misurati la memoria libera sulla VM e la CPU reale della e2-small | Da misurare alla prima installazione |
+| **Motori sulla stessa rete interna** | Si raggiungono fra loro, protetti dalla chiave API | Accettato |
+| **Righe del broker nei log** | Non sono JSON e finiscono nel log dei motori | Da verificare alla prima installazione |
+| **Credenziali del connector** | Non ancora passate come variabili `SHELLY_*` | Quando entra il modulo MQTT di Youssouf |
+| **Mosquitto 3.0** | Toglierà opzioni che usiamo: serviranno i plugin prima di aggiornare | Da fare prima di aggiornare |
+| **Ricarica con file non validi** | Fa uscire il broker: i file si controllano prima | Accettato |
+| **Dispositivi tolti** | La loro password resta nelle versioni vecchie del segreto, che il broker non legge | Accettato |
+
 ## Dispositivi (dal laboratorio di Youssouf)
 
 | Limite | Cosa succede | Stato |
