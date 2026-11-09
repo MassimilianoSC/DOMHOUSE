@@ -66,6 +66,8 @@ ENGINE_FIELDS = {"heating": ("on", "setpoint"), "contact": ("since",), "motion":
 # D-174: a device's limits when its catalog does not list them (the catalog is the boundary in every case)
 DEVICE_LIMITS_FALLBACK = {"climate": (16, 30), "heating": (7, 23)}
 
+QUEUE_FULL = object()       # D-198: in a reader's queue, it stopped reading: end its stream
+
 NAMES = {"apt-rimini-01": "Via Roma 12 – int. 3", "apt-bologna-01": "Corso Italia 5 – int. 7"}
 
 DEFAULT_RULES = [
@@ -1008,7 +1010,14 @@ class ApartmentEngine:
         while self.events and self.events[0]["_t"] < cutoff:
             self.events.popleft()
         for q in list(self.subscribers):
-            q.put_nowait(env)
+            try:
+                q.put_nowait(env)
+            except asyncio.QueueFull:                # the reader reconnects and asks again from its last event
+                self.subscribers.discard(q)
+                while not q.empty():
+                    q.get_nowait()
+                q.put_nowait(QUEUE_FULL)
+                logs.warn("stream closed: too many events waiting", apartment_id=self.apartment_id, limit=q.maxsize)
         return env
 
     def events_after(self, last_id: str | None) -> list[dict]:

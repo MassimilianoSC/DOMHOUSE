@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from starlette._utils import get_route_path
 
-from .core import CONTRACT_VERSION, ApartmentEngine, MockError, parse_dt
+from .core import CONTRACT_VERSION, QUEUE_FULL, ApartmentEngine, MockError, parse_dt
 from .features import feature_for
 
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -287,8 +287,9 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
     async def stream(request: Request, apartment_id: str = Depends(apartment_of)):
         sim = engine_of(apartment_id)
         last_id = request.headers.get("Last-Event-ID")
-        queue: asyncio.Queue = asyncio.Queue()
-        for env in sim.events_after(last_id):
+        replay = sim.events_after(last_id)
+        queue: asyncio.Queue = asyncio.Queue(maxsize=int(sim.setting("STREAM_QUEUE_MAX")) + len(replay))   # D-198
+        for env in replay:
             queue.put_nowait(env)
         sim.subscribers.add(queue)
 
@@ -303,6 +304,8 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
                             break
                         yield ": ping\n\n"
                         continue
+                    if env is QUEUE_FULL:
+                        break
                     payload = {k: v for k, v in env.items() if k != "_t"}
                     yield f"id: {env['id']}\nevent: {env['event']}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
             finally:

@@ -54,6 +54,8 @@ SETTINGS: dict[str, tuple[float, float, float]] = {
     # D-137, F2: in an empty apartment, a meter above these watts for these minutes asks to switch the device off
     "EMPTY_POWER_WATTS": (300.0, 20.0, 5000.0),
     "EMPTY_POWER_MINUTES": (15.0, 5.0, 240.0),
+    # D-198: events waiting for one reader of the stream (the BFF); beyond, that stream is closed and the BFF reconnects
+    "STREAM_QUEUE_MAX": (1000.0, 10.0, 100000.0),
 }
 # settings that are a choice, name -> (default, allowed values)
 CHOICES: dict[str, tuple[str, tuple[str, ...]]] = {
