@@ -1760,8 +1760,9 @@ Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»):
 - **Con il motore simulato integrato** è sempre accesa («Con un indirizzo mock:// l'appartamento è sempre
   dimostrativo.»).
 - **Passando a un sistema domotico vero** l'appartamento torna reale, salvo lasciare accesa la casella.
-- **Nel sito vero**, fino alla consegna al cliente, i dimostrativi con il motore simulato integrato sono ammessi
-  come nell'ambiente di prova (dal 23 ottobre).
+- **Nel sito vero** il motore simulato integrato non è ammesso (dal lotto 36): i dimostrativi si provano nell'ambiente
+  di prova. Il salvataggio risponde «In produzione i dimostrativi non sono disponibili: si provano in staging. Qui serve
+  l'indirizzo di un sistema domotico vero».
 - **Un tale appartamento** non può avere un codice Italianway («In produzione un appartamento dimostrativo non può
   avere un codice Italianway»); un sistema domotico vero segnato dimostrativo può averlo.
 - **Ogni cambio del tipo** resta nel registro («… ha segnato l'appartamento … come dimostrativo»).
