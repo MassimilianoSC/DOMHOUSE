@@ -318,6 +318,8 @@ Risultato atteso: le impostazioni in vigore, oppure «tutte ai valori predefinit
   di agire: `ospiti` = con ospiti presenti per spegnere clima o caldaia o cambiare modalità, e per due o più azioni
   insieme (D-154, D-162); `sempre` = per ogni azione, programmazioni escluse; `multiple` = solo per due o più azioni
   insieme, anche con ospiti. Non esiste «mai».
+- `STREAM_QUEUE_MAX` (predefinito 1000, da 10 a 100000; lotto 35): eventi in attesa per ogni lettore dello stream del
+  motore; oltre, quello stream si chiude e il server si ricollega dal suo ultimo evento, senza perdere nulla.
 - `TIMEZONE` (predefinito `Europe/Rome`; D-177, lotto 31): fuso orario dell'appartamento; il BFF lo legge dal motore
   (`/apartment.timezone`) e in anagrafica si vede ma non si modifica. Si cambia con
   `sudo bash /opt/domhouse/engine-vm.sh set <apartment_id> TIMEZONE=Europe/London` (riavvio del motore). Un nome che
