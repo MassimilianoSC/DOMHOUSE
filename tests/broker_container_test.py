@@ -133,7 +133,7 @@ def start_bench() -> dict:
     rig(f"rm -rf {BENCH}/opt {BENCH}/etc {BENCH}/data {BENCH}/certs {BENCH}/secrets {BENCH}/up; "
         f"mkdir -p {BENCH}/up {BENCH}/opt {BENCH}/etc/_broker/tls {BENCH}/data {BENCH}/certs {BENCH}/secrets; "
         f"cd /repo && cp scripts/broker-vm.sh scripts/broker_accounts.py engine/broker/compose.yaml engine/broker/mosquitto.conf "
-        f"engine/compose.broker.yaml {BENCH}/up/; sed -i 's/\\r$//' {BENCH}/up/*; "
+        f"engine/compose.broker.yaml {BENCH}/up/; sed -i 's/\\r$//' {BENCH}/up/broker-vm.sh; sed -i 's/$/\\r/' {BENCH}/up/mosquitto.conf {BENCH}/up/compose.yaml; "
         f"python3 /repo/tests/broker_rig/stub_gcp.py {BENCH}/secrets > /dev/null 2>&1 &")
     rig(f"""cd {BENCH}/certs && openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.crt -days 30 -subj /CN=CA-di-prova 2>/dev/null &&
         openssl req -x509 -newkey rsa:2048 -nodes -keyout altra.key -out altra.crt -days 30 -subj /CN=CA-estranea 2>/dev/null""")
@@ -168,6 +168,11 @@ def test_install_refuses_a_missing_certificate(bench):
     done = bench["senza_certificato"]
     assert done.returncode and "certificato" in done.stderr, done.stderr
     assert "sano" in bench["install"].stdout
+
+
+def test_files_copied_from_windows_lose_their_carriage_returns(bench):
+    assert rig(f"grep -c $'\\r' {BENCH}/up/mosquitto.conf").stdout.strip() != "0"         # the copy really had them
+    assert rig(f"grep -c $'\\r' {BENCH}/opt/_broker/mosquitto.conf", check=False).stdout.strip() == "0"
 
 
 def test_the_container_runs_unprivileged_and_publishes_only_the_tls_port(bench):

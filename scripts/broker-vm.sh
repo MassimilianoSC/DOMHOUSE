@@ -130,6 +130,8 @@ put_files() {
   install -m 644 "${here}/compose.broker.yaml" "${OPT}/compose.broker.yaml"
   install -m 644 "${here}/compose.yaml" "${BROKER_OPT}/compose.yaml"
   install -m 644 "${here}/mosquitto.conf" "${BROKER_OPT}/mosquitto.conf"
+  # copied from a Windows PC they may carry \r line ends, which the broker would read as part of each value
+  sed -i 's/\r$//' "${OPT}/broker_accounts.py" "${OPT}/compose.broker.yaml" "${BROKER_OPT}/compose.yaml" "${BROKER_OPT}/mosquitto.conf"
 }
 
 fix_tls_owner() {
