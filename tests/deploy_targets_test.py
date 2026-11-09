@@ -134,7 +134,7 @@ def test_the_active_values_are_shown_before_and_the_new_revision_checked_after(r
     line = {w: next(x for x in out.stdout.splitlines() if w in x)
             for w in ("istanze minime", "istanze massime", "richieste contemporanee", "tempo massimo")}
     assert re.search(r"attivo: 0 +nuovo: 1 +CAMBIA", line["istanze minime"])
-    assert re.search(r"attivo: 1 +nuovo: 1 +non cambia", line["istanze massime"])
+    assert re.search(r"attivo: 1 +nuovo: 3 +CAMBIA", line["istanze massime"])
     assert re.search(r"attivo: 1000 +nuovo: 250 +CAMBIA", line["richieste contemporanee"])
     assert re.search(r"attivo: 300 +nuovo: 300 +non cambia", line["tempo massimo"])
     assert calls.index("minScale") < calls.index("services replace") < calls.index("revisions describe rev-nuova")
@@ -155,10 +155,10 @@ def test_a_minimum_of_zero_comes_back_empty_and_is_right(repo):
 
 
 @pytest.mark.parametrize("applied, words", [
-    ("1|1|250|3600\n", "tempo massimo: atteso 300, trovato 3600"),
-    ("0|1|250|300\n", "istanze minime: atteso 1, trovato 0"),
-    ("1|2|250|300\n", "istanze massime: atteso 1, trovato 2"),
-    ("1|1|1000|300\n", "richieste contemporanee: atteso 250, trovato 1000"),
+    ("1|3|250|3600\n", "tempo massimo: atteso 300, trovato 3600"),
+    ("0|3|250|300\n", "istanze minime: atteso 1, trovato 0"),
+    ("1|2|250|300\n", "istanze massime: atteso 3, trovato 2"),
+    ("1|3|1000|300\n", "richieste contemporanee: atteso 250, trovato 1000"),
 ])
 def test_a_revision_unlike_the_manifest_stops_before_the_site(repo, applied, words):
     (repo.stubs / "applied.txt").write_text(applied, encoding="utf-8")

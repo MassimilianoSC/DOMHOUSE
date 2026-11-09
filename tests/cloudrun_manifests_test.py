@@ -48,11 +48,12 @@ def test_two_services_both_reaching_the_vm():
         assert "your-vpc-network" in manifest and "your-vpc-subnet" in manifest   # filled by deploy.sh
         assert env(manifest)["INSTANCE_MODE"] == "real"                     # mock:// works in every mode (D-97)
     # the minimum is the one wanted difference (answer 195 of 23 Oct: staging off when nobody uses it)
-    for key in ("autoscaling.knative.dev/maxScale", "run.googleapis.com/cpu-throttling", "containerConcurrency",
+    for key in ("run.googleapis.com/cpu-throttling", "containerConcurrency",
                 "timeoutSeconds", "run.googleapis.com/startup-cpu-boost"):
         assert annotation(STAGING, key) == annotation(PROD, key), key
-    # one instance: the demonstration apartments keep their state in the BFF's memory (D-97), pushes not doubled (D-35)
-    assert annotation(PROD, "autoscaling.knative.dev/maxScale") == "1"
+    # D-201, D-202: production on several instances; staging on one, because its demonstrations live in the BFF's memory
+    assert annotation(PROD, "autoscaling.knative.dev/maxScale") == "3"
+    assert annotation(STAGING, "autoscaling.knative.dev/maxScale") == "1"
 
 
 def test_the_bff_writes_no_access_log_of_its_own():
@@ -90,7 +91,7 @@ def test_d197_how_production_runs():
     """D-197 (E-27, answer 295): what used to be set by hand on the service is written here, or the next publication
     would put back 3600 s."""
     assert annotation(PROD, "autoscaling.knative.dev/minScale") == "1"
-    assert annotation(PROD, "autoscaling.knative.dev/maxScale") == "1"
+    assert annotation(PROD, "autoscaling.knative.dev/maxScale") == "3"
     assert annotation(PROD, "containerConcurrency") == "250"
     assert annotation(PROD, "timeoutSeconds") == "300"
 

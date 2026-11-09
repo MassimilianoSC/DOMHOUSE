@@ -14,10 +14,9 @@ spec:
     metadata:
       annotations:
         autoscaling.knative.dev/minScale: "1"          # keeps SSE relays and FCM hooks warm
-        # 1 for the pilot (decision D-35): every instance keeps its own upstream streams and push hooks, so with N
-        # instances each notification would arrive N times. A few apartments fit in one instance; scaling out needs a
-        # cross-instance dedupe first (option B of D-35, still to be evaluated).
-        autoscaling.knative.dev/maxScale: "1"
+        # D-201: more than one instance: notifications and timed work are claimed on Firestore, each instance keeps its
+        # connections aligned with the registry. Production has no demonstration apartments (D-202).
+        autoscaling.knative.dev/maxScale: "3"
         run.googleapis.com/cpu-throttling: "false"     # background hubs need CPU between requests
         run.googleapis.com/startup-cpu-boost: "true"
         # The engine instances live on a VM with an internal IP only: route private ranges through the VPC.
