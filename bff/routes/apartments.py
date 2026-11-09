@@ -17,7 +17,7 @@ from ..features import configured_features, feature_for
 from .admin import tenant_out
 from ..logs import ctx_apartment, ctx_correlation, info
 from ..repository import get_repository
-from ..sse_hub import SseEvent, hub_manager
+from ..sse_hub import QUEUE_FULL, SseEvent, hub_manager
 
 router = APIRouter(prefix="/app")
 
@@ -380,8 +380,10 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
     last_event_id = request.headers.get("Last-Event-ID")
     hub = hub_manager.hub(apt)
     hub.start(last_event_id)
-    queue: asyncio.Queue = asyncio.Queue()
-    for ev in hub.replay_after(last_event_id):
+    replay = hub.replay_after(last_event_id)
+    # D-198: bounded, so a browser that stops reading costs a known amount of memory; room for its replay on top
+    queue: asyncio.Queue = asyncio.Queue(maxsize=get_settings().stream_queue_max + len(replay))
+    for ev in replay:
         queue.put_nowait(ev)
     hub.subscribers.add(queue)
 
@@ -396,6 +398,8 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
                 wait = PING_SECONDS if deadline is None else min(PING_SECONDS, max(0.0, deadline - time.time()))
                 try:
                     ev = await asyncio.wait_for(queue.get(), timeout=wait)
+                    if ev is QUEUE_FULL:   # D-198: this browser stopped reading (logged by the hub): it reopens and reloads
+                        break
                     if ev is None:   # the hub was dropped (apartment deleted or reset, D-97): end this stream
                         info("stream closed: apartment reset or removed")
                         break

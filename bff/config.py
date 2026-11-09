@@ -61,6 +61,7 @@ class Settings:
     ai_twin_price_cached_eur_per_m: float | None = None
     ai_demos: bool = False                    # the demonstration apartments with the real model (AI_DEMOS=true)
     token_check_timeout_s: float = 10.0       # D-198: the longest a request waits for its Firebase token to be checked
+    stream_queue_max: int = 500               # D-198: events waiting for one browser; beyond, its stream is closed
     # P-67 (D-136): the Firestore database of this environment, "(default)" in production, "staging" in staging
     firestore_database: str = "(default)"
     summary_job: bool = True                  # P-60 step 11: the weekly summary's hourly round (off in the test runs)
@@ -136,6 +137,7 @@ def get_settings() -> Settings:
         ai_twin_price_cached_eur_per_m=_float_or_none(e("AI_TWIN_PRICE_CACHED_EUR_PER_M", "")),
         ai_demos=_bool("AI_DEMOS"),
         token_check_timeout_s=float(e("TOKEN_CHECK_TIMEOUT_S", "10")),
+        stream_queue_max=int(e("STREAM_QUEUE_MAX", "500")),
         firestore_database=e("FIRESTORE_DATABASE", "(default)").strip() or "(default)",
         summary_job=_bool("SUMMARY_JOB", "true"),
     )

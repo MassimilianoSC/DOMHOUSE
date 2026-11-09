@@ -1,5 +1,6 @@
 """One upstream SSE connection per instance, fanned out to browser subscribers."""
 import asyncio
+import contextvars
 import json
 import time
 from collections import deque
@@ -13,6 +14,14 @@ from .logs import info, warn
 from .repository import Apartment
 
 BUFFER_SECONDS = 3600
+QUEUE_FULL = object()        # D-198: in a browser's queue, this browser stopped reading: end its stream (None: the apartment went)
+
+
+def _end_stream(q: asyncio.Queue, signal) -> None:
+    """What was waiting is dropped and only the signal stays: the browser reopens the stream and reloads."""
+    while not q.empty():
+        q.get_nowait()
+    q.put_nowait(signal)
 
 
 @dataclass
@@ -94,7 +103,14 @@ class InstanceHub:
         if ev.id is not None:
             self.last_id = ev.id
         for q in list(self.subscribers):
-            q.put_nowait(ev)
+            try:
+                q.put_nowait(ev)
+            except asyncio.QueueFull:                # one browser not reading: never the others, nor the upstream
+                self.subscribers.discard(q)
+                _end_stream(q, QUEUE_FULL)
+                # an empty context: this task's may carry the user of the request that started the hub
+                contextvars.Context().run(warn, "stream closed: too many events waiting",
+                                          apartment_id=self.apt.apartment_id, limit=q.maxsize)
         for hook in self.hooks:
             try:
                 await hook(self.apt, ev)
@@ -150,7 +166,7 @@ class HubManager:
         if h.task:
             h.task.cancel()
         for q in list(h.subscribers):
-            q.put_nowait(None)
+            _end_stream(q, None)
 
     async def stop_all(self) -> None:
         for h in self.hubs.values():
