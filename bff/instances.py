@@ -6,6 +6,7 @@ from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 import httpx
 
+from . import runtime
 from .config import get_settings
 from .features import effective_features
 from .repository import Apartment, get_repository
@@ -307,7 +308,7 @@ async def _safe_json(coro):
         return None, {"error": type(exc).__name__}
 
 
-_tz_locks: dict[str, asyncio.Lock] = {}
+TZ_CLAIM_S = 30.0            # D-201: a claim left by a process that died frees itself after this
 
 
 def _valid_timezone(name) -> bool:
@@ -331,11 +332,13 @@ async def sync_timezone(apt: Apartment, engine_apartment) -> None:
     from . import audit
     from .logs import info
 
-    lock = _tz_locks.setdefault(apt.apartment_id, asyncio.Lock())
-    async with lock:                         # two cards read at once: one save, one entry
-        repo = get_repository()
+    apt.timezone = tz
+    repo, claim = get_repository(), f"timezone:{apt.apartment_id}"
+    # two cards read at once, on any instance: one save, one entry. Released at the end, because the zone can change again
+    if await repo.claim_work(claim, runtime.BOOT_ID, TZ_CLAIM_S) != "mine":
+        return
+    try:
         stored = await repo.get_apartment(apt.apartment_id)
-        apt.timezone = tz
         if stored is None or stored.timezone == tz:
             return
         before = stored.timezone
@@ -344,6 +347,8 @@ async def sync_timezone(apt: Apartment, engine_apartment) -> None:
         info("apartment timezone from the engine", apartment_id=apt.apartment_id, **{"from": before, "to": tz})
         await audit.record("timezone_changed", audit.SYSTEM, stored.tenant_id,
                            audit.apartment_target(stored.apartment_id, stored.name), **{"from": before, "to": tz})
+    finally:
+        await repo.release_work(claim)
 
 
 async def summary(apt: Apartment, actor: str, tz_midnight_utc: str | None = None, timeout: float = 3.0) -> dict:

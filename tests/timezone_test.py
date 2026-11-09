@@ -93,3 +93,43 @@ def test_the_admins_patch_accepts_the_time_zone_and_ignores_it():
     assert r.status_code == 200 and r.json()["timezone"] == "Europe/Rome"
     r = run(call("PATCH", f"/app/admin/apartments/{APT}", ADMIN, json={"timezone": "Fake/Zone"}))
     assert r.status_code == 200 and r.json()["timezone"] == "Europe/Rome"
+
+
+def test_two_instances_that_read_a_new_time_zone_write_one_entry(monkeypatch):
+    """D-201: each instance has read the apartment with the old zone; the save takes time, so the two overlap."""
+    repo = get_repository()
+    real = repo.upsert_apartment
+
+    async def slow(apt):
+        await asyncio.sleep(0)
+        return await real(apt)
+    monkeypatch.setattr(repo, "upsert_apartment", slow)
+
+    async def main():
+        one = await repo.get_apartment(APT)
+        other = one.model_copy()
+        before = {e.audit_id for e in await entries(one.tenant_id)}
+        await asyncio.gather(instances.sync_timezone(one, {"timezone": "Europe/London"}),
+                             instances.sync_timezone(other, {"timezone": "Europe/London"}))
+        return one, other, [e for e in await entries(one.tenant_id) if e.audit_id not in before]
+    try:
+        one, other, new = run(main())
+        assert one.timezone == other.timezone == "Europe/London" and len(new) == 1
+    finally:
+        restore()
+
+
+def test_every_real_change_of_time_zone_is_written():
+    """The claim is released: going back and forth is three changes, not one."""
+    async def main():
+        repo = get_repository()
+        first = await repo.get_apartment(APT)
+        before = {e.audit_id for e in await entries(first.tenant_id)}
+        for tz in ("Europe/London", "Europe/Rome", "Europe/London"):
+            await instances.sync_timezone(await repo.get_apartment(APT), {"timezone": tz})
+        return [e.details["to"] for e in reversed(await entries(first.tenant_id)) if e.audit_id not in before]
+    try:
+        assert run(main()) == ["Europe/London", "Europe/Rome", "Europe/London"]
+    finally:
+        restore()
+
