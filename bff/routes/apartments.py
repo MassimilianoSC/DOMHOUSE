@@ -380,22 +380,30 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
     last_event_id = request.headers.get("Last-Event-ID")
     hub = hub_manager.hub(apt)
     hub.start(last_event_id)
-    replay = hub.replay_after(last_event_id)
-    # D-198: bounded, so a browser that stops reading costs a known amount of memory; room for its replay on top
-    queue: asyncio.Queue = asyncio.Queue(maxsize=get_settings().stream_queue_max + len(replay))
-    for ev in replay:
-        queue.put_nowait(ev)
-    hub.subscribers.add(queue)
+    settings = get_settings()
+    ends = time.monotonic() + settings.stream_max_s    # D-197 (E-27): a normal end of the response; the site reopens
 
     # P-50: a support stream ends at the exact expiry of the access, not at the next periodic check
     deadline = support.parse(user.support_expires_at).timestamp() if user.support_expires_at else None
 
     async def gen():
         checked = time.monotonic()
+        # Subscribed here and not before the response starts: a browser gone before the first step leaves nothing behind.
+        # D-198: bounded, so a browser that stops reading costs a known amount of memory; room for its replay on top
+        replay = hub.replay_after(last_event_id)
+        queue: asyncio.Queue = asyncio.Queue(maxsize=settings.stream_queue_max + len(replay))
+        for ev in replay:
+            queue.put_nowait(ev)
+        hub.subscribers.add(queue)
         try:
             yield "retry: 3000\n: connected\n\n"
             while True:
-                wait = PING_SECONDS if deadline is None else min(PING_SECONDS, max(0.0, deadline - time.time()))
+                left = ends - time.monotonic()
+                if left <= 0:
+                    break
+                wait = min(PING_SECONDS, left)
+                if deadline is not None:
+                    wait = min(wait, max(0.0, deadline - time.time()))
                 try:
                     ev = await asyncio.wait_for(queue.get(), timeout=wait)
                     if ev is QUEUE_FULL:   # D-198: this browser stopped reading (logged by the hub): it reopens and reloads

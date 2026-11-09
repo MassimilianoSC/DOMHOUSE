@@ -82,9 +82,10 @@ def test_removing_an_apartment_also_ends_a_full_stream(apt):
     assert drained(asyncio.run(main())) == [None]
 
 
-def stream(apt, monkeypatch, limit, last_event_id=None, buffered=0):
+def stream(apt, monkeypatch, limit, last_event_id=None, buffered=0, stream_max=240.0):
     """The real route, without the upstream connection: (the body, the hub, its queue)."""
-    monkeypatch.setattr(apartments, "get_settings", lambda: dataclasses.replace(get_settings(), stream_queue_max=limit))
+    monkeypatch.setattr(apartments, "get_settings", lambda: dataclasses.replace(get_settings(), stream_queue_max=limit,
+                                                                                stream_max_s=stream_max))
     monkeypatch.setattr(InstanceHub, "start", lambda self, last: None)
     hub = hub_manager.hub(apt)
     monkeypatch.setattr(hub, "hooks", [])
@@ -98,7 +99,7 @@ def stream(apt, monkeypatch, limit, last_event_id=None, buffered=0):
             return False
         request = SimpleNamespace(headers={"Last-Event-ID": last_event_id} if last_event_id else {}, is_disconnected=connected)
         response = await apartments.stream(APT, request, user=user)
-        return response.body_iterator, hub, next(iter(hub.subscribers))
+        return response.body_iterator, hub
     return open_it
 
 
@@ -106,8 +107,9 @@ def test_the_route_gives_each_stream_a_limit_and_ends_it_cleanly(apt, monkeypatc
     opened = stream(apt, monkeypatch, 3)
 
     async def main():
-        body, hub, queue = await opened()
-        assert queue.maxsize == 3 and "connected" in await anext(body)
+        body, hub = await opened()
+        assert "connected" in await anext(body)
+        assert next(iter(hub.subscribers)).maxsize == 3
         for n in range(4):
             await hub._publish(event(n))
         with pytest.raises(StopAsyncIteration):               # a normal end of the response, nothing raised
@@ -120,7 +122,60 @@ def test_a_replay_longer_than_the_limit_fits(apt, monkeypatch):
     opened = stream(apt, monkeypatch, 2, last_event_id="0", buffered=6)       # five events to replay, limit 2
 
     async def main():
-        _, _, queue = await opened()
-        return queue
+        body, hub = await opened()
+        await anext(body)
+        return next(iter(hub.subscribers))
     queue = asyncio.run(main())
     assert queue.maxsize == 7 and [e.id for e in drained(queue)] == ["1", "2", "3", "4", "5"]
+
+
+def test_a_stream_ends_by_itself_within_its_limit(apt, monkeypatch):
+    """D-197 (E-27): a normal end of the response before Cloud Run cuts it, with no event and no ping needed."""
+    opened = stream(apt, monkeypatch, 3, stream_max=0.05)
+
+    async def main():
+        body, hub = await opened()
+        await anext(body)
+        started = time.monotonic()
+        with pytest.raises(StopAsyncIteration):
+            await anext(body)
+        return hub, time.monotonic() - started
+    hub, took = asyncio.run(main())
+    assert took < 1.0 and hub.subscribers == set()
+
+
+def test_a_stream_full_of_events_ends_at_its_limit_too(apt, monkeypatch):
+    opened = stream(apt, monkeypatch, 500, stream_max=0.05)
+
+    async def main():
+        body, hub = await opened()
+        await anext(body)
+        await asyncio.sleep(0.1)                                  # the time is up with an event waiting
+        await hub._publish(event(1))
+        with pytest.raises(StopAsyncIteration):
+            await anext(body)
+        return hub
+    assert asyncio.run(main()).subscribers == set()
+
+
+def test_a_browser_gone_before_the_first_step_leaves_nothing(apt, monkeypatch):
+    opened = stream(apt, monkeypatch, 3)
+
+    async def main():
+        body, hub = await opened()
+        assert hub.subscribers == set()                           # subscribed only when the response really starts
+        await body.aclose()
+        return hub
+    assert asyncio.run(main()).subscribers == set()
+
+
+def test_a_browser_gone_after_the_first_step_leaves_nothing(apt, monkeypatch):
+    opened = stream(apt, monkeypatch, 3)
+
+    async def main():
+        body, hub = await opened()
+        await anext(body)
+        assert len(hub.subscribers) == 1
+        await body.aclose()
+        return hub
+    assert asyncio.run(main()).subscribers == set()

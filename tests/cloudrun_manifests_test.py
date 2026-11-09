@@ -102,3 +102,11 @@ def test_d197_how_staging_runs():
     assert annotation(STAGING, "autoscaling.knative.dev/maxScale") == "1"
     assert annotation(STAGING, "containerConcurrency") == "250"
     assert annotation(STAGING, "timeoutSeconds") == "300"
+
+
+def test_d197_a_stream_ends_before_cloud_run_cuts_it():
+    """STREAM_MAX_S is not in the manifests: its default must stay under their time limit, with room to spare."""
+    from bff.config import get_settings
+    for manifest in (STAGING, PROD):
+        assert get_settings().stream_max_s + 30 <= int(annotation(manifest, "timeoutSeconds"))
+
