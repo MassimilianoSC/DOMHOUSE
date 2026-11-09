@@ -14,6 +14,10 @@ const s = vi.hoisted(() => ({ me: null as unknown, simulated: false }));
 vi.setConfig({ testTimeout: 20_000 });
 const defaultWait = getConfig().asyncUtilTimeout;
 beforeAll(() => configure({ asyncUtilTimeout: 5_000 }));
+// Consumi is the only page opened here that brings the chart library, whose loading blocks the whole test process: 0.8 s
+// on a quiet machine, up to 25 s on a loaded one, with no timer running. Started by one test, it ended inside a later one
+// and used up that test's time, so it is loaded once, here, before any test starts.
+beforeAll(() => import("@/pages/EnergyPage").then(() => undefined), 120_000);
 afterAll(() => configure({ asyncUtilTimeout: defaultWait }));
 
 vi.mock("@/auth/AuthProvider", async (importOriginal) => {
