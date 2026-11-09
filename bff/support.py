@@ -10,12 +10,13 @@ import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from . import audit
+from . import audit, runtime
 from .logs import warn
 from .repository import SupportAccess, get_repository, normalize_email
 from .repository.base import AuditActor, AuditPerson, AuditTarget, now_iso
 
 MAX_HOURS = 24
+CLAIM_S = 30.0               # D-201: a claim of this module, left by a process that died, frees itself after this
 _locks: dict[tuple[int, str], asyncio.Lock] = {}
 
 
@@ -75,16 +76,28 @@ async def _tenant_name(tenant_id: str) -> str:
 
 
 async def note_expiry(a: SupportAccess) -> SupportAccess:
-    """The first time the server sees an expired access, the log gets support_access_expired (no timer runs)."""
-    if status(a) == "expired" and not a.expiry_logged:
-        try:   # D-88: the entry first; only once it is written is the flag set, so a failed write is retried
-            await audit.record("support_access_expired", audit.SYSTEM, a.tenant_id,
-                               target(a, await _tenant_name(a.tenant_id)), strict=True)
-        except Exception as exc:
-            warn("support: expiry not logged yet", access_id=a.access_id, error=str(exc))
+    """The first time the server sees an expired access, the log gets support_access_expired (no timer runs). D-201: every
+    instance can see it at the same moment, the claim makes one write the entry; "done" means it is written and only the
+    flag may be missing."""
+    if status(a) != "expired" or a.expiry_logged:
+        return a
+    repo, claim = get_repository(), f"support_expiry:{a.access_id}"
+    try:   # D-88: the entry first; only once it is written is the flag set, so a failed write is retried
+        got = await repo.claim_work(claim, runtime.BOOT_ID, CLAIM_S)
+        if got == "taken":
             return a
-        return await get_repository().update_support_access(a.access_id, {"expiry_logged": True}) or a
-    return a
+        if got == "mine":
+            try:
+                await audit.record("support_access_expired", audit.SYSTEM, a.tenant_id,
+                                   target(a, await _tenant_name(a.tenant_id)), strict=True)
+            except Exception:
+                await repo.release_work(claim)
+                raise
+            await repo.finish_work(claim)
+    except Exception as exc:
+        warn("support: expiry not logged yet", access_id=a.access_id, error=str(exc))
+        return a
+    return await repo.update_support_access(a.access_id, {"expiry_logged": True}) or a
 
 
 async def listed(tenant_id: str | None = None, operator_uid: str | None = None) -> list[SupportAccess]:

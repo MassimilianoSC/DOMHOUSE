@@ -180,3 +180,38 @@ def test_d189_inside_the_manager_has_the_current_name_and_the_access_keeps_its_c
     finally:
         close(aid)
         run(call("PATCH", "/app/me", support=False, json={"display_name": before}))
+
+
+# -------- D-201: several instances --------
+def expired_access(reason):
+    aid = open_access(reason)
+    run(get_repository().update_support_access(aid, {"expires_at": iso(datetime.now(UTC) - timedelta(seconds=1))}))
+    return aid
+
+
+def expiry_entries(aid):
+    return [e.action for e in run(get_repository().list_audit(TID, 200)) if e.target.id == aid].count("support_access_expired")
+
+
+def test_two_instances_that_see_the_same_expiry_write_one_entry():
+    from bff import support
+
+    aid = expired_access("Due istanze")
+    seen = run(get_repository().get_support_access(aid))        # both have read it before either writes
+
+    async def both():
+        await asyncio.gather(support.note_expiry(seen.model_copy()), support.note_expiry(seen.model_copy()))
+    run(both())
+    assert expiry_entries(aid) == 1 and run(get_repository().get_support_access(aid)).expiry_logged
+
+
+def test_an_expiry_already_written_only_sets_its_flag():
+    """The instance that wrote the entry fell before setting the flag: the next one must not write it again."""
+    from bff import support
+
+    repo, aid = get_repository(), expired_access("Solo il segno")
+    run(repo.claim_work(f"support_expiry:{aid}", "altra-istanza", 30))
+    run(repo.finish_work(f"support_expiry:{aid}"))
+    run(support.note_expiry(run(repo.get_support_access(aid))))
+    assert expiry_entries(aid) == 0 and run(repo.get_support_access(aid)).expiry_logged
+
