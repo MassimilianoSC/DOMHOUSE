@@ -53,6 +53,7 @@ def users():
                                     notification_prefs=NotificationPrefs(approvals=False, offline=False)))
     run(setup())
     push._health_down.clear()
+    get_repository().work.clear()
 
 
 @pytest.fixture
@@ -457,11 +458,12 @@ def test_a_failed_send_is_retried_then_given_up(users, fcm, monkeypatch):
     assert logged.count("push send failed") == push.MAX_SEND_ATTEMPTS and logged.count("push given up") == 1
 
 
-def offline_engine(monkeypatch):
+def offline_engine(monkeypatch, last_seen=None, health="ok"):
     """The engine still says the device is offline when the timer runs out."""
     async def fake(apt, method, path, **kw):
-        return httpx.Response(200, json={"devices": [{"device_id": "dev-due", "label": "Presa", "online": False}]},
-                              request=httpx.Request("GET", "http://x"))
+        body = {"status": health} if path == "/health" else {
+            "devices": [{"device_id": "dev-due", "label": "Presa", "online": False, "last_seen": last_seen}]}
+        return httpx.Response(200, json=body, request=httpx.Request("GET", "http://x"))
     monkeypatch.setattr(push.instances, "call", fake)
 
 
@@ -557,4 +559,151 @@ def test_an_error_while_pruning_does_not_send_it_again(users, fcm, monkeypatch):
         assert await get_repository().claim_work("push:prova:pota", "altro", 60) == "done"
     run(scenario())
     assert logged == ["push tokens not pruned"]
+
+
+# -------- review of lot 36: an outage is one notification on every instance, and a restart does not lose it --------
+SEEN = "2026-10-16T09:00:00.000Z"
+
+
+def went_offline(event_id):
+    return event("device.online", {"device_id": "dev-due", "online": False}, event_id=event_id)
+
+
+def ago(seconds):
+    from datetime import UTC, datetime, timedelta
+    return (datetime.now(UTC) - timedelta(seconds=seconds)).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def fresh_process():
+    push._offline_timers.clear()
+    push._health_down.clear()
+    push._resumed.clear()
+
+
+def test_an_instance_that_joined_during_the_outage_does_not_notify_it_again(users, fcm, monkeypatch):
+    """Its timer started from a later event of the engine: not the same id, the same outage."""
+    alert_minutes(monkeypatch, 0)
+    offline_engine(monkeypatch, last_seen=SEEN)
+
+    async def scenario():
+        await push.on_stream_event(APT, went_offline("7201"))
+        await drain()
+        push._offline_timers.clear()
+        await push.on_stream_event(APT, went_offline("7202"))
+        await drain()
+    run(scenario())
+    assert len(fcm.sent) == 1
+
+
+def test_when_the_device_has_answered_a_new_outage_is_a_new_notification(users, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
+
+    async def scenario():
+        for event_id, seen in (("7203", SEEN), ("7204", "2026-10-16T09:30:00.000Z")):
+            offline_engine(monkeypatch, last_seen=seen)
+            await push.on_stream_event(APT, went_offline(event_id))
+            await drain()
+    run(scenario())
+    assert len(fcm.sent) == 2
+
+
+def test_instance_down_is_one_notification_for_the_whole_outage(users, fcm, monkeypatch):
+    """The engine repeats instance.health at every change of a device; an instance can join with any of those events."""
+    alert_minutes(monkeypatch, 0)
+
+    async def scenario():
+        await push.on_stream_event(APT, event("instance.health", {"status": "down"}, event_id="7205"))
+        await drain()
+        push._health_down.clear()
+        await push.on_stream_event(APT, event("instance.health", {"status": "down"}, event_id="7206"))
+        await drain()
+    run(scenario())
+    assert [m.data["kind"] for m in fcm.sent] == ["instance_down"]
+
+
+def test_a_restart_goes_on_waiting_for_a_device_already_offline(users, fcm, monkeypatch):
+    """The timer died with the process and the event is behind the saved id."""
+    from engine.core import seconds_per_minute
+
+    alert_minutes(monkeypatch, 10)
+    unit = seconds_per_minute()
+
+    async def scenario():
+        fresh_process()
+        offline_engine(monkeypatch, last_seen=ago(9 * unit))    # 9 minutes of 10: it still has to wait
+        await push.resume_watches(APT)
+        await asyncio.sleep(0.01)
+        pending = push._offline_timers[(APT.apartment_id, "dev-due")]
+        assert not pending.done() and fcm.sent == []
+        pending.cancel()
+        fresh_process()
+        offline_engine(monkeypatch, last_seen=ago(11 * unit))   # the wait is over: at once
+        await push.resume_watches(APT)
+        await drain()
+    run(scenario())
+    assert [m.data["kind"] for m in fcm.sent] == ["device_offline"]
+
+
+def test_a_restart_does_not_notify_again_what_was_already_sent(users, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
+    offline_engine(monkeypatch, last_seen=ago(600))
+
+    async def scenario():
+        for _ in range(2):
+            fresh_process()
+            await push.resume_watches(APT)
+            await drain()
+    run(scenario())
+    assert len(fcm.sent) == 1
+
+
+def test_an_outage_older_than_the_claims_is_not_picked_up(users, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
+    offline_engine(monkeypatch, last_seen=ago(push.OFFLINE_RESUME_MAX_S + 60))
+
+    async def scenario():
+        fresh_process()
+        await push.resume_watches(APT)
+        await drain()
+    run(scenario())
+    assert fcm.sent == []
+
+
+def test_a_restart_picks_up_an_instance_down_and_says_only_that(users, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
+    offline_engine(monkeypatch, last_seen=ago(600), health="down")
+
+    async def scenario():
+        fresh_process()
+        await push.resume_watches(APT)
+        await drain()
+    run(scenario())
+    assert [m.data["kind"] for m in fcm.sent] == ["instance_down"]
+
+
+def test_an_outage_that_ended_while_nobody_listened_does_not_silence_the_next(users, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
+    offline_engine(monkeypatch, health="ok")
+
+    async def scenario():
+        repo = get_repository()
+        await repo.claim_work(push.instance_down_key(APT), "morto", 60)
+        await repo.finish_work(push.instance_down_key(APT))
+        fresh_process()
+        await push.resume_watches(APT)
+        assert await repo.claim_work(push.instance_down_key(APT), "altro", 60) == "mine"
+    run(scenario())
+
+
+def test_an_engine_that_does_not_answer_is_asked_again(users, fcm, monkeypatch):
+    async def fake(apt, method, path, **kw):
+        raise httpx.ConnectError("giu")
+    monkeypatch.setattr(push.instances, "call", fake)
+
+    async def scenario():
+        fresh_process()
+        push._resumed.add(APT.apartment_id)
+        await push.resume_watches(APT)
+    run(scenario())
+    assert APT.apartment_id not in push._resumed
 

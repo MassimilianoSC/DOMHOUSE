@@ -6,6 +6,7 @@ tasks, and task errors are logged.
 """
 import asyncio
 import time
+from datetime import datetime
 
 from . import instances, runtime
 from .auth import sees, tenant_status
@@ -25,6 +26,8 @@ _down_timers: dict[str, asyncio.Task] = {}      # D-131: the "instance down" pus
 _tasks: set[asyncio.Task] = set()  # strong references: the loop keeps only weak ones to running tasks
 _loops: list[asyncio.Task] = []    # the rounds that last as long as the process
 HUB_ALIGN_S = 60
+_resumed: set[str] = set()         # the apartments whose timers this process has picked up (resume_watches)
+OFFLINE_RESUME_MAX_S = 6 * 86400   # the claims last 7 days: an outage older than this could be notified a second time
 
 
 def build_push(kind: str, apt: Apartment, title: str, body: str, link: str, tag: str, ts: str | None = None,
@@ -218,6 +221,7 @@ def forget_apartment(apartment_id: str) -> None:
             task.cancel()
             _offline_timers.pop(key, None)
     _health_down.discard(apartment_id)
+    _resumed.discard(apartment_id)
     if (task := _down_timers.pop(apartment_id, None)) and not task.done():
         task.cancel()
 
@@ -233,24 +237,38 @@ async def _offline_alert_minutes(apt: Apartment) -> float | None:
     return 15.0
 
 
-async def _offline_watch(apt: Apartment, device_id: str, ts: str | None, key: str) -> None:
-    """D-201: every instance has this timer; `key` is the originating event's, so when it runs out only one sends."""
+def offline_key(apt: Apartment, device_id: str, last_seen: str | None) -> str | None:
+    """One outage of one device: the engine moves last_seen only when the device answers, so every instance gets the same
+    key whichever event started its timer, also one that started later."""
+    return f"push:offline:{apt.apartment_id}:{device_id}:{last_seen}" if last_seen else None
+
+
+def instance_down_key(apt: Apartment) -> str:
+    """The engine repeats instance.health at every change of a device, and has no date for the start of an outage: one
+    claim for the whole outage, released when the connector is back."""
+    return f"push:instance_down:{apt.apartment_id}"
+
+
+async def _offline_watch(apt: Apartment, device_id: str, ts: str | None, key: str, already_s: float = 0.0) -> None:
+    """D-201: every instance has this timer; when it runs out only one sends. `already_s`: how long the device has been
+    offline when a process that has just started picks up the wait (resume_watches)."""
     minutes = await _offline_alert_minutes(apt)
     if minutes is None:
         return
     from engine.core import seconds_per_minute
 
-    await asyncio.sleep(minutes * (seconds_per_minute() if get_settings().instance_mode == "mock" else 60.0))
+    await asyncio.sleep(max(0.0, minutes * (seconds_per_minute() if get_settings().instance_mode == "mock" else 60.0) - already_s))
     try:
         resp = await instances.call(apt, "GET", "/devices", timeout=5.0)
         dev = next((d for d in resp.json().get("devices", []) if d["device_id"] == device_id), None)
     except Exception:
         return
     if dev and not dev["online"]:
-        await notify_once(key, apt.tenant_id, "offline", *device_offline_push(apt, device_id, dev.get("label") or device_id, minutes, ts))
+        await notify_once(offline_key(apt, device_id, dev.get("last_seen")) or key, apt.tenant_id, "offline",
+                          *device_offline_push(apt, device_id, dev.get("label") or device_id, minutes, ts))
 
 
-async def _instance_down_watch(apt: Apartment, ts: str | None, key: str) -> None:
+async def _instance_down_watch(apt: Apartment, ts: str | None) -> None:
     """D-131: the "instance down" push only when it stays down as long as the offline_alert rule's minutes (the same
     wait as a device's); never with the rule off. A connector that drops and reconnects at once sends nothing."""
     minutes = await _offline_alert_minutes(apt)
@@ -260,7 +278,35 @@ async def _instance_down_watch(apt: Apartment, ts: str | None, key: str) -> None
 
     await asyncio.sleep(minutes * (seconds_per_minute() if get_settings().instance_mode == "mock" else 60.0))
     if apt.apartment_id in _health_down:
-        await notify_once(key, apt.tenant_id, "offline", *instance_down_push(apt, ts))
+        await notify_once(instance_down_key(apt), apt.tenant_id, "offline", *instance_down_push(apt, ts))
+
+
+async def resume_watches(apt: Apartment) -> None:
+    """D-201: the timers live in memory, so a publication or a crash loses them, and the events that started them are
+    already behind the saved id. A process that opens a connection asks the engine who is offline now and goes on waiting;
+    what was already notified is stopped by the claim."""
+    apartment_id = apt.apartment_id
+    try:
+        health = (await instances.call(apt, "GET", "/health", timeout=5.0)).json()
+        devices = (await instances.call(apt, "GET", "/devices", timeout=5.0)).json().get("devices") or []
+        if health.get("status") != "down":
+            await get_repository().release_work(instance_down_key(apt))    # the outage ended while nobody was listening
+        elif apartment_id not in _health_down:
+            _health_down.add(apartment_id)
+            _down_timers[apartment_id] = _spawn(_instance_down_watch(apt, health.get("checked_at")), "instance_down", apartment_id)
+        if health.get("status") == "down":                                  # the notification of the outage says it all
+            return
+        for device in devices:
+            seen, timer = device.get("last_seen"), (apartment_id, device["device_id"])
+            if device.get("online") or not seen or (timer in _offline_timers and not _offline_timers[timer].done()):
+                continue
+            offline_for = time.time() - datetime.fromisoformat(seen.replace("Z", "+00:00")).timestamp()
+            if offline_for <= OFFLINE_RESUME_MAX_S:
+                _offline_timers[timer] = _spawn(_offline_watch(apt, device["device_id"], seen, offline_key(apt, device["device_id"], seen),
+                                                               offline_for), "device_offline", apartment_id)
+    except Exception as exc:                       # the engine does not answer now: the next round asks again
+        _resumed.discard(apartment_id)
+        info("offline timers not resumed yet", apartment_id=apartment_id, error=type(exc).__name__)
 
 
 async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
@@ -290,8 +336,10 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
         down = data.get("status") == "down"
         if down and apt.apartment_id not in _health_down:
             _health_down.add(apt.apartment_id)
-            _down_timers[apt.apartment_id] = _spawn(_instance_down_watch(apt, ts, event_key(apt, ev, ts)), "instance_down", apt.apartment_id)
+            _down_timers[apt.apartment_id] = _spawn(_instance_down_watch(apt, ts), "instance_down", apt.apartment_id)
         elif not down:
+            if apt.apartment_id in _health_down:
+                _spawn(get_repository().release_work(instance_down_key(apt)), "instance_up", apt.apartment_id)
             _health_down.discard(apt.apartment_id)
             if (task := _down_timers.pop(apt.apartment_id, None)) and not task.done():
                 task.cancel()
@@ -315,6 +363,9 @@ async def align_hubs_once() -> None:
         for apt in apartments.values():
             if apt.enabled and not instances.demo_refused(apt.instance_url):
                 hub_manager.hub(apt).start(None)
+                if apt.apartment_id not in _resumed:
+                    _resumed.add(apt.apartment_id)
+                    _spawn(resume_watches(apt), "resume", apt.apartment_id)
 
 
 def _start_round(seconds: float, work, what: str) -> None:

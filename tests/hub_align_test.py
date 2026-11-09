@@ -371,3 +371,22 @@ def test_a_demonstration_gets_no_connection_in_production(world, monkeypatch, en
     play(scenario)
     assert len(world.connections) == connections
 
+
+def test_the_timers_are_picked_up_once_per_process(world, monkeypatch):
+    asked = []
+
+    async def resume(apt):
+        asked.append(apt.apartment_id)
+    monkeypatch.setattr(push, "resume_watches", resume)
+    push._resumed.clear()
+
+    async def scenario():
+        world.apartments.append(apartment())
+        await align()
+        await align()
+    try:
+        play(scenario)
+    finally:
+        push._resumed.clear()
+    assert asked == [APT]
+

@@ -456,7 +456,10 @@ fallisce per tutti i destinatari, un giro di ogni istanza la riprende e la manda
 previsto:** un'istanza che manda la notifica e cade prima di segnarla mandata può farla arrivare due volte; non arriva mai zero
 volte per questo motivo. Una notifica doppia ha lo stesso `tag`: il telefono la mostra una volta sola. Il riepilogo settimanale
 prenota la notifica prima di salvarsi, con una durata di 75 minuti: se l'istanza cade in quel momento, la notifica arriva entro
-quel tempo, quando il giro successivo ha già rifatto il riepilogo.
+quel tempo, quando il giro successivo ha già rifatto il riepilogo. I timer di «dispositivo offline» e «sistema domotico non
+raggiungibile» stanno nella memoria dell'istanza: un'istanza che apre un collegamento chiede al motore chi è offline e riprende
+l'attesa dal tempo già passato, così una pubblicazione non li perde. Al primo avvio di questa versione un dispositivo già offline da
+meno di 6 giorni dà una notifica, anche se era già stata mandata prima.
 
 Ogni istanza allinea ogni minuto i collegamenti ai motori con l'anagrafica: chiude quelli degli appartamenti rimossi o disattivati,
 rifà quelli cambiati e, con FCM acceso, apre quelli mancanti. L'ultimo id di ogni appartamento si salva al massimo ogni 30 s
