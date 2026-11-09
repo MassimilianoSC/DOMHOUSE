@@ -1,0 +1,58 @@
+# Limiti noti di DOMHOUSE
+
+*Aggiornato il 9 novembre 2026 (lotto 36). Regola del committente (D-204): ogni limite che conosciamo sta scritto qui.*
+
+**Come leggerlo:** «Stato» dice se il limite è accettato, se è in lavorazione o se va ancora verificato.
+
+## Notifiche
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Consegna parziale** | Se una notifica raggiunge solo alcuni telefoni per un errore temporaneo, conta come mandata e non viene ritentata: ritentarla la rimanderebbe a tutti | Accettato |
+| **Doppio raro** | Se un server cade mentre manda una notifica, la stessa notifica può partire due volte, mai zero | Accettato |
+| **Tempi di recupero** | Se un server cade, la notifica viene ripresa entro pochi minuti; il riepilogo settimanale entro 75 minuti | Accettato |
+| **Eventi molto vecchi** | Se nessun server resta collegato a un motore per più di un'ora, gli eventi più vecchi di un'ora non generano notifiche; resta una riga nei log | Accettato |
+| **Primo avvio del lotto 36** | Un dispositivo già offline da meno di 6 giorni manda una notifica, anche se era già stata mandata | Una tantum |
+
+## Disponibilità del server
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Fermo del 23 ottobre (E-27)** | La causa ultima è interna a Cloud Run e non è dimostrata; le contromisure ne tolgono la condizione nota | Da verificare alla prossima sostituzione di istanza |
+| **Una sola VM** | Se la VM si ferma, i motori degli appartamenti si fermano con lei | Accettato per ora |
+| **Staging diverso dalla produzione** | Lo staging ha al massimo 1 istanza, la produzione 3: un difetto che compare solo con più istanze non si vede in staging, salvo la prova dedicata | Accettato (D-202) |
+| **Sospensione di un'organizzazione** | Con più istanze, l'effetto può arrivare fino a 30 secondi dopo | Accettato (risposta 338) |
+
+## Staging
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Si spegne da solo** | Senza richieste si spegne: la prima apertura aspetta qualche secondo | Voluto |
+| **A server spento** | Niente notifiche, e gli eventi di quel periodo non si recuperano | Voluto |
+| **Dimostrativi** | Ripartono dai valori iniziali a ogni avvio del server | Voluto |
+
+## Aggiornamenti in diretta
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Pagina in sottofondo** | L'app non si aggiorna in tempo reale; si rimette in pari quando torni | Voluto |
+| **Browser che se ne va** | Il server può non accorgersene: lo stream resta aperto al massimo 4 minuti | Accettato |
+| **Mai provato su un telefono** | La riapertura degli stream è stata provata solo su computer | Da verificare (checklist D27) |
+
+## App nel browser
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Copia dell'app bloccata (E-29)** | Il 9 novembre la copia salvata in Chrome non è partita e il sito non si apriva; chiudere e riaprire Chrome l'ha risolto | Causa da capire |
+| **Avvio senza tempo massimo (E-29)** | Se l'avvio si inceppa, la pagina può restare in caricamento senza errori | In lavorazione (lotto 37) |
+
+## Dispositivi (dal laboratorio di Youssouf)
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Sensore temperatura e umidità** | Trasmette ogni 60 secondi: la caldaia può reagire fino a un minuto dopo | Accettato |
+| **Sensore di movimento** | A riposo trasmette ogni 15 minuti; sul movimento trasmette subito | Accettato |
+| **Portata Bluetooth** | Circa 10 metri al chiuso dal dispositivo che fa da ponte | Da verificare in appartamento |
+| **Gen4 in modalità Zigbee** | I sensori Bluetooth spariscono: i Gen4 restano in Wi-Fi | Vincolo di installazione |
+| **Infrarossi** | Il climatizzatore non dà conferma di ritorno: l'esito si deduce dal consumo | Accettato |
+| **Portata dell'Athom** | Non dichiarata dal produttore; sotto 4–5 metri serve un trasmettitore più potente | Da misurare |
