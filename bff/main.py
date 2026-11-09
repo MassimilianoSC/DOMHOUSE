@@ -9,7 +9,7 @@ from starlette.datastructures import MutableHeaders
 
 from engine.log import setup_logging as setup_engine_logging
 
-from . import instances, push
+from . import instances, push, runtime
 from .config import get_settings
 from .logs import setup_logging
 from .routes import account, admin, apartments, platform, webhooks
@@ -60,16 +60,23 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        runtime.process_started()
+        put_back_sigterm = runtime.watch_sigterm()
+        status = asyncio.create_task(runtime.status_loop(settings.status_log_s))
         await asyncio.to_thread(instances.http)   # D-198: the shared client's certificates, before serving and off the loop
         await webhooks.report_demo_codes()   # D-99 F1: a demonstration apartment with an Italianway code, in production
         await push.start_background_hubs()
         from . import summary_job
         summary_job.start()                   # P-60 step 11: the weekly summary's hourly round
         yield
+        runtime.process_stopping()
+        put_back_sigterm()
+        status.cancel()
         await hub_manager.stop_all()
 
     app = FastAPI(title="DOMHOUSE BFF", lifespan=lifespan)
     app.add_middleware(NoStoreMiddleware, root_path=settings.root_path)
+    app.add_middleware(runtime.RequestCounter, root_path=settings.root_path)
     if settings.is_dev:
         app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
     elif settings.cors_origins:

@@ -758,3 +758,15 @@ Il BFF conta le domande all'assistente per appartamento e settimana (da lunedì 
 complete i `timeouts` superano il 10 % delle `asks`: è la misura di D-182 che riapre la scelta del modello. Il
 conteggio è al meglio: una scrittura fallita non tocca la risposta e lascia un avviso nel log («assistant stats not
 written»).
+
+## Righe di log del processo (D-198, E-27)
+
+`bff/runtime.py`. Mai token, email o persone. Ogni processo ha un `boot_id` casuale.
+
+| Riga | Campi |
+|---|---|
+| `process started` | `boot_id`, `revision` (`K_REVISION`), `pid` |
+| `process got SIGTERM`, `process stopping` | `boot_id`, `uptime_s`, `streams_open` |
+| `stream opened` | `boot_id`, `stream_id`, `apartment_id` |
+| `stream closed` | `boot_id`, `stream_id`, `apartment_id`, `seconds`, `reason`: `max_duration`, `client_disconnect`, `queue_full`, `apartment_removed`, `access_ended`, `error` |
+| `process status`, ogni `STATUS_LOG_S` (60) | `boot_id`, `streams_open`, `requests_active` (stream compresi, non le chiamate interne al motore integrato), `queue_max` (la coda di stream più lunga), `loop_lag_ms` (il ritardo peggiore dell'event loop nel periodo) |

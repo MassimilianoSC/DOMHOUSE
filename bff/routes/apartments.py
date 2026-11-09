@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-from .. import actors, ai_stats, audit, energy_report, energy_since, instances, push, support
+from .. import actors, ai_stats, audit, energy_report, energy_since, instances, push, runtime, support
 from ..auth import CurrentUser, Identity, get_tenant_apartment, resolve_identity, resolve_user, scope_out, still_sees
 from ..bookings import ForwardError, SimulatorTranslator, TranslationError, forward
 from ..config import get_settings
@@ -395,11 +395,13 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
         for ev in replay:
             queue.put_nowait(ev)
         hub.subscribers.add(queue)
+        stream_id, reason = runtime.stream_opened(apt.apartment_id), "error"
         try:
             yield "retry: 3000\n: connected\n\n"
             while True:
                 left = ends - time.monotonic()
                 if left <= 0:
+                    reason = "max_duration"
                     break
                 wait = min(PING_SECONDS, left)
                 if deadline is not None:
@@ -407,16 +409,23 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
                 try:
                     ev = await asyncio.wait_for(queue.get(), timeout=wait)
                     if ev is QUEUE_FULL:   # D-198: this browser stopped reading (logged by the hub): it reopens and reloads
+                        reason = "queue_full"
                         break
                     if ev is None:   # the hub was dropped (apartment deleted or reset, D-97): end this stream
+                        reason = "apartment_removed"
                         info("stream closed: apartment reset or removed")
                         break
                     item = await _event(ev, user.tenant_id)
                 except TimeoutError:
-                    if time.monotonic() >= ends or await request.is_disconnected():
+                    if time.monotonic() >= ends:
+                        reason = "max_duration"
+                        break
+                    if await request.is_disconnected():
+                        reason = "client_disconnect"
                         break
                     item = ": ping\n\n"
                 if deadline is not None and time.time() >= deadline:
+                    reason = "access_ended"
                     info("stream closed: support access expired")
                     break
                 # P-18: checked on every event and ping, with the user record re-read at most every 30 s; the event
@@ -424,11 +433,16 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
                 if time.monotonic() - checked >= ACCESS_RECHECK_SECONDS:
                     checked = time.monotonic()
                     if not await still_sees(user, apt.apartment_id):
+                        reason = "access_ended"
                         info("stream closed: apartment no longer visible to the user")
                         break
                 yield item
+        except (asyncio.CancelledError, GeneratorExit):
+            reason = "client_disconnect"
+            raise
         finally:
             hub.subscribers.discard(queue)
+            runtime.stream_closed(stream_id, apt.apartment_id, reason)
 
     return StreamingResponse(
         gen(),

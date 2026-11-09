@@ -63,6 +63,7 @@ class Settings:
     token_check_timeout_s: float = 10.0       # D-198: the longest a request waits for its Firebase token to be checked
     stream_queue_max: int = 500               # D-198: events waiting for one browser; beyond, its stream is closed
     stream_max_s: float = 240.0               # D-197 (E-27): a browser's stream ends by itself, under Cloud Run's 300 s
+    status_log_s: float = 60.0                # D-198: how often the process writes its status line (bff/runtime.py)
     # P-67 (D-136): the Firestore database of this environment, "(default)" in production, "staging" in staging
     firestore_database: str = "(default)"
     summary_job: bool = True                  # P-60 step 11: the weekly summary's hourly round (off in the test runs)
@@ -140,6 +141,7 @@ def get_settings() -> Settings:
         token_check_timeout_s=float(e("TOKEN_CHECK_TIMEOUT_S", "10")),
         stream_queue_max=int(e("STREAM_QUEUE_MAX", "500")),
         stream_max_s=float(e("STREAM_MAX_S", "240")),
+        status_log_s=float(e("STATUS_LOG_S", "60")),
         firestore_database=e("FIRESTORE_DATABASE", "(default)").strip() or "(default)",
         summary_job=_bool("SUMMARY_JOB", "true"),
     )
