@@ -1,4 +1,4 @@
-import { bffFetch } from "./bff";
+import { bffFetch, SLOW_CALL_TIMEOUT_MS } from "./bff";
 import type { RuleChange } from "./ruleProposals";
 
 // Copy of the rules to other apartments of the organization (P-60 step 12d, D-151 point 22): routes #40 and #41 of
@@ -49,7 +49,7 @@ const base = (aptId: string) => `/app/apartments/${encodeURIComponent(aptId)}/ru
 
 export const ruleCopyApi = (aptId: string) => ({
   /** Changes nothing. 403 to non-admins; 422 bad_request, same_apartment, too_many; 404 for a target not visible. */
-  preview: (to: string[], correlationId: string) => bffFetch<CopyPreview>(`${base(aptId)}/preview`, { method: "POST", body: { to }, correlationId }),
+  preview: (to: string[], correlationId: string) => bffFetch<CopyPreview>(`${base(aptId)}/preview`, { method: "POST", body: { to }, correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
   /** Everything taken from the preview; 409 rules_changed when the source's rules changed after it. */
   copy: (p: CopyPreview, correlationId: string) =>
     bffFetch<{ from: CopyFrom; results: CopyResult[] }>(base(aptId), {
@@ -60,5 +60,6 @@ export const ruleCopyApi = (aptId: string) => ({
         based_on: Object.fromEntries(p.targets.map((x) => [x.apartment_id, x.based_on])),
       },
       correlationId,
+      timeoutMs: SLOW_CALL_TIMEOUT_MS,
     }),
 });

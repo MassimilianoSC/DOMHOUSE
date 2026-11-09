@@ -40,6 +40,32 @@ export interface RequestOptions {
   query?: Record<string, string | number | undefined | null>;
   body?: unknown;
   correlationId?: string;
+  /** How long this call may take; CALL_TIMEOUT_MS unless it is one of the known slow ones. */
+  timeoutMs?: number;
+}
+
+/** D-198: a call with no answer ends in «Server non raggiungibile» instead of a page loading for ever. The stream does not come through here. */
+export const CALL_TIMEOUT_MS = 30_000;
+/** Calls the server itself may spend tens of seconds on: the model, the email of an invite, several engines, the Excel file. */
+export const SLOW_CALL_TIMEOUT_MS = 90_000;
+
+const networkError = (correlationId?: string) => new ApiError(0, "network", t("errors.network"), correlationId ?? null);
+
+/** The whole call, the token and the reading of the answer included, within `ms`; then the request is dropped. */
+async function withinTime<T>(ms: number, correlationId: string | undefined, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(networkError(correlationId));
+      controller.abort();
+    }, ms);
+  });
+  try {
+    return await Promise.race([work(controller.signal), expired]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function buildUrl(path: string, query?: RequestOptions["query"]): string {
@@ -70,24 +96,29 @@ const parseJson = (text: string): unknown => {
   }
 };
 
-export async function bffFetch<T>(path: string, opts: RequestOptions = {}): Promise<T> {
-  const headers: Record<string, string> = { Accept: "application/json", ...(await resolveAuth()), ...supportHeader(path, opts.method) };
-  if (opts.correlationId) headers["X-Correlation-Id"] = opts.correlationId;
-  if (opts.body !== undefined) headers["Content-Type"] = "application/json";
-  let resp: Response;
-  try {
-    resp = await fetch(buildUrl(path, opts.query), {
-      method: opts.method ?? "GET",
-      headers,
-      body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
-    });
-  } catch {
-    throw new ApiError(0, "network", t("errors.network"), opts.correlationId ?? null);
-  }
-  if (resp.status === 204) return undefined as T;
-  const data = parseJson(await resp.text());
-  if (!resp.ok) throw refusal(resp, data, path, opts.correlationId ?? null);
-  return data as T;
+export function bffFetch<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  return withinTime(opts.timeoutMs ?? CALL_TIMEOUT_MS, opts.correlationId, async (signal) => {
+    const headers: Record<string, string> = { Accept: "application/json", ...(await resolveAuth()), ...supportHeader(path, opts.method) };
+    if (opts.correlationId) headers["X-Correlation-Id"] = opts.correlationId;
+    if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+    let resp: Response;
+    let text: string;
+    try {
+      resp = await fetch(buildUrl(path, opts.query), {
+        method: opts.method ?? "GET",
+        headers,
+        body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+        signal,
+      });
+      text = resp.status === 204 ? "" : await resp.text();
+    } catch {
+      throw networkError(opts.correlationId);
+    }
+    if (resp.status === 204) return undefined as T;
+    const data = parseJson(text);
+    if (!resp.ok) throw refusal(resp, data, path, opts.correlationId ?? null);
+    return data as T;
+  });
 }
 
 /** File name from Content-Disposition: filename* (UTF-8) first, then filename; null when there is none. */
@@ -109,15 +140,21 @@ export function fileNameFrom(header: string | null): string | null {
  * A file from the BFF (P-52): it needs the auth headers, so it is fetched (not a plain link) and named as the server
  * says in Content-Disposition. A refusal comes back as the usual ApiError, with the server's message.
  */
-export async function bffDownload(path: string, opts: { query?: RequestOptions["query"]; correlationId?: string; fallbackName: string }): Promise<{ blob: Blob; name: string }> {
-  const headers: Record<string, string> = { ...(await resolveAuth()), ...supportHeader(path) };
-  if (opts.correlationId) headers["X-Correlation-Id"] = opts.correlationId;
-  let resp: Response;
-  try {
-    resp = await fetch(buildUrl(path, opts.query), { headers });
-  } catch {
-    throw new ApiError(0, "network", t("errors.network"), opts.correlationId ?? null);
-  }
-  if (!resp.ok) throw refusal(resp, parseJson(await resp.text()), path, opts.correlationId ?? null);
-  return { blob: await resp.blob(), name: fileNameFrom(resp.headers.get("Content-Disposition")) ?? opts.fallbackName };
+export function bffDownload(path: string, opts: { query?: RequestOptions["query"]; correlationId?: string; fallbackName: string }): Promise<{ blob: Blob; name: string }> {
+  return withinTime(SLOW_CALL_TIMEOUT_MS, opts.correlationId, async (signal) => {
+    const headers: Record<string, string> = { ...(await resolveAuth()), ...supportHeader(path) };
+    if (opts.correlationId) headers["X-Correlation-Id"] = opts.correlationId;
+    let resp: Response;
+    let blob: Blob | null = null;
+    let text = "";
+    try {
+      resp = await fetch(buildUrl(path, opts.query), { headers, signal });
+      if (resp.ok) blob = await resp.blob();
+      else text = await resp.text();
+    } catch {
+      throw networkError(opts.correlationId);
+    }
+    if (!blob) throw refusal(resp, parseJson(text), path, opts.correlationId ?? null);
+    return { blob, name: fileNameFrom(resp.headers.get("Content-Disposition")) ?? opts.fallbackName };
+  });
 }

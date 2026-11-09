@@ -1,5 +1,5 @@
 import type { AuditPage } from "@/lib/auditLog";
-import { bffFetch } from "./bff";
+import { bffFetch, SLOW_CALL_TIMEOUT_MS } from "./bff";
 import type { AppFeature } from "./types";
 
 /** Entries per page of the «Registro attività» (P-47). */
@@ -120,9 +120,9 @@ export const adminApi = {
   users: () => bffFetch<AdminUser[]>("/app/admin/users"),
   /** apartment_ids omitted = "all" (and always omitted for admins: a list on an admin is a 422). */
   invite: (body: { email: string; role: Role; display_name: string; apartment_ids?: ApartmentScope }, correlationId: string) =>
-    bffFetch<InviteResult>("/app/admin/users", { method: "POST", body, correlationId }),
+    bffFetch<InviteResult>("/app/admin/users", { method: "POST", body, correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
   resendInvite: (uid: string, correlationId: string) =>
-    bffFetch<InviteResult>(`/app/admin/users/${encodeURIComponent(uid)}/invite`, { method: "POST", correlationId }),
+    bffFetch<InviteResult>(`/app/admin/users/${encodeURIComponent(uid)}/invite`, { method: "POST", correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
   /** apartment_ids omitted = no change; "all" = back to every apartment; a list = only those ([] = none). */
   patchUser: (uid: string, body: Partial<Pick<AdminUser, "role" | "display_name" | "apartment_ids">>, correlationId: string) =>
     bffFetch<AdminUser>(`/app/admin/users/${encodeURIComponent(uid)}`, { method: "PATCH", body, correlationId }),
@@ -131,7 +131,7 @@ export const adminApi = {
   /** The Italianway code is the platform's (D-72): never sent by the admin (a new code is a 403 platform_only). */
   patchApartment: (id: string, body: Partial<ApartmentInput> & { clear_features?: boolean }, correlationId: string) =>
     bffFetch<AdminApartment>(`/app/admin/apartments/${encodeURIComponent(id)}`, { method: "PATCH", body, correlationId }),
-  verify: (id: string, correlationId: string) => bffFetch<VerifyResult>(`/app/admin/apartments/${encodeURIComponent(id)}/verify`, { method: "POST", correlationId }),
+  verify: (id: string, correlationId: string) => bffFetch<VerifyResult>(`/app/admin/apartments/${encodeURIComponent(id)}/verify`, { method: "POST", correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
   tenant: () => bffFetch<AdminTenant>("/app/admin/tenant"),
   /** energy_price_eur_kwh: 0-10 with at most 4 decimals, null = none (422 invalid_price). */
   patchTenant: (body: { name?: string; enabled_features?: string[] | null; clear_features?: boolean; energy_price_eur_kwh?: number | null }, correlationId: string) =>

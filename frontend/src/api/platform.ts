@@ -1,7 +1,7 @@
 import type { AuditPage } from "@/lib/auditLog";
 import { AUDIT_PAGE, type EmailStatus, type VerifyResult, type WebhookLog } from "./admin";
 import type { SupportAccess } from "./types";
-import { bffFetch } from "./bff";
+import { bffFetch, SLOW_CALL_TIMEOUT_MS } from "./bff";
 
 // Platform area (P-36, API shapes D-61a and D-66): organizations, platform managers and the technical record of the
 // apartments (identifier, name, connection to the engine). Only for users with user.platform_manager; everyone else
@@ -76,12 +76,12 @@ export const platformApi = {
   tenants: () => bffFetch<PlatformTenant[]>("/app/platform/tenants"),
   /** One call: the BFF checks name and email first, then creates organization and invitation, then sends the email. */
   createTenant: (body: { name: string; admin_email: string; admin_display_name?: string }, correlationId: string) =>
-    bffFetch<CreatedTenant>("/app/platform/tenants", { method: "POST", body, correlationId }),
+    bffFetch<CreatedTenant>("/app/platform/tenants", { method: "POST", body, correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
   renameTenant: (tenantId: string, name: string, correlationId: string) =>
     bffFetch<PlatformTenant>(`/app/platform/tenants/${enc(tenantId)}`, { method: "PATCH", body: { name }, correlationId }),
   /** Resends the first administrator's invitation: answers the row + email_status; 409 already_active once signed in. */
   resendInvite: (tenantId: string, correlationId: string) =>
-    bffFetch<CreatedTenant>(`/app/platform/tenants/${enc(tenantId)}/invite`, { method: "POST", correlationId }),
+    bffFetch<CreatedTenant>(`/app/platform/tenants/${enc(tenantId)}/invite`, { method: "POST", correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
   /** reason 1–500 characters (422 invalid_reason); 409 already_suspended. Answers the row. */
   suspendTenant: (tenantId: string, reason: string, correlationId: string) =>
     bffFetch<PlatformTenant>(`/app/platform/tenants/${enc(tenantId)}/suspend`, { method: "POST", body: { reason }, correlationId }),
@@ -109,7 +109,7 @@ export const platformApi = {
   patchConnection: (tenantId: string, aptId: string, body: { instance_url?: string; port?: number | null; italianway_id?: string | null; simulated?: boolean }, correlationId: string) =>
     bffFetch<PlatformApartment>(`${apts(tenantId)}/${enc(aptId)}`, { method: "PATCH", body, correlationId }),
   verifyApartment: (tenantId: string, aptId: string, correlationId: string) =>
-    bffFetch<VerifyResult>(`${apts(tenantId)}/${enc(aptId)}/verify`, { method: "POST", correlationId }),
+    bffFetch<VerifyResult>(`${apts(tenantId)}/${enc(aptId)}/verify`, { method: "POST", correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
   /** Only the platform deletes apartments, in every mode (D-65, D-77). */
   deleteApartment: (tenantId: string, aptId: string, correlationId: string) =>
     bffFetch<void>(`${apts(tenantId)}/${enc(aptId)}`, { method: "DELETE", correlationId }),

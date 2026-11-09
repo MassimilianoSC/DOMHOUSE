@@ -1,4 +1,4 @@
-import { bffFetch, ApiError, type RequestOptions } from "./bff";
+import { bffFetch, ApiError, SLOW_CALL_TIMEOUT_MS, type RequestOptions } from "./bff";
 import type { ApartmentMode, Body, Command, Ok } from "./types";
 import { featureForPath, useFeatureStore } from "@/store/featureStore";
 import { newCorrelationId } from "@/lib/utils";
@@ -45,7 +45,7 @@ export function instanceApi(aptId: string) {
       request<Ok<"decideApproval">>(aptId, `/approvals/${encodeURIComponent(approvalId)}/decision`, { method: "POST", body, correlationId }),
     listDecisions: (query: { from?: string; to?: string; actor?: string; device_id?: string; correlation_id?: string; limit?: number; cursor?: string }) =>
       request<Ok<"listDecisions">>(aptId, "/decisions", { query }),
-    ask: (text: string, correlationId: string) => request<Ok<"ask", 202>>(aptId, "/ask", { method: "POST", body: { text } satisfies Body<"ask">, correlationId }),
+    ask: (text: string, correlationId: string) => request<Ok<"ask", 202>>(aptId, "/ask", { method: "POST", body: { text } satisfies Body<"ask">, correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
     getAsk: (askId: string) => request<Ok<"getAsk">>(aptId, `/ask/${encodeURIComponent(askId)}`),
     getHealth: () => request<Ok<"health">>(aptId, "/health"),
   };

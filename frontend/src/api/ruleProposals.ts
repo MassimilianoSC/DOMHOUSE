@@ -1,4 +1,4 @@
-import { bffFetch } from "./bff";
+import { bffFetch, SLOW_CALL_TIMEOUT_MS } from "./bff";
 import type { RuleSet } from "./types";
 
 // Rules proposed by the assistant and confirmed by the manager (P-60 step 12, D-151): routes #38 and #39 of
@@ -29,7 +29,7 @@ const base = (aptId: string) => `/app/apartments/${encodeURIComponent(aptId)}/ru
 
 export const ruleProposalApi = (aptId: string) => ({
   /** Operator or admin; 422 bad_request / text_too_long, 429 daily_limit / monthly_cap, 409 apartment_disabled, 502/504. */
-  propose: (text: string, correlationId: string) => bffFetch<RuleProposal>(base(aptId), { method: "POST", body: { text }, correlationId }),
+  propose: (text: string, correlationId: string) => bffFetch<RuleProposal>(base(aptId), { method: "POST", body: { text }, correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
   /** The whole RuleSet after the change, as the PUT of the rules; 409 rules_changed when the rules changed meanwhile. */
   apply: (p: Pick<RuleProposal, "based_on" | "rules">, correlationId: string) =>
     bffFetch<RuleSet>(`${base(aptId)}/apply`, { method: "POST", body: { based_on: p.based_on, rules: p.rules }, correlationId }),
