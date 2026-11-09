@@ -8,6 +8,7 @@ import dataclasses
 import json
 from types import SimpleNamespace
 
+import httpx
 import pytest
 from firebase_admin import exceptions, messaging
 
@@ -453,4 +454,57 @@ def test_a_failed_send_is_retried_then_given_up(users, fcm, monkeypatch):
         assert await get_repository().claim_work("push:prova:giu", "altro", 60) == "done"
     run(scenario())
     assert logged.count("push send failed") == push.MAX_SEND_ATTEMPTS and logged.count("push given up") == 1
+
+
+def offline_engine(monkeypatch):
+    """The engine still says the device is offline when the timer runs out."""
+    async def fake(apt, method, path, **kw):
+        return httpx.Response(200, json={"devices": [{"device_id": "dev-due", "label": "Presa", "online": False}]},
+                              request=httpx.Request("GET", "http://x"))
+    monkeypatch.setattr(push.instances, "call", fake)
+
+
+def test_two_instances_whose_offline_timers_run_out_send_one_notification(users, fcm, monkeypatch):
+    """Each instance has its own timers, hence the clear(): in one process the second event would cancel the first timer."""
+    alert_minutes(monkeypatch, 0)
+    offline_engine(monkeypatch)
+
+    async def scenario():
+        same = event("device.online", {"device_id": "dev-due", "online": False}, event_id="7101")
+        await push.on_stream_event(APT, same)
+        push._offline_timers.clear()
+        await push.on_stream_event(APT, same)
+        await drain()
+        assert len(fcm.sent) == 1
+        push._offline_timers.clear()                            # an instance started later, given the same event again
+        await push.on_stream_event(APT, same)
+        await drain()
+    run(scenario())
+    assert len(fcm.sent) == 1 and fcm.sent[0].data["tag"] == "offline:apt-push:dev-due"
+
+
+def test_two_instances_whose_instance_down_timers_run_out_send_one_notification(users, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
+
+    async def scenario():
+        same = event("instance.health", {"status": "down"}, event_id="7102")
+        await push.on_stream_event(APT, same)
+        push._health_down.clear()                               # the other instance has its own state
+        await push.on_stream_event(APT, same)
+        await drain()
+    run(scenario())
+    assert [m.data["kind"] for m in fcm.sent] == ["instance_down"]
+
+
+def test_a_device_that_goes_offline_twice_notifies_twice(users, fcm, monkeypatch):
+    """The claim is per event: a new outage of the same device is a new notification."""
+    alert_minutes(monkeypatch, 0)
+    offline_engine(monkeypatch)
+
+    async def scenario():
+        for event_id in ("7103", "7104"):
+            await push.on_stream_event(APT, event("device.online", {"device_id": "dev-due", "online": False}, event_id=event_id))
+            await drain()
+    run(scenario())
+    assert len(fcm.sent) == 2
 

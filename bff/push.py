@@ -218,7 +218,8 @@ async def _offline_alert_minutes(apt: Apartment) -> float | None:
     return 15.0
 
 
-async def _offline_watch(apt: Apartment, device_id: str, ts: str | None) -> None:
+async def _offline_watch(apt: Apartment, device_id: str, ts: str | None, key: str) -> None:
+    """D-201: every instance has this timer; `key` is the originating event's, so when it runs out only one sends."""
     minutes = await _offline_alert_minutes(apt)
     if minutes is None:
         return
@@ -231,10 +232,10 @@ async def _offline_watch(apt: Apartment, device_id: str, ts: str | None) -> None
     except Exception:
         return
     if dev and not dev["online"]:
-        await send_to_tenant(apt.tenant_id, "offline", *device_offline_push(apt, device_id, dev.get("label") or device_id, minutes, ts))
+        await notify_once(key, apt.tenant_id, "offline", *device_offline_push(apt, device_id, dev.get("label") or device_id, minutes, ts))
 
 
-async def _instance_down_watch(apt: Apartment, ts: str | None) -> None:
+async def _instance_down_watch(apt: Apartment, ts: str | None, key: str) -> None:
     """D-131: the "instance down" push only when it stays down as long as the offline_alert rule's minutes (the same
     wait as a device's); never with the rule off. A connector that drops and reconnects at once sends nothing."""
     minutes = await _offline_alert_minutes(apt)
@@ -244,7 +245,7 @@ async def _instance_down_watch(apt: Apartment, ts: str | None) -> None:
 
     await asyncio.sleep(minutes * (seconds_per_minute() if get_settings().instance_mode == "mock" else 60.0))
     if apt.apartment_id in _health_down:
-        await send_to_tenant(apt.tenant_id, "offline", *instance_down_push(apt, ts))
+        await notify_once(key, apt.tenant_id, "offline", *instance_down_push(apt, ts))
 
 
 async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
@@ -261,7 +262,7 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
         if (task := _offline_timers.pop(key, None)) and not task.done():
             task.cancel()
         if data.get("online") is False:
-            _offline_timers[key] = _spawn(_offline_watch(apt, key[1], ts), "device_offline", apt.apartment_id)
+            _offline_timers[key] = _spawn(_offline_watch(apt, key[1], ts, event_key(apt, ev, ts)), "device_offline", apt.apartment_id)
     elif ev.event == "decision.logged" and data.get("action") == "booking_cancel_reset":
         decision_id = str(data.get("decision_id", ""))
         _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "bookings", *booking_reset_push(apt, decision_id, data.get("reasoning"), ts)),
@@ -274,7 +275,7 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
         down = data.get("status") == "down"
         if down and apt.apartment_id not in _health_down:
             _health_down.add(apt.apartment_id)
-            _down_timers[apt.apartment_id] = _spawn(_instance_down_watch(apt, ts), "instance_down", apt.apartment_id)
+            _down_timers[apt.apartment_id] = _spawn(_instance_down_watch(apt, ts, event_key(apt, ev, ts)), "instance_down", apt.apartment_id)
         elif not down:
             _health_down.discard(apt.apartment_id)
             if (task := _down_timers.pop(apt.apartment_id, None)) and not task.done():
