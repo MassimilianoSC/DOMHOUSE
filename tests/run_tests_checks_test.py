@@ -153,6 +153,101 @@ def test_setup_renders_a_valid_log_policy():
     assert policy["alertStrategy"]["notificationRateLimit"]["period"] == "3600s"   # mandatory for log-based alerts
 
 
+def test_setup_renders_the_alert_on_cloud_runs_429():
+    """E-27: the filter that on the logs of 23 October finds the 111 refused requests of the two outages."""
+    import json
+    import os
+
+    bash = shutil.which("bash")
+    if not bash:
+        pytest.skip("bash non disponibile")
+    env = {**os.environ, "RENDER_ONLY_PLATFORM": "projects/prova/notificationChannels/7", "GCP_PROJECT_ID": "prova",
+           "EMAIL": "a@b.it"}
+    out = subprocess.run([bash, str(MONITORING / "setup.sh")], capture_output=True, text=True, encoding="utf-8", env=env, check=True)
+    policy = json.loads(out.stdout)
+    assert policy["conditions"][0]["conditionMatchedLog"]["filter"] == (
+        'resource.type="cloud_run_revision" AND resource.labels.service_name="domotica-bff" AND httpRequest.status=429 '
+        'AND textPayload:"no available instance"')
+    assert policy["notificationChannels"] == ["projects/prova/notificationChannels/7"]
+    assert policy["alertStrategy"]["notificationRateLimit"]["period"] == "1800s" and policy["severity"] == "CRITICAL"
+
+
+SETUP_GCLOUD = r"""#!/usr/bin/env bash
+echo "gcloud $*" >> "$STUB_DIR/calls.log"
+for a in "$@"; do case "$a" in --policy-from-file=*) FILE="${a#--policy-from-file=}" ;; esac; done
+case "$*" in
+  *"services describe"*) echo '["https://servizio-1.europe-west8.run.app"]' ;;
+  *"channels list"*) echo projects/p/notificationChannels/7 ;;
+  *"uptime list-configs"*httpCheck*) echo /health ;;
+  *"uptime list-configs"*contentMatchers*) echo '"status":"ok"' ;;
+  *"uptime list-configs"*monitoredResource*) echo servizio-1.europe-west8.run.app ;;
+  *"uptime list-configs"*) echo C1 ;;
+  *"policies list"*"non raggiungibile"*) echo projects/p/alertPolicies/A ;;
+  *"policies list"*"scrittura non riuscita"*) echo projects/p/alertPolicies/B ;;
+  *"policies list"*"nessuna istanza"*) [ -f "$STUB_DIR/p429" ] && echo projects/p/alertPolicies/C ;;
+  *"policies create"*|*"policies update"*) cp "$FILE" "$STUB_DIR/p429" ;;
+  *"policies describe"*alertPolicies/A*conditionThreshold*) echo '"C1"' ;;
+  *"policies describe"*alertPolicies/B*conditionMatchedLog*) cat "$STUB_DIR/messages" ;;
+  *"policies describe"*alertPolicies/C*conditionMatchedLog*) grep '"filter"' "$STUB_DIR/p429" | sed 's/\\"/"/g' ;;
+  *"policies describe"*notificationChannels*) echo projects/p/notificationChannels/7 ;;
+  *"policies describe"*enabled*) echo True ;;
+esac
+exit 0
+"""
+
+
+def _posix(path: Path) -> str:
+    """A Windows path as Git Bash wants it in PATH: /c/Users/..."""
+    s = path.as_posix()
+    return f"/{s[0].lower()}/{s[3:]}" if s[1:3] == ":/" else s
+
+
+@pytest.fixture
+def setup(tmp_path):
+    bash = _runner().git_bash()
+    if not bash:
+        pytest.skip("bash non disponibile")
+    (tmp_path / "gcloud").write_text(SETUP_GCLOUD, encoding="utf-8", newline="\n")
+    (tmp_path / "curl").write_text("#!/usr/bin/env bash\necho '{\"status\":\"ok\"}'\n", encoding="utf-8", newline="\n")
+    (tmp_path / "messages").write_text(" ".join(f'"{m}"' for m in _messages()), encoding="utf-8")
+
+    def run(dry=False):
+        (tmp_path / "calls.log").write_text("", encoding="utf-8")
+        here = _posix(tmp_path)                                  # "C:/..." in PATH would split at the colon: the real gcloud
+        cmd = (f'export PATH="{here}:$PATH" STUB_DIR="{here}"; chmod +x "{here}/gcloud" "{here}/curl"; '
+               f'[ "$(command -v gcloud)" = "{here}/gcloud" ] || exit 99; '
+               f'{"DRY_RUN=1 " if dry else ""}GCP_PROJECT_ID=p EMAIL=a@b.it bash "{_posix(MONITORING)}/setup.sh"')
+        out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=120)
+        return out, (tmp_path / "calls.log").read_text(encoding="utf-8")
+    run.dir = tmp_path
+    return run
+
+
+def test_setup_creates_the_429_alert_once(setup):
+    out, calls = setup()
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert calls.count("policies create") == 1 and "la regola «BFF: nessuna istanza disponibile (429)» guarda i 429 di domotica-bff" in out.stdout
+    out, calls = setup()                                                       # idempotent
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "policies create" not in calls and "policies update" not in calls and "già presente: C" in out.stdout
+
+
+def test_setup_corrects_a_wrong_429_filter(setup):
+    assert setup()[0].returncode == 0
+    policy = setup.dir / "p429"
+    policy.write_text(policy.read_text(encoding="utf-8").replace("no available instance", "altro"), encoding="utf-8")
+    out, calls = setup()
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert calls.count("policies update") == 1 and "no available instance" in policy.read_text(encoding="utf-8")
+
+
+def test_setup_dry_run_creates_no_429_alert(setup):
+    out, calls = setup(dry=True)
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "(prova a secco) farei: creo la regola «BFF: nessuna istanza disponibile (429)»" in out.stdout
+    assert "policies create" not in calls and "policies update" not in calls
+
+
 # -------- the CI job in Linux on the PC (scripts/ci-linux.sh, "linux" suite) --------
 def test_ci_linux_script_exists_is_executable_and_says_what_it_does():
     script = ROOT / "scripts" / "ci-linux.sh"

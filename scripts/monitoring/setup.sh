@@ -2,7 +2,9 @@
 # Sets up (or repairs) the BFF monitoring of P-4 with one command and checks the result:
 #   email channel -> uptime check on /health -> alert policy "BFF non raggiungibile" (alert-policy.json)
 #   -> log-based alert policy "BFF: scrittura non riuscita" (log-alert-policy.json, P-57): an email when the BFF logs
-#      one of the best-effort writes that failed (the messages are in log-alert-messages.txt, one per line).
+#      one of the best-effort writes that failed (the messages are in log-alert-messages.txt, one per line)
+#   -> log-based alert policy "BFF: nessuna istanza disponibile (429)" (platform-alert-policy.json, E-27): an email when
+#      Cloud Run itself refuses requests with 429 "no available instance".
 # Not /healthz: Cloud Run's front end reserves paths ending in "z" and answers 404 from outside without reaching the
 # BFF (https://cloud.google.com/run/docs/known-issues#reserved-url-paths, E-12); /healthz serves only internal probes.
 #
@@ -58,6 +60,17 @@ render_log_policy() {   # the template filled in, in a temporary file whose path
   sed -e "s|__CHANNEL__|${CHANNEL}|" -e "s|__FILTER__|${LOG_FILTER//\\/\\\\}|" "${LOG_TEMPLATE}" > "${out}"
   echo "${out}"
 }
+PLATFORM_POLICY_NAME="BFF: nessuna istanza disponibile (429)"
+PLATFORM_TEMPLATE="${HERE}/platform-alert-policy.json"
+[ -f "${PLATFORM_TEMPLATE}" ] || stop "Manca ${PLATFORM_TEMPLATE}."
+render_platform_policy() {
+  local out; out="$(mktemp)"
+  sed -e "s|__CHANNEL__|${CHANNEL}|" -e "s|__SERVICE__|${SERVICE}|" "${PLATFORM_TEMPLATE}" > "${out}"
+  echo "${out}"
+}
+if [ -n "${RENDER_ONLY_PLATFORM:-}" ]; then   # the same for the 429 policy (used by the tests)
+  CHANNEL="${RENDER_ONLY_PLATFORM}"; RENDERED="$(render_platform_policy)"; cat "${RENDERED}"; rm -f "${RENDERED}"; exit 0
+fi
 if [ -n "${RENDER_ONLY:-}" ]; then   # prints the log policy for the channel given, calls nothing (used by the tests)
   CHANNEL="${RENDER_ONLY}"; RENDERED="$(render_log_policy)"; cat "${RENDERED}"; rm -f "${RENDERED}"; exit 0
 fi
@@ -157,9 +170,34 @@ elif [ -z "${DRY_RUN}" ]; then
   stop "Non posso creare la regola «${LOG_POLICY_NAME}»: manca il canale email."
 fi
 
+# --- 4b. Cloud Run refusing requests (E-27) ---------------------------------------------------------------------
+say "4b. Regola sui 429 di Cloud Run"
+platform_filter_ok() {   # the policy looks at the right refusals of the right service
+  local f; f="$(gcloud alpha monitoring policies describe "$1" --project="${P}" --format='value(conditions[0].conditionMatchedLog.filter)')"
+  case "${f}" in *"no available instance"*) ;; *) return 1 ;; esac
+  case "${f}" in *"\"${SERVICE}\""*) ;; *) return 1 ;; esac
+}
+PLATFORM_POLICY="$(gcloud alpha monitoring policies list --project="${P}" --filter="displayName=\"${PLATFORM_POLICY_NAME}\"" --format='value(name)' | head -1)"
+if [ -n "${PLATFORM_POLICY}" ]; then
+  echo "già presente: ${PLATFORM_POLICY##*/}"
+  if ! platform_filter_ok "${PLATFORM_POLICY}" && act "correggo il filtro della regola «${PLATFORM_POLICY_NAME}»"; then
+    RENDERED="$(render_platform_policy)"
+    gcloud alpha monitoring policies update "${PLATFORM_POLICY}" --project="${P}" --policy-from-file="${RENDERED}"
+    rm -f "${RENDERED}"
+  fi
+elif [ -n "${CHANNEL}" ] && act "creo la regola «${PLATFORM_POLICY_NAME}»"; then
+  RENDERED="$(render_platform_policy)"
+  gcloud alpha monitoring policies create --project="${P}" --policy-from-file="${RENDERED}"
+  rm -f "${RENDERED}"
+  PLATFORM_POLICY="$(gcloud alpha monitoring policies list --project="${P}" --filter="displayName=\"${PLATFORM_POLICY_NAME}\"" --format='value(name)' | head -1)"
+  [ -n "${PLATFORM_POLICY}" ] || stop "La regola «${PLATFORM_POLICY_NAME}» non risulta creata."
+elif [ -z "${DRY_RUN}" ]; then
+  stop "Non posso creare la regola «${PLATFORM_POLICY_NAME}»: manca il canale email."
+fi
+
 # --- 5. Re-read everything: the guard against the Git Bash trap ------------------------------------------------
 say "5. Verifica"
-if [ -n "${DRY_RUN}" ] && { [ -z "${CHANNEL}" ] || [ -z "${CHECK_ID}" ] || [ -z "${POLICY}" ] || [ -z "${LOG_POLICY}" ]; }; then
+if [ -n "${DRY_RUN}" ] && { [ -z "${CHANNEL}" ] || [ -z "${CHECK_ID}" ] || [ -z "${POLICY}" ] || [ -z "${LOG_POLICY}" ] || [ -z "${PLATFORM_POLICY}" ]; }; then
   echo "Prova a secco: qualcosa andrebbe creato, quindi la verifica completa si fa dopo la creazione vera."
   exit 0
 fi
@@ -190,7 +228,19 @@ case "${CHANNELS}" in *"${CHANNEL}"*) echo "e avvisa ${EMAIL}" ;;
   *) stop "La regola «${LOG_POLICY_NAME}» non manda gli avvisi a ${EMAIL}." ;; esac
 ENABLED="$(gcloud alpha monitoring policies describe "${LOG_POLICY}" --project="${P}" --format='value(enabled)')"
 [ "${ENABLED}" = "True" ] || stop "La regola «${LOG_POLICY_NAME}» è disattivata."
+if [ -n "${DRY_RUN}" ] && ! platform_filter_ok "${PLATFORM_POLICY}"; then
+  echo "Prova a secco: il filtro della regola «${PLATFORM_POLICY_NAME}» va corretto."
+  exit 0
+fi
+platform_filter_ok "${PLATFORM_POLICY}" || stop "La regola «${PLATFORM_POLICY_NAME}» non guarda i 429 di ${SERVICE}."
+echo "la regola «${PLATFORM_POLICY_NAME}» guarda i 429 di ${SERVICE}"
+CHANNELS="$(gcloud alpha monitoring policies describe "${PLATFORM_POLICY}" --project="${P}" --format='value(notificationChannels)')"
+case "${CHANNELS}" in *"${CHANNEL}"*) echo "e avvisa ${EMAIL}" ;;
+  *) stop "La regola «${PLATFORM_POLICY_NAME}» non manda gli avvisi a ${EMAIL}." ;; esac
+ENABLED="$(gcloud alpha monitoring policies describe "${PLATFORM_POLICY}" --project="${P}" --format='value(enabled)')"
+[ "${ENABLED}" = "True" ] || stop "La regola «${PLATFORM_POLICY_NAME}» è disattivata."
 
 say "Monitoraggio a posto"
 echo "Se ${CHECK_PATH} non risponde per 5 minuti da almeno 2 regioni su 3, arriva un'email a ${EMAIL}."
 echo "Se il BFF scrive nel log una scrittura non riuscita, arriva un'email a ${EMAIL} (al massimo una all'ora)."
+echo "Se Cloud Run rifiuta richieste con 429 «no available instance», arriva un'email a ${EMAIL} (al massimo una ogni mezz'ora)."

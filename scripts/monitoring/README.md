@@ -19,6 +19,16 @@ dalla conversione (`MSYS_NO_PATHCONV=1` invece rompe lo script `gcloud` stesso).
 colonna PATH di `gcloud monitoring uptime list-configs --project="$P" --format="table(displayName,httpCheck.path)"`
 mostri `/health`.
 
+## Nessuna istanza disponibile (E-27)
+
+`setup.sh` crea anche la regola «BFF: nessuna istanza disponibile (429)»: un'email, al massimo una ogni mezz'ora, quando
+Cloud Run rifiuta richieste con 429 «no available instance». Il filtro guarda il log delle richieste del servizio
+(`httpRequest.status=429` e `textPayload:"no available instance"`); provato sui log del 23 ottobre: 111 righe, tutte le
+richieste rifiutate nei due guasti.
+
+Primo passo: nei log del servizio leggere `process status` e `process started` di ogni `boot_id`. Rimedio noto: una
+revisione nuova con la stessa immagine.
+
 ## Scritture non riuscite (P-57)
 
 Alcune scritture del BFF sono «al meglio»: se non riescono, l'azione dell'utente resta valida e il BFF scrive solo un

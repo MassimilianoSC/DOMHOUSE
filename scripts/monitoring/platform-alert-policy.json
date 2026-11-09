@@ -1,0 +1,26 @@
+{
+  "displayName": "BFF: nessuna istanza disponibile (429)",
+  "documentation": {
+    "content": "Cloud Run ha rifiutato richieste del server dell'app con 429 «no available instance»: è il guasto E-27 del 23 ottobre. Le persone vedono «Server non raggiungibile». Il processo può sembrare vivo: i suoi log continuano. Primo passo: Cloud Run > domotica-bff > Log, leggere le righe «process status» e «process started» di ogni boot_id e le sostituzioni di istanza. Rimedio noto: una revisione nuova con la stessa immagine. Istruzioni: scripts/monitoring/README.md, sezione «Nessuna istanza disponibile».",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "429 di Cloud Run: no available instance",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"__SERVICE__\" AND httpRequest.status=429 AND textPayload:\"no available instance\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "1800s"
+    },
+    "autoClose": "3600s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "CRITICAL"
+}
