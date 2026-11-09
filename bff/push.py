@@ -91,8 +91,15 @@ async def send_to_tenant(tenant_id: str, pref: str, data: dict[str, str], header
     resp = await _send_multicast(tokens, data, headers)
     info("push sent", kind=data.get("kind"), tag=data.get("tag"), success=resp.success_count, failure=resp.failure_count)
     if resp.failure_count:
-        # Same event loop as the repository (the async Firestore client is bound to it): no thread, no asyncio.run.
-        await _prune_tokens([t for t, r in zip(tokens, resp.responses) if not r.success and _dead_token(r.exception)])
+        try:
+            # Same event loop as the repository (the async Firestore client is bound to it): no thread, no asyncio.run.
+            await _prune_tokens([t for t, r in zip(tokens, resp.responses) if not r.success and _dead_token(r.exception)])
+        except Exception as exc:                   # the message has gone: this must not make it go again
+            warn("push tokens not pruned", error=type(exc).__name__)
+    # firebase-admin reports a network error or an FCM outage per token, it does not raise: nobody reached and a token that
+    # may still work means not sent, so that the claim stays pending and recover_once tries again
+    if not resp.success_count and any(not r.success and not _dead_token(r.exception) for r in resp.responses):
+        raise RuntimeError(f"no token reached: {type(resp.responses[0].exception).__name__}")
     return len(tokens)
 
 

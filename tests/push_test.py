@@ -59,14 +59,15 @@ def users():
 def fcm(monkeypatch):
     """FCM on, sends recorded; `fcm.fail` maps token -> exception, `fcm.gate` (an Event) holds the send if set."""
     monkeypatch.setattr(push, "get_settings", lambda: dataclasses.replace(get_settings(), fcm_enabled=True))
-    state = SimpleNamespace(sent=[], fail={}, gate=None, threads=[])
+    state = SimpleNamespace(sent=[], fail={}, gate=None, threads=[], down=None)
 
     def fake_send(msg, dry_run=False, app=None):               # in a worker thread (D-198)
         state.threads.append(threading.current_thread())
         while state.gate is not None and not state.gate.is_set():
             time.sleep(0.005)
         state.sent.append(msg)
-        responses = [SimpleNamespace(success=t not in state.fail, exception=state.fail.get(t)) for t in msg.tokens]
+        failing = {t: state.down for t in msg.tokens} if state.down else state.fail
+        responses = [SimpleNamespace(success=t not in failing, exception=failing.get(t)) for t in msg.tokens]
         ok = sum(r.success for r in responses)
         return SimpleNamespace(responses=responses, success_count=ok, failure_count=len(responses) - ok)
 
@@ -507,4 +508,53 @@ def test_a_device_that_goes_offline_twice_notifies_twice(users, fcm, monkeypatch
             await drain()
     run(scenario())
     assert len(fcm.sent) == 2
+
+
+def lease_zero(monkeypatch):
+    monkeypatch.setattr(push, "get_settings", lambda: dataclasses.replace(get_settings(), fcm_enabled=True, notification_lease_s=0.0))
+
+
+def test_an_fcm_outage_is_not_a_sent_notification(users, fcm, monkeypatch):
+    """firebase-admin does not raise: every token comes back failed."""
+    lease_zero(monkeypatch)
+    data, headers = push.approval_push(APT, "apv-fcm-giu", "x", TS)
+    key = "push:prova:fcm-giu"
+
+    async def scenario():
+        fcm.down = exceptions.UnavailableError("FCM giu")
+        await push.notify_once(key, TENANT, "approvals", data, headers)
+        fcm.down = None
+        fcm.sent.clear()
+        assert await push.recover_once(now=time.time() + 1) == 1
+        assert await get_repository().claim_work(key, "altro", 60) == "done"
+    run(scenario())
+    assert [m.data["tag"] for m in fcm.sent] == ["approval:apv-fcm-giu"]
+
+
+def test_when_every_token_is_dead_there_is_nothing_to_retry(users, fcm, monkeypatch):
+    lease_zero(monkeypatch)
+    data, headers = push.approval_push(APT, "apv-morti", "x", TS)
+
+    async def scenario():
+        fcm.down = messaging.UnregisteredError("gone")
+        await push.notify_once("push:prova:morti", TENANT, "approvals", data, headers)
+        assert await get_repository().claim_work("push:prova:morti", "altro", 60) == "done"
+    run(scenario())
+
+
+def test_an_error_while_pruning_does_not_send_it_again(users, fcm, monkeypatch):
+    logged = []
+    monkeypatch.setattr(push, "warn", lambda msg, **kw: logged.append(msg))
+
+    async def broken(_dead):
+        raise RuntimeError("Firestore non raggiungibile")
+    monkeypatch.setattr(push, "_prune_tokens", broken)
+    fcm.fail = {"tok-a": messaging.UnregisteredError("gone")}
+    data, headers = push.approval_push(APT, "apv-pota", "x", TS)
+
+    async def scenario():
+        await push.notify_once("push:prova:pota", TENANT, "approvals", data, headers)
+        assert await get_repository().claim_work("push:prova:pota", "altro", 60) == "done"
+    run(scenario())
+    assert logged == ["push tokens not pruned"]
 

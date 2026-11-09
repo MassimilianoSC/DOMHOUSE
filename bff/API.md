@@ -452,7 +452,7 @@ istanza.
 
 Con più istanze (D-201) ogni evento arriva a ognuna: una prenotazione atomica su Firestore (`work_claims`, scadenza 7 giorni) fa
 partire una sola notifica. La prenotazione contiene il messaggio e dura `NOTIFICATION_LEASE_S` (60 s): se l'istanza cade o FCM
-fallisce, un giro di ogni istanza la riprende e la manda, fino a 5 tentativi (poi «push given up» nel log). **Comportamento
+fallisce per tutti i destinatari, un giro di ogni istanza la riprende e la manda, fino a 5 tentativi (poi «push given up» nel log). **Comportamento
 previsto:** un'istanza che manda la notifica e cade prima di segnarla mandata può farla arrivare due volte; non arriva mai zero
 volte per questo motivo. Una notifica doppia ha lo stesso `tag`: il telefono la mostra una volta sola. Il riepilogo settimanale
 prenota la notifica prima di salvarsi, con una durata di 75 minuti: se l'istanza cade in quel momento, la notifica arriva entro
