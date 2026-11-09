@@ -10,7 +10,8 @@
 #           VITE_FCM_ENABLED, SKIP_HOSTING=1 (passed to deploy.sh).
 #           BUILD_SA=<email> (default domotica-build@<project>.iam.gserviceaccount.com): Cloud Build's account (P-21).
 #           DRY_RUN=1 does everything that stays on this machine (checks, clean copy, PWA build) and nothing that
-#           writes outside it: no firebase, no questions, gcloud only to read (and only with GCP_PROJECT_ID set).
+#           writes outside it: no firebase, no questions, gcloud only to read (and only with GCP_PROJECT_ID set). It
+#           also shows the service's active values against the manifest's (D-197, from the commit's deploy.sh).
 # The image tag is the commit's short SHA (computed by deploy.sh in the clean copy); when that image already exists in
 # Artifact Registry the build is skipped (read-only check), so republishing a commit never rebuilds a different image.
 # Messages are in plain Italian: this script is run by the project owner.
@@ -134,6 +135,12 @@ echo "cartella temporanea: ${WT}"
 
 # --- 6a. Dry run: everything local, nothing online -------------------------------------------------------------
 if [ -n "${DRY_RUN}" ]; then
+  if grep -q 'DRY_RUN' "${WT}/scripts/deploy.sh"; then
+    ( cd "${WT}" && DRY_RUN=1 TARGET="${TARGET}" GCP_PROJECT_ID="${PROJECT}" GCP_REGION="${REGION}" ARTIFACT_REPO="${REPO}" \
+        bash scripts/deploy.sh ) || stop "Il confronto delle impostazioni del servizio non è riuscito: leggi i messaggi sopra."
+  else
+    echo "Il commit ${SHORT} è precedente al confronto delle impostazioni del servizio: non lo faccio."
+  fi
   say "Prova a secco: compilo il sito dalla copia pulita (nessuna pubblicazione)"
   ( cd "${WT}/frontend" && yarn install --frozen-lockfile --silent && \
     VITE_BFF_URL="https://bff.dry-run.invalid" VITE_AUTH_MODE=firebase VITE_FCM_ENABLED="${VITE_FCM_ENABLED:-false}" yarn build ) \

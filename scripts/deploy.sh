@@ -9,7 +9,9 @@
 #           BUILD_SA (default domotica-build@<project>.iam.gserviceaccount.com): the service account Cloud Build runs
 #           as (P-21), instead of the default Compute account with the Editor role,
 #           SMTP_USER=<sender address> for invitation emails (its password is the Secret Manager secret smtp-app-password,
-#           which must exist before the deploy; without SMTP_USER invites are recorded but no email is sent).
+#           which must exist before the deploy; without SMTP_USER invites are recorded but no email is sent),
+#           DRY_RUN=1 to see the service's active values against the manifest's and stop: gcloud only reads, nothing is
+#           built or published.
 # Prerequisites: gcloud authenticated on the project, node + yarn, firebase-tools logged in (npx firebase-tools login),
 #                frontend/.env.production with VITE_FIREBASE_* (see frontend/.env.example).
 set -euo pipefail
@@ -46,6 +48,46 @@ esac
 echo "ambiente ${TARGET}: servizio ${SERVICE}, database ${DATABASE}, sito ${SITE}"
 
 step() { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }
+fail() { printf '\n\033[1;31mFERMO: %s\033[0m\n' "$*" >&2; exit 1; }
+
+# D-197 (E-27): the four values that decide how the service runs. A publication replaces them with the manifest's: the
+# active ones are shown first, and afterwards the new revision must have the manifest's, or the script stops here.
+manifest_number() { sed -n "s#^ *$1: *\"\{0,1\}\([0-9][0-9]*\)\"\{0,1\}.*#\1#p" "${MANIFEST}" | head -1; }
+MIN_NEW="$(manifest_number autoscaling.knative.dev/minScale)"
+MAX_NEW="$(manifest_number autoscaling.knative.dev/maxScale)"
+CONCURRENCY_NEW="$(manifest_number containerConcurrency)"
+TIMEOUT_NEW="$(manifest_number timeoutSeconds)"
+[ -n "${MIN_NEW}" ] && [ -n "${MAX_NEW}" ] && [ -n "${CONCURRENCY_NEW}" ] && [ -n "${TIMEOUT_NEW}" ] \
+  || fail "${MANIFEST} non dichiara istanze minime, istanze massime, concorrenza e tempo massimo: non pubblico."
+values_format() {
+  printf "value[separator='|'](%s.annotations.'autoscaling.knative.dev/minScale',%s.annotations.'autoscaling.knative.dev/maxScale',%s.containerConcurrency,%s.timeoutSeconds)" "$1" "$1" "$2" "$2"
+}
+setting_line() {  # setting_line <what> <active> <new>
+  local note="non cambia"
+  [ "$2" = "$3" ] || note="CAMBIA"
+  [ "$2" != "non letto" ] || note=""
+  printf '  %-37s attivo: %-10s nuovo: %-10s %s\n' "$1" "$2" "$3" "${note}"
+}
+LIVE=""
+if [ "${PROJECT}" != "your-gcp-project-id" ]; then
+  LIVE="$(gcloud run services describe "${SERVICE}" --project "${PROJECT}" --region "${REGION}" \
+    --format "$(values_format spec.template.metadata spec.template.spec)" 2>/dev/null | tr -d '\r' || true)"
+fi
+MIN_LIVE="non letto"; MAX_LIVE="non letto"; CONCURRENCY_LIVE="non letto"; TIMEOUT_LIVE="non letto"
+if [ -n "${LIVE}" ]; then
+  IFS='|' read -r MIN_LIVE MAX_LIVE CONCURRENCY_LIVE TIMEOUT_LIVE <<< "${LIVE}"
+  MIN_LIVE="${MIN_LIVE:-0}"      # Cloud Run does not store a minimum of 0
+fi
+step "Impostazioni del servizio ${SERVICE}"
+[ -n "${LIVE}" ] || echo "  Valori attivi non letti: il servizio non esiste ancora, oppure la lettura non è riuscita."
+setting_line "istanze minime" "${MIN_LIVE}" "${MIN_NEW}"
+setting_line "istanze massime" "${MAX_LIVE}" "${MAX_NEW}"
+setting_line "richieste contemporanee per istanza" "${CONCURRENCY_LIVE}" "${CONCURRENCY_NEW}"
+setting_line "tempo massimo di una richiesta (s)" "${TIMEOUT_LIVE}" "${TIMEOUT_NEW}"
+if [ -n "${DRY_RUN:-}" ]; then
+  echo "Prova a secco: nessuna costruzione e nessuna pubblicazione."
+  exit 0
+fi
 
 if [ -z "${SKIP_BUILD:-}" ]; then
   step "Build BFF image ${IMAGE} (Cloud Build)"
@@ -73,6 +115,25 @@ BFF_URL="$(printf '%s' "${URLS}" | grep -oE "https://[^\"]+\.${REGION}\.run\.app
 [ -n "${BFF_URL}" ] || BFF_URL="$(gcloud run services describe "${SERVICE}" --project "${PROJECT}" --region "${REGION}" --format 'value(status.url)')"
 rm -f "${RENDERED}"
 echo "BFF: ${BFF_URL}"
+
+step "Controllo della revisione nuova"
+REVISION="$(gcloud run services describe "${SERVICE}" --project "${PROJECT}" --region "${REGION}" \
+  --format 'value(status.latestReadyRevisionName)' | tr -d '\r' || true)"
+APPLIED=""
+if [ -n "${REVISION}" ]; then
+  APPLIED="$(gcloud run revisions describe "${REVISION}" --project "${PROJECT}" --region "${REGION}" \
+    --format "$(values_format metadata spec)" | tr -d '\r' || true)"
+fi
+[ -n "${APPLIED}" ] || fail "Non riesco a rileggere la revisione nuova di ${SERVICE}. Il server è pubblicato, il sito no. Passa questi messaggi alla memoria storica."
+IFS='|' read -r MIN_GOT MAX_GOT CONCURRENCY_GOT TIMEOUT_GOT <<< "${APPLIED}"
+MIN_GOT="${MIN_GOT:-0}"
+WRONG=""
+[ "${MIN_GOT}" = "${MIN_NEW}" ] || WRONG="${WRONG} istanze minime: atteso ${MIN_NEW}, trovato ${MIN_GOT};"
+[ "${MAX_GOT}" = "${MAX_NEW}" ] || WRONG="${WRONG} istanze massime: atteso ${MAX_NEW}, trovato ${MAX_GOT};"
+[ "${CONCURRENCY_GOT}" = "${CONCURRENCY_NEW}" ] || WRONG="${WRONG} richieste contemporanee: atteso ${CONCURRENCY_NEW}, trovato ${CONCURRENCY_GOT};"
+[ "${TIMEOUT_GOT}" = "${TIMEOUT_NEW}" ] || WRONG="${WRONG} tempo massimo: atteso ${TIMEOUT_NEW}, trovato ${TIMEOUT_GOT};"
+[ -z "${WRONG}" ] || fail "La revisione ${REVISION} non ha i valori del manifesto:${WRONG} il server è pubblicato così, il sito no. Passa questi messaggi alla memoria storica."
+echo "La revisione ${REVISION} ha i valori del manifesto."
 
 if [ -z "${SKIP_HOSTING:-}" ]; then
   step "Build PWA (VITE_BFF_URL=${BFF_URL})"
