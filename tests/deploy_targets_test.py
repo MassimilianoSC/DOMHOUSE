@@ -31,6 +31,7 @@ GCLOUD = r'''#!/usr/bin/env bash
 echo "gcloud $*" >> "$STUB_DIR/calls.log"
 case "$*" in
   *"run services replace"*) cp "$4" "$STUB_DIR/rendered.yaml" ;;
+  *"services describe"*containers*image*) [ -f "$STUB_DIR/staging_image.txt" ] && cat "$STUB_DIR/staging_image.txt" ;;
   *"services describe"*minScale*) [ -f "$STUB_DIR/live.txt" ] && cat "$STUB_DIR/live.txt" ;;
   *"services describe"*latestReadyRevisionName*) echo rev-nuova ;;
   *"services describe"*urls*) echo '["https://SERVIZIO-444.europe-west8.run.app"]' ;;
@@ -187,7 +188,9 @@ def test_deploy_dry_run_only_reads(repo):
     assert "services describe" in calls and not any(w in calls for w in WRITES) and "yarn " not in calls
 
 
-def test_publish_dry_run_shows_the_values_and_writes_nothing(tmp_path):
+@pytest.fixture
+def publish(tmp_path):
+    """The real publish.sh and deploy.sh in a throwaway repository with its first commit."""
     bash = _bash()
     if not bash:
         pytest.skip("bash non disponibile")
@@ -211,12 +214,80 @@ def test_publish_dry_run_shows_the_values_and_writes_nothing(tmp_path):
     for args in (["init", "-q"], ["config", "core.autocrlf", "false"], ["config", "user.email", "p@p.it"],
                  ["config", "user.name", "p"], ["add", "-A"], ["commit", "-q", "-m", "prova"]):
         subprocess.run(["git", "-C", str(r), *args], check=True, capture_output=True)
-    cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(r)}" && '
-           f'DRY_RUN=1 TARGET=staging GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default '
-           f'ENV_FILE="{posix(env_file)}" bash scripts/publish.sh')
-    out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=120)
-    calls = (stubs / "calls.log").read_text(encoding="utf-8")
+
+    def run(target, env="DRY_RUN=1"):
+        (stubs / "calls.log").unlink(missing_ok=True)
+        cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(r)}" && '
+               f'{env} TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default '
+               f'ENV_FILE="{posix(env_file)}" bash scripts/publish.sh')
+        out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=120, stdin=subprocess.DEVNULL)
+        return out, (stubs / "calls.log").read_text(encoding="utf-8") if (stubs / "calls.log").exists() else ""
+
+    def git(*args):
+        return subprocess.run(["git", "-C", str(r), *args], check=True, capture_output=True, text=True).stdout.strip()
+
+    run.stubs, run.git = stubs, git
+    return run
+
+
+def test_publish_dry_run_shows_the_values_and_writes_nothing(publish):
+    out, calls = publish("staging")
     assert out.returncode == 0, out.stdout + out.stderr
     assert re.search(r"attivo: 3600 +nuovo: 300 +CAMBIA", out.stdout) and "Prova a secco riuscita" in out.stdout
     assert "services describe domotica-bff-staging" in calls and not any(w in calls for w in WRITES)
+
+
+# -------- D-203: production only with the commit that staging is running --------
+READ_STAGING = "services describe domotica-bff-staging"
+IMAGE = "europe-west8-docker.pkg.dev/progetto-prova/domotica/bff:"
+
+
+def staging_runs(publish, tag):
+    (publish.stubs / "staging_image.txt").write_text(f"{IMAGE}{tag}\n" if tag else "", encoding="utf-8")
+
+
+def test_d203_the_commit_running_in_staging_goes_on(publish):
+    staging_runs(publish, publish.git("rev-parse", "--short", "HEAD"))
+    out, calls = publish("prod")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "in staging c'è lo stesso commit" in out.stdout
+    assert f"gcloud run {READ_STAGING}" in calls and not any(w in calls for w in WRITES)
+
+
+@pytest.mark.parametrize("env", ["DRY_RUN=1", "X=1"])
+def test_d203_another_commit_in_staging_stops_before_anything(publish, env):
+    """In a dry run as in a real publication; and before the questions, so nobody answers for nothing."""
+    tag = publish.git("rev-parse", "--short", "HEAD")
+    publish.git("commit", "-q", "--allow-empty", "-m", "un altro commit")
+    head = publish.git("rev-parse", "--short", "HEAD")
+    staging_runs(publish, tag)
+    out, calls = publish("prod", env=env)
+    assert out.returncode != 0 and "FERMO" in out.stderr
+    assert f"In staging c'è: {tag} — prova" in out.stderr and f"Volevi pubblicare: {head} — un altro commit" in out.stderr
+    assert not any(w in calls for w in WRITES) and "yarn " not in calls and "Per continuare" not in out.stdout
+
+
+@pytest.mark.parametrize("tag, words", [
+    ("deadbee", "In staging c'è: deadbee"),
+    ("", "Non riesco a leggere quale commit c'è in staging"),
+])
+def test_d203_a_staging_that_cannot_be_recognised_stops(publish, tag, words):
+    staging_runs(publish, tag)
+    out, calls = publish("prod")
+    assert out.returncode != 0 and "FERMO" in out.stderr and words in out.stderr
+    assert not any(w in calls for w in WRITES) and "yarn " not in calls
+
+
+def test_d203_the_emergency_exit_warns_and_is_never_the_default(publish):
+    staging_runs(publish, "deadbee")
+    out, calls = publish("prod", env="DRY_RUN=1 SKIP_STAGING_CHECK=1")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "AVVISO: controllo su staging SALTATO" in out.stdout and "spec.template.spec.containers[0].image" not in calls
+
+
+def test_d203_staging_itself_is_not_checked(publish):
+    staging_runs(publish, "deadbee")
+    out, calls = publish("staging")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "spec.template.spec.containers[0].image" not in calls
 

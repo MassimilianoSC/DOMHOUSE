@@ -12,6 +12,7 @@
 #           DRY_RUN=1 does everything that stays on this machine (checks, clean copy, PWA build) and nothing that
 #           writes outside it: no firebase, no questions, gcloud only to read (and only with GCP_PROJECT_ID set). It
 #           also shows the service's active values against the manifest's (D-197, from the commit's deploy.sh).
+#           SKIP_STAGING_CHECK=1 only for an emergency: publishes in production a commit that staging is not running (D-203).
 # The image tag is the commit's short SHA (computed by deploy.sh in the clean copy); when that image already exists in
 # Artifact Registry the build is skipped (read-only check), so republishing a commit never rebuilds a different image.
 # Messages are in plain Italian: this script is run by the project owner.
@@ -73,6 +74,31 @@ say "Commit da pubblicare: ${SHORT} — ${SUBJECT}"
 if [ -n "$(git -C "${SRC}" status --porcelain --untracked-files=no)" ]; then
   echo "Nota: nella cartella di lavoro ci sono modifiche non salvate in un commit. NON verranno pubblicate:"
   echo "si pubblica solo il commit ${SHORT}."
+fi
+
+# --- 1b. Production only after staging (D-203): read-only, also in a dry run, before anything else is done ------
+if [ "${TARGET}" = "prod" ]; then
+  if [ -n "${SKIP_STAGING_CHECK:-}" ]; then
+    printf '\n\033[1;31m!!! AVVISO: controllo su staging SALTATO (SKIP_STAGING_CHECK). Il commit %s va in produzione senza la conferma che giri in staging. Solo per un'"'"'emergenza. !!!\033[0m\n' "${SHORT}"
+  elif [ -z "${GCP_PROJECT_ID:-}" ]; then
+    echo "Prova a secco senza GCP_PROJECT_ID: non controllo quale commit c'è in staging."
+  else
+    STAGING_IMAGE="$(gcloud run services describe domotica-bff-staging --project "${PROJECT}" --region "${REGION}" \
+      --format 'value(spec.template.spec.containers[0].image)' 2>/dev/null | tr -d '\r' || true)"
+    [ -n "${STAGING_IMAGE}" ] || stop "Non riesco a leggere quale commit c'è in staging (servizio domotica-bff-staging): non si pubblica in produzione.
+Controlla che gcloud funzioni e ripeti. Solo per un'emergenza: SKIP_STAGING_CHECK=1 prima del comando."
+    STAGING_TAG="${STAGING_IMAGE##*:}"
+    STAGING_SHA="$(git -C "${SRC}" rev-parse --verify --quiet "${STAGING_TAG}^{commit}" 2>/dev/null || true)"
+    if [ "${STAGING_SHA}" != "${SHA}" ]; then
+      STAGING_SAYS="${STAGING_TAG}"
+      [ -z "${STAGING_SHA}" ] || STAGING_SAYS="${STAGING_TAG} — $(git -C "${SRC}" log -1 --format=%s "${STAGING_SHA}")"
+      stop "In staging c'è un commit diverso da quello che vuoi pubblicare in produzione.
+In staging c'è: ${STAGING_SAYS}
+Volevi pubblicare: ${SHORT} — ${SUBJECT}
+Prima pubblica ${SHORT} in staging e provalo, poi ripeti. Solo per un'emergenza: SKIP_STAGING_CHECK=1 prima del comando."
+    fi
+    echo "in staging c'è lo stesso commit ${SHORT}: si può pubblicare in produzione"
+  fi
 fi
 
 # --- 2. Is it on GitHub? ---------------------------------------------------------------------------------------
