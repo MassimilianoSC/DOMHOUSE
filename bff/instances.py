@@ -26,6 +26,11 @@ def http() -> httpx.AsyncClient:
 
 MSG_USE_MOCK = "In questo ambiente di prova scrivi mock://builtin nel campo Indirizzo del sistema domotico"
 MSG_BAD_URL = "Indirizzo non valido: deve cominciare con http:// o https://"
+MSG_NO_DEMO = "In produzione i dimostrativi non sono disponibili: si provano in staging. Qui serve l'indirizzo di un sistema domotico vero"
+
+
+class DemoRefused(Exception):
+    """A record left from before D-202: in production no call reaches the built-in engine."""
 
 
 def normalize_instance_url(raw: str) -> str:
@@ -59,13 +64,21 @@ def demo_variant(url: str | None) -> str | None:
     return values[0].strip().lower() if values else None
 
 
+def demo_refused(url: str | None) -> bool:
+    """D-202 (it revises D-188): the built-in engine lives in each instance's memory, so with several instances each would
+    be a different apartment. Demonstrations stay in staging and development, which have one instance."""
+    return get_settings().app_env == "prod" and is_mock(url)
+
+
 def instance_url_problem(raw: str) -> str | None:
     """Plain-Italian reason why an instance URL cannot work with the current INSTANCE_MODE, or None. With
     INSTANCE_MODE=mock only mock:// is reachable (staging has no VPC egress), so anything else is refused (D-28). In real
-    mode mock:// is accepted too (D-97: demonstration apartments next to real ones; only the platform links engines).
-    D-188: also in production, where the collaborators test until the delivery (it revises D-136 for this phase)."""
+    mode mock:// is accepted too (D-97: demonstration apartments next to real ones; only the platform links engines),
+    except in production (D-202)."""
     v = normalize_instance_url(raw)
     if v.startswith("mock://"):
+        if demo_refused(v):
+            return MSG_NO_DEMO
         variant = demo_variant(v)
         return MSG_BAD_VARIANT if variant is not None and variant not in DEMO_VARIANTS else None
     if get_settings().instance_mode == "mock":
@@ -197,6 +210,8 @@ async def call(
 ) -> httpx.Response:
     if any(seg in (".", "..") for seg in path.split("/")):  # F1: defence in depth, the routes already refuse them
         raise ValueError("dot segment in instance path")
+    if demo_refused(apt.instance_url):
+        raise DemoRefused(apt.apartment_id)
     headers = await instance_headers(apt, actor, correlation_id)
     if content_type:
         headers["Content-Type"] = content_type

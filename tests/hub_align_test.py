@@ -359,3 +359,15 @@ def test_an_instance_that_starts_later_does_not_notify_again_what_was_already_se
         hub_manager.hooks.remove(push.on_stream_event)
     assert sent == ["approval:apv-41"] and len(world.connections) == 2
 
+
+@pytest.mark.parametrize("environment,connections", [("prod", 0), ("staging", 1)])
+def test_a_demonstration_gets_no_connection_in_production(world, monkeypatch, environment, connections):
+    """D-202: a record left from before, until it is removed."""
+    monkeypatch.setattr(instances, "get_settings", lambda: dataclasses.replace(get_settings(), app_env=environment))
+
+    async def scenario():
+        world.apartments.append(apartment(instance_url="mock://builtin"))
+        await align()
+    play(scenario)
+    assert len(world.connections) == connections
+

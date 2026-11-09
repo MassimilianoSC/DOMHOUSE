@@ -9,9 +9,10 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 
 from bff import accounts, auth, config, instances
-from bff.repository import get_repository
+from bff.repository import Apartment, get_repository
 
 ROOT = Path(__file__).resolve().parent.parent
 TENANT = "t-flatsharing-demo"
@@ -112,14 +113,49 @@ def test_production_updates_its_own_or_the_flat_claims_and_revokes(env, firebase
     assert fake.calls[0] == ("claims", {"tenant_id": TENANT, "role": "admin"}) and fake.calls[1][0] == "revoke"
 
 
-def test_d188_demonstrations_in_production_as_in_staging(env):
-    """D-188 (revises D-136 for this phase): the collaborators test on the production app, so a demonstration apartment
-    (mock://builtin, with or without its variant) is accepted there as in staging; a wrong variant stays refused."""
-    for name in ("prod", "staging"):
+def test_d202_demonstrations_are_refused_in_production_only(env):
+    """D-202 (revises D-188): the built-in engine is in each instance's memory. Real addresses are not concerned."""
+    env("prod")
+    for url in ("mock://builtin", "mock://builtin?variante=occupato", "MOCK://builtin"):
+        assert instances.instance_url_problem(url) == instances.MSG_NO_DEMO, url
+    assert instances.instance_url_problem("https://motore.esempio.it") != instances.MSG_NO_DEMO
+    for name in ("staging", "dev"):
         env(name)
         assert instances.instance_url_problem("mock://builtin") is None, name
         assert instances.instance_url_problem("mock://builtin?variante=occupato") is None, name
         assert instances.instance_url_problem("mock://builtin?variante=pieno") == instances.MSG_BAD_VARIANT, name
+
+
+LEFT = Apartment(apartment_id="apt-rimasto", tenant_id=TENANT, name="Rimasto", instance_url="mock://builtin")
+
+
+def test_d202_a_demonstration_left_in_production_gets_a_clear_answer(env):
+    run(get_repository().upsert_apartment(LEFT))
+    user = auth.CurrentUser("u-1", "a@esempio.it", TENANT, "admin", "Prova")
+    env("prod")
+    with pytest.raises(HTTPException) as refused:
+        run(auth.get_tenant_apartment(user, LEFT.apartment_id))
+    assert refused.value.status_code == 409 and instances.MSG_NO_DEMO in str(refused.value.detail)
+    env("staging")
+    assert run(auth.get_tenant_apartment(user, LEFT.apartment_id)).apartment_id == LEFT.apartment_id
+
+
+def test_d202_no_call_reaches_the_built_in_engine_in_production(env, monkeypatch):
+    async def answer(*_a, **_k):
+        return "risposta"
+    monkeypatch.setattr(instances, "http", lambda: SimpleNamespace(request=answer))
+    env("prod")
+    with pytest.raises(instances.DemoRefused):
+        run(instances.call(LEFT, "GET", "/health"))
+    env("staging")
+    assert run(instances.call(LEFT, "GET", "/health")) == "risposta"
+
+
+def test_d202_the_connection_check_says_why(env):
+    run(get_repository().upsert_apartment(LEFT))
+    env("prod")
+    out = run(instances.verify(LEFT, "system:bff"))
+    assert out["error"] == instances.MSG_NO_DEMO and out["ok"] is False
 
 
 def _set_claims():

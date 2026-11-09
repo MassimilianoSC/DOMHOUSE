@@ -306,7 +306,7 @@ async def align_hubs_once() -> None:
             info("upstream stream closed", apartment_id=apartment_id, reason=reason)
     if get_settings().fcm_enabled:
         for apt in apartments.values():
-            if apt.enabled:
+            if apt.enabled and not instances.demo_refused(apt.instance_url):
                 hub_manager.hub(apt).start(None)
 
 

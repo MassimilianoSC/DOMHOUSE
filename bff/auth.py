@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException, Request
 
-from . import accounts
+from . import accounts, instances
 from .config import get_settings
 from .logs import ctx_tenant, ctx_user, warn
 from .repository import User, get_repository, normalize_email
@@ -438,4 +438,6 @@ async def get_tenant_apartment(user: CurrentUser, apartment_id: str):
     apt = await get_repository().get_apartment(apartment_id)
     if not apt or apt.tenant_id != user.tenant_id or not user.can_see(apt.apartment_id):
         raise _err(404, "not_found", "Appartamento inesistente")
+    if instances.demo_refused(apt.instance_url):       # D-202: a record left from before, until it is removed
+        raise _err(409, "demo_not_available", instances.MSG_NO_DEMO)
     return apt
