@@ -83,10 +83,19 @@ if [ "${TARGET}" = "prod" ]; then
   elif [ -z "${GCP_PROJECT_ID:-}" ]; then
     echo "Prova a secco senza GCP_PROJECT_ID: non controllo quale commit c'è in staging."
   else
-    STAGING_IMAGE="$(gcloud run services describe domotica-bff-staging --project "${PROJECT}" --region "${REGION}" \
-      --format 'value(spec.template.spec.containers[0].image)' 2>/dev/null | tr -d '\r' || true)"
+    # the commit is in the tag of the service's template (a revision's own image is a digest); the template is what staging
+    # serves only if its latest revision is ready and has the traffic: a publication that failed leaves its image there
+    STAGING_STATE="$(gcloud run services describe domotica-bff-staging --project "${PROJECT}" --region "${REGION}" \
+      --format "value[separator='|'](spec.template.spec.containers[0].image,status.latestCreatedRevisionName,status.latestReadyRevisionName,status.traffic[0].revisionName)" \
+      2>/dev/null | tr -d '\r' || true)"
+    IFS='|' read -r STAGING_IMAGE STAGING_CREATED STAGING_READY STAGING_SERVING <<< "${STAGING_STATE}"
     [ -n "${STAGING_IMAGE}" ] || stop "Non riesco a leggere quale commit c'è in staging (servizio domotica-bff-staging): non si pubblica in produzione.
 Controlla che gcloud funzioni e ripeti. Solo per un'emergenza: SKIP_STAGING_CHECK=1 prima del comando."
+    if [ "${STAGING_CREATED}" != "${STAGING_READY}" ] || [ "${STAGING_READY}" != "${STAGING_SERVING}" ]; then
+      stop "L'ultima pubblicazione di staging non è quella che riceve il traffico: non si può dire quale commit stia girando.
+Ultima creata: ${STAGING_CREATED:-non letta}; ultima pronta: ${STAGING_READY:-non letta}; con il traffico: ${STAGING_SERVING:-non letta}.
+Sistema staging, poi ripeti. Solo per un'emergenza: SKIP_STAGING_CHECK=1 prima del comando."
+    fi
     STAGING_TAG="${STAGING_IMAGE##*:}"
     STAGING_SHA="$(git -C "${SRC}" rev-parse --verify --quiet "${STAGING_TAG}^{commit}" 2>/dev/null || true)"
     if [ "${STAGING_SHA}" != "${SHA}" ]; then

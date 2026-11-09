@@ -31,7 +31,7 @@ GCLOUD = r'''#!/usr/bin/env bash
 echo "gcloud $*" >> "$STUB_DIR/calls.log"
 case "$*" in
   *"run services replace"*) cp "$4" "$STUB_DIR/rendered.yaml" ;;
-  *"services describe"*containers*image*) [ -f "$STUB_DIR/staging_image.txt" ] && cat "$STUB_DIR/staging_image.txt" ;;
+  *"services describe"*status.traffic*) [ -f "$STUB_DIR/staging_image.txt" ] && cat "$STUB_DIR/staging_image.txt" ;;
   *"services describe"*minScale*) [ -f "$STUB_DIR/live.txt" ] && cat "$STUB_DIR/live.txt" ;;
   *"services describe"*latestReadyRevisionName*) echo rev-nuova ;;
   *"services describe"*urls*) echo '["https://SERVIZIO-444.europe-west8.run.app"]' ;;
@@ -242,8 +242,8 @@ READ_STAGING = "services describe domotica-bff-staging"
 IMAGE = "europe-west8-docker.pkg.dev/progetto-prova/domotica/bff:"
 
 
-def staging_runs(publish, tag):
-    (publish.stubs / "staging_image.txt").write_text(f"{IMAGE}{tag}\n" if tag else "", encoding="utf-8")
+def staging_runs(publish, tag, revisions="r1|r1|r1"):
+    (publish.stubs / "staging_image.txt").write_text(f"{IMAGE}{tag}|{revisions}\n" if tag else "", encoding="utf-8")
 
 
 def test_d203_the_commit_running_in_staging_goes_on(publish):
@@ -278,16 +278,25 @@ def test_d203_a_staging_that_cannot_be_recognised_stops(publish, tag, words):
     assert not any(w in calls for w in WRITES) and "yarn " not in calls
 
 
+@pytest.mark.parametrize("revisions", ["r2|r1|r1", "r2|r2|r1"])
+def test_d203_a_publication_of_staging_that_did_not_take_over_stops(publish, revisions):
+    """The right commit in the template, but a failed revision or the traffic left on an older one: staging is not running it."""
+    staging_runs(publish, publish.git("rev-parse", "--short", "HEAD"), revisions=revisions)
+    out, calls = publish("prod")
+    assert out.returncode != 0 and "FERMO" in out.stderr and "non è quella che riceve il traffico" in out.stderr
+    assert not any(w in calls for w in WRITES) and "yarn " not in calls
+
+
 def test_d203_the_emergency_exit_warns_and_is_never_the_default(publish):
     staging_runs(publish, "deadbee")
     out, calls = publish("prod", env="DRY_RUN=1 SKIP_STAGING_CHECK=1")
     assert out.returncode == 0, out.stdout + out.stderr
-    assert "AVVISO: controllo su staging SALTATO" in out.stdout and "spec.template.spec.containers[0].image" not in calls
+    assert "AVVISO: controllo su staging SALTATO" in out.stdout and "status.traffic" not in calls
 
 
 def test_d203_staging_itself_is_not_checked(publish):
     staging_runs(publish, "deadbee")
     out, calls = publish("staging")
     assert out.returncode == 0, out.stdout + out.stderr
-    assert "spec.template.spec.containers[0].image" not in calls
+    assert "status.traffic" not in calls
 
