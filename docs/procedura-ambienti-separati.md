@@ -337,3 +337,14 @@ in sola lettura, che nel database `(default)` non restino dati di prova: apparta
 dimostrativi, contatori `ai_stats` dei dimostrativi, approvazioni e programmazioni di prova; la memoria storica prepara il
 comando di lettura e l'elenco di ciò che va cancellato, il committente lancia le cancellazioni (D-116); (4) verifica finale con
 `scripts/list_demos.py` (REPOSITORY=firestore, sola lettura): «0 dimostrativi».
+
+## M17. Controllo delle impostazioni a ogni pubblicazione (D-197, lotto 35)
+
+**A cosa serve:** evitare che una pubblicazione cambi senza che nessuno se ne accorga le impostazioni del server.
+
+- **Prima di pubblicare** lo script mostra quattro impostazioni, con il valore attivo, il valore nuovo e se cambia: istanze minime, istanze massime, richieste contemporanee per istanza, tempo massimo di una richiesta.
+- **Per vederle senza pubblicare niente:** aggiungi `DRY_RUN=1` davanti al comando di `publish.sh`.
+- **Dopo la pubblicazione** lo script ricontrolla la versione appena creata.
+- **Se un valore è diverso dal previsto** si ferma con la scritta FERMO, dice valore atteso e trovato, e non pubblica il sito: il server è già online con quei valori. Copia i messaggi e passali alla memoria storica.
+
+> **Attenzione:** fino alla fine del lotto 35 non si pubblica nessun commit successivo a `8a49489` senza il via della memoria storica. Quei commit portano il tempo massimo a 300 s, e prima della chiusura degli stream lato server e della modifica del sito gli aggiornamenti in diretta cadrebbero ogni 5 minuti.
