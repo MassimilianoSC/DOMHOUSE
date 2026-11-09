@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
@@ -8,7 +9,7 @@ from starlette.datastructures import MutableHeaders
 
 from engine.log import setup_logging as setup_engine_logging
 
-from . import push
+from . import instances, push
 from .config import get_settings
 from .logs import setup_logging
 from .routes import account, admin, apartments, platform, webhooks
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI):
+        await asyncio.to_thread(instances.http)   # D-198: the shared client's certificates, before serving and off the loop
         await webhooks.report_demo_codes()   # D-99 F1: a demonstration apartment with an Italianway code, in production
         await push.start_background_hubs()
         from . import summary_job

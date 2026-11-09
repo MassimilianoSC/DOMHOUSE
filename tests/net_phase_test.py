@@ -90,3 +90,55 @@ def test_the_phase_from_the_exception_alone():
     assert net_phase.phase_of(httpx.ConnectTimeout("x")) == net_phase.CONNECT
     assert net_phase.phase_of(httpx.ConnectError("[Errno 11001] getaddrinfo failed")) == net_phase.DNS
     assert net_phase.phase_of(httpx.ConnectError("[SSL: CERTIFICATE_VERIFY_FAILED]")) == net_phase.TLS
+
+
+def test_the_certificates_are_loaded_once_and_off_the_event_loop(monkeypatch):
+    """D-198: a client per model call used to load them on the event loop, 400-800 ms each time."""
+    import threading
+
+    import httpx
+    made, verify = [], []
+
+    def create():
+        made.append(threading.current_thread())
+        return object()
+
+    class Client:
+        def __init__(self, **kw):
+            verify.append(kw["verify"])
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, **kw):
+            return httpx.Response(200)
+    monkeypatch.setattr(net_phase, "_ssl_context", None)
+    monkeypatch.setattr(net_phase.httpx, "create_ssl_context", create)
+    monkeypatch.setattr(net_phase.httpx, "AsyncClient", Client)
+    for _ in range(2):
+        run(net_phase.post_traced("http://127.0.0.1:9/x", json={}, headers={}, connect_s=1, read_s=1))
+    assert len(made) == 1 and made[0] is not threading.main_thread()
+    assert len(verify) == 2 and verify[0] is verify[1]
+
+
+def test_the_shared_client_is_made_before_serving_and_off_the_event_loop(monkeypatch):
+    import threading
+
+    from bff import instances, main, push, summary_job
+    seen = []
+
+    async def nothing(*a, **k):
+        return None
+    monkeypatch.setattr(instances, "http", lambda: seen.append(threading.current_thread()))
+    monkeypatch.setattr(main.webhooks, "report_demo_codes", nothing)
+    monkeypatch.setattr(push, "start_background_hubs", nothing)
+    monkeypatch.setattr(summary_job, "start", lambda: None)
+
+    async def start_and_stop():
+        async with main.app.router.lifespan_context(main.app):
+            pass
+    run(start_and_stop())
+    assert len(seen) == 1 and seen[0] is not threading.main_thread()

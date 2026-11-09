@@ -13,6 +13,17 @@ from urllib.parse import urlsplit
 
 import httpx
 
+_ssl_context = None
+
+
+def shared_ssl_context():
+    """D-198: loading the certificate authorities takes 400-800 ms (measured on a PC, 9 Nov) and httpx does it for every
+    client: once per process, in a thread."""
+    global _ssl_context
+    if _ssl_context is None:
+        _ssl_context = httpx.create_ssl_context()
+    return _ssl_context
+
 DNS, CONNECT, TLS, SEND, WAIT, READ = ("DNS", "connessione", "TLS", "invio della richiesta", "attesa della risposta",
                                        "lettura della risposta")
 _STEPS = {"connect_tcp": CONNECT, "start_tls": TLS, "send_request_headers": SEND, "send_request_body": SEND,
@@ -89,9 +100,10 @@ async def post_traced(url: str, *, json: dict, headers: dict, connect_s: float, 
         raise PhaseFailure(DNS, isinstance(exc, TimeoutError), time.monotonic() - started, exc) from None
     if network is not None:
         network["dns"] = time.monotonic() - started
+    context = _ssl_context or await asyncio.to_thread(shared_ssl_context)
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(read_s, connect=connect_s, write=connect_s,
-                                                           pool=connect_s)) as client:
+        async with httpx.AsyncClient(verify=context, timeout=httpx.Timeout(read_s, connect=connect_s, write=connect_s,
+                                                                           pool=connect_s)) as client:
             resp = await client.post(url, json=json, headers=headers, extensions={"trace": tracker.hook})
     except httpx.HTTPError as exc:
         raise PhaseFailure(tracker.phase(exc), isinstance(exc, httpx.TimeoutException), time.monotonic() - started,
