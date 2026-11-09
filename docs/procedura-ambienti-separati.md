@@ -224,9 +224,9 @@ cliente, insieme a M16.**
 
 ## M12. Pubblicazione della produzione (dal commit del lotto)
 
-Cosa fa: produzione con il database `(default)`. Dal 23 ottobre 2026 (D-188) i dimostrativi restano anche in produzione fino
-alla consegna al cliente, per le prove dei collaboratori: un indirizzo `mock://` è accettato come nello staging (prima
-veniva rifiutato). La pulizia prima della consegna è il passo M16.
+Cosa fa: produzione con il database `(default)`. Dal lotto 36 (D-202) in produzione un indirizzo `mock://` è rifiutato: i dimostrativi si provano in staging e vanno tolti dalla produzione **prima** della prima pubblicazione del lotto 36, con M11.
+
+**La produzione si pubblica solo con il commit che gira in staging (D-203).** `publish.sh` lo controlla prima di ogni altro passo, anche nella prova a secco. Se in staging c'è un altro commit, o l'ultima pubblicazione di staging non ha preso il traffico, si ferma con FERMO e dice cosa c'è e cosa volevi pubblicare: pubblica prima in staging. Solo per un'emergenza: `SKIP_STAGING_CHECK=1` davanti al comando; stampa un avviso.
 
 ```bash
 # Git Bash
@@ -328,9 +328,9 @@ for db in "(default)" staging; do gcloud firestore fields ttls list --database="
 
 Verifica: due righe con `ai_stats` e stato `ACTIVE` (`CREATING` per qualche minuto subito dopo l'attivazione).
 
-## M16. Pulizia della produzione prima della consegna al cliente (D-188)
+## M16. Pulizia della produzione prima della consegna al cliente (D-188, D-202)
 
-Finché l'app non è consegnata, la produzione ospita i dimostrativi e gli utenti di prova dei collaboratori. Prima della
+Dal lotto 36 i dimostrativi `mock://` si tolgono subito (punto 1 fatto il 9 novembre); restano l'appartamento `dev` sulla VM e gli utenti di prova. Prima della
 consegna, nell'ordine: (1) M11, backup recente e rimozione dei dimostrativi dall'app; (2) rimozione degli utenti di prova
 (Amministrazione › Utenti, oppure Organizzazioni per i gestori) e delle organizzazioni di prova che non servono; (3) controllo,
 in sola lettura, che nel database `(default)` non restino dati di prova: appartamenti con `mock://`, decisioni e registri dei

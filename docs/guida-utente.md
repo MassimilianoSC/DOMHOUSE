@@ -1,7 +1,7 @@
 # Guida all'app DOMHOUSE
 
 Tutto quello che l'app sa fare, spiegato passo per passo e diviso per ruolo. Non servono conoscenze tecniche.
-*Versione del 23 ottobre 2026 (lotto 35).*
+*Versione del 9 novembre 2026 (lotto 36).*
 
 > **Ambiente di prova**
 >
@@ -1719,7 +1719,7 @@ dell'organizzazione.»).
 |---|---|
 | «ID» | Da 3 a 64 caratteri, minuscole, numeri e trattini, per esempio apt-milano-01; mai riutilizzabile |
 | «Nome» | Fino a 120 caratteri |
-| «Indirizzo del sistema domotico» | Nell'ambiente di prova «In questo ambiente usa mock://builtin» |
+| «Indirizzo del sistema domotico» | In produzione «Scrivi l'indirizzo del motore dell'appartamento; i dimostrativi si provano in staging»; nell'ambiente di prova «Per un appartamento dimostrativo scrivi mock://builtin; per uno vero, l'indirizzo del suo motore» |
 | «Porta» | Da 1 a 65535, facoltativa |
 | «Fuso orario» | Europe/Rome all'inizio; «Valore iniziale: dopo la creazione il fuso orario si imposta sul motore.» |
 | «ID Italianway» | Fino a 120 caratteri; «Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.» |
@@ -2595,6 +2595,15 @@ Per ogni problema annota:
 ## 14. Novità
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
+
+### 9 novembre 2026 (lotti 35 e 36)
+
+- **Aggiornamenti in diretta**: se lasci la pagina in sottofondo l'app smette di aggiornarsi in tempo reale; quando torni si rimette in pari da sola, e per un attimo può comparire «Riconnessione…».
+- **Dimostrativi solo in staging**: in produzione non si possono creare; compare «In produzione i dimostrativi non sono disponibili: si provano in staging. Qui serve l'indirizzo di un sistema domotico vero».
+- **Notifiche una volta sola**, anche quando il server lavora con più istanze. Se un'istanza cade, la notifica viene ripresa entro pochi minuti; il riepilogo settimanale entro 75 minuti.
+- **Casi rari**: la stessa notifica può partire due volte; il telefono ne mostra una.
+- **Appartamenti nuovi, disattivati o ricollegati**: il server si allinea entro un minuto.
+- **Controllo dell'accesso**: se non risponde in tempo compare «Controllo dell'accesso non disponibile: riprova tra poco», e la sessione resta valida.
 
 ### 23 ottobre 2026 (lotto 35)
 

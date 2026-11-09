@@ -252,7 +252,7 @@
       <p class="eyebrow">DOMHOUSE · Guida utente</p>
 <h1 id="guida-all-app-domhouse-bf67de07">Guida all&#x27;app DOMHOUSE</h1>
 <p class="subtitle">Tutto quello che l&#x27;app sa fare, spiegato passo per passo e diviso per ruolo. Non servono conoscenze tecniche.</p>
-<p class="version"><em>Versione del 23 ottobre 2026 (lotto 35).</em></p>
+<p class="version"><em>Versione del 9 novembre 2026 (lotto 36).</em></p>
     </header>
     <nav class="toc" id="indice" aria-label="Indice della guida">
       <details open id="guide-index">
@@ -392,6 +392,7 @@
 </li>
 <li><a href="#14-novita-710a48f5">14. Novità</a>
 <ol>
+<li><a href="#9-novembre-2026-lotti-35-e-36-fd660053">9 novembre 2026 (lotti 35 e 36)</a></li>
 <li><a href="#23-ottobre-2026-lotto-35-0ef8641e">23 ottobre 2026 (lotto 35)</a></li>
 <li><a href="#23-ottobre-2026-lotto-34-70960072">23 ottobre 2026 (lotto 34)</a></li>
 <li><a href="#23-ottobre-2026-lotto-33-00f07c4f">23 ottobre 2026 (lotto 33)</a></li>
@@ -2927,7 +2928,7 @@ dell&#x27;organizzazione.»).</p>
 <tbody>
 <tr><td data-label="Campo" class="align-left">«ID»</td><td data-label="Cosa scrivere" class="align-left">Da 3 a 64 caratteri, minuscole, numeri e trattini, per esempio apt-milano-01; mai riutilizzabile</td></tr>
 <tr><td data-label="Campo" class="align-left">«Nome»</td><td data-label="Cosa scrivere" class="align-left">Fino a 120 caratteri</td></tr>
-<tr><td data-label="Campo" class="align-left">«Indirizzo del sistema domotico»</td><td data-label="Cosa scrivere" class="align-left">Nell&#x27;ambiente di prova «In questo ambiente usa mock://builtin»</td></tr>
+<tr><td data-label="Campo" class="align-left">«Indirizzo del sistema domotico»</td><td data-label="Cosa scrivere" class="align-left">In produzione «Scrivi l&#x27;indirizzo del motore dell&#x27;appartamento; i dimostrativi si provano in staging»; nell&#x27;ambiente di prova «Per un appartamento dimostrativo scrivi mock://builtin; per uno vero, l&#x27;indirizzo del suo motore»</td></tr>
 <tr><td data-label="Campo" class="align-left">«Porta»</td><td data-label="Cosa scrivere" class="align-left">Da 1 a 65535, facoltativa</td></tr>
 <tr><td data-label="Campo" class="align-left">«Fuso orario»</td><td data-label="Cosa scrivere" class="align-left">Europe/Rome all&#x27;inizio; «Valore iniziale: dopo la creazione il fuso orario si imposta sul motore.»</td></tr>
 <tr><td data-label="Campo" class="align-left">«ID Italianway»</td><td data-label="Cosa scrivere" class="align-left">Fino a 120 caratteri; «Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.»</td></tr>
@@ -4184,6 +4185,27 @@ dell&#x27;email di chi comanda.</p>
 <section aria-labelledby="14-novita-710a48f5">
 <h2 id="14-novita-710a48f5">14. Novità</h2>
 <p class="lead"><strong>Che cosa è cambiato, aggiornamento per aggiornamento.</strong></p>
+<h3 id="9-novembre-2026-lotti-35-e-36-fd660053">9 novembre 2026 (lotti 35 e 36)</h3>
+<ul>
+<li>
+<p><strong>Aggiornamenti in diretta</strong>: se lasci la pagina in sottofondo l&#x27;app smette di aggiornarsi in tempo reale; quando torni si rimette in pari da sola, e per un attimo può comparire «Riconnessione…».</p>
+</li>
+<li>
+<p><strong>Dimostrativi solo in staging</strong>: in produzione non si possono creare; compare «In produzione i dimostrativi non sono disponibili: si provano in staging. Qui serve l&#x27;indirizzo di un sistema domotico vero».</p>
+</li>
+<li>
+<p><strong>Notifiche una volta sola</strong>, anche quando il server lavora con più istanze. Se un&#x27;istanza cade, la notifica viene ripresa entro pochi minuti; il riepilogo settimanale entro 75 minuti.</p>
+</li>
+<li>
+<p><strong>Casi rari</strong>: la stessa notifica può partire due volte; il telefono ne mostra una.</p>
+</li>
+<li>
+<p><strong>Appartamenti nuovi, disattivati o ricollegati</strong>: il server si allinea entro un minuto.</p>
+</li>
+<li>
+<p><strong>Controllo dell&#x27;accesso</strong>: se non risponde in tempo compare «Controllo dell&#x27;accesso non disponibile: riprova tra poco», e la sessione resta valida.</p>
+</li>
+</ul>
 <h3 id="23-ottobre-2026-lotto-35-0ef8641e">23 ottobre 2026 (lotto 35)</h3>
 <ul>
 <li>

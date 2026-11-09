@@ -225,6 +225,7 @@ Servono un account **gestore della piattaforma** e un **amministratore** normale
 | I13 | Gestore | «Nuova organizzazione» indicando come amministratore l'email di un gestore della piattaforma. | L'invito è rifiutato con un messaggio che non dice perché; nessuna organizzazione creata. | |
 | I14 | Gestore | In un'organizzazione, «Nuovo appartamento» con `mock://builtin`. | La casella «Appartamento dimostrativo» è accesa e non si toglie; l'appartamento compare «Dimostrativo». | |
 | I15 | Gestore | Organizzazioni: menu «⋯» di un'organizzazione › «Rinomina». | Si apre la rinomina; nel menu anche «Reinvia invito» e «Sospendi» in rosso (o «Riattiva»); in vista restano «Appartamenti» e «Accesso di assistenza» (oppure «Entra come assistenza» e «Chiudi accesso»). | |
+| I16 | Gestore | In produzione, «Nuovo appartamento»: leggi la riga sotto «Indirizzo del sistema domotico», poi prova a salvare con `mock://builtin`. | La riga dice «Scrivi l'indirizzo del motore dell'appartamento; i dimostrativi si provano in staging»; il salvataggio è rifiutato con «In produzione i dimostrativi non sono disponibili: si provano in staging. Qui serve l'indirizzo di un sistema domotico vero». | |
 
 ## J. Registro, sospensione, assistenza, privacy
 
