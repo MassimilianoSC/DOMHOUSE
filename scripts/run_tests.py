@@ -44,7 +44,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 HTTP_SUITES = ["tests/backend_test.py", "tests/backend_phase2_test.py", "tests/backend_phase3_test.py", "tests/backend_phase4_test.py",
                "tests/backend_isolation_test.py", "tests/backend_platform_test.py"]
-LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py", "tests/push_test.py",
+LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py", "tests/push_test.py", "tests/hub_align_test.py",
                 "tests/apartment_scope_test.py", "tests/tenant_test.py", "tests/routes_test.py", "tests/webhook_test.py",
                 "tests/platform_test.py", "tests/real_mode_test.py", "tests/firebase_flows_test.py",
                 "tests/proxy_path_test.py", "tests/mock_exposure_test.py", "tests/run_tests_checks_test.py",

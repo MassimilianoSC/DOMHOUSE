@@ -379,7 +379,8 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
     apt = await get_tenant_apartment(user, apartment_id)
     last_event_id = request.headers.get("Last-Event-ID")
     hub = hub_manager.hub(apt)
-    hub.start(last_event_id)
+    if apt.enabled:                                    # D-201: a disabled apartment has no connection to its engine
+        hub.start(last_event_id)
     settings = get_settings()
     ends = time.monotonic() + settings.stream_max_s    # D-197 (E-27): a normal end of the response; the site reopens
 

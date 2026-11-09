@@ -72,6 +72,7 @@ def create_app() -> FastAPI:
         runtime.process_stopping()
         put_back_sigterm()
         status.cancel()
+        push.stop_background()
         await hub_manager.stop_all()
 
     app = FastAPI(title="DOMHOUSE BFF", lifespan=lifespan)

@@ -12,7 +12,7 @@ from .auth import sees, tenant_status
 from .config import get_settings
 from .logs import info, warn
 from .repository import Apartment, get_repository
-from .sse_hub import SseEvent, envelope, hub_manager
+from .sse_hub import SseEvent, envelope, hub_manager, link_of
 
 BODY_MAX = 200
 TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400, "booking": 86400,
@@ -23,6 +23,8 @@ _offline_timers: dict[tuple[str, str], asyncio.Task] = {}
 _health_down: set[str] = set()
 _down_timers: dict[str, asyncio.Task] = {}      # D-131: the "instance down" push waits for the offline_alert minutes
 _tasks: set[asyncio.Task] = set()  # strong references: the loop keeps only weak ones to running tasks
+_loops: list[asyncio.Task] = []    # the rounds that last as long as the process
+HUB_ALIGN_S = 60
 
 
 def build_push(kind: str, apt: Apartment, title: str, body: str, link: str, tag: str, ts: str | None = None,
@@ -160,13 +162,13 @@ async def recover_once(now: float | None = None) -> int:
     return recovered
 
 
-async def _recovery_loop() -> None:
+async def _every(seconds: float, work, what: str) -> None:
     while True:
-        await asyncio.sleep(get_settings().notification_lease_s)
+        await asyncio.sleep(seconds)
         try:
-            await recover_once()
+            await work()
         except Exception as exc:
-            warn("push recovery failed", error=type(exc).__name__)
+            warn("background round failed", what=what, error=type(exc).__name__)
 
 
 def _dead_token(exc) -> bool:
@@ -288,14 +290,40 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
                 task.cancel()
 
 
+async def align_hubs_once() -> None:
+    """D-201: a change to the registry is made on one instance and the others learn it here, within HUB_ALIGN_S: closes the
+    connections of apartments removed or disabled, makes again those whose link changed (the browsers on them reload, as
+    after a reset) and, with FCM on, opens the missing ones, so that pushes do not depend on an open browser."""
+    apartments = {a.apartment_id: a for a in await get_repository().list_apartments()}
+    for apartment_id, hub in list(hub_manager.hubs.items()):
+        apt = apartments.get(apartment_id)
+        running = hub.task is not None and not hub.task.done()
+        reason = ("removed" if apt is None else "disabled" if not apt.enabled and running
+                  else "link changed" if running and hub.link not in (None, link_of(apt)) else None)
+        if reason:
+            forget_apartment(apartment_id)
+            hub_manager.drop(apartment_id)
+            info("upstream stream closed", apartment_id=apartment_id, reason=reason)
+    if get_settings().fcm_enabled:
+        for apt in apartments.values():
+            if apt.enabled:
+                hub_manager.hub(apt).start(None)
+
+
+def _start_round(seconds: float, work, what: str) -> None:
+    _loops.append(_spawn(_every(seconds, work, what), what, "-"))
+
+
 async def start_background_hubs() -> None:
-    """With FCM on, keep one upstream stream per enabled apartment so pushes do not depend on an open browser."""
-    if not get_settings().fcm_enabled:
-        return
-    for apt in await get_repository().list_apartments():
-        if apt.enabled:
-            hub_manager.hub(apt).start(None)
-    _spawn(_recovery_loop(), "recovery", "-")
+    if get_settings().fcm_enabled:
+        await align_hubs_once()
+        _start_round(get_settings().notification_lease_s, recover_once, "push recovery")
+    _start_round(HUB_ALIGN_S, align_hubs_once, "hub alignment")
+
+
+def stop_background() -> None:
+    while _loops:
+        _loops.pop().cancel()
 
 
 def register() -> None:

@@ -45,6 +45,11 @@ class SseEvent:
 EventHook = Callable[[Apartment, SseEvent], Awaitable[None]]
 
 
+def link_of(apt: Apartment) -> tuple:
+    """What a connection to the engine depends on: when it changes the connection has to be made again."""
+    return apt.instance_url, apt.port, apt.instance_secret_name
+
+
 async def parse_sse(lines) -> "asyncio.AsyncIterator[SseEvent]":
     ev_id, ev_type, data = None, "message", []
     async for line in lines:
@@ -75,6 +80,7 @@ class InstanceHub:
         self.last_id: str | None = None
         self.connected = False
         self.task: asyncio.Task | None = None
+        self.link: tuple | None = None               # the link the running task is connected to (push.align_hubs_once)
 
     def start(self, last_event_id: str | None) -> None:
         if self.task is None or self.task.done():
@@ -120,14 +126,16 @@ class InstanceHub:
                 warn("stream hook failed", error=str(exc), apartment_id=self.apt.apartment_id)
 
     async def _run(self) -> None:
+        apt = self.apt                               # D-201: one link for the whole life of a hub; a new link is a new hub
+        self.link = link_of(apt)
         backoff = 1.0
         while True:
             try:
-                headers = await instances.instance_headers(self.apt, instances.BFF_ACTOR)
+                headers = await instances.instance_headers(apt, instances.BFF_ACTOR)
                 headers["Accept"] = "text/event-stream"
                 if self.last_id:
                     headers["Last-Event-ID"] = self.last_id
-                url = instances.base_url(self.apt) + "/stream"
+                url = instances.base_url(apt) + "/stream"
                 timeout = httpx.Timeout(10.0, read=90.0)
                 async with instances.http().stream("GET", url, headers=headers, timeout=timeout) as resp:
                     if resp.status_code != 200:
