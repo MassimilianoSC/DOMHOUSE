@@ -1,6 +1,8 @@
 """Push notifications (P-11): message format agreed with the PWA, token pruning, hooks that never block the stream.
-FCM is replaced by a fake send_each_for_multicast_async; no network, memory repository."""
+FCM is replaced by a fake send_each_for_multicast; no network, memory repository."""
 import asyncio
+import time
+import threading
 import dataclasses
 import json
 from types import SimpleNamespace
@@ -50,17 +52,18 @@ def users():
 def fcm(monkeypatch):
     """FCM on, sends recorded; `fcm.fail` maps token -> exception, `fcm.gate` (an Event) holds the send if set."""
     monkeypatch.setattr(push, "get_settings", lambda: dataclasses.replace(get_settings(), fcm_enabled=True))
-    state = SimpleNamespace(sent=[], fail={}, gate=None)
+    state = SimpleNamespace(sent=[], fail={}, gate=None, threads=[])
 
-    async def fake_send(msg, dry_run=False, app=None):
-        if state.gate is not None:
-            await state.gate.wait()
+    def fake_send(msg, dry_run=False, app=None):               # in a worker thread (D-198)
+        state.threads.append(threading.current_thread())
+        while state.gate is not None and not state.gate.is_set():
+            time.sleep(0.005)
         state.sent.append(msg)
         responses = [SimpleNamespace(success=t not in state.fail, exception=state.fail.get(t)) for t in msg.tokens]
         ok = sum(r.success for r in responses)
         return SimpleNamespace(responses=responses, success_count=ok, failure_count=len(responses) - ok)
 
-    monkeypatch.setattr(messaging, "send_each_for_multicast_async", fake_send)
+    monkeypatch.setattr(messaging, "send_each_for_multicast", fake_send)
     return state
 
 
@@ -197,15 +200,16 @@ def test_hook_does_not_block_the_stream(users, fcm):
         await drain()
     run(scenario())
     assert len(fcm.sent) == 1 and fcm.sent[0].data["tag"] == "approval:apv-5" and fcm.sent[0].data["ts"] == TS
+    assert fcm.threads[0] is not threading.main_thread()         # D-198: Google's token is renewed off the event loop
 
 
 def test_hook_failure_is_logged_not_raised(users, fcm, monkeypatch):
     logged = []
     monkeypatch.setattr(push, "warn", lambda msg, **kw: logged.append((msg, kw)))
 
-    async def boom(*_a, **_k):
+    def boom(*_a, **_k):
         raise RuntimeError("fcm down")
-    monkeypatch.setattr(messaging, "send_each_for_multicast_async", boom)
+    monkeypatch.setattr(messaging, "send_each_for_multicast", boom)
 
     async def scenario():
         await push.on_stream_event(APT, event("approval.pending", {"approval_id": "apv-6"}))
@@ -388,3 +392,16 @@ def test_decisions_preference_is_accepted_and_ignored():
     with_key, without, status = run(scenario())
     assert with_key.status_code == 200 and "decisions" not in with_key.json()
     assert without.status_code == 200 and "decisions" not in status.json()["prefs"]
+
+
+def test_firebase_is_initialized_through_its_lock(monkeypatch):
+    """D-198: the token checks initialize it from their threads; a second initialize_app would be refused."""
+    from firebase_admin import messaging
+
+    from bff import auth
+    calls = []
+    monkeypatch.setattr(auth, "firebase_app", lambda: calls.append(1))
+    monkeypatch.setattr(messaging, "send_each_for_multicast", lambda msg: SimpleNamespace(responses=[]))
+    run(push._send_multicast(["t"], {"a": "b"}, {}))
+    assert calls == [1]
+

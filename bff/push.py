@@ -94,13 +94,15 @@ async def send_to_tenant(tenant_id: str, pref: str, data: dict[str, str], header
 
 
 async def _send_multicast(tokens: list[str], data: dict[str, str], headers: dict[str, str]):
-    import firebase_admin
     from firebase_admin import messaging
 
-    if not firebase_admin._apps:
-        firebase_admin.initialize_app(options={"projectId": get_settings().firebase_project_id})
+    from .auth import firebase_app
+
+    firebase_app()                                 # under its lock: the token checks call it from their threads
     msg = messaging.MulticastMessage(tokens=tokens, data=data, webpush=messaging.WebpushConfig(headers=headers))
-    return await messaging.send_each_for_multicast_async(msg)
+    # D-198: the sync call in a thread. The async one renews Google's access token on the event loop (firebase-admin's
+    # httpx.Auth has only a sync flow), with a blocking request
+    return await asyncio.to_thread(messaging.send_each_for_multicast, msg)
 
 
 def _dead_token(exc) -> bool:
