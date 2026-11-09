@@ -1,6 +1,7 @@
 """Push notifications (P-11): message format agreed with the PWA, token pruning, hooks that never block the stream.
 FCM is replaced by a fake send_each_for_multicast; no network, memory repository."""
 import asyncio
+import itertools
 import time
 import threading
 import dataclasses
@@ -24,9 +25,14 @@ def run(coro):
     return asyncio.run(coro)
 
 
-def event(name: str, data: dict) -> SseEvent:
-    env = {"id": "1", "event": name, "ts": TS, "apartment_id": APT.apartment_id, "correlation_id": None, "data": data}
-    return SseEvent(id="1", event=name, data=json.dumps(env), received=0.0)
+_ids = itertools.count(1000)
+
+
+def event(name: str, data: dict, event_id: str | None = None) -> SseEvent:
+    """event_id: the engine's id of the event, the same for every instance that receives it."""
+    event_id = event_id or str(next(_ids))
+    env = {"id": event_id, "event": name, "ts": TS, "apartment_id": APT.apartment_id, "correlation_id": None, "data": data}
+    return SseEvent(id=event_id, event=name, data=json.dumps(env), received=0.0)
 
 
 async def drain():
@@ -215,7 +221,7 @@ def test_hook_failure_is_logged_not_raised(users, fcm, monkeypatch):
         await push.on_stream_event(APT, event("approval.pending", {"approval_id": "apv-6"}))
         await drain()
     run(scenario())
-    assert logged and logged[0][0] == "push task failed" and "fcm down" in logged[0][1]["error"]
+    assert logged and logged[0][0] == "push send failed" and "fcm down" in logged[0][1]["error"]
 
 
 def alert_minutes(monkeypatch, minutes):
@@ -404,4 +410,47 @@ def test_firebase_is_initialized_through_its_lock(monkeypatch):
     monkeypatch.setattr(messaging, "send_each_for_multicast", lambda msg: SimpleNamespace(responses=[]))
     run(push._send_multicast(["t"], {"a": "b"}, {}))
     assert calls == [1]
+
+
+# -------- D-201: several instances --------
+def test_two_instances_that_receive_the_same_event_send_one_notification(users, fcm):
+    async def scenario():
+        same = event("approval.pending", {"approval_id": "apv-due"}, event_id="7001")
+        await asyncio.gather(push.on_stream_event(APT, same), push.on_stream_event(APT, same))   # one per instance
+        await drain()
+    run(scenario())
+    assert len(fcm.sent) == 1
+
+
+def test_a_notification_claimed_by_a_process_that_died_is_sent(users, fcm):
+    data, headers = push.approval_push(APT, "apv-orfana", "Spegnere il clima", TS)
+    payload = {"tenant_id": TENANT, "pref": "approvals", "data": data, "headers": headers}
+    key = "push:prova:orfana"
+
+    async def scenario():
+        repo = get_repository()
+        await repo.claim_work(key, "processo-morto", 0.2, payload)
+        assert await push.recover_once() == 0                       # its lease is still running: nobody touches it
+        await asyncio.sleep(0.25)
+        assert await push.recover_once() == 1
+        assert await repo.claim_work(key, "altro", 60, payload) == "done"
+    run(scenario())
+    assert len(fcm.sent) == 1 and fcm.sent[0].data["tag"] == "approval:apv-orfana"
+
+
+def test_a_failed_send_is_retried_then_given_up(users, fcm, monkeypatch):
+    logged = []
+    monkeypatch.setattr(push, "warn", lambda msg, **kw: logged.append(msg))
+    monkeypatch.setattr(messaging, "send_each_for_multicast", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("fcm giu")))
+    monkeypatch.setattr(push, "get_settings", lambda: dataclasses.replace(
+        get_settings(), fcm_enabled=True, notification_lease_s=0.0))
+    data, headers = push.approval_push(APT, "apv-giu", "x", TS)
+
+    async def scenario():
+        await push.notify_once("push:prova:giu", TENANT, "approvals", data, headers)
+        for _ in range(6):
+            await push.recover_once(now=time.time() + 1)
+        assert await get_repository().claim_work("push:prova:giu", "altro", 60) == "done"
+    run(scenario())
+    assert logged.count("push send failed") == push.MAX_SEND_ATTEMPTS and logged.count("push given up") == 1
 

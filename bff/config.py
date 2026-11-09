@@ -65,6 +65,7 @@ class Settings:
     stream_max_s: float = 240.0               # D-197 (E-27): a browser's stream ends by itself, under Cloud Run's 300 s
     status_log_s: float = 60.0                # D-198: how often the process writes its status line (bff/runtime.py)
     hub_buffer_max: int = 2000                # D-198: events kept per apartment for a reconnecting browser
+    notification_lease_s: float = 60.0        # D-201: how long a claimed notification is left to who claimed it
     # P-67 (D-136): the Firestore database of this environment, "(default)" in production, "staging" in staging
     firestore_database: str = "(default)"
     summary_job: bool = True                  # P-60 step 11: the weekly summary's hourly round (off in the test runs)
@@ -144,6 +145,7 @@ def get_settings() -> Settings:
         stream_max_s=float(e("STREAM_MAX_S", "240")),
         status_log_s=float(e("STATUS_LOG_S", "60")),
         hub_buffer_max=int(e("HUB_BUFFER_MAX", "2000")),
+        notification_lease_s=float(e("NOTIFICATION_LEASE_S", "60")),
         firestore_database=e("FIRESTORE_DATABASE", "(default)").strip() or "(default)",
         summary_job=_bool("SUMMARY_JOB", "true"),
     )

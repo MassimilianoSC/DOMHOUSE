@@ -546,3 +546,54 @@ def test_assistant_weekly_counters(repo):
     if isinstance(repo, FirestoreRepository):
         from datetime import UTC, datetime
         assert _expire(repo._col("ai_stats").document("a1__2026-W43")) == datetime(2027, 10, 19, tzinfo=UTC)
+
+
+def test_work_claims(repo):
+    """D-201: a piece of work done once whatever the number of instances; what is left by a dead process can be taken over."""
+    import time
+    assert run(repo.claim_work("k1", "a", 60, {"x": "1"})) == "mine"
+    assert run(repo.claim_work("k1", "b", 60, {"x": "1"})) == "taken"
+    assert run(repo.due_work(time.time())) == []                           # its lease is running
+    [item] = run(repo.due_work(time.time() + 61))
+    assert item == {"key": "k1", "payload": {"x": "1"}, "attempts": 1}
+    run(repo.finish_work("k1"))
+    assert run(repo.claim_work("k1", "b", 60)) == "done" and run(repo.due_work(time.time() + 61)) == []
+    assert run(repo.claim_work("k2", "a", 0, {"y": "2"})) == "mine"
+    assert run(repo.claim_work("k2", "b", 60)) == "mine"                   # lease over: taken over, the message kept
+    assert run(repo.due_work(time.time() + 61))[0] == {"key": "k2", "payload": {"y": "2"}, "attempts": 2}
+    run(repo.release_work("k2"))
+    assert run(repo.claim_work("k2", "c", 60)) == "mine"
+    assert run(repo.claim_work("senza", "a", 0)) == "mine"
+    assert all(i["key"] != "senza" for i in run(repo.due_work(time.time() + 61)))   # no message, nothing to resend
+    from bff.repository.firestore import FirestoreRepository
+    if isinstance(repo, FirestoreRepository):
+        from datetime import UTC, datetime, timedelta
+        left = _expire(repo._work("k1")) - datetime.now(UTC)
+        assert timedelta(days=6, hours=23) < left <= timedelta(days=7)
+
+
+def test_two_instances_claiming_at_the_same_instant_on_firestore(repo):
+    """D-201: two processes (two repository objects, each with its own in-process queue): exactly one gets it."""
+    from bff.repository.firestore import FirestoreRepository
+    if not isinstance(repo, FirestoreRepository):
+        pytest.skip("la concorrenza fra due processi si prova sull'emulatore")
+    other = FirestoreRepository(project_id=os.environ.get("GCP_PROJECT_ID", "demo-test"), prefix=repo.prefix)
+
+    async def race(key):
+        return await asyncio.gather(repo.claim_work(key, "a", 60, {"m": "1"}), other.claim_work(key, "b", 60, {"m": "1"}))
+    for n in range(8):
+        assert sorted(run(race(f"gara-{n}"))) == ["mine", "taken"]
+
+
+def test_two_instances_taking_over_at_the_same_instant_on_firestore(repo):
+    """D-201: a claim left by a dead process: never two who think it is theirs; if neither gets it the next round does."""
+    from bff.repository.firestore import FirestoreRepository
+    if not isinstance(repo, FirestoreRepository):
+        pytest.skip("la concorrenza fra due processi si prova sull'emulatore")
+    other = FirestoreRepository(project_id=os.environ.get("GCP_PROJECT_ID", "demo-test"), prefix=repo.prefix)
+    assert run(repo.claim_work("orfana", "morto", 0, {"m": "1"})) == "mine"
+
+    async def race():
+        return await asyncio.gather(repo.claim_work("orfana", "a", 60), other.claim_work("orfana", "b", 60))
+    assert run(race()).count("mine") <= 1
+

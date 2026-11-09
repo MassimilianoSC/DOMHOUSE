@@ -6,8 +6,9 @@ Uses the async client; credentials come from ADC (Cloud Run service account) or 
 """
 import asyncio
 import hashlib
+import time
 
-from google.api_core.exceptions import AlreadyExists, NotFound
+from google.api_core.exceptions import Aborted, AlreadyExists, NotFound
 from google.cloud import firestore
 
 from .. import retention
@@ -271,6 +272,64 @@ class FirestoreRepository:
             return {}
         snaps = self.db.get_all([self._col("ai_stats").document(k) for k in keys])
         return {snap.id: snap.to_dict() async for snap in snaps if snap.exists}
+
+    # D-201: work_claims/{key}. The first claim is a create(): of two at the same instant exactly one succeeds, without two
+    # transactions crossing. Only taking over an expired claim needs a transaction. retry_at exists only on a pending claim
+    # with a payload, and is what due_work queries: a single field, so no composite index
+    def _work(self, key):
+        return self._col("work_claims").document(key.replace("/", "_"))
+
+    async def claim_work(self, key, owner, lease_s, payload=None):
+        ref = self._work(key)
+
+        def claim_doc(old: dict) -> dict:
+            until = time.time() + lease_s
+            kept = payload if payload is not None else old.get("payload")
+            doc = {"key": key, "status": "pending", "owner": owner, "lease_until": until,
+                   "attempts": old.get("attempts", 0) + 1, retention.FIELD: retention.work_claim()}
+            return doc | ({"payload": kept, "retry_at": until} if kept is not None else {})
+
+        try:
+            await ref.create(claim_doc({}))
+            return "mine"
+        except AlreadyExists:
+            pass
+        seen = (await ref.get()).to_dict() or {}
+        if seen.get("status") == "done":
+            return "done"
+        if seen.get("lease_until", 0) > time.time():
+            return "taken"
+
+        @firestore.async_transactional
+        async def take_over(tx):
+            snap = await ref.get(transaction=tx)
+            old = snap.to_dict() if snap.exists else {}
+            if old.get("status") == "done":
+                return "done"
+            if old and old["lease_until"] > time.time():
+                return "taken"
+            tx.set(ref, claim_doc(old))
+            return "mine"
+        try:
+            async with self._lock(f"work:{key}"):
+                return await take_over(self.db.transaction())
+        except (Aborted, ValueError):                  # two instances taking over together: the other one has it
+            return "taken"
+
+    async def finish_work(self, key):
+        try:
+            await self._work(key).update({"status": "done", "payload": firestore.DELETE_FIELD,
+                                          "retry_at": firestore.DELETE_FIELD})
+        except NotFound:
+            pass
+
+    async def release_work(self, key):
+        await self._work(key).delete()
+
+    async def due_work(self, now, limit=50):
+        q = self._col("work_claims").where(filter=firestore.FieldFilter("retry_at", "<=", now)).limit(limit)
+        return [{"key": d["key"], "payload": d["payload"], "attempts": d["attempts"]}
+                for d in [s.to_dict() async for s in q.stream()]]
 
     async def mark_ai_alert(self, month):
         ref = self._col("ai_usage").document(month)

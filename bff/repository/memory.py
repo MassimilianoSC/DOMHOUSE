@@ -1,3 +1,5 @@
+import time
+
 from .base import (EMPTY_AI_USAGE, ai_stats_added, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
 
@@ -18,6 +20,7 @@ class InMemoryRepository:
         self.mail_counts: dict[str, int] = {}
         self.ai_usage: dict[str, dict] = {}            # P-60 step 9: month -> the assistant's spending
         self.ai_stats: dict[str, dict] = {}            # decision 120: "<apartment>__<week>" -> the assistant's counters
+        self.work: dict[str, dict] = {}                # D-201: key -> {status, lease_until, attempts, payload}
         self.summaries: dict[str, dict] = {}           # P-60 step 11: "<apartment>__<week>" -> summary
         self.support_access: dict[str, SupportAccess] = {}
         self.actor_refs: dict[str, str] = {}             # uid -> pseudonym
@@ -170,6 +173,29 @@ class InMemoryRepository:
 
     async def get_ai_stats(self, keys):
         return {k: dict(self.ai_stats[k]) for k in keys if k in self.ai_stats}
+
+    async def claim_work(self, key, owner, lease_s, payload=None):
+        now = time.time()
+        d = self.work.get(key)
+        if d and d["status"] == "done":
+            return "done"
+        if d and d["lease_until"] > now:
+            return "taken"
+        self.work[key] = {"status": "pending", "owner": owner, "lease_until": now + lease_s,
+                          "attempts": (d["attempts"] if d else 0) + 1,
+                          "payload": payload if payload is not None else (d or {}).get("payload")}
+        return "mine"
+
+    async def finish_work(self, key):
+        if key in self.work:
+            self.work[key].update(status="done", payload=None)
+
+    async def release_work(self, key):
+        self.work.pop(key, None)
+
+    async def due_work(self, now, limit=50):
+        due = [(k, d) for k, d in self.work.items() if d["status"] == "pending" and d["payload"] and d["lease_until"] <= now]
+        return [{"key": k, "payload": d["payload"], "attempts": d["attempts"]} for k, d in due[:limit]]
 
     async def mark_ai_alert(self, month):
         u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))

@@ -5,8 +5,9 @@ agreed with the PWA and described in bff/API.md («Notifiche push»). Sending ne
 tasks, and task errors are logged.
 """
 import asyncio
+import time
 
-from . import instances
+from . import instances, runtime
 from .auth import sees, tenant_status
 from .config import get_settings
 from .logs import info, warn
@@ -105,6 +106,63 @@ async def _send_multicast(tokens: list[str], data: dict[str, str], headers: dict
     return await asyncio.to_thread(messaging.send_each_for_multicast, msg)
 
 
+MAX_SEND_ATTEMPTS = 5
+
+
+def event_key(apt: Apartment, ev: SseEvent, ts: str | None) -> str:
+    """The same for every instance that receives this event of the engine; with its time, because a demonstration's or a
+    restored engine's numbering can start again."""
+    return f"push:{apt.apartment_id}:{ev.id}:{ts}"
+
+
+async def notify_once(key: str, tenant_id: str, pref: str, data: dict[str, str], headers: dict[str, str]) -> int:
+    """D-201: one notification however many instances saw the event: whoever claims it first sends it. The claim holds the
+    message, so if the process dies before sending it recover_once sends it (see «Notifiche push» in bff/API.md)."""
+    if not get_settings().fcm_enabled:
+        return 0
+    payload = {"tenant_id": tenant_id, "pref": pref, "data": data, "headers": headers}
+    if await get_repository().claim_work(key, runtime.BOOT_ID, get_settings().notification_lease_s, payload) != "mine":
+        return 0
+    return await _deliver(key, payload)
+
+
+async def _deliver(key: str, payload: dict) -> int:
+    try:
+        sent = await send_to_tenant(payload["tenant_id"], payload["pref"], payload["data"], payload["headers"])
+    except Exception as exc:                       # still claimed: when its lease runs out recover_once tries again
+        warn("push send failed", key=key, error=repr(exc))
+        return 0
+    await get_repository().finish_work(key)
+    return sent
+
+
+async def recover_once(now: float | None = None) -> int:
+    """The notifications whose lease ran out without being sent: the process died, or FCM failed. Returns how many."""
+    repo = get_repository()
+    recovered = 0
+    for item in await repo.due_work(now if now is not None else time.time()):
+        key = item["key"]
+        if item["attempts"] >= MAX_SEND_ATTEMPTS:
+            await repo.finish_work(key)
+            warn("push given up", key=key, attempts=item["attempts"])
+            continue
+        if await repo.claim_work(key, runtime.BOOT_ID, get_settings().notification_lease_s) != "mine":
+            continue                                   # another instance got there first
+        info("push recovered", key=key, attempts=item["attempts"])
+        await _deliver(key, item["payload"])
+        recovered += 1
+    return recovered
+
+
+async def _recovery_loop() -> None:
+    while True:
+        await asyncio.sleep(get_settings().notification_lease_s)
+        try:
+            await recover_once()
+        except Exception as exc:
+            warn("push recovery failed", error=type(exc).__name__)
+
+
 def _dead_token(exc) -> bool:
     """Only tokens that can never work again: unregistered, or issued for another Firebase project. INVALID_ARGUMENT
     is not one of them: a malformed message fails every token with it, and they would all be wiped."""
@@ -196,7 +254,7 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
     ts = env.get("ts")
     if ev.event == "approval.pending":
         approval_id = str(data.get("approval_id", ""))
-        _spawn(send_to_tenant(apt.tenant_id, "approvals", *approval_push(apt, approval_id, data.get("description", ""), ts)),
+        _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "approvals", *approval_push(apt, approval_id, data.get("description", ""), ts)),
                "approval", apt.apartment_id)
     elif ev.event == "device.online":
         key = (apt.apartment_id, str(data.get("device_id", "")))
@@ -206,11 +264,11 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
             _offline_timers[key] = _spawn(_offline_watch(apt, key[1], ts), "device_offline", apt.apartment_id)
     elif ev.event == "decision.logged" and data.get("action") == "booking_cancel_reset":
         decision_id = str(data.get("decision_id", ""))
-        _spawn(send_to_tenant(apt.tenant_id, "bookings", *booking_reset_push(apt, decision_id, data.get("reasoning"), ts)),
+        _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "bookings", *booking_reset_push(apt, decision_id, data.get("reasoning"), ts)),
                "booking", apt.apartment_id)
     elif ev.event == "decision.logged" and data.get("action") == "frost_inactive":     # D-164
         device_id = str((data.get("target") or {}).get("device_id", ""))
-        _spawn(send_to_tenant(apt.tenant_id, "offline", *frost_inactive_push(apt, device_id, data.get("reasoning"), ts)),
+        _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "offline", *frost_inactive_push(apt, device_id, data.get("reasoning"), ts)),
                "frost_inactive", apt.apartment_id)
     elif ev.event == "instance.health":
         down = data.get("status") == "down"
@@ -230,6 +288,7 @@ async def start_background_hubs() -> None:
     for apt in await get_repository().list_apartments():
         if apt.enabled:
             hub_manager.hub(apt).start(None)
+    _spawn(_recovery_loop(), "recovery", "-")
 
 
 def register() -> None:

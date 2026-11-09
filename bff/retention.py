@@ -16,6 +16,7 @@ FIELD = "expire_at"
 BOOKING_MONTHS = 12        # after the check-out (D-94)
 SUMMARY_MONTHS = 12        # the weekly summaries (D-150)
 AI_STATS_MONTHS = 12       # the assistant's weekly counters (decision 120, D-183 point 129)
+WORK_CLAIM_DAYS = 7        # D-201: who took a piece of work; longer than the hour of events an engine can repeat
 AUDIT_MONTHS = 24          # the administrative log
 SUPPORT_MONTHS = 24        # closed support accesses: from the end of the window (at most 24 h after opening)
 WEBHOOK_DAYS = 90          # received Italianway calls, besides the 100 per organisation
@@ -74,6 +75,10 @@ def ai_stats(doc: dict) -> datetime:
     return add_months(datetime.fromisoformat(doc["from"]).replace(tzinfo=UTC), AI_STATS_MONTHS)
 
 
+def work_claim(_doc: dict | None = None) -> datetime:
+    return now() + timedelta(days=WORK_CLAIM_DAYS)
+
+
 def pseudonym(_doc: dict | None = None) -> datetime:
     return add_months(now(), ACTOR_MONTHS)
 
@@ -91,4 +96,5 @@ COLLECTIONS = {
     "actor_refs": pseudonym,
     "summaries": summary,
     "ai_stats": ai_stats,
+    "work_claims": work_claim,
 }
