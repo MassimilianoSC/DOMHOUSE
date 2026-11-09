@@ -413,7 +413,7 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
                         break
                     item = await _event(ev, user.tenant_id)
                 except TimeoutError:
-                    if await request.is_disconnected():
+                    if time.monotonic() >= ends or await request.is_disconnected():
                         break
                     item = ": ping\n\n"
                 if deadline is not None and time.time() >= deadline:
