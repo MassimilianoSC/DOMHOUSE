@@ -4,6 +4,7 @@ say; an engine that does not answer loses nothing (the next round makes it); /en
 than MAX_PARALLEL at once; the routes show the summaries only on the apartments the user sees. In-process, dev auth,
 memory repository, the instance replaced by a fake."""
 import asyncio
+import dataclasses
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -11,6 +12,7 @@ import httpx
 import pytest
 
 from bff import instances, push, summary_job
+from bff.config import get_settings
 from bff.main import app
 from bff.repository import NotificationPrefs, get_repository
 
@@ -68,9 +70,11 @@ def engine(monkeypatch):
         sent.append((tenant_id, pref, data))
         return 1
     monkeypatch.setattr(push, "send_to_tenant", fake_send)
+    monkeypatch.setattr(push, "get_settings", lambda: dataclasses.replace(get_settings(), fcm_enabled=True))
     state.sent = sent
     repo = get_repository()
     repo.summaries.clear()
+    repo.work.clear()
     saved = [run(repo.get_apartment(apt_id)) for apt_id in (BOLOGNA, RIMINI, ALTRA)]
     for apt in saved:                                             # 5 weeks of real data and more (step 6)
         run(repo.upsert_apartment(apt.model_copy(update={"energy_since": "2026-01-01T00:00:00.000Z"})))
@@ -78,6 +82,7 @@ def engine(monkeypatch):
     for apt in saved:                                             # the shared memory repository as it was
         run(repo.upsert_apartment(apt))
     repo.summaries.clear()
+    repo.work.clear()
 
 
 def test_made_after_monday_eight_once_per_week_pushed_only_when_notable(engine):
@@ -102,6 +107,27 @@ def test_an_engine_that_does_not_answer_loses_nothing(engine):
     engine.down = set()
     assert run(summary_job.round_once(AFTER + timedelta(hours=1))) == 1              # the next round makes it
     assert run(get_repository().get_summary(RIMINI, WEEK))["week"] == WEEK
+
+
+def test_two_instances_make_each_summary_once(engine):
+    """D-201: the same round at the same moment on two instances."""
+    async def both():
+        return await asyncio.gather(summary_job.round_once(AFTER), summary_job.round_once(AFTER))
+    assert sum(run(both())) == 3
+    assert len([c for c in engine.calls if c == (BOLOGNA, "/energy")]) == 35       # the engine asked once
+    assert len(engine.sent) == 1
+
+
+def test_a_summary_being_made_elsewhere_is_left_alone_until_its_claim_expires(engine):
+    repo = get_repository()
+    claim = f"summary:{RIMINI}:{WEEK}"
+    run(repo.claim_work(claim, "altra-istanza", 60))
+    assert run(summary_job.round_once(AFTER)) == 2
+    assert run(repo.get_summary(RIMINI, WEEK)) is None
+    repo.work.clear()
+    run(repo.claim_work(claim, "processo-morto", 0))               # the process died: its claim has run out
+    assert run(summary_job.round_once(AFTER + timedelta(hours=1))) == 1
+    assert run(repo.get_summary(RIMINI, WEEK))["week"] == WEEK
 
 
 def test_the_push_message():

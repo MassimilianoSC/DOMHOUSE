@@ -5,15 +5,14 @@ loses nothing: the next round finds the summary missing and makes it. The data c
 /energy one local day at a time (the contract gives the per-device split only for the range asked; 35 days, at most
 MAX_PARALLEL calls at once), /decisions, /approvals, /devices, and the bookings the BFF keeps. Computation:
 bff/weekly_summary.py.
-The BFF runs as one instance always on (bff/cloudrun*.yaml: minScale = maxScale = 1, CPU not throttled), so one loop
-is enough; during a deploy two revisions overlap for a few minutes: the first round waits FIRST_ROUND_S and a push sent
-twice carries the same tag, so the phone shows it once.
+Every instance of the BFF runs this loop (D-201): a claim per apartment and week makes one of them do the work. A claim
+left by a process that died expires after SUMMARY_LEASE_S and the next round makes the summary.
 """
 import asyncio
 from datetime import UTC, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from . import instances, weekly_summary as ws
+from . import instances, runtime, weekly_summary as ws
 from .config import get_settings
 from .logs import info, warn
 from .repository import get_repository
@@ -21,6 +20,7 @@ from .repository import get_repository
 ROUND_S = 3600
 FIRST_ROUND_S = 300          # the first round 5 minutes after the start, not during it
 MAX_PARALLEL = 3
+SUMMARY_LEASE_S = 900        # much more than the 36 calls to the engine of one summary, less than ROUND_S
 ACTOR = "system:weekly-summary"
 _task: asyncio.Task | None = None
 
@@ -92,27 +92,34 @@ def summary_push(apt, summary: dict):
 
 async def round_once(now: datetime | None = None) -> int:
     """One round over every enabled apartment; returns the number of summaries made."""
-    from .push import send_to_tenant
+    from .push import notify_once
     repo = get_repository()
     made = 0
     for apt in await repo.list_apartments():
         if not apt.enabled:
             continue
         monday, due = ws.last_week(now or datetime.now(UTC), ZoneInfo(apt.timezone))
-        if not due or await repo.get_summary(apt.apartment_id, ws.week_id(monday)):
+        week = ws.week_id(monday)
+        if not due or await repo.get_summary(apt.apartment_id, week):
             continue
+        claim = f"summary:{apt.apartment_id}:{week}"
+        if await repo.claim_work(claim, runtime.BOOT_ID, SUMMARY_LEASE_S) != "mine":
+            continue                               # another instance is making it, or has just made it
         try:
             summary = await make(apt, now)
         except Exception as exc:                   # the engine does not answer now: the next round tries again
             warn("weekly summary not made", apartment_id=apt.apartment_id, error=type(exc).__name__)
+            await repo.release_work(claim)
             continue
         if summary is None:
+            await repo.release_work(claim)
             continue
         await repo.put_summary(summary)
         made += 1
         info("weekly summary made", apartment_id=apt.apartment_id, week=summary["week"], items=len(summary["items"]))
         if summary["notable"]:                     # D-150 point 4: the push only with something to say
-            await send_to_tenant(apt.tenant_id, "summary", *summary_push(apt, summary))
+            await notify_once(f"push:{claim}", apt.tenant_id, "summary", *summary_push(apt, summary))
+        await repo.finish_work(claim)
     return made
 
 
