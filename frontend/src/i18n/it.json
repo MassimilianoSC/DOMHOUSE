@@ -1106,6 +1106,9 @@
     "status": "Errore {status}",
     "invalidRequest": "Richiesta non accettata dal server: ricarica la pagina e riprova.",
     "notFound": "Pagina non trovata",
-    "notFoundHint": "L'indirizzo non corrisponde a nessuna schermata."
+    "notFoundHint": "L'indirizzo non corrisponde a nessuna schermata.",
+    "pageProblem": "Non riesco ad aprire la pagina",
+    "pageProblemHint": "Controlla la connessione e premi Ricarica. Se il problema resta, contatta HQE.",
+    "reload": "Ricarica"
   }
 }

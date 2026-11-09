@@ -5,6 +5,7 @@ import { ApiError, bffFetch, setAuthResolver, setBlockedHandler } from "@/api/bf
 import { platformApi } from "@/api/platform";
 import type { Me } from "@/api/types";
 import { t } from "@/i18n";
+import { reloadOnce } from "@/lib/lazyPage";
 import { disablePush, forgetPushResume } from "@/lib/push";
 import { clearUserData } from "@/lib/session";
 import { endSupportSession, startSupportSession, supportSession, type SupportSession } from "@/lib/support";
@@ -14,6 +15,8 @@ import { continueUrl, firebaseAuth, firebaseConfigured } from "./firebase";
 const DEV_KEY = "domotica.devUser";
 /** After the expected end of an assistance access, a little later the profile is re-read (P-50). */
 const SUPPORT_END_MARGIN_MS = 5_000;
+/** E-29: how long the start (Firebase, then /app/me) may take before the person is told. A late answer still gets in. */
+export const STARTUP_TIMEOUT_MS = 15_000;
 
 /** A deliberate sign-out also ends an assistance access on the server, so the admin stops seeing it (P-50). */
 async function closeOwnSupport() {
@@ -21,7 +24,7 @@ async function closeOwnSupport() {
   if (s) await platformApi.closeSupport(s.tenant_id, s.access_id, newCorrelationId()).catch(() => undefined);
 }
 
-type Status = "loading" | "anonymous" | "authenticated";
+type Status = "loading" | "unavailable" | "anonymous" | "authenticated";
 
 interface AuthContextValue {
   status: Status;
@@ -234,9 +237,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (user) void loadMe();
         else signedOut();
       });
+    }).catch(() => {
+      // E-29: a block of a previous release that no longer exists, as for the pages (lazyPage): one reload, then say so.
+      if (!reloadOnce()) setStatus("unavailable");
     });
     return () => unsub();
   }, [loadMe, signedOut]);
+
+  // E-29: without this a start that never answers is a loading state for ever, with no request and no message.
+  useEffect(() => {
+    if (status !== "loading") return;
+    const timer = setTimeout(() => setStatus("unavailable"), STARTUP_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [status]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

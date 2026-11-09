@@ -2,6 +2,7 @@ import { Suspense, type ComponentType } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useAuth, useRole } from "@/auth/AuthProvider";
 import { AppShell } from "@/components/layout/AppShell";
+import { PageProblem } from "@/components/layout/PageProblem";
 import { Skeleton } from "@/components/ui/primitives";
 import { PageSkeleton } from "@/components/ui/Skeletons";
 import { useFeatures } from "@/hooks/useFeatures";
@@ -39,6 +40,7 @@ function Lazy({ page: Page }: { page: ComponentType }) {
 function Protected() {
   const { status } = useAuth();
   if (status === "loading") return <div className="p-8"><Skeleton className="h-40" /></div>;
+  if (status === "unavailable") return <PageProblem />;
   if (status === "anonymous") return <Navigate to="/login" replace />;
   return <AppShell />;
 }
