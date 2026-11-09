@@ -2,7 +2,8 @@
 # project as production, with its own Firestore database ("staging") and its own Hosting site; the demonstration
 # apartments live here (mock://, built into the BFF, AI_DEMOS) and the VM's engine "dev" is reached through the same
 # Direct VPC egress as production. Firebase Auth is the project's one: tenant and role per environment in the claims.
-# Always on with one instance (D-136: the demonstrations keep their state in memory).
+# At most one instance (D-136: the demonstrations keep their state in memory) and none when nobody uses it (answer 195):
+# after a pause the demonstrations start again from their seed, and while it is off there are no pushes.
 # Placeholders replaced by scripts/deploy.sh: your-gcp-project-id, europe-west8, image tag, your-vpc-network,
 # your-vpc-subnet, your-staging-site (the Hosting site, <project>-staging by default).
 apiVersion: serving.knative.dev/v1
@@ -17,7 +18,7 @@ spec:
   template:
     metadata:
       annotations:
-        autoscaling.knative.dev/minScale: "1"          # keeps SSE relays warm
+        autoscaling.knative.dev/minScale: "0"          # D-197 (answer 195): nobody pays for a staging nobody uses
         autoscaling.knative.dev/maxScale: "1"          # the mock keeps its state in memory: one instance only
         run.googleapis.com/cpu-throttling: "false"
         # the VM's engine "dev" belongs to staging (D-136 point 2): Direct VPC egress on the default network
@@ -26,8 +27,10 @@ spec:
         run.googleapis.com/startup-cpu-boost: "true"
     spec:
       serviceAccountName: domotica-bff@your-gcp-project-id.iam.gserviceaccount.com
-      containerConcurrency: 250
-      timeoutSeconds: 3600                             # SSE streams
+      containerConcurrency: 250                        # as production (D-197, answer 295)
+      # as production (D-197, E-27): the longest a request may last, a browser's stream included; the server's own end of
+      # the stream, before this limit, comes with lot 35
+      timeoutSeconds: 300
       containers:
         - image: europe-west8-docker.pkg.dev/your-gcp-project-id/domotica/bff:latest
           ports:
