@@ -26,8 +26,10 @@ spec:
         run.googleapis.com/vpc-access-egress: private-ranges-only
     spec:
       serviceAccountName: domotica-bff@your-gcp-project-id.iam.gserviceaccount.com
-      containerConcurrency: 250
-      timeoutSeconds: 3600                             # SSE streams
+      containerConcurrency: 250                        # D-197 (answer 295): E-27 never came near it (14 at most)
+      # D-197 (E-27): the longest a request may last, a browser's stream included. With 3600 s a replaced instance stayed
+      # alive until its streams expired; the server's own end of the stream, before this limit, comes with lot 35
+      timeoutSeconds: 300
       containers:
         - image: europe-west8-docker.pkg.dev/your-gcp-project-id/domotica/bff:latest
           ports:

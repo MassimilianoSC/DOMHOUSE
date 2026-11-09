@@ -83,3 +83,12 @@ def test_d187_main_model_and_twin_on_another_model_in_both():
                          capture_output=True, text=True, timeout=60)
     assert json.loads(out.stdout) == ["google/gemini-3.5-flash", "google/gemini-3.5-flash-lite", 3.0, 0, "nativo", "eu",
                                       [1.5, 9.0, 0.15], [0.3, 2.5, 0.03]], out.stderr
+
+
+def test_d197_how_production_runs():
+    """D-197 (E-27, answer 295): what used to be set by hand on the service is written here, or the next publication
+    would put back 3600 s."""
+    assert annotation(PROD, "autoscaling.knative.dev/minScale") == "1"
+    assert annotation(PROD, "autoscaling.knative.dev/maxScale") == "1"
+    assert annotation(PROD, "containerConcurrency") == "250"
+    assert annotation(PROD, "timeoutSeconds") == "300"
