@@ -1,0 +1,54 @@
+# Il broker MQTT dei dispositivi sulla VM (D-196, D-199): un solo container per tutta la VM, gestito da
+# scripts/broker-vm.sh (procedura in docs/motore-vm.md), che scrive /opt/domhouse/_broker/broker.settings e lancia:
+#   docker compose --env-file /opt/domhouse/_broker/broker.settings -f /opt/domhouse/_broker/compose.yaml up -d
+#
+# La 8883 (TLS) è l'unica porta pubblicata. La 1883 ascolta solo su 172.30.83.2, nella rete interna: la raggiungono i
+# motori che ne fanno parte (engine/compose.broker.yaml), non chi arriva da fuori.
+# Il container gira come utente mosquitto (1883), a file system di sola lettura e senza privilegi; scrive solo in
+# /mosquitto/data. Cartelle, non singoli file: chi rinnova un file lo sostituisce, e il container deve vedere quello nuovo.
+name: domhouse-broker
+
+services:
+  broker:
+    image: ${BROKER_IMAGE:?BROKER_IMAGE}
+    container_name: domhouse-broker
+    restart: unless-stopped
+    user: "1883:1883"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    ulimits:
+      nofile: 65536
+    stop_grace_period: 30s
+    ports:
+      - "${BROKER_TLS_PORT:-8883}:8883"
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ${BROKER_TLS_DIR:?BROKER_TLS_DIR}:/mosquitto/tls:ro
+      - ${BROKER_AUTH_DIR:?BROKER_AUTH_DIR}:/mosquitto/auth:ro
+      - ${BROKER_DATA_DIR:?BROKER_DATA_DIR}:/mosquitto/data
+    networks:
+      default: {}
+      internal:
+        ipv4_address: 172.30.83.2
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      # senza credenziali il broker deve rispondere «non autorizzato»: prova che il suo ciclo gira davvero
+      test: ["CMD-SHELL", "mosquitto_sub -h 172.30.83.2 -p 1883 -t salute -C 1 -W 3 2>&1 | grep -q -i 'not authori'"]
+      interval: 60s
+      timeout: 8s
+      retries: 3
+      start_period: 5s
+
+networks:
+  internal:
+    name: domhouse-broker-internal
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.30.83.0/24

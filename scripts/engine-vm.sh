@@ -21,7 +21,7 @@
 # every installed engine for its /health and looks at the age of its newest backup, and writes to the VM's syslog (that
 # the Ops Agent already sends to Cloud Logging) one line per apartment, "engine ok <id>", "engine down <id>" (answers 503)
 # or "engine silent <id>" (does not answer), "backup missing <id> age_h=<n>" (newest backup older than BACKUP_ALERT_H),
-# then "domhouse-check: <n> motori, <m> muti". The alerts read those lines (scripts/monitoring/engine-alerts.sh): the
+# then "domhouse-check: <n> motori, <m> muti" and, if the broker is installed, its line (scripts/broker-vm.sh check). The alerts read those lines (scripts/monitoring/engine-alerts.sh): the
 # watch writes only while the VM is alive, so a silent VM gives one email, never one per apartment. The daily backup
 # writes "backup ok <id>". logs-agent adds to the Ops Agent a receiver for the engines' container logs (docker json-file,
 # parsed: level, msg, apartment_id) as the log "domhouse_engine", keeping the previous configuration as a copy; the
@@ -149,8 +149,14 @@ change_setting() {
 }
 
 compose() {
+  # a real connector also joins the broker's internal network (compose.broker.yaml, installed with the broker);
+  # the simulated engines never depend on the broker
   local apt="$1"; shift
-  docker compose --env-file "$(settings_file "${apt}")" -f "${OPT}/compose.yaml" "$@"
+  local files=(-f "${OPT}/compose.yaml")
+  if [ "$(sed -n 's/^CONNECTOR=//p' "$(settings_file "${apt}")")" != "simulated" ] && [ -f "${OPT}/compose.broker.yaml" ]; then
+    files+=(-f "${OPT}/compose.broker.yaml")
+  fi
+  docker compose --env-file "$(settings_file "${apt}")" "${files[@]}" "$@"
 }
 
 wait_healthy() {
@@ -275,6 +281,10 @@ check_all() {
     fi
   done
   watch_line "domhouse-check: ${total} motori, ${silent} muti"
+  # after the summary: a stuck broker check must never look like a silent VM
+  if [ -f "${OPT}/_broker/broker.settings" ]; then
+    bash "${OPT}/broker-vm.sh" check || watch_line "broker down (controllo non riuscito)"
+  fi
 }
 
 logs_agent() {

@@ -205,3 +205,33 @@ def test_the_daily_backup_writes_its_line(vm):
     sqlite3.connect(db).close()
     script = SCRIPT.read_text(encoding="utf-8")
     assert 'logger -t domhouse-backup "backup ok ${apt} ${file}"' in script
+
+
+def _connector(vm, name):
+    path = vm.opt / f"{APT}.settings"
+    path.write_text(path.read_text(encoding="utf-8").replace("CONNECTOR=simulated", f"CONNECTOR={name}"), encoding="utf-8", newline="\n")
+    (vm.opt / "compose.broker.yaml").write_text("services: {}\n", encoding="utf-8", newline="\n")
+
+
+def test_a_simulated_engine_stays_out_of_the_brokers_network(vm):
+    (vm.opt / "compose.broker.yaml").write_text("services: {}\n", encoding="utf-8", newline="\n")
+    assert vm("set", APT, "CONFIRM_ON_WATTS=30").returncode == 0
+    assert "compose.broker.yaml" not in (vm.stubs / "docker.log").read_text(encoding="utf-8")
+
+
+def test_an_engine_with_a_real_connector_joins_the_brokers_network(vm):
+    _connector(vm, "shelly")
+    assert vm("set", APT, "CONFIRM_ON_WATTS=30").returncode == 0
+    assert "compose.broker.yaml" in (vm.stubs / "docker.log").read_text(encoding="utf-8")
+
+
+def test_the_watch_calls_the_brokers_check_only_when_it_is_installed_and_after_the_summary(vm):
+    assert "broker" not in vm("check-all").stdout
+    (vm.opt / "_broker").mkdir()
+    (vm.opt / "_broker" / "broker.settings").write_text("BROKER_IMAGE=x\n", encoding="utf-8", newline="\n")
+    (vm.opt / "broker-vm.sh").write_text('echo "broker ok cert_days=50"\n', encoding="utf-8", newline="\n")
+    out = vm("check-all").stdout
+    assert out.index("domhouse-check: 1 motori") < out.index("broker ok cert_days=50")
+    (vm.opt / "broker-vm.sh").write_text("exit 3\n", encoding="utf-8", newline="\n")
+    done = vm("check-all")
+    assert done.returncode == 0 and "broker down (controllo non riuscito)" in done.stdout

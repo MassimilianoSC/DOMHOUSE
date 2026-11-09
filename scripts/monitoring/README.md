@@ -106,7 +106,7 @@ Logging, nel log `domhouse_engine` (campi `level`, `msg`, `apartment_id`); ogni 
 minuti.
 
 `scripts/monitoring/engine-alerts.sh` (una volta, idempotente; `DRY_RUN=1` per vedere senza creare) crea la metrica
-`domhouse_check_runs` e cinque politiche sul canale «Avvisi BFF»:
+`domhouse_check_runs` e sette politiche sul canale «Avvisi BFF»:
 
 | Politica | Quando | Email |
 |---|---|---|
@@ -115,6 +115,8 @@ minuti.
 | Motori: righe di errore | riga di livello `error` di un motore | al massimo una ogni 30 minuti |
 | Motori: backup mancato | riga `backup missing` | al massimo una ogni 12 ore |
 | Motori: disco della VM oltre l'80 % | metrica dell'Ops Agent sopra 80 per 10 minuti | finché non scende |
+| Motori: broker MQTT giù | riga `broker down` (broker fermo o porta TLS muta) | al massimo una ogni 30 minuti |
+| Motori: certificato del broker in scadenza | riga `broker cert expiring` (meno di 14 giorni) | al massimo una ogni 12 ore |
 
 Primo passo per ognuna: SSH alla VM via IAP (`docs/motore-vm.md`), poi `sudo bash /opt/domhouse/engine-vm.sh status
 <apartment_id>`; per i log di un motore `docker logs --tail 50 engine-<apartment_id>`, oppure Cloud Logging con il filtro

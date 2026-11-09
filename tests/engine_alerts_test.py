@@ -1,4 +1,4 @@
-"""scripts/monitoring/engine-alerts.sh and its policies (P-60 step 10c, D-104, D-148): the five policy files are valid,
+"""scripts/monitoring/engine-alerts.sh and its policies (P-60 step 10c, D-104, D-148): the seven policy files are valid,
 their filters and label extractors match the real lines of engine-vm.sh check-all (with or without the PID rsyslog may
 add to the tag), and the script creates only what is missing (DRY_RUN creates nothing), with gcloud replaced by a
 stand-in that records what it is asked."""
@@ -25,9 +25,10 @@ def regex_of(flt: str) -> str:
     return re.search(r'=~"((?:[^"\\]|\\.)*)"', flt).group(1).replace("\\\\", "\\")
 
 
-def test_five_policies_on_the_bff_channel():
+def test_seven_policies_on_the_bff_channel():
     found = policies()
-    assert set(found) == {"vm-muta.json", "motore-muto.json", "motore-errori.json", "backup-mancato.json", "disco-vm.json"}
+    assert set(found) == {"vm-muta.json", "motore-muto.json", "motore-errori.json", "backup-mancato.json", "disco-vm.json",
+                          "broker-giu.json", "broker-certificato.json"}
     for name, p in found.items():
         assert p["displayName"].startswith("Motori: ") and p["notificationChannels"] == ["__CHANNEL__"], name
         assert p["severity"] in ("CRITICAL", "ERROR", "WARNING") and p["documentation"]["content"], name
@@ -56,6 +57,12 @@ def test_the_filters_match_the_watchs_real_lines(tag):
     assert re.search(re.search(r'"(.*)"', backup["labelExtractors"]["apartment"]).group(1), line).group(1) == "dev"
     summary = re.search(r"METRIC_FILTER='(.*)'", SCRIPT.read_text(encoding="utf-8")).group(1)
     assert re.search(regex_of(summary), f"{HOST}{tag}domhouse-check: 3 motori, 0 muti")
+    down = found["broker-giu.json"]["conditions"][0]["conditionMatchedLog"]["filter"]
+    expiring = found["broker-certificato.json"]["conditions"][0]["conditionMatchedLog"]["filter"]
+    assert re.search(regex_of(down), f"{HOST}{tag}broker down (container: assente, porta TLS: muta)")
+    assert re.search(regex_of(expiring), f"{HOST}{tag}broker cert expiring days=9")
+    assert not re.search(regex_of(down), f"{HOST}{tag}broker ok cert_days=60")
+    assert not re.search(regex_of(expiring), f"{HOST}{tag}broker ok cert_days=60")
     errors = found["motore-errori.json"]["conditions"][0]["conditionMatchedLog"]
     assert 'log_id("domhouse_engine")' in errors["filter"] and 'jsonPayload.level="error"' in errors["filter"]
 
@@ -112,12 +119,12 @@ def alerts(tmp_path):
 def test_dry_run_creates_nothing_and_the_real_run_creates_what_is_missing(alerts):
     out, calls, created = alerts(dry=True)
     assert out.returncode == 0, out.stderr
-    assert "create" not in calls and created == "" and out.stdout.count("(prova a secco) la creerei da") == 5
+    assert "create" not in calls and created == "" and out.stdout.count("(prova a secco) la creerei da") == 7
     out, calls, created = alerts()
     assert out.returncode == 0, out.stderr
-    assert "logging metrics create domhouse_check_runs" in calls and calls.count("policies create") == 5
-    assert "__CHANNEL__" not in created and created.count("notificationChannels/9514864875489091801") == 5
+    assert "logging metrics create domhouse_check_runs" in calls and calls.count("policies create") == 7
+    assert "__CHANNEL__" not in created and created.count("notificationChannels/9514864875489091801") == 7
     (alerts.stubs / "metric-exists").write_text("", encoding="utf-8")
     (alerts.stubs / "policies-exist").write_text("", encoding="utf-8")
     out, calls, created = alerts()                                      # again: everything exists, nothing changes
-    assert out.returncode == 0 and "create" not in calls and out.stdout.count("esiste già") == 6
+    assert out.returncode == 0 and "create" not in calls and out.stdout.count("esiste già") == 8

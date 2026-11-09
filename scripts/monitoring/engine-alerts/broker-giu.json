@@ -1,0 +1,26 @@
+{
+  "displayName": "Motori: broker MQTT giù",
+  "documentation": {
+    "content": "Il controllo della VM ha trovato il broker dei dispositivi fermo o che non risponde sulla porta TLS: i relè non si collegano. Primo passo: SSH alla VM via IAP (docs/motore-vm.md), poi sudo bash /opt/domhouse/broker-vm.sh status e docker logs --tail 50 domhouse-broker.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «broker down» del controllo",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\\\[[0-9]+\\\\])?: broker down\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "1800s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "CRITICAL"
+}

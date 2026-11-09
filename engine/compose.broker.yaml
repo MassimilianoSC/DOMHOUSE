@@ -1,0 +1,13 @@
+# Aggiunta a compose.yaml per i motori con un connector vero (CONNECTOR diverso da simulated): li mette anche nella
+# rete interna del broker, dove raggiungono 172.30.83.2:1883. La usa scripts/engine-vm.sh; il motore «dev» resta
+# simulato (D-118) e non la vede. La rete la crea il broker (engine/broker/compose.yaml): va installato prima.
+services:
+  engine:
+    networks:
+      default: {}
+      broker: {}
+
+networks:
+  broker:
+    external: true
+    name: domhouse-broker-internal

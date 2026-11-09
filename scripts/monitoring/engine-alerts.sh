@@ -6,10 +6,10 @@
 # Optional: CHANNEL_NAME (default "Avvisi BFF": the email channel of the BFF's alerts, D-148; it must exist, created
 #           by scripts/monitoring/setup.sh).
 # What it sets up (what exists already is kept, never changed): the log-based metric domhouse_check_runs (the summary
-# line "domhouse-check: N motori, M muti" of engine-vm.sh check-all, every 5 minutes) and five alert policies, from the
+# line "domhouse-check: N motori, M muti" of engine-vm.sh check-all, every 5 minutes) and seven alert policies, from the
 # files in scripts/monitoring/engine-alerts/: «Motori: VM muta» (no summary for 10 minutes: one email for the whole VM),
 # «Motori: motore muto o giù» and «Motori: righe di errore» (at most one email every 30 minutes), «Motori: backup
-# mancato» (every 12 hours), «Motori: disco della VM oltre l'80 %». They read the lines of engine-vm.sh check-all and
+# mancato» (every 12 hours), «Motori: disco della VM oltre l'80 %», «Motori: broker MQTT giù» and «Motori: certificato del broker in scadenza». They read the lines of engine-vm.sh check-all and
 # backup in the VM's syslog and the engines' logs from the Ops Agent (engine-vm.sh logs-agent): before those run on the
 # VM the policies wait, nothing breaks. Messages in plain Italian: run by the project owner.
 set -euo pipefail

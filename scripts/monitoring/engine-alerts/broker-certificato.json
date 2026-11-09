@@ -1,0 +1,26 @@
+{
+  "displayName": "Motori: certificato del broker in scadenza",
+  "documentation": {
+    "content": "Il certificato servito dal broker scade fra meno di 14 giorni: il rinnovo automatico non sta funzionando. Alla scadenza i relè rifiutano il collegamento. Primo passo: SSH alla VM via IAP (docs/motore-vm.md), poi sudo bash /opt/domhouse/broker-vm.sh status.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «broker cert expiring» del controllo",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\\\[[0-9]+\\\\])?: broker cert expiring\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "43200s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "CRITICAL"
+}
