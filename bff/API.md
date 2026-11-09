@@ -458,6 +458,12 @@ volte per questo motivo. Una notifica doppia ha lo stesso `tag`: il telefono la 
 prenota la notifica prima di salvarsi, con una durata di 75 minuti: se l'istanza cade in quel momento, la notifica arriva entro
 quel tempo, quando il giro successivo ha già rifatto il riepilogo.
 
+Ogni istanza allinea ogni minuto i collegamenti ai motori con l'anagrafica: chiude quelli degli appartamenti rimossi o disattivati,
+rifà quelli cambiati e, con FCM acceso, apre quelli mancanti. L'ultimo id di ogni appartamento si salva al massimo ogni 30 s
+(`stream_cursors`, scadenza 7 giorni): un'istanza nuova chiede al motore ciò che ha perso, e le prenotazioni fermano ciò che era già
+stato notificato. Se l'id salvato è più vecchio di un'ora, la finestra garantita dal contratto, gli eventi mancanti possono essere
+persi: nel log compare «stream resumes past the engine's window».
+
 ## Pseudonimo verso il motore e cancellazione (P-48, D-87)
 
 Il motore non riceve mai l'email di una persona: `X-Actor` è uno pseudonimo casuale con la sintassi di un'email,

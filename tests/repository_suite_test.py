@@ -597,3 +597,11 @@ def test_two_instances_taking_over_at_the_same_instant_on_firestore(repo):
         return await asyncio.gather(repo.claim_work("orfana", "a", 60), other.claim_work("orfana", "b", 60))
     assert run(race()).count("mine") <= 1
 
+
+def test_stream_cursors(repo):
+    """D-201: on memory and on Firestore, the same three fields and nothing else."""
+    assert run(repo.get_stream_cursor("apt-cursore")) is None
+    run(repo.put_stream_cursor("apt-cursore", "41", "http://motore.test", 1000.5))
+    run(repo.put_stream_cursor("apt-cursore", "42", "http://motore.test", 1030.5))
+    assert run(repo.get_stream_cursor("apt-cursore")) == {"last_id": "42", "instance_url": "http://motore.test", "saved_at": 1030.5}
+

@@ -22,6 +22,7 @@ class InMemoryRepository:
         self.ai_stats: dict[str, dict] = {}            # decision 120: "<apartment>__<week>" -> the assistant's counters
         self.work: dict[str, dict] = {}                # D-201: key -> {status, lease_until, attempts, payload}
         self.summaries: dict[str, dict] = {}           # P-60 step 11: "<apartment>__<week>" -> summary
+        self.stream_cursors: dict[str, dict] = {}      # D-201: apartment -> where a new connection resumes
         self.support_access: dict[str, SupportAccess] = {}
         self.actor_refs: dict[str, str] = {}             # uid -> pseudonym
         self.actors: dict[str, ActorRecord] = {}         # pseudonym -> who
@@ -196,6 +197,12 @@ class InMemoryRepository:
     async def due_work(self, now, limit=50):
         due = [(k, d) for k, d in self.work.items() if d["status"] == "pending" and d["payload"] and d["lease_until"] <= now]
         return [{"key": k, "payload": d["payload"], "attempts": d["attempts"]} for k, d in due[:limit]]
+
+    async def get_stream_cursor(self, apartment_id):
+        return self.stream_cursors.get(apartment_id)
+
+    async def put_stream_cursor(self, apartment_id, last_id, instance_url, saved_at):
+        self.stream_cursors[apartment_id] = {"last_id": last_id, "instance_url": instance_url, "saved_at": saved_at}
 
     async def mark_ai_alert(self, month):
         u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))

@@ -79,6 +79,9 @@ def work_claim(_doc: dict | None = None) -> datetime:
     return now() + timedelta(days=WORK_CLAIM_DAYS)
 
 
+stream_cursor = work_claim     # D-201: as long as the claims, which keep what is replayed from being notified twice
+
+
 def pseudonym(_doc: dict | None = None) -> datetime:
     return add_months(now(), ACTOR_MONTHS)
 
@@ -97,4 +100,5 @@ COLLECTIONS = {
     "summaries": summary,
     "ai_stats": ai_stats,
     "work_claims": work_claim,
+    "stream_cursors": stream_cursor,
 }

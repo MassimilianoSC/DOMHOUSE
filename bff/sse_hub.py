@@ -12,9 +12,11 @@ import httpx
 from . import instances
 from .config import get_settings
 from .logs import info, warn
-from .repository import Apartment
+from .repository import Apartment, get_repository
 
 BUFFER_SECONDS = 3600
+CURSOR_SAVE_S = 30           # D-201: the last id of each apartment reaches the database at most this often
+CURSOR_REFRESH_S = 1800      # an unchanged id is saved again this often: a quiet apartment must not look unfollowed
 QUEUE_FULL = object()        # D-198: in a browser's queue, this browser stopped reading: end its stream (None: the apartment went)
 
 
@@ -81,6 +83,8 @@ class InstanceHub:
         self.connected = False
         self.task: asyncio.Task | None = None
         self.link: tuple | None = None               # the link the running task is connected to (push.align_hubs_once)
+        self.cursor_id: str | None = None            # the last id written to stream_cursors, and when
+        self.cursor_at = 0.0
 
     def start(self, last_event_id: str | None) -> None:
         if self.task is None or self.task.done():
@@ -125,9 +129,29 @@ class InstanceHub:
             except Exception as exc:
                 warn("stream hook failed", error=str(exc), apartment_id=self.apt.apartment_id)
 
+    async def _resume_from_cursor(self, apt: Apartment) -> None:
+        """D-201: a new instance, or one that restarted, asks the engine for what it missed. What was already notified is
+        stopped by the claims. Only with FCM on, as the connections that do not depend on a browser. Older than the window
+        the contract guarantees, what is gone is gone: it is written to the log."""
+        if self.last_id is not None or not get_settings().fcm_enabled:
+            return
+        try:
+            saved = await get_repository().get_stream_cursor(apt.apartment_id)
+        except Exception as exc:                     # from now on, as if it had never been saved
+            warn("stream cursor not read", apartment_id=apt.apartment_id, error=type(exc).__name__)
+            return
+        if not saved or saved["instance_url"] != apt.instance_url:
+            return
+        self.last_id = saved["last_id"]
+        age = int(time.time() - saved["saved_at"])
+        info("upstream stream resumes", apartment_id=apt.apartment_id, last_id=self.last_id, age_s=age)
+        if age > BUFFER_SECONDS:
+            warn("stream resumes past the engine's window, events may be lost", apartment_id=apt.apartment_id, age_s=age)
+
     async def _run(self) -> None:
         apt = self.apt                               # D-201: one link for the whole life of a hub; a new link is a new hub
         self.link = link_of(apt)
+        await self._resume_from_cursor(apt)
         backoff = 1.0
         while True:
             try:
@@ -177,6 +201,20 @@ class HubManager:
             h.task.cancel()
         for q in list(h.subscribers):
             _end_stream(q, None)
+
+    async def save_cursors(self, now: float | None = None) -> int:
+        """Only the connections that are up: a fresh date on a connection that is down would hide what is being missed."""
+        now = time.time() if now is None else now
+        saved = 0
+        for hub in list(self.hubs.values()):
+            if not hub.connected or hub.last_id is None or hub.link is None:
+                continue
+            if hub.last_id == hub.cursor_id and now - hub.cursor_at < CURSOR_REFRESH_S:
+                continue
+            await get_repository().put_stream_cursor(hub.apt.apartment_id, hub.last_id, hub.link[0], now)
+            hub.cursor_id, hub.cursor_at = hub.last_id, now
+            saved += 1
+        return saved
 
     async def stop_all(self) -> None:
         for h in self.hubs.values():

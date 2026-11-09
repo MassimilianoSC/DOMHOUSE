@@ -3,6 +3,7 @@ instance only. D-198: an apartment created while the server runs sends notificat
 Memory repository; the connection to the engines is a fake, the hubs and their tasks are the real ones."""
 import asyncio
 import dataclasses
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -12,6 +13,7 @@ from bff.auth import CurrentUser
 from bff.config import get_settings
 from bff.repository import Apartment, get_repository
 from bff.routes import apartments as routes
+from bff import sse_hub
 from bff.sse_hub import InstanceHub, hub_manager
 
 APT, URL_A, URL_B = "apt-hub", "http://motore-a.test", "http://motore-b.test"
@@ -43,7 +45,10 @@ class Upstream:
 @pytest.fixture
 def world(monkeypatch):
     state = SimpleNamespace(apartments=[], connections=[], lines=[], fcm=True)
-    monkeypatch.setattr(push, "get_settings", lambda: dataclasses.replace(get_settings(), fcm_enabled=state.fcm))
+    settings = lambda: dataclasses.replace(get_settings(), fcm_enabled=state.fcm)
+    monkeypatch.setattr(push, "get_settings", settings)
+    monkeypatch.setattr(sse_hub, "get_settings", settings)
+    get_repository().stream_cursors.clear()
 
     async def headers(apt, actor, correlation_id=None):
         return {}
@@ -207,7 +212,7 @@ def test_at_start_the_connections_open_without_waiting_for_the_round(world):
     async def scenario():
         await push.start_background_hubs()
         await settle()
-        assert len(world.connections) == 1 and len(push._loops) == 2
+        assert len(world.connections) == 1 and len(push._loops) == 3
     play(scenario)
     assert push._loops == []
 
@@ -221,3 +226,136 @@ def test_without_fcm_only_the_alignment_runs(world):
         await settle()
         assert world.connections == [] and len(push._loops) == 1
     play(scenario)
+
+
+# -------- D-201: where a new connection resumes --------
+EVENT = ["id: 41", "event: device.state", "data: {}", ""]
+
+
+def test_a_new_connection_resumes_from_the_saved_id(world):
+    run_put(URL_A, age=5)
+
+    async def scenario():
+        world.apartments.append(apartment())
+        await align()
+    play(scenario)
+    assert world.connections == [(URL_A + "/api/v1/stream", "40")]
+
+
+def run_put(url, age, last_id="40"):
+    asyncio.run(get_repository().put_stream_cursor(APT, last_id, url, time.time() - age))
+
+
+def test_the_id_of_another_engine_is_ignored(world):
+    run_put(URL_B, age=5)
+
+    async def scenario():
+        world.apartments.append(apartment())
+        await align()
+    play(scenario)
+    assert world.connections[0][1] is None
+
+
+def warnings(monkeypatch):
+    seen = []
+    monkeypatch.setattr(sse_hub, "warn", lambda msg, **kw: seen.append(msg))
+    return seen
+
+
+@pytest.mark.parametrize("age,expected", [(3000, 0), (4000, 1)])
+def test_resuming_past_the_engines_window_is_written_to_the_log(world, monkeypatch, age, expected):
+    seen = warnings(monkeypatch)
+    run_put(URL_A, age=age)
+
+    async def scenario():
+        world.apartments.append(apartment())
+        await align()
+    play(scenario)
+    assert seen.count("stream resumes past the engine's window, events may be lost") == expected
+    assert world.connections[0][1] == "40"                      # it asks all the same: the engine gives what it has
+
+
+def test_a_cursor_that_cannot_be_read_does_not_stop_the_connection(world, monkeypatch):
+    seen = warnings(monkeypatch)
+
+    async def broken(_apartment_id):
+        raise RuntimeError("Firestore non raggiungibile")
+    monkeypatch.setattr(get_repository(), "get_stream_cursor", broken)
+
+    async def scenario():
+        world.apartments.append(apartment())
+        await align()
+    play(scenario)
+    assert seen == ["stream cursor not read"] and world.connections[0][1] is None
+
+
+def test_without_fcm_no_cursor_is_read(world, monkeypatch):
+    world.fcm = False
+    run_put(URL_A, age=5)
+
+    async def scenario():
+        hub_manager.hub(apartment()).start(None)                # a browser has opened it
+        await settle()
+    play(scenario)
+    assert world.connections[0][1] is None
+
+
+def test_the_id_is_saved_when_it_changes_and_again_after_a_long_while(world):
+    world.lines = EVENT
+    repo = get_repository()
+
+    async def scenario():
+        world.apartments.append(apartment())
+        await align()
+        t0 = 1_000_000.0
+        assert await hub_manager.save_cursors(t0) == 1
+        saved = await repo.get_stream_cursor(APT)
+        assert (saved["last_id"], saved["instance_url"], saved["saved_at"]) == ("41", URL_A, t0)
+        assert await hub_manager.save_cursors(t0 + 30) == 0     # nothing new
+        hub_manager.hubs[APT].last_id = "42"
+        assert await hub_manager.save_cursors(t0 + 60) == 1
+        assert await hub_manager.save_cursors(t0 + 60 + sse_hub.CURSOR_REFRESH_S) == 1
+        assert (await repo.get_stream_cursor(APT))["last_id"] == "42"
+    play(scenario)
+
+
+def test_a_connection_that_is_down_saves_nothing(world):
+    """A fresh date on a connection that is down would hide what is being missed."""
+    world.lines = EVENT
+
+    async def scenario():
+        world.apartments.append(apartment())
+        await align()
+        hub_manager.hubs[APT].connected = False
+        assert await hub_manager.save_cursors(1_000_000.0) == 0
+    play(scenario)
+    assert asyncio.run(get_repository().get_stream_cursor(APT)) is None
+
+
+def test_an_instance_that_starts_later_does_not_notify_again_what_was_already_sent(world, monkeypatch):
+    """The whole path: the event comes again from the engine, the claim stops it."""
+    sent = []
+
+    async def fake_send(tenant_id, pref, data, headers):
+        sent.append(data["tag"])
+        return 1
+    monkeypatch.setattr(push, "send_to_tenant", fake_send)
+    envelope = '{"id": "41", "event": "approval.pending", "ts": "2026-10-16T10:00:00.000Z", "data": {"approval_id": "apv-41"}}'
+    world.lines = ["id: 41", "event: approval.pending", f"data: {envelope}", ""]
+    get_repository().work.clear()
+    push.register()
+
+    async def scenario():
+        world.apartments.append(apartment())
+        await align()
+        await asyncio.gather(*list(push._tasks))
+        hub_manager.drop(APT)                                   # the other instance, started later, gets it again
+        await settle()
+        await align()
+        await asyncio.gather(*list(push._tasks))
+    try:
+        play(scenario)
+    finally:
+        hub_manager.hooks.remove(push.on_stream_event)
+    assert sent == ["approval:apv-41"] and len(world.connections) == 2
+

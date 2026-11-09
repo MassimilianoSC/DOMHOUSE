@@ -12,7 +12,7 @@ from .auth import sees, tenant_status
 from .config import get_settings
 from .logs import info, warn
 from .repository import Apartment, get_repository
-from .sse_hub import SseEvent, envelope, hub_manager, link_of
+from .sse_hub import CURSOR_SAVE_S, SseEvent, envelope, hub_manager, link_of
 
 BODY_MAX = 200
 TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400, "booking": 86400,
@@ -318,6 +318,7 @@ async def start_background_hubs() -> None:
     if get_settings().fcm_enabled:
         await align_hubs_once()
         _start_round(get_settings().notification_lease_s, recover_once, "push recovery")
+        _start_round(CURSOR_SAVE_S, hub_manager.save_cursors, "stream cursors")
     _start_round(HUB_ALIGN_S, align_hubs_once, "hub alignment")
 
 

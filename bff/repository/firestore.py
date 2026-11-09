@@ -331,6 +331,17 @@ class FirestoreRepository:
         return [{"key": d["key"], "payload": d["payload"], "attempts": d["attempts"]}
                 for d in [s.to_dict() async for s in q.stream()]]
 
+    async def get_stream_cursor(self, apartment_id):
+        snap = await self._col("stream_cursors").document(apartment_id).get()
+        if not snap.exists:
+            return None
+        d = snap.to_dict()
+        return {k: d[k] for k in ("last_id", "instance_url", "saved_at")}
+
+    async def put_stream_cursor(self, apartment_id, last_id, instance_url, saved_at):
+        await self._col("stream_cursors").document(apartment_id).set(
+            {"last_id": last_id, "instance_url": instance_url, "saved_at": saved_at, retention.FIELD: retention.stream_cursor()})
+
     async def mark_ai_alert(self, month):
         ref = self._col("ai_usage").document(month)
 
