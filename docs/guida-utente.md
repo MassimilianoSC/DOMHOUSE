@@ -2402,6 +2402,7 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | «Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto.» | L'email di conferma non è partita | Riprova tra qualche minuto |
 | «Impossibile caricare il profilo, riprova tra poco» | Il server non risponde | Riprova dopo qualche minuto |
 | «Controllo dell'accesso non disponibile: riprova tra poco» | Il controllo dell'accesso non ha risposto in tempo; la sessione resta valida | Riprova dopo qualche minuto |
+| «Non riesco ad aprire la pagina» con «Controlla la connessione e premi Ricarica. Se il problema resta, contatta HQE.» | L'app non si è aperta entro 15 secondi, o una pagina ha dato un errore (dal lotto 37) | Premi «Ricarica»; se la risposta arriva poco dopo, l'app si apre da sola |
 | «La tua organizzazione non è attiva: contatta HQE.» | L'organizzazione non è ancora pronta | Contatta HQE |
 | «La tua organizzazione è sospesa: l'app non è disponibile. Per informazioni contatta l'assistenza HQE.» | HQE ha sospeso la tua organizzazione | Contatta l'assistenza HQE |
 | «Indirizzo email non valido» | L'email scritta non è un indirizzo | Correggi l'indirizzo |
