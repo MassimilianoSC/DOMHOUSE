@@ -90,42 +90,50 @@ def summary_push(apt, summary: dict):
                       f"summary:{apt.apartment_id}:{summary['week']}", summary["generated_at"])
 
 
-async def round_once(now: datetime | None = None) -> int:
-    """One round over every enabled apartment; returns the number of summaries made."""
+async def _one(apt, now: datetime | None) -> bool:
+    """True when this round has made the apartment's summary."""
     from .push import claim_notification, deliver
     repo = get_repository()
+    monday, due = ws.last_week(now or datetime.now(UTC), ZoneInfo(apt.timezone))
+    week = ws.week_id(monday)
+    if not due or await repo.get_summary(apt.apartment_id, week):
+        return False
+    claim = f"summary:{apt.apartment_id}:{week}"
+    if await repo.claim_work(claim, runtime.BOOT_ID, SUMMARY_LEASE_S) != "mine":
+        return False                               # another instance is making it, or has just made it
+    try:
+        summary = await make(apt, now)
+    except Exception as exc:                       # the engine does not answer now: the next round tries again
+        warn("weekly summary not made", apartment_id=apt.apartment_id, error=type(exc).__name__)
+        await repo.release_work(claim)
+        return False
+    if summary is None:
+        await repo.release_work(claim)
+        return False
+    push_key, message = f"push:{claim}", None
+    if summary["notable"]:                         # D-150 point 4: the push only with something to say
+        # claimed before saving: a process that dies from here on loses no notification. The lease outlasts the next
+        # round, so that if the summary was not saved the recovery finds it made again
+        message = await claim_notification(push_key, apt.tenant_id, "summary", *summary_push(apt, summary),
+                                           lease_s=ROUND_S + SUMMARY_LEASE_S)
+    await repo.put_summary(summary)
+    info("weekly summary made", apartment_id=apt.apartment_id, week=summary["week"], items=len(summary["items"]))
+    if message:
+        await deliver(push_key, message)
+    await repo.finish_work(claim)
+    return True
+
+
+async def round_once(now: datetime | None = None) -> int:
+    """One round over every enabled apartment; returns the number of summaries made."""
     made = 0
-    for apt in await repo.list_apartments():
+    for apt in await get_repository().list_apartments():
         if not apt.enabled:
             continue
-        monday, due = ws.last_week(now or datetime.now(UTC), ZoneInfo(apt.timezone))
-        week = ws.week_id(monday)
-        if not due or await repo.get_summary(apt.apartment_id, week):
-            continue
-        claim = f"summary:{apt.apartment_id}:{week}"
-        if await repo.claim_work(claim, runtime.BOOT_ID, SUMMARY_LEASE_S) != "mine":
-            continue                               # another instance is making it, or has just made it
         try:
-            summary = await make(apt, now)
-        except Exception as exc:                   # the engine does not answer now: the next round tries again
-            warn("weekly summary not made", apartment_id=apt.apartment_id, error=type(exc).__name__)
-            await repo.release_work(claim)
-            continue
-        if summary is None:
-            await repo.release_work(claim)
-            continue
-        push_key, message = f"push:{claim}", None
-        if summary["notable"]:                     # D-150 point 4: the push only with something to say
-            # claimed before saving: a process that dies from here on loses no notification. The lease outlasts the next
-            # round, so that if the summary was not saved the recovery finds it made again
-            message = await claim_notification(push_key, apt.tenant_id, "summary", *summary_push(apt, summary),
-                                               lease_s=ROUND_S + SUMMARY_LEASE_S)
-        await repo.put_summary(summary)
-        made += 1
-        info("weekly summary made", apartment_id=apt.apartment_id, week=summary["week"], items=len(summary["items"]))
-        if message:
-            await deliver(push_key, message)
-        await repo.finish_work(claim)
+            made += await _one(apt, now)
+        except Exception as exc:                   # the database failed on this one: the next round, and the others go on
+            warn("weekly summary failed", apartment_id=apt.apartment_id, error=type(exc).__name__)
     return made
 
 

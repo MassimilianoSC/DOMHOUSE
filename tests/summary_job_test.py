@@ -140,8 +140,7 @@ def test_a_process_that_dies_around_the_save_loses_no_notification(engine, monke
     monkeypatch.setattr(summary_job, "ROUND_S", 0)
     monkeypatch.setattr(summary_job, "SUMMARY_LEASE_S", 0.1)
 
-    with pytest.raises(Died):
-        run(summary_job.round_once(AFTER))
+    run(summary_job.round_once(AFTER))
     assert engine.sent == []
     state.dead = False
 
@@ -152,6 +151,19 @@ def test_a_process_that_dies_around_the_save_loses_no_notification(engine, monke
     run(summary_job.round_once(AFTER + timedelta(hours=1)))
     assert [d["link"] for _, _, d in engine.sent] == [f"/a/{BOLOGNA}/riepiloghi/{WEEK}"]
     assert run(repo.get_summary(BOLOGNA, WEEK))["week"] == WEEK
+
+
+def test_an_error_on_one_apartment_does_not_stop_the_others(engine, monkeypatch):
+    repo = get_repository()
+    real = repo.put_summary
+
+    async def put(summary):
+        if summary["apartment_id"] == RIMINI:
+            raise RuntimeError("Firestore non raggiungibile")
+        return await real(summary)
+    monkeypatch.setattr(repo, "put_summary", put)
+    assert run(summary_job.round_once(AFTER)) == 2
+    assert run(repo.get_summary(RIMINI, WEEK)) is None and run(repo.get_summary(ALTRA, WEEK)) is not None
 
 
 def test_a_summary_being_made_elsewhere_is_left_alone_until_its_claim_expires(engine):
