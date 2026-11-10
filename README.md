@@ -35,7 +35,7 @@ make dev                              # BFF :8000 (+ mock) e PWA :5173
 
 Login dev: pulsanti sulla pagina di accesso (`m.cracchiolo@hqe.it` admin, `operatore@demo.it`, `lettura@demo.it`).
 Simulatore: `/a/{apartment_id}/simulatore` (solo admin, solo sugli appartamenti dimostrativi, che esistono in sviluppo e in staging ma non in produzione: D-202). `MOCK_TIME_SCALE` = secondi reali per
-minuto simulato (default 1; 60 = tempo reale).
+minuto simulato: 60 (tempo reale) in staging, in produzione e nel motore; 1 se non è impostata, cioè in locale e nelle prove.
 
 Test: `python scripts/run_tests.py` (oppure `make test`) è il giro completo; richiede l'emulatore Firestore (JDK 11+ e
 `npx firebase-tools setup:emulators:firestore`): senza, il giro è rosso (P-42). Su Windows il JDK si installa da
