@@ -20,7 +20,7 @@ bff/            FastAPI: auth, proxy istanze, SSE hub, admin, webhook, push, rep
 bff/bookings/   BookingTranslator (ItalianwayTranslator = STUB, SimulatorTranslator), inoltro idempotente a POST /bookings
 bff/mock_instance/  gli appartamenti dimostrativi del BFF, fatti con il codice del motore
 engine/         il motore: API del contratto (api.py), logica (core.py), configurazione, log, Dockerfile e compose
-engine/connector/   l'interfaccia verso i dispositivi (connector.md), il connector simulato e le prove comuni
+engine/connector/   l'interfaccia verso i dispositivi (connector-v2.md in vigore, connector.md storico), il connector simulato e le prove comuni
 frontend/       PWA (React, Tailwind, shadcn/ui, i18n it)
 scripts/        set_claims.py, deploy.sh
 tests/          pytest: BFF end-to-end, suite condivisa dei repository
@@ -53,7 +53,7 @@ pytest tests/backend_test.py tests/backend_phase2_test.py tests/backend_phase3_t
 ## Motore e connector sul proprio PC
 
 Il motore è un programma Python, uno per appartamento: espone all'app l'API del contratto su `/api/v1` e parla con i
-dispositivi attraverso un connector (interfaccia e regole in `engine/connector/connector.md`). Qui sotto come avviarlo
+dispositivi attraverso un connector (interfaccia e regole in `engine/connector/connector-v2.md`, in vigore dal 10 novembre 2026; `connector.md` del 21 ottobre resta come documento storico). Qui sotto come avviarlo
 sul proprio PC, prima con il connector simulato, poi con il proprio. Serve Python 3.11 o più recente (in esercizio gira
 su `python:3.11-slim`); Docker è facoltativo.
 
@@ -151,7 +151,7 @@ cd <cartella del repository>
 python -m pytest contract/conformance --base-url http://127.0.0.1:8100/api/v1 --api-key "$API_KEY" -q
 ```
 
-**5. Collegare il proprio connector** (dettagli in `engine/connector/connector.md`, §2.7). Un connector è il
+**5. Collegare il proprio connector** (dettagli in `engine/connector/connector-v2.md`, §2.7). Un connector è il
 pacchetto `engine/connector/<nome>/` (per Shelly: `engine/connector/shelly/`). Il motore lo sceglie con
 `CONNECTOR=<nome>` e lo costruisce una volta sola, all'avvio e prima di `start()`, con la funzione `make_connector`
 esposta dal pacchetto nel suo `__init__.py`:
