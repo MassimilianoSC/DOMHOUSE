@@ -58,6 +58,15 @@
 | **Attese massime non provabili a mano** | Il limite di 30 e 90 secondi, la pagina «Non riesco ad aprire la pagina» dopo 15 secondi e il messaggio per un errore di disegno si verificano solo con le prove automatiche: senza rete l'errore arriva subito. Il collaudo a mano (sezione O) prova solo l'assenza di rete | Accettato |
 | **Correzione E-29 non provata del tutto** | Non provata con Firebase vero, su Safari o su un telefono vero | Da verificare |
 
+## Orari e cambio d'ora
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Ora doppia** | A ottobre un'ora che capita due volte si salva sempre la prima volta (ora legale): dal sito non si può scegliere la seconda | Accettato |
+| **Simulatore nelle notti del cambio** | Check-in e check-out a un'ora inesistente o doppia seguono la regola della Programmazione, ma senza la riga di spiegazione: è uno strumento di prova | Accettato |
+| **Simulatore prima del caricamento** | Se l'appartamento non è ancora caricato, i valori proposti si calcolano con l'ora italiana; cambia solo il giorno proposto per un appartamento su un altro fuso, l'invio usa sempre il suo fuso | Accettato |
+| **Cambio d'ora nel rodaggio** | Il prossimo è il 28 marzo 2027, dopo la consegna: è provato solo dalle prove automatiche (D-210) | Accettato |
+
 ## Broker MQTT (dal 9 novembre, non ancora installato)
 
 | Limite | Cosa succede | Stato |

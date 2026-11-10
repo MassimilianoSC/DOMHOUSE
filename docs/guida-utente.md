@@ -939,7 +939,8 @@ Nelle Decisioni compare «Approvazione scaduta».
 
 «Nuova azione» apre «Programma un'azione» («L'azione verrà eseguita dal motore all'orario indicato (ora di …).»).
 
-1. **Compila «Quando»**: un orario futuro, nel fuso dell'appartamento.
+1. **Compila «Quando»**: un orario futuro, sempre nell'ora dell'appartamento, come dice la scritta sopra («ora di …»),
+   anche se il telefono o il computer è su un altro fuso. Il campo propone fra un'ora.
 2. **Scegli «Cosa fare»**: «Cambia modalità» oppure «Comando a un dispositivo».
 3. **Con «Cambia modalità»** scegli «Modalità»: «comfort», «eco», «casa vuota».
 4. **Con «Comando a un dispositivo»** scegli «Dispositivo» e «Comando» (tabella sotto).
@@ -955,6 +956,16 @@ Nelle Decisioni compare «Approvazione scaduta».
 > - **Un orario passato** dà «L'orario deve essere nel futuro».
 > - **Un cambio di modalità programmato** durante una forzatura aspetta la sua fine.
 
+**Nelle due notti del cambio d'ora** (dal lotto 37) sotto «Quando» compare una riga, e si salva lo stesso:
+
+| Ora scelta | Riga sotto «Quando» | Quando verrà eseguita |
+|---|---|---|
+| Un'ora che non esiste (a marzo, dalle 02:00 alle 02:59) | «Il 28 marzo 2027 le 02:30 non esistono: quella notte gli orologi vanno avanti. L'azione verrà eseguita alle 03:30.» | Un'ora dopo: le 02:30 diventano le 03:30 |
+| Un'ora che capita due volte (a ottobre, dalle 02:00 alle 02:59) | «Il 31 ottobre 2027 le 02:30 capitano due volte: quella notte gli orologi tornano indietro. L'azione verrà eseguita la prima volta.» | La prima volta, ancora con l'ora legale |
+
+- **Data e ore della riga** sono quelle che hai scelto.
+- **Negli altri giorni** non compare nessuna riga.
+
 ### Programmazione: spostare o annullare un'azione
 
 **Cambiare l'orario di un'azione in programma, o annullarla.**
@@ -962,7 +973,7 @@ Nelle Decisioni compare «Approvazione scaduta».
 **«Sposta»**, su una voce in programma:
 
 - **Apre «Sposta l'azione»**: cambia «Quando» e premi «Salva» («Orario aggiornato»).
-- **Il modulo parte** da un'ora dopo adesso, non dall'orario salvato: controlla la data.
+- **Il modulo parte** dalla data e dall'ora attuali dell'azione (dal lotto 37).
 - **Si possono spostare** anche le azioni nate da una prenotazione; una modifica della prenotazione può
   ricalcolarle.
 
@@ -1563,6 +1574,8 @@ una prenotazione vera fino al motore dell'appartamento. Ripetere lo stesso invio
 1. **Scegli «Tipo evento»**: «Prenotazione creata», «Prenotazione modificata», «Prenotazione annullata», «Check-in
    effettivo», «Check-out effettivo».
 2. **Compila «ID prenotazione»**, «Check-in», «Check-out», «Ospiti».
+   Check-in e check-out sono nell'ora dell'appartamento, come dice la riga sotto i campi («Check-in e check-out sono
+   nell'ora dell'appartamento (…).»); i valori proposti sono domani alle 15:00 e fra tre giorni alle 10:00.
 3. **Premi «Invia evento»**: leggi «Evento prenotazione inoltrato» e «… azioni programmate».
 
 > **Da sapere**

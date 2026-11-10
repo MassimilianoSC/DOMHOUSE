@@ -127,6 +127,12 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D25 📱 | Qualsiasi | Consumi su un telefono largo (400–430 px, Android o iPhone Pro Max): scheda «Rendiconto in Excel». | Titolo e descrizione vanno a capo normalmente; la tendina del mese e «Scarica Excel» stanno sotto la descrizione, a tutta larghezza; da tablet in su stanno accanto. Stessa cosa per la riga del confronto con il soggiorno precedente. | |
 | D26 | Operatore | Panoramica: lascia la pagina aperta e in primo piano per oltre 5 minuti, poi cambia un dispositivo da un altro accesso. | Resta «In tempo reale» senza lampeggiare su «Riconnessione…» e il cambio arriva da solo. | |
 | D27 📱 | Operatore | Panoramica: passa a un'altra scheda o app per un minuto, cambia un dispositivo da un altro accesso, torna. | Lo stato è aggiornato senza ricaricare; per un attimo può comparire «Riconnessione…». | |
+| D28 | Operatore | Programmazione > «Nuova azione». In «Quando» scegli il 28/03/2027 alle 02:30 e salva; poi annulla l'azione. | Sotto il campo: «Il 28 marzo 2027 le 02:30 non esistono: quella notte gli orologi vanno avanti. L'azione verrà eseguita alle 03:30.» Nell'elenco l'azione è il 28 marzo alle 03:30. | |
+| D29 | Operatore | Come D28, con il 31/10/2027 alle 02:30. | Sotto il campo: «Il 31 ottobre 2027 le 02:30 capitano due volte: quella notte gli orologi tornano indietro. L'azione verrà eseguita la prima volta.» Nell'elenco l'azione è il 31 ottobre alle 02:30. | |
+| D30 | Operatore | Come D28, con il 28/03/2027 alle 01:30 e poi il 31/10/2027 alle 01:30. | Nessuna riga sotto il campo; nell'elenco le due azioni sono alle 01:30. | |
+| D31 📱 | Operatore | Su un appartamento dimostrativo apri «Nuova azione», scrivi in «Quando» un'ora a tua scelta e aspetta un minuto senza toccare nulla. | All'apertura il campo propone fra un'ora circa; l'ora che hai scritto resta com'è. | |
+| D32 | Operatore | Su un'azione in programma premi «Sposta». | Il campo parte dalla data e dall'ora dell'azione mostrate nell'elenco, non da «fra un'ora». | |
+| D33 | Operatore, su computer | Imposta sul computer un altro fuso orario (per esempio Londra), apri «Nuova azione», poi rimetti il fuso com'era. | Il campo propone fra un'ora in ora italiana, non in ora di Londra. | |
 
 ## E. Amministrazione
 
@@ -163,6 +169,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | F7 | Nella sezione «Movimento» premi «Simula movimento» su «Sensore soggiorno». | «Movimento simulato su Sensore soggiorno»; entro pochi secondi accanto al nome «ultimo movimento» con l'ora di adesso; in Panoramica il sensore indica «Movimento rilevato». | |
 | F8 | Guarda «Ripristina…» e premilo; nella finestra di conferma guarda «Ripristina», poi premi «Annulla». | «Ripristina…» ha il contorno rosso; nella conferma «Ripristina» è rosso pieno; con «Annulla» non cambia nulla. | |
 | F9 | Simulatore: apri una finestra, poi guarda la fascia della Panoramica. | La casella «Finestre» diventa ambra con la stanza indicata; richiudendola torna verde con «Tutte chiuse». Il Simulatore a 768 px non sborda e non ha vuoti. | |
+| F10 | Simulatore di un appartamento dimostrativo, «Evento prenotazione». | Sotto i campi: «Check-in e check-out sono nell'ora dell'appartamento (Europe/Rome).» | |
 
 ## G. Dopo ogni pubblicazione
 

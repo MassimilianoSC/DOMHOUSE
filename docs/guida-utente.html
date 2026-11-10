@@ -1726,7 +1726,8 @@ il dispositivo è diventato irraggiungibile.</p>
 <p>«Nuova azione» apre «Programma un&#x27;azione» («L&#x27;azione verrà eseguita dal motore all&#x27;orario indicato (ora di …).»).</p>
 <ol>
 <li>
-<p><strong>Compila «Quando»</strong>: un orario futuro, nel fuso dell&#x27;appartamento.</p>
+<p><strong>Compila «Quando»</strong>: un orario futuro, sempre nell&#x27;ora dell&#x27;appartamento, come dice la scritta sopra («ora di …»),
+anche se il telefono o il computer è su un altro fuso. Il campo propone fra un&#x27;ora.</p>
 </li>
 <li>
 <p><strong>Scegli «Cosa fare»</strong>: «Cambia modalità» oppure «Comando a un dispositivo».</p>
@@ -1758,6 +1759,21 @@ il dispositivo è diventato irraggiungibile.</p>
 </li>
 </ul>
 </blockquote>
+<p><strong>Nelle due notti del cambio d&#x27;ora</strong> (dal lotto 37) sotto «Quando» compare una riga, e si salva lo stesso:</p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Ora scelta</th><th scope="col" class="align-left">Riga sotto «Quando»</th><th scope="col" class="align-left">Quando verrà eseguita</th></tr></thead>
+<tbody>
+<tr><td data-label="Ora scelta" class="align-left">Un&#x27;ora che non esiste (a marzo, dalle 02:00 alle 02:59)</td><td data-label="Riga sotto «Quando»" class="align-left">«Il 28 marzo 2027 le 02:30 non esistono: quella notte gli orologi vanno avanti. L&#x27;azione verrà eseguita alle 03:30.»</td><td data-label="Quando verrà eseguita" class="align-left">Un&#x27;ora dopo: le 02:30 diventano le 03:30</td></tr>
+<tr><td data-label="Ora scelta" class="align-left">Un&#x27;ora che capita due volte (a ottobre, dalle 02:00 alle 02:59)</td><td data-label="Riga sotto «Quando»" class="align-left">«Il 31 ottobre 2027 le 02:30 capitano due volte: quella notte gli orologi tornano indietro. L&#x27;azione verrà eseguita la prima volta.»</td><td data-label="Quando verrà eseguita" class="align-left">La prima volta, ancora con l&#x27;ora legale</td></tr>
+</tbody></table></div>
+<ul>
+<li>
+<p><strong>Data e ore della riga</strong> sono quelle che hai scelto.</p>
+</li>
+<li>
+<p><strong>Negli altri giorni</strong> non compare nessuna riga.</p>
+</li>
+</ul>
 <h3 id="programmazione-spostare-o-annullare-un-azione-a2c65817">Programmazione: spostare o annullare un&#x27;azione</h3>
 <p class="lead"><strong>Cambiare l&#x27;orario di un&#x27;azione in programma, o annullarla.</strong></p>
 <p><strong>«Sposta»</strong>, su una voce in programma:</p>
@@ -1766,7 +1782,7 @@ il dispositivo è diventato irraggiungibile.</p>
 <p><strong>Apre «Sposta l&#x27;azione»</strong>: cambia «Quando» e premi «Salva» («Orario aggiornato»).</p>
 </li>
 <li>
-<p><strong>Il modulo parte</strong> da un&#x27;ora dopo adesso, non dall&#x27;orario salvato: controlla la data.</p>
+<p><strong>Il modulo parte</strong> dalla data e dall&#x27;ora attuali dell&#x27;azione (dal lotto 37).</p>
 </li>
 <li>
 <p><strong>Si possono spostare</strong> anche le azioni nate da una prenotazione; una modifica della prenotazione può
@@ -2699,7 +2715,9 @@ una prenotazione vera fino al motore dell&#x27;appartamento. Ripetere lo stesso 
 effettivo», «Check-out effettivo».</p>
 </li>
 <li>
-<p><strong>Compila «ID prenotazione»</strong>, «Check-in», «Check-out», «Ospiti».</p>
+<p><strong>Compila «ID prenotazione»</strong>, «Check-in», «Check-out», «Ospiti».
+Check-in e check-out sono nell&#x27;ora dell&#x27;appartamento, come dice la riga sotto i campi («Check-in e check-out sono
+nell&#x27;ora dell&#x27;appartamento (…).»); i valori proposti sono domani alle 15:00 e fra tre giorni alle 10:00.</p>
 </li>
 <li>
 <p><strong>Premi «Invia evento»</strong>: leggi «Evento prenotazione inoltrato» e «… azioni programmate».</p>
