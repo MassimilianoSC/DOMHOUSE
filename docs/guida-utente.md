@@ -2402,13 +2402,20 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | «Non hai i permessi per accedere. Chiedi un invito.» | L'account esiste ma nessuno ti ha invitato in questo ambiente (un invito nell'ambiente di prova non vale nel sito vero) | Chiedi un invito a un amministratore |
 | «Conferma il tuo indirizzo: abbiamo inviato un link a …. Aprilo e poi accedi di nuovo.» | Il tuo indirizzo non è ancora confermato | Apri il link nell'email, poi accedi di nuovo |
 | «Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto.» | L'email di conferma non è partita | Riprova tra qualche minuto |
-| «Impossibile caricare il profilo, riprova tra poco» | Il server non risponde | Riprova dopo qualche minuto |
+| «Impossibile caricare il profilo, riprova tra poco» | Il server ha rifiutato per un momento la richiesta (per esempio troppe richieste) | Riprova dopo qualche minuto |
 | «Controllo dell'accesso non disponibile: riprova tra poco» | Il controllo dell'accesso non ha risposto in tempo; la sessione resta valida | Riprova dopo qualche minuto |
-| «Non riesco ad aprire la pagina» con «Controlla la connessione e premi Ricarica. Se il problema resta, contatta HQE.» | L'app non si è aperta entro 15 secondi, o una pagina ha dato un errore (dal lotto 37) | Premi «Ricarica»; se la risposta arriva poco dopo, l'app si apre da sola |
+| «Sei senza connessione» con «La pagina si riapre da sola quando torna la connessione.» | Il telefono o il computer non ha rete: modalità aereo, Wi-Fi e dati spenti (dal lotto 37) | Riattiva la rete: la pagina si riapre da sola dopo un istante |
+| «Il servizio non risponde, riprova fra poco» con «Premi Ricarica fra qualche minuto. Se il problema resta, contatta HQE.» | La rete c'è, ma il servizio DOMHOUSE ha risposto con un errore (dal lotto 37) | Premi «Ricarica» fra qualche minuto; se il problema resta, contatta HQE |
+| «Non riesco ad aprire la pagina» con «Controlla la connessione e premi Ricarica. Se il problema resta, contatta HQE.» | L'app non capisce se manca la rete o il servizio (per esempio un Wi-Fi senza internet), non si è aperta entro 15 secondi, o una pagina ha dato un errore (dal lotto 37) | Controlla la connessione e premi «Ricarica»; se la risposta arriva poco dopo, l'app si apre da sola |
 | «Server non raggiungibile» dopo un'attesa | Il server non ha risposto entro 30 secondi, oppure 90 per assistente, proposte di regole, inviti, copia delle regole, verifica della connessione ed Excel (dal lotto 37) | Riprova; se era un comando, controlla prima se è già stato eseguito |
 | «La tua organizzazione non è attiva: contatta HQE.» | L'organizzazione non è ancora pronta | Contatta HQE |
 | «La tua organizzazione è sospesa: l'app non è disponibile. Per informazioni contatta l'assistenza HQE.» | HQE ha sospeso la tua organizzazione | Contatta l'assistenza HQE |
 | «Indirizzo email non valido» | L'email scritta non è un indirizzo | Correggi l'indirizzo |
+
+**Con le tre pagine «Sei senza connessione», «Il servizio non risponde» e «Non riesco ad aprire la pagina»:**
+
+- **Resti dentro:** non serve riscrivere la password e le notifiche restano attive.
+- **Non c'è «Esci»:** per uscire dall'account aspetta che la pagina si riapra.
 
 ### In tutte le pagine
 

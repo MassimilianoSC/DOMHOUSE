@@ -295,10 +295,15 @@ normale di prova con un **operatore**.
 
 Si fanno con la modalità aereo. Su iPhone controlla che anche il Wi-Fi sia spento. L'avviso compare in alto al centro, in rosso.
 
+Per un amministratore, O1, O2 e O3 vanno fatte entro 2 minuti dall'attivazione della modalità aereo: dopo, l'app rilegge il profilo e mostra la pagina di O6. «Il servizio non risponde» non si può provocare a mano: lo coprono le prove automatiche.
+
 | N. | Ruolo | Passi | Risultato atteso | Esito |
 |---|---|---|---|---|
 | O1 📱 | Qualsiasi | Apri Impostazioni. Attiva la modalità aereo. Cambia l'interruttore «Approvazioni richieste». | Subito, senza attese, compare l'avviso rosso «Server non raggiungibile» con sotto «ID richiesta» e un codice; l'interruttore torna com'era. | |
 | O2 📱 | Qualsiasi | Subito dopo O1: togli la modalità aereo, aspetta che torni la rete, cambia di nuovo lo stesso interruttore; poi rimettilo com'era. | Ogni volta «Preferenze salvate»; l'interruttore resta dove lo hai messo. | |
 | O3 | Qualsiasi (anche Sola lettura), su computer | Apri «Consumi» di un appartamento. Scollega la rete. Nella scheda «Rendiconto in Excel» premi «Scarica Excel». | Subito l'avviso rosso «Server non raggiungibile» con «ID richiesta» e un codice; nessun file scaricato; il pulsante si può premere di nuovo. | |
-| O4 📱 | Qualsiasi, su un dispositivo dove hai già aperto l'app | Chiudi del tutto l'app (o la scheda). Attiva la modalità aereo. Riapri l'app. | Compare la pagina di accesso con l'avviso rosso «Impossibile caricare il profilo, riprova tra poco» e sotto «Server non raggiungibile». Nessuna pagina bianca, nessun caricamento infinito. | |
-| O5 📱 | Qualsiasi | Subito dopo O4: togli la modalità aereo e ricarica la pagina (o chiudi e riapri l'app). | Entri senza riscrivere la password. | |
+| O4 📱 | Qualsiasi, su un dispositivo dove hai già aperto l'app | Chiudi del tutto l'app (o la scheda). Attiva la modalità aereo e controlla che anche il Wi-Fi sia spento. Riapri l'app. | «Sei senza connessione» con sotto «La pagina si riapre da sola quando torna la connessione.» e il pulsante «Ricarica». Non la pagina di accesso. | |
+| O5 📱 | Qualsiasi | Subito dopo O4: togli la modalità aereo e non toccare nulla. | Entro pochi secondi la pagina si riapre da sola e sei dentro, senza riscrivere la password. | |
+| O6 📱 | Amministratore | Dentro l'app, su una pagina qualsiasi, attiva la modalità aereo e lascia l'app aperta e in primo piano per 3 minuti. | Al posto della pagina compare «Sei senza connessione»; non la pagina di accesso. | |
+| O7 📱 | Amministratore | Subito dopo O6: togli la modalità aereo e non toccare nulla. | Entro pochi secondi si riapre da sola la stessa pagina. | |
+| O8 | Qualsiasi, telefono | Collega il telefono a un Wi-Fi senza internet (per esempio l'hotspot di un altro telefono con i dati spenti), con i dati mobili spenti. Chiudi del tutto l'app e riaprila. | Entro mezzo minuto «Non riesco ad aprire la pagina» con «Ricarica». Non la pagina di accesso. | |

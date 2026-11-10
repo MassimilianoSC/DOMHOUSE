@@ -45,12 +45,16 @@
 | Limite | Cosa succede | Stato |
 |---|---|---|
 | **Copia dell'app bloccata (E-29)** | Il 9 novembre la copia salvata in Chrome non è partita e il sito non si apriva; chiudere e riaprire Chrome l'ha risolto. Probabile blocco di Chrome, non dimostrato; in teoria può capitare a chiunque; un caso solo finora | Decisione dopo il lotto 36: togliere il gestore `fetch` dalla copia salvata (o2, circa 2 ore; senza rete l'app non si aprirebbe) |
-| **Avvio lento (E-29)** | Dal lotto 37, se l'app non si apre entro 15 secondi compare «Non riesco ad aprire la pagina» con «Ricarica»; se la risposta arriva prima di 30 secondi, l'app entra da sola. Oltre i 30 secondi si finisce sulla pagina di accesso, ma la sessione resta valida. Sullo staging spento il messaggio può comparire per qualche secondo | Accettato |
+| **Avvio lento (E-29)** | Dal lotto 37, se l'app non si apre entro 15 secondi compare «Non riesco ad aprire la pagina» con «Ricarica»; se la risposta arriva prima di 30 secondi, l'app entra da sola. Senza risposta, dal lotto 37 (D-211) compare una pagina con «Ricarica» invece della pagina di accesso, e la sessione resta valida. Sullo staging spento il messaggio può comparire per qualche secondo | Accettato |
 | **Chiamate che scadono** | Dal lotto 37 ogni chiamata al server ha 30 secondi (90 per le operazioni lente); poi compare «Server non raggiungibile» | Accettato |
 | **Comando scaduto** | Un'operazione che scade può essere andata a buon fine sul server: il messaggio non lo può sapere. Comandi e salvataggi non vengono ritentati in automatico | Accettato |
 | **Letture ritentate** | Le letture vengono ritentate una volta: prima dell'errore possono passare fino a 60 secondi | Accettato |
 | **Errore di disegno** | Dal lotto 37 il messaggio sostituisce tutta l'app, menu compreso, e ciò che si stava scrivendo si perde con la ricarica | Accettato |
-| **Pagina di accesso** | Se l'avvio non riesce resta il modulo; il messaggio compare solo sulle pagine protette, e tentare l'accesso dà l'errore normale | Accettato |
+| **Nessun «Esci» dalla pagina «Ricarica»** | Per uscire dall'account la pagina deve prima riaprirsi (D-211) | Accettato |
+| **«Il servizio non risponde» solo con un errore del server** | Un servizio che non risponde affatto dà il testo prudente «Non riesco ad aprire la pagina»: senza risposta l'app non distingue fra rete e servizio | Accettato |
+| **Wi-Fi senza internet** | Il dispositivo si crede in rete: compare il testo prudente e, quando internet torna, la pagina non si riapre da sola perché il browser non segnala nessun ritorno; serve «Ricarica» | Accettato |
+| **Ritorno della rete con il servizio lento** | Se il servizio non è raggiungibile entro 1,5 secondi dal ritorno della rete, la ricarica automatica finisce sul testo prudente e non si ripete: serve «Ricarica» | Accettato |
+| **Casi coperti solo dalle prove automatiche** | «Il servizio non risponde» e le riletture del profilo diverse da quella periodica dell'amministratore (fine di un accesso di assistenza, cambio del nome) | Accettato |
 | **Attese massime non provabili a mano** | Il limite di 30 e 90 secondi, la pagina «Non riesco ad aprire la pagina» dopo 15 secondi e il messaggio per un errore di disegno si verificano solo con le prove automatiche: senza rete l'errore arriva subito. Il collaudo a mano (sezione O) prova solo l'assenza di rete | Accettato |
 | **Correzione E-29 non provata del tutto** | Non provata con Firebase vero, su Safari o su un telefono vero | Da verificare |
 
