@@ -141,3 +141,21 @@ def test_d212_each_night_is_asked_from_local_midnight_to_local_midnight(monkeypa
     assert asked == [("2026-10-23T22:00:00.000Z", "2026-10-24T22:00:00.000Z"),
                      ("2026-10-24T22:00:00.000Z", "2026-10-25T23:00:00.000Z"),      # the 25-hour night
                      ("2026-10-25T23:00:00.000Z", "2026-10-26T23:00:00.000Z")]
+
+
+# ---- verification of 10 November 2026, point e: the whole week of approvals ------------------------------------------
+def test_the_approvals_expired_on_the_monday_before_reach_the_summary_made_after_eight(monkeypatch):
+    """The engine's /approvals?status=all gives the closed ones from the midnight of 7 days ago (engine/core.py
+    list_approvals): the summary made on Monday at 09:00 has the approval expired on the Monday before at 00:30, which
+    before was cut at 09:00 of that Monday."""
+    from engine import core
+    from engine.connector.simulated import SimulatedConnector
+
+    engine = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
+    created = datetime(2026, 10, 12, 0, 30, tzinfo=ROME)                     # the week's first half hour
+    engine.approvals.append({"approval_id": "apr-lun", "status": "expired", "description": "Spegnere la presa",
+                             "created_at": ws.iso(created), "expires_at": ws.iso(created + timedelta(minutes=30))})
+    monkeypatch.setattr(core, "utcnow", lambda: NOW.astimezone(UTC))
+    s = build(approvals=engine.list_approvals("all")["items"])
+    assert [a["approval_id"] for a in s["approvals_expired"]] == ["apr-lun"]
+    assert s["items"] == ["Approvazione scaduta senza risposta: Spegnere la presa."]

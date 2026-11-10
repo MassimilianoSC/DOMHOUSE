@@ -2082,7 +2082,11 @@ class ApartmentEngine:
     def list_approvals(self, status: str) -> dict:
         if status not in ("pending", "all"):
             raise bad_request("status deve essere pending o all")
-        cutoff = utcnow() - timedelta(days=7)
+        # «the closed ones of the last 7 days» (contract): 7 days of the apartment's calendar, from its midnight. Before,
+        # 7×24 hours back from now, and the weekly summary made on Monday after 08:00 lost the approvals of the Monday
+        # before until that hour (verification of 10 November 2026, point e); also in the week of 169 hours.
+        tz = ZoneInfo(self.timezone)
+        cutoff = datetime.combine(utcnow().astimezone(tz).date() - timedelta(days=7), datetime.min.time(), tzinfo=tz)
         items = [a for a in self.approvals if a["status"] == "pending" or (status == "all" and parse_dt(a["created_at"]) >= cutoff)]
         return {"items": copy.deepcopy(sorted(items, key=lambda a: a["created_at"], reverse=True))}
 
