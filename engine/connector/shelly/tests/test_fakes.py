@@ -55,28 +55,49 @@ def test_whole_path_from_device_info_to_confirmed():
     run(scenario)
 
 
-def test_switch_set_sends_output_then_power_as_two_partials():
+def test_switch_on_sends_output_then_power_then_current_as_three_partials():
+    # as in the capture: {"output": true, "source": "MQTT"}, then {"apower": ...}, then {"current": ...}
     async def scenario(device, transport):
         profile = profile_for("PlugMG3")
         status = await transport.call(SID, "Shelly.GetStatus", None, 1)
         await transport.call(SID, "Switch.Set", {"id": 0, "on": True}, 1)
-        first, second = await drain(transport)
-        assert first.method == second.method == "NotifyStatus"
-        assert first.params["switch:0"] == {"output": True, "source": "rpc"}
+        first, second, third = await drain(transport)
+        assert first.method == second.method == third.method == "NotifyStatus"
+        assert first.params["switch:0"] == {"output": True, "source": "MQTT"}
         assert second.params["switch:0"] == {"apower": 12.2}
+        assert third.params["switch:0"] == {"current": 0.054}
         assert first.received_at.tzinfo is not None and "ts" in first.params
         status, changed = apply_notify_status(profile, status, first.params)
         assert changed == {"switch": {"on": True}}
         status, changed = apply_notify_status(profile, status, second.params)
         assert changed == {"power_meter": {"watts": 12.2, "energy_total_wh": 0.0}}
+        status, changed = apply_notify_status(profile, status, third.params)
+        assert changed == {}                                  # current is no capability's field
+    run(scenario)
+
+
+def test_switch_off_sends_one_partial_with_output_power_and_current():
+    # as in the capture: {"apower": 0, "current": 0, "output": false, "source": "MQTT"} in one message
+    async def scenario(device, transport):
+        await transport.call(SID, "Switch.Set", {"id": 0, "on": True}, 1)
+        await drain(transport)
+        status = await transport.call(SID, "Shelly.GetStatus", None, 1)
+        await transport.call(SID, "Switch.Set", {"id": 0, "on": False}, 1)
+        (off,) = await drain(transport)
+        assert off.params["switch:0"] == {"output": False, "source": "MQTT", "apower": 0, "current": 0}
+        _, changed = apply_notify_status(profile_for("PlugMG3"), status, off.params)
+        assert changed == {"switch": {"on": False}, "power_meter": {"watts": 0.0, "energy_total_wh": 0.0}}
     run(scenario)
 
 
 def test_button_press_is_a_partial_with_its_source():
     async def scenario(device, transport):
         device.press_button()
-        first, _ = await drain(transport)
+        first, *_ = await drain(transport)
         assert first.params["switch:0"] == {"output": True, "source": "button"}
+        device.press_button()
+        (off,) = await drain(transport)
+        assert off.params["switch:0"]["source"] == "button"
     run(scenario)
 
 
@@ -86,8 +107,9 @@ def test_load_and_energy_changes_are_partials():
         await drain(transport)
         device.set_load(40.0)
         device.add_energy(1.5)
-        power, energy = await drain(transport)
+        power, current, energy = await drain(transport)
         assert power.params["switch:0"] == {"apower": 40.0}
+        assert current.params["switch:0"] == {"current": 0.178}
         assert energy.params["switch:0"]["aenergy"]["total"] == 1.5
     run(scenario)
 
@@ -137,14 +159,14 @@ def test_unknown_method_and_wrong_channel_are_rpc_errors():
 
 def test_connection_events_travel_in_order_with_the_notifications():
     async def scenario(device, transport):
-        device.press_button()                     # on: output, then power
+        device.press_button()                     # on: output, then power, then current
         transport.set_online(SID, False)
         device.press_button()                     # while offline: nothing reaches us
         transport.set_online(SID, True)
         device.reboot()                           # the snapshot after the reconnection
         items = await drain(transport)
         kinds = [(type(i).__name__, getattr(i, "connected", None), getattr(i, "method", None)) for i in items]
-        assert kinds == [("Notification", None, "NotifyStatus"), ("Notification", None, "NotifyStatus"),
+        assert kinds == [("Notification", None, "NotifyStatus")] * 3 + [
                          ("ConnectionEvent", False, None), ("ConnectionEvent", True, None),
                          ("Notification", None, "NotifyFullStatus")]
         assert all(i.received_at.tzinfo is not None for i in items)

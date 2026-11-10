@@ -2,7 +2,11 @@
 
 It answers the RPCs the connector uses with the shapes of the real plug on the bench (firmware 1.8.99, sample of
 10 November 2026, ids invented as connector.md §5 asks) and sends NotifyStatus with only the changed fields, as the
-real device does: a Switch.Set first reports the output, then, separately, the new power. It is synchronous and has
+real device does in tests/fixtures/plugmg3_mqtt_capture.jsonl:
+  - switching off: ONE NotifyStatus with output, source, apower and current (the zeros as integers, as in the JSON);
+  - switching on: first output and source, then apower, then current, in separate messages;
+  - a change of load: apower, then current, in separate messages.
+A Switch.Set reports source "MQTT", as the real plug does when the command comes over MQTT. It is synchronous and has
 no timer: delays and timeouts belong to tests/fake_transport.py, which reads the faults queued here.
 
 The world around the plug: press_button, set_load, add_energy, reboot. The faults: fail_next (an RPC error),
@@ -65,7 +69,7 @@ class FakePlugMG3:
             if not isinstance(on, bool):
                 raise RpcError(-103, f"Invalid argument 'on': {on!r}")
             was_on = self._on
-            self._switch(on and not self.protection_trips, "rpc")
+            self._switch(on and not self.protection_trips, "MQTT")
             return {"was_on": was_on}
         raise RpcError(-32601, f"Method {method} not found")
 
@@ -78,7 +82,7 @@ class FakePlugMG3:
         old = self._apower()
         self._load = float(watts)
         if self._apower() != old:
-            self._notify("NotifyStatus", {"switch:0": {"apower": self._apower()}})
+            self._notify_power()
 
     def add_energy(self, wh: float) -> None:
         self._energy += wh
@@ -119,13 +123,16 @@ class FakePlugMG3:
     def _apower(self) -> float:
         return self._load if self._on else 0.0
 
+    def _current(self) -> float:
+        return round(self._apower() / 224.1, 3)
+
     def _aenergy(self) -> dict:
         minute_ts = int(self._clock().timestamp()) // 60 * 60
         return {"total": self._energy, "by_minute": [0.0, 0.0, 0.0], "minute_ts": minute_ts}
 
     def _switch_status(self) -> dict:
         return {"id": 0, "source": self._source, "output": self._on, "apower": self._apower(), "voltage": 224.1,
-                "freq": 50.1, "current": round(self._apower() / 224.1, 3), "aenergy": self._aenergy(),
+                "freq": 50.1, "current": self._current(), "aenergy": self._aenergy(),
                 "ret_aenergy": {"total": 0.0, "by_minute": [0.0, 0.0, 0.0], "minute_ts": self._aenergy()["minute_ts"]},
                 "temperature": {"tC": 46.7, "tF": 116.1}}
 
@@ -134,9 +141,16 @@ class FakePlugMG3:
             return
         old_power = self._apower()
         self._on, self._source = on, source
-        self._notify("NotifyStatus", {"switch:0": {"output": on, "source": source}})
+        if not on:
+            self._notify("NotifyStatus", {"switch:0": {"output": False, "source": source, "apower": 0, "current": 0}})
+            return
+        self._notify("NotifyStatus", {"switch:0": {"output": True, "source": source}})
         if self._apower() != old_power:
-            self._notify("NotifyStatus", {"switch:0": {"apower": self._apower()}})
+            self._notify_power()
+
+    def _notify_power(self) -> None:
+        self._notify("NotifyStatus", {"switch:0": {"apower": self._apower()}})
+        self._notify("NotifyStatus", {"switch:0": {"current": self._current()}})
 
     def _notify(self, method: str, status: dict) -> None:
         now = self._clock()
