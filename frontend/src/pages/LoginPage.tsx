@@ -8,6 +8,7 @@ import type { DevUser } from "@/api/types";
 import { authErrorMessage, useAuth } from "@/auth/AuthProvider";
 import { firebaseConfigured } from "@/auth/firebase";
 import { showLoginError } from "@/lib/loginErrors";
+import { PageProblem } from "@/components/layout/PageProblem";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label, Skeleton } from "@/components/ui/primitives";
 import { t } from "@/i18n";
@@ -121,8 +122,11 @@ function FirebaseLogin() {
 }
 
 export default function LoginPage() {
-  const { status } = useAuth();
+  const { status, problem } = useAuth();
   if (status === "authenticated") return <Navigate to="/" replace />;
+  // D-211: signed in but the profile could not be read (no network, 5xx), or a start that never ended: the form would
+  // not help, the person is still signed in.
+  if (status === "unavailable") return <PageProblem cause={problem} />;
   return (
     <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden flex-col justify-between overflow-hidden bg-foreground p-12 text-background lg:flex">
