@@ -205,6 +205,7 @@ def test_timers_installs_the_backup_and_the_5_minute_watch(vm):
     timer = (vm.units / "domhouse-engine-check.timer").read_text(encoding="utf-8")
     service = (vm.units / "domhouse-engine-check.service").read_text(encoding="utf-8")
     assert "OnCalendar=*:0/5" in timer and "engine-vm.sh check-all" in service
+    assert "StandardOutput=null" in service and "StandardError" not in service   # one line per event in the syslog
     assert (vm.units / "domhouse-engine-backup.timer").exists()
     assert "enable --now domhouse-engine-backup.timer domhouse-engine-check.timer" in \
         (vm.stubs / "systemctl.log").read_text(encoding="utf-8")

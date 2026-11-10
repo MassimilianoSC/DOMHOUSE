@@ -239,6 +239,9 @@ Description=DOMHOUSE engine: health of every engine and age of its backups, to t
 [Service]
 Type=oneshot
 ExecStart=/bin/bash ${OPT}/engine-vm.sh check-all
+# the lines reach the syslog through logger (tag domhouse-check); the service's own copy of the output, «bash[pid]:
+# …», doubled each of them (seen on 10 November). Errors still go to the journal
+StandardOutput=null
 UNIT
   cat > "${SYSTEMD}/domhouse-engine-check.timer" <<UNIT
 [Unit]

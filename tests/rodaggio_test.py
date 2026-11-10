@@ -133,7 +133,8 @@ def test_restarts_certificate_errors_vm_and_cloud_run(monkeypatch):
         'log_id("domhouse_engine") AND jsonPayload.level="error"': [
             {"timestamp": z(START), "jsonPayload": {"apartment_id": "dev", "msg": "connector lost"}}],
         "vm mem_used_pct=": [syslog("domhouse-check: vm mem_used_pct=30 disk_used_pct=16"),
-                             syslog("domhouse-check: vm mem_used_pct=50 disk_used_pct=17", 5)],
+                             syslog("bash[4242]: vm mem_used_pct=99 disk_used_pct=99"),    # the service's copy: left out
+                             syslog("domhouse-check[77]: vm mem_used_pct=50 disk_used_pct=17", 5)],
         "Starting new instance": [{"timestamp": z(START), "textPayload": "Starting new instance. Reason: AUTOSCALING - x"}],
         "httpRequest.status>=500": [{"timestamp": z(START), "httpRequest": {"status": 429}},
                                     {"timestamp": z(START), "httpRequest": {"status": 503}}],
@@ -151,6 +152,7 @@ def test_restarts_certificate_errors_vm_and_cloud_run(monkeypatch):
 def test_the_ways_out_of_the_vm_days_covered_and_what_failed(monkeypatch):
     line = lambda text, hours: {"timestamp": z(START + timedelta(hours=hours)), "jsonPayload": {"message": text}}
     fake(monkeypatch, {"egress ": [line("domhouse-check: egress ok server=200 registry=401 acme=200", 0),
+                                   line("bash[105352]: egress ok server=200 registry=401 acme=200", 0),   # the copy
                                    line("domhouse-check: egress failed server=200 registry=401 acme=000", 1),
                                    line("domhouse-check: egress failed server=503 registry=000 acme=200", 25),
                                    line("domhouse-check: egress ok server=200 registry=401 acme=200", 49)]})

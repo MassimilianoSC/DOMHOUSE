@@ -80,6 +80,17 @@ def logs(flt: str, start: datetime, end: datetime, fields: str = "") -> list[dic
     return json.loads(gcloud(["logging", "read", full, f"--format={fmt}", "--order=asc"]) or "[]")
 
 
+TAGGED = re.compile(r"domhouse-check(\[\d+\])?: ")
+
+
+def tagged(entry: dict, what: str) -> str | None:
+    """The watch's line written by logger (tag domhouse-check), never the service's copy of it («bash[pid]: …», which
+    doubled every line until the unit got StandardOutput=null): its text from `what` on, or None."""
+    text = dig(entry, "jsonPayload.message") or ""
+    m = re.search(TAGGED.pattern + re.escape(what), text)
+    return text[m.end() - len(what):] if m else None
+
+
 def ts(entry: dict) -> datetime:
     return datetime.fromisoformat(entry["timestamp"].replace("Z", "+00:00"))
 
@@ -177,7 +188,7 @@ def longest_run(minutes: list[int]) -> int:
 def restarts(start: datetime, end: datetime) -> dict:
     engines = Counter(dig(e, "jsonPayload.apartment_id") or "?" for e in logs(
         'log_id("domhouse_engine") AND jsonPayload.msg="engine started"', start, end, "timestamp,jsonPayload.apartment_id"))
-    seen = [re.search(r"broker started_at=(\S+)", dig(e, "jsonPayload.message") or "") for e in logs(
+    seen = [re.search(r"broker started_at=(\S+)", tagged(e, "broker started_at=") or "") for e in logs(
         f'{SYSLOG} AND jsonPayload.message:"broker started_at="', start, end, "timestamp,jsonPayload.message")]
     starts = {m.group(1) for m in seen if m}
     broker = None if not seen else sum(1 for s in starts if start <= parse_any(s) < end)
@@ -206,9 +217,9 @@ def incidents(start: datetime, end: datetime, now: datetime) -> dict:
 
 
 def certificate(start: datetime, end: datetime) -> dict:
-    lines = [dig(e, "jsonPayload.message") or "" for e in logs(
+    lines = [x for x in (tagged(e, "broker ") for e in logs(
         f'{SYSLOG} AND jsonPayload.message:"domhouse-check" AND jsonPayload.message:"broker "', start, end,
-        "timestamp,jsonPayload.message")]
+        "timestamp,jsonPayload.message")) if x]
     days = [int(m.group(1)) for m in (re.search(r"broker ok cert_days=(\d+)", x) for x in lines) if m]
     return {"new": sum("broker cert new" in x for x in lines), "failed": sum("broker cert renew failed" in x for x in lines),
             "revoked": sum("broker cert revoked" in x for x in lines), "days_last": days[-1] if days else None,
@@ -231,7 +242,7 @@ def errors(start: datetime, end: datetime) -> dict:
 def vm_and_run(start: datetime, end: datetime) -> dict:
     mem, disk = [], []
     for e in logs(f'{SYSLOG} AND jsonPayload.message:"vm mem_used_pct="', start, end, "timestamp,jsonPayload.message"):
-        m = re.search(r"vm mem_used_pct=(\d+) disk_used_pct=(\d+)", dig(e, "jsonPayload.message") or "")
+        m = re.search(r"vm mem_used_pct=(\d+) disk_used_pct=(\d+)", tagged(e, "vm mem_used_pct=") or "")
         if m:
             mem.append(int(m.group(1)))
             disk.append(int(m.group(2)))
@@ -253,7 +264,7 @@ def egress(start: datetime, end: datetime) -> dict:
     ok = failed = 0
     days, broken = set(), Counter()
     for e in entries:
-        m = re.search(r"egress (ok|failed) server=(\S+) registry=(\S+) acme=(\S+)", dig(e, "jsonPayload.message") or "")
+        m = re.search(r"egress (ok|failed) server=(\S+) registry=(\S+) acme=(\S+)", tagged(e, "egress ") or "")
         if not m:
             continue
         days.add(ts(e).astimezone(ROME).date())

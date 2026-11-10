@@ -58,6 +58,10 @@ def test_the_filters_match_the_watchs_real_lines(tag):
     assert re.search(re.search(r'"(.*)"', backup["labelExtractors"]["apartment"]).group(1), line).group(1) == "dev"
     summary = re.search(r"METRIC_FILTER='(.*)'", SCRIPT.read_text(encoding="utf-8")).group(1)
     assert re.search(regex_of(summary), f"{HOST}{tag}domhouse-check: 3 motori, 0 muti")
+    # the check service's own copy of its output («bash[pid]: …», until StandardOutput=null) is never counted
+    copy = f"{HOST}bash[105352]: "
+    assert not re.search(regex_of(summary), f"{copy}domhouse-check: 3 motori, 0 muti")
+    assert not re.search(regex_of(silent["filter"]), f"{copy}engine silent dev (nessuna risposta, codice 000)")
     down = found["broker-giu.json"]["conditions"][0]["conditionMatchedLog"]["filter"]
     expiring = found["broker-certificato.json"]["conditions"][0]["conditionMatchedLog"]["filter"]
     assert re.search(regex_of(down), f"{HOST}{tag}broker down (container: assente, porta TLS: muta)")
