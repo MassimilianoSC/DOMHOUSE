@@ -1,7 +1,7 @@
 # Checklist di collaudo — DOMHOUSE
 
 Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md`.
-*Versione del 16 ottobre 2026, ambiente di prova: https://domotica-poc-511707.web.app*
+*Versione del 10 novembre 2026 (lotto 36). Si collauda sul sito di prova https://domhouse-staging.web.app; il sito vero https://domotica-poc-511707.web.app serve solo per le prove L2 e L4.*
 
 ## Come si usa
 - Ogni riga è una prova: segui i passi e confronta con il risultato atteso.
