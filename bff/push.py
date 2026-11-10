@@ -18,7 +18,8 @@ from .sse_hub import CURSOR_SAVE_S, SseEvent, envelope, hub_manager, link_of
 BODY_MAX = 200
 TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400, "booking": 86400,
                "summary": 7 * 86400,   # P-60 step 11: the weekly summary stays a week
-               "frost_inactive": 86400}  # D-164: a boiler without its sensor in «casa vuota»
+               "frost_inactive": 86400,  # D-164: a boiler without its sensor in «casa vuota»
+               "schedule_failed": 86400}  # D-219: scheduled actions not done
 
 _offline_timers: dict[tuple[str, str], asyncio.Task] = {}
 _health_down: set[str] = set()
@@ -34,6 +35,11 @@ _unreachable: dict[str, float] = {}
 _unreachable_timers: dict[str, asyncio.Task] = {}
 _alert_minutes: dict[str, float | None] = {}
 ALERT_MINUTES_DEFAULT = 15.0
+# D-219: scheduled actions not done, grouped per apartment and category for SCHEDULE_GROUP_S from the first one
+SCHEDULE_GROUP_S = 60.0
+SCHEDULE_FAILURES = ("schedule_failed", "schedule_missed")
+BOOKING_KINDS = ("prearrival", "checkout", "empty")       # the actions born from the bookings: category «Prenotazioni»
+_schedule_groups: dict[tuple[str, str], dict] = {}
 SUSPENSION_MAX_DAYS = 30           # UNREACHABLE_ALERTS_OFF_UNTIL further than this is refused: alerts stay on
 
 
@@ -75,6 +81,18 @@ def instance_unreachable_push(apt: Apartment, minutes: float, ts: str | None):
                       f"Il sistema domotico non risponde da {int(minutes)} minuti: i comandi dall'app non arrivano e "
                       f"le regole automatiche potrebbero essere ferme.", f"/a/{apt.apartment_id}",
                       f"instance:{apt.apartment_id}", ts)
+
+
+def schedule_failed_push(apt: Apartment, first_decision_id: str, reasonings: list[str], ts: str | None):
+    """D-219: one or more scheduled actions not done (refused at their time, or missed with the engine down). Several
+    of the same apartment and category close together are one notification, with the first in full."""
+    n = len(reasonings)
+    if n == 1:
+        title, body = f"{apt.name}: azione programmata non eseguita", reasonings[0]
+    else:
+        title, body = f"{apt.name}: azioni programmate non eseguite", f"{n} azioni programmate non eseguite. La prima: {reasonings[0]}"
+    return build_push("schedule_failed", apt, title, body or "Azione programmata non eseguita",
+                      f"/a/{apt.apartment_id}/programmazione", f"schedule:{apt.apartment_id}:{first_decision_id}", ts)
 
 
 def booking_reset_push(apt: Apartment, decision_id: str, reasoning: str | None, ts: str | None):
@@ -242,6 +260,8 @@ def forget_apartment(apartment_id: str) -> None:
         task.cancel()
     _unreachable.pop(apartment_id, None)
     _alert_minutes.pop(apartment_id, None)
+    for key in [k for k in _schedule_groups if k[0] == apartment_id]:
+        _schedule_groups.pop(key, None)            # its flush finds nothing
     if (task := _unreachable_timers.pop(apartment_id, None)) and not task.done():
         task.cancel()
 
@@ -458,6 +478,37 @@ async def resume_watches(apt: Apartment) -> None:
         info("offline timers not resumed yet", apartment_id=apartment_id, error=type(exc).__name__)
 
 
+def schedule_pref(kind: str | None) -> str:
+    """D-219: pre-arrivo, check-out and casa vuota go to «Prenotazioni»; the manual ones and the assistant's (and an
+    engine that does not say the kind) to «Dispositivi e sistema domotico offline», their usual cause."""
+    return "bookings" if kind in BOOKING_KINDS else "offline"
+
+
+def _schedule_not_done(apt: Apartment, ev: SseEvent, data: dict, ts: str | None) -> None:
+    """D-219: the engine's decision schedule_failed or schedule_missed joins the open group of its apartment and
+    category, or opens one. The key of the group is its first event's, the same on every instance that receives it."""
+    if data.get("action") == "schedule_missed" and alerts_suspended_until():
+        info("missed scheduled action not notified during the suspension", apartment_id=apt.apartment_id)
+        return                                     # after a planned shutdown no burst (D-219); the summary is apart
+    pref = schedule_pref(data.get("new_value"))
+    key = (apt.apartment_id, pref)
+    group = _schedule_groups.get(key)
+    if group is None:
+        group = _schedule_groups[key] = {"first": str(data.get("decision_id", "")), "claim": event_key(apt, ev, ts),
+                                         "ts": ts, "reasonings": []}
+        _spawn(_flush_schedule_group(apt, key), "schedule_failed", apt.apartment_id)
+    group["reasonings"].append(str(data.get("reasoning") or "").strip())
+
+
+async def _flush_schedule_group(apt: Apartment, key: tuple[str, str]) -> None:
+    await asyncio.sleep(SCHEDULE_GROUP_S)
+    group = _schedule_groups.pop(key, None)
+    if not group:
+        return
+    await notify_once(f"{group['claim']}:schedule:{key[1]}", apt.tenant_id, key[1],
+                      *schedule_failed_push(apt, group["first"], group["reasonings"], group["ts"]))
+
+
 async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
     """Hook of every instance hub: decides whether an event deserves a push and starts the sending in a task."""
     env = envelope(ev)
@@ -477,6 +528,8 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
         decision_id = str(data.get("decision_id", ""))
         _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "bookings", *booking_reset_push(apt, decision_id, data.get("reasoning"), ts)),
                "booking", apt.apartment_id)
+    elif ev.event == "decision.logged" and data.get("action") in SCHEDULE_FAILURES:     # D-219
+        _schedule_not_done(apt, ev, data, ts)
     elif ev.event == "decision.logged" and data.get("action") == "frost_inactive":     # D-164
         device_id = str((data.get("target") or {}).get("device_id", ""))
         _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "offline", *frost_inactive_push(apt, device_id, data.get("reasoning"), ts)),

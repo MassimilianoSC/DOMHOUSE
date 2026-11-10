@@ -985,3 +985,83 @@ def test_an_engine_without_the_route_is_skipped_and_not_asked_again(unreachable)
     run(scenario())
     assert len(unreachable.notes) == 1
     assert get_repository().work[push.reachable_note_key(APT)]["status"] == "done"
+
+
+# -------- D-219: scheduled actions not done -----------------------------------------------------------------------------
+@pytest.fixture
+def grouped(users, fcm, monkeypatch):
+    """The grouping window short; bookings and offline on for the opted-in users."""
+    monkeypatch.setattr(push, "SCHEDULE_GROUP_S", 0.05)
+    push._schedule_groups.clear()
+    return fcm
+
+
+def not_done(kind: str | None, reasoning: str, action: str = "schedule_failed", decision_id: str | None = None):
+    decision_id = decision_id or f"dec-{next(_ids)}"
+    return event("decision.logged", {"decision_id": decision_id, "action": action, "outcome": "failed",
+                                     "target": {"type": "schedule"}, "new_value": kind, "reasoning": reasoning})
+
+
+PREARRIVAL = "Azione programmata (pre-arrivo) non eseguita: Il dispositivo non è raggiungibile; riprova quando torna online"
+
+
+def test_one_action_not_done_one_notification_in_its_category(grouped):
+    async def scenario():
+        await push.on_stream_event(APT, not_done("prearrival", PREARRIVAL, decision_id="dec-7"))
+        await drain()
+    run(scenario())
+    [msg] = grouped.sent
+    assert msg.data["kind"] == "schedule_failed" and msg.data["title"] == "Milano Centro: azione programmata non eseguita"
+    assert msg.data["body"] == PREARRIVAL and msg.data["link"] == "/a/apt-push/programmazione"
+    assert msg.data["tag"] == "schedule:apt-push:dec-7" and msg.webpush.headers == {"Urgency": "high", "TTL": "86400"}
+
+
+def test_the_categories():
+    assert [push.schedule_pref(k) for k in ("prearrival", "checkout", "empty", "manual", None, "altro")] == [
+        "bookings", "bookings", "bookings", "offline", "offline", "offline"]
+
+
+def test_several_close_together_are_one_notification_with_the_first_in_full(grouped):
+    async def scenario():
+        for kind in ("prearrival", "checkout", "empty"):
+            await push.on_stream_event(APT, not_done(kind, PREARRIVAL if kind == "prearrival" else f"Azione ({kind})"))
+        await push.on_stream_event(APT, not_done("manual", "Azione programmata (manuale) non eseguita: x"))
+        await drain()
+    run(scenario())
+    bodies = sorted(m.data["body"] for m in grouped.sent)
+    assert bodies == sorted([f"3 azioni programmate non eseguite. La prima: {PREARRIVAL}",
+                             "Azione programmata (manuale) non eseguita: x"])   # bookings and offline apart
+    assert {m.data["title"] for m in grouped.sent} == {"Milano Centro: azioni programmate non eseguite",
+                                                       "Milano Centro: azione programmata non eseguita"}
+
+
+def test_a_user_without_the_category_receives_nothing(grouped):
+    """Token z belongs to a user with offline off: a manual action does not reach it."""
+    async def scenario():
+        await push.on_stream_event(APT, not_done("manual", "Azione programmata (manuale) non eseguita: x"))
+        await drain()
+    run(scenario())
+    assert "tok-z" not in grouped.sent[0].tokens
+
+
+def test_two_instances_one_notification(grouped):
+    async def scenario():
+        ev = not_done("checkout", "Azione programmata (check-out) non eseguita: y", decision_id="dec-77")
+        await push.on_stream_event(APT, ev)
+        push._schedule_groups.clear()                         # a second instance receives the same event
+        await push.on_stream_event(APT, ev)
+        await drain()
+    run(scenario())
+    assert len(grouped.sent) == 1
+
+
+def test_missed_actions_during_a_suspension_are_not_notified_one_by_one(grouped, monkeypatch):
+    s = dataclasses.replace(push.get_settings(), unreachable_alerts_off_until=soon(60))
+    monkeypatch.setattr(push, "get_settings", lambda: s)
+
+    async def scenario():
+        await push.on_stream_event(APT, not_done("prearrival", "saltata", action="schedule_missed"))
+        await push.on_stream_event(APT, not_done("prearrival", PREARRIVAL))               # refused: always told
+        await drain()
+    run(scenario())
+    assert [m.data["body"] for m in grouped.sent] == [PREARRIVAL]

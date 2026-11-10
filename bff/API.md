@@ -415,22 +415,30 @@ La notifica la mostra il service worker della PWA, che ignora le chiavi in più.
 
 | Chiave di `data` (tutte stringhe) | Quando | Valore |
 |---|---|---|
-| `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: sistema domotico non raggiungibile» / «…: prenotazione annullata, appartamento rimesso a vuoto» / «…: riepilogo della settimana» / «…: antigelo non attivo» |
+| `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: sistema domotico non raggiungibile» / «…: prenotazione annullata, appartamento rimesso a vuoto» / «…: riepilogo della settimana» / «…: antigelo non attivo» / «…: azione programmata non eseguita» («…: azioni programmate non eseguite» se più d'una) |
 | `body` | sempre | testo breve, tagliato a 200 caratteri con «…» |
-| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking), `/a/<apartment_id>/riepiloghi/<week>` (summary), `/a/<apartment_id>/decisioni` (frost_inactive) |
-| `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>`, `booking:<decision_id>`, `summary:<apartment_id>:<week>`, `frost:<apartment_id>:<device_id>` |
-| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` \| `summary` \| `frost_inactive` |
+| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking), `/a/<apartment_id>/riepiloghi/<week>` (summary), `/a/<apartment_id>/decisioni` (frost_inactive), `/a/<apartment_id>/programmazione` (schedule_failed) |
+| `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>`, `booking:<decision_id>`, `summary:<apartment_id>:<week>`, `frost:<apartment_id>:<device_id>`, `schedule:<apartment_id>:<decision_id della prima>` |
+| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` \| `summary` \| `frost_inactive` \| `schedule_failed` |
 | `apartment_id` | sempre | |
 | `approval_id` | solo `approval` | |
 | `device_id` | solo `device_offline` e `frost_inactive` | |
 | `ts` | se l'evento del motore lo porta | `ts` dell'evento, ISO 8601 UTC |
 
 `webpush.headers`: `Urgency: high` (`normal` per `summary`, che non è un allarme); `TTL` (secondi, stringa) `3600` per
-`approval`, `86400` per `device_offline`, `instance_down` e `booking`, `604800` (una settimana) per `summary`, `86400` per `frost_inactive`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
+`approval`, `86400` per `device_offline`, `instance_down` e `booking`, `604800` (una settimana) per `summary`, `86400` per `frost_inactive` e `schedule_failed`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
 
 Preferenze: `approval` ← `notification_prefs.approvals`; `device_offline` e `instance_down` ← `notification_prefs.offline`;
 `booking` ← `notification_prefs.bookings` («Prenotazioni», D-123, attiva di default anche per chi aveva già salvato le
 preferenze); `frost_inactive` ← `notification_prefs.offline` (D-164: caldaia senza sensore di temperatura utilizzabile a «casa vuota», l'antigelo non può agire; parte dalla decisione `frost_inactive`, una per episodio, il `body` è il suo testo); `summary` ← `notification_prefs.summary` («Riepilogo», D-150, attiva di default allo stesso modo).
+`schedule_failed` (D-219) parte dalle decisioni `schedule_failed` (azione programmata rifiutata dal motore alla sua
+ora) e `schedule_missed` (saltata perché il motore era fermo all'ora prevista). Categoria dal tipo dell'azione in
+`new_value`: `prearrival`, `checkout`, `empty` ← `notification_prefs.bookings`; `manual`, l'assistente o un tipo che il
+motore non dice ← `notification_prefs.offline`. Le decisioni dello stesso appartamento e della stessa categoria entro
+60 secondi dalla prima sono una notifica sola: `body` il testo della decisione, oppure «N azioni programmate non
+eseguite. La prima: <testo>»; la chiave in `work_claims` è quella dell'evento della prima, uguale per ogni istanza.
+Durante una sospensione D-217 le `schedule_missed` non si notificano una per una (dopo uno spegnimento programmato il
+motore ne scrive una per ogni azione saltata); le `schedule_failed` sempre.
 `booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
 annullata dopo il pre-arrivo, con l'appartamento rimesso a vuoto dal motore (D-121); il `body` è il testo della decisione.
 `device_offline` parte se il dispositivo è ancora offline dopo i minuti della regola `offline_alert` (15 se non
