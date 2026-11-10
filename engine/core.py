@@ -2092,8 +2092,8 @@ class ApartmentEngine:
         if run_at is not None and parse_dt(run_at) > utcnow() + timedelta(seconds=30):
             try:                                          # D-170: approved, the action is scheduled at its time
                 self.create_schedule({"run_at": run_at, "action": pa}, actor, correlation_id, source="assistant")
-            except MockError:
-                pass
+            except MockError as exc:
+                self._approved_not_done(approval, decision_actor, correlation_id, "non programmata", exc)
             return
         try:
             if pa["type"] == "apartment_mode":
@@ -2101,8 +2101,18 @@ class ApartmentEngine:
             else:
                 self.create_command(pa["device_id"], pa, actor, correlation_id, decision_actor=decision_actor,
                                     reasoning=f"Azione approvata: {approval['description']}")
-        except MockError:
-            pass
+        except MockError as exc:
+            self._approved_not_done(approval, decision_actor, correlation_id, "non eseguita", exc)
+
+    def _approved_not_done(self, approval: dict, actor: str, correlation_id: str, what: str, exc: MockError) -> None:
+        """Verification of 10 November 2026, point c: an approved action refused at once (device or connector
+        unreachable, an action no longer valid, a time already past) was dropped without a word, and the manager saw
+        only «Approvata». Now a decision with outcome failed says so, with the engine's reason."""
+        pa = approval["proposed_action"]
+        action, new = ("set_mode", pa.get("mode")) if pa["type"] == "apartment_mode" else (pa.get("action"), None)
+        self.log(actor, self._approval_target(approval), action, None, new,
+                 f"Azione approvata ma {what}: {exc.message}", "failed", correlation_id,
+                 approval_id=approval["approval_id"])
 
     def decide(self, approval_id: str, body: dict, actor: str, correlation_id: str) -> dict:
         approval = next((a for a in self.approvals if a["approval_id"] == approval_id), None)
