@@ -51,8 +51,10 @@ un'interfaccia Python piccola e stabile, descritta qui.
 ```
 
 Restano **nel motore**, e il connector non li deve fare:
-- validazione e limiti: un fuori limite è `422 out_of_limits`, deciso prima di chiamare il connector;
-- regole e priorità: `blocked_by_rule` e `blocked_by_priority`;
+- validazione e limiti: un fuori limite è `422` con `setpoint_out_of_range`, deciso prima di chiamare il connector (corretto il 10
+  novembre: la versione del 21 ottobre diceva `out_of_limits`);
+- regole e priorità: `blocked_by_rule` e `blocked_by_priority` (quest'ultimo è previsto dal contratto, ma oggi il
+  motore non lo produce);
 - la regolazione della caldaia: il motore decide «acceso/spento» confrontando la temperatura con il setpoint; al
   connector arriva solo l'acceso/spento;
 - la verifica «a consumo» dello split a infrarossi (`confirmation: power`), vedi il §2.5;

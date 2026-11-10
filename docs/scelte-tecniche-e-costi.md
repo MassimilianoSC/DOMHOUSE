@@ -36,7 +36,7 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 | **Accesso** | Login con email e password o con Google | Firebase Authentication | Google | D-141 |
 | **Notifiche** | Avvisi sul telefono | Firebase Cloud Messaging | Google | D-39, D-201 |
 | **Assistente** | Risponde a domande sull'appartamento e propone azioni | Gemini 3.5 Flash, più una «gemella» Flash-Lite | Google, solo in Europa | D-180, D-187 |
-| **Broker MQTT** | Riceve i collegamenti degli Shelly | Mosquitto 2.1.2 | VM, Milano (non ancora installato) | D-196, D-206 |
+| **Broker MQTT** | Riceve i collegamenti degli Shelly | Mosquitto 2.1.2 | VM, Milano (installato il 10 novembre 2026; nessun dispositivo vero ancora collegato) | D-196, D-206, D-212 |
 | **Dispositivi** | Relè, misuratori, prese, sensori, infrarossi per i climatizzatori | Shelly Gen4 (e Plug M Gen3), sensori Shelly BLU, Athom AR01 | Negli appartamenti | D-196 |
 | **Dominio di prova** | Il nome con cui i dispositivi trovano il broker | `dh-lab.eu`, DNS su Google | Register.it e Google | D-206 |
 | **Monitoraggio** | Email se il server non risponde o un motore tace | Cloud Monitoring | Google | D-104, D-197 |
@@ -63,7 +63,8 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 
 - **Cosa:** ogni appartamento ha il suo motore, in un container separato sulla stessa VM (e2-small, Milano).
 - **Perché:** il motore governa la casa anche quando nessuno usa l'app; un guasto in un appartamento non tocca gli altri.
-- **Sicurezza:** la VM non ha indirizzo pubblico; il server la raggiunge dalla rete interna di Google.
+- **Sicurezza:** il server raggiunge i motori dalla rete interna di Google. Dal 10 novembre 2026 la VM ha un indirizzo
+  pubblico aperto solo sulla porta 8883 dei dispositivi (D-209); le porte dei motori restano chiuse da internet.
 - **Scartato:** LangBrain, il motore esterno previsto all'inizio. Il committente non lo ha voluto (D-104).
 - **Limite accettato per ora:** se la VM si ferma, si fermano tutti i motori.
 
@@ -137,7 +138,6 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 | Server di produzione (min 1, max 3) | 45–60 € al mese | Fisso; sale solo se servono più copie | Stimato da listino, 9 nov |
 | Server di staging (min 0) | Quasi zero quando nessuno lo usa | A consumo | Stimato, D-197 |
 | VM dei motori (e2-small) con disco da 30 GB | Circa 0,6 € al giorno (circa 18 € al mese), più gli snapshot | Fisso | Stimato da listino, 23 ott |
-| Uscita verso internet della VM (Cloud NAT) | Circa 0,1 € al giorno, più l'indirizzo esterno | Fisso | Stimato da listino, 23 ott |
 | Disco separato per le chiavi del certificato (10 GB) | 0,42 € al mese | Fisso | Listino Google letto il 10 nov alle 9:15 |
 | Zona DNS di `dh-lab.eu` | Circa 0,18 € al mese | Fisso | Stimato, analisi del 9 nov |
 | Indirizzo pubblico della VM per i dispositivi (D-209) | Circa 3,3 € al mese | Fisso | Listino Google letto il 10 nov alle 9:40 |
@@ -198,7 +198,7 @@ Fonte: Report della fatturazione, solo progetto `domotica-poc-511707`, dal 12 ot
 - **Segreti:** password e chiavi stanno in Secret Manager di Google, mai nei file del codice né nei documenti.
 - **Identità:** server e VM usano identità gestite da Google, senza file di chiave.
 - **Dati in Europa:** servizi a Milano; modello dell'assistente solo in Europa (D-180).
-- **Rete:** la VM avrà un indirizzo pubblico aperto solo sulla porta 8883 dei dispositivi (D-209); tutto il resto resta chiuso, verificato dall'esterno.
+- **Rete:** la VM ha un indirizzo pubblico aperto solo sulla porta 8883 dei dispositivi (D-209); tutto il resto resta chiuso, verificato dall'esterno.
 
 ## 6. Come si aggiorna questo file
 

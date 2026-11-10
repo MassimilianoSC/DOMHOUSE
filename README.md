@@ -34,7 +34,7 @@ make dev                              # BFF :8000 (+ mock) e PWA :5173
 ```
 
 Login dev: pulsanti sulla pagina di accesso (`m.cracchiolo@hqe.it` admin, `operatore@demo.it`, `lettura@demo.it`).
-Simulatore: `/a/{apartment_id}/simulatore` (solo admin, solo sugli appartamenti con «istanza simulata», in qualunque ambiente: D-97). `MOCK_TIME_SCALE` = secondi reali per
+Simulatore: `/a/{apartment_id}/simulatore` (solo admin, solo sugli appartamenti dimostrativi, che esistono in sviluppo e in staging ma non in produzione: D-202). `MOCK_TIME_SCALE` = secondi reali per
 minuto simulato (default 1; 60 = tempo reale).
 
 Test: `python scripts/run_tests.py` (oppure `make test`) è il giro completo; richiede l'emulatore Firestore (JDK 11+ e
@@ -124,8 +124,8 @@ python -m engine
 Il motore scrive i suoi log su stdout, una riga JSON per evento (`"msg": "engine started"` all'avvio). Se non parte, lo
 dice nel log ed esce: **codice 2** se la configurazione non va (per esempio manca `API_KEY` o è troppo corta),
 **codice 3** se il connector non si può usare (`unknown connector`, `connector without make_connector`,
-`connector API version mismatch`, `connector setup failed` con il motivo nel campo `error`). Lo stato è in memoria:
-fermato il motore, si riparte dai dati iniziali.
+`connector API version mismatch`, `connector setup failed` con il motivo nel campo `error`). Lo stato è salvato in SQLite nella
+cartella dei dati (`DATA_DIR`): fermato il motore, riparte da dove era.
 
 **4. Provarlo**, da un secondo terminale, con la stessa chiave (in PowerShell `curl.exe` al posto di `curl`):
 
@@ -239,7 +239,8 @@ Prerequisiti (una tantum, progetto `your-gcp-project-id`):
 Deploy (da Git Bash):
 
 ```bash
-# staging: mock integrato nel BFF, simulatore attivo, Firestore e Firebase Auth reali
+# staging: motore della VM («dev») più i dimostrativi integrati nel BFF, simulatore attivo, Firestore e Firebase Auth reali
+# (oggi si pubblica con scripts/publish.sh, che lancia deploy.sh dal commit: docs/procedura-ambienti-separati.md)
 TARGET=staging GCP_PROJECT_ID=your-gcp-project-id GCP_REGION=europe-west8 SMTP_USER=<mittente> scripts/deploy.sh
 # produzione: istanze reali del motore raggiunte via Direct VPC Egress
 TARGET=prod GCP_PROJECT_ID=your-gcp-project-id GCP_REGION=europe-west8 VPC_NETWORK=<rete> VPC_SUBNET=<subnet> SMTP_USER=<mittente> scripts/deploy.sh

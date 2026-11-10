@@ -2149,8 +2149,7 @@ Vedi la parte 5, «Approvazioni: approvare o respingere». In breve:
 
 > **Da sapere**
 >
-> Nel sito vero, fino alla consegna al cliente, i dimostrativi con il motore simulato integrato sono ammessi come
-> nell'ambiente di prova.
+> Nel sito vero i dimostrativi non si possono creare: si provano nell'ambiente di prova (dal 9 novembre 2026).
 
 ### Quando qualcosa non funziona
 

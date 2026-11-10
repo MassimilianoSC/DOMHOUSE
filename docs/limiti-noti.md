@@ -67,7 +67,7 @@
 | **Simulatore prima del caricamento** | Se l'appartamento non è ancora caricato, i valori proposti si calcolano con l'ora italiana; cambia solo il giorno proposto per un appartamento su un altro fuso, l'invio usa sempre il suo fuso | Accettato |
 | **Cambio d'ora nel rodaggio** | Il prossimo è il 28 marzo 2027, dopo la consegna: è provato solo dalle prove automatiche (D-210) | Accettato |
 
-## Broker MQTT (dal 9 novembre, non ancora installato)
+## Broker MQTT (installato sulla VM il 10 novembre; nessun dispositivo vero collegato)
 
 | Limite | Cosa succede | Stato |
 |---|---|---|

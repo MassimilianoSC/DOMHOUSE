@@ -460,6 +460,11 @@ creato il segreto `langbrain-api-key-<apartment_id>` e dato a `langbrain-vm@` Se
 
 ## G. Collegare l'app al motore della VM (P-66, D-120)
 
+> **Sezione storica (ottobre 2026).** Oggi staging e produzione usano entrambi il motore della VM
+> (`INSTANCE_MODE=real`); la produzione ha fino a 3 istanze (D-201) e rifiuta i dimostrativi `mock://` (D-202), che
+> esistono solo in staging; la pubblicazione si fa con `scripts/publish.sh` (`docs/procedura-ambienti-separati.md`).
+> I passi qui sotto restano come riferimento di come è stato fatto il primo collegamento.
+
 Da qui il server dell'app (BFF su Cloud Run) passa a `TARGET=prod`: `INSTANCE_MODE=real` e Direct VPC Egress sulla rete
 `default`, così raggiunge `10.198.0.2:8100`. Gli appartamenti dimostrativi (`mock://builtin`) restano come sono, serviti
 dal BFF stesso (D-97). Prerequisiti: C3 riuscito (il motore `dev` risponde dalla rete interna) e il commit da
@@ -864,6 +869,4 @@ Il disco delle chiavi non ha snapshot: il certificato **non si ripristina, si ri
 
 ## H. Non ancora qui
 
-- Allarmi dai log dei container (D-104): passo 10 del piano. Il backup applicativo c'è (sezione E), insieme allo
-  snapshot giornaliero del disco della VM.
 - Righe di log del motore per i comandi riusciti (oggi solo avvio, avvisi ed errori): con gli allarmi, passo 10.
