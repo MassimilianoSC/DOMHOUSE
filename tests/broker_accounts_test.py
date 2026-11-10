@@ -5,7 +5,9 @@ permissions is in tests/broker_container_test.py."""
 import importlib.util
 import json
 import re
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -137,6 +139,33 @@ def pc(tmp_path):
         return subprocess.run([bash, "-c", command], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=90)
     run.stubs = stubs
     return run
+
+
+def test_a_python3_that_is_no_python_is_passed_over(tmp_path):
+    """The full run of 10 November: in a clean copy without .venv, `python3` in Git Bash was the Microsoft Store alias,
+    found by command -v but no Python, and add-apartment stopped with «testo vuoto». The script, copied away from the
+    repository's .venv, with such a python3 first in the PATH and a real python after it."""
+    bash = _bash()
+    if not bash:
+        pytest.skip("bash non disponibile")
+    alone = tmp_path / "copia" / "scripts"
+    alone.mkdir(parents=True)
+    for name in ("broker-secrets.sh", "broker_accounts.py"):
+        shutil.copy(ROOT / "scripts" / name, alone / name)
+    stubs = tmp_path / "stubs"
+    stubs.mkdir()
+    for name, body in (("gcloud", GCLOUD),
+                       ("python3", '#!/usr/bin/env bash\necho "Python non è stato trovato; eseguire senza argomenti da '
+                                   'installare dal Microsoft Store" >&2\nexit 9009\n'),
+                       ("python", f'#!/usr/bin/env bash\nexec "{posix(Path(sys.executable))}" "$@"\n')):
+        (stubs / name).write_text(body, encoding="utf-8", newline="\n")
+        (stubs / name).chmod(0o755)
+    command = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; '
+               f'GCP_PROJECT_ID=p "{posix(alone / "broker-secrets.sh")}" add-apartment apt-a')
+    done = subprocess.run([bash, "-c", command], capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          timeout=90)
+    assert done.returncode == 0, done.stderr
+    assert len((stubs / "s-langbrain-shelly-apt-a").read_text(encoding="utf-8")) >= 32      # a real password, written
 
 
 def secret(pc, name):
