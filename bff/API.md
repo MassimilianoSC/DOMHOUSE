@@ -722,8 +722,8 @@ started» dice `model` e `reason` (`silenzio` o `errore`), «assistant model cal
 `AI_TWIN_MODEL` la gemella è lo stesso modello e un errore rapido torna subito, come prima.
 
 Modello e chiamata (D-182, modelli di D-187): nei due manifesti `gemini-3.5-flash` (`AI_MODEL`) con la gemella
-`gemini-3.5-flash-lite` (`AI_TWIN_MODEL`) dopo 3 s (`AI_HEDGE_AFTER_S`); senza le variabili il BFF usa ancora i valori
-di D-182 (`gemini-3.8-flash`, 6 s). Località `eu`, endpoint nativo di Vertex (`AI_API`
+`gemini-3.5-flash-lite` (`AI_TWIN_MODEL`) dopo 3 s (`AI_HEDGE_AFTER_S`); gli stessi valori, prezzi compresi, sono anche
+i predefiniti del BFF senza le variabili (D-212). Località `eu`, endpoint nativo di Vertex (`AI_API`
 `nativo`, predefinito; `openai` torna all'endpoint compatibile): `generateContent` su
 `aiplatform.eu.rep.googleapis.com/v1/projects/<progetto>/locations/eu/publishers/google/models/<modello>`.
 Ragionamento spento: `thinkingConfig.thinkingBudget` = `AI_THINKING_BUDGET` (0; -1 non lo manda). Il BFF traduce dal

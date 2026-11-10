@@ -15,7 +15,7 @@ from bff.repository import get_repository
 APT = "apt-bologna-01"
 USAGE = {"prompt_tokens": 1000, "completion_tokens": 200, "total_tokens": 1500,   # 300 reasoning tokens
          "prompt_tokens_details": {"cached_tokens": 400}}
-COST = (600 * 0.83 + 400 * 0.08 + 500 * 4.13) / 1_000_000                       # 0.002595 €
+COST = (600 * 1.50 + 400 * 0.15 + 500 * 9.00) / 1_000_000                       # 0.00546 €, D-187 prices
 
 
 def run(coro):
@@ -65,7 +65,7 @@ def test_the_bff_chooses_model_and_tokens_and_forwards_only_what_it_knows(model)
     run(post({**BODY, "model": "un-altro-modello", "max_tokens": 99_999, "stream": True, "temperature": 0.1,
               "tools": [{"type": "function", "function": {"name": "stato"}}]}))
     sent = model[0]
-    assert sent["model"] == "google/gemini-3.8-flash" and sent["max_tokens"] == 4096
+    assert sent["model"] == "google/gemini-3.5-flash" and sent["max_tokens"] == 4096
     assert "stream" not in sent and sent["temperature"] == 0.1 and sent["tools"][0]["function"]["name"] == "stato"
     assert "reasoning_effort" not in sent                                         # D-182: nothing by default
     assert run(post({"messages": []})).status_code == 422
@@ -135,7 +135,7 @@ def test_a_demonstration_engines_client_is_accepted(model):
 # -------- C-10 layer 1 --------
 def test_a_refused_reasoning_effort_is_dropped_once_and_for_all(model, monkeypatch):
     monkeypatch.setattr(ai_gateway, "get_settings",
-                        lambda: dataclasses.replace(get_settings(), ai_reasoning_effort="low"))
+                        lambda: dataclasses.replace(get_settings(), ai_reasoning_effort="low", ai_twin_model=""))
     logged = []
     monkeypatch.setattr(ai_gateway, "warn", lambda msg, **kw: logged.append(msg))
     calls = []
@@ -155,8 +155,8 @@ def test_a_refused_reasoning_effort_is_dropped_once_and_for_all(model, monkeypat
 
 def test_a_silent_first_request_gets_a_twin_and_the_first_answer_wins(model, monkeypatch):
     monkeypatch.setattr(ai_gateway, "get_settings",
-                        lambda: dataclasses.replace(get_settings(), ai_hedge_after_s=0.05))
-    calls, logged = [], []
+                        lambda: dataclasses.replace(get_settings(), ai_hedge_after_s=0.05, ai_twin_model=""))
+    calls, logged = [], []      # the twin on the same model (C-10); on another model: the D-187 tests below
     monkeypatch.setattr(ai_gateway, "info", lambda msg, **kw: logged.append(kw))
 
     async def fake(body):
