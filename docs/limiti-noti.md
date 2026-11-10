@@ -67,12 +67,19 @@
 | **Attese massime non provabili a mano** | Il limite di 30 e 90 secondi, la pagina «Non riesco ad aprire la pagina» dopo 15 secondi e il messaggio per un errore di disegno si verificano solo con le prove automatiche: senza rete l'errore arriva subito. Il collaudo a mano (sezione O) prova solo l'assenza di rete | Accettato |
 | **Correzione E-29 non provata del tutto** | Non provata con Firebase vero, su Safari o su un telefono vero | Da verificare |
 
+## Prenotazioni
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Formato di Italianway non ancora noto** | Il traduttore delle prenotazioni è provvisorio: con prenotazioni reali di Italianway il pre-arrivo automatico e il risparmio al check-out **non sono disponibili** finché Italianway non manda il formato vero | Da chiedere a Leonardo (committente) |
+
 ## Motore
 
 | Limite | Cosa succede | Stato |
 |---|---|---|
 | **Approvata ma non eseguita** | Dal lotto 38 il fallimento si vede nelle Decisioni («Azione approvata ma non eseguita»), ma l'approvazione resta «Approvata» e l'app riceve un OK: il contratto non ha uno stato «non eseguita» | Accettato |
 | **Riepilogo fatto in ritardo** | Se il motore è irraggiungibile per tutto il lunedì, il riepilogo fatto dopo può ancora perdere le approvazioni scadute nei primi giorni della settimana | Accettato |
+| **Pausa del compressore dopo un riavvio** | È tenuta in memoria: un riavvio del motore la azzera | Da correggere (o1), lotto 38 o 39 |
 | **Finestra chiusa e riaperta mentre la regola aspetta** | Partono due attese, e il clima si spegne allo scadere della prima (c'era già prima del lotto 38) | Accettato |
 | **Azione programmata rifiutata dal motore** | Diventava «non riuscita» senza una riga nelle Decisioni con il motivo | Corretto il 10 novembre (`0e1d04a`), nel lotto 38 |
 

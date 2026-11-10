@@ -1982,6 +1982,11 @@ all'amministratore. Non serve un'approvazione preventiva.
 
 **Dalla prenotazione al check-in, con il pre-arrivo automatico.**
 
+> **Da sapere**
+>
+> Con le prenotazioni reali di Italianway il pre-arrivo automatico e il risparmio al check-out non sono ancora
+> disponibili: Italianway deve ancora mandare il formato vero dei suoi messaggi. Oggi funzionano con il Simulatore.
+
 1. **La prenotazione arriva** da Italianway (o dal Simulatore, nei dimostrativi). Nelle Decisioni leggi «Prenotazione
    creata».
 2. **In «Programmazione»** compare l'azione «pre-arrivo» con origine «prenotazione»: comfort 2 ore prima del check-in
