@@ -326,6 +326,22 @@ class FirestoreRepository:
     async def release_work(self, key):
         await self._work(key).delete()
 
+    async def expire_work(self, key):
+        ref = self._work(key)
+
+        @firestore.async_transactional
+        async def expire(tx):
+            snap = await ref.get(transaction=tx)
+            d = snap.to_dict() or {}
+            if d.get("status") != "pending" or d.get("payload") is None:
+                return False
+            now = time.time()
+            tx.update(ref, {"lease_until": now, "retry_at": now})
+            return True
+
+        async with self._lock(f"work:{key}"):
+            return await expire(self.db.transaction())
+
     async def due_work(self, now, limit=50):
         q = self._col("work_claims").where(filter=firestore.FieldFilter("retry_at", "<=", now)).limit(limit)
         return [{"key": d["key"], "payload": d["payload"], "attempts": d["attempts"]}

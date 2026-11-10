@@ -572,6 +572,22 @@ def test_work_claims(repo):
         assert timedelta(days=6, hours=23) < left <= timedelta(days=7)
 
 
+def test_expire_work(repo):
+    """D-219: a pending claim with its message is made due at once (the summary of a planned shutdown, when the
+    suspension is removed early); without a message, done or missing: nothing."""
+    import time
+    assert run(repo.claim_work("riassunto", "a", 3600, {"m": "1"})) == "mine"
+    assert run(repo.due_work(time.time())) == []
+    assert run(repo.expire_work("riassunto")) is True
+    assert [i["key"] for i in run(repo.due_work(time.time() + 1))] == ["riassunto"]
+    assert run(repo.claim_work("riassunto", "b", 60)) == "mine"           # its lease is over: recover_once takes it
+    run(repo.finish_work("riassunto"))
+    assert run(repo.expire_work("riassunto")) is False                      # done
+    assert run(repo.claim_work("vuota", "a", 3600)) == "mine"
+    assert run(repo.expire_work("vuota")) is False                          # no message
+    assert run(repo.expire_work("mai-vista")) is False
+
+
 def test_two_instances_claiming_at_the_same_instant_on_firestore(repo):
     """D-201: two processes (two repository objects, each with its own in-process queue): exactly one gets it."""
     from bff.repository.firestore import FirestoreRepository

@@ -1065,3 +1065,96 @@ def test_missed_actions_during_a_suspension_are_not_notified_one_by_one(grouped,
         await drain()
     run(scenario())
     assert [m.data["body"] for m in grouped.sent] == [PREARRIVAL]
+
+
+# -------- D-219: the summary at the end of a planned shutdown ------------------------------------------------------------
+@pytest.fixture
+def maintenance(grouped, monkeypatch):
+    """A suspension that can be set and removed; the apartment in the registry (the start reads it)."""
+    state = SimpleNamespace(settings=push.get_settings())
+    monkeypatch.setattr(push, "get_settings", lambda: state.settings)
+    run(get_repository().upsert_apartment(APT))
+    run(get_repository().release_work(push.maintenance_key(APT)))
+    state.suspend = lambda value: setattr(state, "settings", dataclasses.replace(state.settings, unreachable_alerts_off_until=value))
+    return state
+
+
+def missed(kind):
+    return not_done(kind, "Azione programmata non eseguita: il motore era fermo", action="schedule_missed")
+
+
+def kept():
+    return get_repository().work.get(push.maintenance_key(APT))
+
+
+def test_the_missed_actions_wait_as_one_summary_until_the_end_of_the_suspension(maintenance, grouped):
+    maintenance.suspend(soon(3600))
+
+    async def scenario():
+        for kind in ("prearrival", "checkout", "manual"):
+            await push.on_stream_event(APT, missed(kind))
+        await drain()
+    run(scenario())
+    assert grouped.sent == []
+    summary = kept()
+    assert summary["status"] == "pending" and summary["payload"]["pref"] == "bookings"
+    assert summary["payload"]["data"]["body"] == "Durante la manutenzione 3 azioni programmate non sono state eseguite"
+    assert summary["payload"]["data"]["link"] == "/a/apt-push/programmazione"
+    assert 3590 < summary["lease_until"] - time.time() <= 3600                 # until the end of the suspension
+
+
+def test_the_natural_end_sends_it_once(maintenance, grouped):
+    maintenance.suspend(soon(0.2))
+
+    async def scenario():
+        await push.on_stream_event(APT, missed("manual"))
+        await drain()
+        assert await push.recover_once() == 0                                  # not yet
+        await asyncio.sleep(0.3)                                               # the suspension is over
+        first = await push.recover_once()
+        await drain()
+        return first, await push.recover_once()
+    first, second = run(scenario())
+    assert (first, second) == (1, 0)
+    [msg] = grouped.sent
+    assert msg.data["body"] == "Durante la manutenzione 1 azione programmata non è stata eseguita"
+    assert "tok-z" not in msg.tokens                                           # only manual: «Dispositivi…» category
+
+
+def test_removed_early_the_new_revision_sends_it_at_its_start(maintenance, grouped):
+    maintenance.suspend(soon(86400))
+
+    async def scenario():
+        await push.on_stream_event(APT, missed("checkout"))
+        await drain()
+        assert await push.expire_maintenance_summaries() == 0                  # still suspended: it waits
+        maintenance.suspend("")                                                # the variable removed
+        assert await push.expire_maintenance_summaries() == 1
+        return await push.recover_once()
+    assert run(scenario()) == 1 and len(grouped.sent) == 1
+
+
+def test_two_instances_keep_one_summary(maintenance, grouped):
+    maintenance.suspend(soon(0.2))
+
+    async def scenario():
+        ev = missed("prearrival")
+        await push.on_stream_event(APT, ev)
+        push._schedule_groups.clear()                                         # a second instance, the same event
+        await push.on_stream_event(APT, ev)
+        await drain()
+        await asyncio.sleep(0.3)
+        return await push.recover_once()
+    assert run(scenario()) == 1 and len(grouped.sent) == 1
+
+
+def test_the_next_shutdown_has_its_own_summary(maintenance, grouped):
+    async def one_shutdown():
+        maintenance.suspend(soon(0.2))
+        await push.on_stream_event(APT, missed("prearrival"))
+        await drain()
+        await asyncio.sleep(0.3)
+        await push.recover_once()
+    run(one_shutdown())
+    run(one_shutdown())
+    assert len(grouped.sent) == 2

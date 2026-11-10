@@ -438,7 +438,16 @@ motore non dice ← `notification_prefs.offline`. Le decisioni dello stesso appa
 60 secondi dalla prima sono una notifica sola: `body` il testo della decisione, oppure «N azioni programmate non
 eseguite. La prima: <testo>»; la chiave in `work_claims` è quella dell'evento della prima, uguale per ogni istanza.
 Durante una sospensione D-217 le `schedule_missed` non si notificano una per una (dopo uno spegnimento programmato il
-motore ne scrive una per ogni azione saltata); le `schedule_failed` sempre.
+motore ne scrive una per ogni azione saltata); le `schedule_failed` sempre. Le `schedule_missed` della sospensione,
+raccolte per 60 secondi, diventano un riassunto per appartamento: `kind` `schedule_failed`, `title` «…: azioni
+programmate non eseguite», `body` «Durante la manutenzione N azioni programmate non sono state eseguite» («1 azione
+programmata non è stata eseguita»), `link` la Programmazione, `tag` `maintenance:<apartment_id>`; categoria
+«Prenotazioni» se almeno una nasceva da una prenotazione, altrimenti `offline`. Resta in `work_claims` (chiave
+`push:maintenance:<apartment_id>`, con il messaggio) fino alla fine della sospensione, al massimo 6 giorni; poi
+`recover_once` lo manda, da una sola istanza. Se la sospensione viene tolta prima (nuova revisione senza
+`UNREACHABLE_ALERTS_OFF_UNTIL`), all'avvio il server lo rende dovuto subito (`expire_work`) e parte entro un minuto.
+Uno per appartamento: le istanze dopo la prima trovano la chiave presa; alla manutenzione dopo, la chiave consegnata si
+libera e si riprende.
 `booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
 annullata dopo il pre-arrivo, con l'appartamento rimesso a vuoto dal motore (D-121); il `body` è il testo della decisione.
 `device_offline` parte se il dispositivo è ancora offline dopo i minuti della regola `offline_alert` (15 se non

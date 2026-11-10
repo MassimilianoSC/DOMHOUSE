@@ -95,6 +95,22 @@ def schedule_failed_push(apt: Apartment, first_decision_id: str, reasonings: lis
                       f"/a/{apt.apartment_id}/programmazione", f"schedule:{apt.apartment_id}:{first_decision_id}", ts)
 
 
+def maintenance_push(apt: Apartment, n: int):
+    """D-219: at the end of a planned shutdown, the scheduled actions it made the engine miss, one notification."""
+    body = ("Durante la manutenzione 1 azione programmata non è stata eseguita" if n == 1
+            else f"Durante la manutenzione {n} azioni programmate non sono state eseguite")
+    return build_push("schedule_failed", apt, f"{apt.name}: azioni programmate non eseguite", body,
+                      f"/a/{apt.apartment_id}/programmazione", f"maintenance:{apt.apartment_id}")
+
+
+def maintenance_key(apt: Apartment) -> str:
+    """D-219: the summary of one planned shutdown, one per apartment: kept claimed until the suspension ends, then due."""
+    return f"push:maintenance:{apt.apartment_id}"
+
+
+MAINTENANCE_LEASE_MAX_S = 6 * 86400              # the claims last 7 days in Firestore (retention.work_claim)
+
+
 def booking_reset_push(apt: Apartment, decision_id: str, reasoning: str | None, ts: str | None):
     """D-121/D-123: a booking cancelled after its prearrival, the engine put the apartment back to empty."""
     body = (reasoning or "").strip() or "Prenotazione annullata dopo il pre-arrivo: appartamento rimesso a vuoto"
@@ -488,8 +504,14 @@ def _schedule_not_done(apt: Apartment, ev: SseEvent, data: dict, ts: str | None)
     """D-219: the engine's decision schedule_failed or schedule_missed joins the open group of its apartment and
     category, or opens one. The key of the group is its first event's, the same on every instance that receives it."""
     if data.get("action") == "schedule_missed" and alerts_suspended_until():
-        info("missed scheduled action not notified during the suspension", apartment_id=apt.apartment_id)
-        return                                     # after a planned shutdown no burst (D-219); the summary is apart
+        # after a planned shutdown no burst: the engine writes them all at its start, they make one summary (D-219)
+        key = (apt.apartment_id, "maintenance")
+        group = _schedule_groups.get(key)
+        if group is None:
+            group = _schedule_groups[key] = {"kinds": []}
+            _spawn(_keep_maintenance_summary(apt, key), "maintenance summary", apt.apartment_id)
+        group["kinds"].append(data.get("new_value"))
+        return
     pref = schedule_pref(data.get("new_value"))
     key = (apt.apartment_id, pref)
     group = _schedule_groups.get(key)
@@ -507,6 +529,43 @@ async def _flush_schedule_group(apt: Apartment, key: tuple[str, str]) -> None:
         return
     await notify_once(f"{group['claim']}:schedule:{key[1]}", apt.tenant_id, key[1],
                       *schedule_failed_push(apt, group["first"], group["reasonings"], group["ts"]))
+
+
+async def _keep_maintenance_summary(apt: Apartment, key: tuple[str, str]) -> None:
+    """D-219: the missed actions of a planned shutdown wait as one notification, claimed until the end of the suspension:
+    then the push recovery (recover_once, any instance) sends it. When the suspension is removed early the new revision
+    makes it due at its start (expire_maintenance_summaries). One per apartment: the first instance keeps it."""
+    await asyncio.sleep(SCHEDULE_GROUP_S)
+    group = _schedule_groups.pop(key, None)
+    until = alerts_suspended_until()
+    if not group or not get_settings().fcm_enabled:
+        return
+    kinds = group["kinds"]
+    pref = "bookings" if any(k in BOOKING_KINDS for k in kinds) else "offline"
+    data, headers = maintenance_push(apt, len(kinds))
+    payload = {"tenant_id": apt.tenant_id, "pref": pref, "data": data, "headers": headers}
+    left = (until - datetime.now(UTC)).total_seconds() if until else 0.0
+    lease = min(max(left, 0.0), MAINTENANCE_LEASE_MAX_S)
+    repo = get_repository()
+    claimed = await repo.claim_work(maintenance_key(apt), runtime.BOOT_ID, lease, payload)
+    if claimed == "done":                          # the summary of an earlier shutdown, already sent
+        await repo.release_work(maintenance_key(apt))
+        claimed = await repo.claim_work(maintenance_key(apt), runtime.BOOT_ID, lease, payload)
+    info("maintenance summary kept", apartment_id=apt.apartment_id, missed=len(kinds), outcome=claimed, lease_s=int(lease))
+
+
+async def expire_maintenance_summaries() -> int:
+    """D-219: a process that starts without a suspension (the variable removed: a new revision) makes the kept summaries
+    due at once; recover_once sends them within its round."""
+    if alerts_suspended_until():
+        return 0
+    repo = get_repository()
+    expired = 0
+    for apt in await repo.list_apartments():
+        if await repo.expire_work(maintenance_key(apt)):
+            expired += 1
+            info("maintenance summary due", apartment_id=apt.apartment_id)
+    return expired
 
 
 async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
@@ -577,6 +636,10 @@ def _start_round(seconds: float, work, what: str) -> None:
 async def start_background_hubs() -> None:
     _suspension_note()
     if get_settings().fcm_enabled:
+        try:
+            await expire_maintenance_summaries()       # D-219: the suspension removed, the summaries go now
+        except Exception as exc:
+            warn("maintenance summaries not made due", error=type(exc).__name__)
         await align_hubs_once()
         _start_round(get_settings().notification_lease_s, recover_once, "push recovery")
         _start_round(CURSOR_SAVE_S, hub_manager.save_cursors, "stream cursors")
