@@ -533,10 +533,10 @@ class Assistant:
         from .core import iso, parse_dt, utcnow
         if not isinstance(value, str):
             raise ValueError("quando")
-        try:
-            dt = parse_dt(value)
-        except ValueError:
-            dt = datetime.fromisoformat(value).replace(tzinfo=ZoneInfo(self.e.timezone))   # local time without zone
+        # D-212: the prompt asks the apartment's local time without a zone. An offset the model adds anyway is dropped:
+        # written in winter time after the change to summer time (or the other way round) it would move the command
+        # by an hour. An hour that does not exist that day runs an hour later; one that comes twice, the first time.
+        dt = datetime.fromisoformat(value.strip().replace("Z", "+00:00")).replace(tzinfo=ZoneInfo(self.e.timezone))
         if dt <= utcnow() + timedelta(seconds=30):
             raise ValueError("quando nel passato")
         return iso(dt)

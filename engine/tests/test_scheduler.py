@@ -52,15 +52,21 @@ def test_energy_days_start_at_local_midnight(monkeypatch, first, last, starts):
         assert datetime.fromisoformat(s["ts"].replace("Z", "+00:00")).astimezone(ROME).time().hour == 0
 
 
-@pytest.mark.parametrize("now_local, text, expected_utc", [
-    # 02:30 on 29 March does not exist (02:00 -> 03:00): the action runs at 03:30 local time, 01:30 UTC
-    (datetime(2026, 3, 28, 20, 0), "alle 2:30 metti eco", "2026-03-29T01:30:00.000Z"),
+@pytest.mark.parametrize("now_local, text, expected_utc, said", [
+    # 02:30 on 29 March does not exist (02:00 -> 03:00): the action runs at 03:30 local time, 01:30 UTC, and the
+    # answer says so (D-212: it used to say «alle 02:30»)
+    (datetime(2026, 3, 28, 20, 0), "alle 2:30 metti eco", "2026-03-29T01:30:00.000Z",
+     "alle 03:30: quel giorno le 02:30 non esistono, per il passaggio all'ora legale."),
     # 02:30 on 25 October happens twice: the first one, in summer time (00:30 UTC)
-    (datetime(2026, 10, 24, 20, 0), "alle 2:30 metti eco", "2026-10-25T00:30:00.000Z"),
+    (datetime(2026, 10, 24, 20, 0), "alle 2:30 metti eco", "2026-10-25T00:30:00.000Z",
+     "alle 02:30, la prima delle due volte (ancora con l'ora legale)."),
     # an ordinary hour the day after the change: local time, the new offset
-    (datetime(2026, 10, 25, 20, 0), "alle 18 metti eco", "2026-10-26T17:00:00.000Z"),
+    (datetime(2026, 10, 25, 20, 0), "alle 18 metti eco", "2026-10-26T17:00:00.000Z", "alle 18:00."),
+    # the next change, 28 March 2027
+    (datetime(2027, 3, 27, 21, 0), "alle 2:15 metti eco", "2027-03-28T01:15:00.000Z",
+     "alle 03:15: quel giorno le 02:15 non esistono, per il passaggio all'ora legale."),
 ])
-def test_assistant_hours_are_the_apartments_local_hours(monkeypatch, now_local, text, expected_utc):
+def test_assistant_hours_are_the_apartments_local_hours(monkeypatch, now_local, text, expected_utc, said):
     at(monkeypatch, now_local.replace(tzinfo=ROME))
     e = engine()
     monkeypatch.setattr(core.asyncio, "sleep", _no_wait)
@@ -73,6 +79,7 @@ def test_assistant_hours_are_the_apartments_local_hours(monkeypatch, now_local, 
     assert answer["status"] == "answered", answer
     item = e.schedule[answer["actions"][0]["schedule_id"]]
     assert item["run_at"] == expected_utc and item["action"] == {"type": "apartment_mode", "mode": "eco"}
+    assert answer["answer"] == f"Ho programmato la modalità eco {said}", answer["answer"]
 
 
 async def _no_wait(_seconds):

@@ -110,6 +110,17 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def at_local_hour(run: datetime, hh: int, mm: int) -> str:
+    """D-212: «alle HH:MM» said with the hour the action really runs at. On the day summer time starts an hour that
+    does not exist (02:30) runs an hour later; on the day it ends an hour that comes twice runs the first time."""
+    real = run.astimezone(UTC).astimezone(run.tzinfo)
+    if (real.hour, real.minute) != (hh, mm):
+        return f"alle {real:%H:%M}: quel giorno le {hh:02d}:{mm:02d} non esistono, per il passaggio all'ora legale"
+    if run.replace(fold=1).utcoffset() != run.replace(fold=0).utcoffset():
+        return f"alle {hh:02d}:{mm:02d}, la prima delle due volte (ancora con l'ora legale)"
+    return f"alle {hh:02d}:{mm:02d}"
+
+
 def iso(dt: datetime) -> str:
     return dt.astimezone(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
@@ -2277,7 +2288,7 @@ class ApartmentEngine:
                     what = f"la modalità {'casa vuota' if mode == 'empty' else mode}"   # decision 55
                 item = self.create_schedule({"run_at": iso(run), "action": action}, actor, corr, source="assistant")
                 ask.update(status="answered", actions=[{"type": "schedule", "schedule_id": item["schedule_id"]}],
-                           answer=f"Ho programmato {what} alle {hh:02d}:{mm:02d}.")
+                           answer=f"Ho programmato {what} {at_local_hour(run, hh, mm)}.")
             elif "spegni" in text:
                 d = self._match_device(text)
                 cap = next(c for c in ACTIONS if c in d["capabilities"])
