@@ -314,3 +314,16 @@ Per un amministratore, O1, O2 e O3 vanno fatte entro 2 minuti dall'attivazione d
 | O6 📱 | Amministratore | Dentro l'app, su una pagina qualsiasi, attiva la modalità aereo e lascia l'app aperta e in primo piano per 3 minuti. | Al posto della pagina compare «Sei senza connessione»; non la pagina di accesso. | |
 | O7 📱 | Amministratore | Subito dopo O6: togli la modalità aereo e non toccare nulla. | Entro pochi secondi si riapre da sola la stessa pagina. | |
 | O8 | Qualsiasi, telefono | Collega il telefono a un Wi-Fi senza internet (per esempio l'hotspot di un altro telefono con i dati spenti), con i dati mobili spenti. Chiudi del tutto l'app e riaprila. | Entro mezzo minuto «Non riesco ad aprire la pagina» con «Ricarica». Non la pagina di accesso. | |
+
+## P. Prima della consegna: telefoni veri (D-218)
+
+Obbligatorie prima della consegna, su un telefono Android con Chrome e su un iPhone con Safari, con l'app installata.
+
+| N. | Ruolo | Passi | Risultato atteso | Esito |
+|---|---|---|---|---|
+| P1 | Operatore, Android | Panoramica aperta in primo piano per 10 minuti; da un altro accesso cambia un dispositivo ogni 2–3 minuti. | Ogni cambio arriva da solo, senza ricaricare; al massimo per un attimo «Riconnessione…». | |
+| P2 | Operatore, iPhone | Come P1. | Come P1. | |
+| P3 | Operatore, Android | Passa a un'altra app per 2 minuti, cambia un dispositivo da un altro accesso, torna. | Lo stato è già aggiornato o si aggiorna entro pochi secondi. | |
+| P4 | Operatore, iPhone | Come P3. | Come P3. | |
+| P5 | Operatore, Android | Con le notifiche attive, chiudi l'app; fai nascere un'approvazione (Simulatore, da un altro accesso). | Arriva la notifica «…: approvazione richiesta»; toccandola si apre la pagina Approvazioni. | |
+| P6 | Operatore, iPhone | Come P5 (app installata sulla schermata Home, notifiche consentite). | Come P5. | |
