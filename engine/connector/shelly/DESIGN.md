@@ -73,3 +73,4 @@ Propongo due strade, in ordine di preferenza. Entrambe stanno dietro lo stesso P
 5. **Solo per MQTT**: chi gestisce utenti e permessi sul broker, e come si dividono per appartamento?
 6. **Come l'ingresso instrada la connessione di un relè al processo del suo appartamento?**
 7. **Nome dei segreti in Secret Manager**: va bene `langbrain-shelly-<apartment_id>` (`connector.md` §5)?
+8. **Script di messa in servizio per gli installatori**: dove va nel repository (dentro `engine/connector/shelly/` o altrove), e come arrivano all'installatore le credenziali per appartamento, senza dargli accesso a Secret Manager? Lo script non fa parte del connector e non tocca il contratto: configura i relè (Wi-Fi, trasporto, verifica) con le richieste HTTP dei dispositivi.
