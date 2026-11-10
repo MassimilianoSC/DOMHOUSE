@@ -104,7 +104,11 @@ def test_schedule_due_while_down_runs_if_recent_else_missed(tmp_path):
     second = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False, store=SqliteStore(db))
     assert second.schedule[old["schedule_id"]]["status"] == "failed"
     missed = [d for d in second.decisions if d["action"] == "schedule_missed"]
-    assert len(missed) == 1 and missed[0]["outcome"] == "failed" and old["run_at"] in missed[0]["reasoning"]
+    # D-219: the apartment's local hour in the text, not the ISO instant; the kind of the action in new_value
+    from zoneinfo import ZoneInfo
+    local = core.parse_dt(old["run_at"]).astimezone(ZoneInfo(second.timezone))
+    assert len(missed) == 1 and missed[0]["outcome"] == "failed" and missed[0]["new_value"] == "manual"
+    assert f"alle {local:%H:%M} del {local:%d/%m}" in missed[0]["reasoning"]
     assert second.schedule[recent["schedule_id"]]["status"] == "planned"
 
     async def tick():

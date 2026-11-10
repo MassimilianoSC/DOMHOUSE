@@ -119,6 +119,16 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+# D-219: what a scheduled action is, in the decisions schedule_failed and schedule_missed (new_value) and in their text.
+# An action the assistant planned is a manual one in the schedule (kind "manual", source "assistant"): here it has its own.
+SCHEDULE_LABELS = {"prearrival": "pre-arrivo", "checkout": "check-out", "empty": "casa vuota", "manual": "manuale",
+                   "assistant": "dell'assistente"}
+
+
+def schedule_kind(item: dict) -> str:
+    return "assistant" if item.get("kind") == "manual" and item.get("source") == "assistant" else item["kind"]
+
+
 def duration_words(span: timedelta) -> str:
     """D-217: a stretch of time in Italian, as a person says it: «25 minuti», «1 ora», «3 ore e 10 minuti»,
     «2 giorni e 4 ore»; never «e 0 minuti». Minutes and hours are counted down, never up."""
@@ -497,6 +507,11 @@ class ApartmentEngine:
         self.approval_queue = st.get_meta("approval_queue", [])
         self.approval_schedules = st.get_meta("approval_schedules", {}) or {}
         self.deferred = st.get_meta("deferred", {})
+        # D-218: the compressors' pauses, from the UTC instant each one went off (the in-memory clock starts again)
+        for device_id, at in (st.get_meta("compressor_off", {}) or {}).items():
+            elapsed = (utcnow() - parse_dt(at)).total_seconds()
+            if elapsed >= 0:
+                self.compressor_off[device_id] = time.monotonic() - elapsed
         self.asks = dict(st.all("asks"))
         now = time.time()
         self.idem = {k: (v["until"], v["status"], v["body"]) for k, v in st.all("idem") if v["until"] > now}
@@ -529,8 +544,12 @@ class ApartmentEngine:
                 continue
             item["status"], item["executed_at"] = "failed", iso(now)
             self._save_schedule(item)
-            self.log("system", {"type": "schedule"}, "schedule_missed", item["run_at"], None,
-                     f"Azione programmata non eseguita: il motore era fermo all'orario previsto ({item['run_at']}), "
+            # D-219: new_value is the action's kind (the BFF's notification picks its category from it); the time
+            # in the apartment's local hour, not the ISO instant
+            local = parse_dt(item["run_at"]).astimezone(ZoneInfo(self.timezone))
+            self.log("system", {"type": "schedule"}, "schedule_missed", item["run_at"], schedule_kind(item),
+                     f"Azione programmata ({SCHEDULE_LABELS.get(schedule_kind(item), schedule_kind(item))}) non eseguita: "
+                     f"il motore era fermo all'orario previsto, alle {local:%H:%M} del {local:%d/%m}, "
                      f"oltre {fmt_num(self.setting('MISSED_AFTER_MINUTES'))} minuti fa", "failed", str(uuid.uuid4()))
 
     def spawn(self, coro) -> None:
@@ -691,6 +710,10 @@ class ApartmentEngine:
         """R4: when a split's compressor stops, its minimum pause starts."""
         if cap == "climate" and was_on and not is_on:
             self.compressor_off[device_id] = time.monotonic()
+            # D-218: also as a UTC instant in the store, so that a restart does not cut the pause short
+            offs = self.store.get_meta("compressor_off", {}) or {}
+            offs[device_id] = iso(utcnow())
+            self.store.put_meta("compressor_off", offs)
 
     def compressor_wait(self, device_id: str) -> float:
         """R4: seconds left of the compressor's minimum pause (rule compressor_min_off), 0 when it may start."""
@@ -2614,9 +2637,9 @@ class ApartmentEngine:
         """A scheduled action the engine refused at its time (devices or their connection unreachable, an action no
         longer valid) became «failed» without a word: now a decision says so, with the engine's reason (D-198, the
         same defect as point c of the verification of 10 November)."""
-        labels = {"prearrival": "pre-arrivo", "checkout": "check-out", "empty": "casa vuota", "manual": "manuale"}
-        self.log("system", {"type": "schedule"}, "schedule_failed", item["run_at"], None,
-                 f"Azione programmata ({labels.get(item['kind'], item['kind'])}) non eseguita: {why}", "failed",
+        kind = schedule_kind(item)                     # D-219: in new_value, for the BFF's notification
+        self.log("system", {"type": "schedule"}, "schedule_failed", item["run_at"], kind,
+                 f"Azione programmata ({SCHEDULE_LABELS.get(kind, kind)}) non eseguita: {why}", "failed",
                  correlation_id)
 
     # ---- seed ------------------------------------------------------------------------
