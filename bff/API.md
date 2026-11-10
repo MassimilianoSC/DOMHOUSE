@@ -693,7 +693,7 @@ mese UTC) la spesa del progetto, calcolata dai token restituiti, e all'80 % del 
 gestori della piattaforma. Impostazioni: `AI_MODEL`, `AI_LOCATION`, `AI_MONTHLY_CAP_EUR` (20), `AI_ALERT_PERCENT` (80),
 `AI_PRICE_IN_EUR_PER_M` (0.83), `AI_PRICE_OUT_EUR_PER_M` (4.13), `AI_PRICE_CACHED_EUR_PER_M` (0.08; prezzi da aggiornare
 il 1° gennaio 2027 a 1.65 e 8.25), `AI_MAX_TOKENS` (4096), `AI_TIMEOUT_S` (25), `AI_DEMOS` (i dimostrativi con il modello
-vero). Serve il ruolo `roles/aiplatform.user` sull'account del BFF.
+vero: acceso in staging, spento in produzione, che i dimostrativi li rifiuta, D-202). Serve il ruolo `roles/aiplatform.user` sull'account del BFF.
 
 Ogni chiamata riuscita lascia nel log «assistant model call» (token, costo, secondi); dal lotto 28 anche ogni chiamata
 non riuscita lascia «assistant model call failed», con `error` (`timeout`, `model_error` o il tipo
@@ -721,13 +721,15 @@ falliscono insieme. Il costo si conta sulla risposta vincente con i prezzi del s
 started» dice `model` e `reason` (`silenzio` o `errore`), «assistant model call» il `model` che ha risposto. Senza
 `AI_TWIN_MODEL` la gemella è lo stesso modello e un errore rapido torna subito, come prima.
 
-Modello e chiamata (D-182): `gemini-3.8-flash` (`AI_MODEL`), località `eu`, endpoint nativo di Vertex (`AI_API`
+Modello e chiamata (D-182, modelli di D-187): nei due manifesti `gemini-3.5-flash` (`AI_MODEL`) con la gemella
+`gemini-3.5-flash-lite` (`AI_TWIN_MODEL`) dopo 3 s (`AI_HEDGE_AFTER_S`); senza le variabili il BFF usa ancora i valori
+di D-182 (`gemini-3.8-flash`, 6 s). Località `eu`, endpoint nativo di Vertex (`AI_API`
 `nativo`, predefinito; `openai` torna all'endpoint compatibile): `generateContent` su
-`aiplatform.eu.rep.googleapis.com/v1/projects/<progetto>/locations/eu/publishers/google/models/gemini-3.8-flash`.
+`aiplatform.eu.rep.googleapis.com/v1/projects/<progetto>/locations/eu/publishers/google/models/<modello>`.
 Ragionamento spento: `thinkingConfig.thinkingBudget` = `AI_THINKING_BUDGET` (0; -1 non lo manda). Il BFF traduce dal
 formato compatibile OpenAI che parlano motore e proposte (`bff/vertex_native.py`) e ritorno; consumo e prezzi da
 `usageMetadata`. Nessuno strumento: assistente e proposte delle regole chiedono il JSON nel testo e lo validano.
-`AI_REASONING_EFFORT` vale solo per `openai` (predefinito vuoto). La seconda richiesta parte dopo 6 s.
+`AI_REASONING_EFFORT` vale solo per `openai` (predefinito vuoto). La seconda richiesta parte dopo `AI_HEDGE_AFTER_S`.
 Risposta rapida (D-182, strato 3): se il modello non risponde in tempo, non è raggiungibile o il tetto mensile è
 finito, il motore risponde senza modello. Esegue un comando solo per una frase inequivocabile (un verbo e un solo
 dispositivo per tipo, stanza o nome, oppure una modalità; niente negazioni, condizioni od orari), con le stesse

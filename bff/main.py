@@ -112,7 +112,8 @@ def create_app() -> FastAPI:
     app.include_router(ai_routes.router)   # P-60 step 9: engines -> model
     app.include_router(rules_routes.router)   # P-60 step 12: rules proposed by the assistant, copied
 
-    # D-97: the built-in mock is mounted in every mode, also in production, for demonstration apartments (mock://).
+    # D-97: the built-in mock is mounted in every mode. D-202: production refuses mock:// (instances.demo_refused), so
+    # there it serves nobody; the demonstration apartments live in staging and development.
     # F2 (D-70) and N1 (D-71) keep it the BFF's own: refused from the internet, its random key checked on loopback.
     from .mock_instance.app import create_mock_app
 

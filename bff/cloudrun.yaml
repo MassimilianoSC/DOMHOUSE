@@ -44,7 +44,8 @@ spec:
               value: firebase
             - name: INSTANCE_MODE
               value: real
-            # the demonstration apartments (mock://) run on the BFF's built-in engine also here (D-97): real time
+            # D-202: no demonstration apartments here (mock:// is refused), so the built-in engine serves nobody; the
+            # variable stays, at real time, only because both manifests carry the same names (P-66)
             - name: MOCK_TIME_SCALE
               value: "60"
             - name: REPOSITORY
@@ -75,8 +76,8 @@ spec:
               value: "2.50"
             - name: AI_TWIN_PRICE_CACHED_EUR_PER_M
               value: "0.03"
-            - name: AI_DEMOS               # P-60 step 9 (D-132): demonstration apartments with the real assistant;
-              value: "true"             # needs roles/aiplatform.user on the BFF's account
+            - name: AI_DEMOS               # off (D-202): it gives the real model only to demonstration apartments,
+              value: "false"            # which production refuses; on in staging, where they live
             - name: GCP_PROJECT_ID
               value: your-gcp-project-id
             - name: GCP_REGION

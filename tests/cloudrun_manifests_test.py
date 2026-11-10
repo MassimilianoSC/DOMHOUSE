@@ -11,7 +11,8 @@ PROD = (ROOT / "bff" / "cloudrun.yaml").read_text(encoding="utf-8")
 WANTED = {"APP_ENV": ("staging", "prod"), "FIRESTORE_DATABASE": ("staging", "(default)"),     # P-67 (D-136)
           "CORS_ORIGINS": ("https://your-staging-site.web.app,https://your-staging-site.firebaseapp.com",
                            "https://your-gcp-project-id.web.app,https://your-gcp-project-id.firebaseapp.com"),
-          "APP_PUBLIC_URL": ("https://your-staging-site.web.app", "https://your-gcp-project-id.web.app")}
+          "APP_PUBLIC_URL": ("https://your-staging-site.web.app", "https://your-gcp-project-id.web.app"),
+          "AI_DEMOS": ("true", "false")}       # D-202: the demonstrations, and their real model, only in staging
 
 
 def env(manifest: str) -> dict[str, str]:

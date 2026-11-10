@@ -1,8 +1,9 @@
 """The assistant with a real model (P-60 step 9, D-132, D-143, D-144, D-182): POST /ask answered by a model that
 proposes, and the engine that validates and acts, through the same rules and limits as the app.
 
-The model is reached through the BFF's POST /internal/ai/chat (bff/ai_gateway.py: gemini-3.8-flash on Vertex's native
-endpoint in the EU, reasoning off, monthly cap, prices, the twin request after 6 s), never directly: ModelClient below,
+The model is reached through the BFF's POST /internal/ai/chat (bff/ai_gateway.py; D-187 in bff/cloudrun.yaml:
+gemini-3.5-flash on Vertex's native endpoint in the EU, reasoning off, monthly cap, prices, the twin request on
+gemini-3.5-flash-lite after 3 s of silence), never directly: ModelClient below,
 configured by MODEL_BASE_URL, which refuses an answer without a European X-AI-Location (D-181). Without it the engine
 keeps the simulated keyword assistant (core.ApartmentEngine._resolve_ask), as the conformance suite and the CI run it.
 
@@ -314,7 +315,7 @@ class Assistant:
         messages = self.messages(ask["text"])
         loop = asyncio.get_running_loop()
         end = loop.time() + ASK_TIMEOUT_S
-        # D-182: one call, no tools; C-10 layer 2: the model gets all but NO_PROPOSAL_RESERVE_S (the BFF's twin after 6 s)
+        # D-182: one call, no tools; C-10 layer 2: the model gets all but NO_PROPOSAL_RESERVE_S (the BFF's twin after AI_HEDGE_AFTER_S, 3 s in the manifests)
         try:
             answer = await asyncio.wait_for(self.client.chat(messages, []),
                                             timeout=max(end - NO_PROPOSAL_RESERVE_S - loop.time(), 0.01))
