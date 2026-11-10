@@ -55,6 +55,10 @@ Il registro delle decisioni è `docs/registro.md`: lo scrive **solo** la memoria
   la sezione 4 di `per-youssouf/README-youssouf.md` contro `CLAUDE.md` e segnala al committente ogni divergenza: è
   l'unica parte dei documenti per Youssouf che la CI non copre.
 - Le promesse sul disco si fanno come impegno: «non scriverò in <cartella> fino al tuo "è pubblicato"».
+- **File congelati durante una procedura del committente** (C-13, D-213): mentre il committente esegue una procedura,
+  i file che la procedura copia o esegue sono congelati dal primo all'ultimo passo. o1 e o2 li modificano solo dopo il
+  «fatto» del committente, riferito dalla memoria storica. Prima di dare il primo passo, la memoria storica controlla
+  che quei file siano committati e senza modifiche in corso, e avvisa o1 e o2 del congelamento e della fine.
 
 ## Come si misura
 - Un numero scritto in un documento invecchia in ore: prima di agire su un numero, lo si rimisura.
