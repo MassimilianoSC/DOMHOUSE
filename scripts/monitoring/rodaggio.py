@@ -7,13 +7,19 @@
 Senza date: l'ultima settimana intera, da lunedì a lunedì (ora di Roma). Il periodo di confronto è quello di uguale
 durata subito prima. Cosa stampa, per i due periodi:
 1. disponibilità del server di produzione: le richieste del controllo di raggiungibilità domotica-bff-healthz (ogni
-   60 s da 3 regioni) nei registri di Cloud Run; un minuto è «fermo» se nessuna ha avuto 200;
-2. riavvii: «engine started» dei motori, «broker started_at=» del controllo del broker (valori diversi = avvii);
+   60 s da 3 regioni) nei registri di Cloud Run; un minuto è «fermo» se il controllo esisteva e nessuna richiesta ha
+   avuto 200. I minuti in cui il controllo non esisteva perché cancellato da una persona (lo spegnimento voluto di
+   D-195: VM ferma, controllo cancellato, poi ricreato da setup.sh) sono «spento per scelta» e non contano: lo dice il
+   registro di audit delle attività amministrative (Create/DeleteUptimeCheckConfig), sempre attivo, 400 giorni;
+2. riavvii: «engine started» dei motori, «broker started_at=» del controllo del broker (valori diversi = avvii), e
+   i minuti di VM ferma per scelta (instances.stop / start nello stesso registro di audit);
 3. allarmi scattati: gli incidenti di Cloud Monitoring (gcloud monitoring alerts list), per politica, con i minuti aperti;
 4. certificato del broker: righe «broker cert new / renew failed / revoked» e l'ultimo «cert_days»;
 5. righe di errore del server (level error o severity ERROR) e dei motori (level error), raggruppate per messaggio;
 6. memoria e disco della VM dalla riga «vm mem_used_pct=… disk_used_pct=…» del controllo ogni 5 minuti (media,
-   massimo, ultimo valore); avvii di istanza di Cloud Run per motivo e risposte 429 e 5xx.
+   massimo, ultimo valore); avvii di istanza di Cloud Run per motivo e risposte 429 e 5xx;
+7. uscite della VM senza NAT (dal 10 novembre): le righe «egress ok|failed server= registry= acme=» del controllo, una
+   l'ora: giorni coperti, prove riuscite e fallite, quale uscita è fallita. Cloud Logging è provato dalle righe stesse.
 Un dato che non c'è ancora (per esempio la riga della VM prima dell'installazione del broker, B1/B4) è detto così.
 `gcloud` si chiama attraverso bash: su Windows il suo .cmd passerebbe i filtri a cmd.exe, che storpia >= e virgolette.
 """
@@ -32,10 +38,15 @@ from zoneinfo import ZoneInfo
 ROME = ZoneInfo("Europe/Rome")
 SERVICE = "domotica-bff"
 UPTIME_AGENT = "GoogleStackdriverMonitoring-UptimeChecks"
+CHECK_NAME = "domotica-bff-healthz"
+AUDIT = 'log_id("cloudaudit.googleapis.com/activity")'
+# how far back the admin activity log is read: 400 days (all Google keeps) made Cloud Logging answer 500; with no
+# event in the window the check counts as existing and the VM as running, the normal case
+AUDIT_DAYS = 90
 RUN = f'resource.type="cloud_run_revision" AND resource.labels.service_name="{SERVICE}"'
 SYSLOG = 'resource.type="gce_instance" AND log_id("syslog")'
 NOT_YET = "dato non ancora disponibile"
-NO_CHECKS = "nessun controllo (spento)"
+NO_CHECKS = "spento per scelta tutto il periodo"
 
 
 class Fermo(Exception):
@@ -80,19 +91,78 @@ def dig(entry: dict, path: str):
 
 
 # ---- the six parts ------------------------------------------------------------------------------------------------
+def windows_off(events: list[tuple[datetime, bool, str]], end: datetime) -> list[tuple[datetime, datetime, str]]:
+    """[(from, to, who)] while something was off, from (moment, on?, who) events in time order. Before the first event
+    the state is the opposite of it (a first «create» means it did not exist before); still off at the end: to = end."""
+    out, off_from, who = [], None, ""
+    if events and events[0][1]:
+        off_from, who = datetime.min.replace(tzinfo=timezone.utc), "non ancora creato"
+    for moment, on, by in events:
+        if on and off_from is not None:
+            out.append((off_from, moment, who))
+            off_from = None
+        elif not on and off_from is None:
+            off_from, who = moment, by
+    if off_from is not None:
+        out.append((off_from, end, who))
+    return out
+
+
+def audit(methods: str, end: datetime, fields: str) -> list[dict]:
+    return logs(f"{AUDIT} AND ({methods})", end - timedelta(days=AUDIT_DAYS), end, fields)
+
+
+def check_off(end: datetime) -> list[tuple[datetime, datetime, str]]:
+    """When the uptime check did not exist, and who deleted it (admin activity audit log)."""
+    events = []
+    for e in audit('protoPayload.methodName:"UptimeCheckConfig"', end,
+                   "timestamp,protoPayload.methodName,protoPayload.resourceName,"
+                   "protoPayload.request.uptimeCheckConfig.displayName,protoPayload.authenticationInfo.principalEmail"):
+        method = dig(e, "protoPayload.methodName") or ""
+        ours = (dig(e, "protoPayload.request.uptimeCheckConfig.displayName") == CHECK_NAME if method.endswith("Create" + "UptimeCheckConfig")
+                else f"/uptimeCheckConfigs/{CHECK_NAME}-" in (dig(e, "protoPayload.resourceName") or ""))
+        if ours and not method.endswith("UpdateUptimeCheckConfig"):
+            events.append((ts(e), not method.endswith("DeleteUptimeCheckConfig"),
+                           dig(e, "protoPayload.authenticationInfo.principalEmail") or "?"))
+    return windows_off(sorted(events), end)
+
+
+def vm_off(end: datetime) -> list[tuple[datetime, datetime, str]]:
+    """When the VM was stopped by someone (instances.stop / start, the entry that closes each operation)."""
+    events = []
+    for e in audit('protoPayload.methodName="v1.compute.instances.stop" OR protoPayload.methodName="v1.compute.instances.start"',
+                   end, "timestamp,protoPayload.methodName,protoPayload.authenticationInfo.principalEmail,operation"):
+        if dig(e, "operation.last") or not dig(e, "operation"):
+            events.append((ts(e), dig(e, "protoPayload.methodName").endswith(".start"),
+                           dig(e, "protoPayload.authenticationInfo.principalEmail") or "?"))
+    return windows_off(sorted(events), end)
+
+
+def minutes_in(windows, start: datetime, stop: datetime) -> set[int]:
+    """The minutes of [start, stop) that fall in one of the windows."""
+    out = set()
+    for a, b, _ in windows:
+        first = max(int((a - start).total_seconds() // 60), 0) if a > start else 0
+        last = min(int(-(-(b - start).total_seconds() // 60)), int((stop - start).total_seconds() // 60))
+        out.update(range(first, max(last, first)))
+    return out
+
+
 def availability(start: datetime, end: datetime, now: datetime) -> dict:
     stop = min(end, now)
     entries = logs(f'{RUN} AND log_id("run.googleapis.com/requests") AND httpRequest.userAgent:"{UPTIME_AGENT}"',
                    start, stop, "timestamp,httpRequest.status")
     minutes = max(int((stop - start).total_seconds() // 60), 0)
+    windows = [w for w in check_off(stop) if w[1] > start and w[0] < stop]
+    off = minutes_in(windows, start, stop)
     ok = {int((ts(e) - start).total_seconds() // 60) for e in entries if dig(e, "httpRequest.status") == 200}
-    down = sorted(m for m in range(minutes) if m not in ok)
-    # no check at all in the period: the check or the whole service was off (as in the shutdown of 24 October - 9
-    # November), which is not the same as a server that does not answer; said as such, never as 0 %
-    measured = bool(minutes and entries)
-    return {"minutes": minutes, "down": len(down) if measured else None, "checks": len(entries),
+    down = sorted(m for m in range(minutes) if m not in ok and m not in off)
+    measured = minutes - len(off)
+    # a period with the check deleted throughout is said as such, never as 0 % (D-212)
+    return {"minutes": minutes, "off": len(off), "off_by": sorted({w[2] for w in windows}),
+            "down": len(down) if measured else None, "checks": len(entries),
             "failed": sum(1 for e in entries if dig(e, "httpRequest.status") != 200),
-            "pct": round(100 * (minutes - len(down)) / minutes, 3) if measured else None,
+            "pct": round(100 * (measured - len(down)) / measured, 3) if measured else None,
             "longest": longest_run(down) if measured else None}
 
 
@@ -111,7 +181,8 @@ def restarts(start: datetime, end: datetime) -> dict:
         f'{SYSLOG} AND jsonPayload.message:"broker started_at="', start, end, "timestamp,jsonPayload.message")]
     starts = {m.group(1) for m in seen if m}
     broker = None if not seen else sum(1 for s in starts if start <= parse_any(s) < end)
-    return {"engines": dict(engines), "broker": broker}
+    windows = [w for w in vm_off(end) if w[1] > start and w[0] < end]
+    return {"engines": dict(engines), "broker": broker, "vm_off": len(minutes_in(windows, start, end))}
 
 
 def parse_any(text: str) -> datetime:
@@ -176,6 +247,28 @@ def vm_and_run(start: datetime, end: datetime) -> dict:
             "statuses": {str(k): v for k, v in sorted(statuses.items())}}
 
 
+def egress(start: datetime, end: datetime) -> dict:
+    """The hourly tries of the VM's ways out (engine-vm.sh check-all, D-212)."""
+    entries = logs(f'{SYSLOG} AND jsonPayload.message:"egress "', start, end, "timestamp,jsonPayload.message")
+    ok = failed = 0
+    days, broken = set(), Counter()
+    for e in entries:
+        m = re.search(r"egress (ok|failed) server=(\S+) registry=(\S+) acme=(\S+)", dig(e, "jsonPayload.message") or "")
+        if not m:
+            continue
+        days.add(ts(e).astimezone(ROME).date())
+        if m.group(1) == "ok":
+            ok += 1
+            continue
+        failed += 1
+        for name, code, good in (("server", m.group(2), ("200", "nessuno")), ("registry", m.group(3), ("200", "401")),
+                                 ("acme", m.group(4), ("200",))):
+            if code not in good:
+                broken[name] += 1
+    period_days = (end.astimezone(ROME).date() - start.astimezone(ROME).date()).days
+    return {"ok": ok, "failed": failed, "days": len(days), "period_days": period_days, "broken": dict(broken)}
+
+
 def summary(values: list[int]) -> dict | None:
     if not values:
         return None
@@ -185,7 +278,7 @@ def summary(values: list[int]) -> dict | None:
 def collect(start: datetime, end: datetime, now: datetime) -> dict:
     return {"from": start, "to": end, "availability": availability(start, end, now), "restarts": restarts(start, end),
             "incidents": incidents(start, end, now), "certificate": certificate(start, end),
-            "errors": errors(start, end), "vm": vm_and_run(start, end)}
+            "errors": errors(start, end), "vm": vm_and_run(start, end), "egress": egress(start, end)}
 
 
 # ---- printing -----------------------------------------------------------------------------------------------------
@@ -212,13 +305,16 @@ def render(week: dict, before: dict) -> str:
     av = [w["availability"] for w in (week, before)]
     out += ["1. Disponibilità del server di produzione",
             pair("disponibile", *[f'{a["pct"]} %' if a["pct"] is not None else NO_CHECKS for a in av]),
+            pair("spento per scelta, non contato", *[f'{a["off"]} min' + (f' ({", ".join(a["off_by"])})' if a["off"] else "")
+                                                      for a in av]),
             pair("minuti di fermo (il più lungo)", *[f'{a["down"]} ({a["longest"]})' if a["down"] is not None else "-"
                                                       for a in av]),
             pair("controlli / non riusciti", *[f'{a["checks"]} / {a["failed"]}' for a in av]), ""]
     rs = [w["restarts"] for w in (week, before)]
     out += ["2. Riavvii",
             pair("motori (engine started)", *[counted(r["engines"]) for r in rs]),
-            pair("broker", *[r["broker"] if r["broker"] is not None else NOT_YET for r in rs]), ""]
+            pair("broker", *[r["broker"] if r["broker"] is not None else NOT_YET for r in rs]),
+            pair("VM ferma per scelta", *[f'{r["vm_off"]} min' for r in rs]), ""]
     out.append("3. Allarmi scattati (incidenti, minuti aperti)")
     names = sorted(set(week["incidents"]) | set(before["incidents"]))
     for name in names:
@@ -243,6 +339,11 @@ def render(week: dict, before: dict) -> str:
             pair("disco della VM", *[stat(v["disk"]) for v in vs]),
             pair("avvii di istanza (motivo)", *[counted(v["instances"]) for v in vs]),
             pair("risposte 429 e 5xx", *[counted(v["statuses"]) for v in vs])]
+    es = [w["egress"] for w in (week, before)]
+    out += ["", "7. Uscite della VM senza NAT (server, Artifact Registry, Let's Encrypt; Cloud Logging dalle righe stesse)",
+            pair("giorni coperti", *[f'{x["days"]} su {x["period_days"]}' if x["ok"] + x["failed"] else NOT_YET for x in es]),
+            pair("prove riuscite / fallite", *[f'{x["ok"]} / {x["failed"]}' if x["ok"] + x["failed"] else NOT_YET for x in es]),
+            pair("uscite fallite", *[counted(x["broken"]) for x in es])]
     return "\n".join(out)
 
 

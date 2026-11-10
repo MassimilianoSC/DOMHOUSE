@@ -5,6 +5,7 @@ errors grouped by message, the VM's line, Cloud Run's instance starts and 429/5x
 commands are called."""
 import importlib.util
 import json
+import re
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -67,10 +68,41 @@ def test_availability_by_minute_from_the_uptime_checks(monkeypatch):
     assert 'timestamp>="2026-11-15T23:00:00Z"' in calls[0][2] and 'timestamp<"2026-11-16T00:00:00Z"' in calls[0][2]
 
 
-def test_a_period_without_any_check_is_not_zero_per_cent(monkeypatch):
-    fake(monkeypatch, {})
+def audit_check(minutes, method, by="m.scardovellicrac@gmail.com"):
+    entry = {"timestamp": z(START + timedelta(minutes=minutes)), "protoPayload": {
+        "methodName": f"google.monitoring.v3.UptimeCheckService.{method}UptimeCheckConfig",
+        "authenticationInfo": {"principalEmail": by}}}
+    if method == "Create":
+        entry["protoPayload"]["request"] = {"uptimeCheckConfig": {"displayName": "domotica-bff-healthz"}}
+        entry["protoPayload"]["resourceName"] = "projects/p"
+    else:
+        entry["protoPayload"]["resourceName"] = "projects/p/uptimeCheckConfigs/domotica-bff-healthz-abc"
+    return entry
+
+
+def test_minutes_with_the_check_deleted_by_a_person_are_switched_off_not_down(monkeypatch):
+    """D-212: the shutdown of D-195 deleted the check and setup.sh made it again; those minutes are not a stop."""
+    other = audit_check(-30, "Delete")
+    other["protoPayload"]["resourceName"] = "projects/p/uptimeCheckConfigs/prova-allarme-xyz"     # another check
+    fake(monkeypatch, {"UptimeCheckConfig": [audit_check(-60 * 24, "Delete"), other, audit_check(20, "Create")],
+                       "UptimeChecks": [check(m) for m in range(20, 60) if m != 50]})
+    a = rodaggio.availability(START, END, END + timedelta(days=1))
+    assert (a["off"], a["down"], a["minutes"]) == (20, 1, 60) and a["off_by"] == ["m.scardovellicrac@gmail.com"]
+    assert a["pct"] == round(100 * 39 / 40, 3)                      # one minute down out of the 40 the check existed
+
+
+def test_a_period_with_the_check_deleted_throughout_is_not_zero_per_cent(monkeypatch):
+    fake(monkeypatch, {"UptimeCheckConfig": [audit_check(-60, "Delete")]})
     a = rodaggio.availability(START, END, END)
-    assert a["pct"] is None and a["down"] is None and a["checks"] == 0
+    assert a["pct"] is None and a["down"] is None and a["off"] == 60 and a["checks"] == 0
+
+
+def test_a_vm_stopped_by_someone_is_counted_apart(monkeypatch):
+    op = lambda minutes, what: {"timestamp": z(START + timedelta(minutes=minutes)), "operation": {"last": True},
+                                "protoPayload": {"methodName": f"v1.compute.instances.{what}",
+                                                 "authenticationInfo": {"principalEmail": "m.scardovellicrac@gmail.com"}}}
+    fake(monkeypatch, {"instances.stop": [op(10, "stop"), op(25, "start")]})
+    assert rodaggio.restarts(START, END)["vm_off"] == 15
 
 
 def test_incidents_counted_when_they_open_and_their_minutes_clipped_to_the_period(monkeypatch):
@@ -107,7 +139,7 @@ def test_restarts_certificate_errors_vm_and_cloud_run(monkeypatch):
                                     {"timestamp": z(START), "httpRequest": {"status": 503}}],
     }
     fake(monkeypatch, answers)
-    assert rodaggio.restarts(START, END) == {"engines": {"dev": 2}, "broker": 1}       # the old start is not this period's
+    assert rodaggio.restarts(START, END) == {"engines": {"dev": 2}, "broker": 1, "vm_off": 0}       # the old start is not this period's
     assert rodaggio.certificate(START, END) == {"new": 1, "failed": 1, "revoked": 0, "days_last": 39, "seen": True}
     e = rodaggio.errors(START, END)
     assert e == {"server": {"push failed": 2, "Traceback (most recent call last):": 1}, "engines": {"dev: connector lost": 1}}
@@ -116,12 +148,24 @@ def test_restarts_certificate_errors_vm_and_cloud_run(monkeypatch):
     assert v["instances"] == {"AUTOSCALING": 1} and v["statuses"] == {"429": 1, "503": 1}
 
 
+def test_the_ways_out_of_the_vm_days_covered_and_what_failed(monkeypatch):
+    line = lambda text, hours: {"timestamp": z(START + timedelta(hours=hours)), "jsonPayload": {"message": text}}
+    fake(monkeypatch, {"egress ": [line("domhouse-check: egress ok server=200 registry=401 acme=200", 0),
+                                   line("domhouse-check: egress failed server=200 registry=401 acme=000", 1),
+                                   line("domhouse-check: egress failed server=503 registry=000 acme=200", 25),
+                                   line("domhouse-check: egress ok server=200 registry=401 acme=200", 49)]})
+    got = rodaggio.egress(START, START + timedelta(days=7))
+    assert got == {"ok": 2, "failed": 2, "days": 3, "period_days": 7, "broken": {"acme": 1, "server": 1, "registry": 1}}
+
+
 def test_the_report_compares_two_periods_and_says_what_is_missing(monkeypatch):
     calls = fake(monkeypatch, {"UptimeChecks": [check(m) for m in range(60)]})
     week = rodaggio.collect(START, END, END)
     before = rodaggio.collect(START - timedelta(hours=1), START, END)
     text = rodaggio.render(week, before)
     assert "disponibile                            100.0 %" in text
-    assert text.count(rodaggio.NOT_YET) >= 4 and "nessun controllo (spento)" not in text
+    assert text.count(rodaggio.NOT_YET) >= 6 and rodaggio.NO_CHECKS not in text
+    assert re.search(r"spento per scelta, non contato +0 min +0 min", text), text
+    assert "7. Uscite della VM senza NAT" in text
     assert {tuple(c[:2]) if c[0] == "logging" else tuple(c[:3]) for c in calls} == {("logging", "read"),
                                                                                     ("monitoring", "alerts", "list")}
