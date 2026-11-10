@@ -482,7 +482,9 @@ Restano attivi e costano poco: disco della VM e disco delle chiavi, snapshot, ar
    `fstab`); controllare con `broker-vm.sh status` ed `engine-vm.sh status dev` (procedura G2, B7).
 2. Server di produzione al minimo del manifesto (1), se era stato abbassato: la prossima pubblicazione lo rimette da sé.
 3. `scripts/monitoring/setup.sh` per il controllo di raggiungibilità e il suo allarme.
-4. **Riattivare gli avvisi di irraggiungibilità** (D-217). Git Bash:
+4. **Riattivare gli avvisi di irraggiungibilità** (D-217). Alla fine della sospensione arriva, per ogni appartamento
+   con azioni programmate saltate, una sola notifica «Durante la manutenzione N azioni programmate non sono state
+   eseguite», che apre la Programmazione (D-219). Git Bash:
 
    ```
    cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app

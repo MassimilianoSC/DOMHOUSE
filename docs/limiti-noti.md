@@ -20,6 +20,7 @@
 |---|---|---|
 | **Server che parte durante un fermo** | Ogni copia del server conta dalla sua prima connessione fallita: una copia partita durante il fermo conta da quando parte, quindi la notifica può arrivare fino a N minuti dopo l'inizio vero | Accettato |
 | **Nessuna copia del server accesa** | Con il minimo a 0 nessuno controlla e nessuna notifica parte (vale per lo staging) | Accettato |
+| **Riassunto a fine manutenzione** | Se il motore riparte due volte nella stessa sospensione conta solo il primo gruppo di azioni saltate; con una sospensione più lunga di 6 giorni il riassunto parte al sesto giorno; se la sospensione viene prolungata dopo che il riassunto è già in attesa, parte alla data vecchia | Accettato |
 | **Pubblicazione durante una sospensione** | Una pubblicazione toglie la sospensione degli avvisi | Accettato (M19) |
 | **Chiave rifiutata** | Un motore che risponde ma rifiuta la chiave conta come irraggiungibile | Accettato |
 
