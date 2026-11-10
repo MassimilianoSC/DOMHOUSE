@@ -101,6 +101,39 @@ def test_actions_due_together_run_once_in_creation_order(monkeypatch):
     assert modes == ["eco", "comfort"] and e.mode == "comfort"     # the older first, the newer wins; each once
 
 
+def test_d212_an_action_at_0230_on_the_autumn_night_runs_once_whoever_planned_it(monkeypatch):
+    """D-212, the committente's request: on 25 October 2026 02:30 comes twice (00:30 and 01:30 UTC). An action for
+    02:30 runs once, not at both: from the app (one UTC instant), the assistant (the first 02:30) and a booking (the
+    check-out at 02:00 winter time plus 30 minutes falls on the second). The clock goes through the whole night."""
+    clock = {"now": datetime(2026, 10, 24, 20, 0, tzinfo=UTC)}
+    monkeypatch.setattr(core, "utcnow", lambda: clock["now"])
+    monkeypatch.setattr(core.asyncio, "sleep", _no_wait)
+    first, second = datetime(2026, 10, 25, 0, 30, tzinfo=UTC), datetime(2026, 10, 25, 1, 30, tzinfo=UTC)
+    assert f"{first.astimezone(ROME):%H:%M}" == f"{second.astimezone(ROME):%H:%M}" == "02:30"
+    e = engine()
+    app = e.create_schedule({"run_at": core.iso(first), "action": {"type": "apartment_mode", "mode": "eco"}}, ACTOR, CORR)
+
+    async def ask():
+        a = e.create_ask({"text": "alle 2:30 metti comfort"}, ACTOR, CORR)
+        await asyncio.gather(*e.tasks)
+        return e.asks[a["ask_id"]]
+    assistant = e.schedule[asyncio.run(ask())["actions"][0]["schedule_id"]]
+    booking(e, "booking_created", datetime(2026, 10, 24, 22, 0, tzinfo=UTC), datetime(2026, 10, 25, 1, 0, tzinfo=UTC), 1)
+    checkout = items_of(e, "checkout")[0]
+    assert (app["run_at"], assistant["run_at"], checkout["run_at"]) == (core.iso(first), core.iso(first), core.iso(second))
+    planned = [app["schedule_id"], assistant["schedule_id"], checkout["schedule_id"]]
+    runs = []
+    while clock["now"] < datetime(2026, 10, 25, 4, 0, tzinfo=UTC):           # every 5 minutes, through both 02:30
+        clock["now"] += timedelta(minutes=5)
+        before = {sid: e.schedule[sid]["executed_at"] for sid in planned}
+        tick(e)
+        runs += [sid for sid in planned if e.schedule[sid]["executed_at"] != before[sid]]
+    assert sorted(runs) == sorted(planned), runs                                # each one exactly once
+    assert [e.schedule[sid]["status"] for sid in planned] == ["done", "done", "done"]
+    assert e.schedule[app["schedule_id"]]["executed_at"] == e.schedule[assistant["schedule_id"]]["executed_at"] == \
+        core.iso(first) and e.schedule[checkout["schedule_id"]]["executed_at"] == core.iso(second)
+
+
 # ---- what changes an action while it is planned ---------------------------------------------------------------------
 def booking(e, kind, checkin, checkout, n):
     return e.ingest_booking({"event_id": f"evt-sched-{n}", "type": kind, "booking_id": "bk-sched",
