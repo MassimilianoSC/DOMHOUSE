@@ -718,12 +718,16 @@ def unreachable(users, fcm, monkeypatch):
     """The engine does not answer (calls raise ConnectError unless `state.answers`); the rule's last minutes are 15."""
     monkeypatch.setenv("MOCK_TIME_SCALE", str(MINUTE_S))
     base = push.get_settings()
-    state = SimpleNamespace(answers=False, health="ok", settings=dataclasses.replace(base, instance_mode="mock"))
+    state = SimpleNamespace(answers=False, health="ok", settings=dataclasses.replace(base, instance_mode="mock"),
+                            notes=[], note_status=201)
     monkeypatch.setattr(push, "get_settings", lambda: state.settings)
 
     async def call(apt, method, path, **kw):
         if not state.answers:
             raise httpx.ConnectError("motore spento")
+        if path == "/_internal/reachability":                # D-217: the engine's note in its Decisions
+            state.notes.append((method, kw["json"]))
+            return httpx.Response(state.note_status, json={}, request=httpx.Request(method, "http://x"))
         body = {"status": state.health} if path == "/health" else {"devices": [], "rules": [
             {"rule_id": "offline_alert", "enabled": True, "params": {"minutes": 15}}]}
         return httpx.Response(200, json=body, request=httpx.Request("GET", "http://x"))
@@ -918,3 +922,66 @@ def test_register_adds_the_link_hook():
     from bff.sse_hub import hub_manager
     push.register()
     assert push.on_link_change in hub_manager.link_hooks
+
+
+# -------- D-217: the decision «di nuovo raggiungibile» at the return ----------------------------------------------------
+async def outage(state, seconds: float) -> None:
+    """The engine silent for `seconds`, then back."""
+    state.answers = False
+    await push.on_link_change(APT, False)
+    await asyncio.sleep(seconds)
+    state.answers = True
+    await push.on_link_change(APT, True)
+    await drain()
+
+
+def test_a_long_outage_asks_the_engine_for_its_note_once(unreachable):
+    run(outage(unreachable, 0.2))                            # longer than the 15 minutes (0.15 s)
+    assert [m for m, _ in unreachable.notes] == ["POST"]
+    body = unreachable.notes[0][1]
+    assert set(body) == {"from", "to"} and body["from"] < body["to"]
+    assert all(v.endswith("Z") and len(v) == 24 for v in body.values())   # UTC, milliseconds
+
+
+def test_a_short_drop_writes_nothing(unreachable):
+    run(outage(unreachable, 0.03))
+    assert unreachable.notes == []
+
+
+def test_one_note_for_every_instance_and_the_next_outage_has_its_own(unreachable):
+    async def scenario():
+        await outage(unreachable, 0.2)
+        push._unreachable[APT.apartment_id] = time.time() - 1   # a second instance, back from the same outage
+        await push.on_link_change(APT, True)
+        await drain()
+        assert len(unreachable.notes) == 1
+        await outage(unreachable, 0.2)                          # the next outage releases the claim
+    run(scenario())
+    assert len(unreachable.notes) == 2
+
+
+def test_also_during_a_suspension(unreachable, fcm):
+    suspend(unreachable, soon(5))
+    run(outage(unreachable, 0.2))
+    assert len(unreachable.notes) == 1 and fcm.sent == []
+
+
+def test_the_rule_off_still_uses_fifteen_minutes(unreachable):
+    push._alert_minutes[APT.apartment_id] = None
+    run(outage(unreachable, 0.05))
+    assert unreachable.notes == []
+    run(outage(unreachable, 0.2))
+    assert len(unreachable.notes) == 1
+
+
+def test_an_engine_without_the_route_is_skipped_and_not_asked_again(unreachable):
+    unreachable.note_status = 404
+
+    async def scenario():
+        await outage(unreachable, 0.2)
+        push._unreachable[APT.apartment_id] = time.time() - 1   # another instance
+        await push.on_link_change(APT, True)
+        await drain()
+    run(scenario())
+    assert len(unreachable.notes) == 1
+    assert get_repository().work[push.reachable_note_key(APT)]["status"] == "done"

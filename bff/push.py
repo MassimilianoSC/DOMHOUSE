@@ -326,6 +326,38 @@ async def _unreachable_watch(apt: Apartment, since: float) -> None:
     await notify_once(instance_down_key(apt), apt.tenant_id, "offline", *instance_unreachable_push(apt, minutes, ts))
 
 
+def reachable_note_key(apt: Apartment) -> str:
+    """D-217: one decision «di nuovo raggiungibile» per outage, whatever the number of instances: taken and finished at
+    the return, released when the next outage starts. Without a payload, push recovery never picks it up."""
+    return f"note:reachable:{apt.apartment_id}"
+
+
+def _iso_utc(t: float) -> str:
+    return datetime.fromtimestamp(t, UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+async def _note_reachable(apt: Apartment, since: float, until: float) -> None:
+    """D-217: the engine writes in its Decisions «Sistema domotico di nuovo raggiungibile dopo …» (POST
+    /_internal/reachability, a route of the engine outside the contract). One instance; an engine without the route
+    (404) is skipped with a line; a failure is written and not retried: it is a note, the outage is over."""
+    key, repo = reachable_note_key(apt), get_repository()
+    if await repo.claim_work(key, runtime.BOOT_ID, get_settings().notification_lease_s) != "mine":
+        return
+    try:
+        resp = await instances.call(apt, "POST", "/_internal/reachability",
+                                    json={"from": _iso_utc(since), "to": _iso_utc(until)}, timeout=5.0)
+        if resp.status_code == 404:
+            warn("reachability note skipped: the engine has no route", apartment_id=apt.apartment_id)
+        elif not 200 <= resp.status_code < 300:
+            warn("reachability note refused", apartment_id=apt.apartment_id, status=resp.status_code)
+        else:
+            info("reachability note written", apartment_id=apt.apartment_id, after_s=int(until - since))
+    except Exception as exc:
+        warn("reachability note not written", apartment_id=apt.apartment_id, error=type(exc).__name__)
+    finally:
+        await repo.finish_work(key)
+
+
 async def on_link_change(apt: Apartment, up: bool) -> None:
     """Hook of every instance hub (D-217): the engine stopped answering this process's stream, or answers again."""
     apartment_id = apt.apartment_id
@@ -335,13 +367,18 @@ async def on_link_change(apt: Apartment, up: bool) -> None:
             info("engine unreachable, waiting", apartment_id=apartment_id)
             _unreachable_timers[apartment_id] = _spawn(_unreachable_watch(apt, _unreachable[apartment_id]),
                                                        "instance_unreachable", apartment_id)
+            _spawn(get_repository().release_work(reachable_note_key(apt)), "reachability note", apartment_id)
         return
+    threshold = (_alert_minutes.get(apartment_id) or ALERT_MINUTES_DEFAULT) * _minute_s()   # the rule off: 15
     _spawn(_offline_alert_minutes(apt), "alert minutes", apartment_id)      # kept for the next outage
     since = _unreachable.pop(apartment_id, None)
     if (task := _unreachable_timers.pop(apartment_id, None)) and not task.done():
         task.cancel()
     if since is not None:
-        info("engine reachable again", apartment_id=apartment_id, after_s=int(time.time() - since))
+        now = time.time()
+        info("engine reachable again", apartment_id=apartment_id, after_s=int(now - since))
+        if now - since >= threshold:               # the short drops do not fill the Decisions; also when suspended
+            _spawn(_note_reachable(apt, since, now), "reachability note", apartment_id)
         # what the engine says now: the outage's claim released if it is fine, its connector watched if not, the devices
         # still offline waited for (the events of the outage may be gone)
         _resumed.add(apartment_id)

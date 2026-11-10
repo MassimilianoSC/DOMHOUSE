@@ -446,6 +446,13 @@ leggibile). `instance_down` ha due cause, con una notifica sola per episodio qua
   dall'app non arrivano e le regole automatiche potrebbero essere ferme.».
 Una caduta seguita da un ritorno prima dei minuti non manda niente. Al ritorno non parte nessuna notifica: il server
 rilegge `GET /health` e libera la chiave se il connector è su, così l'episodio dopo avvisa di nuovo.
+Decisione al ritorno (D-217): se il motore è stato irraggiungibile almeno per i minuti della regola (15 con la regola
+spenta o mai letta), anche durante una sospensione, una sola istanza (chiave `note:reachable:<apartment_id>` in
+`work_claims`, liberata all'inizio dell'episodio dopo) chiama `POST /_internal/reachability` con
+`{"from": <prima connessione fallita>, "to": <ritorno>}`, istanti UTC ISO 8601 con `Z`. È una route del motore fuori
+dal contratto: il motore scrive nelle Decisioni «Sistema domotico di nuovo raggiungibile dopo <durata>». Un 404
+(motore senza la route) si salta con la riga «reachability note skipped: the engine has no route»; ogni altro errore
+si scrive e non si riprova.
 Sospensione (D-217, procedura M19): `UNREACHABLE_ALERTS_OFF_UNTIL`, un istante ISO 8601 con il fuso (per esempio
 `2026-11-23T08:00:00+01:00`), al massimo 30 giorni avanti. Fino a quell'istante le due notifiche `instance_down`
 aspettano; poi, se il problema c'è ancora, partono. Un valore illeggibile, senza fuso, passato o oltre i 30 giorni è
