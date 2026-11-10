@@ -273,6 +273,20 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
             return JSONResponse(status_code=exc.status, content=exc.body())
         return JSONResponse(status_code=status, content=result)
 
+    @router.post("/_internal/reachability")
+    async def reachability(request: Request, apartment_id: str = Depends(apartment_of)):
+        """D-217, outside the contract: the BFF says it could not reach this engine from `from` to `to` (bff/push.py
+        _note_reachable). Same key and headers as every call; 201 with the decision, 200 with it again for the same
+        interval, 400 for a body that is not two UTC instants from < to <= now + 1 minute."""
+        sim = engine_of(apartment_id)
+        _, corr = ctx(request)
+        try:
+            body = await body_of(request)
+            status, result = sim.note_reachable(body, corr)
+        except MockError as exc:
+            return JSONResponse(status_code=exc.status, content=exc.body())
+        return JSONResponse(status_code=status, content=result)
+
     @router.post("/_test/state")
     async def test_state(request: Request, apartment_id: str = Depends(apartment_of)):
         sim = engine_of(apartment_id)

@@ -119,6 +119,23 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def duration_words(span: timedelta) -> str:
+    """D-217: a stretch of time in Italian, as a person says it: «25 minuti», «1 ora», «3 ore e 10 minuti»,
+    «2 giorni e 4 ore»; never «e 0 minuti». Minutes and hours are counted down, never up."""
+    minutes = int(span.total_seconds() // 60)
+    if minutes < 1:
+        return "meno di un minuto"
+    def unit(n: int, one: str, many: str) -> str:
+        return f"{n} {one if n == 1 else many}"
+    if minutes < 60:
+        return unit(minutes, "minuto", "minuti")
+    hours, rest = divmod(minutes, 60)
+    if hours < 24:
+        return unit(hours, "ora", "ore") + (f" e {unit(rest, 'minuto', 'minuti')}" if rest else "")
+    days, hours = divmod(hours, 24)
+    return unit(days, "giorno", "giorni") + (f" e {unit(hours, 'ora', 'ore')}" if hours else "")
+
+
 def at_local_hour(run: datetime, hh: int, mm: int) -> str:
     """D-212: «alle HH:MM» said with the hour the action really runs at. On the day summer time starts an hour that
     does not exist (02:30) runs an hour later; on the day it ends an hour that comes twice runs the first time."""
@@ -2154,6 +2171,33 @@ class ApartmentEngine:
             approval = self.approval_queue.pop(0)
             self._save_queue()
             self._open_approval(approval)
+
+    # ---- reachability (D-217): the BFF says when it could not reach this engine ---------------------------------------
+    def note_reachable(self, body, correlation_id: str) -> tuple[int, dict]:
+        """POST /_internal/reachability, outside the contract: the BFF could not reach this engine from `from` to `to`
+        (UTC) and now can. One decision says so, «Sistema domotico di nuovo raggiungibile dopo …», sent live like
+        every decision. The same interval twice gives the same decision (kept in the store's meta, the last 50)."""
+        if not isinstance(body, dict) or not isinstance(body.get("from"), str) or not isinstance(body.get("to"), str):
+            raise bad_request("from e to sono obbligatori: istanti ISO 8601 con il fuso")
+        try:
+            frm, to = parse_dt(body["from"]), parse_dt(body["to"])
+        except ValueError:
+            raise bad_request("from e to devono essere istanti ISO 8601 con il fuso") from None
+        if frm >= to:
+            raise bad_request("from deve venire prima di to")
+        if to > utcnow() + timedelta(minutes=1):
+            raise bad_request("to non può essere nel futuro")
+        key = f"{iso(frm)}|{iso(to)}"
+        notes = self.store.get_meta("reachability_notes", {}) or {}
+        if key in notes:
+            done = next((d for d in self.decisions if d["decision_id"] == notes[key]), None)
+            return 200, done or {"decision_id": notes[key]}
+        d = self.log("system", {"type": "apartment"}, "instance_reachable", "unreachable", "reachable",
+                     f"Sistema domotico di nuovo raggiungibile dopo {duration_words(to - frm)}", "informational",
+                     correlation_id)
+        notes[key] = d["decision_id"]
+        self.store.put_meta("reachability_notes", dict(list(notes.items())[-50:]))
+        return 201, d
 
     # ---- decisions -----------------------------------------------------------
     def list_decisions(self, q) -> dict:
