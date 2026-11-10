@@ -470,8 +470,11 @@ prove del trasporto stanno a parte, accanto al suo modulo.
   rispondere solo per sé.
 - Notifiche su `<prefisso>/events/rpc`; stato online su `<prefisso>/online` (`true` alla connessione, `false` come
   ultimo messaggio se il dispositivo cade).
-- Livello di consegna (QoS): richieste RPC con QoS 0, notifiche con QoS 1 (D-215, §7.3 punto 8). Con QoS 1 i duplicati sono possibili e vanno bene,
-  perché i comandi sono stati da raggiungere (§2.5, §2.6).
+- Livello di consegna (QoS), D-215 e risposta 744:
+  - **richieste RPC del connector: QoS 0**. Il broker non accoda mai un messaggio QoS 0 per chi è scollegato: un comando mandato a un dispositivo che non c'è si perde, non arriva in ritardo al suo ritorno. Il connector se ne accorge dalla scadenza (`failed/device_offline` o `timeout`, §2.5) e il motore non ripete.
+  - **risposte e notifiche del dispositivo: QoS 1**, come le manda lo Shelly (la documentazione dice «The supported Quality of service level is 1»). I duplicati sono possibili e vanno bene, perché i comandi sono stati da raggiungere (§2.5, §2.6).
+  - Provato sul broker vero, nel repository: una richiesta QoS 0 a un dispositivo con sessione persistente scollegato non gli arriva al ritorno; la stessa richiesta con QoS 1 gli arriva (tests/broker_container_test.py, `test_d215_a_request_with_qos_0_never_reaches_a_device_late`).
+- Sessioni: il broker cancella **ogni** sessione persistente (dispositivi e connector) dopo **1 ora** di assenza (`persistent_client_expiration 1h`, risposta 744). È un'impostazione di tutto il broker: Mosquitto non la permette per un solo utente o per un solo ascoltatore (provato sull'immagine vera, D-215). Per il connector vuol dire che, se resta via più di un'ora, perde le notifiche accodate: alla ripresa rifà comunque la fotografia con `Shelly.GetStatus` (§2.6).
 - Alla riconnessione il connector chiede lo stato completo (`Shelly.GetStatus`) per la fotografia del §2.6.
 
 ### 7.3 Da concordare con Youssouf
@@ -489,13 +492,10 @@ prove del trasporto stanno a parte, accanto al suo modulo.
 6. Keep-alive e dimensione massima dei messaggi dei dispositivi: oggi nessun limite sul keep-alive e pacchetti fino a
    256 KB.
 7. La cifratura dei sensori BLU negli appartamenti (D-196, punto c).
-8. **Comandi accodati per i dispositivi offline (il punto più importante).** Il broker conserva le sessioni per 14
-   giorni. Se uno Shelly si collega con sessione non pulita, una richiesta RPC pubblicata con QoS 1 mentre è
-   scollegato viene consegnata al ritorno: un comando vecchio eseguito in ritardo, contro il «niente coda» del §2.5.
-   **Deciso (D-215):** richieste RPC con QoS 0, notifiche con QoS 1; **in più** sessione pulita impostata su ogni
-   dispositivo alla messa in servizio (procedura G2, passo B5) e scadenza breve, di minuti e non di 14 giorni,
-   delle sessioni degli utenti dispositivo sul broker (da applicare al broker, o1). Da verificare la sessione
-   predefinita del Gen4.
+8. **Comandi accodati per i dispositivi offline: deciso (D-215, risposta 744).**
+   - Richieste RPC con QoS 0, risposte e notifiche con QoS 1 (§7.2): un comando non può arrivare in ritardo, qualunque sia la sessione del dispositivo.
+   - Scadenza delle sessioni del broker a 1 ora, per tutti (Mosquitto non la permette solo per i dispositivi).
+   - La **sessione pulita sugli Shelly non è impostabile**: la documentazione ufficiale del componente MQTT non ha nessuna impostazione di sessione (`MQTT.SetConfig`: enable, server, client_id, user, pass, ssl_ca, topic_prefix, rpc_ntf, status_ntf, use_client_cert, enable_rpc, enable_control). Da verificare in laboratorio: il flag della sessione del Gen4 nel log del broker alla connessione (`c0` = sessione persistente, `c1` = pulita, nella riga «New client connected … (p4, cX, kY …)»).
 9. **Risposte a nome di un altro dispositivo: risolto (D-215).** Ogni dispositivo risponde su un topic suo
    (§7.1, §7.2) e non può scrivere su quello degli altri. Da verificare con Youssouf solo che il Gen4 accetti le
    barre in `src` (punto 2).

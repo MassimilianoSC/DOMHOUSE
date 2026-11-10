@@ -693,14 +693,34 @@ Verifica:
 1. Compaiono `langbrain-shelly-lab-01 creato`, `langbrain-shelly-lab-01-devices creato` e `nuova versione … scritta`, senza password a video.
 2. Poi `lab-01: connector e 1 dispositivi`, `changed` e `utenti e permessi ricaricati`.
 
-Su ogni Shelly, nelle impostazioni MQTT:
+Si impostano con `MQTT.SetConfig` (o dalla pagina web dello Shelly), poi lo Shelly va **riavviato**: `MQTT.SetConfig` risponde `"restart_required": true`.
 
-| Campo | Valore |
-|---|---|
-| Server | `mqtt.dh-lab.eu:8883`, TLS con verifica del certificato |
-| Utente | `lab-01.shelly-lab-1` |
-| Client ID | lo stesso dell'utente, `lab-01.shelly-lab-1`: così la riga di un accesso rifiutato dice quale dispositivo è |
-| Prefisso | `lab-01/shelly-lab-1` |
+| Campo | Valore | Perché |
+|---|---|---|
+| `enable` | `true` | |
+| `server` | `mqtt.dh-lab.eu:8883` | l'unico ingresso (D-209) |
+| `ssl_ca` | `"ca.pem"` | TLS verificato con le CA integrate; mai `"*"`, mai in chiaro |
+| `client_id` | uguale all'utente: `<apartment_id>.<id dispositivo>` | la riga di un accesso rifiutato dice quale dispositivo è (D-212) |
+| `user` | `<apartment_id>.<id dispositivo>` | |
+| `pass` | la password del segreto `langbrain-shelly-<apartment_id>-devices` | non compare mai in `MQTT.GetConfig` |
+| `topic_prefix` | `<apartment_id>/<id dispositivo>` | i permessi del broker sono per prefisso |
+| `rpc_ntf` | `true` | le notifiche di stato al connector |
+| `status_ntf` | `false` | il connector usa le notifiche RPC, non lo stato completo a ogni cambio |
+| `enable_rpc` | `true` | i comandi del connector arrivano come RPC |
+| `enable_control` | `false` | approvato dal committente: i comandi passano solo dalle RPC, non dai topic «di controllo» (`<prefisso>/command`…); da verificare in laboratorio che il Gen4 lo rispetti |
+
+La sessione pulita non si imposta: lo Shelly non ha questa impostazione (D-215). Il broker cancella le sessioni dopo 1 ora e il connector manda i comandi con QoS 0 (connector-v2.md §7.2).
+
+Verifiche di laboratorio, da fare la prima volta su un Gen4 vero e da scrivere nel registro:
+
+1. **Sessione:** nel log del broker, alla connessione dello Shelly, la riga «New client connected from … as <apartment_id>.<id dispositivo> (p4, c?, k…)»: `c0` = sessione persistente, `c1` = sessione pulita.
+   ```bash
+   # Git Bash
+   cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+   gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo docker logs --since 10m domhouse-broker 2>&1 | grep "New client connected"'
+   ```
+2. **Stato online conservato (retain):** abbonarsi a `<prefisso>/online` con l'utente del connector, dalla rete interna, **dopo** che lo Shelly si è collegato: se arriva subito `true`, il messaggio è conservato. Il comando lo prepara o1 al momento della prova, con l'appartamento e il dispositivo veri: serve la password del connector, che sulla VM non è in chiaro (il broker ne tiene solo l'hash) e va letta da Secret Manager senza mai mostrarla.
+3. **`enable_control false`:** pubblicare con l'utente del connector un comando sul topic `<prefisso>/command` e controllare che lo Shelly lo ignori.
 
 ### B6. Allarmi del broker (scrive su Google Cloud)
 
