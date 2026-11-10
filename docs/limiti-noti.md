@@ -30,6 +30,7 @@
 | **Si spegne da solo** | Senza richieste si spegne: la prima apertura aspetta qualche secondo | Voluto |
 | **A server spento** | Niente notifiche, e gli eventi di quel periodo non si recuperano | Voluto |
 | **Dimostrativi** | Ripartono dai valori iniziali a ogni avvio del server | Voluto |
+| **Nessun backup del database** | Il database dello staging non ha backup pianificati: contiene solo dati di prova | Voluto |
 
 ## Aggiornamenti in diretta
 

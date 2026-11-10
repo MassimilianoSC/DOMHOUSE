@@ -18,6 +18,8 @@ Tutto quello che l'app sa fare, spiegato passo per passo e diviso per ruolo. Non
 - **I tre puntini «…» dentro le virgolette** stanno al posto di un nome, una data, un numero o un indirizzo email
   che l'app mette lì.
 - **«Tocca» e «premi»** vogliono dire la stessa cosa: sul telefono tocchi, sul computer fai clic.
+- **Due documenti a parte:** i limiti che conosciamo sono in `docs/limiti-noti.md`; come è fatta l'app, perché e quanto costa
+  è in `docs/scelte-tecniche-e-costi.md`.
 
 **La guida è divisa per ruolo:**
 

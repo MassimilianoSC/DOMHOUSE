@@ -10,6 +10,9 @@ domotica dell'appartamento, rilancia lo stream SSE e inoltra le prenotazioni.
   proprio PC»). Lo stesso codice, con il connector simulato, fa gli appartamenti dimostrativi del BFF, montati su
   `/mock/{apartment_id}/api/v1` (`bff/mock_instance`).
 
+- **Scelte tecniche e costi**: `docs/scelte-tecniche-e-costi.md` (D-208), da aggiornare a ogni scelta o spesa nuova.
+  **Limiti noti**: `docs/limiti-noti.md` (D-204).
+
 ## Struttura
 
 ```
