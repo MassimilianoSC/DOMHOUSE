@@ -80,7 +80,7 @@
 |---|---|---|
 | **Approvata ma non eseguita** | Dal lotto 38 il fallimento si vede nelle Decisioni («Azione approvata ma non eseguita»), ma l'approvazione resta «Approvata» e l'app riceve un OK: il contratto non ha uno stato «non eseguita» | Accettato |
 | **Riepilogo fatto in ritardo** | Se il motore è irraggiungibile per tutto il lunedì, il riepilogo fatto dopo può ancora perdere le approvazioni scadute nei primi giorni della settimana | Accettato |
-| **Caldaia e clima dopo la chiusura della finestra** | In comfort ed eco, dopo che la regola «Finestra aperta spegne il clima» li ha spenti, chiudere la finestra non li riaccende: serve un cambio di modalità o un comando a mano. A casa vuota l'antigelo funziona ancora | Difetto confermato il 10 novembre: correzione approvata (risposta 811), lotto 38 |
+| **Caldaia e clima dopo la chiusura della finestra** | Dal lotto 38 tornano da soli, circa un minuto dopo la chiusura dell'ultima finestra; la caldaia può aspettare in più il minimo fra due accensioni. Se la modalità cambia a finestra aperta vale quella nuova; un dispositivo offline alla chiusura torna quando risponde | Corretto il 10 novembre (`cb50298`) |
 | **Riconoscimento di Cloud Run** | Il blocco dell'accesso di sviluppo riconosce Cloud Run dalla variabile `K_SERVICE`; su un altro servizio vale solo il controllo su `APP_ENV` | Accettato |
 | **Pausa del compressore dopo un riavvio** | Era tenuta in memoria e un riavvio la azzerava | Corretto il 10 novembre (`ce7d7a5`): si salva e continua dopo un riavvio; lotto 38 |
 | **Finestra chiusa e riaperta mentre la regola aspetta** | Partono due attese, e il clima si spegne allo scadere della prima (c'era già prima del lotto 38) | Accettato |
