@@ -304,6 +304,7 @@ class ApartmentEngine:
         self.last_tick = time.monotonic()            # P-60 step 10: the inner loop is alive when this moves
         self.last_heartbeat = float("-inf")         # "never": the first tick beats, also on a machine just switched on
         self.tick_errors: dict[tuple[str, str], list] = {}   # (step, error kind) -> [monotonic of its last line, unwritten]
+        self.windows_armed = False                  # the window rule's waits live in memory: armed again at the start
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode
@@ -545,6 +546,9 @@ class ApartmentEngine:
         if self.loop_task is None or self.loop_task.done():
             self.loop_task = asyncio.get_running_loop().create_task(self._tick_loop())
             self.device_locks = {}          # a new event loop (the tests run one per case): locks belong to a loop
+            if not self.windows_armed:
+                self.windows_armed = True
+                self._windows_at_start()
         if self.consumer_task is None or self.consumer_task.done():
             self.consumer_task = asyncio.get_running_loop().create_task(self._consume_changes())
 
@@ -1611,10 +1615,32 @@ class ApartmentEngine:
     async def _window_reflex(self, device_id: str, delay: float | None = None) -> None:
         minutes = self.rule("window_open_off")["params"]["minutes"]
         await asyncio.sleep(minutes * seconds_per_minute() if delay is None else delay)
-        contact = self.devices[device_id]["capabilities"]["contact"]
-        if not contact["open"] or not self.window_rule_active():
-            return                       # closed meanwhile, or a hold: the end of the hold looks again (R7)
+        while True:
+            contact = self.devices[device_id]["capabilities"]["contact"]
+            if not contact["open"] or not self.window_rule_active():
+                return                   # closed meanwhile, or a hold: the end of the hold looks again (R7)
+            if self.connector_up():
+                break
+            await asyncio.sleep(1.0)     # the devices cannot be reached (also just after a start): off when they can
         self._window_turn_off(device_id, f"{self.devices[device_id]['label']} aperta da oltre {fmt_num(minutes)} minuti")
+
+    def _windows_at_start(self) -> None:
+        """Verification of 10 November 2026, point a: the wait of the window rule lives in memory, and before this a
+        restart lost it; a window already open then turned nothing off until it was closed and opened again. At the
+        start every open window waits again for the minutes it has left, counted from when it opened (contact.since;
+        from the start when that is not known, or when it opened while the engine was down): the more prudent choice,
+        the climate goes off when it would have without the restart, never later. During a hold nothing: its end looks
+        again (R7)."""
+        rule = self.rule("window_open_off")
+        if not rule["enabled"] or not self.window_rule_active():
+            return
+        minutes = rule["params"]["minutes"]
+        for d in self.devices.values():
+            contact = d["capabilities"].get("contact")
+            if not contact or not contact.get("open"):
+                continue
+            open_s = (utcnow() - parse_dt(contact["since"])).total_seconds() if contact.get("since") else 0.0
+            self.spawn(self._window_reflex(d["device_id"], delay=max(0.0, minutes * seconds_per_minute() - open_s)))
 
     def _window_turn_off(self, window_id: str, why: str) -> None:
         corr = str(uuid.uuid4())
