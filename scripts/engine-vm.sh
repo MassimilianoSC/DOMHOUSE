@@ -21,7 +21,8 @@
 # every installed engine for its /health and looks at the age of its newest backup, and writes to the VM's syslog (that
 # the Ops Agent already sends to Cloud Logging) one line per apartment, "engine ok <id>", "engine down <id>" (answers 503)
 # or "engine silent <id>" (does not answer), "backup missing <id> age_h=<n>" (newest backup older than BACKUP_ALERT_H),
-# then "domhouse-check: <n> motori, <m> muti" and, if the broker is installed, its line (scripts/broker-vm.sh check). The alerts read those lines (scripts/monitoring/engine-alerts.sh): the
+# then "domhouse-check: <n> motori, <m> muti", "vm mem_used_pct=<n> disk_used_pct=<n>" (the weekly run-in report,
+# D-210) and, if the broker is installed, its line (scripts/broker-vm.sh check). The alerts read those lines (scripts/monitoring/engine-alerts.sh): the
 # watch writes only while the VM is alive, so a silent VM gives one email, never one per apartment. The daily backup
 # writes "backup ok <id>". logs-agent adds to the Ops Agent a receiver for the engines' container logs (docker json-file,
 # parsed: level, msg, apartment_id) as the log "domhouse_engine", keeping the previous configuration as a copy; the
@@ -51,6 +52,7 @@ ETC="${DOMHOUSE_ETC:-/etc/domhouse}"
 DATA="${DOMHOUSE_DATA:-/data}"
 SYSTEMD="${DOMHOUSE_SYSTEMD:-/etc/systemd/system}"
 OPS_CONFIG="${DOMHOUSE_OPS_CONFIG:-/etc/google-cloud-ops-agent/config.yaml}"
+MEMINFO="${DOMHOUSE_MEMINFO:-/proc/meminfo}"   # moved only by the tests (Windows has no Linux /proc)
 BACKUP_ALERT_H=26                        # D-148 (c): no backup for longer than this -> "backup missing"
 ENGINE_UID=10001
 METADATA=http://metadata.google.internal/computeMetadata/v1
@@ -281,10 +283,19 @@ check_all() {
     fi
   done
   watch_line "domhouse-check: ${total} motori, ${silent} muti"
+  vm_line
   # after the summary: a stuck broker check must never look like a silent VM
   if [ -f "${OPT}/_broker/broker.settings" ]; then
     bash "${OPT}/broker-vm.sh" check || watch_line "broker down (controllo non riuscito)"
   fi
+}
+
+vm_line() {
+  # D-210: memory in use (what the kernel cannot hand out at once) and the boot disk, for the weekly run-in report
+  local mem disk
+  mem="$(awk '/^MemTotal:/ {t = $2} /^MemAvailable:/ {a = $2} END {if (t > 0 && a != "") printf "%d", (t - a) * 100 / t; else print "?"}' "${MEMINFO}" 2>/dev/null || true)"
+  disk="$(df --output=pcent / 2>/dev/null | tail -1 | tr -dc '0-9' || true)"
+  watch_line "vm mem_used_pct=${mem:-?} disk_used_pct=${disk:-?}"
 }
 
 logs_agent() {

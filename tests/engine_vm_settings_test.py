@@ -64,12 +64,14 @@ def vm(tmp_path):
     (opt / f"{APT}.settings").write_text(f"APARTMENT_ID={APT}\nPORT=8100\nCONNECTOR=simulated\nENGINE_IMAGE=x:1\n",
                                          encoding="utf-8", newline="\n")
     (etc / f"{APT}.env").write_text("API_KEY=chiave-di-prova-lunga\n", encoding="utf-8", newline="\n")
+    (tmp_path / "meminfo").write_text("MemTotal:        2000000 kB\nMemFree:          300000 kB\nMemAvailable:     500000 kB\n",
+                                      encoding="utf-8", newline="\n")             # a Linux /proc/meminfo, e2-small sized
 
     def run(*args):
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}" '
                f'DOMHOUSE_ETC="{posix(etc)}" DOMHOUSE_OPT="{posix(opt)}" DOMHOUSE_HEALTH_TRIES=2 '
                f'DOMHOUSE_DATA="{posix(data)}" DOMHOUSE_SYSTEMD="{posix(units)}" '
-               f'DOMHOUSE_OPS_CONFIG="{posix(tmp_path / "ops" / "config.yaml")}"; '
+               f'DOMHOUSE_OPS_CONFIG="{posix(tmp_path / "ops" / "config.yaml")}" DOMHOUSE_MEMINFO="{posix(tmp_path / "meminfo")}"; '
                f'bash "{posix(SCRIPT)}" ' + " ".join(f"'{a}'" for a in args))
         return subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=60)
 
@@ -167,6 +169,7 @@ def test_the_watch_writes_one_line_per_engine_backup_and_a_summary(vm):
     assert "-t domhouse-check engine silent apt-muto" in syslog and "-t domhouse-check engine down apt-giu" in syslog
     assert f"-t domhouse-check backup missing {APT} age_h=4" in syslog          # 48 hours (4x)
     assert "-t domhouse-check domhouse-check: 3 motori, 2 muti" in syslog
+    assert re.search(r"-t domhouse-check vm mem_used_pct=75 disk_used_pct=\d+$", syslog, re.M), syslog   # D-210: 1.5 of 2 GB
     fresh = backup / "engine-2026-10-21.db"
     fresh.write_text("x", encoding="utf-8")
     (vm.stubs / "syslog.log").unlink()
