@@ -731,7 +731,7 @@ Si fa dopo i comandi della memoria storica per l'indirizzo pubblico, la regola `
 # Cloud Shell
 cd ~
 IP=$(gcloud compute instances describe langbrain-dev --zone=europe-west8-a --project=domotica-poc-511707 --format='get(networkInterfaces[0].accessConfigs[0].natIP)'); echo "IP pubblico: $IP"
-for p in 22 1883 8100 8101 8199 8883; do nc -z -w 3 "$IP" $p && echo "porta $p APERTA" || echo "porta $p chiusa"; done
+for p in 22 1883 8100 8101 8199 8883; do timeout 3 bash -c "</dev/tcp/$IP/$p" 2>/dev/null && echo "porta $p APERTA" || echo "porta $p chiusa"; done
 sudo apt-get install -y -qq nmap > /dev/null && sudo nmap -Pn -p 1-1024,1883,8100-8199,8883 "$IP"
 openssl s_client -connect "$IP:8883" -servername mqtt.dh-lab.eu -verify_return_error < /dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -enddate
 ```
@@ -758,7 +758,7 @@ gcloud logging read 'resource.type="nat_gateway"' --freshness=30m --limit=5 --pr
 
 Verifica:
 
-1. `get-nat-mapping-info` non elenca nessuna macchina (oggi elenca `langbrain-dev`).
+1. `get-nat-mapping-info` non elenca più `langbrain-dev`. Restano voci senza nome macchina (`instanceName: ''`, indirizzi `10.198.0.16`–`10.198.0.23`): sono le interfacce di rete di Cloud Run, che il NAT prenota per tutta la sottorete ma che non lo usano, perché i due servizi hanno `vpc-access-egress: private-ranges-only` (da ricontrollare con `gcloud run services describe`).
 2. Tutte le macchine dell'elenco hanno un indirizzo pubblico (oggi c'è solo `langbrain-dev`).
 3. Nei registri del NAT non c'è niente dopo l'attivazione dell'indirizzo.
 
