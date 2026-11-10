@@ -85,6 +85,8 @@
 | **Ordine all'avvio** | Montaggio del disco delle chiavi prima di Docker e limite sui collegamenti: non provabili sul PC | Da verificare al primo riavvio vero della VM |
 | **Righe di Mosquitto in Cloud Logging** | Arrivano solo se l'agente della VM tiene le righe non JSON dei container | Da verificare dopo l'installazione |
 | **Conto Let's Encrypt** | lego non sa disattivarlo: se la sua chiave uscisse, si apre un conto nuovo e si revocano i certificati vecchi | Accettato |
+| **Comandi accodati per i dispositivi offline** | Il broker conserva le sessioni 14 giorni: se uno Shelly si collega con sessione non pulita, una richiesta inviata con QoS 1 mentre è scollegato verrebbe eseguita al ritorno, in ritardo | Da decidere con Youssouf prima del connector (proposta: richieste con QoS 0) |
+| **Risposte a nome di un altro dispositivo** | Dentro lo stesso appartamento ogni dispositivo può scrivere sul topic delle risposte al connector | Da decidere con Youssouf (il connector confronta id e mittente) |
 | **Mosquitto 3.0** | Toglierà opzioni che usiamo: serviranno i plugin prima di aggiornare | Da fare prima di aggiornare |
 | **Ricarica con file non validi** | Fa uscire il broker: i file si controllano prima | Accettato |
 | **Dispositivi tolti** | La loro password resta nelle versioni vecchie del segreto, che il broker non legge | Accettato |
