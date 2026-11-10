@@ -566,7 +566,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | Cosa vedi | Cosa vuol dire |
 |---|---|
 | La pillola «In attesa» (la scelta è scritta in scuro) | Le richieste aperte |
-| La pillola «Tutte» | Anche quelle decise negli ultimi 7 giorni |
+| La pillola «Tutte» | Anche quelle decise negli ultimi 7 giorni, contati dalla mezzanotte, più quelle di oggi |
 | In alto: lo stato, poi chi la propone e la data | «In attesa», «Approvata», «Respinta», «Scaduta»; «Motore AI», «Regola», «Assistente», «Modulo» |
 | La descrizione, in grande | Che cosa chiede |
 | «Perché il motore lo propone», con il testo sotto | Il motivo, senza riquadro |
@@ -576,6 +576,13 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | Sotto una riga: «Nota (facoltativa)» e i pulsanti | Solo nelle richieste in attesa, per chi può decidere |
 | In fondo: «Approvata da … …» o «Respinta da … …» con la nota, poi l'«ID richiesta» | Solo nelle richieste già decise o scadute |
 | «Nessuna approvazione in attesa» o «Nessuna approvazione negli ultimi 7 giorni» | Non c'è nulla |
+
+> **Da sapere** (dal lotto 38)
+>
+> - **Se approvi un'azione che il sistema non può eseguire subito** (dispositivo offline, collegamento ai
+>   dispositivi assente, azione non più valida), nelle Decisioni compare una riga «Non riuscita»: «Azione approvata ma
+>   non eseguita: …» con il motivo. L'approvazione resta «Approvata».
+> - **Lo stesso succede** quando un'approvazione scade e si approva da sola.
 
 > **Da sapere**
 >
@@ -1881,7 +1888,9 @@ tolti).»
 - **«BFF non raggiungibile»**: server dell'app fermo per 5 minuti, con l'email di chiusura quando torna.
 - **«BFF: scrittura non riuscita»**.
 - **«Motori: VM muta»**, «Motori: motore muto o giù».
-- **«Motori: righe di errore»**, «Motori: backup mancato».
+- **«Motori: righe di errore»**, «Motori: backup mancato». Dal lotto 38 un errore interno del ciclo del motore
+  compare nel log come «engine loop step failed» e fa partire «Motori: righe di errore»; il motore continua con gli
+  altri compiti.
 - **«Motori: disco della VM oltre l'80 %»**.
 
 > **Da sapere**
@@ -2249,7 +2258,9 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 **L'effetto reale di ogni regola, oltre la descrizione.**
 
 - **«Finestra aperta spegne il clima»**: spegne clima e riscaldamento di tutto l'appartamento, non solo della
-  stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte.
+  stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte. Dal lotto 38, se il sistema
+  domotico si riavvia con una finestra aperta, la regola riparte da sola: il clima si spegne allo scadere dei minuti
+  contati da quando la finestra si è aperta; se si è aperta mentre il sistema era fermo, dalla ripartenza.
 - **«Antigelo a casa vuota»**: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
   0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve
   un sensore: senza, «Antigelo non attivo».
@@ -2351,8 +2362,9 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 - **Quando**: ogni lunedì dalle 8 (ora dell'appartamento), per la settimana da lunedì a domenica.
 - **Consumi**: per notte con ospiti e per notte vuota, confrontati con la mediana delle 4 settimane prima («Alto»
   solo con almeno il 30 % in più e almeno 5 kWh di eccedenza).
-- **Segnalazioni**: dispositivi offline da più di 24 ore, approvazioni scadute senza risposta, finestre aperte
-  almeno 3 volte con il clima spento dalla regola.
+- **Segnalazioni**: dispositivi offline da più di 24 ore, approvazioni scadute senza risposta (tutte quelle della
+  settimana, da lunedì a domenica, anche quelle del lunedì mattina; dal lotto 38), finestre aperte almeno 3 volte con
+  il clima spento dalla regola.
 - **Notifica**: se c'è almeno una segnalazione arriva la notifica «Riepilogo».
 - **Settimana senza novità**: il riepilogo dice «Settimana senza novità» e non manda avvisi.
 

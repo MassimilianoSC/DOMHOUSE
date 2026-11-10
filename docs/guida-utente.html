@@ -1196,7 +1196,7 @@ categoria nelle notifiche.</p>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa vuol dire</th></tr></thead>
 <tbody>
 <tr><td data-label="Cosa vedi" class="align-left">La pillola «In attesa» (la scelta è scritta in scuro)</td><td data-label="Cosa vuol dire" class="align-left">Le richieste aperte</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">La pillola «Tutte»</td><td data-label="Cosa vuol dire" class="align-left">Anche quelle decise negli ultimi 7 giorni</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">La pillola «Tutte»</td><td data-label="Cosa vuol dire" class="align-left">Anche quelle decise negli ultimi 7 giorni, contati dalla mezzanotte, più quelle di oggi</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">In alto: lo stato, poi chi la propone e la data</td><td data-label="Cosa vuol dire" class="align-left">«In attesa», «Approvata», «Respinta», «Scaduta»; «Motore AI», «Regola», «Assistente», «Modulo»</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">La descrizione, in grande</td><td data-label="Cosa vuol dire" class="align-left">Che cosa chiede</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Perché il motore lo propone», con il testo sotto</td><td data-label="Cosa vuol dire" class="align-left">Il motivo, senza riquadro</td></tr>
@@ -1207,6 +1207,19 @@ categoria nelle notifiche.</p>
 <tr><td data-label="Cosa vedi" class="align-left">In fondo: «Approvata da … …» o «Respinta da … …» con la nota, poi l&#x27;«ID richiesta»</td><td data-label="Cosa vuol dire" class="align-left">Solo nelle richieste già decise o scadute</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Nessuna approvazione in attesa» o «Nessuna approvazione negli ultimi 7 giorni»</td><td data-label="Cosa vuol dire" class="align-left">Non c&#x27;è nulla</td></tr>
 </tbody></table></div>
+<blockquote class="note-info">
+<p><strong>Da sapere</strong> (dal lotto 38)</p>
+<ul>
+<li>
+<p><strong>Se approvi un&#x27;azione che il sistema non può eseguire subito</strong> (dispositivo offline, collegamento ai
+dispositivi assente, azione non più valida), nelle Decisioni compare una riga «Non riuscita»: «Azione approvata ma
+non eseguita: …» con il motivo. L&#x27;approvazione resta «Approvata».</p>
+</li>
+<li>
+<p><strong>Lo stesso succede</strong> quando un&#x27;approvazione scade e si approva da sola.</p>
+</li>
+</ul>
+</blockquote>
 <blockquote class="note-info">
 <p><strong>Da sapere</strong></p>
 <ul>
@@ -3179,7 +3192,9 @@ configurato.</p>
 <p><strong>«Motori: VM muta»</strong>, «Motori: motore muto o giù».</p>
 </li>
 <li>
-<p><strong>«Motori: righe di errore»</strong>, «Motori: backup mancato».</p>
+<p><strong>«Motori: righe di errore»</strong>, «Motori: backup mancato». Dal lotto 38 un errore interno del ciclo del motore
+compare nel log come «engine loop step failed» e fa partire «Motori: righe di errore»; il motore continua con gli
+altri compiti.</p>
 </li>
 <li>
 <p><strong>«Motori: disco della VM oltre l&#x27;80 %»</strong>.</p>
@@ -3759,7 +3774,9 @@ massimo che hai scelto.</p>
 <ul>
 <li>
 <p><strong>«Finestra aperta spegne il clima»</strong>: spegne clima e riscaldamento di tutto l&#x27;appartamento, non solo della
-stanza. Sospesa durante una forzatura; alla fine riparte. L&#x27;antigelo è più forte.</p>
+stanza. Sospesa durante una forzatura; alla fine riparte. L&#x27;antigelo è più forte. Dal lotto 38, se il sistema
+domotico si riavvia con una finestra aperta, la regola riparte da sola: il clima si spegne allo scadere dei minuti
+contati da quando la finestra si è aperta; se si è aperta mentre il sistema era fermo, dalla ripartenza.</p>
 </li>
 <li>
 <p><strong>«Antigelo a casa vuota»</strong>: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
@@ -3932,8 +3949,9 @@ verificato: misuratore offline».</p>
 solo con almeno il 30 % in più e almeno 5 kWh di eccedenza).</p>
 </li>
 <li>
-<p><strong>Segnalazioni</strong>: dispositivi offline da più di 24 ore, approvazioni scadute senza risposta, finestre aperte
-almeno 3 volte con il clima spento dalla regola.</p>
+<p><strong>Segnalazioni</strong>: dispositivi offline da più di 24 ore, approvazioni scadute senza risposta (tutte quelle della
+settimana, da lunedì a domenica, anche quelle del lunedì mattina; dal lotto 38), finestre aperte almeno 3 volte con
+il clima spento dalla regola.</p>
 </li>
 <li>
 <p><strong>Notifica</strong>: se c&#x27;è almeno una segnalazione arriva la notifica «Riepilogo».</p>
