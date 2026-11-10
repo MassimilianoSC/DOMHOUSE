@@ -336,6 +336,12 @@ class ApartmentEngine:
         self.last_heartbeat = float("-inf")         # "never": the first tick beats, also on a machine just switched on
         self.tick_errors: dict[tuple[str, str], list] = {}   # (step, error kind) -> [monotonic of its last line, unwritten]
         self.windows_armed = False                  # the window rule's waits live in memory: armed again at the start
+        # D-218 point 1 (answer 811): what the window rule turned off, to bring back when the windows are closed again:
+        # device -> {"cap", "by_mode", "state"}; kept in the store. The wait of each open window, cancelled when it closes
+        self.window_off: dict[str, dict] = {}
+        self.window_reflexes: dict[str, asyncio.Task] = {}
+        self.windows_closed_at = float("-inf")      # monotonic: when the last open window closed
+        self._window_command = False                # the rule's own turn_off: not a person's (the mode is kept)
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode
@@ -473,7 +479,8 @@ class ApartmentEngine:
         self.counter = st.get_meta("counter", self.counter)
         self.heating_by_mode = set(st.get_meta("heating_by_mode", []) or [])
         self.climate_by_mode = set(st.get_meta("climate_by_mode", []) or [])
-        self.meters = {k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
+        self.window_off = dict(st.get_meta("window_off", {}) or {})
+        self.meters ={k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
         profile = st.get_meta("energy_profile")
         self.profile_until = parse_dt(profile["until"]) if profile else None
         stored = dict(st.all("devices"))
@@ -552,7 +559,7 @@ class ApartmentEngine:
                      f"il motore era fermo all'orario previsto, alle {local:%H:%M} del {local:%d/%m}, "
                      f"oltre {fmt_num(self.setting('MISSED_AFTER_MINUTES'))} minuti fa", "failed", str(uuid.uuid4()))
 
-    def spawn(self, coro) -> None:
+    def spawn(self, coro) -> asyncio.Task:
         task = asyncio.get_running_loop().create_task(coro)
         self.tasks.add(task)
 
@@ -561,6 +568,7 @@ class ApartmentEngine:
             if not t.cancelled() and t.exception() is not None:     # before, lost without a line
                 self._step_failed(f"task {getattr(coro, '__name__', 'unknown')}", t.exception())
         task.add_done_callback(done)
+        return task
 
     def _step_failed(self, step: str, exc: BaseException) -> None:
         """An error of the inner loop or of a background task: one line per step and kind every TICK_ERROR_EVERY_S."""
@@ -701,6 +709,8 @@ class ApartmentEngine:
         self._note_climate(change.device_id, cap, was_on, state.get("on"))
         if cap == "contact" and state.get("open") and not was_open:
             self._window_opened(change.device_id)
+        elif cap == "contact" and was_open and not state.get("open"):
+            self._window_closed(change.device_id)
         device["last_seen"] = iso(change.ts)
         self._save_device(device)
         self.emit("device.state", {"device_id": device["device_id"], "capability": cap, "state": state}, corr)
@@ -955,6 +965,7 @@ class ApartmentEngine:
         connector down nothing can be switched: it waits for it (D-131)."""
         if not self.connector_was_up:
             return
+        self._restore_after_window()                         # D-218 point 1: first, so the boiler's relay follows now
         for device in self.devices.values():
             if "heating" not in device["capabilities"] or not device["online"]:
                 continue
@@ -975,6 +986,97 @@ class ApartmentEngine:
             self.spawn(self._switch_relay(device, want, temperature, setpoint, frost))
         self._regulate_climates()
 
+    def _mode_heating_setpoint(self, device: dict) -> float:
+        """The boiler's setpoint of the current mode, as mode_commands gives it."""
+        sl = self.rule("setpoint_limits")["params"]
+        h = device["capabilities"]["heating"]
+        target = {"comfort": sl["comfort_celsius"], "eco": sl["eco_celsius"],
+                  "empty": self.rule("frost_protection")["params"]["celsius"]}[self.mode]
+        lo, hi = self.frost_limits(device["device_id"]) if self.mode == "empty" else (h["setpoint_min"], h["setpoint_max"])
+        return min(max(target, lo), hi)
+
+    def _restore_after_window(self) -> None:
+        """D-218 point 1 (answer 811): what the window rule turned off comes back when no window is open any more and they
+        have been closed for a regulation's minute (a window that bangs in the wind sends nothing). A boiler or a climate
+        of the mode goes back to the mode: the boiler's intention again, its relay switched by the thermostat (at most one
+        switch every THERMOSTAT_MIN_SWITCH_MINUTES); the climate by the comfort regulation, once its pause and the
+        compressor's are over. One a person had turned on goes back as it was. A command meanwhile took it out of here
+        (create_command); during a hold nothing comes back, the hold wins. Each return is a decision."""
+        if not self.window_off:
+            return
+        if self.window_open() and self.window_rule_active():
+            return
+        if time.monotonic() - self.windows_closed_at < seconds_per_minute():
+            return
+        if self.hold:
+            self.window_off = {}
+            self.store.put_meta("window_off", self.window_off)
+            return
+        wait = self.setting("THERMOSTAT_MIN_SWITCH_MINUTES") * seconds_per_minute()
+        for device_id, entry in list(self.window_off.items()):
+            device = self.devices.get(device_id)
+            cap = entry["cap"]
+            if device is None or cap not in device["capabilities"]:
+                self.window_off.pop(device_id, None)
+                continue
+            if not device["online"] or any(r[0] == device_id for r in self.inflight):
+                continue                                     # later, when it can be reached
+            state = device["capabilities"][cap]
+            if state.get("on"):
+                self.window_off.pop(device_id, None)         # already back on (by itself, or the mode)
+                continue
+            by_mode = device_id in (self.heating_by_mode if cap == "heating" else self.climate_by_mode)
+            if not by_mode and entry["by_mode"]:
+                self.window_off.pop(device_id, None)         # the mode changed meanwhile and keeps it off
+                continue
+            if cap == "climate" and (self.compressor_wait(device_id) > 0
+                                     or time.monotonic() - self.climate_switched.get(device_id, -1e18) < wait):
+                continue                                     # the compressor's pause, the regulation's minutes
+            self.window_off.pop(device_id, None)
+            words = f"riacceso ({self.mode})" if by_mode else "riacceso come prima"
+            reasoning = f"Finestra chiusa: {device['label']} {words}"
+            corr = str(uuid.uuid4())
+            if cap == "heating":
+                setpoint = self._mode_heating_setpoint(device) if by_mode else entry["state"].get("setpoint", state.get("setpoint"))
+                state.update(on=True, setpoint=setpoint)    # the intention: the thermostat switches the relay
+                self._save_device(device)
+                self.emit("device.state", {"device_id": device_id, "capability": cap, "state": state}, corr)
+            else:
+                params = (self._comfort_climate(device, state) if by_mode
+                          else {k: v for k, v in entry["state"].items() if k in ("mode", "setpoint", "fan")})
+                if params is None:
+                    reasoning = f"Finestra chiusa: {device['label']} torna alla regolazione ({self.mode})"
+                else:
+                    self.climate_switched[device_id] = time.monotonic()
+                    self._auto_climate = True
+                    try:
+                        self.create_command(device_id, {"capability": "climate", "action": "set_climate",
+                                                        "params": {"on": True, **params}},
+                                            "system:engine", corr, decision_actor="rule:window_open_off", reasoning=reasoning)
+                    except MockError:
+                        pass
+                    finally:
+                        self._auto_climate = False
+            self.log("rule:window_open_off", {"type": "device", "device_id": device_id}, "window_restore", "off", "on",
+                     reasoning, "applied", corr)
+        self.store.put_meta("window_off", self.window_off)
+
+    def _comfort_climate(self, device: dict, c: dict) -> dict | None:
+        """The comfort regulation's command for a climate (mode and setpoint), None when its room needs nothing."""
+        room = self.room_temperature(device)
+        if room is None:
+            return None
+        sl = self.rule("setpoint_limits")["params"]
+        heat, cool = sl["comfort_celsius"], sl["comfort_cool_celsius"]
+        margin = self.setting("THERMOSTAT_HYSTERESIS_C")
+        if room < heat - margin:
+            climate_mode, target = "heat", heat
+        elif room > cool + margin:
+            climate_mode, target = "cool", cool
+        else:
+            return None
+        return {"mode": climate_mode, "setpoint": min(max(target, c["setpoint_min"]), c["setpoint_max"])}
+
     def _regulate_climates(self) -> None:
         """D-169: in comfort, every "minute", each climate the mode set and no person changed since follows its room's
         sensor: heating to comfort_celsius below it minus the hysteresis, cooling to comfort_cool_celsius above it plus
@@ -991,6 +1093,8 @@ class ApartmentEngine:
             device = self.devices.get(device_id)
             if not device or not device["online"] or "climate" not in device["capabilities"]:
                 continue
+            if device_id in self.window_off:
+                continue                                    # D-218: its return after the window comes first
             room = self.room_temperature(device)
             if room is None:
                 self._note_no_sensor(device, None)
@@ -1412,9 +1516,12 @@ class ApartmentEngine:
                        decision_actor: str | None = None, reasoning: str | None = None) -> dict | None:
         """A command, or None when an automatic one waits for the compressor's pause (R4) and starts after it."""
         device = self.get_device(device_id)
-        if body.get("capability") == "heating" and device_id in self.heating_by_mode:
+        if not self._window_command and not self._auto_climate and self.window_off.pop(device_id, None) is not None:
+            self.store.put_meta("window_off", self.window_off)  # D-218: commanded meanwhile, it stays as it is left
+        if body.get("capability") == "heating" and device_id in self.heating_by_mode and not self._window_command:
             self._heating_set_by(device_id, mode=False)       # D-164: a person's (or a scheduled) command
-        if body.get("capability") == "climate" and device_id in self.climate_by_mode and not self._auto_climate:
+        if body.get("capability") == "climate" and device_id in self.climate_by_mode and not self._auto_climate \
+                and not self._window_command:
             self.climate_by_mode.discard(device_id)          # D-169: never against a person, until the next mode
             self.store.put_meta("climate_by_mode", sorted(self.climate_by_mode))
         if not self.connector_up():                          # D-131: nothing can reach the devices
@@ -1654,7 +1761,22 @@ class ApartmentEngine:
                      None, self.hold["until"], f"{self.devices[device_id]['label']} aperta durante la forzatura: la regola "
                      f"«Finestra aperta spegne il clima» riparte alla sua fine (alle {until})", "informational",
                      str(uuid.uuid4()))
-        self.spawn(self._window_reflex(device_id))
+        self._arm_window(device_id)
+
+    def _arm_window(self, device_id: str, delay: float | None = None) -> None:
+        """The wait of one window, one at a time: a new one replaces the old (D-218: a window that bangs in the wind
+        counts its minutes from its last opening)."""
+        if (old := self.window_reflexes.pop(device_id, None)) and not old.done():
+            old.cancel()
+        self.window_reflexes[device_id] = self.spawn(self._window_reflex(device_id, delay))
+
+    def _window_closed(self, device_id: str) -> None:
+        """D-218 point 1: a window closed. Its wait is cancelled; when none is open any more, what the rule turned off
+        comes back at the regulation's next round, after a minute with the windows closed (_restore_after_window)."""
+        if (task := self.window_reflexes.pop(device_id, None)) and not task.done():
+            task.cancel()
+        if not self.window_open():
+            self.windows_closed_at = time.monotonic()
 
     async def _window_reflex(self, device_id: str, delay: float | None = None) -> None:
         minutes = self.rule("window_open_off")["params"]["minutes"]
@@ -1684,7 +1806,7 @@ class ApartmentEngine:
             if not contact or not contact.get("open"):
                 continue
             open_s = (utcnow() - parse_dt(contact["since"])).total_seconds() if contact.get("since") else 0.0
-            self.spawn(self._window_reflex(d["device_id"], delay=max(0.0, minutes * seconds_per_minute() - open_s)))
+            self._arm_window(d["device_id"], delay=max(0.0, minutes * seconds_per_minute() - open_s))
 
     def _window_turn_off(self, window_id: str, why: str) -> None:
         corr = str(uuid.uuid4())
@@ -1695,9 +1817,21 @@ class ApartmentEngine:
                 if st and st["on"] and d["online"]:
                     # R8: safety stays stronger than the window: in an empty apartment the frost protection goes on
                     extra = "; l'antigelo resta attivo" if cap == "heating" and frost else ""
-                    self.create_command(d["device_id"], {"capability": cap, "action": "turn_off"}, "system:engine", corr,
-                                        decision_actor="rule:window_open_off",
-                                        reasoning=f"{why} con {d['label'].lower()} acceso{extra}")
+                    device_id = d["device_id"]
+                    # D-218 point 1: remembered to bring back, and not a person's command (the mode keeps it)
+                    by_mode = device_id in (self.heating_by_mode if cap == "heating" else self.climate_by_mode)
+                    self.window_off[device_id] = {"cap": cap, "by_mode": by_mode, "state": {
+                        k: st[k] for k in ("on", "mode", "setpoint", "fan") if k in st}}
+                    self._window_command = True
+                    try:
+                        self.create_command(device_id, {"capability": cap, "action": "turn_off"}, "system:engine", corr,
+                                            decision_actor="rule:window_open_off",
+                                            reasoning=f"{why} con {d['label'].lower()} acceso{extra}")
+                    finally:
+                        self._window_command = False
+                    # a switch like any other: the return waits the boiler's minimum and the regulation's minutes
+                    (self.relay_switched if cap == "heating" else self.climate_switched)[device_id] = time.monotonic()
+        self.store.put_meta("window_off", self.window_off)
 
     def _window_after_hold(self) -> None:
         """R7 (D-127): at the end of a hold the window rule is active again. A window open for at least the rule's
@@ -1717,7 +1851,7 @@ class ApartmentEngine:
                                                       f"{fmt_num(minutes)} minuti (regola «Finestra aperta spegne il "
                                                       f"clima» di nuovo attiva)")
             else:
-                self.spawn(self._window_reflex(d["device_id"], delay=left))
+                self._arm_window(d["device_id"], delay=left)
 
     def test_state(self, body: dict, actor: str, correlation_id: str) -> None:
         if not isinstance(body, dict) or not body:
@@ -1759,6 +1893,8 @@ class ApartmentEngine:
             self.emit("device.state", {"device_id": device_id, "capability": cap, "state": state}, correlation_id)
             if cap == "contact" and state.get("open") and not was_open:
                 self._window_opened(device_id)
+            elif cap == "contact" and was_open and not state.get("open"):
+                self._window_closed(device_id)
 
     # ---- rules -------------------------------------------------------------
     def ruleset(self) -> dict:
