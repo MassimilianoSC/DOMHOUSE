@@ -75,6 +75,13 @@ def engine(monkeypatch):
     repo = get_repository()
     repo.summaries.clear()
     repo.work.clear()
+    # E-22: the memory repository is shared by every suite of the process; another one (apartment_scope, tenant,
+    # simulated_apartments) leaves its apartments there, and a round counted 12 of them instead of these 3
+    real_list = repo.list_apartments
+
+    async def only_these(tenant_id=None):
+        return [a for a in await real_list(tenant_id) if a.apartment_id in (BOLOGNA, RIMINI, ALTRA)]
+    monkeypatch.setattr(repo, "list_apartments", only_these)
     saved = [run(repo.get_apartment(apt_id)) for apt_id in (BOLOGNA, RIMINI, ALTRA)]
     for apt in saved:                                             # 5 weeks of real data and more (step 6)
         run(repo.upsert_apartment(apt.model_copy(update={"energy_since": "2026-01-01T00:00:00.000Z"})))
