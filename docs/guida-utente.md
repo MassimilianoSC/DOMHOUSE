@@ -2273,6 +2273,10 @@ Tutte partono attive. Sette si modificano dall'app, una no.
   stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte. Dal lotto 38, se il sistema
   domotico si riavvia con una finestra aperta, la regola riparte da sola: il clima si spegne allo scadere dei minuti
   contati da quando la finestra si è aperta; se si è aperta mentre il sistema era fermo, dalla ripartenza.
+  **Alla chiusura della finestra riscaldamento e clima riprendono da soli** (dal lotto 38): quando si chiude l'ultima
+  finestra aperta, caldaia e clima tornano a seguire la modalità; un dispositivo acceso a mano torna com'era; se
+  nel frattempo qualcuno l'ha comandato, resta come l'ha lasciato. Con una forzatura attiva non si ripristina niente.
+  Nelle Decisioni compare «Finestra chiusa: … riacceso».
 - **«Antigelo a casa vuota»**: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
   0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve
   un sensore: senza, «Antigelo non attivo».
