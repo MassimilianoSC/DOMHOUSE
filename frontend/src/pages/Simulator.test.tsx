@@ -211,4 +211,19 @@ describe("Simulatore: lo stesso evento inviato di nuovo (C-4, lotto 30)", () => 
     expect((s.bodies["/app/apartments/apt-001/simulator/booking"] as { event_id: string }).event_id).not.toBe(first);
     expect(screen.getByTestId("sim-booking-result")).toHaveTextContent(t("simulator.scheduled", { count: 2 }));
   });
+
+  it("check-in e check-out sono l'ora dell'appartamento, non del browser (D-212)", async () => {
+    open("/a/apt-001/simulatore");
+    await screen.findByTestId("simulator-booking");
+    act(() => {
+      useApartmentStore.setState({ apartment: { ...(useApartmentStore.getState().apartment ?? {}), timezone: "America/New_York" } as never });
+    });
+    expect(screen.getByTestId("sim-booking-tz")).toHaveTextContent(t("simulator.bookingTz", { tz: "America/New_York" }));
+    fireEvent.change(screen.getByTestId("sim-booking-checkin"), { target: { value: "2027-03-14T15:00" } });
+    fireEvent.change(screen.getByTestId("sim-booking-checkout"), { target: { value: "2027-03-14T02:30" } }); // does not exist in New York
+    await send();
+    const body = s.bodies["/app/apartments/apt-001/simulator/booking"] as { checkin_at: string; checkout_at: string };
+    expect(body.checkin_at).toBe("2027-03-14T19:00:00.000Z");
+    expect(body.checkout_at).toBe("2027-03-14T07:30:00.000Z");
+  });
 });
