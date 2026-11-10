@@ -82,7 +82,7 @@
 | **Riepilogo fatto in ritardo** | Se il motore è irraggiungibile per tutto il lunedì, il riepilogo fatto dopo può ancora perdere le approvazioni scadute nei primi giorni della settimana | Accettato |
 | **Caldaia e clima dopo la chiusura della finestra** | In comfort ed eco, dopo che la regola «Finestra aperta spegne il clima» li ha spenti, chiudere la finestra non li riaccende: serve un cambio di modalità o un comando a mano. A casa vuota l'antigelo funziona ancora | Difetto confermato il 10 novembre: correzione approvata (risposta 811), lotto 38 |
 | **Riconoscimento di Cloud Run** | Il blocco dell'accesso di sviluppo riconosce Cloud Run dalla variabile `K_SERVICE`; su un altro servizio vale solo il controllo su `APP_ENV` | Accettato |
-| **Pausa del compressore dopo un riavvio** | È tenuta in memoria: un riavvio del motore la azzera | Da correggere (o1), lotto 38 o 39 |
+| **Pausa del compressore dopo un riavvio** | Era tenuta in memoria e un riavvio la azzerava | Corretto il 10 novembre (`ce7d7a5`): si salva e continua dopo un riavvio; lotto 38 |
 | **Finestra chiusa e riaperta mentre la regola aspetta** | Partono due attese, e il clima si spegne allo scadere della prima (c'era già prima del lotto 38) | Accettato |
 | **Azione programmata rifiutata dal motore** | Diventava «non riuscita» senza una riga nelle Decisioni con il motivo | Corretto il 10 novembre (`0e1d04a`), nel lotto 38 |
 
