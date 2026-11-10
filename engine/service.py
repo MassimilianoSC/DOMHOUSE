@@ -35,7 +35,7 @@ def without_secrets(text: str, env) -> str:
 
 def load_connector(config: EngineConfig):
     """engine/connector/<CONNECTOR> must offer make_connector(ConnectorConfig) -> Connector, with api_version equal to
-    the engine's CONNECTOR_API_VERSION: otherwise the engine does not start (connector.md §2.1). make_connector may read
+    the engine's CONNECTOR_API_VERSION: otherwise the engine does not start (connector-v2.md §2.1). make_connector may read
     and check the catalog, never open connections (that is start()'s job): whatever it raises, like a library the
     connector's package cannot import, stops the engine with "connector setup failed" (§2.7)."""
     name = f"engine.connector.{config.connector}"

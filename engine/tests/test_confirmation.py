@@ -1,4 +1,4 @@
-"""The power confirmation of an infrared split (P-60 step 7, D-131, connector.md §2.5): the simulated split with
+"""The power confirmation of an infrared split (P-60 step 7, D-131, connector-v2.md §2.5): the simulated split with
 `confirmation: power` answers "delivered" as an infrared blaster would, and only its meter moves.
 
 Run: python -m pytest engine/tests -q
@@ -110,7 +110,7 @@ def test_the_thresholds_are_settings_of_the_engine():
             load_config({**base, "CONFIRM_OFF_WATTS": bad})
 
 
-# -------- the links checked at start (step 7b, connector.md §2.2) --------
+# -------- the links checked at start (step 7b, connector-v2.md §2.2) --------
 def warnings(monkeypatch) -> list[tuple[str, dict]]:
     seen = []
     monkeypatch.setattr(core.logs, "warn", lambda msg, **fields: seen.append((msg, fields)))

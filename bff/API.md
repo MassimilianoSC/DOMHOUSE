@@ -447,8 +447,8 @@ utente»).
 Token tolti dopo un invio: solo quelli che non funzioneranno mai (`UnregisteredError`, `SenderIdMismatchError`).
 Un `INVALID_ARGUMENT` riguarda il messaggio, non il token: i token restano.
 
-Un'istanza Cloud Run sola (`maxScale: 1`, decisione D-35): con più istanze ogni notifica arriverebbe una volta per
-istanza.
+Istanze: la produzione ne ha fino a 3 (`maxScale: 3`, D-201), lo staging una (D-202). Il vincolo di D-35 (una sola
+istanza, altrimenti una notifica per istanza) non vale più: lo sostituisce la prenotazione descritta qui sotto.
 
 Con più istanze (D-201) ogni evento arriva a ognuna: una prenotazione atomica su Firestore (`work_claims`, scadenza 7 giorni) fa
 partire una sola notifica. La prenotazione contiene il messaggio e dura `NOTIFICATION_LEASE_S` (60 s): se l'istanza cade o FCM

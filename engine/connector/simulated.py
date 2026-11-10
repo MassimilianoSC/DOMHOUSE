@@ -1,6 +1,7 @@
-"""SimulatedConnector: simulated devices behind the connector interface (per-youssouf/connector.md, §4). Ours.
+"""SimulatedConnector: simulated devices behind the connector interface (engine/connector/connector-v2.md, §4). Ours.
 
-Extracted unchanged from the BFF's simulated engine (bff/mock_instance/state.py, P-60 step 1): the seeded catalog, the
+Extracted unchanged, at P-60 step 1, from the BFF's simulated engine of the time (bff/mock_instance/state.py, a file
+that no longer exists: today bff/mock_instance/app.py mounts the engine itself on this connector): the seeded catalog, the
 timing of a command (0.3 s to "sent", 0.2 s to "verifying", 1.0 s to the outcome), the power each appliance draws.
 It is what the demonstration apartments and the conformance suite run on, and the model for a real connector.
 
@@ -9,7 +10,7 @@ set_state change the simulated world and return the resulting changes, also sent
 (the engine applies them itself, at once, with the request's correlation_id).
 changes() is a live stream: each call gets the changes pushed while it is being read, in its own event loop.
 DOMOTICA_TEST_CONNECTOR_DOWN=1 makes status() report the connector down (scenario C14 of the conformance suite).
-Power meters (P-60 step 6, D-130) work as connector.md §2.3 says: watts and the raw cumulative counter
+Power meters (P-60 step 6, D-130) work as connector-v2.md §2.3 says: watts and the raw cumulative counter
 energy_total_wh, which grows with the watts over real time (never the accelerated MOCK_TIME_SCALE); a meter that draws
 power sends a reading every READING_EVERY_S, as a real one does, besides the reading that follows each command. The
 readings are made inside changes(), in the reader's loop: no task of its own. read_meters() makes one at once (tests).
@@ -29,7 +30,7 @@ from .interface import (CONNECTOR_API_VERSION, CommandResult, ConnectorCommand, 
 SENT_AFTER_S, VERIFYING_AFTER_S, OUTCOME_AFTER_S = 0.3, 0.2, 1.0
 READING_EVERY_S = 60.0                 # a power meter that draws power reports every minute of real time
 _STOP = object()
-# what a simulated device reports of each capability (connector.md §2.3: the "device" fields; the catalog's and the
+# what a simulated device reports of each capability (connector-v2.md §2.3: the "device" fields; the catalog's and the
 # engine's stay with the engine; kwh_today and the hourly consumption are the engine's, from energy_total_wh).
 DEVICE_FIELDS = {"switch": ("on",), "power_meter": ("watts", "energy_total_wh"), "climate": ("on", "mode", "setpoint", "fan"),
                  "heating": ("on",), "temperature": ("celsius",), "humidity": ("percent",), "contact": ("open", "since"),
@@ -52,7 +53,7 @@ def seed_devices(variant: int) -> tuple[list[dict], dict[str, dict]]:
     warm = variant == 0
     devices = [
         # D-139: the split behind an infrared blaster and the meter that measures it, two devices as in a real
-        # catalog (connector.md §6): the meter offline lets a tester see «Comando non verificato» from the Simulator
+        # catalog (connector-v2.md §6): the meter offline lets a tester see «Comando non verificato» from the Simulator
         {"device_id": "dev-clima-soggiorno", "label": "Climatizzatore soggiorno", "room_id": "soggiorno", "online": True,
          "last_seen": now, "capabilities": {
              "climate": {"on": warm, "mode": "heat", "setpoint": 21, "fan": "auto", "setpoint_min": 16,

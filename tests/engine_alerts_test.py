@@ -1,4 +1,5 @@
-"""scripts/monitoring/engine-alerts.sh and its policies (P-60 step 10c, D-104, D-148): the seven policy files are valid,
+"""scripts/monitoring/engine-alerts.sh and its policies (P-60 step 10c, D-104, D-148): the eight policy files (the
+broker's three included, D-209) are valid,
 their filters and label extractors match the real lines of engine-vm.sh check-all (with or without the PID rsyslog may
 add to the tag), and the script creates only what is missing (DRY_RUN creates nothing), with gcloud replaced by a
 stand-in that records what it is asked."""

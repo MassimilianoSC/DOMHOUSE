@@ -6,7 +6,9 @@
 #   /etc/domhouse/<apartment_id>.settings.env   per esempio CONFIRM_ON_WATTS=30; facoltativo
 # e poi lancia, per quell'appartamento:
 #   docker compose --env-file /opt/domhouse/<apartment_id>.settings -f /opt/domhouse/compose.yaml up -d
-# Porta 81xx sull'IP interno della VM (quella dell'indirizzo dell'istanza nell'app), dati in /data/<apartment_id>
+# Porta 81xx pubblicata su tutte le interfacce della VM (l'indirizzo dell'istanza nell'app è quello interno): da fuori
+# la protegge il firewall VPC, che la apre solo a 10.198.0.0/20 (langbrain-allow-internal) e chiude il resto
+# (langbrain-deny-other-ingress, priorità 1100; D-209). Dati in /data/<apartment_id>
 # (proprietario uid 10001, l'utente del container), restart: unless-stopped (D-104), log JSON di Docker ruotati.
 # L'istanza «dev» (porta 8100) resta PER SEMPRE con CONNECTOR=simulated: è l'ambiente di prova, anche dopo il
 # connector Shelly (D-118). Gli appartamenti veri sono istanze a parte, ciascuna con il suo apartment_id, la sua porta

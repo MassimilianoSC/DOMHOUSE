@@ -18,7 +18,7 @@ TIMEZONE (D-177, Europe/Rome by default): the apartment's time zone, an IANA nam
 
 With CONNECTOR=simulated also: MOCK_TIME_SCALE (real seconds per simulated minute: 60 = real time, the default here)
 and DOMOTICA_TEST_CONNECTOR_DOWN=1 (the connector reported down: conformance scenario C14). A connector receives a
-ConnectorConfig (for_connector()): no key, and of the environment only its own variables, <NAME>_* (connector.md §2.7).
+ConnectorConfig (for_connector()): no key, and of the environment only its own variables, <NAME>_* (connector-v2.md §2.7).
 """
 import os
 import re
@@ -98,7 +98,7 @@ def valid_timezone(name: str) -> bool:
 
 
 class ConfigError(Exception):
-    """Every problem found, one per line: the engine does not start (connector.md §2.1, a key is required)."""
+    """Every problem found, one per line: the engine does not start (connector-v2.md §2.1, a key is required)."""
 
 
 @dataclass(frozen=True)
@@ -127,7 +127,7 @@ class EngineConfig:
         return self.connector == "simulated"
 
     def for_connector(self) -> ConnectorConfig:
-        """What make_connector receives (connector.md §2.7): no key, no engine setting; of the environment only the
+        """What make_connector receives (connector-v2.md §2.7): no key, no engine setting; of the environment only the
         connector's variables, <NAME>_* (SHELLY_* for CONNECTOR=shelly), never one of the engine's."""
         prefix = self.connector.upper() + "_"
         env = {k: v for k, v in self.env.items()

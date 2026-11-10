@@ -1,4 +1,4 @@
-"""The engine's log (connector.md §5): one JSON line per event on stdout, with ts, level, msg, apartment_id and the
+"""The engine's log (connector-v2.md §5): one JSON line per event on stdout, with ts, level, msg, apartment_id and the
 fields given (in commands: correlation_id, command_id, device_id). For the engine and for every connector:
 
     from engine import log

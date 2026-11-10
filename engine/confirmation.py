@@ -1,4 +1,4 @@
-"""How the engine confirms a command the device cannot confirm itself (outcome "delivered", connector.md §2.5;
+"""How the engine confirms a command the device cannot confirm itself (outcome "delivered", connector-v2.md §2.5;
 P-60 step 7, D-131).
 
 A split behind an infrared blaster has no feedback: with `confirmation: power` the engine watches the watts of the

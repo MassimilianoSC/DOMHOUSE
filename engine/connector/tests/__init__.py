@@ -1,1 +1,1 @@
-"""The connector tests (per-youssouf/connector.md, §3)."""
+"""The connector tests (engine/connector/connector-v2.md, §3)."""

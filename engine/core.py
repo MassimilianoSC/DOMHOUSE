@@ -1,8 +1,9 @@
 """The engine of one apartment (contract 1.0.5): rules, modes, bookings, schedule, approvals, decisions, assistant,
-the commands' life and the event stream. In memory until step 3 of the plan (SQLite).
+the commands' life and the event stream. Its state is in a store: SQLite on the VM (engine/store.py SqliteStore, opened
+by engine/service.py since P-60 step 3), in memory (MemoryStore) for the BFF's built-in engine and the tests.
 
-Moved here from the BFF's simulated engine (bff/mock_instance/state.py) at P-60 step 2: one program for the engine
-and the demonstration apartments, which the BFF still mounts at /mock. The devices are behind the connector
+Moved here at P-60 step 2 from the BFF's simulated engine of the time (bff/mock_instance/state.py, a file that no
+longer exists): one program for the engine and the demonstration apartments, which the BFF still mounts at /mock. The devices are behind the connector
 interface (engine/connector/): the catalog comes from the connector, commands go through its execute() and the state
 it reports through changes()."""
 import asyncio
@@ -26,8 +27,8 @@ from .connector.simulated import SimulatedConnector
 from .store import MemoryStore
 
 CONTRACT_VERSION = "1.0.5"
-COMMAND_DEADLINE_S = 9           # the connector's deadline, inside the contract's 10 s (connector.md §2.2)
-# what a command asks the device: only the device's fields of the capability (connector.md §2.4, D-108)
+COMMAND_DEADLINE_S = 9           # the connector's deadline, inside the contract's 10 s (connector-v2.md §2.2)
+# what a command asks the device: only the device's fields of the capability (connector-v2.md §2.4, D-108)
 TARGET_FIELDS = {"switch": ("on",), "climate": ("on", "mode", "setpoint", "fan"), "heating": ("on",)}
 # the fields of each capability in the contract (components.schemas.Cap*): nothing else reaches the app
 CONTRACT_FIELDS = {
@@ -105,7 +106,10 @@ DEFAULT_RULES = [
 
 
 def seconds_per_minute() -> float:
-    """MOCK_TIME_SCALE = real seconds per simulated minute (1 in dev, 60 = real time)."""
+    """MOCK_TIME_SCALE = real seconds per simulated minute: 60 is real time. 1 (the rules' minutes in seconds) only when
+    the variable is missing: the BFF's built-in engine run locally and the tests. The engine service sets 60 itself
+    (engine/__main__.py: a default with the simulated connector, always with real devices) and both Cloud Run
+    manifests set 60."""
     import os
 
     return float(os.environ.get("MOCK_TIME_SCALE", "1"))
@@ -188,7 +192,7 @@ def spread(wh: float, start: datetime, end: datetime) -> list[tuple[str, float]]
 
 
 class EnergyCounter:
-    """kwh_today of one power meter, from the connector's raw cumulative counter (energy_total_wh, connector.md §2.3)
+    """kwh_today of one power meter, from the connector's raw cumulative counter (energy_total_wh, connector-v2.md §2.3)
     since the apartment's local midnight, and the Wh of each reading spread over the hours since the previous one
     (D-130). A counter that drops (the device restarted) counts again from zero: what was used between the last reading
     and the restart is not measurable. Its state is saved with the engine's, so neither kwh_today nor the hourly
@@ -277,7 +281,7 @@ class ApartmentEngine:
         self.deferred: dict[str, str] = {}      # schedule_id -> the hold's end, for mode actions waiting for it (D-122)
         self.compressor_off: dict[str, float] = {}   # climate device -> when it went off (monotonic), R4
         self.offline_watch: dict[str, object] = {}   # device -> the offline episode being watched, R5
-        self.links: dict[str, dict[str, str]] = {}   # device -> its links (connector.md §2.2), never shown to the app
+        self.links: dict[str, dict[str, str]] = {}   # device -> its links (connector-v2.md §2.2), never shown to the app
         self.relay: dict[str, bool] = {}             # boiler -> its relay as the device reports it (R2, D-128)
         self.relay_switched: dict[str, float] = {}   # boiler -> when the thermostat last switched it (monotonic)
         self.relay_busy: set[str] = set()            # boilers with a thermostat switch running
@@ -594,7 +598,7 @@ class ApartmentEngine:
                 "contact": {"open": False, "since": None}, "motion": {"detected": False, "last_seen": None}}.get(cap, {})
 
     def _contract_part(self, device_id: str, cap: str, raw: dict, ts: datetime, current: dict) -> dict:
-        """The contract's fields out of what the connector reports, plus what the engine computes (connector.md §2.3):
+        """The contract's fields out of what the connector reports, plus what the engine computes (connector-v2.md §2.3):
         kwh_today from energy_total_wh, contact's since, motion's last_seen."""
         out = {k: copy.deepcopy(v) for k, v in raw.items() if k in CONTRACT_FIELDS[cap]}
         if cap in DEVICE_LIMITS_FALLBACK and ("setpoint_min" in raw or "setpoint_max" in raw):
@@ -818,7 +822,7 @@ class ApartmentEngine:
 
     # ---- the boiler's thermostat (R1, R2) ---------------------------------------------------------------------------
     def _read_links_and_relays(self) -> None:
-        """The catalog's links, checked at start (connector.md §2.2, P-60 step 7b): a link with an unknown key, to a
+        """The catalog's links, checked at start (connector-v2.md §2.2, P-60 step 7b): a link with an unknown key, to a
         device that is not in the catalog or to one without the capability it needs, from a device without the
         capability it is for, is left out with a log line. Then a split with `confirmation: power` and no meter is
         treated as `confirmation: none`, a boiler without a sensor is not regulated (it follows the switch it is asked,
@@ -1169,7 +1173,7 @@ class ApartmentEngine:
 
     def room_temperature(self, device: dict) -> float | None:
         """D-162: the temperature of the room of a climate, from a sensor with «temperature» in the same room, online;
-        None without one (the explicit link sensor_device_id is the boiler's, connector.md §2.2)."""
+        None without one (the explicit link sensor_device_id is the boiler's, connector-v2.md §2.2)."""
         for d in sorted(self.devices.values(), key=lambda x: x["device_id"]):
             t = d["capabilities"].get("temperature")
             if (d["room_id"] == device["room_id"] and d["device_id"] != device["device_id"] and t and d["online"]
@@ -1476,7 +1480,7 @@ class ApartmentEngine:
         check = self._power_check(device, cap, new_state)        # D-131: (meter, direction, watts before) or None
         waiter = self._watch_power(check) if check and check[0]["online"] else None
         no_confirmation = "Nessuna conferma dal dispositivo entro il tempo massimo"
-        async with self._device_lock(device["device_id"]):       # at most one command per device (connector.md §2.5)
+        async with self._device_lock(device["device_id"]):       # at most one command per device (connector-v2.md §2.5)
             running = (device["device_id"], cap, cmd["correlation_id"], new_state)
             self.inflight.append(running)
             try:
