@@ -184,6 +184,90 @@ cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 REPOSITORY=firestore GCP_PROJECT_ID=domotica-poc-511707 FIRESTORE_DATABASE=staging .venv/Scripts/python scripts/set_claims.py --platform-add <email>
 ```
 
+## M18. Pubblicare un lotto con un solo comando (D-214): il modo normale dal 10 novembre 2026
+
+`scripts/publish-all.sh` pubblica un lotto intero: staging, controlli, produzione, controlli, motore sulla VM se serve, riepilogo. Lo lancia il committente (D-116).
+
+### Prima di partire
+
+1. Il commit del lotto è su GitHub (`git push` fatto). Se non c'è, lo script si ferma prima di chiedere conferma.
+2. In Git Bash funzionano `gcloud` (account proprietario) e `npx firebase-tools` (accesso fatto).
+3. C'è `frontend/.env.production` (non è in Git).
+4. La VM `langbrain-dev` è accesa: lo script legge il motore via `gcloud compute ssh` (IAP).
+
+Le impostazioni (progetto, account, sito di staging, rete, mittente delle email, notifiche push, VM e appartamento del motore) sono in `scripts/publish-settings.conf`, senza segreti. Non si scrivono più a mano.
+
+### M18.1 Prova a secco (sola lettura)
+
+Cosa fa: legge lo stato vero di staging, produzione e motore, e mostra ogni passo che farebbe. Compila il sito in una copia pulita. Non scrive niente online e non chiede conferma.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+DRY_RUN=1 bash scripts/publish-all.sh <commit del lotto>
+```
+
+Verifica, da verificare al primo uso:
+
+1. Righe «ora immagine …» per `domotica-bff-staging` e `domotica-bff`, e «motore dev sulla VM: …».
+2. Una delle tre: «codice del motore invariato», «il motore è già all'immagine …», «codice del motore cambiato» con l'elenco dei file.
+3. Ultima sezione: «Riepilogo … (prova a secco: niente è stato pubblicato)».
+4. La produzione si prova a secco solo se lo staging serve già quel commit (D-203): la prima volta lo script lo dice e salta.
+
+### M18.2 Pubblicazione (scrive su Google Cloud, sul sito e sulla VM)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+bash scripts/publish-all.sh <commit del lotto>
+```
+
+Lo script mostra cosa farà e chiede una sola volta: «scrivi pubblica». Qualunque altra risposta non cambia niente.
+
+Poi, in ordine:
+
+| Passo | Cosa fa | Controllo |
+|---|---|---|
+| 1. Staging | `publish.sh TARGET=staging` | revisione nuova pronta e al 100 %, immagine del commit, `/health` 200 |
+| 2. Produzione | `publish.sh TARGET=prod` (con il suo controllo D-203) | gli stessi, più i valori attivi uguali al manifesto |
+| 3. Motore | solo se serve (sotto) | `engine-vm.sh update` aspetta `/health` 200; la VM dice l'immagine nuova |
+| 4. Riepilogo | da incollare alla memoria storica | — |
+
+Il motore si aggiorna solo se, fra il commit sulla VM e quello nuovo, cambia un file che entra nella sua immagine: `engine/` senza le cartelle `tests/` e senza i documenti `.md`, più `cloudbuild.engine.yaml` (D-215). L'immagine si costruisce una volta sola; se esiste già non si ricostruisce. `engine-vm.sh` si copia sulla VM, con `engine-vm.sh timers`, solo se la copia sulla VM è diversa da quella del commit.
+
+Esito atteso, da verificare al primo giro vero:
+
+1. Nessun FERMO.
+2. Nel riepilogo: le due righe dei servizi con l'immagine del commit al 100 %, la riga del motore («invariato» o «da … a …»), i comandi per tornare indietro, il percorso del registro.
+3. Durata stimata 15–25 minuti, non ancora misurata.
+
+### Se si ferma
+
+1. Ogni FERMO dice cosa è successo e cosa fare.
+2. Risolto il problema, si rilancia **lo stesso comando**: i passi già fatti e verificati si saltano (scrive «già fatto in un giro precedente»).
+3. La produzione non parte mai se i controlli dello staging non sono verdi.
+4. Lo script non torna mai indietro da solo. Se serve, nel FERMO e nel riepilogo c'è il comando esatto:
+   - server: `gcloud run services update-traffic <servizio> --to-revisions=<revisione di prima>=100 …`;
+   - motore: `engine-vm.sh update dev <immagine di prima>` sulla VM.
+5. Il sito di Hosting non ha un comando di ritorno nello script: si ripubblica il commit di prima, oppure si usa la console di Firebase (da verificare).
+6. Se lo script dice «C'è già una pubblicazione in corso» e non ce n'è nessuna (finestra chiusa a metà): cancellare la cartella `logs/publish.lock`, poi rilanciare.
+
+### Registro
+
+Tutta l'uscita va anche in `logs/publish-<data-ora>-<commit>.log`; lo stato dei passi di un commit in `logs/publish-state-<commit>.txt`. La cartella `logs/` non va in Git. Alla memoria storica basta incollare il riepilogo.
+
+### Cosa resta a mano
+
+1. `git push` del commit.
+2. I login di `gcloud` e `firebase`, e `frontend/.env.production`.
+3. Il broker e i suoi segreti: procedura G2 (B5 e successivi), `broker-secrets.sh`.
+4. Gli allarmi: `scripts/monitoring/setup.sh` ed `engine-alerts.sh`, quando cambiano.
+5. La prova dell'app pubblicata (checklist di collaudo).
+
+M8 e M12 restano come riferimento dei singoli passi; M18 li esegue in ordine. Differenza: M18 pubblica lo staging
+sempre con le notifiche push attive (`VITE_FCM_ENABLED=true`, D-39), che il comando di M8 non passava.
+
+
 ## M8. Pubblicazione dello staging (dal commit del lotto)
 
 Cosa fa: crea il servizio `domotica-bff-staging` sul database `staging` e pubblica il sito di staging. Il commit lo indica
