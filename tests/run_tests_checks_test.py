@@ -347,3 +347,40 @@ def test_e2e_refuses_a_taken_port(tmp_path, monkeypatch):
     c = rt.run_e2e_suite(tmp_path)
     assert c["errors"] == 1 and c["note"].startswith("porta 5174 già occupata")
 
+
+# the patterns of the repository's test files, and where the full run takes the ones it does not list one by one
+TEST_PATTERNS = ("tests/*_test.py", "engine/tests/test_*.py", "engine/connector/tests/test_*.py",
+                 "engine/connector/*/tests/test_*.py", "bff/**/test_*.py")
+RUN_ELSEWHERE = {"contract/conformance/test_scenari.py": "the «conformita» suite (CONFORMANCE_SUITE)"}
+
+
+def test_every_test_file_of_the_repository_is_in_the_full_run():
+    """D-198 (10 November 2026): run_tests.py lists the suites by hand and four new files of the engine were left out of
+    the full run, without anybody noticing. Now a file that matches a test pattern and is in no list is red here,
+    also before its first commit (the files on disk are read, not git's)."""
+    mod = _runner()
+    listed = set(mod.HTTP_SUITES) | set(mod.LOCAL_SUITES) | set(RUN_ELSEWHERE)
+    found = {path.relative_to(ROOT).as_posix() for pattern in TEST_PATTERNS for path in ROOT.glob(pattern)
+             if "__pycache__" not in path.parts and "node_modules" not in path.parts}
+    found |= {path.relative_to(ROOT).as_posix() for path in (ROOT / "contract" / "conformance").glob("test_*.py")}
+    assert not sorted(found - listed), f"prove fuori dal giro completo: {sorted(found - listed)}"
+    assert not sorted(x for x in listed if not (ROOT / x).is_file()), "in elenco ma il file non esiste"
+
+
+def test_every_test_file_of_the_site_is_found_by_its_runner():
+    """Risposta 761 (10 November 2026): the site's tests are found by their runners, not listed by hand: vitest
+    (vite.config.ts, test.include) for the «sito» suite and Playwright (playwright.config.ts, testDir) for «e2e». A test
+    file that neither of them would find is red here, and so is a change of those two settings."""
+    import re
+    vite = (ROOT / "frontend" / "vite.config.ts").read_text(encoding="utf-8")
+    playwright = (ROOT / "frontend" / "playwright.config.ts").read_text(encoding="utf-8")
+    assert 'include: ["src/**/*.test.{ts,tsx}"]' in vite, "vitest non cerca più tutte le prove in src/"
+    assert 'testDir: "./e2e"' in playwright, "Playwright non cerca più le prove in e2e/"
+    site = ROOT / "frontend"
+    files = [path.relative_to(site).as_posix() for path in site.rglob("*")
+             if re.search(r"\.(test|spec)\.[cm]?[jt]sx?$", path.name) and "node_modules" not in path.parts
+             and "dist" not in path.parts]
+    lost = [f for f in files if not re.fullmatch(r"src/.+\.test\.(ts|tsx)", f) and not f.startswith("e2e/")]
+    assert not lost, f"prove del sito che né vitest né Playwright trovano: {lost}"
+    assert len(files) > 50                                      # the folder was really read
+
