@@ -510,6 +510,17 @@ def test_revoking_gives_a_new_key_that_the_broker_serves_at_once(bench, sub):
     assert connected.running(), "la riemissione ha fatto cadere il connector"
 
 
+def test_a_forced_renewal_gives_a_new_certificate_at_once(bench):
+    """D-210: the first automatic renewal falls after the delivery, so one is forced during the run-in."""
+    served_before = served_fingerprint()
+    assert vm("cert-renew", "now", check=False).returncode
+    done = vm("cert-renew", "force")
+    assert "broker cert new notAfter=" in done.stdout and "ricarica fatta" in done.stdout, done.stdout
+    assert served_fingerprint() != served_before and served_fingerprint() == file_fingerprint(f"{ACME}/certificates/{HOST}.crt")
+    assert "rinnovo non ancora dovuto" in vm("cert-renew").stdout
+    assert key_modes() == ONLY_THE_BROKER
+
+
 DISK_RIG = "domhouse-broker-disk-run"
 OPTIONS = "defaults,nofail,nodev,nosuid,noexec,x-systemd.device-timeout=30s,x-systemd.before=docker.service"
 
@@ -520,8 +531,9 @@ def on_disk_rig(script, check=True):
 
 @pytest.fixture(scope="module")
 def disk():
-    """A privileged bench: /vm is an ext4 loop disk standing for the VM's boot disk; four loop disks stand for the
-    keys' disk (empty), one already formatted ext2, one with data and no file system, plus a name that is no disk."""
+    """A privileged bench: /vm is an ext4 loop disk standing for the VM's boot disk; loop disks stand for the keys'
+    disk (empty), one already formatted ext2, one with data and no file system, a new keys' disk after a restore, plus
+    a name that is no disk."""
     if shutil.which("docker") is None or docker("info", check=False).returncode:
         pytest.fail("Docker non disponibile: questa prova ha bisogno di un contenitore privilegiato")
     docker("build", "-q", "-t", "domhouse-broker-rig", str(ROOT / "tests" / "broker_rig"), timeout=240)
@@ -531,7 +543,7 @@ def disk():
     try:
         on_disk_rig("mkdir -p /w /vm && truncate -s 64M /w/boot.img && mkfs.ext4 -q /w/boot.img && mount -o loop /w/boot.img /vm && "
                     "cp /repo/scripts/broker-vm.sh /w/ && sed -i 's/\\r$//' /w/broker-vm.sh")
-        for name in ("tls", "ext2", "dirty"):
+        for name in ("tls", "ext2", "dirty", "fresh"):
             on_disk_rig(f"truncate -s 16M /w/{name}.img")
             loops[name] = on_disk_rig(f"losetup -f --show /w/{name}.img").stdout.strip()
             on_disk_rig(f"ln -s {loops[name]} /w/google-{name}")
@@ -652,6 +664,23 @@ def test_new_connections_are_limited_per_address_and_never_banned(limited):
     assert 60 <= flood <= 70, f"{flood} collegamenti su 90 da un solo indirizzo"   # the burst, then 30 a minute
     assert connections_from("10.98.0.13", 10) == 10, "un altro indirizzo è stato fermato"
     assert int(re.search(r"counter packets (\d+)", table := on_limit_rig("nft list table inet domhouse_broker").stdout).group(1)) > 0, table
+
+
+def test_after_a_restore_with_a_new_disk_the_line_of_the_old_one_is_replaced(disk):
+    mount = "/vm/mnt/ripristino"
+    gone = f"UUID=0b5e55ed-dead-4bad-beef-000000000001 {mount} ext4 {OPTIONS} 0 2"
+    on_disk_rig(f"echo '{gone}' >> /etc/fstab")
+    done = prepare("fresh", mount)
+    assert done.returncode == 0 and "sostituita" in done.stdout, done.stdout + done.stderr
+    uuid = on_disk_rig(f"blkid -p -o value -s UUID {disk['fresh']}").stdout.strip()
+    assert fstab_lines(mount) == [f"UUID={uuid} {mount} ext4 {OPTIONS} 0 2"]
+    assert on_disk_rig("ls /etc/fstab.before-domhouse-tls-*").returncode == 0      # the previous file, kept
+    on_disk_rig(f"umount {mount}")
+    ext2 = on_disk_rig(f"blkid -p -o value -s UUID {disk['ext2']}").stdout.strip()   # a disk that is there: not ours to drop
+    on_disk_rig(f"sed -i 's#^UUID=[^ ]* {mount} #UUID={ext2} {mount} #' /etc/fstab")
+    refused = prepare("fresh", mount)
+    assert refused.returncode and "diversa da quella attesa" in refused.stderr
+    assert fstab_lines(mount) == [f"UUID={ext2} {mount} ext4 {OPTIONS} 0 2"]
 
 
 def test_the_address_of_the_internal_listener_is_the_same_everywhere():

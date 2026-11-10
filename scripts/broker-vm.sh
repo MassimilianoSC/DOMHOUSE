@@ -9,7 +9,7 @@
 #   sudo bash /opt/domhouse/broker-vm.sh status
 #   sudo bash /opt/domhouse/broker-vm.sh restart                       # everyone reconnects: reload is enough, usually
 #   sudo bash /opt/domhouse/broker-vm.sh reload                        # SIGHUP: certificate, users and permissions
-#   sudo bash /opt/domhouse/broker-vm.sh cert-renew                    # the daily timer: renews only when due
+#   sudo bash /opt/domhouse/broker-vm.sh cert-renew [force]            # the daily timer: renews only when due
 #   sudo bash /opt/domhouse/broker-vm.sh cert-revoke <key-compromise|superseded>   # revokes, then a new key and certificate
 #   sudo bash /opt/domhouse/broker-vm.sh install-cert <fullchain> <privkey>   # a certificate from elsewhere; checks it first
 #   sudo bash /opt/domhouse/broker-vm.sh add-apartment <apartment_id>  # its accounts from Secret Manager
@@ -214,7 +214,7 @@ put_files() {
 
 prepare_tls_disk() {
   # formats the disk only when it is empty, mounts it, writes its fstab line once; each step is skipped when done
-  local dev fstype uuid line current source
+  local dev fstype uuid line current source old_uuid
   for tool in blkid mkfs.ext4 mountpoint findmnt chattr mount cmp; do command -v "$tool" > /dev/null || die "manca $tool sulla VM"; done
   [ -e "${TLS_DEVICE}" ] || die "manca il disco ${TLS_DEVICE}: va creato e collegato alla VM con --device-name=domhouse-tls"
   dev="$(readlink -f "${TLS_DEVICE}")"
@@ -246,7 +246,18 @@ prepare_tls_disk() {
   elif [ "${current}" = "${line}" ]; then
     echo "già presente: ${line}"
   else
-    die "/etc/fstab ha già una riga per ${TLS_MOUNT} diversa da quella attesa: ${current}"
+    # after a restore from snapshot with a new keys' disk the line still names the old one: it is replaced only when
+    # it is our own line and its disk is gone; any other line is someone else's, and is left alone
+    old_uuid="$(printf '%s\n' "${current}" | awk 'NR == 1 {print $1}' | sed -n 's/^UUID=//p')"
+    if [ -n "${old_uuid}" ] && [ "${current}" = "UUID=${old_uuid} ${TLS_MOUNT} ext4 ${TLS_MOUNT_OPTIONS} 0 2" ] \
+       && [ -z "$(blkid -U "${old_uuid}" 2>/dev/null || true)" ]; then
+      cp -p /etc/fstab "/etc/fstab.before-domhouse-tls-$(date +%Y%m%d%H%M%S)"
+      awk -v m="${TLS_MOUNT}" -v l="${line}" '$1 !~ /^#/ && $2 == m {print l; next} {print}' /etc/fstab > /etc/fstab.domhouse-new
+      cat /etc/fstab.domhouse-new > /etc/fstab && rm -f /etc/fstab.domhouse-new
+      echo "sostituita (il disco ${old_uuid} non c'è più): ${line}"
+    else
+      die "/etc/fstab ha già una riga per ${TLS_MOUNT} diversa da quella attesa: ${current}"
+    fi
   fi
 
   if ! mountpoint -q "${TLS_MOUNT}"; then
@@ -276,12 +287,13 @@ lego() {
 }
 
 acme_get() {
-  # gets the certificate when it is missing or due; puts it in the broker's folder only when it is a new one
+  # gets the certificate when it is missing or due (or at once, with --renew-force as argument); puts it in the
+  # broker's folder only when it is a new one
   local domain crt key dns_args=(--dns gcloud)
   domain="$(acme_setting ACME_DOMAIN)"
   [ -z "${DOMHOUSE_ACME_TEST:-}" ] || dns_args=(--dns exec --dns.propagation.wait 1s)   # Pebble accepts every challenge
   crt="${ACME_DIR}/certificates/${domain}.crt"; key="${ACME_DIR}/certificates/${domain}.key"
-  if ! lego run --accept-tos -d "${domain}" --no-random-sleep "${dns_args[@]}"; then
+  if ! lego run --accept-tos -d "${domain}" --no-random-sleep "${dns_args[@]}" "$@"; then
     secure_keys
     watch_line "broker cert renew failed (${domain})"
     exit 1
@@ -492,10 +504,10 @@ case "${cmd}" in
     acme_get
     ;;
   cert-renew)
-    [ $# -eq 0 ] || die "uso: cert-renew"
+    [ $# -eq 0 ] || { [ $# -eq 1 ] && [ "$1" = "force" ]; } || die "uso: cert-renew [force]"
     if [ ! -f "${ACME_SETTINGS}" ]; then echo "nessun certificato automatico (manca ${ACME_SETTINGS}): niente da fare"; exit 0; fi
     need_tls_disk
-    acme_get
+    if [ $# -eq 1 ]; then acme_get --renew-force; else acme_get; fi   # force: the renewal tried once during the run-in (D-210)
     ;;
   cert-revoke)
     [ $# -eq 1 ] || die "uso: cert-revoke <key-compromise|superseded>"
