@@ -11,6 +11,7 @@ import copy
 import random
 import re
 import time
+import traceback
 import uuid
 from collections import deque
 from datetime import UTC, datetime, timedelta
@@ -50,6 +51,10 @@ DECISION_MONTHS, BOOKING_MONTHS, COMMAND_DAYS, TELEMETRY_MONTHS = 24, 12, 90, 24
 # raises the alert (scripts/monitoring/engine-alerts.sh); the inner loop is "stuck" without a tick for LOOP_STALE_S
 HEARTBEAT_S = 300
 LOOP_STALE_S = 30
+# A step of the inner loop that fails is written in the log as "engine loop step failed" (level error: the alert «Motori:
+# righe di errore» reads it), at most one line per step and kind of error every TICK_ERROR_EVERY_S, with how many
+# failures the line before left unwritten; the other steps go on.
+TICK_ERROR_EVERY_S = 600
 # D-130, decision 3: a demonstration apartment (seeded) shows an invented, repeatable consumption, per meter, from the
 # start of 2026 to the hour its engine started; after that only what its (simulated) meters measure. The BFF finds
 # ENERGY_PROFILE_START as the apartment's energy_since, so nothing odd shows. Shares of the meters, in catalog order.
@@ -298,6 +303,7 @@ class ApartmentEngine:
         self.last_housekeeping = self.last_retention = time.monotonic()
         self.last_tick = time.monotonic()            # P-60 step 10: the inner loop is alive when this moves
         self.last_heartbeat = float("-inf")         # "never": the first tick beats, also on a machine just switched on
+        self.tick_errors: dict[tuple[str, str], list] = {}   # (step, error kind) -> [monotonic of its last line, unwritten]
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode
@@ -508,7 +514,32 @@ class ApartmentEngine:
     def spawn(self, coro) -> None:
         task = asyncio.get_running_loop().create_task(coro)
         self.tasks.add(task)
-        task.add_done_callback(self.tasks.discard)
+
+        def done(t: asyncio.Task) -> None:
+            self.tasks.discard(t)
+            if not t.cancelled() and t.exception() is not None:     # before, lost without a line
+                self._step_failed(f"task {getattr(coro, '__name__', 'unknown')}", t.exception())
+        task.add_done_callback(done)
+
+    def _step_failed(self, step: str, exc: BaseException) -> None:
+        """An error of the inner loop or of a background task: one line per step and kind every TICK_ERROR_EVERY_S."""
+        key, now = (step, type(exc).__name__), time.monotonic()
+        seen = self.tick_errors.get(key)
+        if seen and now - seen[0] < TICK_ERROR_EVERY_S:
+            seen[1] += 1
+            return
+        frames = traceback.extract_tb(exc.__traceback__)
+        logs.error("engine loop step failed", apartment_id=self.apartment_id, step=step, error_type=key[1],
+                   error=str(exc)[:200], at=f"{frames[-1].name}:{frames[-1].lineno}" if frames else None,
+                   unwritten_before=seen[1] if seen else 0)
+        self.tick_errors[key] = [now, 0]
+
+    def _guarded(self, step: str, fn, *args) -> None:
+        """One step of the tick: an error is written and the other steps go on."""
+        try:
+            fn(*args)
+        except Exception as exc:
+            self._step_failed(step, exc)
 
     def ensure_started(self) -> None:
         if self.loop_task is None or self.loop_task.done():
@@ -2334,8 +2365,8 @@ class ApartmentEngine:
             await asyncio.sleep(1.0)
             try:
                 self.tick()
-            except Exception:
-                pass
+            except Exception as exc:                      # each step is guarded: this is the tick's own frame
+                self._step_failed("tick", exc)
 
     def _purge_retention(self) -> None:
         """Retention (D-94): what is past its expire_at goes from engine.db and from memory; the hourly telemetry after
@@ -2381,23 +2412,48 @@ class ApartmentEngine:
                 self.store.delete("idem", key)
 
     def tick(self) -> None:
+        """Once a second. Each step is guarded (_guarded): one that fails is written in the log and the others go on; an
+        approval or a scheduled action that fails does not stop the next ones."""
         now = utcnow()
         self.last_tick = time.monotonic()
         if self.last_tick - self.last_heartbeat >= HEARTBEAT_S:
             self.last_heartbeat = self.last_tick
-            self._heartbeat()
+            self._guarded("heartbeat", self._heartbeat)
+        self._guarded("connector", self._tick_connector)
+        if time.monotonic() - self.last_regulation >= seconds_per_minute():
+            self.last_regulation = time.monotonic()
+            self._guarded("regulate", self.regulate)
+        if time.monotonic() - self.last_housekeeping >= 60:
+            self.last_housekeeping = time.monotonic()
+            self._guarded("housekeeping", self.housekeeping)
+        self._guarded("hold", self._tick_hold, now)
+        for a in self.approvals:
+            if a["status"] == "pending" and a["expires_at"] and parse_dt(a["expires_at"]) <= now:
+                self._guarded("approval_expiry", self._expire_approval, a)
+        # by time, and by creation for the same time (a stable sort on the creation order, which engine.db keeps too).
+        # An action is closed (done/failed) and saved in this same pass, so a later pass never runs it again. After a
+        # crash between its commands and that save it runs again at the restart (within MISSED_AFTER_MINUTES): harmless,
+        # commands are states to reach (P-60 step 4).
+        for item in sorted(self.schedule.values(), key=lambda s: s["run_at"]):
+            if item["status"] != "planned" or parse_dt(item["run_at"]) > now:
+                continue
+            try:
+                self._run_scheduled(item, now)
+            except Exception as exc:
+                # an unexpected error: the action is closed as failed, so that it does not run again every second
+                self._step_failed("schedule", exc)
+                item.update(status="failed", executed_at=iso(now))
+                self._guarded("schedule", self._save_schedule, item)
+
+    def _tick_connector(self) -> None:
         up = self.connector_up()
         if up != self.connector_was_up:
             self.connector_was_up = up
             self._connector_changed(up)
         if up:
             self._watch_empty_power()
-        if time.monotonic() - self.last_regulation >= seconds_per_minute():
-            self.last_regulation = time.monotonic()
-            self.regulate()
-        if time.monotonic() - self.last_housekeeping >= 60:
-            self.last_housekeeping = time.monotonic()
-            self.housekeeping()
+
+    def _tick_hold(self, now: datetime) -> None:
         if self.hold and parse_dt(self.hold["until"]) <= now:
             self.hold = None
             self._save_apartment()
@@ -2406,63 +2462,58 @@ class ApartmentEngine:
                      "Forzatura scaduta: le regole tornano attive", "informational", corr)
             self.apartment_changed(corr)
             self._window_after_hold()
-        for a in self.approvals:
-            if a["status"] == "pending" and a["expires_at"] and parse_dt(a["expires_at"]) <= now:
-                a["status"] = "expired"
-                self._save_approval(a)
-                corr = str(uuid.uuid4())
-                outcome = {"reject": "respinta", "approve": "approvata", "wait": "in attesa"}[a["expires_action"]]
-                self.log("system", self._approval_target(a), "expire",
-                         "pending", "expired", f"Approvazione scaduta senza risposta: {outcome}", "informational", corr,
-                         approval_id=a["approval_id"])
-                if a["expires_action"] == "approve":
-                    self._execute_proposed(a, "system:engine", corr, "system")
-                else:
-                    self._take_schedule(a["approval_id"])
-                self._dequeue_approval()
-        # by time, and by creation for the same time (a stable sort on the creation order, which engine.db keeps too).
-        # An action is closed (done/failed) and saved in this same pass, so a later pass never runs it again. After a
-        # crash between its commands and that save it runs again at the restart (within MISSED_AFTER_MINUTES): harmless,
-        # commands are states to reach (P-60 step 4).
-        for item in sorted(self.schedule.values(), key=lambda s: s["run_at"]):
-            if item["status"] != "planned" or parse_dt(item["run_at"]) > now:
-                continue
-            corr = str(uuid.uuid4())
-            labels = {"prearrival": "pre-arrivo", "checkout": "check-out", "empty": "casa vuota", "manual": "manuale"}
-            reasoning = f"Azione programmata ({labels[item['kind']]})" + (f", prenotazione {item['booking_id']}" if item["booking_id"] else "")
-            act = item["action"]
-            if act["type"] == "apartment_mode" and self.hold:
-                # D-122: a mode action waits for the end of the hold (at most 12 hours, the contract's 720 minutes)
-                if item["schedule_id"] not in self.deferred:
-                    self.deferred[item["schedule_id"]] = self.hold["until"]
-                    self.store.put_meta("deferred", self.deferred)
-                    until = parse_dt(self.hold["until"]).astimezone(ZoneInfo(self.timezone)).strftime("%H:%M")
-                    self.log("system", {"type": "schedule"}, "schedule_deferred", item["run_at"], self.hold["until"],
-                             f"{reasoning}: rimandata per la forzatura, si esegue alla sua fine (alle {until})",
-                             "informational", corr)
-                continue
-            if self.deferred.pop(item["schedule_id"], None) is not None:
+
+    def _expire_approval(self, a: dict) -> None:
+        a["status"] = "expired"
+        self._save_approval(a)
+        corr = str(uuid.uuid4())
+        outcome = {"reject": "respinta", "approve": "approvata", "wait": "in attesa"}[a["expires_action"]]
+        self.log("system", self._approval_target(a), "expire",
+                 "pending", "expired", f"Approvazione scaduta senza risposta: {outcome}", "informational", corr,
+                 approval_id=a["approval_id"])
+        if a["expires_action"] == "approve":
+            self._execute_proposed(a, "system:engine", corr, "system")
+        else:
+            self._take_schedule(a["approval_id"])
+        self._dequeue_approval()
+
+    def _run_scheduled(self, item: dict, now: datetime) -> None:
+        corr = str(uuid.uuid4())
+        labels = {"prearrival": "pre-arrivo", "checkout": "check-out", "empty": "casa vuota", "manual": "manuale"}
+        reasoning = f"Azione programmata ({labels[item['kind']]})" + (f", prenotazione {item['booking_id']}" if item["booking_id"] else "")
+        act = item["action"]
+        if act["type"] == "apartment_mode" and self.hold:
+            # D-122: a mode action waits for the end of the hold (at most 12 hours, the contract's 720 minutes)
+            if item["schedule_id"] not in self.deferred:
+                self.deferred[item["schedule_id"]] = self.hold["until"]
                 self.store.put_meta("deferred", self.deferred)
-                reasoning += " (rimandata per la forzatura)"
-            if item["kind"] == "checkout" and act["type"] == "apartment_mode" and (seen := self._presence_after_checkout(item)):
-                self._propose_checkout(item, seen, corr)      # F1 (D-137): the manager decides; approved at expiry
-                item.update(status="done", command_ids=[], executed_at=iso(now))
-                self._save_schedule(item)
-                self.apartment_changed(corr)
-                continue
-            try:
-                if act["type"] == "apartment_mode":
-                    item["command_ids"] = self.set_mode(act["mode"], "system:engine", corr, reasoning, "system")
-                else:
-                    cmd = self.create_command(act["device_id"], act, "system:engine", corr, decision_actor="system",
-                                              reasoning=reasoning)
-                    item["command_ids"] = [cmd["command_id"]] if cmd else []
-                item["status"] = "done"
-            except MockError:
-                item["status"] = "failed"
-            item["executed_at"] = iso(now)
+                until = parse_dt(self.hold["until"]).astimezone(ZoneInfo(self.timezone)).strftime("%H:%M")
+                self.log("system", {"type": "schedule"}, "schedule_deferred", item["run_at"], self.hold["until"],
+                         f"{reasoning}: rimandata per la forzatura, si esegue alla sua fine (alle {until})",
+                         "informational", corr)
+            return
+        if self.deferred.pop(item["schedule_id"], None) is not None:
+            self.store.put_meta("deferred", self.deferred)
+            reasoning += " (rimandata per la forzatura)"
+        if item["kind"] == "checkout" and act["type"] == "apartment_mode" and (seen := self._presence_after_checkout(item)):
+            self._propose_checkout(item, seen, corr)      # F1 (D-137): the manager decides; approved at expiry
+            item.update(status="done", command_ids=[], executed_at=iso(now))
             self._save_schedule(item)
             self.apartment_changed(corr)
+            return
+        try:
+            if act["type"] == "apartment_mode":
+                item["command_ids"] = self.set_mode(act["mode"], "system:engine", corr, reasoning, "system")
+            else:
+                cmd = self.create_command(act["device_id"], act, "system:engine", corr, decision_actor="system",
+                                          reasoning=reasoning)
+                item["command_ids"] = [cmd["command_id"]] if cmd else []
+            item["status"] = "done"
+        except MockError:
+            item["status"] = "failed"
+        item["executed_at"] = iso(now)
+        self._save_schedule(item)
+        self.apartment_changed(corr)
 
     # ---- seed ------------------------------------------------------------------------
     def _seed_history(self, variant: int) -> None:
