@@ -25,7 +25,14 @@ services:
       - "${BROKER_TLS_PORT:-8883}:8883"
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
-      - ${BROKER_TLS_DIR:?BROKER_TLS_DIR}:/mosquitto/tls:ro
+      # le chiavi stanno solo sul loro disco (C-12): se non è montato la cartella manca e il broker non parte,
+      # docker non la crea mai sul disco di avvio
+      - type: bind
+        source: ${BROKER_TLS_DIR:?BROKER_TLS_DIR}
+        target: /mosquitto/tls
+        read_only: true
+        bind:
+          create_host_path: false
       - ${BROKER_AUTH_DIR:?BROKER_AUTH_DIR}:/mosquitto/auth:ro
       - ${BROKER_DATA_DIR:?BROKER_DATA_DIR}:/mosquitto/data
     networks:

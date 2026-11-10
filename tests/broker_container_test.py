@@ -1,7 +1,11 @@
 """The real broker (D-196, D-199) in containers, driven by the real scripts/broker-vm.sh. The bench (tests/broker_rig) is a
 Linux that runs the script as root and uses this machine's Docker through its socket: what is checked is the image, the
 configuration and the file permissions that go on the VM. Only Secret Manager and the metadata server are stand-ins.
-Clients are the broker image's own mosquitto_pub and mosquitto_sub. Docker missing is one red, never a skip."""
+Clients are the broker image's own mosquitto_pub and mosquitto_sub. Docker missing is one red, never a skip.
+
+The keys' disk (C-12): on the bench it is a folder mounted on itself, so that it is a mount point both for the script
+and for Docker; its preparation (format, fstab, mount) runs apart, in a privileged bench on loop disks. Certificates
+from ACME come from Pebble, Let's Encrypt's own test server, that accepts every challenge: lego is the real one."""
 import json
 import re
 import shutil
@@ -18,6 +22,10 @@ RIG, BENCH = "domhouse-broker-rig-run", "/tmp/domhouse-broker-bench"
 INTERNAL_IP, INTERNAL_NET, BRIDGE_NET, CONTAINER = "172.30.83.2", "domhouse-broker-internal", "domhouse-broker_default", "domhouse-broker"
 PORT = 18883
 HOST = "mqtt.banco.test"
+TLS = f"{BENCH}/tlsdisk/broker"
+ACME = f"{BENCH}/tlsdisk/acme"
+PEBBLE, PEBBLE_IMAGE = "domhouse-broker-pebble", "ghcr.io/letsencrypt/pebble@sha256:ddf230642b1a584f519f32e347de1b05a6e4c1f6c35c1863b33effeab5f78199"
+DNS_ACCOUNT = "domhouse-dns-lab@domotica-poc-511707.iam.gserviceaccount.com"
 A, B = "apt-a", "apt-b"
 PW = {"connA": "connector-A-password-lunga-0001", "connB": "connector-B-password-lunga-0002",
       "a1": "device-a1-password-lunga-000001", "a2": "device-a2-password-lunga-000002",
@@ -123,31 +131,40 @@ def sub():
 def start_bench() -> dict:
     """The bench up, the certificates made, the broker installed by the real script. Returns the install's outcomes."""
     docker("build", "-q", "-t", "domhouse-broker-rig", str(ROOT / "tests" / "broker_rig"), timeout=240)
-    docker("rm", "-f", RIG, check=False)
+    docker("rm", "-f", RIG, PEBBLE, check=False)
+    docker("run", "-d", "--name", PEBBLE, "-p", "14000:14000", "-e", "PEBBLE_VA_ALWAYS_VALID=1", PEBBLE_IMAGE, timeout=180)
     docker("run", "-d", "--name", RIG, "--network", "host",
-           "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", f"{BENCH}:{BENCH}", "-v", f"{ROOT.as_posix()}:/repo:ro",
+           "-v", "/var/run/docker.sock:/var/run/docker.sock", "-v", f"{BENCH}:{BENCH}", "-v", f"{BENCH}/tlsdisk:{BENCH}/tlsdisk",
+           "-v", f"{ROOT.as_posix()}:/repo:ro",
            "-e", f"DOMHOUSE_OPT={BENCH}/opt", "-e", f"DOMHOUSE_ETC={BENCH}/etc", "-e", f"DOMHOUSE_DATA={BENCH}/data",
+           "-e", f"DOMHOUSE_TLS_MOUNT={BENCH}/tlsdisk", "-e", f"DOMHOUSE_SYSTEMD={BENCH}/systemd",
            "-e", f"DOMHOUSE_BROKER_PORT={PORT}", "-e", "DOMHOUSE_METADATA=http://127.0.0.1:18090",
            "-e", "DOMHOUSE_SECRETS_API=http://127.0.0.1:18090/v1", "-e", "DOMHOUSE_HEALTH_TRIES=45",
+           "-e", "DOMHOUSE_ACME_TEST=1", "-e", "DOMHOUSE_ACME_SERVER=https://127.0.0.1:14000/dir", "-e", "DOMHOUSE_LEGO_NETWORK=host",
            "domhouse-broker-rig", "sleep", "3600")
-    rig(f"rm -rf {BENCH}/opt {BENCH}/etc {BENCH}/data {BENCH}/certs {BENCH}/secrets {BENCH}/up; "
-        f"mkdir -p {BENCH}/up {BENCH}/opt {BENCH}/etc/_broker/tls {BENCH}/data {BENCH}/certs {BENCH}/secrets; "
+    rig(f"rm -rf {BENCH}/opt {BENCH}/etc {BENCH}/data {BENCH}/certs {BENCH}/secrets {BENCH}/up {BENCH}/systemd {BENCH}/finto {BENCH}/systemctl.log; "
+        f"find {BENCH}/tlsdisk -mindepth 1 -delete; install -d -m 700 {TLS} {ACME}; "
+        f"mkdir -p {BENCH}/up {BENCH}/opt {BENCH}/data {BENCH}/certs {BENCH}/secrets {BENCH}/systemd {BENCH}/finto; "
+        f"printf '#!/bin/sh\\necho \"$*\" >> {BENCH}/systemctl.log\\n' > /usr/local/bin/systemctl; chmod 755 /usr/local/bin/systemctl; "
         f"cd /repo && cp scripts/broker-vm.sh scripts/broker_accounts.py engine/broker/compose.yaml engine/broker/mosquitto.conf "
         f"engine/compose.broker.yaml {BENCH}/up/; sed -i 's/\\r$//' {BENCH}/up/broker-vm.sh; sed -i 's/$/\\r/' {BENCH}/up/mosquitto.conf {BENCH}/up/compose.yaml; "
         f"python3 /repo/tests/broker_rig/stub_gcp.py {BENCH}/secrets > /dev/null 2>&1 &")
     rig(f"""cd {BENCH}/certs && openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.crt -days 30 -subj /CN=CA-di-prova 2>/dev/null &&
         openssl req -x509 -newkey rsa:2048 -nodes -keyout altra.key -out altra.crt -days 30 -subj /CN=CA-estranea 2>/dev/null""")
     make_cert("uno")
-    outcome = {"senza_certificato": rig(f"bash {BENCH}/up/broker-vm.sh install {IMAGE}", check=False)}
-    rig(f"cp {BENCH}/certs/uno.crt {BENCH}/etc/_broker/tls/fullchain.pem; cp {BENCH}/certs/uno.key {BENCH}/etc/_broker/tls/privkey.pem")
+    outcome = {"senza_disco": rig(f"DOMHOUSE_TLS_MOUNT={BENCH}/finto bash {BENCH}/up/broker-vm.sh install {IMAGE}", check=False),
+               "senza_certificato": rig(f"bash {BENCH}/up/broker-vm.sh install {IMAGE}", check=False),
+               "cert_prima": rig(f"bash {BENCH}/up/broker-vm.sh install-cert {BENCH}/certs/uno.crt {BENCH}/certs/uno.key")}
     outcome["install"] = rig(f"bash {BENCH}/up/broker-vm.sh install {IMAGE}", timeout=200)
     return outcome
 
 
 def stop_bench():
     if docker("ps", "-a", "-q", "-f", f"name=^{RIG}$", check=False).stdout.strip():
-        rig(f"docker compose --env-file {BENCH}/opt/_broker/broker.settings -f {BENCH}/opt/_broker/compose.yaml down -v; rm -rf {BENCH}/opt {BENCH}/etc {BENCH}/data {BENCH}/certs {BENCH}/secrets {BENCH}/up", check=False, timeout=90)
-    docker("rm", "-f", RIG, check=False)
+        rig(f"docker compose --env-file {BENCH}/opt/_broker/broker.settings -f {BENCH}/opt/_broker/compose.yaml down -v; "
+            f"rm -rf {BENCH}/opt {BENCH}/etc {BENCH}/data {BENCH}/certs {BENCH}/secrets {BENCH}/up {BENCH}/systemd {BENCH}/finto; "
+            f"find {BENCH}/tlsdisk -mindepth 1 -delete", check=False, timeout=90)
+    docker("rm", "-f", RIG, PEBBLE, check=False)
 
 
 @pytest.fixture(scope="module")
@@ -168,6 +185,49 @@ def test_install_refuses_a_missing_certificate(bench):
     done = bench["senza_certificato"]
     assert done.returncode and "certificato" in done.stderr, done.stderr
     assert "sano" in bench["install"].stdout
+
+
+def key_modes():
+    """Every folder and file on the keys' disk, as "<kind> <owner> <mode>": the set C-12 allows is two lines."""
+    return set(rig(f"find {BENCH}/tlsdisk -mindepth 1 -exec stat -c '%F %u %a' {{}} +").stdout.splitlines())
+
+
+ONLY_THE_BROKER = {"directory 1883 700", "regular file 1883 600"}
+
+
+def test_the_keys_are_readable_only_by_the_broker(bench):
+    assert "certificato pronto" in bench["cert_prima"].stdout and "ora install" in bench["cert_prima"].stdout
+    assert key_modes() == ONLY_THE_BROKER
+    assert rig(f"ls {TLS}").stdout.split() == ["fullchain.pem", "privkey.pem"]
+
+
+def test_without_the_keys_disk_nothing_is_written_and_the_watch_says_down(bench):
+    done = bench["senza_disco"]
+    assert done.returncode and f"disco delle chiavi non montato su {BENCH}/finto" in done.stderr, done.stderr
+    live = rig(f"sha256sum {TLS}/fullchain.pem {TLS}/privkey.pem").stdout
+    elsewhere = f"DOMHOUSE_TLS_MOUNT={BENCH}/finto bash {BENCH}/opt/broker-vm.sh"
+    refused = rig(f"{elsewhere} install-cert {BENCH}/certs/uno.crt {BENCH}/certs/uno.key", check=False)
+    assert refused.returncode and "non montato" in refused.stderr, refused.stderr
+    assert rig(f"{elsewhere} cert-new {HOST} domhouse-lab {DNS_ACCOUNT}", check=False).returncode
+    assert rig(f"ls -A {BENCH}/finto").stdout == "", "una chiave scritta fuori dal disco delle chiavi"
+    assert rig(f"sha256sum {TLS}/fullchain.pem {TLS}/privkey.pem").stdout == live
+    assert f"broker down (disco delle chiavi non montato su {BENCH}/finto)" in rig(f"{elsewhere} check").stdout
+
+
+def test_without_its_keys_folder_the_broker_does_not_start_and_docker_creates_nothing(bench):
+    docker("stop", CONTAINER, timeout=60)
+    rig(f"mv {TLS} {TLS}-via")
+    try:
+        started = docker("start", CONTAINER, check=False)
+        missing = rig(f"test -e {TLS}", check=False).returncode
+        text = vm("check").stdout
+    finally:
+        rig(f"mv {TLS}-via {TLS}")
+    assert started.returncode and "does not exist" in started.stderr, started.stderr
+    assert missing, "docker ha creato la cartella delle chiavi"
+    assert "broker down (disco delle chiavi senza le cartelle broker e acme)" in text, text
+    assert "sano" in vm("restart").stdout
+    assert can_connect("tls", f"{A}.a1", PW["a1"])
 
 
 def test_files_copied_from_windows_lose_their_carriage_returns(bench):
@@ -325,6 +385,7 @@ def test_a_new_certificate_is_loaded_without_dropping_anyone(bench, sub):
     assert served_fingerprint() != fingerprint("due")
     vm("install-cert", f"{BENCH}/certs/due.crt", f"{BENCH}/certs/due.key")
     assert served_fingerprint() == fingerprint("due")
+    assert key_modes() == ONLY_THE_BROKER
     assert can_connect("tls", f"{A}.a2", PW["a2"])
     assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "dopo-la-ricarica").returncode == 0
     assert connected.wait_for("dopo-la-ricarica") and connected.running()
@@ -334,11 +395,11 @@ def test_a_new_certificate_is_loaded_without_dropping_anyone(bench, sub):
 @pytest.mark.parametrize("cert, key, reason", [("due.crt", "uno.key", "non corrisponde"), ("due.key", "due.key", "non è un certificato"),
                                                ("mancante.crt", "due.key", "manca")])
 def test_a_bad_certificate_never_reaches_the_broker(bench, cert, key, reason):
-    live = rig(f"sha256sum {BENCH}/etc/_broker/tls/fullchain.pem {BENCH}/etc/_broker/tls/privkey.pem").stdout
+    live = rig(f"sha256sum {TLS}/fullchain.pem {TLS}/privkey.pem").stdout
     served = served_fingerprint()
     done = vm("install-cert", f"{BENCH}/certs/{cert}", f"{BENCH}/certs/{key}", check=False)
     assert done.returncode != 0 and reason in done.stderr
-    assert rig(f"sha256sum {BENCH}/etc/_broker/tls/fullchain.pem {BENCH}/etc/_broker/tls/privkey.pem").stdout == live
+    assert rig(f"sha256sum {TLS}/fullchain.pem {TLS}/privkey.pem").stdout == live
     assert served_fingerprint() == served and can_connect("tls", f"{A}.a1", PW["a1"])
 
 
@@ -378,6 +439,116 @@ def test_data_are_written_on_the_data_folder(bench):
     rig(f"docker compose --env-file {BENCH}/opt/_broker/broker.settings -f {BENCH}/opt/_broker/compose.yaml restart", timeout=90)
     time.sleep(2)
     assert "mosquitto.db" in rig(f"ls {BENCH}/data/_broker").stdout
+
+
+def file_fingerprint(path):
+    return rig(f"openssl x509 -in {path} -noout -fingerprint -sha256 | sed 's/.*=//'").stdout.strip()
+
+
+def test_without_acme_settings_the_daily_renewal_does_nothing(bench):
+    assert "niente da fare" in vm("cert-renew").stdout
+    assert "OnCalendar=*-*-* 04:17:00" in rig(f"cat {BENCH}/systemd/domhouse-broker-cert.timer").stdout
+    assert f"ExecStart=/bin/bash {BENCH}/opt/broker-vm.sh cert-renew" in rig(f"cat {BENCH}/systemd/domhouse-broker-cert.service").stdout
+    assert "enable --now domhouse-broker-cert.timer" in rig(f"cat {BENCH}/systemctl.log").stdout
+
+
+def test_a_certificate_from_acme_is_served_at_once_and_renewed_only_when_due(bench):
+    done = vm("cert-new", HOST, "domhouse-lab", DNS_ACCOUNT)
+    crt = f"{ACME}/certificates/{HOST}.crt"
+    assert "ricarica fatta" in done.stdout and served_fingerprint() == file_fingerprint(crt)
+    settings = rig(f"cat {BENCH}/etc/_broker/acme.settings").stdout.splitlines()
+    assert settings == [f"ACME_DOMAIN={HOST}", "ACME_DNS_ZONE=domhouse-lab", f"ACME_DNS_ACCOUNT={DNS_ACCOUNT}",
+                        "ACME_SERVER=https://127.0.0.1:14000/dir"]
+    assert rig(f"ls {ACME}/accounts/*/domhouse-broker/domhouse-broker.key").returncode == 0      # the account key, on that disk
+    assert key_modes() == ONLY_THE_BROKER
+    again = vm("cert-renew")
+    assert "rinnovo non ancora dovuto" in again.stdout and served_fingerprint() == file_fingerprint(crt)
+    assert vm("cert-new", "Non Valido", "domhouse-lab", DNS_ACCOUNT, check=False).returncode
+
+
+def test_revoking_gives_a_new_key_that_the_broker_serves_at_once(bench, sub):
+    connected = sub("internal", f"{A}.connector", PW["connA"], f"{A}/#")
+    key_before = rig(f"sha256sum < {TLS}/privkey.pem").stdout
+    served_before = served_fingerprint()
+    assert vm("cert-revoke", "boh", check=False).returncode
+    done = vm("cert-revoke", "key-compromise")
+    assert f"broker cert revoked ({HOST}, key-compromise)" in done.stdout and "ricarica fatta" in done.stdout
+    assert rig(f"sha256sum < {TLS}/privkey.pem").stdout != key_before
+    assert served_fingerprint() != served_before and served_fingerprint() == file_fingerprint(f"{ACME}/certificates/{HOST}.crt")
+    assert rig(f"ls {ACME}/archives/certificates/").stdout.strip().endswith(".zip")    # the old pair, still on that disk
+    assert key_modes() == ONLY_THE_BROKER
+    assert connected.running(), "la riemissione ha fatto cadere il connector"
+
+
+DISK_RIG = "domhouse-broker-disk-run"
+OPTIONS = "defaults,nofail,nodev,nosuid,noexec,x-systemd.device-timeout=30s,x-systemd.before=docker.service"
+
+
+def on_disk_rig(script, check=True):
+    return docker("exec", DISK_RIG, "bash", "-c", script, check=check, timeout=120)
+
+
+@pytest.fixture(scope="module")
+def disk():
+    """A privileged bench: /vm is an ext4 loop disk standing for the VM's boot disk; four loop disks stand for the
+    keys' disk (empty), one already formatted ext2, one with data and no file system, plus a name that is no disk."""
+    if shutil.which("docker") is None or docker("info", check=False).returncode:
+        pytest.fail("Docker non disponibile: questa prova ha bisogno di un contenitore privilegiato")
+    docker("build", "-q", "-t", "domhouse-broker-rig", str(ROOT / "tests" / "broker_rig"), timeout=240)
+    docker("rm", "-f", DISK_RIG, check=False)
+    docker("run", "-d", "--name", DISK_RIG, "--privileged", "-v", f"{ROOT.as_posix()}:/repo:ro", "domhouse-broker-rig", "sleep", "1800")
+    loops = {}
+    try:
+        on_disk_rig("mkdir -p /w /vm && truncate -s 64M /w/boot.img && mkfs.ext4 -q /w/boot.img && mount -o loop /w/boot.img /vm && "
+                    "cp /repo/scripts/broker-vm.sh /w/ && sed -i 's/\\r$//' /w/broker-vm.sh")
+        for name in ("tls", "ext2", "dirty"):
+            on_disk_rig(f"truncate -s 16M /w/{name}.img")
+            loops[name] = on_disk_rig(f"losetup -f --show /w/{name}.img").stdout.strip()
+            on_disk_rig(f"ln -s {loops[name]} /w/google-{name}")
+        on_disk_rig(f"mkfs.ext2 -q {loops['ext2']} && dd if=/dev/urandom of={loops['dirty']} bs=4k seek=8 count=16 conv=notrunc 2>/dev/null")
+        yield loops
+    finally:
+        on_disk_rig("umount /vm/mnt/* 2>/dev/null; " + " ".join(f"losetup -d {dev};" for dev in loops.values()) + " umount /vm", check=False)
+        docker("rm", "-f", DISK_RIG, check=False)
+
+
+def prepare(name, mount):
+    return on_disk_rig(f"DOMHOUSE_TLS_DEVICE=/w/google-{name} DOMHOUSE_TLS_MOUNT={mount} bash /w/broker-vm.sh prepare-tls-disk", check=False)
+
+
+def fstab_lines(mount):
+    return [line for line in on_disk_rig("cat /etc/fstab").stdout.splitlines() if f" {mount} " in line]
+
+
+def test_the_keys_disk_is_formatted_once_mounted_at_boot_and_closed_when_absent(disk):
+    mount = "/vm/mnt/domhouse-tls"
+    first = prepare("tls", mount)
+    assert first.returncode == 0 and "Formattazione" in first.stdout, first.stdout + first.stderr
+    uuid = on_disk_rig(f"blkid -p -o value -s UUID {disk['tls']}").stdout.strip()
+    assert fstab_lines(mount) == [f"UUID={uuid} {mount} ext4 {OPTIONS} 0 2"]
+    assert on_disk_rig(f"findmnt -n -o SOURCE --mountpoint {mount}").stdout.strip() == disk["tls"]
+    assert on_disk_rig(f"stat -c '%u %a' {mount}/broker {mount}/acme").stdout.split("\n")[:2] == ["1883 700", "1883 700"]
+    on_disk_rig(f"echo segno > {mount}/broker/segno")
+    second = prepare("tls", mount)
+    assert second.returncode == 0 and "Formattazione" not in second.stdout and "già presente" in second.stdout
+    assert on_disk_rig(f"cat {mount}/broker/segno").stdout.strip() == "segno" and len(fstab_lines(mount)) == 1
+    on_disk_rig(f"umount {mount}")
+    assert on_disk_rig(f"touch {mount}/chiave", check=False).returncode, "con il disco assente si scrive sul disco di avvio"
+    assert on_disk_rig(f"ls -A {mount}").stdout == ""
+    third = prepare("tls", mount)                       # mounts through the fstab line: the line is a valid one
+    assert third.returncode == 0 and on_disk_rig(f"cat {mount}/broker/segno").stdout.strip() == "segno"
+
+
+def test_a_disk_that_holds_something_is_never_formatted(disk):
+    other = prepare("ext2", "/vm/mnt/altro")
+    assert other.returncode and "ext2" in other.stderr
+    assert on_disk_rig(f"blkid -p -o value -s TYPE {disk['ext2']}").stdout.strip() == "ext2"
+    dirty = prepare("dirty", "/vm/mnt/sporco")
+    assert dirty.returncode and "non è vuoto" in dirty.stderr
+    assert on_disk_rig(f"blkid -p -o value -s TYPE {disk['dirty']}", check=False).stdout.strip() == ""
+    absent = prepare("nessuno", "/vm/mnt/nessuno")
+    assert absent.returncode and "manca il disco" in absent.stderr
+    assert not fstab_lines("/vm/mnt/altro") and not fstab_lines("/vm/mnt/sporco") and not fstab_lines("/vm/mnt/nessuno")
 
 
 def test_the_address_of_the_internal_listener_is_the_same_everywhere():
