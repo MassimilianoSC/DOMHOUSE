@@ -149,7 +149,7 @@ def start_bench() -> dict:
         f"mkdir -p {BENCH}/up {BENCH}/opt {BENCH}/data {BENCH}/certs {BENCH}/secrets {BENCH}/systemd {BENCH}/finto; "
         f"printf '#!/bin/sh\\necho \"$*\" >> {BENCH}/systemctl.log\\n' > /usr/local/bin/systemctl; chmod 755 /usr/local/bin/systemctl; "
         f"cd /repo && cp scripts/broker-vm.sh scripts/broker_accounts.py engine/broker/compose.yaml engine/broker/mosquitto.conf "
-        f"engine/compose.broker.yaml {BENCH}/up/; sed -i 's/\\r$//' {BENCH}/up/broker-vm.sh; sed -i 's/$/\\r/' {BENCH}/up/mosquitto.conf {BENCH}/up/compose.yaml; "
+        f"engine/compose.broker.yaml {BENCH}/up/; sed -i 's/\\r$//' {BENCH}/up/broker-vm.sh; sed -i 's/$/\\r/' {BENCH}/up/compose.yaml; sed -i 's/$/\\r\\r/' {BENCH}/up/mosquitto.conf; "
         f"python3 /repo/tests/broker_rig/stub_gcp.py {BENCH}/secrets > /dev/null 2>&1 &")
     rig(f"""cd {BENCH}/certs && openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.crt -days 30 -subj /CN=CA-di-prova 2>/dev/null &&
         openssl req -x509 -newkey rsa:2048 -nodes -keyout altra.key -out altra.crt -days 30 -subj /CN=CA-estranea 2>/dev/null""")
@@ -233,7 +233,7 @@ def test_without_its_keys_folder_the_broker_does_not_start_and_docker_creates_no
 
 
 def test_files_copied_from_windows_lose_their_carriage_returns(bench):
-    assert rig(f"grep -c $'\\r' {BENCH}/up/mosquitto.conf").stdout.strip() != "0"         # the copy really had them
+    assert rig(f"grep -c $'\\r\\r$' {BENCH}/up/mosquitto.conf").stdout.strip() != "0"     # the copy really had two
     assert rig(f"grep -c $'\\r' {BENCH}/opt/_broker/mosquitto.conf", check=False).stdout.strip() == "0"
 
 
@@ -420,7 +420,10 @@ def test_after_a_restart_clients_reconnect_and_nothing_queued_is_lost(bench, sub
 
 
 def test_the_watch_says_ok_expiring_and_down(bench):
-    assert re.search(r"^broker ok cert_days=\d+$", vm("check").stdout, re.M)
+    text = vm("check").stdout
+    assert re.search(r"^broker ok cert_days=\d+$", text, re.M)
+    started = docker("inspect", "-f", "{{.State.StartedAt}}", CONTAINER).stdout.strip()
+    assert f"broker started_at={started}" in text                        # D-210: the report counts restarts from it
     make_cert("breve", days=5)
     vm("install-cert", f"{BENCH}/certs/breve.crt", f"{BENCH}/certs/breve.key")
     text = vm("check").stdout
@@ -488,7 +491,8 @@ def test_a_certificate_from_acme_is_served_at_once_and_renewed_only_when_due(ben
     assert "ricarica fatta" in done.stdout and served_fingerprint() == file_fingerprint(crt)
     settings = rig(f"cat {BENCH}/etc/_broker/acme.settings").stdout.splitlines()
     assert settings == [f"ACME_DOMAIN={HOST}", "ACME_DNS_ZONE=domhouse-lab", f"ACME_DNS_ACCOUNT={DNS_ACCOUNT}",
-                        "ACME_SERVER=https://127.0.0.1:14000/dir"]
+                        "ACME_SERVER=https://127.0.0.1:14000/dir", "ACME_KEY_TYPE=rsa2048"]
+    assert served_key() == "rsa 2048"                                  # D-212: RSA-2048 unless asked otherwise
     assert rig(f"ls {ACME}/accounts/*/domhouse-broker/domhouse-broker.key").returncode == 0      # the account key, on that disk
     assert key_modes() == ONLY_THE_BROKER
     again = vm("cert-renew")
@@ -518,6 +522,33 @@ def test_a_forced_renewal_gives_a_new_certificate_at_once(bench):
     assert "broker cert new notAfter=" in done.stdout and "ricarica fatta" in done.stdout, done.stdout
     assert served_fingerprint() != served_before and served_fingerprint() == file_fingerprint(f"{ACME}/certificates/{HOST}.crt")
     assert "rinnovo non ancora dovuto" in vm("cert-renew").stdout
+    assert key_modes() == ONLY_THE_BROKER
+
+
+def served_key():
+    """The kind and size of the key the TLS port serves, e.g. "rsa 2048" or "ec 256"."""
+    text = rig(f"python3 {BENCH}/opt/broker_accounts.py probe 127.0.0.1 {PORT} | openssl x509 -noout -text").stdout
+    if "rsaEncryption" in text:
+        return "rsa " + re.search(r"Public-Key: \((\d+) bit\)", text).group(1)
+    return "ec " + re.search(r"Public-Key: \((\d+) bit\)", text).group(1)
+
+
+def test_d212_the_key_type_is_a_setting_and_a_missing_one_means_rsa(bench):
+    """cert-new with ec256 gives an ECDSA key; acme.settings without the line (as written on 10 November) gives RSA at
+    the next renewal, with the same ACME account; a type not foreseen is refused."""
+    assert vm("cert-new", HOST, "domhouse-lab", DNS_ACCOUNT, "rsa4096", check=False).returncode
+    # RSA -> ECDSA: the reload is enough (OpenSSL prefers the ECDSA one it now holds); the other way round it is not
+    assert re.search(r"(ricarica|riavvio) fatt", vm("cert-new", HOST, "domhouse-lab", DNS_ACCOUNT, "ec256").stdout)
+    accounts = rig(f"ls {ACME}/accounts/*/domhouse-broker/").stdout
+    assert served_key() == "ec 256" and "ACME_KEY_TYPE=ec256" in rig(f"cat {BENCH}/etc/_broker/acme.settings").stdout
+    rig(f"sed -i '/^ACME_KEY_TYPE=/d' {BENCH}/etc/_broker/acme.settings")
+    started = docker("inspect", "-f", "{{.State.StartedAt}}", CONTAINER).stdout
+    done = vm("cert-renew", "force").stdout
+    # the reload alone keeps serving the ECDSA one (D-212): the broker restarts once, and serves the RSA one
+    assert "la ricarica non basta" in done and "riavvio fatto" in done, done
+    assert docker("inspect", "-f", "{{.State.StartedAt}}", CONTAINER).stdout != started
+    assert served_key() == "rsa 2048"
+    assert rig(f"ls {ACME}/accounts/*/domhouse-broker/").stdout == accounts             # the same account
     assert key_modes() == ONLY_THE_BROKER
 
 

@@ -3,7 +3,7 @@
 # identity, like engine-vm.sh: no gcloud there, only python3, openssl and docker. Procedure: docs/motore-vm.md, G2.
 #
 #   sudo bash broker-vm.sh prepare-tls-disk                            # once: the keys' disk (C-12); safe to repeat
-#   sudo bash broker-vm.sh cert-new <domain> <dns_zone> <dns_account>  # the first certificate, from Let's Encrypt
+#   sudo bash broker-vm.sh cert-new <domain> <dns_zone> <dns_account> [rsa2048|ec256]   # the first certificate
 #   sudo bash broker-vm.sh install <image>                             # first time; needs the certificate
 #   sudo bash /opt/domhouse/broker-vm.sh update <image>                # new image, same data
 #   sudo bash /opt/domhouse/broker-vm.sh status
@@ -28,6 +28,11 @@
 # credential on the VM: lego uses the VM's identity to act as the DNS account. When that disk is not mounted nothing
 # here writes a key, the broker does not start (its folder is missing and docker is told never to create it, the
 # empty mount point is immutable) and check reports "broker down".
+#
+# Certificate key (D-212): RSA-2048 unless acme.settings says ACME_KEY_TYPE=ec256. An RSA certificate depends only on
+# ISRG Root X1 (leaf, YR1 or YR2, Root YR cross-signed by X1), the root a Shelly Gen4 is most likely to carry; the
+# chain ending at X1 is asked for by name, so a change of Let's Encrypt's default chain does not change ours. An
+# acme.settings without the line (the first certificate of 10 November was ECDSA) means RSA from the next renewal.
 #
 # Secrets: broker_accounts.py reads them with the VM's identity (langbrain-vm@, Secret Accessor) and writes only hashes.
 # Nothing here prints a password; adding them to Secret Manager is broker-secrets.sh, on the PC.
@@ -71,6 +76,7 @@ ACCOUNTS="${OPT}/broker_accounts.py"
 LEGO_IMAGE="goacme/lego:v5.6.0@sha256:6f1583fc026a455ea46a7a5858c576105bb69c2e2de69db391cab7f14750350c"
 LETS_ENCRYPT="https://acme-v02.api.letsencrypt.org/directory"
 ACME_ACCOUNT_ID=domhouse-broker          # no email: Let's Encrypt sends none, and no address leaves the VM
+ACME_CHAIN="ISRG Root X1"               # the chain that ends at the root every client has; the default one today
 LIMIT="${DOMHOUSE_LIMIT:-on}"            # "off" only on the unprivileged test bench, which shares the host's network
 LIMIT_TABLE=domhouse_broker
 LIMIT_FILE="${BROKER_OPT}/limit.nft"
@@ -159,15 +165,24 @@ reload_broker() {
   [ -z "${problem}" ] || die "ricarica non fatta: ${problem}"
   hup
   wanted="$(fingerprint_of_stdin < "${TLS_DIR}/fullchain.pem")"
+  served_is "${wanted}" && { echo "ricarica fatta: la porta $(tls_port) serve il certificato ${wanted}"; return 0; }
+  # D-212: from an ECDSA certificate to an RSA one (or back) the reload is not enough, Mosquitto keeps serving the old
+  # one (OpenSSL holds one certificate per key type and prefers ECDSA): a restart, once, and everyone reconnects
+  echo "la ricarica non basta (tipo di chiave cambiato?): riavvio del broker, i dispositivi si ricollegano"
+  compose restart
+  wait_healthy
+  served_is "${wanted}" && { echo "riavvio fatto: la porta $(tls_port) serve il certificato ${wanted}"; return 0; }
+  die "dopo ricarica e riavvio la porta non serve il certificato sul disco (servito: ${served:-nessuno})"
+}
+
+served_is() {
+  # served_is <fingerprint>: true when the TLS port serves that certificate within 10 seconds (served: the last seen)
   for _ in $(seq 1 10); do
     served="$(served_pem 2>/dev/null | fingerprint_of_stdin 2>/dev/null || true)"
-    if [ "${served}" = "${wanted}" ]; then
-      echo "ricarica fatta: la porta $(tls_port) serve il certificato ${wanted}"
-      return 0
-    fi
+    [ "${served}" = "$1" ] && return 0
     sleep 1
   done
-  die "dopo la ricarica la porta non serve il certificato sul disco (servito: ${served:-nessuno})"
+  return 1
 }
 
 put_cert() {
@@ -208,8 +223,9 @@ put_files() {
   install -m 644 "${here}/compose.broker.yaml" "${OPT}/compose.broker.yaml"
   install -m 644 "${here}/compose.yaml" "${BROKER_OPT}/compose.yaml"
   install -m 644 "${here}/mosquitto.conf" "${BROKER_OPT}/mosquitto.conf"
-  # copied from a Windows PC they may carry \r line ends, which the broker would read as part of each value
-  sed -i 's/\r$//' "${OPT}/broker_accounts.py" "${OPT}/compose.broker.yaml" "${BROKER_OPT}/compose.yaml" "${BROKER_OPT}/mosquitto.conf"
+  # copied from a Windows PC they may carry \r line ends, which the broker would read as part of each value; all of
+  # them, also two (a file converted twice, as git archive does on Windows)
+  sed -i 's/\r*$//' "${OPT}/broker_accounts.py" "${OPT}/compose.broker.yaml" "${BROKER_OPT}/compose.yaml" "${BROKER_OPT}/mosquitto.conf"
 }
 
 prepare_tls_disk() {
@@ -289,11 +305,17 @@ lego() {
 acme_get() {
   # gets the certificate when it is missing or due (or at once, with --renew-force as argument); puts it in the
   # broker's folder only when it is a new one
-  local domain crt key dns_args=(--dns gcloud)
+  local domain crt key key_type dns_args=(--dns gcloud)
   domain="$(acme_setting ACME_DOMAIN)"
+  case "$(acme_setting ACME_KEY_TYPE)" in
+    ""|rsa2048) key_type=RSA2048 ;;
+    ec256) key_type=EC256 ;;
+    *) die "ACME_KEY_TYPE non previsto in ${ACME_SETTINGS}: $(acme_setting ACME_KEY_TYPE) (rsa2048 o ec256)" ;;
+  esac
   [ -z "${DOMHOUSE_ACME_TEST:-}" ] || dns_args=(--dns exec --dns.propagation.wait 1s)   # Pebble accepts every challenge
   crt="${ACME_DIR}/certificates/${domain}.crt"; key="${ACME_DIR}/certificates/${domain}.key"
-  if ! lego run --accept-tos -d "${domain}" --no-random-sleep "${dns_args[@]}" "$@"; then
+  if ! lego run --accept-tos -d "${domain}" --no-random-sleep --key-type "${key_type}" --preferred-chain "${ACME_CHAIN}" \
+       "${dns_args[@]}" "$@"; then
     secure_keys
     watch_line "broker cert renew failed (${domain})"
     exit 1
@@ -424,6 +446,8 @@ check() {
   days=$(( ( $(date -d "$(printf '%s\n' "${pem}" | openssl x509 -noout -enddate | sed 's/^notAfter=//')" +%s) - $(date +%s) ) / 86400 ))
   watch_line "broker ok cert_days=${days}"
   if [ "${days}" -lt "${CERT_ALERT_DAYS}" ]; then watch_line "broker cert expiring days=${days}"; fi
+  # D-210: when the container last started; the run-in report counts the different values as restarts
+  watch_line "broker started_at=$(docker inspect -f '{{.State.StartedAt}}' "${CONTAINER}" 2>/dev/null || echo '?')"
   auth_refused_report
 }
 
@@ -490,18 +514,20 @@ case "${cmd}" in
     cert_in_place
     ;;
   cert-new)
-    [ $# -eq 3 ] || die "uso: cert-new <domain> <dns_zone> <dns_account>"
+    [ $# -eq 3 ] || [ $# -eq 4 ] || die "uso: cert-new <domain> <dns_zone> <dns_account> [rsa2048|ec256]"
+    key_type="${4:-rsa2048}"
+    [[ "${key_type}" =~ ^(rsa2048|ec256)$ ]] || die "tipo di chiave non previsto: ${key_type} (rsa2048 o ec256)"
     [[ "$1" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]] || die "nome non valido: $1"
     [[ "$2" =~ ^[a-z][a-z0-9-]{0,62}$ ]] || die "zona Cloud DNS non valida: $2"
     [[ "$3" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z0-9-]+\.iam\.gserviceaccount\.com$ ]] || die "account DNS non valido: $3"
     need_tls_disk
     install -d -m 700 "${ETC}"
     install -d -m 750 "${BROKER_ETC}"
-    printf 'ACME_DOMAIN=%s\nACME_DNS_ZONE=%s\nACME_DNS_ACCOUNT=%s\nACME_SERVER=%s\n' \
-      "$1" "$2" "$3" "${DOMHOUSE_ACME_SERVER:-${LETS_ENCRYPT}}" > "${ACME_SETTINGS}.new"
+    printf 'ACME_DOMAIN=%s\nACME_DNS_ZONE=%s\nACME_DNS_ACCOUNT=%s\nACME_SERVER=%s\nACME_KEY_TYPE=%s\n' \
+      "$1" "$2" "$3" "${DOMHOUSE_ACME_SERVER:-${LETS_ENCRYPT}}" "${key_type}" > "${ACME_SETTINGS}.new"
     mv -f "${ACME_SETTINGS}.new" "${ACME_SETTINGS}"
     cat "${ACME_SETTINGS}"
-    acme_get
+    acme_get --renew-force               # new means now: also over a valid one (another key type, another name)
     ;;
   cert-renew)
     [ $# -eq 0 ] || { [ $# -eq 1 ] && [ "$1" = "force" ]; } || die "uso: cert-renew [force]"
