@@ -205,3 +205,64 @@ def test_both_manifests_say_eu():
     for name in ("cloudrun.yaml", "cloudrun.staging.yaml"):
         text = (root / "bff" / name).read_text(encoding="utf-8")
         assert re.search(r"name: AI_LOCATION[^\n]*\n\s*value: \"eu\"", text), name
+
+
+# -------- D-218: no development setting that opens the access outside development ------------------------------------
+def startup(app_env: str, auth_mode: str, service: str | None = None):
+    """check_access_settings with these values; the error lines it writes."""
+    from bff import main, logs
+    lines = []
+    original = logs.error
+    logs.error = lambda msg, **fields: lines.append((msg, fields))
+    try:
+        main.check_access_settings(dataclasses.replace(config.get_settings(), app_env=app_env, auth_mode=auth_mode),
+                                   {"K_SERVICE": service} if service else {})
+    finally:
+        logs.error = original
+    return lines
+
+
+def test_dev_login_refused_in_staging_and_production():
+    for app_env in ("staging", "prod"):
+        for auth_mode in ("dev", "", "firebse"):
+            with pytest.raises(SystemExit, match=rf"AUTH_MODE «{auth_mode}» with APP_ENV «{app_env}».*does not start"):
+                startup(app_env, auth_mode, "domotica-bff")
+        assert startup(app_env, "firebase", "domotica-bff") == []                    # starts
+
+
+def test_on_cloud_run_app_env_must_say_staging_or_prod():
+    """APP_ENV and AUTH_MODE are both «dev» when the variables are missing: on Cloud Run that is refused."""
+    with pytest.raises(SystemExit, match=r"APP_ENV is «dev» \(or missing\) on Cloud Run \(service domotica-bff\)"):
+        startup("dev", "dev", "domotica-bff")
+    assert startup("dev", "dev") == []                                               # the PC and the test runs
+
+
+def test_an_unknown_app_env_is_refused_everywhere():
+    with pytest.raises(SystemExit, match=r"APP_ENV «production» is not one of dev, staging, prod"):
+        startup("production", "firebase")
+
+
+def test_the_refusal_is_one_clear_line_in_the_log():
+    from bff import main, logs
+    lines = []
+    original = logs.error
+    logs.error = lambda msg, **fields: lines.append((msg, fields))
+    try:
+        with pytest.raises(SystemExit):
+            main.check_access_settings(dataclasses.replace(config.get_settings(), app_env="prod", auth_mode="dev"),
+                                       {"K_SERVICE": "domotica-bff"})
+    finally:
+        logs.error = original
+    assert [m for m, _ in lines] == ["development setting refused"]
+    assert {k: lines[0][1][k] for k in ("app_env", "auth_mode", "service")} == {
+        "app_env": "prod", "auth_mode": "dev", "service": "domotica-bff"}
+
+
+def test_both_manifests_start(monkeypatch):
+    """What the two manifests declare passes the check on Cloud Run."""
+    from bff import main
+    from tests.cloudrun_manifests_test import PROD, STAGING, env as manifest_env
+    for manifest in (STAGING, PROD):
+        e = manifest_env(manifest)
+        settings = dataclasses.replace(config.get_settings(), app_env=e["APP_ENV"], auth_mode=e["AUTH_MODE"])
+        main.check_access_settings(settings, {"K_SERVICE": "domotica-bff"})
