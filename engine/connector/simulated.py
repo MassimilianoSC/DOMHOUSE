@@ -66,9 +66,10 @@ def seed_devices(variant: int) -> tuple[list[dict], dict[str, dict]]:
         {"device_id": "dev-presa-camera", "label": "Presa stufetta camera", "room_id": "camera", "online": True,
          "last_seen": now, "capabilities": {"switch": {"on": False}, "power_meter": {"watts": 0, "energy_total_wh": 41_700.0}}},
         {"device_id": "dev-finestra-camera", "label": "Finestra camera", "room_id": "camera", "online": True,
-         "last_seen": now, "capabilities": {"contact": {"open": False, "since": iso(utcnow() - timedelta(hours=4))}}},
+         "last_seen": now, "battery_percent": 88.0,
+         "capabilities": {"contact": {"open": False, "since": iso(utcnow() - timedelta(hours=4))}}},
         {"device_id": "dev-ambiente-soggiorno", "label": "Sensore soggiorno", "room_id": "soggiorno", "online": True,
-         "last_seen": now, "capabilities": {
+         "last_seen": now, "battery_percent": 64.0, "capabilities": {
              "temperature": {"celsius": 20.6 if warm else 16.9}, "humidity": {"percent": 48 if warm else 57},
              "motion": {"detected": warm, "last_seen": iso(utcnow() - timedelta(minutes=3 if warm else 2900))}}},
     ]
@@ -94,6 +95,7 @@ class SimulatedDevice:
         self.label, self.room_id = data["label"], data["room_id"]
         self.online = data["online"]
         self.last_seen = data["last_seen"]           # ISO string, as in the contract
+        self.battery_percent = data.get("battery_percent")   # battery sensors only; None when mains-powered
         self.capabilities = copy.deepcopy(data["capabilities"])
         self.links = dict(links or {})
         self.meter_at = utcnow()                     # the instant energy_total_wh was brought up to
@@ -111,7 +113,8 @@ class SimulatedDevice:
         self.meter_to(utcnow())
         seen = datetime.fromisoformat(self.last_seen.replace("Z", "+00:00")) if self.last_seen else None
         return DeviceInfo(device_id=self.device_id, label=self.label, room_id=self.room_id, online=self.online,
-                          last_seen=seen, capabilities=copy.deepcopy(self.capabilities), links=dict(self.links))
+                          last_seen=seen, capabilities=copy.deepcopy(self.capabilities), links=dict(self.links),
+                          battery_percent=self.battery_percent)
 
     def reported(self, capability: str) -> dict:
         """The capability as the device reports it: its own fields only."""
