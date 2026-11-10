@@ -13,6 +13,8 @@
 #           writes outside it: no firebase, no questions, gcloud only to read (and only with GCP_PROJECT_ID set). It
 #           also shows the service's active values against the manifest's (D-197, from the commit's deploy.sh).
 #           SKIP_STAGING_CHECK=1 only for an emergency: publishes in production a commit that staging is not running (D-203).
+#           PUBLISH_ALL_CONFIRMED=pubblica is set by scripts/publish-all.sh after its one question (D-214): «scrivi prod»
+#           is not asked again, and a commit that is not on GitHub stops instead of being asked about.
 # The image tag is the commit's short SHA (computed by deploy.sh in the clean copy); when that image already exists in
 # Artifact Registry the build is skipped (read-only check), so republishing a commit never rebuilds a different image.
 # Messages are in plain Italian: this script is run by the project owner.
@@ -117,6 +119,10 @@ fi
 if ! git -C "${SRC}" merge-base --is-ancestor "${SHA}" origin/main 2>/dev/null; then
   if [ -n "${DRY_RUN}" ]; then
     echo "Attenzione: il commit ${SHORT} non è su GitHub (origin/main). In una pubblicazione vera chiederei conferma."
+  elif [ "${PUBLISH_ALL_CONFIRMED:-}" = "pubblica" ]; then
+    # D-214: from publish-all.sh nobody is asked, so a commit GitHub does not keep is never published
+    stop "Il commit ${SHORT} non è su GitHub (origin/main): con publish-all.sh non si pubblica un commit che GitHub non conserva.
+Fai «git push», poi rilancia lo stesso comando: riparte da qui."
   else
     echo "Il commit ${SHORT} non è ancora su GitHub: online andrebbe una versione che GitHub non conserva."
     echo "Di solito prima si fa «git push» e poi si pubblica."
@@ -128,6 +134,8 @@ fi
 if [ "${TARGET}" = "prod" ]; then
   if [ -n "${DRY_RUN}" ]; then
     echo "Attenzione: TARGET=prod. In una pubblicazione vera chiederei di scrivere «prod»."
+  elif [ "${PUBLISH_ALL_CONFIRMED:-}" = "pubblica" ]; then
+    echo "Produzione: la conferma l'hai già data all'inizio di publish-all.sh («pubblica»)."
   else
     echo "Stai per pubblicare in PRODUZIONE: l'app userà il motore domotico vero sulla VM."
     echo "Va fatto solo se il motore risponde (regola 3 di CLAUDE.md)."

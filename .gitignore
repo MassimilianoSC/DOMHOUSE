@@ -96,3 +96,6 @@ credentials.json
 
 # firebase-tools hosting cache
 .firebase/
+
+# publish-all.sh: the log of each publication and its state (D-214), never in Git
+logs/

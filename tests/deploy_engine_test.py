@@ -76,3 +76,38 @@ def test_head_by_default_and_a_given_commit_with_uncommitted_work_in_engine(repo
 def test_an_unknown_commit_stops(repo):
     r = repo("abcdef123456")
     assert r.returncode != 0 and "commit sconosciuto: abcdef123456" in r.stderr
+
+
+GCLOUD = r"""#!/usr/bin/env bash
+echo "gcloud $*" >> "$STUB_DIR/calls.log"
+case "$*" in
+  *"artifacts docker images describe"*) [ -f "$STUB_DIR/image-exists" ]; exit $? ;;
+esac
+exit 0
+"""
+
+
+def real_run(repo, tmp_path, exists):
+    """deploy-engine.sh for real, with gcloud stubbed: whether Cloud Build is called."""
+    stubs = tmp_path / "stubs"
+    stubs.mkdir(exist_ok=True)
+    (stubs / "gcloud").write_text(GCLOUD, encoding="utf-8", newline="\n")
+    (stubs / "gcloud").chmod(0o755)
+    (stubs / "calls.log").unlink(missing_ok=True)
+    (stubs / "image-exists").unlink(missing_ok=True)
+    if exists:
+        (stubs / "image-exists").write_text("", encoding="utf-8")
+    cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(repo.root)}" && '
+           f'GCP_PROJECT_ID=progetto-prova bash scripts/deploy-engine.sh {repo.second}')
+    done = subprocess.run([_bash(), "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    return done, (stubs / "calls.log").read_text(encoding="utf-8")
+
+
+def test_d214_an_image_that_exists_is_not_built_again(repo, tmp_path):
+    image = f"europe-west8-docker.pkg.dev/progetto-prova/domotica/engine:{repo.second}"
+    done, calls = real_run(repo, tmp_path, exists=True)
+    assert done.returncode == 0, done.stderr
+    assert f"Immagine già presente, non la ricostruisco: {image}" in done.stdout and "builds submit" not in calls
+    done, calls = real_run(repo, tmp_path, exists=False)
+    assert done.returncode == 0, done.stderr
+    assert "builds submit" in calls and f"Immagine pronta: {image}" in done.stdout

@@ -300,3 +300,35 @@ def test_d203_staging_itself_is_not_checked(publish):
     assert out.returncode == 0, out.stdout + out.stderr
     assert "status.traffic" not in calls
 
+
+# -------- D-214: called by publish-all.sh, after its one question --------
+def on_github(publish, tmp_path):
+    """A bare repository as origin, with the commit pushed to main: what «is it on GitHub?» reads."""
+    bare = tmp_path / "origin.git"
+    subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True, capture_output=True)
+    publish.git("branch", "-M", "main")
+    publish.git("remote", "add", "origin", str(bare))
+    publish.git("push", "-q", "origin", "main")
+
+
+def test_d214_from_publish_all_a_commit_not_on_github_stops_and_asks_nothing(publish):
+    out, calls = publish("staging", env="PUBLISH_ALL_CONFIRMED=pubblica X=1")
+    assert out.returncode != 0 and "FERMO" in out.stderr and "non è su GitHub" in out.stderr and "git push" in out.stderr
+    assert "pubblicare lo stesso?" not in out.stdout and not any(w in calls for w in WRITES)
+
+
+def test_d214_from_publish_all_production_is_not_asked_again(publish, tmp_path):
+    on_github(publish, tmp_path)
+    staging_runs(publish, publish.git("rev-parse", "--short", "HEAD"))
+    out, calls = publish("prod", env="PUBLISH_ALL_CONFIRMED=pubblica X=1")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "la conferma l'hai già data all'inizio di publish-all.sh" in out.stdout and "Per continuare" not in out.stdout
+    assert "run services replace" in calls                                # it really published, with the stubs
+
+
+def test_d214_without_publish_all_production_still_asks(publish, tmp_path):
+    on_github(publish, tmp_path)
+    staging_runs(publish, publish.git("rev-parse", "--short", "HEAD"))
+    out, calls = publish("prod", env="PUBLISH_ALL_CONFIRMED=si X=1")      # any other value is not the confirmation
+    assert out.returncode != 0 and "Per continuare scrivi prod:" in out.stdout and "Pubblicazione annullata" in out.stderr
+    assert not any(w in calls for w in WRITES)
