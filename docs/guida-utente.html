@@ -979,7 +979,7 @@ sessione.</p>
 <tbody>
 <tr><td data-label="Categoria" class="align-left">«Approvazioni richieste»</td><td data-label="Notifica" class="align-left">«…: approvazione richiesta», con la proposta oppure «Il motore chiede il tuo consenso»</td><td data-label="Quando arriva" class="align-left">Quando il motore apre una richiesta (non per quelle in coda dietro un&#x27;altra)</td><td data-label="Dove porta" class="align-left">«Approvazioni»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: dispositivo offline», «… non risponde da oltre … minuti»</td><td data-label="Quando arriva" class="align-left">Dopo i minuti della regola «Avviso dispositivo offline» (15 all&#x27;inizio); regola spenta, niente avviso</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
-<tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: sistema domotico non raggiungibile», «Il connettore domotico risulta fermo»</td><td data-label="Quando arriva" class="align-left">Sistema domotico fermo oltre la stessa soglia; una volta per episodio</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall&#x27;app non arrivano e le regole automatiche potrebbero essere ferme.»</td><td data-label="Quando arriva" class="align-left">Sistema domotico fermo o irraggiungibile oltre la stessa soglia; una volta per episodio</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo»</td><td data-label="Quando arriva" class="align-left">A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio</td><td data-label="Dove porta" class="align-left">«Decisioni»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Prenotazioni»</td><td data-label="Notifica" class="align-left">«…: prenotazione annullata, appartamento rimesso a vuoto»</td><td data-label="Quando arriva" class="align-left">Disdetta dopo che l&#x27;appartamento era già stato preparato per l&#x27;arrivo</td><td data-label="Dove porta" class="align-left">«Decisioni»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Riepilogo»</td><td data-label="Notifica" class="align-left">«…: riepilogo della settimana», con la prima segnalazione e «E altre … voci.»</td><td data-label="Quando arriva" class="align-left">Il lunedì mattina, solo se la settimana ha qualcosa da segnalare</td><td data-label="Dove porta" class="align-left">Il riepilogo di quella settimana</td></tr>
@@ -3434,11 +3434,17 @@ l&#x27;assistenza.</p>
 <p><strong>Compare l&#x27;avviso</strong> «Sistema domotico non raggiungibile».</p>
 </li>
 <li>
-<p><strong>Dopo la stessa soglia</strong> arriva la notifica «…: sistema domotico non raggiungibile», «Il connettore domotico
-risulta fermo».</p>
+<p><strong>Dopo la stessa soglia</strong> arriva una sola notifica «…: sistema domotico non raggiungibile». Dice «Il connettore
+domotico risulta fermo» se il sistema risponde ma ha perso i dispositivi; dal lotto 38 dice «Il sistema domotico
+non risponde da N minuti: …» se non risponde affatto (macchina spenta, rete interrotta).</p>
 </li>
 <li>
-<p><strong>Nelle Decisioni</strong>: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi ripristinato».</p>
+<p><strong>Nelle Decisioni</strong>, nel primo caso: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi
+ripristinato».</p>
+</li>
+<li>
+<p><strong>Durante uno spegnimento programmato</strong> HQE sospende questi avvisi fino a una data e ora: dopo quell&#x27;ora, se il
+sistema è ancora fermo, l&#x27;avviso arriva. Gli avvisi «dispositivo offline» non si sospendono.</p>
 </li>
 <li>
 <p><strong>Non arriva</strong> una notifica di ritorno online.</p>

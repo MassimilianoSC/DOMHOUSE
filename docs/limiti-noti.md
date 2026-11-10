@@ -14,6 +14,15 @@
 | **Eventi molto vecchi** | Se nessun server resta collegato a un motore per più di un'ora, gli eventi più vecchi di un'ora non generano notifiche; resta una riga nei log | Accettato |
 | **Primo avvio del lotto 36** | Un dispositivo già offline da meno di 6 giorni manda una notifica, anche se era già stata mandata | Una tantum |
 
+## Notifica «sistema domotico non raggiungibile» (dal lotto 38, D-217)
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Server che parte durante un fermo** | Ogni copia del server conta dalla sua prima connessione fallita: una copia partita durante il fermo conta da quando parte, quindi la notifica può arrivare fino a N minuti dopo l'inizio vero | Accettato |
+| **Nessuna copia del server accesa** | Con il minimo a 0 nessuno controlla e nessuna notifica parte (vale per lo staging) | Accettato |
+| **Pubblicazione durante una sospensione** | Una pubblicazione toglie la sospensione degli avvisi | Accettato (M19) |
+| **Chiave rifiutata** | Un motore che risponde ma rifiuta la chiave conta come irraggiungibile | Accettato |
+
 ## Disponibilità del server
 
 | Limite | Cosa succede | Stato |

@@ -395,7 +395,7 @@ Tutte hanno il nome dell'appartamento davanti.
 |---|---|---|---|
 | «Approvazioni richieste» | «…: approvazione richiesta», con la proposta oppure «Il motore chiede il tuo consenso» | Quando il motore apre una richiesta (non per quelle in coda dietro un'altra) | «Approvazioni» |
 | «Dispositivi e sistema domotico offline» | «…: dispositivo offline», «… non risponde da oltre … minuti» | Dopo i minuti della regola «Avviso dispositivo offline» (15 all'inizio); regola spenta, niente avviso | «Panoramica» |
-| «Dispositivi e sistema domotico offline» | «…: sistema domotico non raggiungibile», «Il connettore domotico risulta fermo» | Sistema domotico fermo oltre la stessa soglia; una volta per episodio | «Panoramica» |
+| «Dispositivi e sistema domotico offline» | «…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall'app non arrivano e le regole automatiche potrebbero essere ferme.» | Sistema domotico fermo o irraggiungibile oltre la stessa soglia; una volta per episodio | «Panoramica» |
 | «Dispositivi e sistema domotico offline» | «…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo» | A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio | «Decisioni» |
 | «Prenotazioni» | «…: prenotazione annullata, appartamento rimesso a vuoto» | Disdetta dopo che l'appartamento era già stato preparato per l'arrivo | «Decisioni» |
 | «Riepilogo» | «…: riepilogo della settimana», con la prima segnalazione e «E altre … voci.» | Il lunedì mattina, solo se la settimana ha qualcosa da segnalare | Il riepilogo di quella settimana |
@@ -2042,9 +2042,13 @@ all'amministratore. Non serve un'approvazione preventiva.
 
 - **La striscia di salute** dice «Ferma» e «Sistema domotico non raggiungibile».
 - **Compare l'avviso** «Sistema domotico non raggiungibile».
-- **Dopo la stessa soglia** arriva la notifica «…: sistema domotico non raggiungibile», «Il connettore domotico
-  risulta fermo».
-- **Nelle Decisioni**: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi ripristinato».
+- **Dopo la stessa soglia** arriva una sola notifica «…: sistema domotico non raggiungibile». Dice «Il connettore
+  domotico risulta fermo» se il sistema risponde ma ha perso i dispositivi; dal lotto 38 dice «Il sistema domotico
+  non risponde da N minuti: …» se non risponde affatto (macchina spenta, rete interrotta).
+- **Nelle Decisioni**, nel primo caso: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi
+  ripristinato».
+- **Durante uno spegnimento programmato** HQE sospende questi avvisi fino a una data e ora: dopo quell'ora, se il
+  sistema è ancora fermo, l'avviso arriva. Gli avvisi «dispositivo offline» non si sospendono.
 - **Non arriva** una notifica di ritorno online.
 
 ### Approvare una richiesta

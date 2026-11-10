@@ -444,8 +444,28 @@ I comandi li lancia il committente (D-116); la memoria storica verifica in sola 
 ### M19.1 Spegnimento, in quest'ordine
 
 1. **Sospendere gli avvisi di irraggiungibilità del sistema domotico** (D-217), così i gestori non ricevono la notifica
-   «sistema domotico non raggiungibile» per uno spegnimento voluto. **Il comando arriva con il lotto 38** (o2): fino ad
-   allora la notifica non esiste, e il passo non serve.
+   «sistema domotico non raggiungibile» per uno spegnimento voluto. Vale dal lotto 38. Si scrive l'istante di fine,
+   con il fuso (+01:00 d'inverno, +02:00 d'estate): fine prevista dello spegnimento più un margine, al massimo 30
+   giorni. Allo scadere, se il motore è ancora fermo, l'avviso parte. Git Bash:
+
+   ```
+   cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+   gcloud run services update domotica-bff-staging --project=domotica-poc-511707 --region=europe-west8 --account=m.scardovellicrac@gmail.com --update-env-vars=UNREACHABLE_ALERTS_OFF_UNTIL=<istante di fine>
+   ```
+
+   Per la produzione lo stesso comando con `domotica-bff` (solo quando D-210 lo permette). L'istante esatto lo scrive
+   la memoria storica nel comando al momento, senza segnaposto.
+
+   Verifica (sola lettura):
+
+   ```
+   gcloud run services describe domotica-bff-staging --project=domotica-poc-511707 --region=europe-west8 --account=m.scardovellicrac@gmail.com --format="value(spec.template.spec.containers[0].env)" | tr ';' '\n' | grep UNREACHABLE
+   ```
+
+   Atteso: una riga con `UNREACHABLE_ALERTS_OFF_UNTIL` e l'istante. Dopo circa un minuto, nei registri del servizio
+   la riga «unreachable alerts suspended» con la data; se compare «UNREACHABLE_ALERTS_OFF_UNTIL ignored», il valore
+   è sbagliato (senza fuso, passato o oltre 30 giorni), gli avvisi restano attivi e il comando va rilanciato
+   corretto. Una pubblicazione toglie la sospensione.
 2. Fermare la VM `langbrain-dev` (motori e broker si fermano con lei; i dati restano sul disco).
 3. Server di produzione a minimo 0 istanze (solo dopo la consegna o per un fermo deciso: oggi D-210 lo vieta).
 4. Togliere il controllo di raggiungibilità `domotica-bff-healthz` e il suo allarme, che altrimenti terrebbero sveglio
@@ -460,7 +480,16 @@ Restano attivi e costano poco: disco della VM e disco delle chiavi, snapshot, ar
    `fstab`); controllare con `broker-vm.sh status` ed `engine-vm.sh status dev` (procedura G2, B7).
 2. Server di produzione al minimo del manifesto (1), se era stato abbassato: la prossima pubblicazione lo rimette da sé.
 3. `scripts/monitoring/setup.sh` per il controllo di raggiungibilità e il suo allarme.
-4. **Riattivare gli avvisi di irraggiungibilità** (D-217): comando con il lotto 38.
+4. **Riattivare gli avvisi di irraggiungibilità** (D-217). Git Bash:
+
+   ```
+   cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+   gcloud run services update domotica-bff-staging --project=domotica-poc-511707 --region=europe-west8 --account=m.scardovellicrac@gmail.com --remove-env-vars=UNREACHABLE_ALERTS_OFF_UNTIL
+   ```
+
+   Verifica: il comando di verifica del passo 1 dello spegnimento non stampa niente. Se ci si dimentica, la
+   sospensione finisce comunque all'istante scritto. Dopo la riattivazione il server riparte: se il motore fosse
+   ancora fermo, l'avviso arriva dopo la soglia, contata da lì.
 
 I comandi esatti la memoria storica li prepara al momento, con la verifica: il modello è nella memoria del progetto
 (spegnimento del 23–24 ottobre 2026).
