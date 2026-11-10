@@ -43,7 +43,7 @@ def test_hash_in_the_brokers_format_and_verifiable():
 def test_files_give_each_account_only_its_own_topics(tmp_path):
     texts = ba.render({"apt-a": (PASSWORD, {"d1": PASSWORD}), "apt-b": (PASSWORD, {})}, tmp_path)
     assert set(texts) == set(ba.FILES)
-    assert texts["devices.acl"] == "user apt-a.d1\ntopic readwrite apt-a/d1/#\ntopic write apt-a/connector/rpc\n\n"
+    assert texts["devices.acl"] == "user apt-a.d1\ntopic readwrite apt-a/d1/#\ntopic write apt-a/connector/d1/rpc\n\n"   # D-215
     assert texts["connectors.acl"] == ("user apt-a.connector\ntopic readwrite apt-a/#\n\n"
                                        "user apt-b.connector\ntopic readwrite apt-b/#\n\n")
     assert [line.split(":")[0] for line in texts["connectors.passwd"].splitlines()] == ["apt-a.connector", "apt-b.connector"]

@@ -330,12 +330,23 @@ def test_a_device_cannot_leave_its_own_topics(bench, sub):
 
 
 def test_request_and_answer_between_the_connector_and_its_device(bench, sub):
+    """D-215: the answer goes on the device's own answer topic, <apartment>/connector/<device>/rpc."""
     device = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/rpc")
-    connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/connector/rpc")
+    connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/connector/+/rpc")
     assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "richiesta-1").returncode == 0
     assert device.wait_for("richiesta-1")
-    assert pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/rpc", "risposta-1").returncode == 0
-    assert connector.wait_for("risposta-1")
+    assert pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/a1/rpc", "risposta-1").returncode == 0
+    assert connector.wait_for(f"{A}/connector/a1/rpc risposta-1")
+
+
+def test_a_device_cannot_answer_in_the_name_of_another(bench, sub):
+    """D-215: a1 may not write on a2's answer topic, nor on the shared one of before."""
+    connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/connector/#")
+    pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/a2/rpc", "risposta-falsa")
+    pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/rpc", "risposta-vecchia")
+    assert pub("tls", f"{A}.a2", PW["a2"], f"{A}/connector/a2/rpc", "risposta-vera").returncode == 0
+    assert connector.wait_for("risposta-vera")
+    assert not any("risposta-falsa" in line or "risposta-vecchia" in line for line in connector.lines())
 
 
 def test_a_second_sync_with_the_same_secrets_changes_nothing(bench):

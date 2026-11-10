@@ -13,9 +13,10 @@ Secrets: `langbrain-shelly-<apartment_id>` holds the connector's password; `lang
 holds {"<device_id>": "<password>", ...}. Users: `<apartment_id>.connector` and `<apartment_id>.<device_id>`: an
 apartment id has no dots, so two apartments cannot produce the same user.
 
-Topics: a device reads and writes `<apartment_id>/<device_id>/#` and may write `<apartment_id>/connector/rpc`, where
-the answers to the connector go (the device publishes them on `<src>/rpc`, with src = `<apartment_id>/connector`). The
-connector reads and writes `<apartment_id>/#`.
+Topics: a device reads and writes `<apartment_id>/<device_id>/#` and may write only its own answer topic
+`<apartment_id>/connector/<device_id>/rpc` (D-215, connector-v2.md §7.2: the connector sends each request with
+src = `<apartment_id>/connector/<device_id>` and the device answers on `<src>/rpc`), so one device cannot answer in
+the name of another. The connector reads and writes `<apartment_id>/#`.
 
 sync reads every secret first and changes nothing if one is missing or malformed: a temporary read error must not
 take accounts away. A password is hashed once: a line whose hash still matches is kept, so a sync that changes
@@ -143,7 +144,7 @@ def render(apartments: dict[str, tuple[str, dict[str, str]]], auth_dir: Path) ->
         for device in sorted(its_devices):
             devices[device_user(apartment, device)] = its_devices[device]
             device_acl.append(f"user {device_user(apartment, device)}\ntopic readwrite {apartment}/{device}/#\n"
-                              f"topic write {apartment}/{RESERVED_DEVICE}/rpc\n\n")
+                              f"topic write {apartment}/{RESERVED_DEVICE}/{device}/rpc\n\n")
     return {"devices.passwd": _passwd_text(devices, read_passwd(auth_dir / "devices.passwd")),
             "devices.acl": "".join(device_acl),
             "connectors.passwd": _passwd_text(connectors, read_passwd(auth_dir / "connectors.passwd")),
