@@ -8,8 +8,9 @@
 # Regola usata per i valori: tre beacon persi più 20 s di margine. Gli intervalli vengono dalla documentazione
 # ufficiale Shelly (shelly-api-docs.shelly.cloud/docs-ble, pagine dei singoli sensori, lette il 5 novembre 2026).
 #
+# Ogni dispositivo del catalogo deve avere `shelly.type`: senza, il catalogo è rifiutato (nessuna soglia di ripiego).
 # Precedenza (offline.py): `shelly.offline_after_s` del singolo dispositivo nel catalogo > valore del suo
-# `shelly.type` qui sotto > variabile SHELLY_OFFLINE_AFTER_S > 120 s. Niente segreti in questo file.
+# `shelly.type` qui sotto. Niente segreti in questo file.
 # Un appartamento può usarne una copia modificata indicandola in SHELLY_OFFLINE_THRESHOLDS_PATH.
 
 [types]
