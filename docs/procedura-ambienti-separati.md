@@ -434,3 +434,33 @@ comando di lettura e l'elenco di ciò che va cancellato, il committente lancia l
 **Controllo e allarmi prima della produzione:** subito prima di pubblicare in produzione si lancia `scripts/monitoring/setup.sh`, che ricrea il controllo di raggiungibilità e le regole. Il monitoraggio avvisa anche quando Cloud Run rifiuta le richieste perché non ha un'istanza disponibile (al massimo un'email ogni mezz'ora). Lo script usa i componenti `alpha` e `beta` di gcloud: alla prima esecuzione gcloud chiede di installarli, rispondi sì. Se il server è spento, lo script lo aspetta fino a circa un minuto.
 
 > **Attenzione:** fino alla fine del lotto 35 non si pubblica nessun commit successivo a `8a49489` senza il via della memoria storica. Quei commit portano il tempo massimo a 300 s, e prima della chiusura degli stream lato server e della modifica del sito gli aggiornamenti in diretta cadrebbero ogni 5 minuti.
+
+## M19. Spegnimento programmato e riaccensione (D-195, D-217)
+
+Quando nessuno usa l'app per giorni, per non spendere (D-195). **Fino alla consegna la produzione resta accesa**
+(rodaggio, D-210): questa procedura vale per lo staging, per dopo la consegna o per un fermo deciso dal committente.
+I comandi li lancia il committente (D-116); la memoria storica verifica in sola lettura dopo ogni passo.
+
+### M19.1 Spegnimento, in quest'ordine
+
+1. **Sospendere gli avvisi di irraggiungibilità del sistema domotico** (D-217), così i gestori non ricevono la notifica
+   «sistema domotico non raggiungibile» per uno spegnimento voluto. **Il comando arriva con il lotto 38** (o2): fino ad
+   allora la notifica non esiste, e il passo non serve.
+2. Fermare la VM `langbrain-dev` (motori e broker si fermano con lei; i dati restano sul disco).
+3. Server di produzione a minimo 0 istanze (solo dopo la consegna o per un fermo deciso: oggi D-210 lo vieta).
+4. Togliere il controllo di raggiungibilità `domotica-bff-healthz` e il suo allarme, che altrimenti terrebbero sveglio
+   il server; si ricreano con `scripts/monitoring/setup.sh`.
+5. Sospendere gli allarmi della VM e dei motori per il periodo dello spegnimento.
+
+Restano attivi e costano poco: disco della VM e disco delle chiavi, snapshot, archivio delle immagini, segreti.
+
+### M19.2 Riaccensione, in quest'ordine
+
+1. Avviare la VM: motori e broker ripartono da soli (`restart: unless-stopped`; il disco delle chiavi si monta da
+   `fstab`); controllare con `broker-vm.sh status` ed `engine-vm.sh status dev` (procedura G2, B7).
+2. Server di produzione al minimo del manifesto (1), se era stato abbassato: la prossima pubblicazione lo rimette da sé.
+3. `scripts/monitoring/setup.sh` per il controllo di raggiungibilità e il suo allarme.
+4. **Riattivare gli avvisi di irraggiungibilità** (D-217): comando con il lotto 38.
+
+I comandi esatti la memoria storica li prepara al momento, con la verifica: il modello è nella memoria del progetto
+(spegnimento del 23–24 ottobre 2026).
