@@ -2488,6 +2488,8 @@ class ApartmentEngine:
                 self._step_failed("schedule", exc)
                 item.update(status="failed", executed_at=iso(now))
                 self._guarded("schedule", self._save_schedule, item)
+                self._guarded("schedule", self._schedule_not_done, item, str(uuid.uuid4()),
+                              "errore interno del motore")
 
     def _tick_connector(self) -> None:
         up = self.connector_up()
@@ -2515,11 +2517,15 @@ class ApartmentEngine:
         self.log("system", self._approval_target(a), "expire",
                  "pending", "expired", f"Approvazione scaduta senza risposta: {outcome}", "informational", corr,
                  approval_id=a["approval_id"])
-        if a["expires_action"] == "approve":
-            self._execute_proposed(a, "system:engine", corr, "system")
-        else:
-            self._take_schedule(a["approval_id"])
-        self._dequeue_approval()
+        try:
+            if a["expires_action"] == "approve":
+                self._execute_proposed(a, "system:engine", corr, "system")
+            else:
+                self._take_schedule(a["approval_id"])
+        finally:
+            # the next approval in the queue opens also when the action above failed unexpectedly (o1's review of
+            # 5287e4b): otherwise it stayed queued until another event
+            self._dequeue_approval()
 
     def _run_scheduled(self, item: dict, now: datetime) -> None:
         corr = str(uuid.uuid4())
@@ -2553,11 +2559,21 @@ class ApartmentEngine:
                                           reasoning=reasoning)
                 item["command_ids"] = [cmd["command_id"]] if cmd else []
             item["status"] = "done"
-        except MockError:
+        except MockError as exc:
             item["status"] = "failed"
+            self._schedule_not_done(item, corr, exc.message)
         item["executed_at"] = iso(now)
         self._save_schedule(item)
         self.apartment_changed(corr)
+
+    def _schedule_not_done(self, item: dict, correlation_id: str, why: str) -> None:
+        """A scheduled action the engine refused at its time (devices or their connection unreachable, an action no
+        longer valid) became «failed» without a word: now a decision says so, with the engine's reason (D-198, the
+        same defect as point c of the verification of 10 November)."""
+        labels = {"prearrival": "pre-arrivo", "checkout": "check-out", "empty": "casa vuota", "manual": "manuale"}
+        self.log("system", {"type": "schedule"}, "schedule_failed", item["run_at"], None,
+                 f"Azione programmata ({labels.get(item['kind'], item['kind'])}) non eseguita: {why}", "failed",
+                 correlation_id)
 
     # ---- seed ------------------------------------------------------------------------
     def _seed_history(self, variant: int) -> None:
