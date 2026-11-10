@@ -91,6 +91,12 @@
 | **Ricarica con file non validi** | Fa uscire il broker: i file si controllano prima | Accettato |
 | **Dispositivi tolti** | La loro password resta nelle versioni vecchie del segreto, che il broker non legge | Accettato |
 
+## Documenti
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **Versione scritta nella suite di conformità** | Due commenti in `contract/conformance/` (README e `conftest.py`) dicono 1.0.4, mentre il contratto è 1.0.5. La cartella `contract/` non si tocca (regola 1 di `CLAUDE.md`; unica eccezione la 1.0.5, D-107) | Accettato: solo commenti, nessun effetto sulle prove |
+
 ## Dispositivi (dal laboratorio di Youssouf)
 
 | Limite | Cosa succede | Stato |
