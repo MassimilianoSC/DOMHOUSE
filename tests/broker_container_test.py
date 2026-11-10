@@ -416,6 +416,28 @@ def test_a_bad_certificate_never_reaches_the_broker(bench, cert, key, reason):
     assert served_fingerprint() == served and can_connect("tls", f"{A}.a1", PW["a1"])
 
 
+def test_d215_a_request_with_qos_0_never_reaches_a_device_late(bench, sub):
+    """Risposta 744: a device with a persistent session goes away; the connector sends it a request with QoS 0 and one
+    with QoS 1; the device comes back after a couple of minutes. The QoS 1 one is waiting for it, the QoS 0 one is not:
+    with requests sent as QoS 0 a command never reaches a device late (connector-v2.md §7.2)."""
+    away = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/rpc", client_id=f"{A}.a1", persistent=True)
+    docker("rm", "-f", away.name)                                 # the device goes away, its session stays
+    time.sleep(1)
+    assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "richiesta-qos0", extra=["-q", "0"]).returncode == 0
+    assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "richiesta-qos1").returncode == 0
+    time.sleep(120)                                              # «dopo qualche minuto»
+    back = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/rpc", client_id=f"{A}.a1", persistent=True)
+    assert back.wait_for("richiesta-qos1"), "la richiesta con QoS 1 non è arrivata: la sessione non era persistente"
+    time.sleep(2)
+    assert not any("richiesta-qos0" in line for line in back.lines()), "una richiesta con QoS 0 è arrivata in ritardo"
+
+
+def test_d215_sessions_expire_after_an_hour_for_everybody():
+    conf = (ROOT / "engine/broker/mosquitto.conf").read_text(encoding="utf-8")
+    assert re.search(r"^persistent_client_expiration 1h$", conf, re.M)          # h: an hour (m would be a month)
+    assert not re.search(r"^queue_qos0_messages true", conf, re.M)
+
+
 def test_after_a_restart_clients_reconnect_and_nothing_queued_is_lost(bench, sub):
     connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/#", client_id="connettore-persistente", persistent=True)
     assert pub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/online", "true", extra=["-r"]).returncode == 0
