@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ApartmentMode, ScheduleItem, ScheduledAction } from "@/api/types";
 import { instanceApi } from "@/api/instance";
 import { Button } from "@/components/ui/button";
@@ -50,12 +50,17 @@ export function ScheduleDialog({ aptId, tz, open, onOpenChange, onDone, move }: 
   const [setpoint, setSetpoint] = useState("21");
   const [saving, setSaving] = useState(false);
 
+  // The time is set once, when the window opens: the devices update live, and before this each update put back the time
+  // proposed over the one being written. «Sposta» starts from the action's own time; a new action from an hour from now.
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (open) {
-      setRunAt(defaultLocal(tz));
-      if (!deviceId && controllable[0]) setDeviceId(controllable[0].device_id);
-    }
-  }, [open, controllable, deviceId, tz]);
+    if (open && !wasOpen.current) setRunAt(move ? instantToWall(new Date(move.run_at), tz) : defaultLocal(tz));
+    wasOpen.current = open;
+  }, [open, move, tz]);
+
+  useEffect(() => {
+    if (open && !deviceId && controllable[0]) setDeviceId(controllable[0].device_id);
+  }, [open, controllable, deviceId]);
 
   const device = controllable.find((d) => d.device_id === deviceId);
   const cap = device?.capabilities.climate ? "climate" : device?.capabilities.heating ? "heating" : "switch";

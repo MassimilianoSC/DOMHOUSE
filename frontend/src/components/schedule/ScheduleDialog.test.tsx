@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { t } from "@/i18n";
+import { useApartmentStore } from "@/store/apartmentStore";
 import { ScheduleDialog } from "./ScheduleDialog";
 
 // D-212: «Quando» is the apartment's date and time. On the nights the clocks change the time saved follows the
@@ -85,5 +86,44 @@ describe("Programmazione, l'ora proposta all'apertura (D-212)", () => {
     vi.setSystemTime(new Date("2027-07-15T22:10:30Z"));
     open("America/New_York");
     expect(field().value).toBe("2027-07-15T19:10");
+  });
+});
+
+describe("Programmazione, il campo «Quando» mentre la finestra è aperta", () => {
+  it("un aggiornamento dei dispositivi in diretta non riporta indietro l'ora scritta", () => {
+    open();
+    choose("2027-05-10T08:00");
+    act(() => {
+      useApartmentStore.setState({ devices: [...useApartmentStore.getState().devices] });
+    });
+    expect(field().value).toBe("2027-05-10T08:00");
+  });
+});
+
+describe("Programmazione, «Sposta»", () => {
+  const item = { schedule_id: "s-1", run_at: "2027-05-10T06:15:00Z", status: "planned", kind: "manual", source: "manual", booking_id: null, action: { type: "apartment_mode", mode: "eco" } } as never;
+
+  function openMove(isOpen: boolean, tz = "Europe/Rome") {
+    return <ScheduleDialog aptId="apt-001" tz={tz} open={isOpen} onOpenChange={() => {}} onDone={() => {}} move={item} />;
+  }
+
+  it("il campo parte dall'ora attuale dell'azione, nell'ora dell'appartamento, non da «fra un'ora»", () => {
+    render(openMove(true));
+    expect(field().value).toBe("2027-05-10T08:15");
+  });
+
+  it("riaperta dopo aver cambiato l'ora senza salvare: di nuovo l'ora dell'azione", () => {
+    const { rerender } = render(openMove(true));
+    choose("2027-05-11T09:00");
+    rerender(openMove(false));
+    rerender(openMove(true));
+    expect(field().value).toBe("2027-05-10T08:15");
+  });
+
+  it("spostata: si salva il nuovo istante", async () => {
+    render(openMove(true));
+    choose("2027-05-10T09:45");
+    await save();
+    expect(api.moveSchedule).toHaveBeenCalledWith("s-1", { run_at: "2027-05-10T07:45:00.000Z" }, expect.any(String));
   });
 });
