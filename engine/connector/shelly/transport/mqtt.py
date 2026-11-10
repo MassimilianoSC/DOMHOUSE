@@ -209,6 +209,7 @@ class MqttTransport:
         self._queue: asyncio.Queue | None = None
         self._task: asyncio.Task | None = None
         self._first_attempt: asyncio.Event | None = None
+        self._waiting_since: datetime | None = None    # since start() or the loss of the broker: for the log
 
     @classmethod
     def from_config(cls, config: ConnectorConfig, **kwargs) -> "MqttTransport":
@@ -252,7 +253,8 @@ class MqttTransport:
             raise RuntimeError("MqttTransport already started")
         self._queue = asyncio.Queue()
         self._first_attempt = asyncio.Event()
-        self._task = asyncio.create_task(self._run(), name=f"mqtt-transport-{self._apartment_id}")
+        self._waiting_since = self._clock()
+        self._task =asyncio.create_task(self._run(), name=f"mqtt-transport-{self._apartment_id}")
         try:
             async with asyncio.timeout(START_WAIT_S):
                 await self._first_attempt.wait()
@@ -315,7 +317,12 @@ class MqttTransport:
                         await client.subscribe(topic, qos=QOS)
                     self._client, reached = client, True
                     delay = RECONNECT_FIRST_S
-                    log.info("mqtt connected", host=self._settings.host, port=self._settings.port)
+                    # every (re)connection, with how long the connector waited for the broker: until then status().up
+                    # is False and the app sees the engine as not available
+                    waited = (self._clock() - self._waiting_since).total_seconds() if self._waiting_since else 0.0
+                    log.info("mqtt broker connected", host=self._settings.host, port=self._settings.port,
+                             waited_s=round(max(waited, 0.0), 1))
+                    self._waiting_since = None
                     self._first_attempt.set()
                     async for message in client.messages:
                         self._dispatch(str(message.topic), message.payload)
@@ -331,6 +338,8 @@ class MqttTransport:
             delay = min(delay * 2, RECONNECT_MAX_S)
 
     def _broker_lost(self) -> None:
+        if self._client is not None or self._waiting_since is None:
+            self._waiting_since = self._clock()
         self._client = None
         self._fail_pending()
         now = self._clock()

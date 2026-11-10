@@ -45,8 +45,14 @@ class CommandSpec:
 @dataclass(frozen=True)
 class ModelProfile:
     app: str
+    device_type: str                                         # the catalog's shelly.type it serves (offline.DEVICE_TYPES)
+    label: str                                               # for the messages: "Shelly Plug M Gen3"
     capabilities: Mapping[str, Mapping[str, FieldSource]]   # capability -> field -> where it lives
     commands: Mapping[str, CommandSpec]                      # commandable capability -> how to command it
+
+    def covers(self, device_type: str, capabilities) -> bool:
+        """This model can be the device the catalog describes: same type, and every capability listed has a row."""
+        return device_type == self.device_type and set(capabilities) <= set(self.capabilities)
 
 
 _SWITCH_COMMAND = CommandSpec(method="Switch.Set", read_back="Switch.GetStatus", target_field="on", param="on",
@@ -56,6 +62,8 @@ PROFILES: Mapping[str, ModelProfile] = {
     # Shelly Plug M Gen3 (S3PL-30110EU): one relay with metering, everything in the switch:0 component
     "PlugMG3": ModelProfile(
         app="PlugMG3",
+        device_type="plug",
+        label="Shelly Plug M Gen3",
         capabilities={
             "switch": {"on": FieldSource("switch:{ch}", ("output",), "bool")},
             "power_meter": {"watts": FieldSource("switch:{ch}", ("apower",), "float"),
@@ -76,6 +84,19 @@ def profile_for(app: str) -> ModelProfile:
         return PROFILES[app]
     except (KeyError, TypeError):
         raise UnknownModel("unsupported Shelly app") from None
+
+
+def profile_for_catalog(device_type: str, capabilities) -> ModelProfile | None:
+    """The profile that can serve a catalog entry (its shelly.type and its capabilities), or None: checked at start,
+    so a device no model supports is refused before anything connects. With several candidates the first row wins;
+    Shelly.GetDeviceInfo then tells which model is really there (ShellyConnector checks it with covers())."""
+    return next((p for p in PROFILES.values() if p.covers(device_type, capabilities)), None)
+
+
+def supported_models() -> str:
+    """For the catalog's error message: "Shelly Plug M Gen3 (type plug: power_meter, switch)"."""
+    return "; ".join(f"{p.label} (type {p.device_type}: {', '.join(sorted(p.capabilities))})"
+                     for p in PROFILES.values())
 
 
 # --- status -> capabilities --------------------------------------------------------------------------------------

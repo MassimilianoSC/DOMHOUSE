@@ -1,8 +1,8 @@
 """One command to one Shelly device over the Transport (connector.md §2.4, §2.5): set, then read back, before the
 deadline.
 
-Transport-independent: it only uses the Protocol in transport/base.py, so ShellyConnector.execute (connector.py, not
-written yet) will call it whatever transport is in use, and the tests run it on tests/fake_transport.py.
+Transport-independent: it only uses the Protocol in transport/base.py, so ShellyConnector.execute (connector.py) calls
+it whatever transport is in use, and the tests run it on tests/fake_transport.py.
 
 The sequence:
   1. a device the transport does not have in connected() fails at once with failed/device_offline: no RPC, no "sent"

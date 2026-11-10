@@ -79,6 +79,11 @@ class RpcError(TransportError):
 
 
 class Transport(Protocol):
+    @property
+    def broker_connected(self) -> bool:
+        """The transport itself is up (for MQTT: connected to the broker). ShellyConnector.status().up copies it."""
+        ...
+
     async def start(self) -> None: ...
     async def stop(self) -> None: ...
 
