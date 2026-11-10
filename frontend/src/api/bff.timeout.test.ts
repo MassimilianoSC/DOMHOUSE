@@ -80,6 +80,37 @@ describe("tempo massimo delle chiamate al server (D-198)", () => {
     expect(signals).toHaveLength(0);
   });
 
+  // Firebase renews an expired token over the network: in airplane mode that fails at once with this code.
+  const noNetworkForToken = async () => Promise.reject(Object.assign(new Error("Firebase: Error (auth/network-request-failed)."), { code: "auth/network-request-failed" }));
+
+  it("token scaduto e niente rete: «Server non raggiungibile» con il suo ID, non «Operazione non riuscita»", async () => {
+    setAuthResolver(noNetworkForToken);
+    hangingFetch();
+    const seen = watch(bffFetch("/app/me/push/prefs", { method: "PUT", body: {}, correlationId: "corr-2" }));
+    await advance(0);
+    expect(seen.error).toBeInstanceOf(ApiError);
+    expect(seen.error).toMatchObject({ ...NETWORK, correlationId: "corr-2" });
+    expect(signals).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("token scaduto e niente rete, scaricando l'Excel: lo stesso messaggio", async () => {
+    setAuthResolver(noNetworkForToken);
+    hangingFetch();
+    const seen = watch(bffDownload("/x", { fallbackName: "x.xlsx", correlationId: "corr-3" }));
+    await advance(0);
+    expect(seen.error).toMatchObject({ ...NETWORK, correlationId: "corr-3" });
+  });
+
+  it("un altro rifiuto del servizio di accesso resta quello che è", async () => {
+    const revoked = Object.assign(new Error("revoked"), { code: "auth/user-token-expired" });
+    setAuthResolver(() => Promise.reject(revoked));
+    hangingFetch();
+    const seen = watch(bffFetch("/app/apartments"));
+    await advance(0);
+    expect(seen.error).toBe(revoked);
+  });
+
   it("risposta in tempo: il risultato, e nessun timer rimasto", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response('{"ok":true}', { status: 200 })));
     const seen = watch(bffFetch("/app/apartments"));

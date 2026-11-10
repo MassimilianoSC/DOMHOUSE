@@ -51,6 +51,17 @@ export const SLOW_CALL_TIMEOUT_MS = 90_000;
 
 const networkError = (correlationId?: string) => new ApiError(0, "network", t("errors.network"), correlationId ?? null);
 
+/** The token: an expired one that cannot be renewed for lack of network is the same «Server non raggiungibile» as a
+ *  failed call, not «Operazione non riuscita». Any other refusal of the sign-in service goes on as it is. */
+async function tokenHeaders(correlationId?: string): Promise<Record<string, string>> {
+  try {
+    return await resolveAuth();
+  } catch (err) {
+    if ((err as { code?: unknown } | null)?.code === "auth/network-request-failed") throw networkError(correlationId);
+    throw err;
+  }
+}
+
 /** The whole call, the token and the reading of the answer included, within `ms`; then the request is dropped. */
 async function withinTime<T>(ms: number, correlationId: string | undefined, work: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController();
@@ -98,7 +109,7 @@ const parseJson = (text: string): unknown => {
 
 export function bffFetch<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   return withinTime(opts.timeoutMs ?? CALL_TIMEOUT_MS, opts.correlationId, async (signal) => {
-    const headers: Record<string, string> = { Accept: "application/json", ...(await resolveAuth()), ...supportHeader(path, opts.method) };
+    const headers: Record<string, string> = { Accept: "application/json", ...(await tokenHeaders(opts.correlationId)), ...supportHeader(path, opts.method) };
     if (opts.correlationId) headers["X-Correlation-Id"] = opts.correlationId;
     if (opts.body !== undefined) headers["Content-Type"] = "application/json";
     let resp: Response;
@@ -142,7 +153,7 @@ export function fileNameFrom(header: string | null): string | null {
  */
 export function bffDownload(path: string, opts: { query?: RequestOptions["query"]; correlationId?: string; fallbackName: string }): Promise<{ blob: Blob; name: string }> {
   return withinTime(SLOW_CALL_TIMEOUT_MS, opts.correlationId, async (signal) => {
-    const headers: Record<string, string> = { ...(await resolveAuth()), ...supportHeader(path) };
+    const headers: Record<string, string> = { ...(await tokenHeaders(opts.correlationId)), ...supportHeader(path) };
     if (opts.correlationId) headers["X-Correlation-Id"] = opts.correlationId;
     let resp: Response;
     let blob: Blob | null = null;
