@@ -35,8 +35,11 @@ STUBS = {
     "docker": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/docker.log"\nexit 0\n',
     # health: 200 unless the test put a file "unhealthy" (503) or "code-<port>" (that code) next to the stand-ins
     "curl": ('#!/usr/bin/env bash\n'
+             'echo "$*" >> "$STUB_DIR/curl.log"\n'
              'port=$(echo "$*" | grep -oE "127.0.0.1:[0-9]+" | cut -d: -f2)\n'
-             'if [ -f "$STUB_DIR/code-$port" ]; then code=$(cat "$STUB_DIR/code-$port"); '
+             'host=$(echo "$*" | grep -oE "https://[^/ ]+" | head -1 | cut -d/ -f3)\n'
+             'if [ -n "$host" ] && [ -f "$STUB_DIR/code-$host" ]; then code=$(cat "$STUB_DIR/code-$host"); '
+             'elif [ -f "$STUB_DIR/code-$port" ]; then code=$(cat "$STUB_DIR/code-$port"); '
              'elif [ -f "$STUB_DIR/unhealthy" ]; then code=503; else code=200; fi\n'
              'case "$*" in *%{http_code}*) printf "%s" "$code" ;; '
              '*) echo \'{"status": "ok", "implementation": {}, "connector": {"status": "up"}}\' ;; esac\n'),
@@ -175,6 +178,25 @@ def test_the_watch_writes_one_line_per_engine_backup_and_a_summary(vm):
     (vm.stubs / "syslog.log").unlink()
     vm("check-all")
     assert "backup missing" not in (vm.stubs / "syslog.log").read_text(encoding="utf-8")   # a new backup stops it
+
+
+def test_once_an_hour_the_watch_tries_the_ways_out_the_vm_uses(vm):
+    """D-212: since the NAT went (10 November) the VM goes out from its own address. Once an hour: the server the
+    assistant asks (MODEL_BASE_URL of an engine), Artifact Registry (401 = reached) and Let's Encrypt."""
+    vm.settings.write_text("MODEL_BASE_URL=https://domotica-bff.example.run.app\n", encoding="utf-8", newline="\n")
+    (vm.stubs / "code-europe-west8-docker.pkg.dev").write_text("401", encoding="utf-8")
+    assert vm("check-all").returncode == 0
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert "-t domhouse-check egress ok server=200 registry=401 acme=200" in syslog
+    called = (vm.stubs / "curl.log").read_text(encoding="utf-8")
+    assert "https://domotica-bff.example.run.app/health" in called and "acme-v02.api.letsencrypt.org/directory" in called
+    (vm.stubs / "syslog.log").unlink()
+    vm("check-all")                                                        # within the hour: not again
+    assert "egress" not in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    (vm.opt / ".egress-checked").write_text("0", encoding="utf-8")       # an hour later, Let's Encrypt unreachable
+    (vm.stubs / "code-acme-v02.api.letsencrypt.org").write_text("000", encoding="utf-8")
+    vm("check-all")
+    assert "-t domhouse-check egress failed server=200 registry=401 acme=000" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
 
 
 def test_timers_installs_the_backup_and_the_5_minute_watch(vm):

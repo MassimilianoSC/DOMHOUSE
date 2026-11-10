@@ -22,7 +22,9 @@
 # the Ops Agent already sends to Cloud Logging) one line per apartment, "engine ok <id>", "engine down <id>" (answers 503)
 # or "engine silent <id>" (does not answer), "backup missing <id> age_h=<n>" (newest backup older than BACKUP_ALERT_H),
 # then "domhouse-check: <n> motori, <m> muti", "vm mem_used_pct=<n> disk_used_pct=<n>" (the weekly run-in report,
-# D-210) and, if the broker is installed, its line (scripts/broker-vm.sh check). The alerts read those lines (scripts/monitoring/engine-alerts.sh): the
+# D-210), once an hour "egress ok|failed server=<code> registry=<code> acme=<code>" (the ways out the VM uses since
+# the NAT went, 10 November: the server the assistant asks, Artifact Registry, Let's Encrypt; Cloud Logging is proved by
+# these very lines arriving) and, if the broker is installed, its line (scripts/broker-vm.sh check). The alerts read those lines (scripts/monitoring/engine-alerts.sh): the
 # watch writes only while the VM is alive, so a silent VM gives one email, never one per apartment. The daily backup
 # writes "backup ok <id>". logs-agent adds to the Ops Agent a receiver for the engines' container logs (docker json-file,
 # parsed: level, msg, apartment_id) as the log "domhouse_engine", keeping the previous configuration as a copy; the
@@ -53,6 +55,9 @@ DATA="${DOMHOUSE_DATA:-/data}"
 SYSTEMD="${DOMHOUSE_SYSTEMD:-/etc/systemd/system}"
 OPS_CONFIG="${DOMHOUSE_OPS_CONFIG:-/etc/google-cloud-ops-agent/config.yaml}"
 MEMINFO="${DOMHOUSE_MEMINFO:-/proc/meminfo}"   # moved only by the tests (Windows has no Linux /proc)
+EGRESS_EVERY_S=3600                      # the ways out, once an hour (D-212)
+REGISTRY_URL="https://europe-west8-docker.pkg.dev/v2/"           # 401 without credentials: reached
+ACME_URL="https://acme-v02.api.letsencrypt.org/directory"
 BACKUP_ALERT_H=26                        # D-148 (c): no backup for longer than this -> "backup missing"
 ENGINE_UID=10001
 METADATA=http://metadata.google.internal/computeMetadata/v1
@@ -284,6 +289,7 @@ check_all() {
   done
   watch_line "domhouse-check: ${total} motori, ${silent} muti"
   vm_line
+  egress_line
   # after the summary: a stuck broker check must never look like a silent VM
   if [ -f "${OPT}/_broker/broker.settings" ]; then
     bash "${OPT}/broker-vm.sh" check || watch_line "broker down (controllo non riuscito)"
@@ -296,6 +302,26 @@ vm_line() {
   mem="$(awk '/^MemTotal:/ {t = $2} /^MemAvailable:/ {a = $2} END {if (t > 0 && a != "") printf "%d", (t - a) * 100 / t; else print "?"}' "${MEMINFO}" 2>/dev/null || true)"
   disk="$(df --output=pcent / 2>/dev/null | tail -1 | tr -dc '0-9' || true)"
   watch_line "vm mem_used_pct=${mem:-?} disk_used_pct=${disk:-?}"
+}
+
+probe_code() { curl -s -o /dev/null -m 10 -w '%{http_code}' "$1" 2>/dev/null || true; }
+
+egress_line() {
+  # D-212: once an hour, the ways out the VM really uses; the hour is kept in a file, so a 5-minute timer is enough
+  local now last url server registry acme
+  now=$(date +%s)
+  last=$(cat "${OPT}/.egress-checked" 2>/dev/null || echo 0)
+  [ $((now - last)) -ge "${EGRESS_EVERY_S}" ] || return 0
+  echo "${now}" > "${OPT}/.egress-checked"
+  url="$(cat "${ETC}"/*.settings.env 2>/dev/null | sed -n 's/^MODEL_BASE_URL=//p' | head -1)"
+  if [ -n "${url}" ]; then server="$(probe_code "${url%/}/health")"; else server="nessuno"; fi
+  registry="$(probe_code "${REGISTRY_URL}")"
+  acme="$(probe_code "${ACME_URL}")"
+  if [[ "${server}" =~ ^(200|nessuno)$ ]] && [[ "${registry}" =~ ^(200|401)$ ]] && [ "${acme}" = "200" ]; then
+    watch_line "egress ok server=${server:-000} registry=${registry:-000} acme=${acme:-000}"
+  else
+    watch_line "egress failed server=${server:-000} registry=${registry:-000} acme=${acme:-000}"
+  fi
 }
 
 logs_agent() {
