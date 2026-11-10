@@ -141,6 +141,8 @@ def start_bench() -> dict:
            "-e", f"DOMHOUSE_BROKER_PORT={PORT}", "-e", "DOMHOUSE_METADATA=http://127.0.0.1:18090",
            "-e", "DOMHOUSE_SECRETS_API=http://127.0.0.1:18090/v1", "-e", "DOMHOUSE_HEALTH_TRIES=45",
            "-e", "DOMHOUSE_ACME_TEST=1", "-e", "DOMHOUSE_ACME_SERVER=https://127.0.0.1:14000/dir", "-e", "DOMHOUSE_LEGO_NETWORK=host",
+           # the limit on new connections would change this machine's own firewall: it has a privileged bench of its own
+           "-e", "DOMHOUSE_LIMIT=off", "-e", "DOMHOUSE_AUTH_ALERT_PER_HOUR=3",
            "domhouse-broker-rig", "sleep", "3600")
     rig(f"rm -rf {BENCH}/opt {BENCH}/etc {BENCH}/data {BENCH}/certs {BENCH}/secrets {BENCH}/up {BENCH}/systemd {BENCH}/finto {BENCH}/systemctl.log; "
         f"find {BENCH}/tlsdisk -mindepth 1 -delete; install -d -m 700 {TLS} {ACME}; "
@@ -434,6 +436,31 @@ def test_the_watch_says_ok_expiring_and_down(bench):
     assert re.search(r"^broker down \(container: \w+, porta TLS: muta\)$", text, re.M), text
 
 
+def test_every_refused_login_leaves_a_line_and_many_raise_the_alert(bench):
+    """D-209: Mosquitto's own line names the client id and the address; the client id is the device's user name."""
+    for _ in range(4):
+        assert pub("tls", f"{A}.a1", "password-sbagliata-ma-lunga-00001", f"{A}/a1/x", extra=["-i", f"{A}.a1"]).returncode
+    for _ in range(6):            # the internal door is not the way in from the internet: these must not count
+        assert pub("internal", f"{A}.connector", "password-sbagliata-ma-lunga-00001", "x", extra=["-i", "porta-interna"]).returncode
+    logs = docker("logs", "--since", "3m", CONTAINER).stdout + docker("logs", "--since", "3m", CONTAINER).stderr
+    assert re.search(rf"Client {A}\.a1 \[[0-9a-f.:]+:\d+\] disconnected: not authorised\.", logs), logs[-800:]
+    text = vm("check").stdout
+    assert re.search(rf"^broker auth refused hour=\d+ top_ip=[0-9a-f.:]+\(\d+\) top_client={A}\.a1\([4-9]\d*\)$", text, re.M), text
+    assert re.search(r"^broker ok cert_days=\d+$", text, re.M)
+    assert "porta-interna" not in text and "domhouse-check" not in text      # nor check's own probe, every 5 minutes
+    assert re.search(r"^accessi rifiutati sulla 8883 nell'ultima ora: \d+$", vm("status").stdout, re.M)
+
+
+def test_no_anonymous_login_on_either_door():
+    """D-209: both listeners refuse a client without a user (the bench proves it too: can_connect with no user)."""
+    conf = (ROOT / "engine/broker/mosquitto.conf").read_text(encoding="utf-8")
+    listeners = re.split(r"^listener ", conf, flags=re.M)[1:]
+    assert [l.split("\n")[0] for l in listeners] == ["8883", f"1883 {INTERNAL_IP}"]
+    for section in listeners:
+        assert re.search(r"^allow_anonymous false$", section, re.M) and re.search(r"^password_file ", section, re.M)
+    assert "per_listener_settings true" in conf
+
+
 def test_data_are_written_on_the_data_folder(bench):
     docker("exec", CONTAINER, "sh", "-c", "kill -0 1")
     rig(f"docker compose --env-file {BENCH}/opt/_broker/broker.settings -f {BENCH}/opt/_broker/compose.yaml restart", timeout=90)
@@ -450,6 +477,9 @@ def test_without_acme_settings_the_daily_renewal_does_nothing(bench):
     assert "OnCalendar=*-*-* 04:17:00" in rig(f"cat {BENCH}/systemd/domhouse-broker-cert.timer").stdout
     assert f"ExecStart=/bin/bash {BENCH}/opt/broker-vm.sh cert-renew" in rig(f"cat {BENCH}/systemd/domhouse-broker-cert.service").stdout
     assert "enable --now domhouse-broker-cert.timer" in rig(f"cat {BENCH}/systemctl.log").stdout
+    limit_unit = rig(f"cat {BENCH}/systemd/domhouse-broker-limit.service").stdout
+    assert f"ExecStart=/bin/bash {BENCH}/opt/broker-vm.sh limit" in limit_unit and "WantedBy=multi-user.target" in limit_unit
+    assert "enable domhouse-broker-limit.service" in rig(f"cat {BENCH}/systemctl.log").stdout
 
 
 def test_a_certificate_from_acme_is_served_at_once_and_renewed_only_when_due(bench):
@@ -549,6 +579,79 @@ def test_a_disk_that_holds_something_is_never_formatted(disk):
     absent = prepare("nessuno", "/vm/mnt/nessuno")
     assert absent.returncode and "manca il disco" in absent.stderr
     assert not fstab_lines("/vm/mnt/altro") and not fstab_lines("/vm/mnt/sporco") and not fstab_lines("/vm/mnt/nessuno")
+
+
+LIMIT_RIG = "domhouse-broker-limit-run"
+CONNECT = """import socket, sys
+ok = 0
+for _ in range(int(sys.argv[3])):
+    s = socket.socket(); s.settimeout(0.4)
+    try:
+        s.connect((sys.argv[1], int(sys.argv[2]))); ok += 1
+    except OSError:
+        pass
+    s.close()
+print(ok)
+"""
+
+
+def on_limit_rig(script, check=True):
+    return docker("exec", LIMIT_RIG, "bash", "-c", script, check=check, timeout=120)
+
+
+LIMIT_NET, LIMIT_RIG_IP = "bench-limit", "10.98.0.2"
+
+
+def connections_from(source, count):
+    """Opens `count` connections one after the other from the address `source`: how many got in."""
+    done = docker("run", "--rm", "--network", LIMIT_NET, "--ip", source, "--entrypoint", "python3", "domhouse-broker-rig",
+                  "-c", CONNECT, LIMIT_RIG_IP, "18883", str(count), timeout=120)
+    return int(done.stdout.strip())
+
+
+@pytest.fixture(scope="module")
+def limited():
+    """A privileged bench with the VM's path: port 18883 goes through a DNAT to a server on 8883 in another network
+    namespace, as docker publishes the broker; the limit is the real broker-vm.sh limit, on the forward hook."""
+    if shutil.which("docker") is None or docker("info", check=False).returncode:
+        pytest.fail("Docker non disponibile: questa prova ha bisogno di un contenitore privilegiato")
+    docker("build", "-q", "-t", "domhouse-broker-rig", str(ROOT / "tests" / "broker_rig"), timeout=240)
+    docker("rm", "-f", LIMIT_RIG, check=False)
+    docker("network", "rm", LIMIT_NET, check=False)
+    docker("network", "create", "--subnet", "10.98.0.0/24", LIMIT_NET)
+    docker("run", "-d", "--name", LIMIT_RIG, "--privileged", "--network", LIMIT_NET, "--ip", LIMIT_RIG_IP, "-v", f"{ROOT.as_posix()}:/repo:ro", "-e", "DOMHOUSE_OPT=/w/opt",
+           "domhouse-broker-rig", "sleep", "900")
+    try:
+        on_limit_rig(
+            "mkdir -p /w && cp /repo/scripts/broker-vm.sh /w/ && sed -i 's/\\r$//' /w/broker-vm.sh && "
+            "ip netns add srv && ip link add vs type veth peer name vs-in && ip link set vs-in netns srv && "
+            "ip addr add 10.99.0.1/24 dev vs && ip link set vs up && ip netns exec srv ip addr add 10.99.0.2/24 dev vs-in && "
+            "ip netns exec srv ip link set vs-in up && ip netns exec srv ip link set lo up && "
+            "ip netns exec srv ip route add default via 10.99.0.1 && sysctl -q -w net.ipv4.ip_forward=1 && "
+            "nft add table ip docker_finto && "
+            "nft 'add chain ip docker_finto pre { type nat hook prerouting priority -100; }' && "
+            "nft add rule ip docker_finto pre tcp dport 18883 dnat to 10.99.0.2:8883")
+        on_limit_rig("ip netns exec srv python3 -c \"import socket; s = socket.socket(); "
+                     "s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(('0.0.0.0', 8883)); s.listen(512)\n"
+                     "while True: s.accept()[0].close()\" > /dev/null 2>&1 &")
+        yield
+    finally:
+        docker("rm", "-f", LIMIT_RIG, check=False)
+        docker("network", "rm", LIMIT_NET, check=False)
+
+
+def test_new_connections_are_limited_per_address_and_never_banned(limited):
+    assert connections_from("10.98.0.11", 10) == 10                              # the way through works without the limit
+    first = on_limit_rig("bash /w/broker-vm.sh limit")
+    assert first.returncode == 0 and "limite attivo" in first.stdout
+    on_limit_rig("bash /w/broker-vm.sh limit")                                   # a repeat leaves one copy
+    table = on_limit_rig("nft list table inet domhouse_broker").stdout
+    assert table.count('comment "domhouse-broker-limit"') == 2 and "hook forward" in table
+    assert on_limit_rig("nft list tables").stdout.count("domhouse_broker") == 1
+    flood = connections_from("10.98.0.12", 90)
+    assert 60 <= flood <= 70, f"{flood} collegamenti su 90 da un solo indirizzo"   # the burst, then 30 a minute
+    assert connections_from("10.98.0.13", 10) == 10, "un altro indirizzo è stato fermato"
+    assert int(re.search(r"counter packets (\d+)", table := on_limit_rig("nft list table inet domhouse_broker").stdout).group(1)) > 0, table
 
 
 def test_the_address_of_the_internal_listener_is_the_same_everywhere():

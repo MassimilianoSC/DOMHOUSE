@@ -16,6 +16,7 @@
 #   sudo bash /opt/domhouse/broker-vm.sh remove-apartment <apartment_id>
 #   sudo bash /opt/domhouse/broker-vm.sh sync                          # rereads the secrets of every apartment
 #   sudo bash /opt/domhouse/broker-vm.sh check                         # one line for the 5-minute watch
+#   sudo bash /opt/domhouse/broker-vm.sh limit                         # (re)applies the limit on new connections
 #
 # Folders: /opt/domhouse/_broker (compose, configuration, settings), /etc/domhouse/_broker (auth, the list of
 # apartments, acme.settings), /data/_broker (the broker's persistence). The underscore on purpose: an apartment_id
@@ -33,6 +34,15 @@
 #
 # Watch: check writes "broker ok cert_days=<n> ..." or "broker down (...)" and "broker cert expiring days=<n>" (under
 # CERT_ALERT_DAYS) with the syslog tag domhouse-check; engine-vm.sh check-all calls it when the broker is installed.
+#
+# Way in from the internet (D-209): every device has its own user, nobody enters without one, on both doors. Mosquitto
+# writes one line for each refused login, "Client <client id> [<ip>:<port>] disconnected: not authorised." (it names
+# the user only in its debug log, too large to keep on: each device's client id is set to its user name instead).
+# Above AUTH_ALERT_PER_HOUR refused logins in the last hour, check writes "broker auth refused hour=<n> ..." for the
+# alert. Mosquitto has no limit on failed logins: the limit is on new connections to 8883, per source address, in an
+# nftables table of its own (inet domhouse_broker): beyond LIMIT_BURST at once and LIMIT_RATE after, that address's
+# new connections are dropped until it slows down. No ban: the devices of an apartment share one public address, and a
+# single relay with a wrong password must not lock out its neighbours; guessing a random 192-bit password is hopeless.
 set -euo pipefail
 set +x                                   # never trace
 
@@ -61,6 +71,12 @@ ACCOUNTS="${OPT}/broker_accounts.py"
 LEGO_IMAGE="goacme/lego:v5.6.0@sha256:6f1583fc026a455ea46a7a5858c576105bb69c2e2de69db391cab7f14750350c"
 LETS_ENCRYPT="https://acme-v02.api.letsencrypt.org/directory"
 ACME_ACCOUNT_ID=domhouse-broker          # no email: Let's Encrypt sends none, and no address leaves the VM
+LIMIT="${DOMHOUSE_LIMIT:-on}"            # "off" only on the unprivileged test bench, which shares the host's network
+LIMIT_TABLE=domhouse_broker
+LIMIT_FILE="${BROKER_OPT}/limit.nft"
+LIMIT_RATE="30/minute"                   # per source address, after the first LIMIT_BURST
+LIMIT_BURST=60                           # an apartment's relays reconnecting together after a power cut
+AUTH_ALERT_PER_HOUR="${DOMHOUSE_AUTH_ALERT_PER_HOUR:-100}"   # one relay with a wrong password retrying alone stays under
 
 die() { echo "errore: $*" >&2; exit 1; }
 step() { printf '\n== %s\n' "$*"; }
@@ -280,7 +296,74 @@ acme_get() {
   cert_in_place
 }
 
-install_cert_timer() {
+limit_rules() {
+  # one transaction: the table is created if missing, emptied and written again, so a repeat leaves one copy
+  cat <<NFT
+# written by broker-vm.sh limit (D-209): new connections to the broker's TLS port, per source address
+add table inet ${LIMIT_TABLE}
+delete table inet ${LIMIT_TABLE}
+table inet ${LIMIT_TABLE} {
+  set sources4 { type ipv4_addr; flags dynamic, timeout; timeout 10m; size 65536; }
+  set sources6 { type ipv6_addr; flags dynamic, timeout; timeout 10m; size 65536; }
+  chain new_connections {
+    type filter hook forward priority -5; policy accept;
+    tcp dport 8883 ct state new add @sources4 { ip saddr limit rate over ${LIMIT_RATE} burst ${LIMIT_BURST} packets } counter drop comment "domhouse-broker-limit"
+    tcp dport 8883 ct state new add @sources6 { ip6 saddr limit rate over ${LIMIT_RATE} burst ${LIMIT_BURST} packets } counter drop comment "domhouse-broker-limit"
+  }
+}
+NFT
+}
+
+apply_limit() {
+  # the published port reaches the container through docker's DNAT: the hook is forward, where the port is 8883
+  command -v nft > /dev/null || die "manca nft sulla VM (sudo apt-get install -y nftables)"
+  install -d -m 755 "${OPT}" "${BROKER_OPT}"
+  limit_rules > "${LIMIT_FILE}"
+  nft -f "${LIMIT_FILE}"
+  echo "limite attivo: alla porta 8883, oltre ${LIMIT_BURST} collegamenti nuovi di fila e poi ${LIMIT_RATE} per indirizzo, il resto è scartato"
+}
+
+limit_active() { nft list table inet "${LIMIT_TABLE}" > /dev/null 2>&1; }
+
+auth_refused_report() {
+  # the refused logins of the last hour; above AUTH_ALERT_PER_HOUR, one line with the busiest address and client id
+  local pairs n ip client
+  pairs="$(auth_refused_pairs)"
+  n="$(printf '%s' "${pairs}" | grep -c . || true)"
+  [ "${n}" -gt "${AUTH_ALERT_PER_HOUR}" ] || return 0
+  ip="$(printf '%s\n' "${pairs}" | cut -d' ' -f1 | sort | uniq -c | sort -rn | awk 'NR == 1 {print $2 "(" $1 ")"}')"
+  client="$(printf '%s\n' "${pairs}" | cut -d' ' -f2- | sort | uniq -c | sort -rn | awk 'NR == 1 {print $2 "(" $1 ")"}')"
+  watch_line "broker auth refused hour=${n} top_ip=${ip} top_client=${client}"
+}
+
+auth_refused_pairs() {
+  # "<ip> <client id>" for each refused login of the last hour that came in on 8883: the refusal line is matched to
+  # its "New connection from <ip>:<port> on port 8883." line. Left out: the internal door (the container's own health
+  # check refuses itself there every minute) and check's own probe, client id domhouse-check
+  docker logs --since 1h "${CONTAINER}" 2>&1 | awk '
+    / New connection from .* on port 8883\.$/ { for (i = 1; i < NF; i++) if ($i == "from") outside[$(i + 1)] = 1 }
+    / disconnected: not authorised\.$/ {
+      at = substr($0, index($0, "[") + 1); at = substr(at, 1, index(at, "]") - 1)
+      client = $0; sub(/^.*Client /, "", client); sub(/ \[.*$/, "", client)
+      if ((at in outside) && client != "domhouse-check") { ip = at; sub(/:[0-9]+$/, "", ip); print ip, client }
+    }'
+}
+
+install_units() {
+  step "Limite sui collegamenti a ogni avvio: domhouse-broker-limit.service"
+  cat > "${SYSTEMD}/domhouse-broker-limit.service" <<UNIT
+[Unit]
+Description=DOMHOUSE broker: limit on new connections to 8883 per source address (broker-vm.sh limit, D-209)
+After=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash ${OPT}/broker-vm.sh limit
+
+[Install]
+WantedBy=multi-user.target
+UNIT
   step "Rinnovo quotidiano del certificato: domhouse-broker-cert.timer"
   cat > "${SYSTEMD}/domhouse-broker-cert.service" <<UNIT
 [Unit]
@@ -305,8 +388,9 @@ Persistent=true
 WantedBy=timers.target
 UNIT
   systemctl daemon-reload
+  systemctl enable domhouse-broker-limit.service > /dev/null
   systemctl enable --now domhouse-broker-cert.timer > /dev/null
-  echo "timer domhouse-broker-cert.timer attivo"
+  echo "domhouse-broker-limit.service abilitato, timer domhouse-broker-cert.timer attivo"
 }
 
 check() {
@@ -315,6 +399,9 @@ check() {
   if [ -n "${problem}" ]; then
     watch_line "broker down (${problem})"
     return 0
+  fi
+  if [ "${LIMIT}" = "on" ] && ! limit_active; then          # lost (a flush of the firewall): put it back at once
+    if (apply_limit > /dev/null 2>&1); then watch_line "broker limit restored"; else watch_line "broker limit missing"; fi
   fi
   state="$(docker inspect -f '{{.State.Health.Status}}' "${CONTAINER}" 2>/dev/null || echo assente)"
   pem="$(served_pem 2>/dev/null || true)"
@@ -325,6 +412,7 @@ check() {
   days=$(( ( $(date -d "$(printf '%s\n' "${pem}" | openssl x509 -noout -enddate | sed 's/^notAfter=//')" +%s) - $(date +%s) ) / 86400 ))
   watch_line "broker ok cert_days=${days}"
   if [ "${days}" -lt "${CERT_ALERT_DAYS}" ]; then watch_line "broker cert expiring days=${days}"; fi
+  auth_refused_report
 }
 
 cmd="${1:-}"; shift || true
@@ -353,7 +441,9 @@ case "${cmd}" in
     [ -f "${APARTMENTS}" ] || : > "${APARTMENTS}"
     step "Utenti e permessi"
     sync_accounts
-    install_cert_timer
+    install_units
+    step "Limite sui collegamenti nuovi"
+    if [ "${LIMIT}" = "on" ]; then apply_limit; else echo "non applicato (DOMHOUSE_LIMIT=${LIMIT}, solo nelle prove)"; fi
     step "Avvio di ${CONTAINER} con ${image}"
     compose pull --quiet
     compose up -d
@@ -444,6 +534,10 @@ case "${cmd}" in
     need_installed
     check
     ;;
+  limit)
+    [ $# -eq 0 ] || die "uso: limit"
+    apply_limit
+    ;;
   status)
     need_installed
     cat "${SETTINGS}"
@@ -454,9 +548,17 @@ case "${cmd}" in
     echo "connessioni sulla porta TLS: $(docker exec "${CONTAINER}" cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk '$2 ~ /:22B3$/ && $4 == "01"' | wc -l)"
     echo "appartamenti: $(wc -l < "${APARTMENTS}")"
     for file in devices connectors; do echo "utenti ${file}: $(wc -l < "${AUTH}/${file}.passwd")"; done
+    echo "accessi rifiutati sulla 8883 nell'ultima ora: $(auth_refused_pairs | grep -c . || true)"
+    if [ "${LIMIT}" = "on" ]; then
+      if limit_active; then
+        echo "collegamenti scartati dal limite: $(nft list table inet "${LIMIT_TABLE}" | awk '{for (i = 1; i < NF; i++) if ($i == "packets") s += $(i + 1)} END {print s + 0}')"
+      else
+        echo "limite sui collegamenti assente: sudo bash /opt/domhouse/broker-vm.sh limit"
+      fi
+    fi
     check
     ;;
   *)
-    die "uso: prepare-tls-disk | cert-new | install | update | restart | reload | cert-renew | cert-revoke | install-cert | add-apartment | remove-apartment | sync | check | status (vedi l'intestazione)"
+    die "uso: prepare-tls-disk | cert-new | install | update | restart | reload | cert-renew | cert-revoke | install-cert | add-apartment | remove-apartment | sync | check | limit | status (vedi l'intestazione)"
     ;;
 esac
