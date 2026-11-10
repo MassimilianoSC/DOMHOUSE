@@ -153,8 +153,8 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 
 | Voce | Costo | Fonte |
 |---|---|---|
-| Dominio `dh-lab.eu` (Register.it) | Rinnovo annuale, scadenza 9 novembre 2027. Importo non registrato | D-206 |
-| Kit di laboratorio (Shelly, sensori, Athom) | Non registrato | D-196 |
+| Dominio `dh-lab.eu` (Register.it) | 0 € il primo anno (promozione). Rinnovo annuale, scadenza 9 novembre 2027: prezzo del rinnovo da leggere prima della scadenza | D-206, committente 10 nov |
+| Kit di laboratorio (Shelly, sensori, Athom) | 131,30 €, una tantum | D-196, committente 10 nov |
 
 ### Controlli sulla spesa
 
