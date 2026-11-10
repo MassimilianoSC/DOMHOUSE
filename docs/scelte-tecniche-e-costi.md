@@ -152,6 +152,20 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 - Erano quasi tutti costi fissi di risorse sempre accese, non costi d'uso (registro, §7 «Costi»).
 - Allora lo staging era sempre acceso; dal lotto 35 si spegne da solo.
 
+### Costi reali degli ultimi 30 giorni (letti il 10 novembre 2026)
+
+Fonte: Report della fatturazione, solo progetto `domotica-poc-511707`, dal 12 ottobre al 10 novembre 2026. In questo periodo il progetto è rimasto quasi tutto spento dal 24 ottobre al 9 novembre (D-195). Lo stesso account di fatturazione paga anche un altro progetto del committente, escluso qui.
+
+| Voce | Netto in 30 giorni | Proiezione a un mese tutto acceso | Giudizio fino alla consegna |
+|---|---|---|---|
+| Server (Cloud Run, produzione e staging) | 9,82 € (16,06 € lordi, meno la quota gratuita mensile) | Circa 40 € | Riducibile: la produzione resta sempre accesa (minimo 1 copia) e il controllo di raggiungibilità ogni 60 secondi la tiene sveglia. Lo staging si spegne già da solo |
+| VM dei motori (CPU, memoria, disco 30 GB) | 6,17 € (circa 210 ore accesa) | Circa 16 € | Necessaria: motore `dev` e, a breve, il broker |
+| Snapshot del disco | 0,19 € | Circa 0,3 € | Necessaria (backup) |
+| Cloud NAT | 1,43 € | Circa 4,2 € | Da togliere dopo l'indirizzo pubblico (D-209), che costa circa 3,3 € |
+| Modello dell'assistente (Vertex AI) | 0,83 € | Pochi euro, tetto a 20 € | Necessaria; quasi tutto dalle misure dei modelli di ottobre |
+| Tutto il resto (database, archivio immagini, segreti, log, monitoraggio, hosting, DNS) | Meno di 0,05 € | Meno di 1 € | Necessario |
+| **Totale** | **18,47 €** | **Circa 60 €** | |
+
 ### Fuori da Google Cloud
 
 | Voce | Costo | Fonte |
