@@ -51,6 +51,7 @@
 | **Letture ritentate** | Le letture vengono ritentate una volta: prima dell'errore possono passare fino a 60 secondi | Accettato |
 | **Errore di disegno** | Dal lotto 37 il messaggio sostituisce tutta l'app, menu compreso, e ciò che si stava scrivendo si perde con la ricarica | Accettato |
 | **Pagina di accesso** | Se l'avvio non riesce resta il modulo; il messaggio compare solo sulle pagine protette, e tentare l'accesso dà l'errore normale | Accettato |
+| **Attese massime non provabili a mano** | Il limite di 30 e 90 secondi, la pagina «Non riesco ad aprire la pagina» dopo 15 secondi e il messaggio per un errore di disegno si verificano solo con le prove automatiche: senza rete l'errore arriva subito. Il collaudo a mano (sezione O) prova solo l'assenza di rete | Accettato |
 | **Correzione E-29 non provata del tutto** | Non provata con Firebase vero, su Safari o su un telefono vero | Da verificare |
 
 ## Broker MQTT (dal 9 novembre, non ancora installato)

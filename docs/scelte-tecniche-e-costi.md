@@ -85,10 +85,12 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 - **Infrarossi:** due Athom AR01 in laboratorio (uno trasmette, uno fa da climatizzatore finto). Anche loro parlano MQTT.
 - **Chi lo costruisce:** il collegamento fra dispositivi e motore («connector») lo scrive Youssouf.
 
-### Come i dispositivi raggiungono la VM: da decidere
+### Come i dispositivi raggiungono la VM: indirizzo pubblico (D-209)
 
-- **Opzione A:** indirizzo pubblico fisso sulla VM, aperta solo sulla porta 8883. Circa 3,5 € al mese. Consigliata dall'analisi.
-- **Opzione D:** un bilanciatore di Google davanti alla VM, che resta senza indirizzo pubblico. Circa 16 € al mese.
+- **Scelta:** la VM riceve un indirizzo pubblico fisso, aperto solo sulla porta 8883 dei dispositivi. Circa 3,3 € al mese, più 0,18 € per la zona DNS.
+- **Condizioni:** una sola regola di firewall dedicata (`mqtt-tls-in`); verifica dall'esterno che tutto il resto sia chiuso; password per ogni dispositivo, nessun accesso anonimo, limite ai tentativi sbagliati e allarme.
+- **Risparmio collegato:** con l'indirizzo pubblico l'uscita a internet attraverso Cloud NAT non serve più. Toglierlo risparmia almeno 3,3 € al mese.
+- **Per la produzione:** se i dispositivi diventeranno molti, si passa a un bilanciatore di Google (circa 16 € al mese), senza toccare gli Shelly: puntano al nome `mqtt.dh-lab.eu`.
 - **Scartate:** la cifratura fatta da Google (le password dei dispositivi passerebbero in chiaro) e il proxy TCP (costo incerto).
 - **Dettagli:** `docs/analisi-ingresso-mqtt-2026-11-09.md`.
 
@@ -137,7 +139,8 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 | Uscita verso internet della VM (Cloud NAT) | Circa 0,1 € al giorno, più l'indirizzo esterno | Fisso | Stimato da listino, 23 ott |
 | Disco separato per le chiavi del certificato (10 GB) | 0,42 € al mese | Fisso | Listino Google letto il 10 nov alle 9:15 |
 | Zona DNS di `dh-lab.eu` | Circa 0,18 € al mese | Fisso | Stimato, analisi del 9 nov |
-| Ingresso dei dispositivi | Opzione A circa 3,5 € al mese; opzione D circa 16 € al mese | Fisso | Stimato, **da decidere** |
+| Indirizzo pubblico della VM per i dispositivi (D-209) | Circa 3,3 € al mese | Fisso | Listino Google letto il 10 nov alle 9:40 |
+| Cloud NAT, da togliere dopo l'indirizzo pubblico | Almeno 3,3 € al mese di risparmio | Fisso | Listino Google letto il 10 nov alle 9:40 |
 | Assistente | Circa 2 € al mese per appartamento con 20 domande al giorno; tetto 20 € al mese | A consumo | Stimato da listini di terze parti, D-187 |
 | Archivio delle immagini del server e dei motori (1,6 GB, oltre la quota gratuita di 0,5 GB) | Pochi centesimi al mese | A consumo | Stimato, 10 nov |
 | Database, segreti, log, monitoraggio | Trascurabili | A consumo | Stimato, 23 ott |
@@ -155,6 +158,12 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 |---|---|---|
 | Dominio `dh-lab.eu` (Register.it) | 0 € il primo anno (promozione). Rinnovo annuale, scadenza 9 novembre 2027: prezzo del rinnovo da leggere prima della scadenza | D-206, committente 10 nov |
 | Kit di laboratorio (Shelly, sensori, Athom) | 131,30 €, una tantum | D-196, committente 10 nov |
+
+### Chi paga fino alla consegna
+
+- **Fino alla consegna (circa un mese dal 10 novembre 2026) la fatturazione di Google Cloud è a carico del committente** (D-209).
+- Prima della consegna il progetto passa all'account di fatturazione (o all'organizzazione) del cliente: passo P-81 del piano.
+- In preparazione: estratto dei costi reali degli ultimi 30 giorni, voce per voce, con cosa si può ridurre fino alla consegna.
 
 ### Controlli sulla spesa
 
@@ -174,7 +183,7 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 - **Segreti:** password e chiavi stanno in Secret Manager di Google, mai nei file del codice né nei documenti.
 - **Identità:** server e VM usano identità gestite da Google, senza file di chiave.
 - **Dati in Europa:** servizi a Milano; modello dell'assistente solo in Europa (D-180).
-- **Rete:** la VM non ha indirizzo pubblico. Con l'opzione A ne avrà uno, aperto solo sulla porta dei dispositivi.
+- **Rete:** la VM avrà un indirizzo pubblico aperto solo sulla porta 8883 dei dispositivi (D-209); tutto il resto resta chiuso, verificato dall'esterno.
 
 ## 6. Come si aggiorna questo file
 

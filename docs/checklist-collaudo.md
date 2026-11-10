@@ -290,3 +290,15 @@ normale di prova con un **operatore**.
 | K4 📱 | Qualsiasi (anche Sola lettura) | Consumi > «Rendiconto in Excel»: scegli il mese in corso e «Scarica Excel». | Si scarica `consumi-<appartamento>-<mese>.xlsx`; aperto in Excel ha i fogli Riepilogo, Giornaliero, Orario, Dispositivi e l'importo in euro. | |
 | K4b | Qualsiasi | Consumi di un appartamento dimostrativo: guarda sotto il grafico; poi scarica l'Excel di un mese del 2025. | Sotto il grafico «Consumi disponibili dal 1 gennaio» (2026, l'inizio del profilo di esempio); i consumi per dispositivo sono per misuratore, non a percentuali fisse; «ore di clima evitate» = «non calcolate». L'Excel del 2025 ha in testa «Consumi disponibili dal …», celle vuote nelle ore precedenti e la riga che dice che il periodo è prima dei dati. | |
 | K5 | Qualsiasi | Consumi, periodo «Soggiorno», «Excel del soggiorno» (serve un soggiorno, anche dal Simulatore). | Il file copre dall'arrivo alla partenza; nessun nome, email o telefono di ospiti. | |
+
+## O. Senza connessione (dal lotto 37)
+
+Si fanno con la modalità aereo. Su iPhone controlla che anche il Wi-Fi sia spento. L'avviso compare in alto al centro, in rosso.
+
+| N. | Ruolo | Passi | Risultato atteso | Esito |
+|---|---|---|---|---|
+| O1 📱 | Qualsiasi | Apri Impostazioni. Attiva la modalità aereo. Cambia l'interruttore «Approvazioni richieste». | Subito, senza attese, compare l'avviso rosso «Server non raggiungibile» con sotto «ID richiesta» e un codice; l'interruttore torna com'era. | |
+| O2 📱 | Qualsiasi | Subito dopo O1: togli la modalità aereo, aspetta che torni la rete, cambia di nuovo lo stesso interruttore; poi rimettilo com'era. | Ogni volta «Preferenze salvate»; l'interruttore resta dove lo hai messo. | |
+| O3 | Qualsiasi (anche Sola lettura), su computer | Apri «Consumi» di un appartamento. Scollega la rete. Nella scheda «Rendiconto in Excel» premi «Scarica Excel». | Subito l'avviso rosso «Server non raggiungibile» con «ID richiesta» e un codice; nessun file scaricato; il pulsante si può premere di nuovo. | |
+| O4 📱 | Qualsiasi, su un dispositivo dove hai già aperto l'app | Chiudi del tutto l'app (o la scheda). Attiva la modalità aereo. Riapri l'app. | Compare la pagina di accesso con l'avviso rosso «Impossibile caricare il profilo, riprova tra poco» e sotto «Server non raggiungibile». Nessuna pagina bianca, nessun caricamento infinito. | |
+| O5 📱 | Qualsiasi | Subito dopo O4: togli la modalità aereo e ricarica la pagina (o chiudi e riapri l'app). | Entri senza riscrivere la password. | |
