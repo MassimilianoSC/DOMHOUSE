@@ -263,6 +263,8 @@ Tutta l'uscita va anche in `logs/publish-<data-ora>-<commit>.log`; lo stato dei 
 3. Il broker e i suoi segreti: procedura G2 (B5 e successivi), `broker-secrets.sh`.
 4. Gli allarmi: `scripts/monitoring/setup.sh` ed `engine-alerts.sh`, quando cambiano.
 5. La prova dell'app pubblicata (checklist di collaudo).
+6. **Durante uno spegnimento con gli avvisi sospesi (M19)** una pubblicazione li riattiva senza dirlo: se serve, dopo la
+   pubblicazione si rilancia il passo 1 di M19.1. Una pubblicazione rimette anche il minimo di istanze del manifesto.
 
 M8 e M12 restano come riferimento dei singoli passi; M18 li esegue in ordine. Differenza: M18 pubblica lo staging
 sempre con le notifiche push attive (`VITE_FCM_ENABLED=true`, D-39), che il comando di M8 non passava.

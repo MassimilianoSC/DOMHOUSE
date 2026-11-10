@@ -2046,7 +2046,8 @@ all'amministratore. Non serve un'approvazione preventiva.
   domotico risulta fermo» se il sistema risponde ma ha perso i dispositivi; dal lotto 38 dice «Il sistema domotico
   non risponde da N minuti: …» se non risponde affatto (macchina spenta, rete interrotta).
 - **Nelle Decisioni**, nel primo caso: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi
-  ripristinato».
+  ripristinato». Nel secondo caso (dal lotto 38), dopo un fermo più lungo della soglia: «Sistema domotico di nuovo
+  raggiungibile dopo …», con la durata.
 - **Durante uno spegnimento programmato** HQE sospende questi avvisi fino a una data e ora: dopo quell'ora, se il
   sistema è ancora fermo, l'avviso arriva. Gli avvisi «dispositivo offline» non si sospendono.
 - **Non arriva** una notifica di ritorno online.
