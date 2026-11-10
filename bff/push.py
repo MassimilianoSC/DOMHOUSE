@@ -6,7 +6,7 @@ tasks, and task errors are logged.
 """
 import asyncio
 import time
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from . import instances, runtime
 from .auth import sees, tenant_status
@@ -28,6 +28,13 @@ _loops: list[asyncio.Task] = []    # the rounds that last as long as the process
 HUB_ALIGN_S = 60
 _resumed: set[str] = set()         # the apartments whose timers this process has picked up (resume_watches)
 OFFLINE_RESUME_MAX_S = 6 * 86400   # the claims last 7 days: an outage older than this could be notified a second time
+# D-217: the engine that does not answer this process's stream. Since when (time.time()), its timer, and the last minutes
+# of the offline_alert rule read while it answered (None: the rule off), because when it does not answer it cannot say
+_unreachable: dict[str, float] = {}
+_unreachable_timers: dict[str, asyncio.Task] = {}
+_alert_minutes: dict[str, float | None] = {}
+ALERT_MINUTES_DEFAULT = 15.0
+SUSPENSION_MAX_DAYS = 30           # UNREACHABLE_ALERTS_OFF_UNTIL further than this is refused: alerts stay on
 
 
 def build_push(kind: str, apt: Apartment, title: str, body: str, link: str, tag: str, ts: str | None = None,
@@ -59,6 +66,15 @@ def device_offline_push(apt: Apartment, device_id: str, label: str, minutes: flo
 def instance_down_push(apt: Apartment, ts: str | None):
     return build_push("instance_down", apt, f"{apt.name}: sistema domotico non raggiungibile", "Il connettore domotico risulta fermo",
                       f"/a/{apt.apartment_id}", f"instance:{apt.apartment_id}", ts)
+
+
+def instance_unreachable_push(apt: Apartment, minutes: float, ts: str | None):
+    """D-217: the server does not reach the engine itself (machine or process stopped, network cut). Same kind, tag and
+    claim as instance_down: one notification per outage whatever its cause."""
+    return build_push("instance_down", apt, f"{apt.name}: sistema domotico non raggiungibile",
+                      f"Il sistema domotico non risponde da {int(minutes)} minuti: i comandi dall'app non arrivano e "
+                      f"le regole automatiche potrebbero essere ferme.", f"/a/{apt.apartment_id}",
+                      f"instance:{apt.apartment_id}", ts)
 
 
 def booking_reset_push(apt: Apartment, decision_id: str, reasoning: str | None, ts: str | None):
@@ -224,6 +240,10 @@ def forget_apartment(apartment_id: str) -> None:
     _resumed.discard(apartment_id)
     if (task := _down_timers.pop(apartment_id, None)) and not task.done():
         task.cancel()
+    _unreachable.pop(apartment_id, None)
+    _alert_minutes.pop(apartment_id, None)
+    if (task := _unreachable_timers.pop(apartment_id, None)) and not task.done():
+        task.cancel()
 
 
 async def _offline_alert_minutes(apt: Apartment) -> float | None:
@@ -231,10 +251,101 @@ async def _offline_alert_minutes(apt: Apartment) -> float | None:
         resp = await instances.call(apt, "GET", "/rules", timeout=5.0)
         for r in resp.json().get("rules", []):
             if r["rule_id"] == "offline_alert":
-                return float(r["params"]["minutes"]) if r["enabled"] else None
+                minutes = float(r["params"]["minutes"]) if r["enabled"] else None
+                _alert_minutes[apt.apartment_id] = minutes        # D-217: what to use when the engine does not answer
+                return minutes
     except Exception as exc:
         warn("offline_alert rule lookup failed", error=str(exc), apartment_id=apt.apartment_id)
-    return 15.0
+    return ALERT_MINUTES_DEFAULT
+
+
+def alerts_suspended_until(now: datetime | None = None) -> datetime | None:
+    """D-217: the end of the suspension of the «sistema domotico non raggiungibile» notifications, or None (on). A value
+    that cannot be read, without its offset, past, or further than SUSPENSION_MAX_DAYS leaves them on (the prudent
+    side); start_background_hubs writes which."""
+    raw = get_settings().unreachable_alerts_off_until
+    if not raw:
+        return None
+    try:
+        until = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    now = now or datetime.now(UTC)
+    if until.tzinfo is None or until <= now or until - now > timedelta(days=SUSPENSION_MAX_DAYS):
+        return None
+    return until
+
+
+def _suspension_note() -> None:
+    raw = get_settings().unreachable_alerts_off_until
+    if not raw:
+        return
+    until = alerts_suspended_until()
+    if until:
+        info("unreachable alerts suspended", until=until.isoformat())
+    else:
+        warn("UNREACHABLE_ALERTS_OFF_UNTIL ignored: alerts on", value=raw[:40],
+             reason=f"not an ISO 8601 instant with its offset, past, or more than {SUSPENSION_MAX_DAYS} days ahead")
+
+
+async def _after_suspension(apt: Apartment) -> None:
+    """While suspended the notification waits for the end of the suspension, then whoever called looks again: an engine
+    still down after a planned shutdown is told."""
+    until = alerts_suspended_until()
+    if until:
+        info("instance alert waits for the end of the suspension", apartment_id=apt.apartment_id, until=until.isoformat())
+        await asyncio.sleep((until - datetime.now(UTC)).total_seconds())
+
+
+def _minute_s() -> float:
+    from engine.core import seconds_per_minute
+
+    return seconds_per_minute() if get_settings().instance_mode == "mock" else 60.0
+
+
+async def _engine_answers(apt: Apartment) -> bool:
+    try:
+        return (await instances.call(apt, "GET", "/health", timeout=5.0)).status_code == 200
+    except Exception:
+        return False
+
+
+async def _unreachable_watch(apt: Apartment, since: float) -> None:
+    """D-217: the engine has not answered this process since `since`. After the offline_alert rule's minutes (the last
+    ones read; 15 if never; nothing with the rule off), and after a suspension if there is one, it is asked once more;
+    still silent, one notification for the outage (the instance_down claim: one for every instance and every cause)."""
+    apartment_id = apt.apartment_id
+    minutes = _alert_minutes.get(apartment_id, ALERT_MINUTES_DEFAULT)
+    if minutes is None:
+        return
+    await asyncio.sleep(max(0.0, minutes * _minute_s() - (time.time() - since)))
+    await _after_suspension(apt)
+    if apartment_id not in _unreachable or await _engine_answers(apt):
+        return                                     # back meanwhile, maybe before this process saw it
+    ts = datetime.fromtimestamp(since, UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+    await notify_once(instance_down_key(apt), apt.tenant_id, "offline", *instance_unreachable_push(apt, minutes, ts))
+
+
+async def on_link_change(apt: Apartment, up: bool) -> None:
+    """Hook of every instance hub (D-217): the engine stopped answering this process's stream, or answers again."""
+    apartment_id = apt.apartment_id
+    if not up:
+        if apartment_id not in _unreachable:
+            _unreachable[apartment_id] = time.time()
+            info("engine unreachable, waiting", apartment_id=apartment_id)
+            _unreachable_timers[apartment_id] = _spawn(_unreachable_watch(apt, _unreachable[apartment_id]),
+                                                       "instance_unreachable", apartment_id)
+        return
+    _spawn(_offline_alert_minutes(apt), "alert minutes", apartment_id)      # kept for the next outage
+    since = _unreachable.pop(apartment_id, None)
+    if (task := _unreachable_timers.pop(apartment_id, None)) and not task.done():
+        task.cancel()
+    if since is not None:
+        info("engine reachable again", apartment_id=apartment_id, after_s=int(time.time() - since))
+        # what the engine says now: the outage's claim released if it is fine, its connector watched if not, the devices
+        # still offline waited for (the events of the outage may be gone)
+        _resumed.add(apartment_id)
+        _spawn(resume_watches(apt), "resume", apartment_id)
 
 
 def offline_key(apt: Apartment, device_id: str, last_seen: str | None) -> str | None:
@@ -277,6 +388,7 @@ async def _instance_down_watch(apt: Apartment, ts: str | None) -> None:
     from engine.core import seconds_per_minute
 
     await asyncio.sleep(minutes * (seconds_per_minute() if get_settings().instance_mode == "mock" else 60.0))
+    await _after_suspension(apt)                   # D-217: a planned shutdown is not told
     if apt.apartment_id in _health_down:
         await notify_once(instance_down_key(apt), apt.tenant_id, "offline", *instance_down_push(apt, ts))
 
@@ -373,6 +485,7 @@ def _start_round(seconds: float, work, what: str) -> None:
 
 
 async def start_background_hubs() -> None:
+    _suspension_note()
     if get_settings().fcm_enabled:
         await align_hubs_once()
         _start_round(get_settings().notification_lease_s, recover_once, "push recovery")
@@ -388,3 +501,5 @@ def stop_background() -> None:
 def register() -> None:
     if on_stream_event not in hub_manager.hooks:
         hub_manager.hooks.append(on_stream_event)
+    if on_link_change not in hub_manager.link_hooks:
+        hub_manager.link_hooks.append(on_link_change)

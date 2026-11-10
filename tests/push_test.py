@@ -707,3 +707,214 @@ def test_an_engine_that_does_not_answer_is_asked_again(users, fcm, monkeypatch):
     run(scenario())
     assert APT.apartment_id not in push._resumed
 
+
+
+# -------- D-217: the engine itself unreachable ------------------------------------------------------------------------
+MINUTE_S = 0.01                                    # MOCK_TIME_SCALE here: the rule's 15 minutes are 0.15 s
+
+
+@pytest.fixture
+def unreachable(users, fcm, monkeypatch):
+    """The engine does not answer (calls raise ConnectError unless `state.answers`); the rule's last minutes are 15."""
+    monkeypatch.setenv("MOCK_TIME_SCALE", str(MINUTE_S))
+    base = push.get_settings()
+    state = SimpleNamespace(answers=False, health="ok", settings=dataclasses.replace(base, instance_mode="mock"))
+    monkeypatch.setattr(push, "get_settings", lambda: state.settings)
+
+    async def call(apt, method, path, **kw):
+        if not state.answers:
+            raise httpx.ConnectError("motore spento")
+        body = {"status": state.health} if path == "/health" else {"devices": [], "rules": [
+            {"rule_id": "offline_alert", "enabled": True, "params": {"minutes": 15}}]}
+        return httpx.Response(200, json=body, request=httpx.Request("GET", "http://x"))
+    monkeypatch.setattr(push.instances, "call", call)
+    for d in (push._unreachable, push._unreachable_timers, push._alert_minutes, push._down_timers):
+        d.clear()
+    push._resumed.clear()
+    push._alert_minutes[APT.apartment_id] = 15.0
+    return state
+
+
+def suspend(state, value: str) -> None:
+    state.settings = dataclasses.replace(state.settings, unreachable_alerts_off_until=value)
+
+
+def soon(seconds: float) -> str:
+    from datetime import UTC, datetime, timedelta
+    return (datetime.now(UTC) + timedelta(seconds=seconds)).isoformat()
+
+
+UNREACHABLE_BODY = ("Il sistema domotico non risponde da 15 minuti: i comandi dall'app non arrivano e le regole "
+                    "automatiche potrebbero essere ferme.")
+
+
+def test_unreachable_message():
+    data, headers = push.instance_unreachable_push(APT, 15, TS)
+    assert data == {"title": "Milano Centro: sistema domotico non raggiungibile", "body": UNREACHABLE_BODY,
+                    "link": "/a/apt-push", "tag": "instance:apt-push", "kind": "instance_down", "apartment_id": "apt-push",
+                    "ts": TS}
+    assert headers == {"Urgency": "high", "TTL": "86400"}
+
+
+def test_an_engine_silent_for_the_rules_minutes_is_told_once(unreachable, fcm):
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await push.on_link_change(APT, False)                 # the hub tells only changes; twice changes nothing
+        await drain()
+    run(scenario())
+    assert [m.data["body"] for m in fcm.sent] == [UNREACHABLE_BODY]
+
+
+def test_back_before_the_minutes_nothing_and_the_next_outage_is_told(unreachable, fcm):
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await asyncio.sleep(0.03)
+        unreachable.answers = True
+        await push.on_link_change(APT, True)
+        await drain()
+        assert fcm.sent == [] and APT.apartment_id not in push._unreachable_timers
+        unreachable.answers = False
+        await push.on_link_change(APT, False)
+        await drain()
+    run(scenario())
+    assert len(fcm.sent) == 1
+
+
+def test_with_the_rule_off_never(unreachable, fcm):
+    push._alert_minutes[APT.apartment_id] = None             # the last time the engine answered, the rule was off
+
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await drain()
+    run(scenario())
+    assert fcm.sent == []
+
+
+def test_an_engine_that_answers_at_the_last_check_is_not_told(unreachable, fcm):
+    """Another instance may have seen it come back, or this hub is still in its backoff."""
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await asyncio.sleep(0.05)
+        unreachable.answers = True
+        await drain()
+    run(scenario())
+    assert fcm.sent == []
+
+
+def test_two_instances_one_notification_and_the_return_frees_the_next(unreachable, fcm):
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await drain()
+        push._unreachable.clear()                            # a second instance, the same outage
+        await push.on_link_change(APT, False)
+        await drain()
+        assert len(fcm.sent) == 1
+        unreachable.answers = True
+        await push.on_link_change(APT, True)                 # back, and its connector fine: the claim goes
+        await drain()
+        unreachable.answers = False
+        await push.on_link_change(APT, False)
+        await drain()
+    run(scenario())
+    assert len(fcm.sent) == 2
+
+
+def test_one_notification_for_the_outage_whatever_its_cause(unreachable, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
+
+    async def scenario():
+        await push.on_stream_event(APT, event("instance.health", {"status": "down"}))   # first the connector
+        await drain()
+        await push.on_link_change(APT, False)                                          # then the engine itself
+        await drain()
+    run(scenario())
+    assert [m.data["body"] for m in fcm.sent] == ["Il connettore domotico risulta fermo"]
+
+
+def test_a_suspension_holds_it_until_its_end_then_an_engine_still_down_is_told(unreachable, fcm):
+    suspend(unreachable, soon(0.4))
+
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await asyncio.sleep(0.25)                            # past the minutes, inside the suspension
+        assert fcm.sent == []
+        await drain()
+    run(scenario())
+    assert [m.data["body"] for m in fcm.sent] == [UNREACHABLE_BODY]
+
+
+def test_a_suspension_holds_the_connector_down_too(unreachable, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
+    suspend(unreachable, soon(0.3))
+
+    async def scenario():
+        await push.on_stream_event(APT, event("instance.health", {"status": "down"}))
+        await asyncio.sleep(0.1)
+        assert fcm.sent == []
+        await push.on_stream_event(APT, event("instance.health", {"status": "ok"}))    # back during the suspension
+        await drain()
+    run(scenario())
+    assert fcm.sent == []
+
+
+def test_a_suspension_that_cannot_be_read_or_is_too_long_leaves_alerts_on(unreachable):
+    from datetime import UTC, datetime
+    now = datetime(2026, 11, 20, 8, 0, tzinfo=UTC)
+    for value, on in (("", True), ("domani", True), ("2026-11-22T08:00:00", True),           # no offset
+                      ("2026-11-19T08:00:00Z", True), ("2026-12-21T08:00:00Z", True),          # past, 31 days
+                      ("2026-11-22T08:00:00Z", False), ("2026-11-22T09:00:00+01:00", False)):
+        suspend(unreachable, value)
+        assert (push.alerts_suspended_until(now) is None) is on, value
+    assert push.alerts_suspended_until(now).isoformat() == "2026-11-22T09:00:00+01:00"
+
+
+def test_the_hub_tells_the_link_changes(monkeypatch):
+    """The stream to the engine fails, then answers: the hooks hear False, then True."""
+    from bff import sse_hub
+
+    heard, attempts = [], iter(["fail", "ok"])
+
+    class Resp:
+        status_code = 200
+
+        async def aiter_lines(self):
+            await asyncio.Event().wait()
+            yield ""                                         # pragma: no cover
+
+    class Stream:
+        async def __aenter__(self):
+            if next(attempts) == "fail":
+                raise httpx.ConnectError("motore spento")
+            return Resp()
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class Http:
+        def stream(self, *a, **kw):
+            return Stream()
+
+    async def headers(apt, actor):
+        return {}
+    monkeypatch.setattr(sse_hub.instances, "http", lambda: Http())
+    monkeypatch.setattr(sse_hub.instances, "instance_headers", headers)
+
+    async def hook(apt, up):
+        heard.append(up)
+
+    async def scenario():
+        hub = sse_hub.InstanceHub(APT, [], [hook])
+        hub.start(None)
+        for _ in range(300):
+            if heard == [False, True]:
+                break
+            await asyncio.sleep(0.01)
+        hub.task.cancel()
+    run(scenario())
+    assert heard == [False, True]
+
+
+def test_register_adds_the_link_hook():
+    from bff.sse_hub import hub_manager
+    push.register()
+    assert push.on_link_change in hub_manager.link_hooks

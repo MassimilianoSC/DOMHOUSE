@@ -45,6 +45,7 @@ class SseEvent:
 
 
 EventHook = Callable[[Apartment, SseEvent], Awaitable[None]]
+LinkHook = Callable[[Apartment, bool], Awaitable[None]]      # D-217: the engine reachable (True) or not, at each change
 
 
 def link_of(apt: Apartment) -> tuple:
@@ -73,9 +74,11 @@ async def parse_sse(lines) -> "asyncio.AsyncIterator[SseEvent]":
 
 
 class InstanceHub:
-    def __init__(self, apt: Apartment, hooks: list[EventHook]):
+    def __init__(self, apt: Apartment, hooks: list[EventHook], link_hooks: list[LinkHook] | None = None):
         self.apt = apt
         self.hooks = hooks
+        self.link_hooks = link_hooks if link_hooks is not None else []
+        self.reachable: bool | None = None           # D-217: None until the first attempt, then each change is told
         # D-198: an hour at most, and a number at most: 60 events a minute are 3 MB per apartment, and a storm has no limit
         self.buffer: deque[SseEvent] = deque(maxlen=get_settings().hub_buffer_max)
         self.subscribers: set[asyncio.Queue] = set()
@@ -130,6 +133,18 @@ class InstanceHub:
             except Exception as exc:
                 warn("stream hook failed", error=str(exc), apartment_id=self.apt.apartment_id)
 
+    async def _set_reachable(self, up: bool) -> None:
+        """D-217: the engine answered the stream (True) or the attempt failed (False); the hooks hear only the changes.
+        A stream that ends normally changes nothing: the next attempt says."""
+        if self.reachable is up:
+            return
+        self.reachable = up
+        for hook in self.link_hooks:
+            try:
+                await hook(self.apt, up)
+            except Exception as exc:
+                warn("stream link hook failed", error=str(exc), apartment_id=self.apt.apartment_id)
+
     async def _resume_from_cursor(self, apt: Apartment) -> None:
         """D-201: a new instance, or one that restarted, asks the engine for what it missed. What was already notified is
         stopped by the claims. Only with FCM on, as the connections that do not depend on a browser. Older than the window
@@ -168,12 +183,14 @@ class InstanceHub:
                     self.connected = True
                     backoff = 1.0
                     info("upstream stream connected", apartment_id=self.apt.apartment_id)
+                    await self._set_reachable(True)
                     async for ev in parse_sse(resp.aiter_lines()):
                         await self._publish(ev)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 warn("upstream stream error", error=str(exc), apartment_id=self.apt.apartment_id)
+                await self._set_reachable(False)
             self.connected = False
             await asyncio.sleep(backoff)
             backoff = min(backoff * 2, 30.0)
@@ -183,11 +200,12 @@ class HubManager:
     def __init__(self) -> None:
         self.hubs: dict[str, InstanceHub] = {}
         self.hooks: list[EventHook] = []
+        self.link_hooks: list[LinkHook] = []
 
     def hub(self, apt: Apartment) -> InstanceHub:
         h = self.hubs.get(apt.apartment_id)
         if h is None:
-            h = InstanceHub(apt, self.hooks)
+            h = InstanceHub(apt, self.hooks, self.link_hooks)
             self.hubs[apt.apartment_id] = h
         h.apt = apt
         return h

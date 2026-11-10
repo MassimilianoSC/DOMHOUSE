@@ -69,6 +69,9 @@ class Settings:
     # P-67 (D-136): the Firestore database of this environment, "(default)" in production, "staging" in staging
     firestore_database: str = "(default)"
     summary_job: bool = True                  # P-60 step 11: the weekly summary's hourly round (off in the test runs)
+    # D-217: until this instant (ISO 8601 with its offset, at most 30 days ahead) the «sistema domotico non
+    # raggiungibile» notifications wait: a planned shutdown (procedure M19). Empty: on. Read by bff/push.py
+    unreachable_alerts_off_until: str = ""
 
     @property
     def mail_configured(self) -> bool:
@@ -148,4 +151,5 @@ def get_settings() -> Settings:
         notification_lease_s=float(e("NOTIFICATION_LEASE_S", "60")),
         firestore_database=e("FIRESTORE_DATABASE", "(default)").strip() or "(default)",
         summary_job=_bool("SUMMARY_JOB", "true"),
+        unreachable_alerts_off_until=e("UNREACHABLE_ALERTS_OFF_UNTIL", "").strip(),
     )

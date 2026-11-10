@@ -434,9 +434,24 @@ preferenze); `frost_inactive` ← `notification_prefs.offline` (D-164: caldaia s
 `booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
 annullata dopo il pre-arrivo, con l'appartamento rimesso a vuoto dal motore (D-121); il `body` è il testo della decisione.
 `device_offline` parte se il dispositivo è ancora offline dopo i minuti della regola `offline_alert` (15 se non
-leggibile); `instance_down` (evento `instance.health` con `status` `down`: istanza irraggiungibile o connector del
-motore giù, D-131) parte se resta giù per gli stessi minuti della regola `offline_alert`, mai con la regola spenta, una
-volta sola finché l'istanza non torna su: una caduta seguita da un ritorno prima dei minuti non manda niente.
+leggibile). `instance_down` ha due cause, con una notifica sola per episodio qualunque sia (stesso `tag`
+`instance:<apartment_id>` e stessa chiave `push:instance_down:<apartment_id>` in `work_claims`):
+- connector del motore giù (D-131): evento `instance.health` con `status` `down`, dal motore che risponde. Parte se
+  resta giù per gli stessi minuti della regola `offline_alert`, mai con la regola spenta. `body` «Il connettore
+  domotico risulta fermo».
+- motore irraggiungibile (D-217): lo stream verso il motore fallisce (macchina o processo fermi, rete interrotta).
+  Ogni istanza del server conta dalla sua prima connessione fallita; vale l'ultimo valore della regola `offline_alert`
+  letto quando il motore rispondeva (15 se mai letto, niente con la regola spenta). Allo scadere chiede ancora
+  `GET /health` (5 s): se risponde, niente. `body` «Il sistema domotico non risponde da <N> minuti: i comandi
+  dall'app non arrivano e le regole automatiche potrebbero essere ferme.».
+Una caduta seguita da un ritorno prima dei minuti non manda niente. Al ritorno non parte nessuna notifica: il server
+rilegge `GET /health` e libera la chiave se il connector è su, così l'episodio dopo avvisa di nuovo.
+Sospensione (D-217, procedura M19): `UNREACHABLE_ALERTS_OFF_UNTIL`, un istante ISO 8601 con il fuso (per esempio
+`2026-11-23T08:00:00+01:00`), al massimo 30 giorni avanti. Fino a quell'istante le due notifiche `instance_down`
+aspettano; poi, se il problema c'è ancora, partono. Un valore illeggibile, senza fuso, passato o oltre i 30 giorni è
+ignorato: gli avvisi restano attivi e il log all'avvio lo dice («UNREACHABLE_ALERTS_OFF_UNTIL ignored»). Si imposta con
+`gcloud run services update … --update-env-vars`, si toglie con `--remove-env-vars`; una pubblicazione (`services
+replace` dal manifesto) la toglie. `device_offline` non è sospesa.
 
 D-170: la vecchia preferenza `decisions` («Decisioni del motore») non esiste più: non faceva niente. Un corpo di #28 o un
 record salvato che la contiene è accettato e la chiave è ignorata; `GET /app/push/status` e `/app/me` non la mandano più.
