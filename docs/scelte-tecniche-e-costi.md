@@ -89,7 +89,8 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 
 - **Scelta:** la VM riceve un indirizzo pubblico fisso, aperto solo sulla porta 8883 dei dispositivi. Circa 3,3 € al mese, più 0,18 € per la zona DNS.
 - **Condizioni:** una sola regola di firewall dedicata (`mqtt-tls-in`); verifica dall'esterno che tutto il resto sia chiuso; password per ogni dispositivo, nessun accesso anonimo, limite ai tentativi sbagliati e allarme.
-- **Risparmio collegato:** con l'indirizzo pubblico l'uscita a internet attraverso Cloud NAT non serve più. Toglierlo risparmia almeno 3,3 € al mese.
+- **Risparmio collegato:** con l'indirizzo pubblico l'uscita a internet attraverso Cloud NAT non serve più: eliminato il 10 novembre 2026, circa 4 € al mese risparmiati.
+- **Stato:** attivo dal 10 novembre 2026, indirizzo 34.154.57.13, nome `mqtt.dh-lab.eu`; verificato dall'esterno che sia aperta solo la porta 8883.
 - **Per la produzione:** se i dispositivi diventeranno molti, si passa a un bilanciatore di Google (circa 16 € al mese), senza toccare gli Shelly: puntano al nome `mqtt.dh-lab.eu`.
 - **Scartate:** la cifratura fatta da Google (le password dei dispositivi passerebbero in chiaro) e il proxy TCP (costo incerto).
 - **Dettagli:** `docs/analisi-ingresso-mqtt-2026-11-09.md`.
@@ -140,7 +141,7 @@ I numeri «D-x», «E-x» e «C-x» rimandano alle decisioni, agli errori e ai c
 | Disco separato per le chiavi del certificato (10 GB) | 0,42 € al mese | Fisso | Listino Google letto il 10 nov alle 9:15 |
 | Zona DNS di `dh-lab.eu` | Circa 0,18 € al mese | Fisso | Stimato, analisi del 9 nov |
 | Indirizzo pubblico della VM per i dispositivi (D-209) | Circa 3,3 € al mese | Fisso | Listino Google letto il 10 nov alle 9:40 |
-| Cloud NAT, da togliere dopo l'indirizzo pubblico | Almeno 3,3 € al mese di risparmio | Fisso | Listino Google letto il 10 nov alle 9:40 |
+| Cloud NAT | Eliminato il 10 novembre 2026: circa 4 € al mese risparmiati | — | Costi reali degli ultimi 30 giorni |
 | Assistente | Circa 2 € al mese per appartamento con 20 domande al giorno; tetto 20 € al mese | A consumo | Stimato da listini di terze parti, D-187 |
 | Archivio delle immagini del server e dei motori (1,6 GB, oltre la quota gratuita di 0,5 GB) | Pochi centesimi al mese | A consumo | Stimato, 10 nov |
 | Database, segreti, log, monitoraggio | Trascurabili | A consumo | Stimato, 23 ott |
@@ -161,7 +162,7 @@ Fonte: Report della fatturazione, solo progetto `domotica-poc-511707`, dal 12 ot
 | Server (Cloud Run, produzione e staging) | 9,82 € (16,06 € lordi, meno la quota gratuita mensile) | Circa 40 € | Riducibile: la produzione resta sempre accesa (minimo 1 copia) e il controllo di raggiungibilità ogni 60 secondi la tiene sveglia. Lo staging si spegne già da solo |
 | VM dei motori (CPU, memoria, disco 30 GB) | 6,17 € (circa 210 ore accesa) | Circa 16 € | Necessaria: motore `dev` e, a breve, il broker |
 | Snapshot del disco | 0,19 € | Circa 0,3 € | Necessaria (backup) |
-| Cloud NAT | 1,43 € | Circa 4,2 € | Da togliere dopo l'indirizzo pubblico (D-209), che costa circa 3,3 € |
+| Cloud NAT | 1,43 € | — | Eliminato il 10 novembre 2026 (D-209); l'indirizzo pubblico che lo sostituisce costa circa 3,3 € |
 | Modello dell'assistente (Vertex AI) | 0,83 € | Pochi euro, tetto a 20 € | Necessaria; quasi tutto dalle misure dei modelli di ottobre |
 | Tutto il resto (database, archivio immagini, segreti, log, monitoraggio, hosting, DNS) | Meno di 0,05 € | Meno di 1 € | Necessario |
 | **Totale** | **18,47 €** | **Circa 60 €** | |
