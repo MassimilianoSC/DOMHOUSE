@@ -815,7 +815,18 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 Verifica:
 
 1. Compaiono `broker cert new notAfter=…` e `ricarica fatta: la porta 8883 serve il certificato …`, e i relè restano collegati.
+   Se il tipo di chiave cambia (per esempio da ECDSA a RSA-2048, predefinito dal 10 novembre), la ricarica non basta: compaiono `la ricarica non basta (tipo di chiave cambiato?): riavvio del broker, i dispositivi si ricollegano`, poi `broker sano…` e `riavvio fatto: la porta 8883 serve il certificato …`.
 2. Il giro del timer subito dopo dice `certificato invariato: rinnovo non ancora dovuto`.
+3. Da Cloud Shell, chiave e catena servite:
+
+```bash
+# Cloud Shell
+cd ~
+openssl s_client -connect mqtt.dh-lab.eu:8883 -servername mqtt.dh-lab.eu -showcerts < /dev/null 2>/dev/null | grep -E '^ *[0-9]+ s:|^ *i:'
+openssl s_client -connect mqtt.dh-lab.eu:8883 -servername mqtt.dh-lab.eu < /dev/null 2>/dev/null | openssl x509 -noout -text | grep -E 'Public Key Algorithm|Public-Key'
+```
+
+   Atteso (da verificare al primo rinnovo vero): `rsaEncryption`, `(2048 bit)`; catena foglia → YR1 o YR2 → Root YR con emittente ISRG Root X1 (la catena lunga, chiesta per nome con `--preferred-chain`).
 
 Revoca e riemissione: si usa quando la chiave è uscita, o potrebbe essere uscita, dalla VM.
 
