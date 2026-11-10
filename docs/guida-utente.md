@@ -1892,6 +1892,8 @@ tolti).»
   compare nel log come «engine loop step failed» e fa partire «Motori: righe di errore»; il motore continua con gli
   altri compiti.
 - **«Motori: disco della VM oltre l'80 %»**.
+- **Accesso di sviluppo rifiutato** (dal lotto 38): il server non parte se in staging o in produzione è impostato
+  l'accesso di sviluppo, o se su Cloud Run manca l'ambiente; nel log c'è «development setting refused» con il motivo.
 
 > **Da sapere**
 >
