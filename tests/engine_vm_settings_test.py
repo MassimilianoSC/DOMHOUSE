@@ -32,11 +32,11 @@ def posix(path: Path) -> str:
 STUBS = {
     "id": '#!/usr/bin/env bash\necho 0\n',
     "sleep": '#!/usr/bin/env bash\nexit 0\n',
-    "docker": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/docker.log"\nexit 0\n',
+    "docker": '#!/usr/bin/env bash\necho "$* [ENGINE_BIND_IP=${ENGINE_BIND_IP:-}]" >> "$STUB_DIR/docker.log"\nexit 0\n',
     # health: 200 unless the test put a file "unhealthy" (503) or "code-<port>" (that code) next to the stand-ins
     "curl": ('#!/usr/bin/env bash\n'
              'echo "$*" >> "$STUB_DIR/curl.log"\n'
-             'port=$(echo "$*" | grep -oE "127.0.0.1:[0-9]+" | cut -d: -f2)\n'
+             'port=$(echo "$*" | grep -oE "://[0-9.]+:[0-9]+/" | head -1 | cut -d: -f3 | tr -d /)\n'
              'host=$(echo "$*" | grep -oE "https://[^/ ]+" | head -1 | cut -d/ -f3)\n'
              'if [ -n "$host" ] && [ -f "$STUB_DIR/code-$host" ]; then code=$(cat "$STUB_DIR/code-$host"); '
              'elif [ -f "$STUB_DIR/code-$port" ]; then code=$(cat "$STUB_DIR/code-$port"); '
@@ -70,10 +70,10 @@ def vm(tmp_path):
     (tmp_path / "meminfo").write_text("MemTotal:        2000000 kB\nMemFree:          300000 kB\nMemAvailable:     500000 kB\n",
                                       encoding="utf-8", newline="\n")             # a Linux /proc/meminfo, e2-small sized
 
-    def run(*args):
+    def run(*args, bind="10.198.0.2"):           # D-218: the VM's internal address, as the metadata server gives it
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}" '
                f'DOMHOUSE_ETC="{posix(etc)}" DOMHOUSE_OPT="{posix(opt)}" DOMHOUSE_HEALTH_TRIES=2 '
-               f'DOMHOUSE_DATA="{posix(data)}" DOMHOUSE_SYSTEMD="{posix(units)}" '
+               f'DOMHOUSE_DATA="{posix(data)}" DOMHOUSE_SYSTEMD="{posix(units)}" DOMHOUSE_BIND_IP="{bind}" '
                f'DOMHOUSE_OPS_CONFIG="{posix(tmp_path / "ops" / "config.yaml")}" DOMHOUSE_MEMINFO="{posix(tmp_path / "meminfo")}"; '
                f'bash "{posix(SCRIPT)}" ' + " ".join(f"'{a}'" for a in args))
         return subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=60)
@@ -261,3 +261,26 @@ def test_the_watch_calls_the_brokers_check_only_when_it_is_installed_and_after_t
     (vm.opt / "broker-vm.sh").write_text("exit 3\n", encoding="utf-8", newline="\n")
     done = vm("check-all")
     assert done.returncode == 0 and "broker down (controllo non riuscito)" in done.stdout
+
+
+def test_d218_the_engines_are_reached_and_published_on_the_vms_internal_address_only(vm):
+    """D-218: the ports go on the VM's internal address (ENGINE_BIND_IP, from the metadata server; here the tests' own),
+    not on every interface; the watch, the waits and the api command call the engines there, never on 127.0.0.1."""
+    assert vm("check-all").returncode == 0
+    assert vm("api", APT, "GET", "/health").returncode == 0
+    called = (vm.stubs / "curl.log").read_text(encoding="utf-8")
+    assert "http://10.198.0.2:8100/api/v1/health" in called and "127.0.0.1" not in called
+    assert vm("set", APT, "CONFIRM_ON_WATTS=30").returncode == 0                  # a restart: compose with the address
+    assert "[ENGINE_BIND_IP=10.198.0.2]" in (vm.stubs / "docker.log").read_text(encoding="utf-8")
+    compose = (ROOT / "engine" / "compose.yaml").read_text(encoding="utf-8")
+    assert '- "${ENGINE_BIND_IP:?ENGINE_BIND_IP}:${PORT}:${PORT}"' in compose and '- "${PORT}:${PORT}"' not in compose
+
+
+def test_d218_without_the_internal_address_nothing_is_started(vm):
+    """The metadata server does not give the address (the stand-in curl answers something that is not one): the script
+    stops before touching an engine, instead of publishing on an empty address."""
+    done = vm("status", APT, bind="")
+    assert done.returncode != 0 and "non leggo l'indirizzo interno della VM" in done.stderr, done.stderr
+    log = (vm.stubs / "docker.log").read_text(encoding="utf-8") if (vm.stubs / "docker.log").exists() else ""
+    assert "--env-file" not in log                        # only the start's «docker compose version»: no engine touched
+

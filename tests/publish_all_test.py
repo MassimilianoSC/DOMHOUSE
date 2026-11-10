@@ -41,7 +41,9 @@ case "$*" in
     cmd="${*#*--command }"
     case "$cmd" in
       *ENGINE_IMAGE*) cat "$STUB_DIR/vm-image" ;;
-      *sha256sum*) cat "$STUB_DIR/vm-script-hash" ;;
+      *engine-vm.sh*sha256sum*) cat "$STUB_DIR/vm-script-hash" ;;
+      *compose.yaml*sha256sum*) cat "$STUB_DIR/vm-compose-hash" ;;
+      *"install -m 644 ~/compose.yaml"*) echo compose-ok ;;
       *"engine-vm.sh timers"*) echo timer-ok ;;
       *"engine-vm.sh update"*)
         [ -f "$STUB_DIR/update-fails" ] && exit 1
@@ -75,7 +77,7 @@ def pub(tmp_path):
     if not bash or not shutil.which("git"):
         pytest.skip("bash o git non disponibili")
     r = tmp_path / "app"
-    for rel in ("scripts/publish-all.sh", "bff/cloudrun.yaml"):
+    for rel in ("scripts/publish-all.sh", "bff/cloudrun.yaml", "engine/compose.yaml"):
         (r / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, r / rel)
     (r / "scripts" / "publish-settings.conf").write_text(
@@ -84,7 +86,6 @@ def pub(tmp_path):
         "SMTP_USER=mittente@example.com\nVITE_FCM_ENABLED=true\nENGINE_APARTMENT=dev\nVM_NAME=vm-prova\nVM_ZONE=europe-west8-a\n",
         encoding="utf-8", newline="\n")
     (r / "scripts" / "engine-vm.sh").write_text("echo motore v1\n", encoding="utf-8", newline="\n")
-    (r / "engine").mkdir()
     (r / "engine" / "core.py").write_text("x = 1\n", encoding="utf-8", newline="\n")
     (r / ".gitignore").write_text("logs/\n", encoding="utf-8", newline="\n")
 
@@ -120,6 +121,7 @@ def pub(tmp_path):
     (stubs / "values-prod").write_text(values + "\n", encoding="utf-8")
     (stubs / "vm-image").write_text(f"{ENGINE}{on_vm}\n", encoding="utf-8")
     (stubs / "vm-script-hash").write_text("diverso  -\n", encoding="utf-8")
+    (stubs / "vm-compose-hash").write_text("diverso  -\n", encoding="utf-8")
 
     def run(commit=None, answer="pubblica\n", env=""):
         (stubs / "calls.log").unlink(missing_ok=True)
@@ -144,6 +146,8 @@ def steps(calls):
             out.append(line.split(" dry=")[0] + (" (a secco)" if "dry=1" in line else ""))
         elif "compute scp" in line:
             out.append("scp")
+        elif "install -m 644 ~/compose.yaml" in line:
+            out.append("compose")
         elif "engine-vm.sh timers" in line:
             out.append("timers")
         elif "engine-vm.sh update" in line:
@@ -155,7 +159,7 @@ def test_a_lot_goes_to_staging_then_production_then_the_engine_with_one_question
     done, calls = pub()
     assert done.returncode == 0, done.stdout + done.stderr
     assert steps(calls) == [f"publish staging {pub.git('rev-parse', pub.lot)}", f"publish prod {pub.git('rev-parse', pub.lot)}",
-                            f"deploy-engine {pub.git('rev-parse', pub.lot)}", "scp", "timers", "update"]
+                            f"deploy-engine {pub.git('rev-parse', pub.lot)}", "scp", "compose", "timers", "update"]
     assert "confirmed=pubblica fcm=true site=sito-prova" in calls        # the settings reach publish.sh
     assert done.stdout.count("scrivi pubblica") == 1
     assert f"motore dev: da {pub.on_vm} a {pub.lot}" in done.stdout and "valori attivi uguali al manifesto" in done.stdout
@@ -217,12 +221,33 @@ def test_documents_in_engine_do_not_rebuild_the_engine_and_the_same_script_is_no
     pub.git("commit", "-q", "-m", "solo documenti e prove")
     pub.git("push", "-q", "origin", "main")
     head = pub.git("rev-parse", "--short", "HEAD")
-    script = (pub.root / "scripts" / "engine-vm.sh").read_bytes().replace(b"\r", b"")
-    (pub.stubs / "vm-script-hash").write_text(f"{hashlib.sha256(script).hexdigest()}  -\n", encoding="utf-8")
+    same_on_vm(pub)
     done, calls = pub(commit=head)
     assert done.returncode == 0, done.stdout + done.stderr
     assert "codice del motore invariato" in done.stdout and "motore dev: invariato" in done.stdout
     assert [s for s in steps(calls) if not s.startswith("publish")] == []
+
+
+def same_on_vm(pub):
+    """The VM has the commit's engine-vm.sh and compose.yaml (their hashes without \\r, as the script reads them)."""
+    for name, rel in (("vm-script-hash", "scripts/engine-vm.sh"), ("vm-compose-hash", "engine/compose.yaml")):
+        data = (pub.root / rel).read_bytes().replace(b"\r", b"")
+        (pub.stubs / name).write_text(f"{hashlib.sha256(data).hexdigest()}  -\n", encoding="utf-8")
+
+
+def test_a_new_compose_file_alone_recreates_the_engine_with_the_same_image(pub):
+    """D-218: install copies engine/compose.yaml once; when only that file changes (the ports on the internal address),
+    publish-all copies it and recreates the engine with the image it already runs, so the change takes effect."""
+    (pub.stubs / "vm-image").write_text(f"{ENGINE}{pub.lot}\n", encoding="utf-8")       # the engine's code is current
+    same_on_vm(pub)
+    (pub.stubs / "vm-compose-hash").write_text("diverso  -\n", encoding="utf-8")       # but not its compose.yaml
+    done, calls = pub()
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert [s for s in steps(calls) if not s.startswith("publish")] == ["scp", "compose", "update"]
+    update = next(line for line in calls.splitlines() if "engine-vm.sh update" in line)
+    assert f"update dev {ENGINE}{pub.lot}" in update                                    # the same image
+    assert f"ricreato con la stessa immagine ({pub.lot}) per il nuovo compose.yaml" in done.stdout
+    assert "compose.yaml aggiornato sulla VM" in done.stdout
 
 
 def test_a_commit_not_on_github_stops_before_the_question(pub):

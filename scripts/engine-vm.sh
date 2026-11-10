@@ -83,6 +83,14 @@ token() {
 
 project() { curl -sf -H "Metadata-Flavor: Google" "${METADATA}/project/project-id"; }
 
+BIND_IP="${DOMHOUSE_BIND_IP:-}"          # moved only by the tests
+resolve_bind_ip() {
+  # D-218: the engines' ports are published on the VM's internal address only, the one the app's instance URL names.
+  # Read once, in the main shell, before any command that reaches an engine (a failure inside $(...) would not stop us)
+  [ -n "${BIND_IP}" ] || BIND_IP="$(curl -sf -H "Metadata-Flavor: Google" "${METADATA}/instance/network-interfaces/0/ip" || true)"
+  [[ "${BIND_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "non leggo l'indirizzo interno della VM dal server dei metadati"
+}
+
 write_key() {
   local apt="$1" secret="${SECRET_PREFIX}$1" tok url key
   step "Chiave dal segreto ${secret} -> ${ETC}/${apt}.env (permessi 600)"
@@ -163,17 +171,17 @@ compose() {
   if [ "$(sed -n 's/^CONNECTOR=//p' "$(settings_file "${apt}")")" != "simulated" ] && [ -f "${OPT}/compose.broker.yaml" ]; then
     files+=(-f "${OPT}/compose.broker.yaml")
   fi
-  docker compose --env-file "$(settings_file "${apt}")" "${files[@]}" "$@"
+  ENGINE_BIND_IP="${BIND_IP:?}" docker compose --env-file "$(settings_file "${apt}")" "${files[@]}" "$@"
 }
 
 wait_healthy() {
   local apt="$1" port code
   port="$(sed -n 's/^PORT=//p' "$(settings_file "${apt}")")"
-  step "Attesa di http://127.0.0.1:${port}/api/v1/health"
+  step "Attesa di http://${BIND_IP}:${port}/api/v1/health"
   for _ in $(seq 1 "${DOMHOUSE_HEALTH_TRIES:-30}"); do      # 30 tries, 2 s apart (fewer only in the tests)
-    code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}/api/v1/health" || true)"
+    code="$(curl -s -o /dev/null -w '%{http_code}' "http://${BIND_IP}:${port}/api/v1/health" || true)"
     if [ "${code}" = "200" ]; then
-      curl -s "http://127.0.0.1:${port}/api/v1/health" | python3 -c \
+      curl -s "http://${BIND_IP}:${port}/api/v1/health" | python3 -c \
         'import json, sys; h = json.load(sys.stdin); print("health 200:", h["status"], h["implementation"], "connector", h["connector"]["status"])'
       return 0
     fi
@@ -272,7 +280,7 @@ check_all() {
     apt="$(basename "${settings}" .settings)"
     total=$((total + 1))
     port="$(sed -n 's/^PORT=//p' "${settings}")"
-    code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://127.0.0.1:${port}/api/v1/health" 2>/dev/null || true)"
+    code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://${BIND_IP}:${port}/api/v1/health" 2>/dev/null || true)"
     case "${code}" in
       200) watch_line "engine ok ${apt}" ;;
       503) watch_line "engine down ${apt} (risponde 503: connector o database)"; silent=$((silent + 1)) ;;
@@ -368,6 +376,7 @@ start() {
 }
 
 cmd="${1:-}"; shift || true
+case "${cmd}" in backup|backup-all|timers|logs-agent|"") ;; *) resolve_bind_ip ;; esac
 case "${cmd}" in
   install)
     [ $# -ge 3 ] || die "uso: install <apartment_id> <port> <image> [connector]"
@@ -446,7 +455,7 @@ case "${cmd}" in
     corr="$(python3 -c 'import uuid; print(uuid.uuid4())')"
     curl -s -w '\nHTTP %{http_code}\n' -X "${method}" -H @<(sed -n 's/^API_KEY=/X-API-Key: /p' "${ETC}/${apt}.env") \
       -H "X-Actor: system:vm-admin" -H "X-Correlation-Id: ${corr}" -H "Content-Type: application/json" \
-      ${body:+--data "${body}"} "http://127.0.0.1:${port}/api/v1${path}"
+      ${body:+--data "${body}"} "http://${BIND_IP}:${port}/api/v1${path}"
     ;;
   set)
     [ $# -eq 2 ] && [[ "$2" == *=* ]] || die "uso: set <apartment_id> NOME=VALORE"
