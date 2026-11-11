@@ -24,12 +24,17 @@ const STATUS_TONE: Record<Approval["status"], Tone> = {
   expired: "neutral",
 };
 
-function Countdown({ until, id }: { until: string; id: string }) {
+/** The time now, again every second. */
+function useNow() {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const i = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(i);
   }, []);
+  return now;
+}
+
+function Countdown({ until, id, now }: { until: string; id: string; now: number }) {
   const ms = new Date(until).getTime() - now;
   const urgent = ms < 5 * 60_000;
   return (
@@ -45,6 +50,10 @@ function ApprovalCard({ aptId, a, canWrite, onDecided }: { aptId: string; a: App
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState<"approve" | "reject" | null>(null);
   const pending = a.status === "pending";
+  const now = useNow();
+  // P-83, D70: past its expiry the engine closes it at its next round; until then «Approva» and «Rifiuta» would only
+  // meet «già decisa» (or, with this phone's clock ahead, decide one the engine still counts as open)
+  const expired = Boolean(a.expires_at) && new Date(a.expires_at!).getTime() <= now;
 
   const decide = async (decision: "approve" | "reject") => {
     setBusy(decision);
@@ -72,7 +81,7 @@ function ApprovalCard({ aptId, a, canWrite, onDecided }: { aptId: string; a: App
       </p>
       {pending && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          {a.expires_at && <Countdown until={a.expires_at} id={a.approval_id} />}
+          {a.expires_at && <Countdown until={a.expires_at} id={a.approval_id} now={now} />}
           <span className="text-xs text-muted-foreground">{t(`approvals.onExpiry.${a.expires_action}`)}</span>
         </div>
       )}
@@ -83,10 +92,10 @@ function ApprovalCard({ aptId, a, canWrite, onDecided }: { aptId: string; a: App
             <Input id={`approval-note-${a.approval_id}`} value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} placeholder={t("approvals.notePlaceholder")} data-testid={`approval-note-${a.approval_id}`} />
           </div>
           <div className="flex gap-2">
-            <Button className="flex-1" onClick={() => decide("approve")} disabled={busy !== null} data-testid={`approve-action-btn-${a.approval_id}`}>
+            <Button className="flex-1" onClick={() => decide("approve")} disabled={busy !== null || expired} data-testid={`approve-action-btn-${a.approval_id}`}>
               <Check /> {t("approvals.approve")}
             </Button>
-            <Button className="flex-1" variant="destructive" onClick={() => decide("reject")} disabled={busy !== null} data-testid={`reject-action-btn-${a.approval_id}`}>
+            <Button className="flex-1" variant="destructive" onClick={() => decide("reject")} disabled={busy !== null || expired} data-testid={`reject-action-btn-${a.approval_id}`}>
               <X /> {t("approvals.reject")}
             </Button>
           </div>

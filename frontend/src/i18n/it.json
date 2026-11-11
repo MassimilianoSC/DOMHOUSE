@@ -516,6 +516,7 @@
     "windowTitle": "Finestra aperta",
     "windowOpen": "Finestra aperta in {rooms}: durante la forzatura il clima resta acceso.",
     "windowsOpen": "Finestre aperte in {rooms}: durante la forzatura il clima resta acceso.",
+    "windowUnknown": "Sensore della finestra senza segnale in {rooms}: se è aperta, durante la forzatura il clima resta acceso.",
     "windowConfirm": "Forza comunque"
   },
   "apartments": {
@@ -560,6 +561,9 @@
       "windowsOneOpen": "1 aperta",
       "windowsOpen": "{count} aperte",
       "windowsNone": "Nessun sensore",
+      "windowsUnknown": "Stato non noto",
+      "windowsNoneOpen": "Nessuna aperta",
+      "windowsNoSignal": "Senza segnale: {rooms}",
       "energy": "Consumo di oggi",
       "devices": "Dispositivi online",
       "offline": "{count} offline"

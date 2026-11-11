@@ -65,11 +65,14 @@ export function ScheduleDialog({ aptId, tz, open, onOpenChange, onDone, move }: 
   const device = controllable.find((d) => d.device_id === deviceId);
   const cap = device?.capabilities.climate ? "climate" : device?.capabilities.heating ? "heating" : "switch";
   const cmds: Cmd[] = cap === "switch" ? ["turn_off", "turn_on"] : ["turn_off", "setpoint"];
+  // P-83, D21: what the menu shows is what is saved. A command chosen for another device (a socket's «Accendi», a
+  // boiler's «Imposta temperatura») that this one does not have falls back to the first, as the menu shows it.
+  const shownCmd: Cmd = cmds.includes(cmd) ? cmd : cmds[0];
 
   const buildAction = (): ScheduledAction => {
     if (type === "apartment_mode") return { type, mode };
-    if (cmd === "setpoint") return { type, device_id: deviceId, capability: cap, action: cap === "climate" ? "set_climate" : "set_heating", params: { on: true, setpoint: Number(setpoint) } };
-    return { type, device_id: deviceId, capability: cap, action: cmd };
+    if (shownCmd === "setpoint") return { type, device_id: deviceId, capability: cap, action: cap === "climate" ? "set_climate" : "set_heating", params: { on: true, setpoint: Number(setpoint) } };
+    return { type, device_id: deviceId, capability: cap, action: shownCmd };
   };
 
   const save = async () => {
@@ -124,11 +127,11 @@ export function ScheduleDialog({ aptId, tz, open, onOpenChange, onDone, move }: 
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="schedule-cmd">{t("schedule.command")}</Label>
-                    <NativeSelect id="schedule-cmd" value={cmds.includes(cmd) ? cmd : cmds[0]} onChange={(e) => setCmd(e.target.value as Cmd)} data-testid="schedule-command-select">
+                    <NativeSelect id="schedule-cmd" value={shownCmd} onChange={(e) => setCmd(e.target.value as Cmd)} data-testid="schedule-command-select">
                       {cmds.map((c) => <option key={c} value={c}>{t(`schedule.cmd${c === "turn_off" ? "TurnOff" : c === "turn_on" ? "TurnOn" : "Setpoint"}`)}</option>)}
                     </NativeSelect>
                   </div>
-                  {cmd === "setpoint" && cmds.includes("setpoint") && (
+                  {shownCmd === "setpoint" && (
                     <div className="space-y-1.5">
                       <Label htmlFor="schedule-setpoint">{t("schedule.setpoint")}</Label>
                       <Input id="schedule-setpoint" type="number" step="0.5" value={setpoint} onChange={(e) => setSetpoint(e.target.value)} data-testid="schedule-setpoint-input" />

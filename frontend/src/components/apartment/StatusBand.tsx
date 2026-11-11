@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Apartment, ApartmentMode, Device, Room } from "@/api/types";
-import { openWindowRooms } from "@/components/apartment/ApartmentControls";
+import { openWindowRooms, unknownWindowRooms } from "@/components/apartment/ApartmentControls";
 import { t } from "@/i18n";
 import { capitalizeFirst, fmtNumber, fmtShortDateTime, fmtTime } from "@/lib/format";
 import { MODE_BG, MODE_FG } from "@/lib/modeColours";
@@ -42,8 +42,12 @@ function nextEvent(apartment: Apartment): { kind: "checkin" | "checkout"; at: st
 export function StatusBand({ apartment, devices, rooms, kwhToday, energyOn, tz }: { apartment: Apartment; devices: Device[]; rooms: Room[]; kwhToday: number | null; energyOn: boolean; tz: string }) {
   const next = nextEvent(apartment);
   const contacts = devices.filter((d) => d.capabilities.contact);
-  const open = contacts.filter((d) => d.capabilities.contact?.open === true).length;
+  // P-83, D44: an offline sensor says nothing about its window now; it counts neither as open nor as closed
+  const open = contacts.filter((d) => d.online && d.capabilities.contact?.open === true).length;
+  const unknown = contacts.filter((d) => !d.online).length;
   const openRooms = openWindowRooms(devices, rooms);
+  const unknownRooms = unknownWindowRooms(devices, rooms);
+  const noSignal = unknown ? t("overview.band.windowsNoSignal", { rooms: unknownRooms.join(", ") }) : undefined;
   const offline = apartment.devices_total - apartment.devices_online;
   const metered = devices.filter((d) => d.capabilities.power_meter);
   const kwh = kwhToday ?? (metered.length ? metered.reduce((s, d) => s + (d.capabilities.power_meter?.kwh_today ?? 0), 0) : null);
@@ -64,9 +68,14 @@ export function StatusBand({ apartment, devices, rooms, kwhToday, energyOn, tz }
       />
       <Cell
         label={t("overview.band.windows")}
-        value={contacts.length === 0 ? "—" : open === 0 ? t("overview.band.windowsClosed") : open === 1 ? t("overview.band.windowsOneOpen") : t("overview.band.windowsOpen", { count: open })}
-        sub={open > 0 ? openRooms.join(", ") : contacts.length === 0 ? t("overview.band.windowsNone") : undefined}
-        tint={contacts.length === 0 ? undefined : open > 0 ? "warning" : "positive"}
+        value={contacts.length === 0 ? "—"
+          : open === 1 ? t("overview.band.windowsOneOpen")
+          : open > 1 ? t("overview.band.windowsOpen", { count: open })
+          : unknown === contacts.length ? t("overview.band.windowsUnknown")
+          : unknown > 0 ? t("overview.band.windowsNoneOpen")
+          : t("overview.band.windowsClosed")}
+        sub={contacts.length === 0 ? t("overview.band.windowsNone") : [open > 0 ? openRooms.join(", ") : "", noSignal ?? ""].filter(Boolean).join(" · ") || undefined}
+        tint={contacts.length === 0 ? undefined : open > 0 ? "warning" : unknown > 0 ? undefined : "positive"}
         testId="band-windows"
       />
       <Cell

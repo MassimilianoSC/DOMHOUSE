@@ -13,8 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Badge, Card, Input, Skeleton, Switch, Tip } from "@/components/ui/primitives";
 import { t, tOr } from "@/i18n";
 import { runAction } from "@/lib/actions";
-import { fmtDateTime, fmtNumber } from "@/lib/format";
+import { DEFAULT_TZ, fmtDateTime, fmtNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { useApartmentStore } from "@/store/apartmentStore";
 
 type Draft = Record<string, { enabled?: boolean; params: Record<string, string> }>;
 
@@ -111,6 +112,7 @@ export default function RulesPage() {
   const barRef = useRef<HTMLDivElement>(null);
   const [saveError, setSaveError] = useState<unknown>(null);
   const rules = useMemo(() => q.data?.rules ?? [], [q.data]);
+  const tz = useApartmentStore((s) => s.apartment?.timezone) ?? DEFAULT_TZ; // P-83, D71: the apartment's clock
 
   const patches: RulePatch[] = rules.flatMap((r) => {
     const d = draft[r.rule_id];
@@ -177,7 +179,7 @@ export default function RulesPage() {
     <div className="mx-auto max-w-6xl space-y-8 pb-24">
       <PageHeader title={t("rules.title")} subtitle={t("rules.subtitle")} testId="rules-header" />
       {q.error && <ErrorNotice error={q.error} onRetry={() => void q.refetch()} testId="rules-error" />}
-      {q.data && <p className="text-xs text-muted-foreground" data-testid="rules-updated-at">{t("rules.updatedAt", { when: fmtDateTime(q.data.updated_at) })}</p>}
+      {q.data && <p className="text-xs text-muted-foreground" data-testid="rules-updated-at">{t("rules.updatedAt", { when: fmtDateTime(q.data.updated_at, tz) })}</p>}
       {q.isLoading ? (
         <div className="space-y-4">{[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-40 rounded-2xl" />)}</div>
       ) : (

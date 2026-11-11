@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ApiError } from "@/api/bff";
 import { TooltipProvider } from "@/components/ui/primitives";
+import { useApartmentStore } from "@/store/apartmentStore";
 import RulesPage from "./RulesPage";
 
 // Lotto 30 (o1 91bc015): «Limiti del setpoint» gets the temperatures of the modes; the page draws the fields from the
@@ -73,5 +74,18 @@ describe("Regole: le temperature delle modalità (lotto 30)", () => {
       fireEvent.click(screen.getByTestId("rules-save-btn"));
     });
     expect(await screen.findByTestId("rules-save-error")).toHaveTextContent("La temperatura eco non può superare quella comfort");
+  });
+});
+
+describe("Regole: «Ultima modifica» nell'ora dell'appartamento (P-83, D71)", () => {
+  afterEach(() => useApartmentStore.getState().reset("apt-001"));
+
+  it("appartamento a New York: l'ora di New York, non quella di Roma", async () => {
+    useApartmentStore.getState().reset("apt-001");
+    useApartmentStore.getState().setSnapshot({ apartment: { timezone: "America/New_York" } as never });
+    await open();
+    // 14:00 UTC del 22 ottobre 2026 = 10:00 a New York (16:00 a Roma)
+    expect(screen.getByTestId("rules-updated-at")).toHaveTextContent("10:00");
+    expect(screen.getByTestId("rules-updated-at")).not.toHaveTextContent("16:00");
   });
 });

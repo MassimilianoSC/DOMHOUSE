@@ -127,3 +127,42 @@ describe("Programmazione, «Sposta»", () => {
     expect(api.moveSchedule).toHaveBeenCalledWith("s-1", { run_at: "2027-05-10T07:45:00.000Z" }, expect.any(String));
   });
 });
+
+describe("Programmazione, il comando inviato è quello mostrato (P-83, D21)", () => {
+  const dev = (device_id: string, label: string, capabilities: Record<string, unknown>) =>
+    ({ device_id, label, room_id: "r1", online: true, last_seen: null, capabilities });
+  beforeEach(() => {
+    useApartmentStore.getState().reset("apt-001");
+    useApartmentStore.getState().setSnapshot({
+      rooms: [],
+      devices: [
+        dev("dev-presa", "Presa", { switch: { on: false } }),
+        dev("dev-clima", "Clima", { climate: { on: false, mode: "heat", setpoint: 21, fan: "auto" } }),
+        dev("dev-caldaia", "Caldaia", { heating: { on: false, setpoint: 21 } }),
+      ] as never,
+    });
+  });
+  const select = (id: string, value: string) => fireEvent.change(screen.getByTestId(id), { target: { value } });
+  const savedAction = () => (api.createSchedule.mock.calls.at(-1) as unknown as [{ action: unknown }])[0].action;
+
+  it("presa «Accendi», poi il clima: il menu mostra «Spegni» e si salva lo spegnimento del clima", async () => {
+    open();
+    select("schedule-type-select", "device_command");
+    select("schedule-device-select", "dev-presa");
+    select("schedule-command-select", "turn_on");
+    select("schedule-device-select", "dev-clima");
+    expect((screen.getByTestId("schedule-command-select") as HTMLSelectElement).value).toBe("turn_off");
+    await save();
+    expect(savedAction()).toEqual({ type: "device_command", device_id: "dev-clima", capability: "climate", action: "turn_off" });
+  });
+
+  it("caldaia «Imposta temperatura», poi la presa: si salva lo spegnimento della presa", async () => {
+    open();
+    select("schedule-type-select", "device_command");
+    select("schedule-device-select", "dev-caldaia");
+    select("schedule-command-select", "setpoint");
+    select("schedule-device-select", "dev-presa");
+    await save();
+    expect(savedAction()).toEqual({ type: "device_command", device_id: "dev-presa", capability: "switch", action: "turn_off" });
+  });
+});

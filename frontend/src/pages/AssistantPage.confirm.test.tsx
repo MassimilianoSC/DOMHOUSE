@@ -131,6 +131,9 @@ describe("Assistente: conferma nella chat con ospiti presenti (D-154)", () => {
     s.lists = [[approval("apr-0012", "pending", "Spegnere climatizzatore soggiorno")]];
     open();
     expect(await screen.findByTestId("ask-answer-ask-0007")).toHaveTextContent("Spengo climatizzatore soggiorno con ospiti presenti?");
+    // P-83, T3b-1: the buttons would come only after the list of approvals is read; wait for that long before looking
+    await act(() => new Promise((r) => setTimeout(r, 100)));
     expect(screen.queryByTestId("ask-confirm-ask-0007")).toBeNull();
+    expect(screen.queryByTestId("ask-confirm-yes-ask-0007")).toBeNull();
   });
 });
