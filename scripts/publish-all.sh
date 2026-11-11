@@ -263,7 +263,8 @@ if [ -n "${COMPOSE_NEW}" ] && [ -z "${ENGINE_NEEDED}" ]; then
 Guarda engine-vm.sh status ${ENGINE_APARTMENT} sulla VM; il compose.yaml di prima è nel commit del motore sulla VM (${VM_TAG})."
     note "motore ${ENGINE_APARTMENT} ricreato con la stessa immagine, /health 200"
   fi
-  ENGINE_DONE="ricreato con la stessa immagine (${VM_TAG}) per il nuovo compose.yaml"
+  if [ -n "${DRY_RUN}" ]; then ENGINE_DONE="da ricreare"; else ENGINE_DONE="ricreato"; fi
+  ENGINE_DONE="${ENGINE_DONE} con la stessa immagine (${VM_TAG}) per il nuovo compose.yaml"
 fi
 if [ -n "${ENGINE_NEEDED}" ]; then
   if [ -n "${DRY_RUN}" ]; then
@@ -278,7 +279,7 @@ Per tornare all'immagine di prima (lo decidi tu):
     note "motore ${ENGINE_APARTMENT} a ${SHORT}, /health 200"
     done_step engine
   fi
-  ENGINE_DONE="da ${VM_TAG} a ${SHORT}"
+  if [ -n "${DRY_RUN}" ]; then ENGINE_DONE="da aggiornare, da ${VM_TAG} a ${SHORT}"; else ENGINE_DONE="da ${VM_TAG} a ${SHORT}"; fi
 fi
 
 # ---- 4: the summary -------------------------------------------------------------------------------------------------
@@ -290,7 +291,9 @@ for service in domotica-bff-staging domotica-bff; do
   IFS='|' read -r image _ _ serving percent url <<< "$(service_state "${service}")"
   echo "${service}: immagine ${image##*:}, revisione ${serving:-non letta} al ${percent:-0} %, ${url:-indirizzo non letto}"
 done
-echo "motore ${ENGINE_APARTMENT}: ${ENGINE_DONE}$([ -n "${SCRIPT_NEW}" ] && echo '; engine-vm.sh aggiornato sulla VM')$([ -n "${COMPOSE_NEW}" ] && echo '; compose.yaml aggiornato sulla VM')"
+# a dry run has changed nothing: the summary says what is to be done, never «aggiornato» (lot 38 dry run, 10 November)
+if [ -n "${DRY_RUN}" ]; then DONE_WORD="da aggiornare"; else DONE_WORD="aggiornato"; fi   # never $(... && ...): set -e
+echo "motore ${ENGINE_APARTMENT}: ${ENGINE_DONE}$([ -n "${SCRIPT_NEW}" ] && echo "; engine-vm.sh ${DONE_WORD} sulla VM")$([ -n "${COMPOSE_NEW}" ] && echo "; compose.yaml ${DONE_WORD} sulla VM")"
 for target in staging prod; do
   before="$(recall "prima-${target}")"
   [ -z "${before}" ] || echo "per tornare indietro (${target}): gcloud run services update-traffic $([ "${target}" = prod ] && echo domotica-bff || echo domotica-bff-staging) --to-revisions=${before}=100 --region ${GCP_REGION} --project ${GCP_PROJECT_ID}"

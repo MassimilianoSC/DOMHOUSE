@@ -180,6 +180,23 @@ def test_the_dry_run_reads_the_real_state_and_writes_nothing(pub):
     assert "la produzione si prova a secco solo quando lo staging serve già" in done.stdout   # D-203
     assert "services describe domotica-bff-staging" in calls and "ENGINE_IMAGE" in calls          # it did read
     assert not (pub.root / "logs" / f"publish-state-{pub.lot}.txt").exists()
+    # the summary says what is to be done: on 10 November it said «aggiornato» for what the dry run had not touched
+    summary = done.stdout.split("Riepilogo", 1)[1]
+    assert (f"motore dev: da aggiornare, da {pub.on_vm} a {pub.lot}; engine-vm.sh da aggiornare sulla VM; "
+            f"compose.yaml da aggiornare sulla VM") in summary
+    assert "aggiornato" not in summary and "ricreato" not in summary
+
+
+def test_a_dry_run_with_only_a_new_compose_file_says_the_engine_is_to_be_recreated(pub):
+    (pub.stubs / "vm-image").write_text(f"{ENGINE}{pub.lot}\n", encoding="utf-8")
+    same_on_vm(pub)
+    (pub.stubs / "vm-compose-hash").write_text("diverso  -\n", encoding="utf-8")
+    done, calls = pub(answer="", env="DRY_RUN=1")
+    assert done.returncode == 0, done.stdout + done.stderr
+    summary = done.stdout.split("Riepilogo", 1)[1]
+    assert (f"motore dev: da ricreare con la stessa immagine ({pub.lot}) per il nuovo compose.yaml; "
+            f"compose.yaml da aggiornare sulla VM") in summary
+    assert "scp" not in steps(calls) and "update" not in steps(calls)
 
 
 def test_any_other_answer_changes_nothing(pub):
