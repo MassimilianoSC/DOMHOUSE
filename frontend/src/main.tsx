@@ -7,6 +7,12 @@ import App from "./App";
 import { AuthProvider } from "./auth/AuthProvider";
 import { ErrorBoundary } from "./components/layout/PageProblem";
 import { TooltipProvider } from "./components/ui/primitives";
+// P-83, D55: the fonts are part of the site, no request to Google (Manrope variable 200–800, all scripts by
+// unicode-range; JetBrains Mono for codes and identifiers, Latin only)
+import "@fontsource-variable/manrope";
+import "@fontsource/jetbrains-mono/latin-400.css";
+import "@fontsource/jetbrains-mono/latin-500.css";
+import "@fontsource/jetbrains-mono/latin-600.css";
 import "./index.css";
 import "./hooks/useInstallPrompt"; // registers the beforeinstallprompt listener before any page mounts
 import { ApiError } from "@/api/bff";

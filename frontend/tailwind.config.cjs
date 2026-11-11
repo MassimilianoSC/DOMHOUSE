@@ -5,8 +5,8 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        heading: ["Manrope", "sans-serif"],
-        sans: ["Manrope", "sans-serif"],
+        heading: ['"Manrope Variable"', "Manrope", "sans-serif"],
+        sans: ['"Manrope Variable"', "Manrope", "sans-serif"],
         mono: ['"JetBrains Mono"', "monospace"],
       },
       colors: {
