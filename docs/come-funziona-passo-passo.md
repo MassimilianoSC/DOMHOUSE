@@ -243,3 +243,43 @@ presa vera sono il cuore della tappa B.
 | Youssouf | Per il relè della caldaia: la pagina del dizionario dello Shelly 1 Gen4 e il legame con il sensore nel catalogo | Prima di un appartamento vero |
 | Youssouf | Per il climatizzatore: la pagina dell'Athom e il legame con il misuratore EM Mini nel catalogo; misurare in laboratorio in quanti secondi sale il consumo dopo il comando (il motore aspetta un aumento di 20 W entro circa 8 secondi) | Prima di un appartamento con climatizzatori |
 | Noi (tutti) | Misurare nel test vero il tempo fra il tocco e «eseguito» | Tappa B |
+
+---
+
+## Passo 4. Quando qualcosa si rompe
+
+| Cosa si rompe | Cosa vede il motore | Cosa vede il gestore | Notifica |
+|---|---|---|---|
+| **Una presa si stacca** (spina tolta, guasto) | Il broker avvisa subito «non c'è più» per lei | La scheda passa a «non in linea»; i comandi a quella presa vengono rifiutati subito | Sì, se resta offline più dei minuti della regola «Avviso dispositivo offline» (15 di base) |
+| **Un sensore a batteria tace** (batteria scarica) | Dopo una soglia di silenzio diversa per tipo (un sensore di movimento a riposo parla solo ogni 15 minuti, quindi la sua soglia è più lunga) | «Non in linea»; dal livello della batteria si capirà se è scarica | Come sopra |
+| **Cade internet in casa** | Tutti i dispositivi dell'appartamento «non ci sono più» | Tutte le schede «non in linea»; in casa le cose restano come sono (la presa accesa resta accesa) | Sì, dopo i minuti della regola |
+| **Si ferma il traduttore** | «Collegamento ai dispositivi perso» | Avviso «sistema domotico» e riga nelle Decisioni | Sì, «… sistema domotico non raggiungibile» |
+| **Si ferma la VM** (motore e broker) | Niente: il motore è fermo | «Sistema domotico non raggiungibile» | Sì, dopo i minuti della regola (dal lotto 38) |
+| **Si ferma il server della web app** | Il motore continua da solo: regole e programmazioni vanno avanti | L'app non si apre | No: email di allarme a chi gestisce la piattaforma (oggi HQE) |
+
+- **Al ritorno ognuno si ricollega da solo:** gli Shelly richiamano il broker, il traduttore rifà la «fotografia» dello
+  stato di tutti i dispositivi, il server si ricollega al motore. Provato l'11 novembre spegnendo e riaccendendo la VM:
+  tutto è ripartito in pochi secondi.
+- **I comandi dati mentre un dispositivo è offline non restano in coda:** vengono rifiutati subito. Meglio un rifiuto
+  chiaro che una stufa accesa ore dopo.
+
+### Decisioni e osservazioni
+
+- **«Non in linea» subito (D-225):** il motore segna un dispositivo «non in linea» appena il traduttore lo sa; i minuti
+  della regola servono solo a decidere quando mandare la notifica. Così l'app mostra sempre la verità e non dice «in
+  linea» per una presa che rifiuta i comandi. Il contratto dell'app, scritto a ottobre, diceva «dopo i minuti»: la frase
+  è superata e resta (il contratto non si modifica); la spiegazione è nel contratto del connector (§2.6) e nei limiti
+  noti.
+- **A chi arrivano le email di allarme:** oggi solo all'indirizzo del committente in HQE. Con il cliente probabilmente
+  dovranno arrivare (anche) a lui; dipende dal rapporto con il cliente, ancora da definire. Si decide con il passaggio del
+  progetto al cliente (P-81). Tecnicamente basta cambiare o aggiungere un indirizzo.
+
+### Cosa resta da fare (passo 4)
+
+| Chi | Che cosa | Per quando |
+|---|---|---|
+| Youssouf | Segnalare un dispositivo offline appena lo sa, senza aspettare i minuti della regola (contratto del connector, §2.6) | Già così nel suo connector: da confermare nel test |
+| Youssouf | Per ogni tipo di sensore a batteria, la soglia di silenzio giusta (il suo file delle soglie di offline per tipo) | Prima dei sensori Bluetooth |
+| Noi (o1) | Scrivere in `bff/API.md` che «non in linea» è immediato (D-225) | Lotto 39 |
+| Committente | Decidere a chi arrivano le email di allarme dopo la consegna | Con il passaggio al cliente (P-81) |
+| Tutti | Nel test vero: staccare la presa e controllare «non in linea» subito, la notifica dopo i minuti, il ritorno da solo | Tappa B |
