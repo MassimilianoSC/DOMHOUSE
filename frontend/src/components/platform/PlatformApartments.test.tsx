@@ -72,6 +72,12 @@ describe("Piattaforma > Appartamenti di un'organizzazione", () => {
     expect(document.querySelectorAll('a[href^="/a/"]')).toHaveLength(0);
   });
 
+  it("P-83, T3d-5: indirizzo che ha già la porta (apt-002, porta 8102): la porta non si ripete", async () => {
+    await open();
+    expect(screen.getByTestId("platform-apt-apt-002")).toHaveTextContent("http://10.198.0.2:8102");
+    expect(screen.getByTestId("platform-apt-apt-002")).not.toHaveTextContent(":8102:8102");
+  });
+
   it("nuovo appartamento in produzione: id, nome e collegamento; poi il promemoria della chiave dell'istanza", async () => {
     await open();
     await click(screen.getByTestId("platform-apt-add-btn-t-1"));

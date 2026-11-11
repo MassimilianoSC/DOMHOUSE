@@ -67,6 +67,9 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
+/** P-83, T3d-3: a «nothing happened» is looked at after a real wait, so that a sign-out arriving late still shows. */
+const afterAWhile = () => act(() => new Promise((r) => setTimeout(r, 100)));
+
 describe("accesso: risposta di /app/me", () => {
   it("200: entra, con il token solo nell'intestazione Authorization", async () => {
     const fetchMock = answerMe(200, { user: { uid: "u1", email: "gestore@esempio.it", display_name: "" }, role: "operator", tenant: { tenant_id: "t1", name: "Demo" }, env: {} });
@@ -119,6 +122,7 @@ describe("accesso: risposta di /app/me", () => {
   it("401: resta sulla pagina di accesso senza avvisi e senza uscire da Firebase", async () => {
     answerMe(401, { error: "unauthorized", message: "Token scaduto" });
     await signIn();
+    await afterAWhile();
     expect(screen.getByTestId("auth-status")).toHaveTextContent("anonymous");
     expect(toast.error).not.toHaveBeenCalled();
     expect(toast.info).not.toHaveBeenCalled();
@@ -128,6 +132,7 @@ describe("accesso: risposta di /app/me", () => {
   it("500: non va alla pagina di accesso, la pagina dice che il servizio non risponde (D-211); resta in Firebase", async () => {
     answerMe(500, { error: "internal", message: "Errore interno" });
     await signIn();
+    await afterAWhile();
     expect(screen.getByTestId("auth-status")).toHaveTextContent("unavailable");
     expect(screen.getByTestId("auth-problem")).toHaveTextContent("server");
     expect(toast.error).not.toHaveBeenCalled();
@@ -139,6 +144,7 @@ describe("accesso: risposta di /app/me", () => {
       throw new TypeError("Failed to fetch");
     }));
     await signIn();
+    await afterAWhile();
     expect(screen.getByTestId("auth-status")).toHaveTextContent("unavailable");
     expect(screen.getByTestId("auth-problem")).toHaveTextContent("network");
     expect(toast.error).not.toHaveBeenCalled();

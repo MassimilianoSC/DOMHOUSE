@@ -11,6 +11,7 @@ import { CopyableId } from "@/components/ui/CopyableId";
 import { Badge, Dialog, DialogContent, DialogDescription, DialogTitle, Label, Skeleton, Switch } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
+import { instanceAddress } from "@/lib/instanceAddress";
 
 const key = (tenantId: string) => ["platform", "apartments", tenantId];
 const toPort = (v: string) => (v.trim() ? Number(v) : null);
@@ -165,7 +166,7 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
                       {!a.enabled && <Badge className="border-neutral-border bg-neutral-bg text-neutral-fg">{t("admin.apartments.disabled")}</Badge>}
                       <CopyableId id={a.apartment_id} testId={`platform-apt-id-${a.apartment_id}`} />
                     </div>
-                    <div className="tabular text-xs text-muted-foreground [overflow-wrap:anywhere]">{a.instance_url}{a.port ? `:${a.port}` : ""} · {a.timezone}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</div>
+                    <div className="tabular text-xs text-muted-foreground [overflow-wrap:anywhere]">{instanceAddress(a.instance_url, a.port)} · {a.timezone}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</div>
                     <div className="text-xs">{t("admin.apartments.lastCheck")}: <LastCheck check={a.last_check} testId={`platform-apt-check-${a.apartment_id}`} /></div>
                   </div>
                   <div className="flex flex-wrap gap-2">

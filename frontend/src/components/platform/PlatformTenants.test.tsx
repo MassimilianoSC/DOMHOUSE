@@ -76,8 +76,14 @@ describe("Organizzazioni: elenco", () => {
     expect(screen.getByTestId("tenant-admin-t-3")).toHaveTextContent(t("platform.noAdmin"));
     await openMenu("tenant-menu-t-1");
     expect(await screen.findByTestId("tenant-resend-btn-t-1")).toBeInTheDocument();
-    expect(screen.queryByTestId("tenant-resend-btn-t-2")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("tenant-resend-btn-t-3")).not.toBeInTheDocument();
+  });
+
+  // P-83, T3d-4: the entry lives in each organization's «⋯» menu: its absence is looked at with THAT menu open
+  it.each(["t-2", "t-3"])("%s (amministratore già entrato, o nessuno): nel menu aperto niente «Reinvia invito»", async (id) => {
+    await open();
+    await openMenu(`tenant-menu-${id}`);
+    expect(await screen.findByTestId(`tenant-rename-btn-${id}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`tenant-resend-btn-${id}`)).not.toBeInTheDocument();
   });
 
   it("ruolo tolto mentre la pagina è aperta (403): «Non hai più accesso» e il profilo viene ricaricato", async () => {
