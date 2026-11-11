@@ -149,10 +149,29 @@ def test_catalog_is_consistent(make):
             assert d.room_id in room_ids, d
             assert d.label and d.capabilities and set(d.capabilities) <= set(CAPABILITIES), d
             assert d.last_seen is None or d.last_seen.tzinfo is not None, d
+            assert d.battery_percent is None or 0 <= d.battery_percent <= 100, d
             for key, linked in d.links.items():
                 assert key in LINKS, f"unknown link {key}"
                 own, other = LINKS[key]
                 assert own in d.capabilities and linked in by_id and other in by_id[linked].capabilities, d
+    run(make, scenario)
+
+
+def test_battery_level_is_reported_for_battery_sensors_only(make):
+    """A battery sensor (contact, motion, temperature) carries its last known level; a mains device has None.
+    The level is not a capability: it never appears in a StateChange nor in the contract's GET /devices."""
+    async def scenario(h, conn):
+        devices = conn.devices()
+        battery = [d for d in devices if d.battery_percent is not None]
+        mains = [d for d in devices if "switch" in d.capabilities or "heating" in d.capabilities
+                 or "climate" in d.capabilities]
+        if not battery:
+            pytest.skip("no battery sensor in this connector's catalog")
+        for d in battery:
+            assert isinstance(d.battery_percent, float) and 0 <= d.battery_percent <= 100, d
+            assert not ({"switch", "heating", "climate"} & set(d.capabilities)), f"a battery device that switches? {d}"
+        for d in mains:
+            assert d.battery_percent is None, d
     run(make, scenario)
 
 
