@@ -124,13 +124,16 @@ for service in domotica-bff-staging domotica-bff; do
   else note "${service}: stato non letto (il servizio non esiste ancora, oppure gcloud non risponde)"; fi
 done
 ENGINE_IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/engine:${SHORT}"
-VM_IMAGE="$(on_vm "sudo sed -n 's/^ENGINE_IMAGE=//p' /opt/domhouse/${ENGINE_APARTMENT}.settings" | tail -1)"
+# D73 (P-83): a failed ssh inside the assignment left the script at once (set -euo pipefail), without the FERMO: every
+# reading from the VM catches its failure
+VM_IMAGE="$(on_vm "sudo sed -n 's/^ENGINE_IMAGE=//p' /opt/domhouse/${ENGINE_APARTMENT}.settings" | tail -1)" || VM_IMAGE=""
 [ -n "${VM_IMAGE}" ] || stop "Non riesco a leggere l'immagine del motore ${ENGINE_APARTMENT} sulla VM ${VM_NAME} (gcloud compute ssh via IAP).
 Controlla che la VM sia accesa e che «gcloud compute ssh» funzioni, poi rilancia."
 note "motore ${ENGINE_APARTMENT} sulla VM: ${VM_IMAGE##*:}"
 # D25: the image the engine really runs; engine-vm.sh update writes the settings before the start, so after a failed
 # update the file says the new image and the old one runs (or none healthy): the running one decides
-VM_RUNNING="$(on_vm "sudo docker inspect -f '{{.Config.Image}}' engine-${ENGINE_APARTMENT}" | tail -1)"
+# (no container: removed or never started; the settings' image counts)
+VM_RUNNING="$(on_vm "sudo docker inspect -f '{{.Config.Image}}' engine-${ENGINE_APARTMENT}" | tail -1)" || VM_RUNNING=""
 if [ -n "${VM_RUNNING}" ] && [ "${VM_RUNNING}" != "${VM_IMAGE}" ]; then
   note "ma il motore ${ENGINE_APARTMENT} gira con ${VM_RUNNING##*:}: un aggiornamento non concluso, lo rifaccio"
   VM_IMAGE="${VM_RUNNING}"
@@ -147,9 +150,11 @@ else
     | grep -v '/tests/' | grep -v '\.md$' || true)"
 fi
 WANTED_SCRIPT="$(git -C "${ROOT}" show "${SHA}:scripts/engine-vm.sh" | tr -d '\r' | sha256sum | cut -d' ' -f1)"
-VM_SCRIPT="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/engine-vm.sh | sha256sum" | cut -d' ' -f1)"
+VM_SCRIPT="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/engine-vm.sh | sha256sum" | cut -d' ' -f1)" \
+  || stop "La VM ${VM_NAME} non risponde più (gcloud compute ssh via IAP) mentre leggo engine-vm.sh: rilancia lo stesso comando."
 WANTED_COMPOSE="$(git -C "${ROOT}" show "${SHA}:engine/compose.yaml" | tr -d '\r' | sha256sum | cut -d' ' -f1)"
-VM_COMPOSE="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/compose.yaml | sha256sum" | cut -d' ' -f1)"
+VM_COMPOSE="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/compose.yaml | sha256sum" | cut -d' ' -f1)" \
+  || stop "La VM ${VM_NAME} non risponde più (gcloud compute ssh via IAP) mentre leggo compose.yaml: rilancia lo stesso comando."
 if pending motore; then ENGINE_CHANGES="aggiornamento del motore non concluso al giro precedente: lo rifaccio"; fi
 SCRIPT_NEW=""; COMPOSE_NEW=""
 [ "${WANTED_SCRIPT}" = "${VM_SCRIPT}" ] || SCRIPT_NEW=1
