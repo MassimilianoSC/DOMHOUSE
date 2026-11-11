@@ -6,7 +6,7 @@ import { clientsClaim } from "workbox-core";
 import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
 import { NavigationRoute, registerRoute } from "workbox-routing";
 import { t } from "@/i18n";
-import { deliverInApp, isWebKitSafari, safeLink, toNotice, type OpenMessage, type PushMessage } from "@/lib/pushPayload";
+import { deliverInApp, isWebKitSafari, notificationOptions, safeLink, toNotice, type OpenMessage, type PushMessage } from "@/lib/pushPayload";
 
 declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<string | { url: string; revision: string | null }> };
 
@@ -33,7 +33,7 @@ self.addEventListener("push", (event) => {
         focused.postMessage({ type: "domotica-push", notice } satisfies PushMessage);
         return;
       }
-      await self.registration.showNotification(notice.title, { body: notice.body, icon: "/icons/icon-192.png", tag: notice.tag, data: { link: notice.link } });
+      await self.registration.showNotification(notice.title, notificationOptions(notice));
     })(),
   );
 });

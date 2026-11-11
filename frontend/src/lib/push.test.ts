@@ -332,3 +332,35 @@ describe("push: rientro della STESSA persona sullo stesso dispositivo (P-44)", (
     expect(pushResumePending("u1")).toBe(true);
   });
 });
+
+describe("push: uscita senza rete (P-83, D50)", () => {
+  const sub = { unsubscribe: vi.fn(async () => true) };
+  beforeEach(() => {
+    sub.unsubscribe.mockClear();
+    Object.assign(s.registration, { pushManager: { getSubscription: async () => sub } });
+  });
+  afterEach(() => {
+    Reflect.deleteProperty(s.registration, "pushManager");
+  });
+
+  it("BFF e FCM non raggiungibili: la sottoscrizione del browser si annulla subito, così il dispositivo non riceve più nulla", async () => {
+    own("tok-1", "u1");
+    s.unsubscribe.mockRejectedValueOnce(new Error("offline"));
+    s.deleteToken.mockRejectedValueOnce(new Error("offline"));
+    await disablePush({ resume: true });
+    expect(sub.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(KEY)).toBe("tok-1"); // la cancellazione presso FCM resta da fare
+  });
+
+  it("al ritorno della rete la cancellazione si riprova da sola, senza aspettare il prossimo avvio", async () => {
+    own("tok-1", "u1");
+    s.unsubscribe.mockRejectedValueOnce(new Error("offline"));
+    s.deleteToken.mockRejectedValueOnce(new Error("offline"));
+    await disablePush({ resume: true });
+    window.dispatchEvent(new Event("online"));
+    await vi.waitFor(() => expect(localStorage.getItem(KEY)).toBeNull());
+    expect(s.deleteToken).toHaveBeenCalledTimes(2);
+    expect(s.unsubscribe).toHaveBeenLastCalledWith("tok-1");
+    expect(pushResumePending("u1")).toBe(true); // la persona ritrova le notifiche al suo rientro (P-44)
+  });
+});
