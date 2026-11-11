@@ -341,3 +341,107 @@ async def audit_page(tenant_id):
     from bff import audit
 
     return (await audit.page(tenant_id, 100, None, viewer="platform"))["items"]
+
+
+# -------- R4-1 (P-83 review, gravity 1): a removed person never comes back by their claims --------
+@pytest.fixture
+def prod(fb, monkeypatch):
+    """Production: the claims of this environment are {"prod": {...}} or the flat ones of before P-67."""
+    from bff import config
+    settings = dataclasses.replace(get_settings(), app_env="prod", auth_mode="firebase")
+    for module in (config, auth, accounts):
+        monkeypatch.setattr(module, "get_settings", lambda: settings)
+    return fb
+
+
+def fresh_token(fb, uid, iat=6000):
+    """What Firebase puts in a token minted now: the account's current custom claims at the top."""
+    u = fb.users[uid]
+    return {"uid": uid, "email": u.email, "email_verified": True, "iat": iat, **(u.custom_claims or {})}
+
+
+@pytest.mark.parametrize("claims", [{"prod": {"tenant_id": "t-fb", "role": "admin"}, "staging": {"tenant_id": "t-s", "role": "viewer"}},
+                                    {"tenant_id": "t-fb", "role": "admin", "staging": {"tenant_id": "t-s", "role": "viewer"}}],
+                         ids=["claim-prod", "claim-piatti"])
+def test_a_removed_person_with_production_claims_does_not_come_back(prod, claims):
+    repo = get_repository()
+    prod.add("u-r41", "r41@fb.it", dict(claims), email_verified=True)
+    run(repo.upsert_user(User(uid="u-r41", email="r41@fb.it", tenant_id="t-fb", role="admin")))
+    run(repo.upsert_user(User(uid="u-r41-boss", email="boss@r41.it", tenant_id="t-fb", role="admin")))
+    run(admin.delete_user("u-r41", CurrentUser("u-r41-boss", "boss@r41.it", "t-fb", "admin")))
+    left = prod.users["u-r41"].custom_claims
+    assert "prod" not in left and "tenant_id" not in left and "role" not in left    # this environment's claims gone
+    assert left["staging"] == {"tenant_id": "t-s", "role": "viewer"}                # the other environment's kept
+    assert ("revoke", "u-r41") in prod.calls and "u-r41" in prod.users              # identity kept (F5)
+    accounts._valid_after.clear()
+    with pytest.raises(HTTPException) as e:                                         # a new sign-in, after the revocation
+        run(_from_claims(repo, fresh_token(prod, "u-r41")))
+    assert e.value.status_code == 403 and e.value.detail["error"] == "forbidden"
+    assert run(repo.get_user("u-r41")) is None                                      # no record made again
+
+
+def test_a_limited_operator_removed_does_not_come_back_with_every_apartment(prod):
+    repo = get_repository()
+    prod.add("u-r41-op", "op@r41.it", {"prod": {"tenant_id": "t-fb", "role": "operator"}}, email_verified=True)
+    run(repo.upsert_user(User(uid="u-r41-op", email="op@r41.it", tenant_id="t-fb", role="operator", apartment_ids=["a1"])))
+    run(repo.upsert_user(User(uid="u-r41-b2", email="b2@r41.it", tenant_id="t-fb", role="admin")))
+    run(admin.delete_user("u-r41-op", CurrentUser("u-r41-b2", "b2@r41.it", "t-fb", "admin")))
+    with pytest.raises(HTTPException):
+        run(_from_claims(repo, fresh_token(prod, "u-r41-op")))
+    assert run(repo.get_user("u-r41-op")) is None
+
+
+def test_removing_never_touches_claims_of_another_organisation(prod):
+    """The claims name another organisation than the record removed (an invite by email, a moved person): kept."""
+    repo = get_repository()
+    prod.add("u-r41-x", "x@r41.it", {"prod": {"tenant_id": "t-altra", "role": "admin"}}, email_verified=True)
+    run(repo.upsert_user(User(uid="inv-r41-x", email="x@r41.it", tenant_id="t-fb", role="viewer")))
+    run(repo.upsert_user(User(uid="u-r41-b3", email="b3@r41.it", tenant_id="t-fb", role="admin")))
+    run(admin.delete_user("inv-r41-x", CurrentUser("u-r41-b3", "b3@r41.it", "t-fb", "admin")))
+    assert prod.users["u-r41-x"].custom_claims == {"prod": {"tenant_id": "t-altra", "role": "admin"}}
+
+
+def test_an_invitation_elsewhere_wins_over_old_claims_and_moves_them(prod):
+    """Claims left from before the fix (record gone, claims still naming T): the person accepts an invitation of B and
+    lands in B with the invitation's role and apartments, now and at every later sign-in."""
+    repo = get_repository()
+    run(repo.upsert_tenant(Tenant(tenant_id="t-b", name="B")))
+    prod.add("u-r41-c", "c@r41.it", {"prod": {"tenant_id": "t-fb", "role": "operator"}, "tenant_id": "t-fb",
+                                      "role": "operator"}, email_verified=True)
+    run(repo.upsert_user(User(uid="inv-r41-c", email="c@r41.it", tenant_id="t-b", role="viewer", apartment_ids=[])))
+    user = run(_from_claims(repo, fresh_token(prod, "u-r41-c")))
+    assert (user.tenant_id, user.role, user.apartment_ids) == ("t-b", "viewer", [])
+    stored = run(repo.get_user("u-r41-c"))
+    assert (stored.tenant_id, stored.role) == ("t-b", "viewer") and run(repo.get_user("inv-r41-c")) is None
+    claims = prod.users["u-r41-c"].custom_claims
+    assert claims["prod"] == {"tenant_id": "t-b", "role": "viewer"}
+    assert (claims["tenant_id"], claims["role"]) == ("t-b", "viewer")              # the flat copy follows
+    again = run(_from_claims(repo, fresh_token(prod, "u-r41-c", iat=7000)))
+    assert (again.tenant_id, again.role) == ("t-b", "viewer")
+    # the token of the same sign-in still carries the old copy (T) for up to an hour: it never takes the person back
+    stale = {"uid": "u-r41-c", "email": "c@r41.it", "email_verified": True, "iat": 6000,
+             "prod": {"tenant_id": "t-fb", "role": "operator"}}
+    assert (run(_from_claims(repo, stale)).tenant_id, run(repo.get_user("u-r41-c")).tenant_id) == ("t-b", "t-b")
+
+
+def test_a_move_by_set_claims_confirmed_by_firebase_still_moves_the_record(prod):
+    """scripts/set_claims.py writes the claims in Firebase and revokes: the new token and Firebase agree, the record follows."""
+    repo = get_repository()
+    run(repo.upsert_tenant(Tenant(tenant_id="t-nuova", name="Nuova")))
+    prod.add("u-r41-m", "m@r41.it", {"prod": {"tenant_id": "t-nuova", "role": "admin"}}, email_verified=True)
+    run(repo.upsert_user(User(uid="u-r41-m", email="m@r41.it", tenant_id="t-fb", role="viewer")))
+    user = run(_from_claims(repo, fresh_token(prod, "u-r41-m")))
+    assert (user.tenant_id, user.role) == ("t-nuova", "admin")
+    assert (run(repo.get_user("u-r41-m")).tenant_id, run(repo.get_user("u-r41-m")).role) == ("t-nuova", "admin")
+
+
+def test_an_invitation_elsewhere_is_not_consumed_when_the_claims_cannot_be_moved(prod):
+    repo = get_repository()
+    run(repo.upsert_tenant(Tenant(tenant_id="t-b", name="B")))
+    prod.add("u-r41-d", "d@r41.it", {"prod": {"tenant_id": "t-fb", "role": "operator"}}, email_verified=True)
+    run(repo.upsert_user(User(uid="inv-r41-d", email="d@r41.it", tenant_id="t-b", role="viewer")))
+    prod.fail_claims = True
+    with pytest.raises(HTTPException) as e:
+        run(_from_claims(repo, fresh_token(prod, "u-r41-d")))
+    assert e.value.status_code == 503
+    assert run(repo.get_user("inv-r41-d")) is not None and run(repo.get_user("u-r41-d")) is None   # untouched

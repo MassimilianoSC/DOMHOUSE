@@ -59,12 +59,32 @@ def revoke_sessions(uid: str) -> None:
     info("auth: sessions revoked", uid=uid)
 
 
-def delete_account(uid: str | None = None, email: str | None = None, protect: bool = False, owner: bool = False) -> bool:
+def without_env_claims(claims: dict | None, env: str, tenant_id: str) -> dict | None:
+    """R4-1 (P-83): the claims without this environment's tenant and role when they name tenant_id ({"<env>": {...}} and,
+    outside staging, the flat ones of before P-67); None when they name another organisation or nothing."""
+    out = dict(claims or {})
+    changed = False
+    own = out.get(env)
+    if isinstance(own, dict) and own.get("tenant_id") == tenant_id:
+        out.pop(env)
+        changed = True
+    if env != "staging" and out.get("tenant_id") == tenant_id:
+        out.pop("tenant_id", None)
+        out.pop("role", None)
+        changed = True
+    return out if changed else None
+
+
+def delete_account(uid: str | None = None, email: str | None = None, protect: bool = False, owner: bool = False,
+                   tenant_id: str | None = None) -> bool:
     """Detaches an account removed from an organisation. Returns True only when the Firebase account was hard-deleted.
 
     F5 (D-70): the Firebase identity is global, so an ADMINISTRATOR's action never destroys a real one. The account is
     deleted ONLY when it was never truly used (unverified email, no tenant claims) and is not protected (a platform
     manager). Otherwise its sessions are revoked and it is kept, so the org record is gone but the identity survives.
+    R4-1 (P-83): tenant_id is the organisation of the record removed: when the account is kept, this environment's
+    claims naming it go first, or the next sign-in would make the record again from them (_from_claims). Claims naming
+    another organisation are never touched.
     N3 (D-71): owner=True is the person asking to delete their own account: then the deletion is real."""
     if not _enabled():
         return False
@@ -85,6 +105,10 @@ def delete_account(uid: str | None = None, email: str | None = None, protect: bo
     has_claims = bool(env_claims(record.custom_claims).get("tenant_id")) or bool(
         (record.custom_claims or {}).get("staging"))
     if not owner and (protect or record.email_verified or has_claims):
+        left = without_env_claims(record.custom_claims, get_settings().app_env, tenant_id) if tenant_id else None
+        if left is not None:               # before the revocation: a token minted after it never carries them
+            fb_auth.set_custom_user_claims(record.uid, left, app=app)
+            info("auth: this environment's claims removed with the person", uid=record.uid)
         fb_auth.revoke_refresh_tokens(record.uid, app=app)
         _valid_after.pop(record.uid, None)
         info("auth: firebase account kept, sessions revoked", uid=record.uid)
@@ -93,6 +117,32 @@ def delete_account(uid: str | None = None, email: str | None = None, protect: bo
     _valid_after[record.uid] = (time.monotonic(), None)
     info("auth: firebase account deleted", uid=record.uid)
     return True
+
+
+def current_env_claims(uid: str) -> dict | None:
+    """R4-1: this environment's tenant and role as Firebase holds them NOW (a token carries a copy up to an hour old);
+    None when the accounts module is off (dev). Errors go to the caller."""
+    if not _enabled():
+        return None
+    fb_auth, app = _auth()
+    from .auth import env_claims
+    return env_claims(fb_auth.get_user(uid, app=app).custom_claims)
+
+
+def move_env_claims(uid: str, tenant_id: str, role: str) -> None:
+    """R4-1: an invitation accepted in another organisation than the one the claims name (left by an earlier
+    membership): this environment's claims follow the invitation, the flat copy of before P-67 too. No revocation: the
+    person is signing in, and _from_claims trusts a token's different copy only if Firebase confirms it."""
+    if not _enabled():
+        return
+    fb_auth, app = _auth()
+    claims = dict(fb_auth.get_user(uid, app=app).custom_claims or {})
+    env = get_settings().app_env
+    claims[env] = {"tenant_id": tenant_id, "role": role}
+    if env != "staging" and claims.get("tenant_id"):
+        claims["tenant_id"], claims["role"] = tenant_id, role
+    fb_auth.set_custom_user_claims(uid, claims, app=app)
+    info("auth: claims moved to the accepted invitation", uid=uid)
 
 
 def set_role_claim(uid: str, role: str) -> None:

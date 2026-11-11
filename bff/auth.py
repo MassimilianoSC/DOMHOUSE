@@ -136,6 +136,7 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
     recognised by email and its `inv-*` record is migrated to the real uid on first login."""
     uid, email = claims["uid"], (claims.get("email") or "").lower()
     stored = await repo.get_user(uid)
+    own = env_claims(claims)                     # P-67: this environment's tenant and role only
     if stored is None and email:
         invited = await repo.get_user_by_email(email)
         if invited and invited.uid.startswith("inv-"):
@@ -143,12 +144,24 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
             # first and take the invitation. Google sign-in and the password link of the invitation verify it.
             if not claims.get("email_verified"):
                 raise _err(403, "email_not_verified", "Conferma il tuo indirizzo email per completare l'accesso")
+            if own.get("tenant_id") and (own.get("tenant_id"), own.get("role")) != (invited.tenant_id, invited.role):
+                # R4-1: claims left by an earlier membership; the invitation accepted now wins, and the claims follow
+                # it BEFORE the invitation is used, or every later sign-in would take the person back there
+                try:
+                    await asyncio.to_thread(accounts.move_env_claims, uid, invited.tenant_id, invited.role)
+                except Exception as exc:
+                    warn("auth: claims not moved to the invitation", uid=uid, error=type(exc).__name__)
+                    raise _err(503, "auth_unavailable", "Controllo dell'accesso non disponibile: riprova tra poco")
+                own = {}
             stored = invited.model_copy(update={"uid": uid, "former_emails": [invited.email]})   # D-91 (F3)
             await repo.upsert_user(stored)
             await repo.delete_user(invited.uid)
-    own = env_claims(claims)                     # P-67: this environment's tenant and role only
     tenant_id, role = own.get("tenant_id"), own.get("role")
     if (not tenant_id or role not in ROLES) and stored:
+        tenant_id, role = stored.tenant_id, stored.role
+    elif stored and (stored.tenant_id, stored.role) != (tenant_id, role) and not await _claims_confirmed(uid, tenant_id, role):
+        # R4-1: a token carries a copy of the claims up to an hour old; the record follows them only when Firebase
+        # holds the same now (scripts/set_claims.py), never a stale copy
         tenant_id, role = stored.tenant_id, stored.role
     if not tenant_id or role not in ROLES:
         raise _err(403, "forbidden", "Account non abilitato: mancano tenant o ruolo")
@@ -178,6 +191,18 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
     return CurrentUser(uid=uid, email=email, tenant_id=tenant_id, role=role,
                        display_name=(stored.display_name if stored else claims.get("name", "")) or "",
                        apartment_ids=stored.apartment_ids, issued_at=float(claims.get("iat", 0)))
+
+
+async def _claims_confirmed(uid: str, tenant_id: str, role: str) -> bool:
+    """R4-1: Firebase holds these claims for this environment now (True also when the accounts module is off, in dev);
+    False when it holds others or cannot be read: then the record stays as it is."""
+    try:
+        current = await asyncio.wait_for(asyncio.to_thread(accounts.current_env_claims, uid),
+                                         timeout=get_settings().token_check_timeout_s)
+    except Exception as exc:
+        warn("auth: current claims not read, the record stays", uid=uid, error=type(exc).__name__)
+        return False
+    return current is None or (current.get("tenant_id"), current.get("role")) == (tenant_id, role)
 
 
 async def _revoked(uid: str, issued_at: float) -> bool:

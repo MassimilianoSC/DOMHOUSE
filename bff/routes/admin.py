@@ -169,10 +169,11 @@ async def delete_user(uid: str, user: CurrentUser = Depends(require_admin)):
     # F5 (D-70): never hard-delete the Firebase account of a platform manager (its email is visible to every user)
     protect = await repo.get_platform_member(target.email) is not None
     try:  # removing only the app record would leave a Firebase account (with claims, still able to sign in)
+        # R4-1: with the organisation of the record, so that claims naming it go too
         if target.uid.startswith("inv-"):
-            await asyncio.to_thread(accounts.delete_account, None, target.email, protect)
+            await asyncio.to_thread(accounts.delete_account, None, target.email, protect, False, target.tenant_id)
         else:
-            await asyncio.to_thread(accounts.delete_account, target.uid, None, protect)
+            await asyncio.to_thread(accounts.delete_account, target.uid, None, protect, False, target.tenant_id)
     except Exception as exc:
         warn("admin: firebase account not detached", uid=target.uid, error=str(exc))
         await repo.upsert_user(target)  # put the record back: the person is not half removed
