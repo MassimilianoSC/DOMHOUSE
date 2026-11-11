@@ -8,8 +8,19 @@ from bff.main import app
 PROBE_ONLY = {"/healthz"}  # internal startup/liveness probes (cloudrun*.yaml), never called from outside
 
 
+def every_route(routes):
+    """The routes one by one: from FastAPI 0.16x (D58) include_router keeps the router whole (original_router), and
+    app.routes alone would list none of ours (the checks below passing on an empty list)."""
+    for r in routes:
+        inner = getattr(r, "original_router", None)
+        yield from every_route(inner.routes) if inner is not None else (r,)
+
+
+ROUTES = [r for r in every_route(app.routes) if isinstance(r, APIRoute)]
+
+
 def _paths() -> set[str]:
-    return {r.path for r in app.routes if isinstance(r, APIRoute)}
+    return {r.path for r in ROUTES}
 
 
 def test_no_public_route_on_a_reserved_path():
@@ -29,7 +40,7 @@ def _depends_on(route: APIRoute, fn) -> bool:
 def test_every_platform_route_requires_the_platform_role():
     from bff.auth import require_platform
 
-    platform = [r for r in app.routes if isinstance(r, APIRoute) and r.path.startswith("/app/platform")]
+    platform = [r for r in ROUTES if r.path.startswith("/app/platform")]
     assert platform, "nessuna rotta di piattaforma registrata"
     missing = [f"{sorted(r.methods)} {r.path}" for r in platform if not _depends_on(r, require_platform)]
     assert missing == [], f"rotte di piattaforma senza require_platform: {missing}"
@@ -40,7 +51,8 @@ def test_every_platform_route_requires_the_platform_role():
 def test_organisation_routes_never_use_the_platform_role():
     from bff.auth import require_platform
 
-    org = [r for r in app.routes if isinstance(r, APIRoute) and r.path.startswith("/app/") and not r.path.startswith("/app/platform")]
+    org = [r for r in ROUTES if r.path.startswith("/app/") and not r.path.startswith("/app/platform")]
+    assert len(org) >= 10, "nessuna rotta di organizzazione registrata"
     assert [r.path for r in org if _depends_on(r, require_platform)] == []
 
 
@@ -68,7 +80,7 @@ def test_no_organisation_route_takes_a_tenant_from_the_client():
             out.add(b.name)
         return out
 
-    org = [r for r in app.routes if isinstance(r, APIRoute) and r.path.startswith("/app/") and not r.path.startswith("/app/platform")]
+    org = [r for r in ROUTES if r.path.startswith("/app/") and not r.path.startswith("/app/platform")]
     bad = [f"{r.path} {sorted(names(r) & {'tenant_id', 'tenant'})}" for r in org if names(r) & {"tenant_id", "tenant"}]
     assert bad == [], f"rotte di organizzazione che accettano un tenant dal client: {bad}"
     assert any(names(r) for r in org)                                        # the inspection does see parameters
@@ -86,7 +98,7 @@ def test_own_account_and_push_routes_ignore_the_support_header():
             stack.extend(d.dependencies)
         return found
 
-    own = [r for r in app.routes if isinstance(r, APIRoute) and (
+    own = [r for r in ROUTES if (
         r.path.startswith("/app/push") or r.path in ("/app/me/revoke-sessions", "/app/me/notification-prefs")
         or (r.path == "/app/me" and r.methods & {"PATCH", "DELETE"}))]
     assert len(own) >= 7, [r.path for r in own]
