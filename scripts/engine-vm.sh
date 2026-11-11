@@ -14,7 +14,8 @@
 #   sudo bash /opt/domhouse/engine-vm.sh set <apartment_id> NOME=VALORE          # an engine setting, restart
 #   sudo bash /opt/domhouse/engine-vm.sh unset <apartment_id> NOME               # back to its default, restart
 #   sudo bash /opt/domhouse/engine-vm.sh check-all                               # the 5-minute watch (timer)
-#   sudo bash /opt/domhouse/engine-vm.sh timers                                  # (re)install the two timers
+#   sudo bash /opt/domhouse/engine-vm.sh timers                                  # (re)install the timers and the boot unit
+#   sudo bash /opt/domhouse/engine-vm.sh start-all                               # after a boot: start what is down
 #   sudo bash /opt/domhouse/engine-vm.sh logs-agent                              # engines' logs to Cloud Logging
 #
 # Watch (P-60 step 10, D-104, D-148): every 5 minutes the timer domhouse-engine-check.timer runs check-all, which asks
@@ -62,8 +63,13 @@ BACKUP_ALERT_H=26                        # D-148 (c): no backup for longer than 
 ENGINE_UID=10001
 METADATA=http://metadata.google.internal/computeMetadata/v1
 SECRET_PREFIX="${SECRET_PREFIX:-langbrain-api-key-}"
+SECRETS_API="${DOMHOUSE_SECRETS_API:-https://secretmanager.googleapis.com/v1}"   # moved only by the tests
+MQTT_SECRET_PREFIX=langbrain-shelly-     # the connector's password on the broker (broker-secrets.sh, D-212)
+BROKER_INTERNAL_HOST=172.30.83.2         # the broker's internal door, on domhouse-broker-internal (compose.broker.yaml)
+BROKER_INTERNAL_PORT=1883
 BACKUP_DAYS=7
 BACKUP_AT="22:30:00 UTC"                 # before the daily snapshot of the disk (23:00 UTC)
+ADDRESS_WAIT_S="${DOMHOUSE_ADDRESS_WAIT_S:-120}"   # start-all: how long a boot may take to put the internal address
 
 die() { echo "errore: $*" >&2; exit 1; }
 step() { printf '\n== %s\n' "$*"; }
@@ -91,20 +97,46 @@ resolve_bind_ip() {
   [[ "${BIND_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "non leggo l'indirizzo interno della VM dal server dei metadati"
 }
 
+read_secret() {
+  # read_secret <secret>: its latest value on stdout, for a variable of the caller; never printed nor logged
+  local tok url
+  tok="$(token)" || return 1
+  url="${SECRETS_API}/projects/$(project)/secrets/$1/versions/latest:access"
+  curl -sf -H "Authorization: Bearer ${tok}" "${url}" |
+    python3 -c 'import base64, json, sys; print(base64.b64decode(json.load(sys.stdin)["payload"]["data"]).decode().strip())'
+}
+
 write_key() {
-  local apt="$1" secret="${SECRET_PREFIX}$1" tok url key
+  # the engine's key, and for CONNECTOR=shelly the broker account of its connector (lot 39, D-221/D-223): the names
+  # are those of Youssouf's transport (connector-v2.md §7.3 point 3); host and port are the broker's internal door
+  # (engine/broker/mosquitto.conf, compose.broker.yaml), the user is <apartment_id>.connector (broker_accounts.py)
+  local apt="$1" secret="${SECRET_PREFIX}$1" key connector mqtt=""
   step "Chiave dal segreto ${secret} -> ${ETC}/${apt}.env (permessi 600)"
-  tok="$(token)" || die "token della VM non disponibile"
-  url="https://secretmanager.googleapis.com/v1/projects/$(project)/secrets/${secret}/versions/latest:access"
-  key="$(curl -sf -H "Authorization: Bearer ${tok}" "${url}" |
-         python3 -c 'import base64, json, sys; print(base64.b64decode(json.load(sys.stdin)["payload"]["data"]).decode().strip())')" ||
+  key="$(read_secret "${secret}")" ||
     die "segreto ${secret} non leggibile dalla VM (esiste? langbrain-vm@ ha Secret Accessor su di lui?)"
+  connector="$(sed -n 's/^CONNECTOR=//p' "$(settings_file "${apt}")" 2>/dev/null || true)"
+  if [ "${connector}" = "shelly" ]; then
+    step "Conto del connector sul broker dal segreto ${MQTT_SECRET_PREFIX}${apt}"
+    mqtt="$(read_secret "${MQTT_SECRET_PREFIX}${apt}")" ||
+      die "segreto ${MQTT_SECRET_PREFIX}${apt} non leggibile dalla VM (broker-secrets.sh add-apartment ${apt} fatto?)"
+    # what compose reads from an env file must be one plain word: the passwords of broker-secrets.sh are token_urlsafe
+    [[ "${mqtt}" =~ ^[A-Za-z0-9_-]{24,}$ ]] || die "la password del connector in ${MQTT_SECRET_PREFIX}${apt} non ha la forma prevista"
+  fi
   install -d -m 700 -o root -g root "${ETC}"
-  (umask 077; printf 'API_KEY=%s\n' "${key}" > "${ETC}/${apt}.env.new")
+  (
+    umask 077                            # before the file exists: it is never readable by others, not even for a moment
+    {
+      printf 'API_KEY=%s\n' "${key}"
+      if [ -n "${mqtt}" ]; then
+        printf 'SHELLY_MQTT_HOST=%s\nSHELLY_MQTT_PORT=%s\nSHELLY_MQTT_TLS=false\nSHELLY_MQTT_USERNAME=%s.connector\nSHELLY_MQTT_PASSWORD=%s\n' \
+          "${BROKER_INTERNAL_HOST}" "${BROKER_INTERNAL_PORT}" "${apt}" "${mqtt}"
+      fi
+    } > "${ETC}/${apt}.env.new"
+  )
   mv -f "${ETC}/${apt}.env.new" "${ETC}/${apt}.env"
   chmod 600 "${ETC}/${apt}.env"
-  key=""
-  echo "scritto ${ETC}/${apt}.env"
+  key=""; mqtt=""
+  echo "scritto ${ETC}/${apt}.env$([ "${connector}" = "shelly" ] && echo ' (chiave e conto del connector sul broker)')"
 }
 
 registry_login() {
@@ -115,6 +147,16 @@ registry_login() {
     die "login rifiutato: langbrain-vm@ ha Artifact Registry Reader sul repository?"
   echo "ok"
 }
+
+lock_engines() {
+  # one change to the engines at a time: install, update, key, restore, set, unset and start-all wait here; the
+  # 5-minute watch never waits, it skips its restart while someone holds the lock (a restore stops an engine on purpose)
+  install -d -m 755 "${OPT}"
+  exec 9> "${OPT}/.engines.lock"
+  flock 9
+}
+
+container_state() { docker inspect -f '{{.State.Status}}' "engine-$1" 2>/dev/null || true; }
 
 settings_file() { echo "${OPT}/$1.settings"; }
 engine_settings_file() { echo "${ETC}/$1.settings.env"; }
@@ -262,7 +304,22 @@ OnCalendar=*:0/5
 [Install]
 WantedBy=timers.target
 UNIT
+  step "Avvio dei motori dopo un riavvio della VM: domhouse-engines-start.service (lotto 39)"
+  cat > "${SYSTEMD}/domhouse-engines-start.service" <<UNIT
+[Unit]
+Description=DOMHOUSE engines: after a boot, start the engines docker could not (engine-vm.sh start-all)
+After=docker.service network-online.target
+Wants=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash ${OPT}/engine-vm.sh start-all
+
+[Install]
+WantedBy=multi-user.target
+UNIT
   systemctl daemon-reload
+  systemctl enable domhouse-engines-start.service > /dev/null       # at the next boot; nothing to start now
   systemctl enable --now domhouse-engine-backup.timer domhouse-engine-check.timer > /dev/null
   systemctl list-timers domhouse-engine-backup.timer domhouse-engine-check.timer --no-pager | sed -n 1,3p
 }
@@ -284,7 +341,8 @@ check_all() {
     case "${code}" in
       200) watch_line "engine ok ${apt}" ;;
       503) watch_line "engine down ${apt} (risponde 503: connector o database)"; silent=$((silent + 1)) ;;
-      *)   watch_line "engine silent ${apt} (nessuna risposta, codice ${code:-nessuno})"; silent=$((silent + 1)) ;;
+      *)   watch_line "engine silent ${apt} (nessuna risposta, codice ${code:-nessuno})"; silent=$((silent + 1))
+           restart_stopped "${apt}" ;;
     esac
     newest="$(ls -1t "${DATA}/${apt}/backup"/engine-*.db 2>/dev/null | head -1 || true)"
     if [ -n "${newest}" ]; then
@@ -305,6 +363,49 @@ check_all() {
   if [ -f "${OPT}/_broker/broker.settings" ]; then
     bash "${OPT}/broker-vm.sh" check || watch_line "broker down (controllo non riuscito)"
   fi
+}
+
+restart_stopped() {
+  # lot 39: an engine whose container is not running (exited, created, dead) is started again by the watch. Docker
+  # never retries a container that failed to start (its restart policy applies only after a successful start): after a
+  # boot with the internal address late, the engine would stay down until someone came. Skipped while another command
+  # holds the lock. A container stopped by hand with docker stop is started again too: there is no «stopped on purpose»
+  restart_stopped_state="$(container_state "$1")"
+  case "${restart_stopped_state}" in exited|created|dead) ;; *) return 0 ;; esac
+  (
+    flock -n 9 || exit 0
+    if compose "$1" up -d > /dev/null 2>&1; then
+      watch_line "engine restarted $1 (il contenitore era ${restart_stopped_state})"
+    else
+      watch_line "engine restart failed $1 (contenitore ${restart_stopped_state})"
+    fi
+  ) 9> "${OPT}/.engines.lock"
+}
+
+start_all() {
+  # after a boot (domhouse-engines-start.service): wait until the internal address is on the network card, then start
+  # every engine that is not running. Docker starts them itself, but one whose port could not be bound yet is never
+  # retried (see restart_stopped); the watch would catch it within 5 minutes, this within seconds
+  local settings apt state waited=0
+  until ip -4 -o addr show 2>/dev/null | grep -qF " ${BIND_IP}/"; do
+    if [ "${waited}" -ge "${ADDRESS_WAIT_S}" ]; then
+      watch_line "engines start: indirizzo ${BIND_IP} non sulla scheda dopo ${waited} s"
+      break
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  shopt -s nullglob
+  for settings in "${OPT}"/*.settings; do
+    apt="$(basename "${settings}" .settings)"
+    state="$(container_state "${apt}")"
+    [ "${state}" != "running" ] || continue
+    if compose "${apt}" up -d > /dev/null 2>&1; then
+      watch_line "engine started ${apt} (all'avvio della VM, il contenitore era ${state:-assente})"
+    else
+      watch_line "engine start failed ${apt} (all'avvio della VM, contenitore ${state:-assente})"
+    fi
+  done
 }
 
 vm_line() {
@@ -382,6 +483,7 @@ case "${cmd}" in
     [ $# -ge 3 ] || die "uso: install <apartment_id> <port> <image> [connector]"
     apt="$1"; port="$2"; image="$3"; connector="${4:-simulated}"
     valid_id "${apt}"; valid_port "${port}"
+    lock_engines
     here="$(cd "$(dirname "$0")" && pwd)"
     [ -f "${here}/compose.yaml" ] || die "compose.yaml deve stare accanto a questo script"
     step "File del motore in ${OPT}"
@@ -401,6 +503,7 @@ case "${cmd}" in
   update)
     [ $# -eq 2 ] || die "uso: update <apartment_id> <image>"
     apt="$1"; image="$2"; valid_id "${apt}"
+    lock_engines
     [ -f "$(settings_file "${apt}")" ] || die "${apt} non è installato (manca $(settings_file "${apt}"))"
     previous="$(sed -n 's/^ENGINE_IMAGE=//p' "$(settings_file "${apt}")")"
     sed -i "s#^ENGINE_IMAGE=.*#ENGINE_IMAGE=${image}#" "$(settings_file "${apt}")"
@@ -410,6 +513,7 @@ case "${cmd}" in
   key)
     [ $# -eq 1 ] || die "uso: key <apartment_id>"
     apt="$1"; valid_id "${apt}"
+    lock_engines
     write_key "${apt}"
     compose "${apt}" up -d --force-recreate
     wait_healthy "${apt}"
@@ -431,6 +535,7 @@ case "${cmd}" in
   restore)
     [ $# -eq 2 ] || die "uso: restore <apartment_id> <file di backup>"
     apt="$1"; src="$2"; valid_id "${apt}"
+    lock_engines
     [ -f "$(settings_file "${apt}")" ] || die "${apt} non è installato"
     [ -f "${src}" ] || src="${DATA}/${apt}/backup/${src}"
     [ -f "${src}" ] || die "file di backup non trovato: $2"
@@ -461,15 +566,21 @@ case "${cmd}" in
     [ $# -eq 2 ] && [[ "$2" == *=* ]] || die "uso: set <apartment_id> NOME=VALORE"
     apt="$1"; name="${2%%=*}"; value="${2#*=}"; valid_id "${apt}"; valid_setting_name "${name}"
     [[ "${value}" =~ ^[A-Za-z0-9._:/-]{1,128}$ ]] || die "valore non valido per ${name}: lettere, cifre e . _ : / -"
+    lock_engines
     change_setting "${apt}" "${name}" "${value}"
     ;;
   unset)
     [ $# -eq 2 ] || die "uso: unset <apartment_id> NOME"
     apt="$1"; name="$2"; valid_id "${apt}"; valid_setting_name "${name}"
+    lock_engines
     change_setting "${apt}" "${name}"
     ;;
   check-all)
     check_all
+    ;;
+  start-all)
+    lock_engines
+    start_all
     ;;
   timers)
     install_timer
@@ -491,6 +602,6 @@ case "${cmd}" in
     wait_healthy "${apt}"
     ;;
   *)
-    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | timers | logs-agent (vedi l'intestazione)"
+    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | start-all | timers | logs-agent (vedi l'intestazione)"
     ;;
 esac

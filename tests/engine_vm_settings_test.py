@@ -32,10 +32,26 @@ def posix(path: Path) -> str:
 STUBS = {
     "id": '#!/usr/bin/env bash\necho 0\n',
     "sleep": '#!/usr/bin/env bash\nexit 0\n',
-    "docker": '#!/usr/bin/env bash\necho "$* [ENGINE_BIND_IP=${ENGINE_BIND_IP:-}]" >> "$STUB_DIR/docker.log"\nexit 0\n',
+    # docker inspect answers the state written in state-<container> (lot 39: the watch and start-all read it)
+    "docker": ('#!/usr/bin/env bash\necho "$* [ENGINE_BIND_IP=${ENGINE_BIND_IP:-}]" >> "$STUB_DIR/docker.log"\n'
+               'if [ "$1" = inspect ]; then cat "$STUB_DIR/state-${!#}" 2>/dev/null; fi\nexit 0\n'),
+    # flock: refuses (as flock -n would) when the test put a file "locked"
+    "flock": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/flock.log"\n[ ! -f "$STUB_DIR/locked" ]\n',
+    "ip": '#!/usr/bin/env bash\ncat "$STUB_DIR/addresses" 2>/dev/null\nexit 0\n',
+    # install without owner and modes: this machine has no user root, and Windows refuses them (write_key makes ETC
+    # root's, 700); folders are made, files copied
+    "install": ('#!/usr/bin/env bash\nd=""; pos=()\nwhile [ $# -gt 0 ]; do case "$1" in -o|-g|-m) shift 2 ;; '
+                '-d) d=1; shift ;; *) pos+=("$1"); shift ;; esac; done\n'
+                'if [ -n "$d" ]; then mkdir -p "${pos[@]}"; else cp "${pos[0]}" "${pos[1]}"; fi\n'),
     # health: 200 unless the test put a file "unhealthy" (503) or "code-<port>" (that code) next to the stand-ins
     "curl": ('#!/usr/bin/env bash\n'
              'echo "$*" >> "$STUB_DIR/curl.log"\n'
+             # the metadata server and Secret Manager (write_key): a secret is the file secret-<name>
+             'case "$*" in *service-accounts/default/token*) echo \'{"access_token": "tok"}\'; exit 0 ;; '
+             '*project/project-id*) printf progetto; exit 0 ;; '
+             '*versions/latest:access*) name=$(echo "$*" | grep -oE "secrets/[^/]+/versions" | cut -d/ -f2); '
+             '[ -f "$STUB_DIR/secret-$name" ] || exit 22; '
+             'printf \'{"payload": {"data": "%s"}}\' "$(base64 -w0 < "$STUB_DIR/secret-$name")"; exit 0 ;; esac\n'
              'port=$(echo "$*" | grep -oE "://[0-9.]+:[0-9]+/" | head -1 | cut -d: -f3 | tr -d /)\n'
              'host=$(echo "$*" | grep -oE "https://[^/ ]+" | head -1 | cut -d/ -f3)\n'
              'if [ -n "$host" ] && [ -f "$STUB_DIR/code-$host" ]; then code=$(cat "$STUB_DIR/code-$host"); '
@@ -70,8 +86,8 @@ def vm(tmp_path):
     (tmp_path / "meminfo").write_text("MemTotal:        2000000 kB\nMemFree:          300000 kB\nMemAvailable:     500000 kB\n",
                                       encoding="utf-8", newline="\n")             # a Linux /proc/meminfo, e2-small sized
 
-    def run(*args, bind="10.198.0.2"):           # D-218: the VM's internal address, as the metadata server gives it
-        cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}" '
+    def run(*args, bind="10.198.0.2", env=""):   # D-218: the VM's internal address, as the metadata server gives it
+        cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}" {env} '
                f'DOMHOUSE_ETC="{posix(etc)}" DOMHOUSE_OPT="{posix(opt)}" DOMHOUSE_HEALTH_TRIES=2 '
                f'DOMHOUSE_DATA="{posix(data)}" DOMHOUSE_SYSTEMD="{posix(units)}" DOMHOUSE_BIND_IP="{bind}" '
                f'DOMHOUSE_OPS_CONFIG="{posix(tmp_path / "ops" / "config.yaml")}" DOMHOUSE_MEMINFO="{posix(tmp_path / "meminfo")}"; '
@@ -284,3 +300,120 @@ def test_d218_without_the_internal_address_nothing_is_started(vm):
     log = (vm.stubs / "docker.log").read_text(encoding="utf-8") if (vm.stubs / "docker.log").exists() else ""
     assert "--env-file" not in log                        # only the start's «docker compose version»: no engine touched
 
+
+# ---- lot 39: the broker account of a Shelly engine (D-221, D-223), the engines after a boot ---------------------------
+MQTT_PASSWORD = "Pw-del-connector_0123456789abcdef"
+
+
+def _secrets(vm, mqtt=MQTT_PASSWORD):
+    (vm.stubs / f"secret-langbrain-api-key-{APT}").write_text("chiave-nuova-lunga-0001", encoding="utf-8", newline="")
+    if mqtt is not None:
+        (vm.stubs / f"secret-langbrain-shelly-{APT}").write_text(mqtt, encoding="utf-8", newline="")
+
+
+def test_the_key_of_a_shelly_engine_brings_its_broker_account(vm):
+    """CONNECTOR=shelly: the engine's env file gets, next to API_KEY, the variables of Youssouf's transport for the
+    broker's internal door, the user <apartment_id>.connector and the password of langbrain-shelly-<apartment_id>.
+    Nothing of the two secrets on screen."""
+    _connector(vm, "shelly")
+    _secrets(vm)
+    done = vm("key", APT)
+    assert done.returncode == 0, done.stderr
+    assert vm.key.read_text(encoding="utf-8") == (
+        "API_KEY=chiave-nuova-lunga-0001\nSHELLY_MQTT_HOST=172.30.83.2\nSHELLY_MQTT_PORT=1883\nSHELLY_MQTT_TLS=false\n"
+        f"SHELLY_MQTT_USERNAME={APT}.connector\nSHELLY_MQTT_PASSWORD={MQTT_PASSWORD}\n")
+    assert MQTT_PASSWORD not in done.stdout + done.stderr and "chiave-nuova" not in done.stdout + done.stderr
+    assert "conto del connector sul broker" in done.stdout
+    assert "up -d --force-recreate" in (vm.stubs / "docker.log").read_text(encoding="utf-8")
+
+
+def test_the_key_of_a_simulated_engine_is_the_key_alone(vm):
+    _secrets(vm)
+    assert vm("key", APT).returncode == 0
+    assert vm.key.read_text(encoding="utf-8") == "API_KEY=chiave-nuova-lunga-0001\n"
+    assert "langbrain-shelly" not in (vm.stubs / "curl.log").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("mqtt, says", [
+    (None, "segreto langbrain-shelly-apt-prova-01 non leggibile"),
+    ("corta", "non ha la forma prevista"),
+    ("password con spazi # e altro 0123456789", "non ha la forma prevista"),
+])
+def test_a_missing_or_strange_broker_password_leaves_the_key_file_as_it_was(vm, mqtt, says):
+    _connector(vm, "shelly")
+    _secrets(vm, mqtt)
+    done = vm("key", APT)
+    assert done.returncode != 0 and says in done.stderr, done.stderr
+    assert vm.key.read_text(encoding="utf-8") == "API_KEY=chiave-di-prova-lunga\n"
+    assert mqtt is None or mqtt not in done.stdout + done.stderr
+
+
+def test_the_watch_starts_again_an_engine_whose_container_is_stopped(vm):
+    """Docker never retries a container that failed to start (after a boot with the internal address late, the port
+    cannot be bound): the watch starts it again and says so; a running one, or one it cannot read, is left alone."""
+    (vm.stubs / "code-8100").write_text("000", encoding="utf-8")
+    (vm.stubs / f"state-engine-{APT}").write_text("exited", encoding="utf-8")
+    assert vm("check-all").returncode == 0
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert f"-t domhouse-check engine silent {APT}" in syslog
+    assert f"-t domhouse-check engine restarted {APT} (il contenitore era exited)" in syslog
+    assert "up -d [ENGINE_BIND_IP=10.198.0.2]" in (vm.stubs / "docker.log").read_text(encoding="utf-8")
+    assert "-n 9" in (vm.stubs / "flock.log").read_text(encoding="utf-8")            # never waits for the lock
+    for state in ("running", "restarting", ""):
+        (vm.stubs / "syslog.log").unlink()
+        (vm.stubs / "docker.log").unlink()
+        (vm.stubs / f"state-engine-{APT}").write_text(state, encoding="utf-8")
+        vm("check-all")
+        assert "restarted" not in (vm.stubs / "syslog.log").read_text(encoding="utf-8"), state
+        assert " up -d" not in (vm.stubs / "docker.log").read_text(encoding="utf-8"), state
+
+
+def test_the_watch_leaves_a_stopped_engine_alone_while_another_command_holds_the_lock(vm):
+    """A restore stops the engine on purpose: while it holds the lock the watch only writes «silent»."""
+    (vm.stubs / "code-8100").write_text("000", encoding="utf-8")
+    (vm.stubs / f"state-engine-{APT}").write_text("exited", encoding="utf-8")
+    (vm.stubs / "locked").write_text("", encoding="utf-8")
+    assert vm("check-all").returncode == 0
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert f"engine silent {APT}" in syslog and "restarted" not in syslog
+    assert " up -d" not in (vm.stubs / "docker.log").read_text(encoding="utf-8")
+
+
+def test_commands_that_stop_or_recreate_an_engine_take_the_lock(vm):
+    assert vm("set", APT, "CONFIRM_ON_WATTS=30").returncode == 0
+    assert vm("unset", APT, "CONFIRM_ON_WATTS").returncode == 0
+    assert (vm.stubs / "flock.log").read_text(encoding="utf-8").splitlines() == ["9", "9"]   # waits (no -n)
+
+
+def test_after_a_boot_start_all_waits_for_the_address_then_starts_what_is_down(vm):
+    (vm.stubs / "addresses").write_text("2: ens4    inet 10.198.0.2/32 brd 10.198.0.2 scope global dynamic ens4\n",
+                                         encoding="utf-8")
+    (vm.opt / "apt-acceso.settings").write_text("APARTMENT_ID=apt-acceso\nPORT=8101\nCONNECTOR=simulated\n",
+                                                 encoding="utf-8", newline="\n")
+    (vm.stubs / f"state-engine-{APT}").write_text("exited", encoding="utf-8")
+    (vm.stubs / "state-engine-apt-acceso").write_text("running", encoding="utf-8")
+    done = vm("start-all")
+    assert done.returncode == 0, done.stderr
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert f"-t domhouse-check engine started {APT} (all'avvio della VM, il contenitore era exited)" in syslog
+    assert "apt-acceso" not in syslog
+    docker = (vm.stubs / "docker.log").read_text(encoding="utf-8")
+    assert docker.count(" up -d") == 1 and "domhouse-apt-acceso" not in docker.replace("inspect", "")
+
+
+def test_start_all_without_the_address_says_so_and_still_tries(vm):
+    (vm.stubs / f"state-engine-{APT}").write_text("created", encoding="utf-8")
+    cmd_env = "DOMHOUSE_ADDRESS_WAIT_S=0"
+    done = vm("start-all", env=cmd_env)
+    assert done.returncode == 0, done.stderr
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert "engines start: indirizzo 10.198.0.2 non sulla scheda dopo 0 s" in syslog
+    assert f"engine started {APT}" in syslog
+
+
+def test_timers_also_installs_the_boot_unit_of_the_engines(vm):
+    assert vm("timers").returncode == 0
+    unit = (vm.units / "domhouse-engines-start.service").read_text(encoding="utf-8")
+    assert "After=docker.service network-online.target" in unit and "engine-vm.sh start-all" in unit
+    assert "WantedBy=multi-user.target" in unit
+    assert "enable domhouse-engines-start.service" in (vm.stubs / "systemctl.log").read_text(encoding="utf-8")
