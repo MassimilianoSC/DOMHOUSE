@@ -4,7 +4,8 @@
 #
 #   sudo bash broker-vm.sh prepare-tls-disk                            # once: the keys' disk (C-12); safe to repeat
 #   sudo bash broker-vm.sh cert-new <domain> <dns_zone> <dns_account> [rsa2048|ec256]   # the first certificate
-#   sudo bash broker-vm.sh install <image>                             # first time; needs the certificate
+#   sudo bash broker-vm.sh install <image>                             # first time (needs the certificate) and to bring
+#                                                                      # new files; restarts the broker if mosquitto.conf changed
 #   sudo bash /opt/domhouse/broker-vm.sh update <image>                # new image, same data
 #   sudo bash /opt/domhouse/broker-vm.sh status
 #   sudo bash /opt/domhouse/broker-vm.sh restart                       # everyone reconnects: reload is enough, usually
@@ -483,7 +484,18 @@ case "${cmd}" in
     step "Avvio di ${CONTAINER} con ${image}"
     compose pull --quiet
     compose up -d
+    # mosquitto.conf is mounted as a single file and put_files replaces it with a new one: a broker already running
+    # keeps reading the old one, also after a reload, and compose does not recreate it for a change of content. When
+    # what the container reads is not the installed file, a restart (the lot 38 procedure, V3, 11 November)
+    if docker exec "${CONTAINER}" cat /mosquitto/config/mosquitto.conf 2>/dev/null | cmp -s - "${BROKER_OPT}/mosquitto.conf"; then
+      echo "il broker legge la configurazione installata"
+    else
+      echo "configurazione cambiata: riavvio del broker, i dispositivi si ricollegano"
+      compose restart
+    fi
     wait_healthy
+    docker exec "${CONTAINER}" cat /mosquitto/config/mosquitto.conf | cmp -s - "${BROKER_OPT}/mosquitto.conf" \
+      || die "dopo il riavvio il broker non legge ancora ${BROKER_OPT}/mosquitto.conf"
     ;;
   update)
     [ $# -eq 1 ] || die "uso: update <image>"

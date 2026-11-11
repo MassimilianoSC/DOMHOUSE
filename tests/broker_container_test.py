@@ -330,23 +330,26 @@ def test_a_device_cannot_leave_its_own_topics(bench, sub):
 
 
 def test_request_and_answer_between_the_connector_and_its_device(bench, sub):
-    """D-215: the answer goes on the device's own answer topic, <apartment>/connector/<device>/rpc."""
+    """D-223: the answer goes on the device's own answer topic, <apartment>/<device>/connector/rpc (src
+    <apartment>/<device>/connector, the form measured in the lab), which the connector reads with one subscription."""
     device = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/rpc")
-    connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/connector/+/rpc")
+    connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/+/connector/rpc")
     assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "richiesta-1").returncode == 0
     assert device.wait_for("richiesta-1")
-    assert pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/a1/rpc", "risposta-1").returncode == 0
-    assert connector.wait_for(f"{A}/connector/a1/rpc risposta-1")
+    assert pub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/connector/rpc", "risposta-1").returncode == 0
+    assert connector.wait_for(f"{A}/a1/connector/rpc risposta-1")
 
 
 def test_a_device_cannot_answer_in_the_name_of_another(bench, sub):
-    """D-215: a1 may not write on a2's answer topic, nor on the shared one of before."""
-    connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/connector/#")
-    pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/a2/rpc", "risposta-falsa")
+    """D-223: a1 may not write on a2's answer topic, nor on the two forms of before (D-215 and the shared one)."""
+    connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/#")
+    pub("tls", f"{A}.a1", PW["a1"], f"{A}/a2/connector/rpc", "risposta-falsa")
+    pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/a1/rpc", "risposta-d215")
     pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/rpc", "risposta-vecchia")
-    assert pub("tls", f"{A}.a2", PW["a2"], f"{A}/connector/a2/rpc", "risposta-vera").returncode == 0
+    assert pub("tls", f"{A}.a2", PW["a2"], f"{A}/a2/connector/rpc", "risposta-vera").returncode == 0
     assert connector.wait_for("risposta-vera")
-    assert not any("risposta-falsa" in line or "risposta-vecchia" in line for line in connector.lines())
+    assert not any(word in line for line in connector.lines()
+                   for word in ("risposta-falsa", "risposta-d215", "risposta-vecchia"))
 
 
 def test_a_second_sync_with_the_same_secrets_changes_nothing(bench):
@@ -502,6 +505,27 @@ def test_data_are_written_on_the_data_folder(bench):
     rig(f"docker compose --env-file {BENCH}/opt/_broker/broker.settings -f {BENCH}/opt/_broker/compose.yaml restart", timeout=90)
     time.sleep(2)
     assert "mosquitto.db" in rig(f"ls {BENCH}/data/_broker").stdout
+
+
+def test_install_restarts_the_broker_only_when_mosquitto_conf_changed(bench):
+    """Lot 39 (V3 of the lot 38 procedure, 11 November): mosquitto.conf is mounted as a single file and install replaces
+    it, so a broker already running kept reading the old one, also after a reload. Now install restarts the broker
+    when what it reads is not the installed file, and only then."""
+    in_container = lambda: docker("exec", CONTAINER, "cat", "/mosquitto/config/mosquitto.conf").stdout
+    started = lambda: docker("inspect", "-f", "{{.State.StartedAt}}", CONTAINER).stdout.strip()
+    before = started()
+    same = rig(f"bash {BENCH}/up/broker-vm.sh install {IMAGE}", timeout=200)
+    assert "il broker legge la configurazione installata" in same.stdout and started() == before, same.stdout
+    rig(f"printf '# cambio di prova\\n' >> {BENCH}/up/mosquitto.conf")
+    try:
+        changed = rig(f"bash {BENCH}/up/broker-vm.sh install {IMAGE}", timeout=200)
+        assert "configurazione cambiata: riavvio del broker" in changed.stdout and "sano" in changed.stdout, changed.stdout
+        assert "# cambio di prova" in in_container() and started() != before
+    finally:
+        rig(f"cp /repo/engine/broker/mosquitto.conf {BENCH}/up/mosquitto.conf && "
+            f"bash {BENCH}/up/broker-vm.sh install {IMAGE}", timeout=200)
+    assert "# cambio di prova" not in in_container()
+    assert can_connect("tls", f"{A}.a1", PW["a1"]) and can_connect("internal", f"{A}.connector", PW["connA"])
 
 
 def file_fingerprint(path):
