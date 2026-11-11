@@ -2351,12 +2351,12 @@ Tutte partono attive. Sette si modificano dall'app, una no.
   manda la notifica «Prenotazioni», salvo un altro soggiorno in corso o un altro pre-arrivo già eseguito.
 - **Due ospiti di fila** (dal lotto 40): il check-out del primo non mette la casa a vuoto se il secondo è già
   dentro, se il suo pre-arrivo è già partito o se arriva entro le ore del pre-arrivo. Nelle Decisioni compare
-  «Check-out senza casa vuota».
+  «Check-out: casa non svuotata».
 - **Prenotazione modificata dopo il pre-arrivo** (dal lotto 40): non rimette il comfort al posto della tua scelta.
   Se l'arrivo slitta più avanti, la casa torna subito a vuoto e si riscalda al nuovo pre-arrivo («Arrivo spostato:
-  casa a vuoto»).
+  casa vuota»).
 - **Un messaggio di prenotazione arrivato in ritardo**, più vecchio dell'ultimo già applicato, viene ignorato
-  (dal lotto 40, «Evento di prenotazione superato»).
+  (dal lotto 40, «Prenotazione: evento vecchio ignorato»).
 - **Un cambio di modalità programmato durante una forzatura** aspetta la sua fine («Azione rimandata»).
 - **Dopo un riavvio del sistema**, un'azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).
 - **L'occupazione «Occupato»** richiede il check-in effettivo comunicato da Italianway; la sola prenotazione dà
