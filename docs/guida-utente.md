@@ -399,6 +399,7 @@ Tutte hanno il nome dell'appartamento davanti.
 | «Dispositivi e sistema domotico offline» | «…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo» | A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio | «Decisioni» |
 | «Prenotazioni» | «…: prenotazione annullata, appartamento rimesso a vuoto» | Disdetta dopo che l'appartamento era già stato preparato per l'arrivo | «Decisioni» |
 | «Prenotazioni» (pre-arrivo, check-out, casa vuota) oppure «Dispositivi e sistema domotico offline» (le altre) | «…: azione programmata non eseguita» con il motivo, oppure «N azioni programmate non eseguite. La prima: …» se più d'una entro un minuto; dopo uno spegnimento programmato «Durante la manutenzione N azioni programmate non sono state eseguite» | Un'azione programmata rifiutata alla sua ora o saltata perché il sistema era fermo (dal lotto 38); dopo uno spegnimento programmato le azioni saltate non arrivano una per una | «Programmazione» |
+| «Prenotazioni» | «…: pre-arrivo con comandi non riusciti» oppure «…: check-out con comandi non riusciti», con l'elenco dei dispositivi che non hanno eseguito e il motivo | Un pre-arrivo o un check-out partito ma con qualche comando non riuscito, anche per un dispositivo offline in quel momento (dal lotto 39) | «Programmazione» |
 | «Riepilogo» | «…: riepilogo della settimana», con la prima segnalazione e «E altre … voci.» | Il lunedì mattina, solo se la settimana ha qualcosa da segnalare | Il riepilogo di quella settimana |
 
 > **Da sapere**
@@ -2274,6 +2275,8 @@ Tutte partono attive. Sette si modificano dall'app, una no.
   stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte. Dal lotto 38, se il sistema
   domotico si riavvia con una finestra aperta, la regola riparte da sola: il clima si spegne allo scadere dei minuti
   contati da quando la finestra si è aperta; se si è aperta mentre il sistema era fermo, dalla ripartenza.
+  Quando la modalità comfort accende un climatizzatore dopo la pausa del compressore, il climatizzatore resta regolato
+  dal comfort (dal lotto 39).
   **Alla chiusura della finestra riscaldamento e clima riprendono da soli** (dal lotto 38): quando si chiude l'ultima
   finestra aperta, caldaia e clima tornano a seguire la modalità; un dispositivo acceso a mano torna com'era; se
   nel frattempo qualcuno l'ha comandato, resta come l'ha lasciato. Con una forzatura attiva non si ripristina niente.

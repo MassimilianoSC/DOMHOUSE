@@ -133,6 +133,9 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D31 📱 | Operatore | Su un appartamento dimostrativo apri «Nuova azione», scrivi in «Quando» un'ora a tua scelta e aspetta un minuto senza toccare nulla. | All'apertura il campo propone fra un'ora circa; l'ora che hai scritto resta com'è. | |
 | D32 | Operatore | Su un'azione in programma premi «Sposta». | Il campo parte dalla data e dall'ora dell'azione mostrate nell'elenco, non da «fra un'ora». | |
 | D33 | Operatore, su computer | Imposta sul computer un altro fuso orario (per esempio Londra), apri «Nuova azione», poi rimetti il fuso com'era. | Il campo propone fra un'ora in ora italiana, non in ora di Londra. | |
+| D34 | Amministratore e operatore (staging, dimostrativo) | Simulatore: metti offline la Caldaia, poi crea una prenotazione con il check-in vicino, così che il pre-arrivo parta subito; apri Decisioni. | Riga «Programma: eseguita in parte» con «Pre-arrivo eseguito in parte: 1 comando non riuscito (Caldaia: dispositivo offline, non comandato)»; sul telefono, con le Prenotazioni attive, la notifica «…: pre-arrivo con comandi non riusciti». | |
+| D35 | Amministratore e operatore (staging, dimostrativo) | Come D34, ma con tutti i dispositivi online. | Nessuna riga «eseguita in parte», nessuna notifica. | |
+| D36 | Qualsiasi | Decisioni: scorri le righe degli ultimi giorni. | Nessun codice con il trattino basso (per esempio `schedule_failed`): ogni riga ha un nome in italiano, come «Programma: non eseguita», «Sistema domotico di nuovo raggiungibile», «Finestra chiusa: riacceso». | |
 
 ## E. Amministrazione
 

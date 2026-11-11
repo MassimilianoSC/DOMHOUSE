@@ -78,6 +78,10 @@
 
 | Limite | Cosa succede | Stato |
 |---|---|---|
+| **Esecuzione in parte: check-out con presenza** | Un check-out con presenza rilevata diventa un'approvazione: l'esecuzione non è legata all'azione programmata, quindi niente «eseguita in parte»; l'eventuale fallimento lo dice la decisione dell'approvazione | Accettato |
+| **Esecuzione in parte: comandi successivi** | I comandi che la regolazione manda dopo, per conto suo, non contano per l'azione | Accettato |
+| **Esecuzione in parte: riavvio durante un'attesa** | Un'accensione rimandata per la pausa del compressore e interrotta da un riavvio conta come non riuscita, anche se poi la regolazione la fa comunque | Accettato |
+| **Testo delle notifiche** | Nella notifica il testo si taglia a 200 caratteri; nelle Decisioni resta intero | Accettato |
 | **Approvata ma non eseguita** | Dal lotto 38 il fallimento si vede nelle Decisioni («Azione approvata ma non eseguita»), ma l'approvazione resta «Approvata» e l'app riceve un OK: il contratto non ha uno stato «non eseguita» | Accettato |
 | **Riepilogo fatto in ritardo** | Se il motore è irraggiungibile per tutto il lunedì, il riepilogo fatto dopo può ancora perdere le approvazioni scadute nei primi giorni della settimana | Accettato |
 | **Caldaia e clima dopo la chiusura della finestra** | Dal lotto 38 tornano da soli, circa un minuto dopo la chiusura dell'ultima finestra; la caldaia può aspettare in più il minimo fra due accensioni. Se la modalità cambia a finestra aperta vale quella nuova; un dispositivo offline alla chiusura torna quando risponde | Corretto il 10 novembre (`cb50298`) |
