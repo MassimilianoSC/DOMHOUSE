@@ -1605,9 +1605,17 @@ class ApartmentEngine:
             if note:
                 reasoning = f"{reasoning or 'Comando automatico'}; {note}"
         cap, action, params = self.validate_command(device, body)
+        turning_off = cap == "climate" and any(
+            c["device_id"] == device_id and c["status"] not in FINAL and c["capability"] == cap
+            and not self.target_state(device, cap, c["action"], c["params"]).get("on", True)
+            for c in self.commands.values())
         if cap == "climate" and not manual and who != "assistant" \
-                and self.target_state(device, cap, action, params)["on"] and not device["capabilities"][cap]["on"]:
+                and self.target_state(device, cap, action, params)["on"] \
+                and (not device["capabilities"][cap]["on"] or turning_off):
             wait = self.compressor_wait(device_id)
+            if turning_off:                                  # D11: its pause starts when that turn_off is over
+                rule = self.rule("compressor_min_off")
+                wait = rule["params"]["minutes"] * seconds_per_minute() if rule["enabled"] else 0.0
             if wait > 0:                                     # R4: an automatic start waits for the pause
                 self.log("rule:compressor_min_off", {"type": "device", "device_id": device_id}, action, "off", "on",
                          f"{reasoning or 'Accensione automatica'}: rimandata di {int(wait) + 1} s per la pausa minima "
@@ -1688,6 +1696,39 @@ class ApartmentEngine:
             if (sid := self.command_schedule.get(cmd["command_id"])) and cmd["status"] in FINAL:
                 self._schedule_check(sid)
 
+    async def _refused_by_pause(self, cmd: dict, decision_actor: str, reasoning: str, target: dict, old, new_state: dict,
+                                pause: float) -> None:
+        """D11: a start that finds the compressor's pause inside the lock. A person's (or the assistant's) is refused
+        saying when to try again; an automatic one (the mode, the regulation, the rules) is created again when the
+        pause ends, as create_command does for an automatic start (R4)."""
+        cap = cmd["capability"]
+        automatic = decision_actor == "system" or decision_actor.startswith("rule:")
+        self._set_status(cmd, "sent")
+        await asyncio.sleep(0.2)
+        self._set_status(cmd, "failed", "blocked_by_rule")
+        if not automatic:
+            self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state),
+                     f"Comando bloccato dalla regola «Pausa minima del compressore»: riprova tra {int(pause) + 1} secondi",
+                     "rejected", cmd["correlation_id"], command_id=cmd["command_id"])
+            return
+        device_id = cmd["device_id"]
+        self.log("rule:compressor_min_off", target, cmd["action"], "off", "on",
+                 f"{reasoning or 'Accensione automatica'}: rimandata di {int(pause) + 1} s per la pausa minima "
+                 f"del compressore", "informational", cmd["correlation_id"])
+        body = {"capability": cap, "action": cmd["action"], **({"params": cmd["params"]} if cmd.get("params") else {})}
+
+        async def later():
+            await asyncio.sleep(pause)
+            self._auto_climate = True
+            try:
+                self.create_command(device_id, body, "system:engine", cmd["correlation_id"], decision_actor, reasoning)
+            except MockError as exc:
+                logs.warn("deferred command not created", apartment_id=self.apartment_id, device_id=device_id,
+                          error=exc.error)
+            finally:
+                self._auto_climate = False
+        self.spawn(later())
+
     async def _execute_command(self, cmd: dict, decision_actor: str, reasoning: str) -> None:
         device = self.devices[cmd["device_id"]]
         cap = cmd["capability"]
@@ -1734,6 +1775,18 @@ class ApartmentEngine:
         waiter = self._watch_power(check) if check and check[0]["online"] else None
         no_confirmation = "Nessuna conferma dal dispositivo entro il tempo massimo"
         async with self._device_lock(device["device_id"]):       # at most one command per device (connector-v2.md §2.5)
+            if cap == "climate" and new_state["on"] and not device["capabilities"][cap]["on"]:
+                # D11 (P-83): the pause checked again here, where a turn_off sent before this command is over (its
+                # pause starts when it is settled): before, a start queued behind a turn_off ran at once
+                pause = self.compressor_wait(device["device_id"])
+                if 0 < pause <= self.setting("COMPRESSOR_WAIT_SECONDS"):
+                    await asyncio.sleep(pause)
+                    pause = 0.0
+                if pause > 0:
+                    if waiter is not None:
+                        self._unwatch_power(check[0]["device_id"], waiter)
+                    await self._refused_by_pause(cmd, decision_actor, reasoning, target, old, new_state, pause)
+                    return
             running = (device["device_id"], cap, cmd["correlation_id"], new_state)
             self.inflight.append(running)
             try:
