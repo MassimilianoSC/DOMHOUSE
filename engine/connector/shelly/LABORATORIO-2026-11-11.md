@@ -15,12 +15,13 @@ sul PC con `CONNECTOR=shelly`.
    (§3.4).
 2. **I sensori BLU non compaiono in `Shelly.GetStatus`**: per la fotografia del §2.6 serve una seconda chiamata,
    `Shelly.GetComponents`, che è paginata (§3.1).
-3. **L'EM Mini Gen4 manda la potenza ogni ~14 s**, non al cambio: la conferma a consumo del §2.5 (variazione entro
-   2 s) è a rischio con questo misuratore. La misura con un carico vero è prevista nel pomeriggio dell'11 (§2.2).
+3. **L'EM Mini Gen4 rispetta i 2 secondi del §2.5** (aggiornato alle 15:45). A riposo manda la potenza ogni
+   ~14 s, ed era il mio dubbio di stamattina; sotto carico notifica la variazione in 50 ms e poi circa ogni secondo
+   (§2.2).
 4. **Per il catalogo dei BLU propongo il kit preparato in ufficio**: l'elettricista non configura niente e nessuno
    detta un MAC (§4.1). Risponde anche al §7.3 punto 4.
-5. I profili di **Shelly 1 Gen4 ed EM Mini Gen4** sono pronti sul ramo `shelly-gen4`, che ora va riallineato a
-   `main` prima della pull request (§5).
+5. I profili di **Shelly 1 Gen4 ed EM Mini Gen4** e i sensori BLU sono nella pull request #7; nel pomeriggio sono
+   stati provati dal vivo con il motore (§7).
 
 ## 2. Dispositivi alimentati
 
@@ -34,17 +35,29 @@ La scatola è rimasta senza corrente tutta la notte, con il DHCP attivo e l'acce
 - Il motore, partito prima del broker, si è agganciato da solo con attesa crescente (91 s in quel caso), poi
   `connector up` e dispositivo online.
 
-### 2.2 EM Mini Gen4: ritardo della potenza
-- `em1:0` (con `act_power`) arriva ogni ~14,4 s, e il suo `ts` è ~13,5 s prima dell'arrivo. Confermato anche
-  nelle catture di oggi, sempre senza carico.
-- Non sappiamo ancora se una variazione di carico anticipa la notifica o aspetta il giro. Se aspetta, il misuratore
-  non rispetta «ogni variazione di `watts` entro 2 secondi» del §2.5 e la conferma `power` dello split può dare
-  `no_confirmation` anche quando lo split si è acceso.
-- Attenzione nel leggere la misura: il flusso del connector non manda mai un `ts` all'indietro, quindi dopo un
-  comando al relè la notifica dell'EM Mini può uscire con il `ts` del cambio del relè. La misura va letta sulla
-  cattura MQTT (ora di arrivo e `ts` del dispositivo), non sugli `StateChange`.
-- Oggi alle 15 l'elettricista chiude la catena del banco (EM Mini → Shelly 1 → presa). Carico: un caricabatterie
-  sopra i 20 W. Porto i tempi misurati.
+### 2.2 EM Mini Gen4: la potenza, a riposo e sotto carico
+**A riposo** (misure del mattino, senza carico): `em1:0` con `act_power` arriva ogni ~14,4 s, e il suo `ts` è
+~13,5 s prima dell'arrivo. Da qui il dubbio sul §2.5.
+
+**Sotto carico** (pomeriggio, catena EM Mini → Shelly 1 → presa montata dall'elettricista, carico: caricabatterie di
+un portatile, ~40 W). Orari di arrivo al motore, comando dato dall'API del motore:
+
+| Evento | Ora | Dopo il cambio del relè |
+|---|---|---|
+| Relè acceso | 15:38:23,73 | |
+| Prima variazione di `watts` (3,4 W) | 15:38:23,79 | 0,05 s |
+| `watts` sopra i 20 W (30,0 W) | 15:38:26,78 | 3,1 s |
+| Relè spento | 15:40:02,65 | |
+| `watts` sotto i 15 W (1,4 W) | 15:40:04,44 | 1,8 s |
+| Seconda accensione: `watts` sopra i 20 W | 15:40:47,60 | 2,9 s |
+
+- **Il misuratore notifica subito quando la potenza cambia**, poi circa una volta al secondo finché varia. I ~14 s
+  sono solo il ritmo a riposo. «Ogni variazione di `watts` entro 2 secondi» del §2.5 è rispettato.
+- I ~3 s per superare i 20 W sono del carico: il caricabatterie sale per gradi (3, 7, 19, 30, 48 W). Stanno dentro
+  i 10 s della conferma. Con uno split vero la salita sarà diversa e va misurata su quello.
+- Nel leggere queste misure: il flusso del connector non manda mai un `ts` all'indietro, quindi il `ts` di uno
+  `StateChange` dell'EM Mini può coincidere con quello del relè. Per i tempi valgono gli orari di arrivo.
+- La presa è alimentata solo a relè acceso, e `watts` torna a zero allo spegnimento: il cablaggio è verificato.
 
 ### 2.3 Shelly 1 Gen4
 - `switch:0` con `output` e `source`, nessuna misura; ogni minuto una notifica con solo `counts`, da ignorare.
@@ -120,6 +133,8 @@ La regola di `offline_thresholds.toml` (tre beacon persi più 20 s) regge con le
 | `blu_motion` | 900 s | 906 s | 2720 s | 2720 s |
 
 Con 200 s un contatto sano risulterebbe offline a ogni giro. La correzione entra con il ramo `shelly-blu`.
+Durante le prove un pacchetto del contatto si è perso (`packet_id` da 45 a 47, 605 s fra i due) con il sensore sul
+banco e segnale buono: con 920 s resta online.
 
 Due cose collegate:
 - Il «visto l'ultima volta» di un sensore va preso dal `last_updated_ts` più recente fra tutti i suoi componenti,
@@ -146,7 +161,7 @@ formato del catalogo o il contratto le segnalo.
   (`shelly: {addr, bridge, type}`); il ponte deve essere un dispositivo dello stesso catalogo. È la risposta che
   propongo al §7.3 punto 4: l'id del broker resta quello dell'apparecchio fisico (il ponte), e i sensori si legano
   al `device_id` con MAC + ponte.
-- **Da verificare** oggi alle 15: che l'associazione sopravviva allo spegnimento del ponte.
+- **Verificato alle 15**: l'associazione sopravvive allo spegnimento del ponte (vedi §7).
 - **Limiti**: ponte e sensori viaggiano insieme; sostituire un sensore guasto richiede una nuova associazione sul
   posto. Il processo (chi prepara i kit) lo sto definendo con il team.
 - Alternativa tenuta da parte: nessun MAC nel catalogo, il connector lega per tipo e nome. Più comoda sul posto,
@@ -168,9 +183,10 @@ diagnosi la fa lo script.
 ### 4.5 Sensore mai sentito: offline fino al primo pacchetto
 Con valori `null` il connector non inventa uno stato e non dichiara online (§2.6). Se i valori non sopravvivono al
 riavvio del ponte, dopo un blackout il Motion può risultare offline fino a 15 minuti e il contatto fino a 5: non
-sono cose critiche, si aspetta il primo pacchetto. Lo misuro alle 15.
+sono cose critiche, si aspetta il primo pacchetto. Al blackout delle 15 i tre sensori sono tornati online 1,4 s dopo
+il ponte, con la loro fotografia (§7).
 
-### 4.6 Già nel ramo `shelly-gen4`
+### 4.6 Dai profili Gen4 (ora nella pull request #7)
 - Lo Shelly 1 Gen4 copre `switch` oppure `heating` (mai insieme nel catalogo). `links.sensor_device_id` è
   facoltativo finché non ci sono i BLU: senza, il motore segue solo il comando di una persona.
 - `setpoint_min` e `setpoint_max` della caldaia non sono controllati nel catalogo: farlo romperebbe le prove
@@ -199,9 +215,33 @@ luci accese solo se è buio. Richiede capacità nuove: da valutare dopo il pilot
 
 | Ramo | Contenuto | Stato |
 |---|---|---|
-| `shelly-gen4` | Profili Shelly 1 Gen4 (`switch`/`heating`) ed EM Mini Gen4 (`power_meter`), finti e prove | Un commit sopra `shelly-banco` prima dell'unione: 466 passate, 3 saltate (Python 3.11 in Docker, `python -m pytest engine -q -rs`). Ora è 146 commit dietro `main`: lo riallineo e apro la pull request |
-| `shelly-blu` | I tre sensori BLU, `GetComponents`, soglia del contatto | In lavorazione dall'11 novembre |
+| `shelly-qos0` | Richieste RPC a QoS 0 e ritocchi della revisione della #4 | Pull request #6 |
+| `shelly-blu` | Profili Shelly 1 Gen4 ed EM Mini Gen4, i tre sensori BLU, `GetComponents`, soglia del contatto | Pull request #7 (contiene anche il lavoro di `shelly-gen4`, riallineato a `main`) |
 | `developYouss` | `DESIGN.md` (pull request #1) | Aperta; da aggiornare con queste note e con `connector-v2.md` |
 
-Catture di laboratorio di oggi (associazioni, ritmi, pagine di `GetComponents`): entrano anonimizzate in
-`tests/fixtures/` con il ramo `shelly-blu`.
+Le catture di laboratorio di oggi sono anonimizzate in `tests/fixtures/` del ramo `shelly-blu`.
+
+## 7. Prova dal vivo del pomeriggio: sei dispositivi con il motore
+
+Motore in Docker sul PC, costruito dal ramo `shelly-blu`, catalogo con Plug, Shelly 1, EM Mini e i tre sensori
+(ponte: Shelly 1). È la prima volta che Gen4 e BLU passano dal connector vero.
+
+- **Avvio**: sei dispositivi online. `Shelly.GetComponents` funziona anche via MQTT, con le due pagine.
+- **Blackout** (corrente tolta e ridata alla scatola): i tre sensori vanno offline 31 ms dopo il loro ponte; al
+  ritorno sono online 1,4 s dopo il ponte, con la fotografia. L'EM Mini è risultato offline 39 s dopo gli altri:
+  probabilmente il broker si è accorto più tardi della sua caduta. Dopo il ritorno, tutti e sei corretti.
+- **Comandi al relè**: `turn_on` e `turn_off` entrambi `acked`.
+- **Sensori**: apertura e chiusura del contatto con `since` aggiornato; `detected` vero al passaggio, con
+  `last_seen`; temperatura e umidità dell'H&T che seguono la mano.
+- **Regole del motore**: l'umidità al 90 % (la mano sul sensore) ha fatto scattare `mold_warning`. Il dato dei
+  sensori arriva quindi fino alle decisioni.
+
+### Due punti aperti, emersi qui
+1. **Lo Shelly 1 che fa da ponte risponde lentamente alle RPC**: fra 69 ms e 2,8 s misurati sul broker, contro i
+   78–144 ms della Plug; i due comandi hanno impiegato 4,9 s e 2,5 s in tutto. Causa probabile, non dimostrata: la
+   scansione Bluetooth. A 2,8 s siamo vicini ai 3 s di attesa del connector. Da rimisurare con i sensori dissociati
+   prima di decidere (attesa più lunga, oppure ponte su un altro Shelly).
+2. **La fotografia dei BLU è datata all'inizio della lettura di `GetComponents`**, circa 1 s prima dei dati. Non
+   riordina nulla; la correggo nel ramo `shelly-blu`.
+
+Per o1, fuori dal mio perimetro: un `turn_on` ha aspettato 1,6 s nel motore prima di arrivare al connector.
