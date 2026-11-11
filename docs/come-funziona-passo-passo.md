@@ -283,3 +283,99 @@ presa vera sono il cuore della tappa B.
 | Noi (o1) | Scrivere in `bff/API.md` che «non in linea» è immediato (D-225) | Lotto 39 |
 | Committente | Decidere a chi arrivano le email di allarme dopo la consegna | Con il passaggio al cliente (P-81) |
 | Tutti | Nel test vero: staccare la presa e controllare «non in linea» subito, la notifica dopo i minuti, il ritorno da solo | Tappa B |
+
+---
+
+## Passo 5. Che cosa succede da solo
+
+Il motore di ogni appartamento ha un orologio interno che gira ogni secondo, e reagisce a quello che gli raccontano i
+dispositivi. Senza che nessuno tocchi l'app fa queste cose.
+
+**Le regole automatiche** (si regolano dalla pagina Regole, salvo dove indicato):
+
+| Regola | Che cosa fa | Da quale dispositivo dipende |
+|---|---|---|
+| **Finestra aperta spegne il clima** | Dopo i minuti della regola (5 all'inizio) spegne clima e caldaia; quando la finestra si chiude riprendono da soli (dal lotto 38) | Sensore della finestra |
+| **Antigelo a casa vuota** | A casa vuota accende la caldaia sotto la soglia (8 °C all'inizio) e la spegne sopra | Sensore di temperatura e relè della caldaia |
+| **Antimuffa** | Sopra una soglia di umidità scrive un avviso nelle Decisioni; non deumidifica | Sensore di umidità |
+| **Pausa del compressore** | Dopo uno spegnimento del climatizzatore aspetta 3 minuti prima di riaccenderlo | Nessuno: è una protezione del climatizzatore |
+| **Consumo a casa vuota** (non è nella pagina Regole: le soglie le imposta chi gestisce il sistema) | Se un apparecchio consuma oltre 300 W per più di 15 minuti a casa vuota, chiede al gestore se spegnerlo (mai la caldaia) | Presa o misuratore con misura del consumo |
+| **Avviso dispositivo offline** | «Non in linea» subito; decisione e notifica dopo i minuti della regola (15 all'inizio) | Tutti |
+
+**Le modalità:** comfort, eco e casa vuota decidono la temperatura e che cosa resta acceso. Il gestore può anche
+bloccare gli automatismi per 30 minuti, 2 ore o 6 ore; l'antigelo resta comunque attivo.
+
+**Le prenotazioni:**
+- 2 ore prima del check-in parte il **pre-arrivo**: l'appartamento passa in comfort;
+- 30 minuti dopo il check-out l'appartamento passa a **casa vuota**;
+- se al check-out il sensore di movimento ha visto qualcuno, il motore non agisce da solo: **chiede al gestore**. Senza
+  risposta entro 30 minuti la richiesta è approvata e l'appartamento va a casa vuota.
+
+**Le approvazioni:** quando un'azione è delicata, il motore propone e il gestore decide dal telefono, entro una
+scadenza.
+
+**Le notifiche e il riepilogo:**
+- le notifiche sul telefono (approvazioni, dispositivi offline, programmazioni non eseguite o eseguite in parte) le
+  manda il server della web app, che ascolta il motore;
+- ogni lunedì mattina, dalle 8 ora dell'appartamento, si prepara il **riepilogo della settimana**: arriva solo se c'è
+  qualcosa da segnalare.
+
+**Il legame con Youssouf:** quasi tutte queste regole funzionano solo se i suoi dispositivi danno i dati giusti:
+- senza sensore della finestra non scatta «finestra aperta»;
+- senza sensore di temperatura niente antigelo né regolazione della caldaia;
+- senza sensore di movimento niente approvazione al check-out.
+
+In un appartamento vero il catalogo decide quali regole possono funzionare.
+
+**Cosa è provato:** tutto questo funziona da settimane con i dispositivi simulati, ed è descritto nella guida. Il test
+vero lo proverà un pezzo alla volta, man mano che arrivano i modelli di Youssouf.
+
+### Domande e risposte
+
+**Come avverrà concretamente il collegamento con Italianway?** Con un **webhook**, che funziona come un campanello: ogni
+volta che una prenotazione nasce, cambia o viene annullata, il server di Italianway manda un messaggio a un indirizzo
+fisso del nostro server. Noi non andiamo a chiedere: aspettiamo che ci avvisino.
+
+| Tappa | Chi | Che cosa succede |
+|---|---|---|
+| 1 | Italianway | Un ospite prenota, cambia le date o annulla |
+| 2 | Italianway | Il loro server manda il messaggio all'indirizzo `…/webhooks/italianway` del nostro server |
+| 3 | Nostro server | Controlla la **firma**, un timbro fatto con una chiave che conosciamo solo noi e Italianway: senza la firma giusta il messaggio è scartato, così nessuno può inventare prenotazioni |
+| 4 | Nostro server | Dal **codice Italianway** nel messaggio trova il nostro appartamento |
+| 5 | Nostro server | Il **traduttore** trasforma il messaggio nel nostro formato: arrivo, partenza, ospiti, tipo di evento |
+| 6 | Nostro server → motore | Passa la prenotazione al motore di quell'appartamento |
+| 7 | Motore | Programma da solo pre-arrivo e casa vuota |
+
+- **Privacy:** dei messaggi teniamo solo date, numero di ospiti e codici, mai nomi e contatti (D-90); il registro dei
+  messaggi ricevuti dura 90 giorni (D-94).
+- **Pronto:** indirizzo, controllo della firma, collegamento al codice, passaggio al motore, registro. Si prova oggi con
+  il Simulatore.
+- **Manca, e dipende da Italianway:** il formato vero dei loro messaggi (il nostro traduttore è un'ipotesi, P-10), la
+  chiave della firma (oggi provvisoria, P-9), una prova insieme a loro. E prima ancora: sanno mandare webhook? Se no,
+  ci sono due strade, da costruire perché oggi non esistono: leggere il loro calendario iCal (solo le date, senza il
+  numero di ospiti) oppure interrogare a intervalli il loro sistema.
+- Il messaggio per Leonardo, da girare a Italianway, è pronto in `docs/da-inviare/messaggio-italianway-per-leonardo.md`
+  (11 novembre); il committente lo manda quando decide.
+
+**Se tutto è automatico, a cosa serve l'«ID Italianway» nella scheda dell'appartamento?** Serve proprio al meccanismo
+automatico. Il campanello è uno solo per tutti gli appartamenti di tutte le organizzazioni; nel messaggio Italianway
+scrive il **suo** codice dell'appartamento (per esempio «IW-4711»). Il nostro server non sa da solo che IW-4711 è il
+nostro «Bologna – via Indipendenza»: l'ID Italianway è il **cartellino che collega i due nomi**. Lo scrive una volta,
+all'attivazione, la Piattaforma (HQE); l'amministratore lo vede ma non lo cambia (D-72).
+- senza cartellino il server risponde «appartamento sconosciuto» e la prenotazione è scartata (resta nel registro dei
+  messaggi);
+- lo stesso codice non può stare su due appartamenti: il server rifiuta e non tira a indovinare;
+- in produzione un dimostrativo non può averlo.
+
+Per questo a Italianway chiediamo anche l'elenco dei codici dei nostri appartamenti.
+
+### Cosa resta da fare (passo 5)
+
+| Chi | Che cosa | Per quando |
+|---|---|---|
+| Committente | Mandare a Leonardo il messaggio su Italianway (`docs/da-inviare/messaggio-italianway-per-leonardo.md`) | Quando decide; è ciò che blocca il pre-arrivo con prenotazioni vere |
+| Noi (o1) | Con la risposta: riscrivere il traduttore di Italianway; se non ci sono webhook, stimare iCal o interrogazione periodica | Dopo la risposta di Italianway (P-10) |
+| Committente | Mettere la chiave della firma concordata in Secret Manager (`italianway-webhook-secret`) | Dopo l'accordo con Italianway (P-9) |
+| Piattaforma (HQE) | Scrivere l'ID Italianway di ogni appartamento vero | All'attivazione di ogni appartamento |
+| Youssouf | Fornire per ogni appartamento i sensori che servono alle regole (finestra, temperatura, movimento, consumo) e il catalogo che li descrive | Prima di un appartamento vero |
+| Tutti | Nel test vero, provare le regole una alla volta con i dispositivi veri (prima finestra e presa, poi caldaia e clima) | Tappa B e appartamenti successivi |
