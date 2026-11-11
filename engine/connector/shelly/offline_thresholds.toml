@@ -1,0 +1,29 @@
+# Soglie di silenzio per tipo di apparato (connector.md §2.6: «silenzio oltre offline_after_s → online=False»).
+#
+# Perché per tipo: i relè alimentati tengono una connessione viva e 120 s di silenzio bastano a dichiararli offline;
+# i sensori BLU a batteria invece non parlano mai con noi, mandano un beacon Bluetooth a intervalli fissi che il
+# relè-ponte inoltra, e l'intervallo cambia da sensore a sensore. Una soglia unica, se bassa, dichiara offline un
+# Motion sano tre volte all'ora; se alta, nasconde per ore un relè caduto.
+#
+# Regola usata per i valori: tre beacon persi più 20 s di margine. Gli intervalli vengono dalla documentazione
+# ufficiale Shelly (shelly-api-docs.shelly.cloud/docs-ble, pagine dei singoli sensori, lette il 5 novembre 2026).
+#
+# Ogni dispositivo del catalogo deve avere `shelly.type`: senza, il catalogo è rifiutato (nessuna soglia di ripiego).
+# Precedenza (offline.py): `shelly.offline_after_s` del singolo dispositivo nel catalogo > valore del suo
+# `shelly.type` qui sotto. Niente segreti in questo file.
+# Un appartamento può usarne una copia modificata indicandola in SHELLY_OFFLINE_THRESHOLDS_PATH.
+
+[types]
+# relè alimentati e misuratori Gen3/Gen4 (Shelly 1, EM Mini, Plug M): keep-alive del trasporto
+relay = 120
+plug = 120
+energy_meter = 120
+# emettitore a infrarossi (Broadlink RM4 Mini o Athom): alimentato, keep-alive del trasporto
+ir_blaster = 120
+# BLU H&T ZB: beacon ogni 60 s (3 × 60 + 20)
+blu_ht = 200
+# BLU Door/Window ZB: beacon ogni 60 s, più invio immediato su apertura/chiusura (3 × 60 + 20)
+blu_door_window = 200
+# BLU Motion ZB: beacon ogni 900 s in modalità normale, più invio immediato su movimento (3 × 900 + 20).
+# Con la «beacon mode» attiva il sensore manda ogni 30 s: in quel caso abbassare la soglia sul singolo dispositivo.
+blu_motion = 2720
