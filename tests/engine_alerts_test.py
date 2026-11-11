@@ -110,6 +110,8 @@ def alerts(tmp_path):
     (stubs / "gcloud").write_text(GCLOUD, encoding="utf-8", newline="\n")
     (stubs / "python3").write_text(f'#!/usr/bin/env bash\nexec "{posix(Path(sys.executable))}" "$@"\n',
                                    encoding="utf-8", newline="\n")
+    for stub in ("gcloud", "python3"):             # D85: on Linux a stub must be executable (Windows' bash does not ask)
+        (stubs / stub).chmod(0o755)
 
     def run(dry=False):
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; '
