@@ -865,7 +865,8 @@ lavora con un accesso di assistenza.
   cui riparte).
 - **La regolazione automatica del clima** si ferma.
 - **Un cambio di modalità programmato** (per esempio il check-out) aspetta la fine della forzatura (nelle Decisioni
-  «Azione rimandata», «rimandata per la forzatura»).
+  «Azione rimandata», «rimandata per la forzatura»). Dal lotto 40 aspetta anche una richiesta di approvazione che
+  scade durante la forzatura con «Alla scadenza verrà eseguita».
 - **L'antigelo** resta attivo.
 
 **Quando finisce:**
@@ -2348,6 +2349,14 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 - **Una disdetta** annulla le azioni aperte.
 - **Se il pre-arrivo era già stato eseguito**, programma il ritorno a casa vuota («Disdetta dopo il pre-arrivo») e
   manda la notifica «Prenotazioni», salvo un altro soggiorno in corso o un altro pre-arrivo già eseguito.
+- **Due ospiti di fila** (dal lotto 40): il check-out del primo non mette la casa a vuoto se il secondo è già
+  dentro, se il suo pre-arrivo è già partito o se arriva entro le ore del pre-arrivo. Nelle Decisioni compare
+  «Check-out senza casa vuota».
+- **Prenotazione modificata dopo il pre-arrivo** (dal lotto 40): non rimette il comfort al posto della tua scelta.
+  Se l'arrivo slitta più avanti, la casa torna subito a vuoto e si riscalda al nuovo pre-arrivo («Arrivo spostato:
+  casa a vuoto»).
+- **Un messaggio di prenotazione arrivato in ritardo**, più vecchio dell'ultimo già applicato, viene ignorato
+  (dal lotto 40, «Evento di prenotazione superato»).
 - **Un cambio di modalità programmato durante una forzatura** aspetta la sua fine («Azione rimandata»).
 - **Dopo un riavvio del sistema**, un'azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).
 - **L'occupazione «Occupato»** richiede il check-in effettivo comunicato da Italianway; la sola prenotazione dà
