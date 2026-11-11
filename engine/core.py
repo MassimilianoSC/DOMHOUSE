@@ -510,6 +510,8 @@ class ApartmentEngine:
                 contact, was = device["capabilities"].get("contact"), old["capabilities"].get("contact")
                 if contact and was and contact.get("open") != was.get("open"):
                     contact["since"] = iso(utcnow())    # it changed while the engine was down
+                if device["last_seen"] is None and old.get("last_seen"):
+                    device["last_seen"] = old["last_seen"]     # D12: the connector does not know it yet
             self.devices[info.device_id] = device
             self._save_device(device)
         self._apply_limits()                               # D-174: the manager's inside the catalog's
@@ -619,6 +621,7 @@ class ApartmentEngine:
             if not self.windows_armed:
                 self.windows_armed = True
                 self._windows_at_start()
+                self._offline_at_start()
         if self.consumer_task is None or self.consumer_task.done():
             self.consumer_task = asyncio.get_running_loop().create_task(self._consume_changes())
 
@@ -840,6 +843,18 @@ class ApartmentEngine:
         fixed = min(max(sp, lo), hi)
         note = f"setpoint {fmt_num(sp)} °C riportato a {fmt_num(fixed)} °C (limiti {fmt_num(lo)}–{fmt_num(hi)})"
         return {**body, "params": {**params, "setpoint": fixed}}, note
+
+    def _offline_at_start(self) -> None:
+        """D12 (P-83): a device already offline at the start (unplugged while the engine was down, or never connected)
+        is watched as if it had just gone offline (one offline_alert decision after the rule's minutes, the BFF's
+        push), and the apps hear it at once (device.online false, with the last_seen known)."""
+        corr = str(uuid.uuid4())
+        for device in self.devices.values():
+            if device["online"]:
+                continue
+            self._watch_offline(device["device_id"], False)
+            self.emit("device.online", {"device_id": device["device_id"], "online": False,
+                                        "last_seen": device["last_seen"]}, corr)
 
     def _watch_offline(self, device_id: str, online: bool) -> None:
         """R5: a device still offline after the minutes of offline_alert gets one decision for the episode (the push
