@@ -18,13 +18,13 @@ from datetime import UTC, datetime
 from engine.connector.shelly.transport.base import (ConnectionEvent, Notification, RpcError, TransportEvent,
                                                     TransportOffline, TransportTimeout)
 
-from .fake_device import FakePlugMG3
+from .fake_device import _FakeShelly
 
 _STOP = object()
 
 
 class FakeTransport:
-    def __init__(self, *devices: FakePlugMG3, announce_on_start: bool = False, latency_s: float = 0.0):
+    def __init__(self, *devices: _FakeShelly, announce_on_start: bool = False, latency_s: float = 0.0):
         self.devices = {d.shelly_id: d for d in devices}
         self.calls: list[tuple[str, str, dict | None]] = []
         self.announce_on_start = announce_on_start

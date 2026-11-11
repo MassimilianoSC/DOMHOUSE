@@ -222,3 +222,75 @@ def test_wrong_files(tmp_path: Path, content, expected):
 def test_folder_instead_of_file(tmp_path: Path):
     with pytest.raises(CatalogError, match="is a folder"):
         load_catalog(tmp_path, THRESHOLDS)
+
+
+# --- the three models: Plug, Shelly 1 Gen4, EM Mini Gen4 ---------------------------------------------------------
+
+THREE_YAML = """\
+rooms:
+  - {room_id: soggiorno, name: Soggiorno}
+devices:
+  - device_id: dev-presa-soggiorno
+    label: Presa
+    room_id: soggiorno
+    capabilities: {switch: {}, power_meter: {}}
+    shelly: {id: shellyplugmg3-000000000001, type: plug}
+  - device_id: dev-rele-soggiorno
+    label: Relè
+    room_id: soggiorno
+    capabilities: {switch: {}}
+    shelly: {id: shelly1g4-000000000002, type: relay}
+  - device_id: dev-misura-soggiorno
+    label: Misuratore
+    room_id: soggiorno
+    capabilities: {power_meter: {}}
+    shelly: {id: shellyemminig4-000000000003, type: energy_meter}
+"""
+
+
+def three() -> dict:
+    import yaml
+    return yaml.safe_load(THREE_YAML)
+
+
+def test_catalog_with_the_three_models(tmp_path: Path):
+    path = tmp_path / "catalog.yaml"
+    path.write_text(THREE_YAML, encoding="utf-8")
+    cat = load_catalog(path, THRESHOLDS)
+    plug, relay, meter = cat.devices
+    assert plug.profile is PROFILES["PlugMG3"] and plug.capabilities == {"switch": {}, "power_meter": {}}
+    assert relay.profile is PROFILES["S1G4"] and relay.capabilities == {"switch": {}}
+    assert meter.profile is PROFILES["MiniEMG4"] and meter.capabilities == {"power_meter": {}}
+    assert relay.offline_after_s == THRESHOLDS.by_type["relay"]
+    assert meter.offline_after_s == THRESHOLDS.by_type["energy_meter"]
+
+
+def test_shelly_1_as_the_boiler():
+    def change(d):
+        d["devices"][1]["capabilities"] = {"heating": {"setpoint_min": 7, "setpoint_max": 23}}
+    boiler = parse_catalog(catalog_with_three(change), THRESHOLDS).by_device_id()["dev-rele-soggiorno"]
+    assert boiler.profile is PROFILES["S1G4"] and boiler.links == {}       # sensor_device_id optional for now
+    assert boiler.capabilities == {"heating": {"setpoint_min": 7, "setpoint_max": 23}}
+
+
+def catalog_with_three(change) -> dict:
+    data = three()
+    change(data)
+    return data
+
+
+@pytest.mark.parametrize("device, capabilities", [
+    (1, {"switch": {}, "power_meter": {}}),            # a Shelly 1 Gen4 does not measure
+    (1, {"power_meter": {}}),
+    (1, {"switch": {}, "heating": {}}),                # switch OR heating, never both
+    (2, {"switch": {}}),                               # an EM Mini Gen4 has no relay
+    (2, {"switch": {}, "power_meter": {}}),
+    (2, {"heating": {}}),
+], ids=["s1-switch+power_meter", "s1-power_meter", "s1-switch+heating", "em-switch", "em-switch+power_meter",
+        "em-heating"])
+def test_combinations_the_gen4_models_do_not_have(device, capabilities):
+    names = {1: "dev-rele-soggiorno", 2: "dev-misura-soggiorno"}
+    message = refused(catalog_with_three(lambda d: d["devices"][device].update(capabilities=capabilities)),
+                      f"catalog device {names[device]}", "shelly.type and capabilities are not supported")
+    assert "Shelly 1 Gen4 (type relay: heating or switch)" in message
+    assert "Shelly EM Mini Gen4 (type energy_meter: power_meter)" in message

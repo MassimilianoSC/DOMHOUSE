@@ -1,5 +1,6 @@
 """ShellyConnector on FakeTransport (connector.md §2, §3): connection and snapshot, partial notifications, commands,
-silence, unknown devices, the order of ts, status, stop, make_connector. No pytest-asyncio: asyncio.run per test.
+silence, unknown devices, the order of ts, status, stop, make_connector; then the Shelly 1 Gen4 and the EM Mini Gen4.
+No pytest-asyncio: asyncio.run per test.
 """
 import asyncio
 import json
@@ -18,7 +19,7 @@ from engine.connector.shelly.transport.mqtt import MqttConfigError, MqttTranspor
 from engine.connector.shelly.translate import notification_ts
 
 from . import fake_device
-from .fake_device import FakePlugMG3
+from .fake_device import FakeMiniEMG4, FakePlugMG3, FakeS1G4
 from .fake_mqtt import load_capture
 from .fake_transport import FakeTransport
 from .harness import CATALOG_YAML, FAKE_MQTT_ENV
@@ -468,3 +469,157 @@ def test_make_connector_errors_are_clear(tmp_path):
     with pytest.raises(CatalogError) as info:
         make_connector(config(tmp_path, catalog_text=CATALOG_YAML.replace("type: plug", "type: tostapane")))
     assert "shelly.type" in str(info.value) and "tostapane" not in str(info.value)
+
+
+# --- Shelly 1 Gen4 and EM Mini Gen4 ------------------------------------------------------------------------------
+
+SID_S1, SID_EM = "shelly1g4-000000000002", "shellyemminig4-000000000003"
+DEV_S1, DEV_EM = "dev-rele", "dev-misura"
+
+
+class G4World(World):
+    """A Shelly 1 Gen4 (as switch or as boiler) and an EM Mini Gen4, offline until the test connects them. Each fake
+    has its own clock, now + shift[shelly_id], so a test can place their notifications in time."""
+
+    def __init__(self, s1_capability="switch", **kwargs):
+        self.shift = {SID_S1: timedelta(0), SID_EM: timedelta(0)}
+        self.s1 = FakeS1G4(SID_S1, clock=lambda: datetime.now(UTC) + self.shift[SID_S1])
+        self.em = FakeMiniEMG4(SID_EM, energy_wh=500.0, clock=lambda: datetime.now(UTC) + self.shift[SID_EM])
+        for fake in (self.s1, self.em):
+            fake.online = False
+        s1_values = {"setpoint_min": 7, "setpoint_max": 23} if s1_capability == "heating" else {}
+        cat = parse_catalog({"rooms": [{"room_id": "camera", "name": "Camera"}], "devices": [
+            {"device_id": DEV_S1, "label": "Relè", "room_id": "camera", "capabilities": {s1_capability: s1_values},
+             "shelly": {"id": SID_S1, "type": "relay"}},
+            {"device_id": DEV_EM, "label": "Misuratore", "room_id": "camera", "capabilities": {"power_meter": {}},
+             "shelly": {"id": SID_EM, "type": "energy_meter"}}]}, load_thresholds())
+        self.transport = FakeTransport(self.s1, self.em)
+        self.conn = ShellyConnector(cat, self.transport, **kwargs)
+        self.changes: list[StateChange] = []
+        self._task = None
+
+    async def connect_g4(self, sid, capability):
+        device_id = DEV_S1 if sid == SID_S1 else DEV_EM
+        start = len(self.changes)
+        self.transport.set_online(sid, True)
+        await self.wait_for(lambda xs: any(c.device_id == device_id and c.capability == capability
+                                           for c in xs[start:]))
+        return self.changes[start:]
+
+
+def run_g4(scenario, **world):
+    async def main():
+        async with G4World(**world) as w:
+            return await asyncio.wait_for(scenario(w), 20)
+    return asyncio.run(main())
+
+
+def test_shelly_1_online_snapshot_and_confirmed_command():
+    async def scenario(w):
+        new = await w.connect_g4(SID_S1, "switch")
+        assert kinds(new) == [("online", True), ("state", "switch")] and new[1].state == {"on": False}
+        assert [m for s, m, _ in w.transport.calls if s == SID_S1] == ["Shelly.GetDeviceInfo", "Shelly.GetStatus"]
+        assert w.info(DEV_S1).capabilities == {"switch": {"on": False}}
+        start = len(w.changes)
+        w.s1.minute()                                      # switch:0.counts only: no StateChange
+        await w.settle()
+        assert w.changes[start:] == []
+        progress = []
+        result = await w.conn.execute(cmd(True, device_id=DEV_S1), progress.append)
+        assert (result.outcome, result.state, progress) == ("confirmed", {"on": True}, ["sent", "verifying"])
+        assert [m for s, m, _ in w.transport.calls if s == SID_S1][-2:] == ["Switch.Set", "Switch.GetStatus"]
+        await w.wait_for(lambda xs: [(c.capability, c.state) for c in xs[start:]] == [("switch", {"on": True})])
+        assert w.s1.on and w.info(DEV_S1).capabilities == {"switch": {"on": True}}
+    run_g4(scenario)
+
+
+def test_shelly_1_as_the_boiler_reports_and_switches_its_relay():
+    async def scenario(w):
+        new = await w.connect_g4(SID_S1, "heating")
+        assert kinds(new) == [("online", True), ("state", "heating")] and new[1].state == {"on": False}
+        assert w.info(DEV_S1).capabilities == {"heating": {"setpoint_min": 7, "setpoint_max": 23, "on": False}}
+        result = await w.conn.execute(cmd(True, device_id=DEV_S1, capability="heating"), lambda s: None)
+        assert (result.outcome, result.state) == ("confirmed", {"on": True})
+        await w.wait_for(lambda xs: xs[-1].capability == "heating" and xs[-1].state == {"on": True})
+        assert not any(c.capability == "switch" for c in w.changes)    # the catalog says heating: never switch
+        result = await w.conn.execute(cmd(True, device_id=DEV_S1, capability="switch", n=2), lambda s: None)
+        assert (result.outcome, result.reason) == ("failed", "internal_error")
+    run_g4(scenario, s1_capability="heating")
+
+
+def test_shelly_1_reboot_full_status_is_a_snapshot():
+    async def scenario(w):
+        await w.connect_g4(SID_S1, "switch")
+        await w.conn.execute(cmd(True, device_id=DEV_S1), lambda s: None)
+        await w.wait_for(lambda xs: xs[-1].capability == "switch" and xs[-1].state == {"on": True})
+        start = len(w.changes)
+        w.s1.reboot()
+        await w.wait_for(lambda xs: kinds(xs[start:]) == [("state", "switch")])
+        assert w.changes[-1].state == {"on": True}
+    run_g4(scenario)
+
+
+def test_em_mini_online_without_full_status_gets_its_snapshot_from_get_status():
+    sent = []
+
+    async def scenario(w):
+        w.em.subscribe(sent.append)                        # everything the meter sends by itself
+        new = await w.connect_g4(SID_EM, "power_meter")
+        assert kinds(new) == [("online", True), ("state", "power_meter")]
+        assert new[1].state == {"watts": 0.0, "energy_total_wh": 500.0}
+        w.em.set_load(40.0)
+        w.transport.set_online(SID_EM, False)              # a restart: offline, then back without NotifyFullStatus
+        await w.wait_for(lambda xs: xs[-1].kind == "online" and xs[-1].online is False)
+        new = await w.connect_g4(SID_EM, "power_meter")
+        assert kinds(new) == [("online", True), ("state", "power_meter")]
+        assert new[1].state == {"watts": 40.0, "energy_total_wh": 500.0}
+        assert [m for s, m, _ in w.transport.calls if s == SID_EM] == ["Shelly.GetDeviceInfo", "Shelly.GetStatus"] * 2
+        assert sent == [], "the EM Mini sent nothing by itself: the snapshot came from Shelly.GetStatus"
+    run_g4(scenario)
+
+
+def test_em_mini_notifications_become_power_meter_changes():
+    async def scenario(w):
+        await w.connect_g4(SID_EM, "power_meter")
+        start = len(w.changes)
+        w.em.set_load(850.0)
+        w.em.report_power()                                 # em1:0
+        await w.wait_for(lambda xs: len(xs) > start)
+        w.em.add_energy(12.5)
+        w.em.report_energy()                                # em1data:0, then the NotifyEvent "data": ignored
+        await w.wait_for(lambda xs: len(xs) > start + 1)
+        await w.settle()
+        assert [(c.capability, c.state) for c in w.changes[start:]] == [
+            ("power_meter", {"watts": 850.0, "energy_total_wh": 500.0}),
+            ("power_meter", {"watts": 850.0, "energy_total_wh": 512.5})]
+        assert w.info(DEV_EM).capabilities == {"power_meter": {"watts": 850.0, "energy_total_wh": 512.5}}
+        result = await w.conn.execute(cmd(True, device_id=DEV_EM, capability="power_meter"), lambda s: None)
+        assert (result.outcome, result.reason) == ("failed", "internal_error")
+        assert not any(m.startswith("Switch.") for _, m, _ in w.transport.calls)
+    run_g4(scenario)
+
+
+def test_ts_order_with_the_em_mini_delay():
+    """em1:0's ts is ~13.5 s before its arrival (translate.py, MiniEMG4): not compensated. Behind a later change of
+    another device it takes that change's ts (the stream never goes back); alone it keeps its own, 13.5 s early."""
+    async def scenario(w):
+        await w.connect_g4(SID_S1, "switch")
+        await w.connect_g4(SID_EM, "power_meter")
+        w.shift[SID_S1] = timedelta(seconds=30)
+        w.s1.press_button()                                 # the relay at now + 30 s
+        await w.wait_for(lambda xs: xs[-1].capability == "switch" and xs[-1].state == {"on": True})
+        relay_ts = w.changes[-1].ts
+        w.shift[SID_EM] = timedelta(seconds=31)            # the meter 1 s later, its ts 13.5 s earlier
+        w.em.set_load(850.0)
+        w.em.report_power()
+        await w.wait_for(lambda xs: xs[-1].capability == "power_meter" and xs[-1].state["watts"] == 850.0)
+        assert w.changes[-1].ts == relay_ts                 # not now + 17.5 s: the last emitted
+        w.shift[SID_EM] = timedelta(seconds=60)            # alone: the device's ts, 13.5 s before the reception
+        w.em.set_load(0.0)
+        received = datetime.now(UTC) + timedelta(seconds=60)
+        w.em.report_power()
+        await w.wait_for(lambda xs: xs[-1].capability == "power_meter" and xs[-1].state["watts"] == 0.0)
+        early = (received - w.changes[-1].ts).total_seconds()
+        assert 13.0 < early < 14.5, early
+        assert [c.ts for c in w.changes] == sorted(c.ts for c in w.changes)
+    run_g4(scenario)

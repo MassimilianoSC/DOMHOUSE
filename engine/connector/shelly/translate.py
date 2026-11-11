@@ -4,10 +4,13 @@ Everything model-specific is a row of PROFILES, keyed by the `app` field of Shel
 device-reported field of a capability lives in the device's status, and which RPC brings a commandable capability to
 its target. Adding a model means adding a row, not new code.
 
-What this module reports is only what connector.md §2.3 calls «dispositivo»: switch.on, power_meter.watts and the raw
+What this module reports is only what connector.md §2.3 calls «dispositivo»: switch.on, heating.on (the boiler's
+relay, §2.3: never the «riscaldamento abilitato» the app sees, which is the engine's), power_meter.watts and the raw
 cumulative counter power_meter.energy_total_wh (Wh, as the device counts it, also when it restarts from zero after a
-reboot: the engine recognises the drop). kwh_today and the hourly consumption are the engine's, never computed here.
-Numbers come out as float; a field of the wrong type leaves its capability out rather than guessing.
+reboot: the engine recognises the drop). The fields of one capability may live in different components of the status
+(the EM Mini's watts in em1:0, its counter in em1data:0): every FieldSource names its own. kwh_today and the hourly
+consumption are the engine's, never computed here. Numbers come out as float; a field of the wrong type leaves its
+capability out rather than guessing.
 """
 import copy
 from collections.abc import Mapping
@@ -49,10 +52,22 @@ class ModelProfile:
     label: str                                               # for the messages: "Shelly Plug M Gen3"
     capabilities: Mapping[str, Mapping[str, FieldSource]]   # capability -> field -> where it lives
     commands: Mapping[str, CommandSpec]                      # commandable capability -> how to command it
+    # groups of capabilities of which the catalog lists at most one: the Shelly 1's relay is a switch OR a boiler
+    exclusive: tuple[frozenset[str], ...] = ()
 
     def covers(self, device_type: str, capabilities) -> bool:
-        """This model can be the device the catalog describes: same type, and every capability listed has a row."""
-        return device_type == self.device_type and set(capabilities) <= set(self.capabilities)
+        """This model can be the device the catalog describes: same type, every capability listed has a row, and at
+        most one of each exclusive group."""
+        listed = set(capabilities)
+        return (device_type == self.device_type and listed <= set(self.capabilities)
+                and all(len(listed & group) <= 1 for group in self.exclusive))
+
+    def offer(self) -> str:
+        """For the messages: "power_meter, switch"; an exclusive group reads "heating or switch"."""
+        grouped = set().union(*self.exclusive) if self.exclusive else set()
+        parts = [c for c in self.capabilities if c not in grouped]
+        parts += [" or ".join(sorted(group)) for group in self.exclusive]
+        return ", ".join(sorted(parts))
 
 
 _SWITCH_COMMAND = CommandSpec(method="Switch.Set", read_back="Switch.GetStatus", target_field="on", param="on",
@@ -71,11 +86,46 @@ PROFILES: Mapping[str, ModelProfile] = {
         },
         commands={"switch": _SWITCH_COMMAND},
     ),
-    # Next rows, not written yet (same shape):
-    # - Shelly 1 Gen4: a relay; check with Shelly.GetStatus on the real device whether its switch:0 reports
-    #   apower/aenergy before giving it a power_meter.
-    # - Shelly EM Mini Gen4: a meter only, no command. Its component name (perhaps "pm1:{ch}") is NOT confirmed:
-    #   verify it with Shelly.GetStatus on the real device before writing the row.
+    # Shelly 1 Gen4 (S4SW-001X16EU, firmware 2.0.3, bench of 10 November 2026): one relay, NO metering (its switch:0
+    # has output, source, counts and temperature, never apower/aenergy). The relay is either a switch or the
+    # boiler's thermostat contact (heating, connector.md §2.3-§2.4): the device reports only "on" = the relay, the
+    # engine sends {"on": bool}, the same Switch.Set and read back as a switch. setpoint_min/max come from the
+    # catalog; links.sensor_device_id is optional (without it the engine logs «boiler without sensor» and the relay
+    # follows only a person's command, unregulated). The catalog lists switch OR heating, never both.
+    # Ignored: input:0, and the NotifyStatus a minute with only switch:0.counts (no field of any capability).
+    "S1G4": ModelProfile(
+        app="S1G4",
+        device_type="relay",
+        label="Shelly 1 Gen4",
+        capabilities={
+            "switch": {"on": FieldSource("switch:{ch}", ("output",), "bool")},
+            "heating": {"on": FieldSource("switch:{ch}", ("output",), "bool")},
+        },
+        commands={"switch": _SWITCH_COMMAND, "heating": _SWITCH_COMMAND},
+        exclusive=(frozenset({"switch", "heating"}),),
+    ),
+    # Shelly EM Mini Gen4 (S4EM-001PXCEU16, firmware 1.7.0, bench of 10 November 2026): a meter only, no command.
+    # watts <- em1:{ch}.act_power (W); energy_total_wh <- em1data:{ch}.total_act_energy, in Wh («Total active energy,
+    # Wh», Shelly API docs, EM1Data.GetStatus, read on 11 November 2026). Two components for one capability: a
+    # NotifyStatus with em1:0 alone takes the counter from the last known status, and the other way round.
+    # Ignored: em1:0's voltage, current, freq and calibration; the NotifyEvent "data" of em1data:0 (the minute's
+    # records saved to flash); total_act_ret_energy. On its return online it sends NO NotifyFullStatus (the Shelly 1
+    # and the Plug do): the snapshot is the connector's Shelly.GetStatus.
+    # KNOWN LIMIT for the «confirmation: power» of a split (connector.md §2.5: a change of watts in changes() within
+    # 2 s). In the capture em1:0 comes every ~14.4 s, whatever the load, and its ts is ~13.5 s before its arrival
+    # (the device's other notifications are not). Nothing is compensated here: StateChange.ts is the device's ts
+    # as for any notification. Whether a change of load is reported at once, out of the 14.4 s cycle, must be
+    # measured with a real load before an EM Mini confirms a split.
+    "MiniEMG4": ModelProfile(
+        app="MiniEMG4",
+        device_type="energy_meter",
+        label="Shelly EM Mini Gen4",
+        capabilities={
+            "power_meter": {"watts": FieldSource("em1:{ch}", ("act_power",), "float"),
+                            "energy_total_wh": FieldSource("em1data:{ch}", ("total_act_energy",), "float")},
+        },
+        commands={},
+    ),
 }
 
 
@@ -94,9 +144,9 @@ def profile_for_catalog(device_type: str, capabilities) -> ModelProfile | None:
 
 
 def supported_models() -> str:
-    """For the catalog's error message: "Shelly Plug M Gen3 (type plug: power_meter, switch)"."""
-    return "; ".join(f"{p.label} (type {p.device_type}: {', '.join(sorted(p.capabilities))})"
-                     for p in PROFILES.values())
+    """For the catalog's error message: "Shelly Plug M Gen3 (type plug: power_meter, switch); Shelly 1 Gen4 (type
+    relay: heating or switch); ..."."""
+    return "; ".join(f"{p.label} (type {p.device_type}: {p.offer()})" for p in PROFILES.values())
 
 
 # --- status -> capabilities --------------------------------------------------------------------------------------

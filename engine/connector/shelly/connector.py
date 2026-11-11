@@ -1,7 +1,8 @@
 """ShellyConnector: the Connector of interface.py for Shelly Gen2+ devices (connector.md §2), over a Transport (§3).
 
 Built by make_connector (__init__.py) from the checked catalog (catalog.py) and the MQTT transport; the tests build it
-on tests/fake_transport.py. Only the Plug M Gen3 is supported today (translate.PROFILES).
+on tests/fake_transport.py. The models are the rows of translate.PROFILES: Plug M Gen3, Shelly 1 Gen4 (switch or
+heating), EM Mini Gen4 (power_meter only).
 
 How the events flow. One reader task takes the transport's stream (Notification and ConnectionEvent, base.py) and
 puts each item in the queue of its device; one worker per device handles them in order. The order of one device is

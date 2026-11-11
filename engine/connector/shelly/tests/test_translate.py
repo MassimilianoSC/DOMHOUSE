@@ -1,17 +1,21 @@
 """Capabilities <-> Shelly RPC and notifications (engine/connector/shelly/translate.py, connector.md §2.3-§2.6).
 
-The samples are the Plug M Gen3 on the bench (firmware 1.8.99, 10 November 2026) with invented ids (connector.md §5).
+The samples are the Plug M Gen3 on the bench (firmware 1.8.99, 10 November 2026) with invented ids (connector.md §5);
+the Shelly 1 Gen4 and the EM Mini Gen4 come from tests/fixtures/g4_relay_emmini_mqtt_capture.jsonl (session C).
 Run: python -m pytest engine/connector/shelly/tests -q
 """
 import asyncio
 import copy
+import json
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
 from engine.connector.shelly.translate import (PROFILES, UnknownModel, apply_notify_status, capabilities_from_status,
                                                capabilities_touched, command_call, confirmed_result, error_result,
-                                               merge_partial, notification_ts, profile_for, read_back_call)
+                                               merge_partial, notification_ts, profile_for, read_back_call,
+                                               supported_models)
 from engine.connector.shelly.transport.base import RpcError, TransportOffline, TransportTimeout
 
 PLUG = profile_for("PlugMG3")
@@ -202,3 +206,150 @@ def test_prefix_tells_where_it_failed():
 def test_cancellation_is_never_turned_into_an_outcome():
     with pytest.raises(TypeError):
         error_result(asyncio.CancelledError())    # a BaseException: it must reach the engine
+
+
+# --- Shelly 1 Gen4 and EM Mini Gen4, from the bench capture (session C, 10 November 2026) -------------------------
+
+G4_CAPTURE = Path(__file__).with_name("fixtures") / "g4_relay_emmini_mqtt_capture.jsonl"
+S1 = profile_for("S1G4")
+EM = profile_for("MiniEMG4")
+
+
+def g4_messages(prefix: str) -> list[tuple[datetime, dict]]:
+    """(received_at, the JSON message) of one device of the capture, by the start of its shelly_id."""
+    out = []
+    for line in G4_CAPTURE.read_text(encoding="utf-8").splitlines():
+        record = json.loads(line)
+        if not record["topic"].split("/")[1].startswith(prefix) or record["topic"].endswith("/online"):
+            continue
+        received = datetime.strptime(record["received_at"], "%Y-%m-%dT%H:%M:%S%z").astimezone(UTC)
+        out.append((received, json.loads(record["payload"])))
+    return out
+
+
+def g4_result(prefix: str, method: str) -> dict:
+    """The answer to the first RPC of that method sent to that device."""
+    messages = [m for _, m in g4_messages(prefix)]
+    rpc_id = next(m["id"] for m in messages if m.get("method") == method and "result" not in m)
+    return next(m["result"] for m in messages if m.get("id") == rpc_id and "result" in m)
+
+
+def g4_status_notifications(prefix: str) -> list[tuple[datetime, dict]]:
+    return [(r, m["params"]) for r, m in g4_messages(prefix) if m.get("method") == "NotifyStatus"]
+
+
+def test_the_two_gen4_rows_are_found_by_their_app():
+    assert (S1.device_type, S1.label) == ("relay", "Shelly 1 Gen4")
+    assert (EM.device_type, EM.label) == ("energy_meter", "Shelly EM Mini Gen4")
+    assert g4_result("shelly1g4", "Shelly.GetDeviceInfo")["app"] == "S1G4"
+    assert g4_result("shellyemminig4", "Shelly.GetDeviceInfo")["app"] == "MiniEMG4"
+
+
+def test_s1g4_full_status_from_the_capture():
+    status = g4_result("shelly1g4", "Shelly.GetStatus")
+    assert capabilities_from_status(S1, status) == {"switch": {"on": False}, "heating": {"on": False}}
+
+
+def test_s1g4_is_a_switch_or_a_boiler_never_both_and_never_a_meter():
+    assert S1.covers("relay", {"switch": {}}) and S1.covers("relay", {"heating": {"setpoint_min": 7}})
+    assert not S1.covers("relay", {"switch": {}, "heating": {}})
+    assert not S1.covers("relay", {"switch": {}, "power_meter": {}})
+    assert not S1.covers("plug", {"switch": {}})
+    assert PLUG.covers("plug", {"switch": {}, "power_meter": {}})          # the Plug as before
+
+
+def test_s1g4_partial_with_output_touches_its_relay():
+    output = [p for _, p in g4_status_notifications("shelly1g4") if "output" in p.get("switch:0", {})]
+    assert [p["switch:0"]["output"] for p in output] == [True, False, True, False, True, False]
+    status = g4_result("shelly1g4", "Shelly.GetStatus")
+    status, changed = apply_notify_status(S1, status, output[0])
+    assert changed == {"switch": {"on": True}, "heating": {"on": True}}
+    assert status["switch:0"]["source"] == "MQTT"
+
+
+def test_s1g4_counts_input_and_the_rest_change_nothing():
+    status = g4_result("shelly1g4", "Shelly.GetStatus")
+    others = [p for _, p in g4_status_notifications("shelly1g4") if "output" not in p.get("switch:0", {})]
+    assert any(set(p) == {"ts", "switch:0"} and set(p["switch:0"]) == {"counts"} for p in others)   # every minute
+    for params in others + [{"input:0": {"state": True}}]:
+        status, changed = apply_notify_status(S1, status, params)
+        assert changed == {}, params
+
+
+def test_s1g4_command_is_switch_set_for_switch_and_heating():
+    for capability in ("switch", "heating"):
+        assert command_call(S1, capability, {"on": True}) == ("Switch.Set", {"id": 0, "on": True})
+        assert read_back_call(S1, capability) == ("Switch.GetStatus", {"id": 0})
+    read_back = g4_result("shelly1g4", "Switch.GetStatus")         # output false in the capture
+    assert confirmed_result(S1, "heating", {"on": False}, read_back).state == {"on": False}
+    assert confirmed_result(S1, "switch", {"on": True}, read_back).reason == "device_rejected"
+
+
+def test_em_mini_full_status_from_the_capture():
+    status = g4_result("shellyemminig4", "Shelly.GetStatus")
+    assert capabilities_from_status(EM, status) == {"power_meter": {"watts": 0.0, "energy_total_wh": 0.0}}
+    loaded = copy.deepcopy(status)
+    loaded["em1:0"]["act_power"], loaded["em1data:0"]["total_act_energy"] = 850, 1234.5
+    result = capabilities_from_status(EM, loaded)
+    assert result == {"power_meter": {"watts": 850.0, "energy_total_wh": 1234.5}}
+    assert type(result["power_meter"]["watts"]) is float
+
+
+def test_em_mini_each_component_completes_the_other():
+    status = copy.deepcopy(g4_result("shellyemminig4", "Shelly.GetStatus"))
+    status["em1data:0"]["total_act_energy"] = 500.0
+    status, changed = apply_notify_status(EM, status, {"em1:0": {"act_power": 850.0, "voltage": 224.0}})
+    assert changed == {"power_meter": {"watts": 850.0, "energy_total_wh": 500.0}}
+    status, changed = apply_notify_status(EM, status, {"em1data:0": {"total_act_energy": 512.5}})
+    assert changed == {"power_meter": {"watts": 850.0, "energy_total_wh": 512.5}}
+
+
+def test_em_mini_notifications_of_the_capture():
+    status = g4_result("shellyemminig4", "Shelly.GetStatus")
+    touched = 0
+    for _, params in g4_status_notifications("shellyemminig4"):
+        status, changed = apply_notify_status(EM, status, params)
+        if "em1:0" in params or "em1data:0" in params:
+            assert changed == {"power_meter": {"watts": 0.0, "energy_total_wh": 0.0}}, params
+            touched += 1
+        else:
+            assert changed == {}, params            # mqtt, sys: nothing
+    assert touched > 50
+
+
+def test_em_mini_voltage_current_freq_calibration_are_ignored():
+    status = g4_result("shellyemminig4", "Shelly.GetStatus")
+    _, changed = apply_notify_status(EM, status, {"em1:0": {"voltage": 230.0, "current": 1.2, "freq": 49.9,
+                                                            "calibration": "user"}})
+    assert changed == {}
+    assert capabilities_touched(EM, {"em1data:0": {"total_act_ret_energy": 3.0}}) == set()
+
+
+def test_em_mini_has_no_command():
+    assert EM.commands == {}
+    for capability in ("power_meter", "switch"):
+        with pytest.raises(ValueError, match="not commandable"):
+            command_call(EM, capability, {"on": True})
+
+
+def test_em1_ts_comes_about_13_s_earlier_than_the_rest():
+    """The known limit written in the profile: em1:0's ts is ~13.5 s before its arrival, em1data:0's is not (the
+    capture's clock is ~103 s behind the devices: only the difference between the two counts)."""
+    em1, em1data = [], []
+    for received, params in g4_status_notifications("shellyemminig4"):
+        offset = params["ts"] - received.timestamp()
+        if "em1:0" in params:
+            em1.append(offset)
+        elif "em1data:0" in params:
+            em1data.append(offset)
+    gap = sorted(em1data)[len(em1data) // 2] - sorted(em1)[len(em1) // 2]
+    assert 12.5 < gap < 14.5, gap
+    arrivals = [r.timestamp() for r, p in g4_status_notifications("shellyemminig4") if "em1:0" in p]
+    steps = sorted(b - a for a, b in zip(arrivals, arrivals[1:]))
+    assert 13 <= steps[len(steps) // 2] <= 16                      # one em1:0 every ~14.4 s
+
+
+def test_supported_models_lists_the_three():
+    assert supported_models() == ("Shelly Plug M Gen3 (type plug: power_meter, switch); "
+                                  "Shelly 1 Gen4 (type relay: heating or switch); "
+                                  "Shelly EM Mini Gen4 (type energy_meter: power_meter)")
