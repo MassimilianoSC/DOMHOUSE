@@ -309,3 +309,49 @@ def test_the_log_lines_say_which_question(model, monkeypatch):
     logged.clear()
     assert run(post(BODY)).status_code == 200
     assert "ask_id" not in [kw for msg, kw in logged if msg == "assistant model call"][0]
+
+
+
+# ---- T3c-4 (P-83): in real mode, through /internal/ai/chat, each apartment only with its own key -----------------------
+@pytest.fixture
+def two_real_apartments(monkeypatch):
+    import dataclasses as _dc
+
+    from bff import instances
+    from bff.config import get_settings as _settings
+    from bff.repository import Apartment, get_repository as _repo
+    s = _dc.replace(_settings(), instance_mode="real")
+    monkeypatch.setattr(instances, "get_settings", lambda: s)
+    keys = {instances.secret_name("apt-t3c4-a"): "chiave-finta-di-a", instances.secret_name("apt-t3c4-b"): "chiave-finta-di-b"}
+    monkeypatch.setattr(instances, "_read_secret", lambda name: keys.get(name, "chiave-finta-altra"))
+    instances._secret_cache.clear()
+    for n, x in ((11, "a"), (12, "b")):
+        asyncio.run(_repo().upsert_apartment(Apartment(apartment_id=f"apt-t3c4-{x}", tenant_id="t-altra-demo",
+                                                       name=f"t3c4 {x}", instance_url=f"http://10.198.0.{n}:8100")))
+
+    async def fake(body):
+        return {"choices": [{"message": {"role": "assistant", "content": "Ciao"}}], "usage": {"total_tokens": 1}}
+    monkeypatch.setattr(ai_gateway, "call_model", fake)
+    monkeypatch.setattr(ai_gateway, "_reasoning_refused", False)
+    _repo().ai_usage = {}
+    yield
+    instances._secret_cache.clear()
+
+
+def _chat(apartment, key):
+    import httpx as _httpx
+
+    from bff.main import app as _app
+
+    async def go():
+        async with _httpx.AsyncClient(transport=_httpx.ASGITransport(app=_app), base_url="http://t") as c:
+            return await c.post("/internal/ai/chat", json={"messages": [{"role": "user", "content": "ciao"}]},
+                                headers={"X-Apartment-Id": apartment, "X-API-Key": key})
+    return asyncio.run(go())
+
+
+def test_real_mode_each_apartment_only_with_its_own_key(two_real_apartments):
+    from bff.config import get_settings as _settings
+    assert _chat("apt-t3c4-b", "chiave-finta-di-b").status_code == 200
+    assert _chat("apt-t3c4-b", "chiave-finta-di-a").status_code == 401                  # A's key for B
+    assert _chat("apt-t3c4-b", _settings().instance_api_key_fallback).status_code == 401  # the demonstrations' key

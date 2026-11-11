@@ -30,6 +30,8 @@ def _bash():
 GCLOUD = r'''#!/usr/bin/env bash
 echo "gcloud $*" >> "$STUB_DIR/calls.log"
 case "$*" in
+  *"artifacts docker images describe"*) [ -f "$STUB_DIR/no-image" ] && exit 1 ;;
+  *"builds submit"*) rm -rf "$STUB_DIR/received"; cp -r "$3" "$STUB_DIR/received" ;;   # T3c-2: what Cloud Build gets
   *"run services replace"*) cp "$4" "$STUB_DIR/rendered.yaml" ;;
   *"services describe"*status.traffic*) [ -f "$STUB_DIR/staging_image.txt" ] && cat "$STUB_DIR/staging_image.txt" ;;
   *"services describe"*minScale*) [ -f "$STUB_DIR/live.txt" ] && cat "$STUB_DIR/live.txt" ;;
@@ -238,7 +240,7 @@ def publish(tmp_path):
     def git(*args):
         return subprocess.run(["git", "-C", str(r), *args], check=True, capture_output=True, text=True).stdout.strip()
 
-    run.stubs, run.git = stubs, git
+    run.stubs, run.git, run.root = stubs, git, r
     return run
 
 
@@ -336,6 +338,22 @@ def test_d214_from_publish_all_production_is_not_asked_again(publish, tmp_path):
     assert out.returncode == 0, out.stdout + out.stderr
     assert "la conferma l'hai già data all'inizio di publish-all.sh" in out.stdout and "Per continuare" not in out.stdout
     assert "run services replace" in calls                                # it really published, with the stubs
+
+
+def test_t3c2_cloud_build_receives_the_commit_never_the_working_copy(publish, tmp_path):
+    """T3c-2 (P-83): the BFF's image is built from the commit's clean copy: work not committed in the working copy (a
+    changed manifest, a new file) never reaches Cloud Build. A stand-in gcloud keeps the folder builds submit gets."""
+    on_github(publish, tmp_path)
+    (publish.stubs / "no-image").write_text("", encoding="utf-8")
+    committed = (publish.root / "bff" / "cloudrun.staging.yaml").read_text(encoding="utf-8")
+    (publish.root / "bff" / "cloudrun.staging.yaml").write_text(committed + "# not committed\n", encoding="utf-8")
+    (publish.root / "bff" / "new.py").write_text("y = 1\n", encoding="utf-8")
+    out, calls = publish("staging", env="PUBLISH_ALL_CONFIRMED=pubblica X=1")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "builds submit" in calls
+    received = publish.stubs / "received"
+    assert (received / "bff" / "cloudrun.staging.yaml").read_text(encoding="utf-8") == committed
+    assert not (received / "bff" / "new.py").exists()
 
 
 def test_d214_without_publish_all_production_still_asks(publish, tmp_path):

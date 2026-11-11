@@ -133,8 +133,11 @@ def test_refusals(vm, args, says):
 def test_an_engine_that_does_not_come_back_gets_the_previous_settings(vm):
     assert vm("set", APT, "CONFIRM_ON_WATTS=30").returncode == 0
     (vm.stubs / "unhealthy").write_text("", encoding="utf-8")                         # it refuses the new value
+    (vm.stubs / "docker.log").unlink(missing_ok=True)
     r = vm("set", APT, "CONFIRM_ON_WATTS=9999")
     assert r.returncode != 0 and "impostazione CONFIRM_ON_WATTS non applicata" in r.stderr
+    # T3c-1 (P-83): recreated with the new value, then again with the previous one: two recreations, not one
+    assert (vm.stubs / "docker.log").read_text(encoding="utf-8").count("up -d --force-recreate") == 2
     assert vm.settings.read_text(encoding="utf-8") == "CONFIRM_ON_WATTS=30\n"
 
 

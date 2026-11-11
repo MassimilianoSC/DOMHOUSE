@@ -111,3 +111,31 @@ def test_d214_an_image_that_exists_is_not_built_again(repo, tmp_path):
     done, calls = real_run(repo, tmp_path, exists=False)
     assert done.returncode == 0, done.stderr
     assert "builds submit" in calls and f"Immagine pronta: {image}" in done.stdout
+
+
+GCLOUD_SUBMIT = r'''#!/usr/bin/env bash
+case "$*" in
+  *"artifacts docker images describe"*) exit 1 ;;                     # the image does not exist yet
+  *"builds submit"*) rm -rf "$STUB_DIR/received"; cp -r "$3" "$STUB_DIR/received"; echo "submit $3" >> "$STUB_DIR/calls" ;;
+esac
+exit 0
+'''
+
+
+def test_cloud_build_receives_the_commit_never_the_working_copy(repo, tmp_path):
+    """T3c-2 (P-83): the DRY_RUN checks only said the image's name; a version that sent ${ROOT} (the working copy, with
+    work not committed) to Cloud Build stayed green. Here a stand-in gcloud keeps the folder it receives."""
+    bash = _bash()
+    stubs = tmp_path / "stubs"
+    stubs.mkdir()
+    (stubs / "gcloud").write_text(GCLOUD_SUBMIT, encoding="utf-8", newline="\n")
+    (stubs / "gcloud").chmod(0o755)
+    (repo.root / "engine" / "core.py").write_text("x = 2  # not committed\n", encoding="utf-8")
+    (repo.root / "engine" / "new.py").write_text("y = 1\n", encoding="utf-8")
+    cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(repo.root)}" && '
+           f'GCP_PROJECT_ID=progetto-prova bash scripts/deploy-engine.sh {repo.second}')
+    r = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=60)
+    assert r.returncode == 0, r.stderr
+    received = stubs / "received"
+    assert (received / "engine" / "core.py").read_text(encoding="utf-8") == "x = 1\n"      # the commit's
+    assert not (received / "engine" / "new.py").exists() and not (received / ".git").exists()
