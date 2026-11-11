@@ -68,6 +68,12 @@
 | **Attese massime non provabili a mano** | Il limite di 30 e 90 secondi, la pagina «Non riesco ad aprire la pagina» dopo 15 secondi e il messaggio per un errore di disegno si verificano solo con le prove automatiche: senza rete l'errore arriva subito. Il collaudo a mano (sezione O) prova solo l'assenza di rete | Accettato |
 | **Correzione E-29 non provata del tutto** | Non provata con Firebase vero, su Safari o su un telefono vero | Da verificare |
 
+## Contratto dell'app
+
+| Limite | Cosa succede | Stato |
+|---|---|---|
+| **«Non in linea» subito** | Il contratto dell'app (1.0.5) dice che un dispositivo diventa «non in linea» dopo i minuti della regola «Avviso dispositivo offline»; il motore lo segna invece appena il connector lo sa, e usa i minuti solo per la decisione e la notifica | Voluto (D-225): l'app mostra subito la verità; il contratto non si modifica (regola 1) |
+
 ## Prenotazioni
 
 | Limite | Cosa succede | Stato |

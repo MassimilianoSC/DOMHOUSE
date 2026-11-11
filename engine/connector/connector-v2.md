@@ -251,6 +251,10 @@ Nel contratto un comando passa per `pending → sent → verifying → acked | f
   la soglia era unica (`SHELLY_OFFLINE_AFTER_S`, predefinita 120 s); con il ramo `soglie-offline` diventa **per tipo
   di apparecchio, con override per dispositivo**, in un file di configurazione senza segreti (D-196: il Motion a
   riposo trasmette ogni 900 s, con 120 s risulterebbe sempre offline). Questo punto si aggiorna quando quel ramo entra.
+- **Segnala offline appena lo sai** (D-225, 11 novembre 2026): il motore mostra il dispositivo «non in linea»
+  nell'app subito, e i minuti della regola «Avviso dispositivo offline» li conta il motore solo per la decisione e la
+  notifica. Non aspettare quei minuti nel connector. (La frase del contratto dell'app su `device.online`, «offline dopo
+  offline_alert.minutes», è superata da questo comportamento: il contratto non si modifica.)
 - **Riconnessione**: emetti `online=True` e poi una **fotografia completa**, cioè uno `StateChange` `"state"` per ogni
   capacità del dispositivo, letto dallo stato completo (es. `Shelly.GetStatus`). Il motore si riallinea su quella.
 - **Ordine**: per uno stesso dispositivo, nell'ordine in cui accadono, senza riordinare. Fra dispositivi diversi
