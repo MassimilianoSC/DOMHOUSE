@@ -351,6 +351,8 @@ class ApartmentEngine:
         self.window_fired: set[str] = set()
         self.windows_closed_at = float("-inf")      # monotonic: when the last open window closed
         self._window_command = False                # the rule's own turn_off: not a person's (the mode is kept)
+        self.commanded_at: dict[str, float] = {}    # D13: device -> monotonic of its last non-automatic command
+        self._mode_in_progress: str | None = None   # D13: the mode set_mode is setting (its commands are made first)
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode
@@ -1444,6 +1446,7 @@ class ApartmentEngine:
         command_ids = []
         self._auto_climate = True
         self._frost_command = mode == "empty"
+        self._mode_in_progress = mode
         try:
             for device_id, body in self.mode_commands(mode, correlation_id):
                 try:
@@ -1460,6 +1463,7 @@ class ApartmentEngine:
         finally:
             self._auto_climate = False
             self._frost_command = False
+            self._mode_in_progress = None
         # D-169: in comfort every climate is the regulation's until a person changes it; in eco and «casa vuota» none
         self.climate_by_mode = ({d["device_id"] for d in self.devices.values() if "climate" in d["capabilities"]}
                                 if mode == "comfort" else set())
@@ -1601,6 +1605,8 @@ class ApartmentEngine:
                        decision_actor: str | None = None, reasoning: str | None = None) -> dict | None:
         """A command, or None when an automatic one waits for the compressor's pause (R4) and starts after it."""
         device = self.get_device(device_id)
+        if not self._window_command and not self._auto_climate:
+            self.commanded_at[device_id] = time.monotonic()   # D13: a deferred automatic start must not undo it
         if not self._window_command and not self._auto_climate and self.window_off.pop(device_id, None) is not None:
             self.store.put_meta("window_off", self.window_off)  # D-218: commanded meanwhile, it stays as it is left
         if body.get("capability") == "heating" and device_id in self.heating_by_mode and not self._window_command:
@@ -1643,9 +1649,16 @@ class ApartmentEngine:
                                                 self._schedule_run)
                 if sid:
                     self._schedule_wait(sid, device_id)
+                snap = self._start_snapshot(device_id)
 
                 async def later():
                     await asyncio.sleep(wait)
+                    if why := self._start_not_wanted(device_id, snap):   # D13: the situation it was made for is gone
+                        self._start_dropped(device_id, why, correlation_id)
+                        if sid:
+                            self._schedule_refused(sid, device_id, f"non eseguita: {why}")
+                            self._schedule_wait(sid, device_id, done=True)
+                        return
                     saved = (self._auto_climate, self._frost_command, self._window_command, self._schedule_run)
                     self._auto_climate, self._frost_command, self._window_command, self._schedule_run = \
                         auto, frost, window_cmd, sid
@@ -1711,6 +1724,32 @@ class ApartmentEngine:
             if (sid := self.command_schedule.get(cmd["command_id"])) and cmd["status"] in FINAL:
                 self._schedule_check(sid)
 
+    def _start_snapshot(self, device_id: str) -> dict:
+        """D13 (P-83): what an automatic start put off for the compressor's pause was made for."""
+        if self._mode_in_progress is not None:            # a mode's own command: made before the mode is recorded
+            return {"mode": self._mode_in_progress, "hold": (self.hold or {}).get("until"),
+                    "by_mode": self._mode_in_progress == "comfort", "at": time.monotonic()}
+        return {"mode": self.mode, "hold": (self.hold or {}).get("until"), "by_mode": device_id in self.climate_by_mode,
+                "at": time.monotonic()}
+
+    def _start_not_wanted(self, device_id: str, snap: dict) -> str | None:
+        """D13: why a start put off is no longer wanted when the pause ends, or None."""
+        if self.mode != snap["mode"]:
+            return f"la modalità è cambiata ({self.mode})"
+        if self.hold and self.hold.get("until") != snap["hold"] and self.hold.get("mode") != snap["mode"]:
+            return f"è iniziata una forzatura in {self.hold['mode']}"
+        if snap["by_mode"] and device_id not in self.climate_by_mode:
+            return "il climatizzatore non segue più la modalità"
+        if self.commanded_at.get(device_id, float("-inf")) > snap["at"]:
+            return "nel frattempo è stato comandato"
+        return None
+
+    def _start_dropped(self, device_id: str, why: str, correlation_id: str) -> None:
+        device = self.devices.get(device_id)
+        self.log("rule:compressor_min_off", {"type": "device", "device_id": device_id}, "set_climate", "off", "off",
+                 f"Accensione automatica di {device['label'].lower() if device else device_id} rimandata per la pausa "
+                 f"del compressore e non eseguita: {why}", "informational", correlation_id)
+
     async def _refused_by_pause(self, cmd: dict, decision_actor: str, reasoning: str, target: dict, old, new_state: dict,
                                 pause: float) -> None:
         """D11: a start that finds the compressor's pause inside the lock. A person's (or the assistant's) is refused
@@ -1731,9 +1770,13 @@ class ApartmentEngine:
                  f"{reasoning or 'Accensione automatica'}: rimandata di {int(pause) + 1} s per la pausa minima "
                  f"del compressore", "informational", cmd["correlation_id"])
         body = {"capability": cap, "action": cmd["action"], **({"params": cmd["params"]} if cmd.get("params") else {})}
+        snap = self._start_snapshot(device_id)
 
         async def later():
             await asyncio.sleep(pause)
+            if why := self._start_not_wanted(device_id, snap):   # D13
+                self._start_dropped(device_id, why, cmd["correlation_id"])
+                return
             self._auto_climate = True
             try:
                 self.create_command(device_id, body, "system:engine", cmd["correlation_id"], decision_actor, reasoning)
