@@ -287,7 +287,7 @@ class ShellyConnector:
             self._check_silence(device, item.now)
             if device.sensors and device.online:
                 if device.components_failed:
-                    await self._read_components(device, item.now, snapshot=True)
+                    await self._read_components(device, snapshot=True)
                 self._check_blu_silence(device, item.now)
             return
         if isinstance(item, _Lost):
@@ -326,7 +326,7 @@ class ShellyConnector:
             self._snapshot(device, {k: v for k, v in item.params.items() if k != "ts"}, ts)
         elif device.sensors and component_event_targets(item.params):
             # a BLU sensor paired or removed on this bridge: the numbers changed, the map is read again
-            await self._read_components(device, item.received_at, snapshot=False)
+            await self._read_components(device, snapshot=False)
         # any other NotifyEvent: nothing (its last_seen is already counted)
 
     # ---- connection, snapshot, silence ---------------------------------------------------------------------------
@@ -360,7 +360,7 @@ class ShellyConnector:
             device.last_seen = self._clock()
             self._snapshot(device, status if isinstance(status, dict) else {}, device.last_seen)
         if device.sensors:                       # a bridge of BLU sensors of the catalog: their map and snapshot
-            await self._read_components(device, self._clock(), snapshot=True)
+            await self._read_components(device, snapshot=True)
 
     def _snapshot(self, device: _Device, status: dict, ts: datetime) -> None:
         """A full status: one "state" change for every capability of the device (§2.6)."""
@@ -409,9 +409,12 @@ class ShellyConnector:
                 break
         return bthome_components(found)
 
-    async def _read_components(self, bridge: _Device, at: datetime, *, snapshot: bool) -> None:
+    async def _read_components(self, bridge: _Device, *, snapshot: bool) -> None:
         """Reads the bridge's map and brings its sensors up to date. snapshot=True (the bridge is back): every
-        sensor online sends online=True and its snapshot; False (a sensor paired or removed): only the changes."""
+        sensor online sends online=True and its snapshot; False (a sensor paired or removed): only the changes.
+        The time of the data is taken AFTER the last page: the pages take up to a few seconds (the bench's Shelly 1
+        answered in up to 2.3 s), and a time taken before would date the data before they arrived. It is only the
+        fallback: a component's own valid last_updated_ts dates its packet."""
         try:
             components = await self._get_components(bridge.entry.shelly_id)
         except TransportError as exc:
@@ -420,6 +423,7 @@ class ShellyConnector:
                          error_type=type(exc).__name__)
             bridge.components_failed = True
             return
+        at = self._clock()
         bridge.components_failed = False
         bridge.components = components
         addrs = {c.addr for c in components.values()}

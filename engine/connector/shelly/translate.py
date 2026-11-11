@@ -111,11 +111,12 @@ PROFILES: Mapping[str, ModelProfile] = {
     # Ignored: em1:0's voltage, current, freq and calibration; the NotifyEvent "data" of em1data:0 (the minute's
     # records saved to flash); total_act_ret_energy. On its return online it sends NO NotifyFullStatus (the Shelly 1
     # and the Plug do): the snapshot is the connector's Shelly.GetStatus.
-    # KNOWN LIMIT for the «confirmation: power» of a split (connector.md §2.5: a change of watts in changes() within
-    # 2 s). In the capture em1:0 comes every ~14.4 s, whatever the load, and its ts is ~13.5 s before its arrival
-    # (the device's other notifications are not). Nothing is compensated here: StateChange.ts is the device's ts
-    # as for any notification. Whether a change of load is reported at once, out of the 14.4 s cycle, must be
-    # measured with a real load before an EM Mini confirms a split.
+    # Timing, for the «confirmation: power» of a split (connector-v2.md §2.5: a change of watts in changes() within
+    # 2 s). AT REST (the bench capture, steady load) em1:0 comes every ~14.4 s and its ts is ~13.5 s before
+    # its arrival (the device's other notifications are not). When the power CHANGES the device notifies at once,
+    # out of that cycle, then about every second: measured on 11 November with a real load (~40 W) switched by a
+    # relay, the first change of watts reached the engine 50 ms after the relay's change. §2.5 is met. Nothing is
+    # compensated here: StateChange.ts is the device's ts, as for any notification.
     "MiniEMG4": ModelProfile(
         app="MiniEMG4",
         device_type="energy_meter",

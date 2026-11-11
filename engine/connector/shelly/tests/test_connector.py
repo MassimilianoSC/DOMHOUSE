@@ -1018,3 +1018,80 @@ def test_blu_fake_pairing_gives_0_and_the_connector_waits_for_the_first_packet()
         await w.wait_for(lambda xs: w.blu() == [(DEV_MOTION, "online", True, None),
                                                (DEV_MOTION, "state", "motion", {"detected": True})])
     run_blu(scenario, sensors=(DEV_MOTION,))
+
+
+GET_COMPONENTS_DELAY = timedelta(seconds=2)             # a page of the bench's Shelly 1 took up to 2.3 s
+
+
+def slow_get_components(w, untrusted_ts_addr=None):
+    """Every GetComponents page takes 2 s on the shared clock; returns the clock at the end of each page. With
+    untrusted_ts_addr, that sensor's bthomesensors answer with a value and a last_updated_ts 1000 s off (beyond
+    MAX_CLOCK_SKEW_S): the connector must fall back on its own time."""
+    ends = []
+    real_call = w.transport.call
+
+    async def call(shelly_id, method, params, timeout_s):
+        if method != "Shelly.GetComponents":
+            return await real_call(shelly_id, method, params, timeout_s)
+        page = await real_call(shelly_id, method, params, timeout_s)
+        await asyncio.sleep(0.01)
+        w.shift += GET_COMPONENTS_DELAY
+        for c in page["components"]:
+            if c["config"]["addr"] == untrusted_ts_addr and c["key"].startswith("bthomesensor"):
+                c["status"].update(value=c["status"]["value"] if c["status"]["value"] is not None else False,
+                                   last_updated_ts=int((datetime.now(UTC) + w.shift).timestamp()) - 1000)
+        ends.append(datetime.now(UTC) + w.shift)
+        return page
+    w.transport.call = call
+    return ends
+
+
+def assert_ts_never_go_back(changes):
+    assert [c.ts for c in changes] == sorted(c.ts for c in changes)
+    for device_id in {c.device_id for c in changes}:
+        ts = [c.ts for c in changes if c.device_id == device_id]
+        assert ts == sorted(ts), device_id
+
+
+def test_blu_snapshot_fallback_time_is_after_the_slow_get_components():
+    """The bridge comes back and GetComponents is slow (2 pages, 2 s each): the time taken when a component has no
+    valid last_updated_ts of its own is the one AFTER the last page, not the one before the first. A valid
+    last_updated_ts still dates its packet."""
+    async def scenario(w):
+        w.pair(ADDR_HT, ADDR_MOTION, ADDR_DOOR)
+        all_packets(w)
+        door_packet = datetime.fromtimestamp(int((datetime.now(UTC) + w.shift).timestamp()), UTC)
+        ends = slow_get_components(w, untrusted_ts_addr=ADDR_HT)
+        before = datetime.now(UTC) + w.shift
+        await w.connect_bridge()
+        assert len(ends) == 2 and ends[-1] - before >= 2 * GET_COMPONENTS_DELAY
+        ht = [c for c in w.changes if c.device_id == DEV_HT]
+        assert [(c.kind, c.capability) for c in ht] == [("online", None), ("state", "temperature"),
+                                                        ("state", "humidity")]
+        for c in ht:                                    # online, and both readings without a valid ts of their own
+            assert ends[-1] <= c.ts < ends[-1] + timedelta(seconds=1), (c, ends)
+        assert w.info(DEV_HT).last_seen == ht[0].ts
+        assert w.info(DEV_DOOR).last_seen == door_packet   # its own last_updated_ts, not the fallback
+        assert_ts_never_go_back(w.changes)
+    run_blu(scenario)
+
+
+def test_blu_component_added_fallback_time_is_after_the_slow_get_components():
+    """The same on the read after a component_added (snapshot=False): a sensor that becomes reachable is dated
+    after the pages were read, not when the event arrived."""
+    async def scenario(w):
+        await w.connect_bridge()
+        ends = slow_get_components(w, untrusted_ts_addr=ADDR_MOTION)
+        paired_at = datetime.now(UTC) + w.shift
+        start = len(w.changes)
+        w.pair(ADDR_MOTION)                             # component_added: the map is read again
+        await w.wait_for(lambda xs: any(c.device_id == DEV_MOTION and c.kind == "state" for c in xs[start:]))
+        await w.settle()
+        motion = [c for c in w.changes[start:] if c.device_id == DEV_MOTION]
+        assert [(c.kind, c.capability, c.online, c.state) for c in motion] == [
+            ("online", None, True, None), ("state", "motion", None, {"detected": False})]
+        assert motion[0].ts - paired_at >= GET_COMPONENTS_DELAY
+        for c in motion:
+            assert ends[0] <= c.ts < ends[0] + timedelta(seconds=1), (c, ends)
+        assert_ts_never_go_back(w.changes)
+    run_blu(scenario, sensors=(DEV_MOTION,))

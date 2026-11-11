@@ -335,7 +335,7 @@ def test_em_mini_has_no_command():
 
 
 def test_em1_ts_comes_about_13_s_earlier_than_the_rest():
-    """The known limit written in the profile: em1:0's ts is ~13.5 s before its arrival, em1data:0's is not (the
+    """The rhythm at rest written in the profile: em1:0's ts is ~13.5 s before its arrival, em1data:0's is not (the
     capture's clock is ~103 s behind the devices: only the difference between the two counts)."""
     em1, em1data = [], []
     for received, params in g4_status_notifications("shellyemminig4"):
