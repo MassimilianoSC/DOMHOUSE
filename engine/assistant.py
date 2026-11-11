@@ -626,7 +626,8 @@ class Assistant:
         command not final by then is announced as sent, its outcome arrives in the app)."""
         from .core import FINAL, MockError
         e = self.e
-        corr, why = ask["correlation_id"], f"Richiesta all'assistente: «{ask['text']}»"
+        # D56 (P-83): never the question's text: decisions and approvals are read by every member, viewers too
+        corr, why = ask["correlation_id"], "Richiesta all'assistente"
         together = len([p for p in proposals if p["type"] != "schedule"]) >= 2
         lines, waiting = [], []
         for p in proposals:

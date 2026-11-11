@@ -1911,6 +1911,17 @@ class ApartmentEngine:
         waiter = self._watch_power(check) if check and check[0]["online"] else None
         no_confirmation = "Nessuna conferma dal dispositivo entro il tempo massimo"
         async with self._device_lock(device["device_id"]):       # at most one command per device (connector-v2.md §2.5)
+            # D32 (P-83): what it asks is computed from the state the command before it left (it was computed at its
+            # creation: «fan high» sent while the split was being turned on turned it off again), and its time starts
+            # here, where it gets the device
+            fresh = self.target_state(device, cap, cmd["action"], cmd["params"])
+            if fresh != new_state:
+                old, new_state = describe(cap, device["capabilities"][cap]), fresh
+                if waiter is not None:
+                    self._unwatch_power(check[0]["device_id"], waiter)
+                check = self._power_check(device, cap, new_state)
+                waiter = self._watch_power(check) if check and check[0]["online"] else None
+            deadline = max(deadline, utcnow() + timedelta(seconds=COMMAND_DEADLINE_S))
             if cap == "climate" and new_state["on"] and not device["capabilities"][cap]["on"]:
                 # D11 (P-83): the pause checked again here, where a turn_off sent before this command is over (its
                 # pause starts when it is settled): before, a start queued behind a turn_off ran at once
@@ -2261,6 +2272,14 @@ class ApartmentEngine:
         self.log(actor_of(actor), {"type": "rules"}, "update_rules", None, changed, "Regole modificate dall'app",
                  "applied", correlation_id)
         self._apply_limits(correlation_id, emit=True)       # D-174: the switch and the limits take effect now
+        if any(p.get("rule_id") == "window_open_off" for p in patches):
+            # D30 (P-83): turned on, or its minutes changed: every open window waits again from when it opened (past
+            # the minutes, at once); before, a wait that ended with the rule off was never planned again
+            try:
+                asyncio.get_running_loop()
+                self._windows_at_start()
+            except RuntimeError:
+                pass                                         # no loop (a call outside the engine's): the start arms them
         return self.ruleset()
 
     # ---- schedule & bookings -----------------------------------------------
@@ -2638,6 +2657,12 @@ class ApartmentEngine:
     def _execute_proposed(self, approval: dict, actor: str, correlation_id: str, decision_actor: str) -> None:
         pa = approval["proposed_action"]
         run_at = self._take_schedule(approval["approval_id"])
+        if run_at is not None and parse_dt(run_at) < utcnow() - timedelta(seconds=30):
+            # D37 (P-83): approved after its time: nothing runs at a time nobody chose
+            at = parse_dt(run_at).astimezone(ZoneInfo(self.timezone)).strftime("%d/%m %H:%M")
+            self._approved_not_done(approval, decision_actor, correlation_id, "non eseguita",
+                                    MockError(422, "run_at_in_past", f"l'orario ({at}) è già passato"))
+            return
         if run_at is not None and parse_dt(run_at) > utcnow() + timedelta(seconds=30):
             try:                                          # D-170: approved, the action is scheduled at its time
                 self.create_schedule({"run_at": run_at, "action": pa}, actor, correlation_id, source="assistant")
@@ -2905,7 +2930,7 @@ class ApartmentEngine:
                                answer="C'è già un'approvazione in attesa: decidi prima quella.")
                 else:
                     approval = self.trigger_approval(corr, source="assistant",
-                                                     reason=f"Richiesta all'assistente: «{ask['text']}». Ospiti presenti nell'appartamento.")
+                                                     reason="Richiesta all'assistente. Ospiti presenti nell'appartamento.")   # D56: not its text
                     ask.update(status="needs_approval", approval_id=approval["approval_id"],
                                answer="Spegnere la caldaia con ospiti presenti richiede la tua approvazione.")
             elif at and int(at.group(1)) < 24:
@@ -2936,7 +2961,7 @@ class ApartmentEngine:
                 d = self._match_device(text)
                 cap = next(c for c in ACTIONS if c in d["capabilities"])
                 cmd = self.create_command(d["device_id"], {"capability": cap, "action": "turn_off"}, actor, corr,
-                                          decision_actor="assistant", reasoning=f"Richiesta all'assistente: «{ask['text']}»")
+                                          decision_actor="assistant", reasoning="Richiesta all'assistente")
                 ask.update(status="answered", actions=[{"type": "command", "command_id": cmd["command_id"]}],
                            answer=f"Ho spento {d['label'].lower()}.")
             elif "caldaia" in text:                       # D-189: the boiler on, at a temperature if given
@@ -2946,7 +2971,7 @@ class ApartmentEngine:
                 params = {"on": True, **({"setpoint": setpoint} if setpoint is not None else {})}
                 cmd = self.create_command(d["device_id"], {"capability": "heating", "action": "set_heating",
                                                            "params": params}, actor, corr, decision_actor="assistant",
-                                          reasoning=f"Richiesta all'assistente: «{ask['text']}»")
+                                          reasoning="Richiesta all'assistente")
                 done = cmd["params"].get("setpoint")
                 ask.update(status="answered", actions=[{"type": "command", "command_id": cmd["command_id"]}],
                            answer=(f"Ho acceso {d['label'].lower()} a {fmt_num(done)} °C." if done is not None
@@ -2958,7 +2983,7 @@ class ApartmentEngine:
                 else:
                     cmd = self.create_command(d["device_id"], {"capability": "climate", "action": "set_climate",
                                                                "params": {"on": True, "setpoint": setpoint}}, actor, corr,
-                                              decision_actor="assistant", reasoning=f"Richiesta all'assistente: «{ask['text']}»")
+                                              decision_actor="assistant", reasoning="Richiesta all'assistente")
                     done = cmd["params"]["setpoint"]          # R6: maybe brought within the limits
                     extra = "" if done == setpoint else f", nei limiti consentiti (avevi chiesto {fmt_num(setpoint)} °C)"
                     ask.update(status="answered", actions=[{"type": "command", "command_id": cmd["command_id"]}],
@@ -3085,8 +3110,17 @@ class ApartmentEngine:
         self.log("system", self._approval_target(a), "expire",
                  "pending", "expired", f"Approvazione scaduta senza risposta: {outcome}", "informational", corr,
                  approval_id=a["approval_id"])
+        late = utcnow() - parse_dt(a["expires_at"]) if a.get("expires_at") else timedelta(0)
         try:
-            if a["expires_action"] == "approve" and a["description"] == CHECKOUT_APPROVAL and \
+            if a["expires_action"] == "approve" and late > timedelta(minutes=self.setting("MISSED_AFTER_MINUTES")):
+                # D10 (P-83): it expired while the engine was down, longer ago than a scheduled action may run late:
+                # closed without running, as schedule_missed does
+                at = parse_dt(a["expires_at"]).astimezone(ZoneInfo(self.timezone)).strftime("%d/%m %H:%M")
+                self._take_schedule(a["approval_id"])
+                self.log("system", self._approval_target(a), "expire", "pending", "expired",
+                         f"Approvazione scaduta alle {at}, mentre il sistema era fermo: azione non eseguita "
+                         f"({a['description']})", "failed", corr, approval_id=a["approval_id"])
+            elif a["expires_action"] == "approve" and a["description"] == CHECKOUT_APPROVAL and \
                     self._checkout_keeps_comfort(None, corr):
                 pass                                     # D05: approved at expiry, but the next guest arrived meanwhile
             elif a["expires_action"] == "approve" and self.hold and a["proposed_action"].get("type") == "apartment_mode":
