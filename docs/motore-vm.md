@@ -757,14 +757,14 @@ Si fa dopo i comandi della memoria storica per l'indirizzo pubblico, la regola `
 cd ~
 IP=$(gcloud compute instances describe langbrain-dev --zone=europe-west8-a --project=domotica-poc-511707 --format='get(networkInterfaces[0].accessConfigs[0].natIP)'); echo "IP pubblico: $IP"
 for p in 22 1883 8100 8101 8199 8883; do timeout 3 bash -c "</dev/tcp/$IP/$p" 2>/dev/null && echo "porta $p APERTA" || echo "porta $p chiusa"; done
-sudo apt-get install -y -qq nmap > /dev/null && sudo nmap -Pn -p 1-1024,1883,8100-8199,8883 "$IP"
+sudo apt-get install -y -qq nmap > /dev/null && sudo nmap -Pn -sT -p 1-1024,1883,8100-8199,8883 "$IP"
 openssl s_client -connect "$IP:8883" -servername mqtt.dh-lab.eu -verify_return_error < /dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -enddate
 ```
 
 Esito atteso:
 
 1. Solo `porta 8883 APERTA`; tutte le altre `chiusa`.
-2. `nmap` mostra `8883/tcp open` e tutte le altre porte `filtered` (nessuna `open`, nessuna `closed`).
+2. `nmap` mostra `8883/tcp open` e tutte le altre porte `filtered` (nessuna `open`, nessuna `closed`). `-sT` usa il collegamento normale del sistema: l'11 novembre la scansione con pacchetti grezzi (`-sS`, quella di `sudo nmap` senza opzioni) da Cloud Shell vedeva filtrata anche la 8883, con il limite a 0 scartati. Dura qualche minuto.
 3. `openssl` stampa `subject=CN = mqtt.dh-lab.eu`, l'emittente Let's Encrypt e la scadenza.
 
 Se compare un'altra porta aperta: togliere subito la regola `mqtt-tls-in` (comando della memoria storica) e avvisare.
