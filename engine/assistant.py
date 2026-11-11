@@ -518,6 +518,8 @@ class Assistant:
             if name == "programma":
                 when = self._when(args.get("quando"))
                 if args.get("modalita"):
+                    if args["modalita"] not in ("comfort", "eco", "empty"):    # D60 (P-83): as cambia_modalita
+                        return {"errore": "modalità non valida: comfort, eco o empty"}
                     action = {"type": "apartment_mode", "mode": args["modalita"]}
                 else:
                     device = e.get_device(args.get("device_id", ""))

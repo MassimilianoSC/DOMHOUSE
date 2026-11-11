@@ -298,6 +298,20 @@ def test_settings_of_the_assistant():
         load_config({**base, "MODEL_BASE_URL": "domotica-bff"})
 
 
+@pytest.mark.parametrize("mode", ["casa vuota", "away", "", 3])
+def test_a_scheduled_mode_is_checked_before_it_is_proposed(mode):
+    """D60 (P-83): «programma» took any mode: a useless approval took the place and moved the queue on."""
+    e = engine(None)
+    a, proposals = assistant.Assistant(e, None), []
+    later = (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+    out = a.tool("programma", {"quando": later, "modalita": mode}, proposals)
+    if mode == "":                                     # no mode: read as a device command, refused for its device
+        assert "errore" in out and proposals == []
+        return
+    assert "errore" in out and "modalità non valida" in out["errore"] and proposals == []
+    assert "errore" not in a.tool("programma", {"quando": later, "modalita": "eco"}, proposals) and len(proposals) == 1
+
+
 def test_the_model_address_must_be_https():
     """D35 (P-83): the engine sends its key (X-API-Key) to MODEL_BASE_URL: http:// would send it in clear."""
     base = {"APARTMENT_ID": "apt-prova-01", "API_KEY": "k" * 16, "CONNECTOR": "simulated"}
