@@ -173,7 +173,9 @@ def make_connector(config: ConnectorConfig) -> ShellyConnector:
 Le proprie variabili hanno il prefisso del nome del connector in maiuscolo più «_» (`SHELLY_` per `shelly`): una
 variabile senza prefisso non arriva in `config.env`. Se il catalogo manca o è sbagliato, `make_connector` solleva
 un'eccezione il cui messaggio dice quale campo e quale dispositivo sono sbagliati, mai il valore trovato: il motore
-scrive «connector setup failed» con quel messaggio ed esce con il codice 3.
+scrive «connector setup failed» con quel messaggio ed esce con il codice 3. Un errore che arriva dopo, all'avvio
+vero (la `start()` del connector che non si collega, un `engine.db` di uno schema più nuovo), scrive «engine start
+failed» ed esce con il codice 4; il 4 vale anche per la porta già occupata, con la riga «engine did not start» (D36).
 
 Poi lo si avvia come al punto 3, con `CONNECTOR=shelly`, le proprie `SHELLY_*` e il catalogo in `CATALOG_PATH` (o in
 `<DATA_DIR>/catalog.yaml`). Con un connector diverso dal simulato `POST /_test/state` risponde 404 e `/ask` 501, come
