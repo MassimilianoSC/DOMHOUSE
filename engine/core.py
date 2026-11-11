@@ -64,7 +64,10 @@ ENERGY_PROFILE_SHARES = (0.62, 0.28, 0.10)
 RETENTION_EVERY_S = 3600
 # the engine's own fields of a capability, kept across restarts (the device reports the others again)
 ENGINE_FIELDS = {"heating": ("on", "setpoint"), "contact": ("since",), "motion": ("last_seen",),
-                 "power_meter": ("kwh_today",)}
+                 "power_meter": ("kwh_today",), "climate": ("on", "mode", "setpoint", "fan")}
+# D14 (P-83): an infrared split reports nothing of its state (connector-v2 §2.3): the engine's copy is all there is, and
+# it is kept across restarts; a climate that reports these fields keeps its own report (REPORTED_WINS)
+REPORTED_WINS = {"climate"}
 # the boiler's thermostat (R1, R2, D-126, D-128): heating.on is the intention the app sees; the relay is the engine's
 # D-133: the rules' thresholds that the app does not change are settings of the engine per apartment, with defaults
 # and limits in engine/config.py (SETTINGS); the engine reads them with self.setting(name)
@@ -506,7 +509,10 @@ class ApartmentEngine:
                     if cap in device["capabilities"] and cap in old["capabilities"]:
                         if cap == "power_meter" and info.device_id in self.meters:
                             continue                    # kwh_today comes from the restored counter
+                        reported = info.capabilities.get(cap) or {}
                         for f in fields:
+                            if cap in REPORTED_WINS and f in reported:
+                                continue                # D14: the device said it itself
                             if f in old["capabilities"][cap]:
                                 device["capabilities"][cap][f] = old["capabilities"][cap][f]
                 contact, was = device["capabilities"].get("contact"), old["capabilities"].get("contact")
@@ -1928,12 +1934,28 @@ class ApartmentEngine:
             self.power_waiters.pop(meter_id, None)
 
     def _power_seen(self, meter_id: str, state: dict) -> None:
-        """A meter's new watts: the commands watching it that they confirm are confirmed."""
+        """A meter's new watts: the commands watching it that they confirm are confirmed; D14, a split confirmed by this
+        meter and with no command running follows it (drawing: on; nothing: off), so a start that came after its
+        command's window, or a split switched by its own remote, is seen as it is (the window rule turns it off)."""
         watts = float(state.get("watts") or 0)
         for direction, baseline, waiter in self.power_waiters.get(meter_id, []):
             if not waiter.done() and confirm.power_confirms(direction, baseline, watts, self.confirm_on_watts,
                                                             self.confirm_off_watts):
                 waiter.set_result(True)
+        busy = {c["device_id"] for c in self.commands.values() if c["status"] not in FINAL} | {r[0] for r in self.inflight}
+        for split in self.devices.values():
+            climate = split["capabilities"].get("climate")
+            if (not climate or climate.get("confirmation") != "power" or split["device_id"] in busy
+                    or (self.confirmation_meter(split["device_id"]) or {}).get("device_id") != meter_id):
+                continue
+            seen_on = (True if watts >= self.confirm_on_watts else False if watts < self.confirm_off_watts else None)
+            if seen_on is None or seen_on == bool(climate.get("on")):
+                continue
+            climate["on"] = seen_on
+            self._note_climate(split["device_id"], "climate", not seen_on, seen_on)
+            self._save_device(split)
+            self.emit("device.state", {"device_id": split["device_id"], "capability": "climate", "state": climate},
+                      str(uuid.uuid4()))
 
     async def _power_confirmed(self, waiter: asyncio.Future, cmd: dict) -> bool:
         """Wait for the meter until CONFIRM_UNTIL_S after the command's creation."""
