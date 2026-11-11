@@ -6,7 +6,7 @@
 
 - **Dispositivo:** `lab-01.shellyplugmg3-9070695cb0d0`.
 - **Tutti i comandi si lanciano in Git Bash.** Ognuno apre la VM attraverso il tunnel di Google.
-- **Nessuna password compare a video.** La password del connector la legge la VM da sola.
+- **Nessuna password compare a video.** La password del connector la legge la VM da sola. Nelle verifiche 2 e 3, per i 5–10 secondi del comando, è visibile solo dentro la VM a chi vi è collegato in quel momento, cioè solo tu.
 - **Incolla alla memoria storica l'uscita di ogni verifica:** l'esito va nel registro.
 
 ## 1. La presa si è collegata? (sola lettura)
