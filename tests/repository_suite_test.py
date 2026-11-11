@@ -238,6 +238,33 @@ def test_an_invitation_never_counts_as_an_admin(repo):
     assert run(repo.delete_user_keeping_an_admin("inv-tc3-x")) == "deleted"
 
 
+def test_two_events_of_a_booking_folded_at_once_both_count(repo):
+    """D43 (P-83): fold_booking_event reads, folds and writes in one transaction (Firestore) or with no await between
+    (memory): two events of the same booking at the same moment are both in the record."""
+    def ev(eid, kind, checkout):
+        return {"event_id": eid, "type": kind, "booking_id": "bk-rs", "checkin_at": "2026-12-01T14:00:00.000Z",
+                "checkout_at": checkout, "source": "italianway", "ts": f"2026-11-11T10:00:0{eid[-1]}.000Z"}
+    run(repo.fold_booking_event("apt-rs", ev("e0", "booking_created", "2026-12-04T10:00:00.000Z")))
+
+    async def both():
+        return await asyncio.gather(repo.fold_booking_event("apt-rs", ev("e1", "booking_changed", "2026-12-05T10:00:00.000Z")),
+                                    repo.fold_booking_event("apt-rs", ev("e2", "checkin", "2026-12-05T10:00:00.000Z")))
+    run(both())
+    rec = run(repo.get_booking("apt-rs", "bk-rs"))
+    assert set(rec.event_ids) == {"e0", "e1", "e2"} and rec.checkout_at == "2026-12-05T10:00:00.000Z"
+
+
+def test_a_change_never_brings_a_deleted_user_back(repo):
+    """D57 (P-83): update_user_if_present and upsert_user_keeping_an_admin leave a deleted record deleted."""
+    run(repo.upsert_user(User(uid="tc4-u", email="u@tc4.it", tenant_id="tc4", role="operator", push_tokens=["a", "b"])))
+    out = run(repo.update_user_if_present("tc4-u", lambda u: u.model_copy(update={"push_tokens": ["b"]})))
+    assert out.push_tokens == ["b"] and run(repo.get_user("tc4-u")).push_tokens == ["b"]
+    run(repo.delete_user("tc4-u"))
+    assert run(repo.update_user_if_present("tc4-u", lambda u: u)) is None and run(repo.get_user("tc4-u")) is None
+    gone = User(uid="tc4-u", email="u@tc4.it", tenant_id="tc4", role="viewer")
+    assert run(repo.upsert_user_keeping_an_admin(gone)) is None and run(repo.get_user("tc4-u")) is None
+
+
 def test_last_platform_manager_concurrent_removals(repo):
     from bff.repository import PlatformMember
 

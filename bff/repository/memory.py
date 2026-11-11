@@ -109,6 +109,22 @@ class InMemoryRepository:
         self.bookings[booking.key] = booking.model_copy(deep=True)
         return booking
 
+    async def fold_booking_event(self, apartment_id, ev):
+        from .base import apply_booking_event
+        key = f"{apartment_id}__{ev['booking_id']}"
+        current = self.bookings.get(key)
+        new = apply_booking_event(current.model_copy(deep=True) if current else None, apartment_id, ev)
+        self.bookings[key] = new.model_copy(deep=True)
+        return new
+
+    async def update_user_if_present(self, uid, change):
+        current = self.users.get(uid)
+        if current is None:
+            return None
+        new = change(current.model_copy(deep=True))
+        self.users[uid] = new.model_copy(deep=True)
+        return new
+
     async def add_webhook_log(self, log):
         self.webhook_logs.append(log.model_copy(deep=True))
         same = [i for i, l in enumerate(self.webhook_logs) if l.tenant_id == log.tenant_id]
@@ -316,6 +332,8 @@ class InMemoryRepository:
 
     async def upsert_user_keeping_an_admin(self, user):
         current = self.users.get(user.uid)
+        if current is None:
+            return None                                  # D57 (P-83): deleted meanwhile: never written back
         if current and current.role == "admin" and user.role != "admin" and not self._other_admins(user.tenant_id, user.uid):
             return False
         self.users[user.uid] = user.model_copy(deep=True)

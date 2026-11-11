@@ -127,7 +127,10 @@ async def patch_user(uid: str, body: UserPatch, user: CurrentUser = Depends(requ
         target.display_name = body.display_name
     target.apartment_ids = apartment_ids
     # P-36 point 14b: "at least one admin" checked and written atomically (two admins demoting each other at once)
-    if not await repo.upsert_user_keeping_an_admin(target):
+    saved = await repo.upsert_user_keeping_an_admin(target)
+    if saved is None:                                    # D57 (P-83): removed meanwhile by someone else
+        return err(404, "not_found", "Utente inesistente")
+    if not saved:
         return err(409, "last_admin", "Deve restare almeno un amministratore nell'organizzazione")
     if body.role and body.role != before.role and not target.uid.startswith("inv-"):
         try:  # claims prevail over the app record: a role change must reach them, or it would be undone at login

@@ -257,8 +257,9 @@ async def _prune_tokens(dead: list[str]) -> None:
     for t in await repo.list_tenants():
         for u in await repo.list_users(t.tenant_id):
             if any(tok in u.push_tokens for tok in dead):
-                u.push_tokens = [tok for tok in u.push_tokens if tok not in dead]
-                await repo.upsert_user(u)
+                # D57 (P-83): only if the record still exists (a user deleted meanwhile is not written back)
+                await repo.update_user_if_present(u.uid, lambda cur: cur.model_copy(update={
+                    "push_tokens": [tok for tok in cur.push_tokens if tok not in dead]}))
     info("push tokens pruned", count=len(dead))
 
 
@@ -438,6 +439,10 @@ def offline_key(apt: Apartment, device_id: str, last_seen: str | None) -> str | 
     return f"push:offline:{apt.apartment_id}:{device_id}:{last_seen}" if last_seen else None
 
 
+OFFLINE_READ_TRIES = 3            # D41: reads of /devices when an offline wait ends
+OFFLINE_READ_RETRY_S = 20.0       # between them
+
+
 def instance_down_key(apt: Apartment) -> str:
     """The engine repeats instance.health at every change of a device, and has no date for the start of an outage: one
     claim for the whole outage, released when the connector is back."""
@@ -453,11 +458,20 @@ async def _offline_watch(apt: Apartment, device_id: str, ts: str | None, key: st
     from engine.core import seconds_per_minute
 
     await asyncio.sleep(max(0.0, minutes * (seconds_per_minute() if get_settings().instance_mode == "mock" else 60.0) - already_s))
-    try:
-        resp = await instances.call(apt, "GET", "/devices", timeout=5.0)
-        dev = next((d for d in resp.json().get("devices", []) if d["device_id"] == device_id), None)
-    except Exception:
-        return
+    dev = None
+    for attempt in range(1, OFFLINE_READ_TRIES + 1):
+        try:
+            resp = await instances.call(apt, "GET", "/devices", timeout=5.0)
+            resp.raise_for_status()
+            dev = next((d for d in resp.json().get("devices", []) if d["device_id"] == device_id), None)
+            break
+        except Exception as exc:
+            # D41 (P-83): never silent, and tried again: one failed read used to lose the notification
+            warn("offline push: devices not read", apartment_id=apt.apartment_id, device_id=device_id,
+                 error=type(exc).__name__, attempt=attempt)
+            if attempt == OFFLINE_READ_TRIES:
+                return
+            await asyncio.sleep(OFFLINE_READ_RETRY_S)
     if dev and not dev["online"]:
         await notify_once(offline_key(apt, device_id, dev.get("last_seen")) or key, apt.tenant_id, "offline",
                           *device_offline_push(apt, device_id, dev.get("label") or device_id, minutes, ts))

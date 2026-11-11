@@ -137,6 +137,34 @@ class FirestoreRepository:
     async def upsert_booking(self, booking):
         return await self._put("bookings", booking.key, booking, retention.booking(booking.model_dump()))
 
+    async def fold_booking_event(self, apartment_id, ev):
+        from .base import apply_booking_event
+        ref = self._col("bookings").document(f"{apartment_id}__{ev['booking_id']}")
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            new = apply_booking_event(BookingRecord(**snap.to_dict()) if snap.exists else None, apartment_id, ev)
+            data = new.model_dump()
+            data[retention.FIELD] = retention.booking(data)
+            tx.set(ref, data)
+            return new
+        return await txn(self.db.transaction())
+
+    async def update_user_if_present(self, uid, change):
+        ref = self._col("users").document(uid)
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            if not snap.exists:
+                return None
+            new = change(User(**snap.to_dict()))
+            new.email = new.email.lower()
+            tx.set(ref, new.model_dump())
+            return new
+        return await txn(self.db.transaction())
+
     # webhook logs (last WEBHOOK_LOG_LIMIT overall; older documents are deleted on insert)
     async def _tenant_logs(self, tenant_id):
         # equality filter only (automatic single-field index, no composite index to deploy); at most
@@ -502,6 +530,8 @@ class FirestoreRepository:
 
         @firestore.async_transactional
         async def txn(tx):
+            if not (await ref.get(transaction=tx)).exists:
+                return None                              # D57 (P-83): deleted meanwhile: never written back
             admins = [d.id async for d in self._admins_query(user.tenant_id).stream(transaction=tx)
                       if not d.id.startswith("inv-")]                      # D39: invitations never count
             if user.role != "admin" and user.uid in admins and len(admins) == 1:
