@@ -71,74 +71,44 @@ class TestHeaderAuth:
 # SSE Last-Event-ID replay
 # =========================================================================
 class TestSSELastEventID:
+    @staticmethod
+    def _ids(r, wanted: int, seconds: float, until: str | None = None) -> list[str]:
+        """The ids of the stream's events (not the pings), in order, until `wanted` of them, `until` or the time."""
+        ids, buf, deadline = [], "", time.time() + seconds
+        for chunk in r.iter_content(chunk_size=256, decode_unicode=True):
+            buf += chunk or ""
+            buf = buf.replace("\r\n", "\n")
+            while "\n\n" in buf:
+                block, buf = buf.split("\n\n", 1)
+                fields = dict(line.split(": ", 1) for line in block.splitlines() if ": " in line)
+                if fields.get("id") and fields.get("event") not in (None, "ping", "connected"):
+                    ids.append(fields["id"])
+            if len(ids) >= wanted or (until and until in ids) or time.time() > deadline:
+                break
+        return ids
+
+    def _window(self, open_: bool):
+        r = requests.post(f"{INSTANCE}/_test/state", headers={**ADMIN, "Content-Type": "application/json"},
+                          json={"device_id": "dev-finestra-camera", "capability": "contact", "state": {"open": open_}})
+        assert r.status_code in (200, 204)
+
     def test_last_event_id_replay(self):
-        # Connect, read a few events to capture a known id, trigger an event,
-        # reconnect with Last-Event-ID lower than the triggered event id,
-        # and verify the triggered event is replayed.
+        """D80 (P-83): the test skipped when it caught no id, and resumed only from "0". Now no id is a failure, and the
+        stream resumed from an id in the middle gives what came after it, never that id again."""
         headers = {**ADMIN, "Accept": "text/event-stream"}
-        # 1) First connection: get the baseline latest id by causing a benign event.
-        corr = str(uuid.uuid4())
-        # Toggle presa online->online (no-op online emits health; use a real contact toggle)
-        # Easier: list current id by causing a contact=false->false (idempotent). Use schedule create + delete.
-        # Trigger a non-destructive event: close window (already closed) -> may still emit. Use trigger_approval? not idempotent.
-        # Instead: open a short-lived SSE and read the first event ids while triggering device_offline toggle.
-        with requests.get(
-            f"{API}/app/apartments/{APT}/stream",
-            headers=headers, stream=True, timeout=10,
-        ) as r:
+        with requests.get(f"{API}/app/apartments/{APT}/stream", headers=headers, stream=True, timeout=10) as r:
             assert r.status_code == 200
-            # Trigger an event: set finestra online toggle via _test state capability contact open->closed
-            # The simulator emits device.online or device.state for state changes.
-            req = requests.post(
-                f"{INSTANCE}/_test/state",
-                headers={**ADMIN, "Content-Type": "application/json"},
-                json={"device_id": "dev-presa-camera", "online": True},
-            )
-            assert req.status_code in (200, 204)
-            # Also force a state change event (open window shortly then close)
-            r1 = requests.post(
-                f"{INSTANCE}/_test/state",
-                headers={**ADMIN, "Content-Type": "application/json"},
-                json={"device_id": "dev-finestra-camera", "capability": "contact", "state": {"open": True}},
-            )
-            assert r1.status_code in (200, 204)
-            last_id = None
-            deadline = time.time() + 5
-            buf = ""
-            for chunk in r.iter_content(chunk_size=256, decode_unicode=True):
-                if not chunk:
-                    continue
-                buf += chunk
-                for line in buf.splitlines():
-                    if line.startswith("id:"):
-                        last_id = line.split(":", 1)[1].strip()
-                if last_id or time.time() > deadline:
-                    break
-        # Clean up: close window
-        requests.post(
-            f"{INSTANCE}/_test/state",
-            headers={**ADMIN, "Content-Type": "application/json"},
-            json={"device_id": "dev-finestra-camera", "capability": "contact", "state": {"open": False}},
-        )
-        if last_id is None:
-            pytest.skip("Could not capture an event id from stream (environment may buffer)")
-        # Reconnect with Last-Event-ID smaller than last_id to force replay.
-        # Last ids are typically monotonic integers or ULIDs; use prefix '0' to force replay of all buffered.
-        headers2 = {**ADMIN, "Last-Event-ID": "0"}
-        with requests.get(
-            f"{API}/app/apartments/{APT}/stream",
-            headers=headers2, stream=True, timeout=5,
-        ) as r2:
+            self._window(True)                               # two events: the window opens, then closes
+            self._window(False)
+            ids = self._ids(r, 2, 8)
+        assert len(ids) >= 2, f"dallo stream servono almeno due eventi con id, arrivati: {ids}"
+        first, second = ids[0], ids[1]
+        with requests.get(f"{API}/app/apartments/{APT}/stream", headers={**headers, "Last-Event-ID": first},
+                          stream=True, timeout=10) as r2:
             assert r2.status_code == 200
-            replayed = ""
-            deadline = time.time() + 3
-            for chunk in r2.iter_content(chunk_size=512, decode_unicode=True):
-                replayed += chunk
-                if last_id and f"id: {last_id}" in replayed:
-                    break
-                if time.time() > deadline:
-                    break
-        assert last_id in replayed, f"Last-Event-ID replay missing id {last_id}"
+            replayed = self._ids(r2, 50, 5, until=second)
+        assert second in replayed, f"ripresa da {first}: manca {second} ({replayed})"
+        assert first not in replayed, f"ripresa da {first}: l'evento {first} è tornato ({replayed})"
 
 
 # =========================================================================
