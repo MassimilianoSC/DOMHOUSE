@@ -181,6 +181,25 @@ def test_real_mode_has_no_test_hooks_and_no_ask(tmp_path):
         assert client.get("/api/v1/apartment", headers=HEADERS).json()["current_booking_id"] is None   # no demo history
 
 
+def test_the_key_is_compared_in_constant_time(tmp_path, monkeypatch):
+    """D74 (P-83): the engine compared X-API-Key with != (the server already used compare_digest)."""
+    import hmac
+    seen = []
+    real = hmac.compare_digest
+
+    def spy(a, b):
+        seen.append((type(a), type(b)))
+        return real(a, b)
+    monkeypatch.setattr(hmac, "compare_digest", spy)
+    with TestClient(create_engine_app(config(DATA_DIR=str(tmp_path)))) as client:
+        other = {k: v for k, v in HEADERS.items() if k != "X-API-Key"}
+        for key in (None, "", KEY[:-1], KEY[:-1] + "x", KEY + "x"):
+            sent = other if key is None else {**other, "X-API-Key": key}
+            assert client.get("/api/v1/devices", headers=sent).status_code == 401, key
+        assert client.get("/api/v1/devices", headers=HEADERS).status_code == 200
+    assert seen and all(t == (bytes, bytes) for t in seen)
+
+
 def test_no_schema_pages_without_the_key(tmp_path):
     """D61 (P-83): /docs, /redoc and /openapi.json answered 200 without a key, listing every path of the engine."""
     with TestClient(create_engine_app(config(DATA_DIR=str(tmp_path)))) as client:

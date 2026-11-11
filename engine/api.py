@@ -3,6 +3,7 @@
 - many apartments, at /{apartment_id}/api/v1: the BFF's demonstration apartments (mounted at /mock) and
   python -m bff.mock_instance."""
 import asyncio
+import hmac
 import json
 import re
 from collections.abc import Callable
@@ -34,6 +35,7 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
     only, at /api/v1; without, any apartment at /{apartment_id}/api/v1."""
     enabled = list(features)
     ping = ping_seconds
+    expected_key = api_key.encode("utf-8")
     # D61 (P-83): no /docs, /redoc, /openapi.json: they answered without the key (the contract is contract/openapi.yaml)
     app = FastAPI(title=title, lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     single = apartment_id
@@ -54,7 +56,8 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
         top = path.strip("/").split("/")[0]
         if top in NO_AUTH:
             return await call_next(request)
-        if request.headers.get("X-API-Key") != api_key:
+        # D74 (P-83): constant time, on bytes (headers arrive as latin-1); a missing key is an empty one
+        if not hmac.compare_digest(request.headers.get("X-API-Key", "").encode("latin-1"), expected_key):
             return error(401, "unauthorized", "Chiave API mancante o non valida")
         actor = request.headers.get("X-Actor", "")
         corr = request.headers.get("X-Correlation-Id", "")
