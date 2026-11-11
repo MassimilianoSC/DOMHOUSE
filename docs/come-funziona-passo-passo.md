@@ -168,6 +168,25 @@ procedura prevede che non pubblichi lui. Da ridiscutere prima della consegna.
   pull request #4, già completo per la Plug M Gen3, con la correzione di una riga sull'invio dei comandi. Gli altri
   modelli arriveranno uno alla volta.
 
+**«Quindi il traduttore di Youssouf è parziale?»** Sì, in un senso preciso: è un **interprete con un dizionario**.
+
+- **L'interprete c'è già**, ed è la parte più difficile: collegarsi al broker e restare collegato, leggere il catalogo,
+  capire quando un dispositivo sparisce (soglie di offline per tipo), mandare un comando e aspettarne la conferma,
+  rifare la «fotografia» quando un dispositivo si ricollega, leggere il livello delle batterie. Vale per tutti i
+  modelli; le prove comuni dicono che rispetta il contratto.
+- **Il dizionario ha una sola pagina: la Plug M Gen3.** Per ogni modello nuovo serve una pagina: come quel modello
+  parla e che cosa significano i suoi messaggi, con prove e messaggi registrati in laboratorio.
+
+| Pagina che manca | Impegno (stima della memoria storica, da confermare da Youssouf) |
+|---|---|
+| Shelly 1 Gen4, relè della caldaia | Piccolo: molto simile alla presa |
+| EM Mini Gen4, misuratore del climatizzatore | Piccolo: solo consumo |
+| Sensori Bluetooth (temperatura e umidità, finestra, movimento) | Medio: passano da uno Shelly Gen4 «ponte» e hanno un formato diverso; il catalogo oggi non sa descrivere un ponte con più sensori |
+| Athom AR01, telecomando a infrarossi | Il più diverso: non è uno Shelly, parla un altro dialetto (Tasmota) con caselle diverse; punto aperto del contratto (§7.3, punto 5) |
+
+Per il primo test basta la pagina della presa. Per un appartamento vero servono almeno caldaia e sensori, e
+l'infrarosso se ci sono climatizzatori.
+
 ### Cosa resta da fare (passo 2)
 
 | Chi | Che cosa | Per quando |
@@ -179,3 +198,4 @@ procedura prevede che non pubblichi lui. Da ridiscutere prima della consegna.
 | Committente | Pubblicare il lotto con il traduttore di Youssouf (`publish-all.sh`) | Prima della tappa B |
 | Noi (o1), committente | Creare sulla VM il motore di `lab-01` con il traduttore Shelly e il catalogo | Prima della tappa B |
 | Committente | Rivalutare i permessi di Youssouf sulla VM (D-47) | Prima della consegna |
+| Youssouf | Le pagine del dizionario per gli altri modelli: relè della caldaia, misuratore, sensori Bluetooth con il ponte, infrarosso Athom; e il catalogo con gli Shelly «ponte» | Prima di un appartamento vero; stima da chiedergli |
