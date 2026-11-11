@@ -212,6 +212,13 @@ class InMemoryRepository:
     async def release_work(self, key):
         self.work.pop(key, None)
 
+    async def renew_work(self, key, owner, lease_s, payload):
+        d = self.work.get(key)
+        if not d or d["status"] != "pending" or d["owner"] != owner:
+            return False
+        d.update(lease_until=time.time() + lease_s, payload=payload)
+        return True
+
     async def expire_work(self, key):
         d = self.work.get(key)
         if not d or d["status"] != "pending" or not d["payload"]:

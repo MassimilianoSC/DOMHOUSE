@@ -289,7 +289,7 @@ def forget_apartment(apartment_id: str) -> None:
     _unreachable.pop(apartment_id, None)
     _alert_minutes.pop(apartment_id, None)
     for key in [k for k in _schedule_groups if k[0] == apartment_id]:
-        _schedule_groups.pop(key, None)            # its flush finds nothing
+        _schedule_groups.pop(key)["forgotten"] = True   # its flush releases its claim and tells nothing (D42)
     if (task := _unreachable_timers.pop(apartment_id, None)) and not task.done():
         task.cancel()
 
@@ -532,10 +532,12 @@ def _schedule_not_done(apt: Apartment, ev: SseEvent, data: dict, ts: str | None)
         # after a planned shutdown no burst: the engine writes them all at its start, they make one summary (D-219)
         key = (apt.apartment_id, "maintenance")
         group = _schedule_groups.get(key)
-        if group is None:
+        opened = group is None
+        if opened:
             group = _schedule_groups[key] = {"kinds": []}
-            _spawn(_keep_maintenance_summary(apt, key), "maintenance summary", apt.apartment_id)
         group["kinds"].append(data.get("new_value"))
+        if opened:
+            _spawn(_keep_maintenance_summary(apt, key, group), "maintenance summary", apt.apartment_id)
         return
     partial = data.get("action") == "schedule_partial"
     if partial and data.get("new_value") not in PARTIAL_KINDS:
@@ -543,44 +545,88 @@ def _schedule_not_done(apt: Apartment, ev: SseEvent, data: dict, ts: str | None)
     pref = schedule_pref(data.get("new_value"))
     key = (apt.apartment_id, pref)
     group = _schedule_groups.get(key)
-    if group is None:
+    opened = group is None
+    if opened:
         group = _schedule_groups[key] = {"first": str(data.get("decision_id", "")), "claim": event_key(apt, ev, ts),
                                          "ts": ts, "reasonings": [], "partial": []}
-        _spawn(_flush_schedule_group(apt, key), "schedule_failed", apt.apartment_id)
     group["reasonings"].append(str(data.get("reasoning") or "").strip())
     group["partial"].append(data.get("new_value") if partial else None)
+    if opened:
+        _spawn(_flush_schedule_group(apt, key, group), "schedule_failed", apt.apartment_id)
 
 
-async def _flush_schedule_group(apt: Apartment, key: tuple[str, str]) -> None:
+def _close_group(key: tuple[str, str], group: dict) -> bool:
+    """The window is over: the group leaves the open ones. False when forget_apartment removed it (a reset)."""
+    if _schedule_groups.get(key) is group:
+        del _schedule_groups[key]
+    return not group.get("forgotten")
+
+
+def _schedule_payload(apt: Apartment, pref: str, group: dict) -> dict:
+    data, headers = schedule_failed_push(apt, group["first"], list(group["reasonings"]), group["ts"],
+                                         list(group["partial"]))
+    return {"tenant_id": apt.tenant_id, "pref": pref, "data": data, "headers": headers}
+
+
+async def _flush_schedule_group(apt: Apartment, key: tuple[str, str], group: dict) -> None:
+    """D42 (P-83): the group is claimed at once with what it holds (the cursor of the stream can be saved beyond its
+    events), with a lease covering the window and a margin: a process that dies in the window loses nothing, recover_once
+    sends what was claimed. At the end of the window the claim gets the whole group and is sent."""
+    claim = f"{group['claim']}:schedule:{key[1]}"
+    repo = get_repository()
+    margin = get_settings().notification_lease_s
+    first = _schedule_payload(apt, key[1], group)
+    mine = await claim_notification(claim, first["tenant_id"], first["pref"], first["data"], first["headers"],
+                                    lease_s=SCHEDULE_GROUP_S + margin)
     await asyncio.sleep(SCHEDULE_GROUP_S)
-    group = _schedule_groups.pop(key, None)
-    if not group:
+    still_open = _close_group(key, group)
+    if not mine:                                   # another instance holds it (or the notifications are off)
         return
-    await notify_once(f"{group['claim']}:schedule:{key[1]}", apt.tenant_id, key[1],
-                      *schedule_failed_push(apt, group["first"], group["reasonings"], group["ts"], group.get("partial")))
+    if not still_open:                             # the apartment was reset meanwhile: nothing to tell
+        await repo.release_work(claim)
+        return
+    payload = _schedule_payload(apt, key[1], group)
+    if await repo.renew_work(claim, runtime.BOOT_ID, margin, payload):
+        await deliver(claim, payload)
 
 
-async def _keep_maintenance_summary(apt: Apartment, key: tuple[str, str]) -> None:
-    """D-219: the missed actions of a planned shutdown wait as one notification, claimed until the end of the suspension:
-    then the push recovery (recover_once, any instance) sends it. When the suspension is removed early the new revision
-    makes it due at its start (expire_maintenance_summaries). One per apartment: the first instance keeps it."""
-    await asyncio.sleep(SCHEDULE_GROUP_S)
-    group = _schedule_groups.pop(key, None)
-    until = alerts_suspended_until()
-    if not group or not get_settings().fcm_enabled:
-        return
+def _maintenance_payload(apt: Apartment, group: dict) -> tuple[dict, float]:
     kinds = group["kinds"]
     pref = "bookings" if any(k in BOOKING_KINDS for k in kinds) else "offline"
     data, headers = maintenance_push(apt, len(kinds))
-    payload = {"tenant_id": apt.tenant_id, "pref": pref, "data": data, "headers": headers}
+    until = alerts_suspended_until()
     left = (until - datetime.now(UTC)).total_seconds() if until else 0.0
-    lease = min(max(left, 0.0), MAINTENANCE_LEASE_MAX_S)
-    repo = get_repository()
-    claimed = await repo.claim_work(maintenance_key(apt), runtime.BOOT_ID, lease, payload)
-    if claimed == "done":                          # the summary of an earlier shutdown, already sent
-        await repo.release_work(maintenance_key(apt))
-        claimed = await repo.claim_work(maintenance_key(apt), runtime.BOOT_ID, lease, payload)
-    info("maintenance summary kept", apartment_id=apt.apartment_id, missed=len(kinds), outcome=claimed, lease_s=int(lease))
+    return ({"tenant_id": apt.tenant_id, "pref": pref, "data": data, "headers": headers},
+            min(max(left, 0.0), MAINTENANCE_LEASE_MAX_S))
+
+
+async def _keep_maintenance_summary(apt: Apartment, key: tuple[str, str], group: dict) -> None:
+    """D-219: the missed actions of a planned shutdown wait as one notification, claimed until the end of the suspension:
+    then the push recovery (recover_once, any instance) sends it. When the suspension is removed early the new revision
+    makes it due at its start (expire_maintenance_summaries). One per apartment: the first instance keeps it.
+    D42 (P-83): claimed at once with the count so far, completed at the end of the window: a process that dies in the
+    window does not lose it."""
+    repo, mkey = get_repository(), maintenance_key(apt)
+    claimed = None
+    if get_settings().fcm_enabled:
+        payload, lease = _maintenance_payload(apt, group)
+        claimed = await repo.claim_work(mkey, runtime.BOOT_ID, lease, payload)
+        if claimed == "done":                      # the summary of an earlier shutdown, already sent
+            await repo.release_work(mkey)
+            claimed = await repo.claim_work(mkey, runtime.BOOT_ID, lease, payload)
+    await asyncio.sleep(SCHEDULE_GROUP_S)
+    still_open = _close_group(key, group)
+    if claimed != "mine":
+        if claimed is not None:
+            info("maintenance summary kept", apartment_id=apt.apartment_id, missed=len(group["kinds"]), outcome=claimed)
+        return
+    if not still_open:
+        await repo.release_work(mkey)
+        return
+    payload, lease = _maintenance_payload(apt, group)
+    outcome = "mine" if await repo.renew_work(mkey, runtime.BOOT_ID, lease, payload) else "lost"
+    info("maintenance summary kept", apartment_id=apt.apartment_id, missed=len(group["kinds"]), outcome=outcome,
+         lease_s=int(lease))
 
 
 async def expire_maintenance_summaries() -> int:

@@ -647,6 +647,25 @@ def test_expire_work(repo):
     assert run(repo.expire_work("mai-vista")) is False
 
 
+def test_renew_work(repo):
+    """D42 (P-83): the notification group claimed at once gets its whole message at the end of the window, only while
+    the claim is still its own."""
+    import time
+    assert run(repo.claim_work("gruppo", "a", 120, {"m": "primo"})) == "mine"
+    assert run(repo.renew_work("gruppo", "b", 60, {"m": "altro"})) is False          # not b's
+    assert run(repo.renew_work("gruppo", "a", 60, {"m": "tutto"})) is True
+    assert run(repo.due_work(time.time() + 59)) == []                                   # the new lease, not the old one
+    [item] = run(repo.due_work(time.time() + 61))
+    assert item["payload"] == {"m": "tutto"}
+    assert run(repo.claim_work("gruppo", "b", 60)) == "taken"
+    run(repo.finish_work("gruppo"))
+    assert run(repo.renew_work("gruppo", "a", 60, {"m": "dopo"})) is False             # done
+    assert run(repo.renew_work("mai-visto", "a", 60, {"m": "x"})) is False
+    assert run(repo.claim_work("ripreso", "a", 0, {"m": "1"})) == "mine"
+    assert run(repo.claim_work("ripreso", "b", 60)) == "mine"                          # lease over, taken over by b
+    assert run(repo.renew_work("ripreso", "a", 60, {"m": "2"})) is False
+
+
 def test_two_instances_claiming_at_the_same_instant_on_firestore(repo):
     """D-201: two processes (two repository objects, each with its own in-process queue): exactly one gets it."""
     from bff.repository.firestore import FirestoreRepository

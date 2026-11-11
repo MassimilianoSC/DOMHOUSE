@@ -449,6 +449,11 @@ ora) e `schedule_missed` (saltata perché il motore era fermo all'ora prevista).
 motore non dice ← `notification_prefs.offline`. Le decisioni dello stesso appartamento e della stessa categoria entro
 60 secondi dalla prima sono una notifica sola: `body` il testo della decisione, oppure «N azioni programmate non
 eseguite. La prima: <testo>»; la chiave in `work_claims` è quella dell'evento della prima, uguale per ogni istanza.
+D42 (P-83): il gruppo si prenota appena si apre, con il messaggio della prima e una durata di 60 secondi più
+`NOTIFICATION_LEASE_S`; alla fine dei 60 secondi la prenotazione riceve il messaggio intero (`renew_work`) e parte. Se
+l'istanza cade nella finestra, `recover_once` manda ciò che era prenotato. Prima il gruppo stava solo nella memoria
+dell'istanza e andava perso. Stessa cosa per il riassunto della manutenzione qui sotto. Un reset del motore
+(`forget_apartment`) nella finestra libera la prenotazione e non manda nulla.
 Durante una sospensione D-217 le `schedule_missed` non si notificano una per una (dopo uno spegnimento programmato il
 motore ne scrive una per ogni azione saltata); le `schedule_failed` sempre. Le `schedule_missed` della sospensione,
 raccolte per 60 secondi, diventano un riassunto per appartamento: `kind` `schedule_failed`, `title` «…: azioni

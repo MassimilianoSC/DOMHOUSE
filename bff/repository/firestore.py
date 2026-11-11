@@ -149,7 +149,8 @@ class FirestoreRepository:
             data[retention.FIELD] = retention.booking(data)
             tx.set(ref, data)
             return new
-        return await txn(self.db.transaction())
+        async with self._lock(f"booking:{ref.id}"):    # two events at once in this process: one after the other
+            return await txn(self.db.transaction())
 
     async def update_user_if_present(self, uid, change):
         ref = self._col("users").document(uid)
@@ -163,7 +164,8 @@ class FirestoreRepository:
             new.email = new.email.lower()
             tx.set(ref, new.model_dump())
             return new
-        return await txn(self.db.transaction())
+        async with self._lock(f"user:{uid}"):
+            return await txn(self.db.transaction())
 
     # webhook logs (last WEBHOOK_LOG_LIMIT overall; older documents are deleted on insert)
     async def _tenant_logs(self, tenant_id, signature_ok=None):
@@ -357,6 +359,24 @@ class FirestoreRepository:
 
     async def release_work(self, key):
         await self._work(key).delete()
+
+    async def renew_work(self, key, owner, lease_s, payload):
+        ref = self._work(key)
+
+        @firestore.async_transactional
+        async def renew(tx):
+            snap = await ref.get(transaction=tx)
+            d = snap.to_dict() or {}
+            if d.get("status") != "pending" or d.get("owner") != owner:
+                return False
+            until = time.time() + lease_s
+            tx.update(ref, {"lease_until": until, "payload": payload, "retry_at": until})
+            return True
+        try:
+            async with self._lock(f"work:{key}"):
+                return await renew(self.db.transaction())
+        except (Aborted, ValueError):                  # taken over at that very moment: no longer ours
+            return False
 
     async def expire_work(self, key):
         ref = self._work(key)

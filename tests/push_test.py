@@ -1210,3 +1210,79 @@ def test_the_next_shutdown_has_its_own_summary(maintenance, grouped):
     run(one_shutdown())
     run(one_shutdown())
     assert len(grouped.sent) == 2
+
+
+# -------- D42 (P-83): a process that dies within the grouping window ----------------------------------------------------
+async def dies():
+    """The process stops: its tasks cancelled, its open groups gone (they lived only in its memory)."""
+    for task in list(push._tasks):
+        task.cancel()
+    await asyncio.gather(*list(push._tasks), return_exceptions=True)
+    push._schedule_groups.clear()
+
+
+def leases_run_out():
+    for d in get_repository().work.values():
+        d["lease_until"] = min(d["lease_until"], time.time())
+
+
+def test_a_group_survives_a_process_that_dies_in_the_window(grouped, monkeypatch):
+    """Before D42 the group was only in memory for 60 s (and the stream's cursor already beyond its event): lost."""
+    monkeypatch.setattr(push, "SCHEDULE_GROUP_S", 30.0)
+
+    async def scenario():
+        await push.on_stream_event(APT, not_done("checkout", "Azione programmata (check-out) non eseguita: z",
+                                                 decision_id="dec-42"))
+        await asyncio.sleep(0.05)
+        await dies()
+        assert await push.recover_once() == 0              # its lease covers the window and a margin
+        leases_run_out()
+        recovered = await push.recover_once()
+        await drain()
+        return recovered
+    assert run(scenario()) == 1
+    [msg] = grouped.sent
+    assert msg.data["body"] == "Azione programmata (check-out) non eseguita: z"
+    assert msg.data["tag"] == "schedule:apt-push:dec-42"
+
+
+def test_the_group_claimed_at_once_is_sent_whole_at_the_end_of_the_window(grouped):
+    async def scenario():
+        for n in range(3):
+            await push.on_stream_event(APT, not_done("checkout", f"Azione {n}", decision_id=f"dec-42{n}"))
+        await drain()
+        leases_run_out()
+        return await push.recover_once()
+    assert run(scenario()) == 0                            # sent and done: nothing left to recover
+    [msg] = grouped.sent
+    assert msg.data["body"] == "3 azioni programmate non eseguite. La prima: Azione 0"
+
+
+def test_a_reset_within_the_window_leaves_nothing_to_recover(grouped, monkeypatch):
+    monkeypatch.setattr(push, "SCHEDULE_GROUP_S", 0.2)
+
+    async def scenario():
+        await push.on_stream_event(APT, not_done("manual", "Azione programmata (manuale) non eseguita: r"))
+        await asyncio.sleep(0.05)
+        push.forget_apartment(APT.apartment_id)
+        await drain()
+        leases_run_out()
+        return await push.recover_once()
+    assert run(scenario()) == 0 and grouped.sent == []
+
+
+def test_the_maintenance_summary_survives_a_process_that_dies_in_the_window(maintenance, grouped, monkeypatch):
+    monkeypatch.setattr(push, "SCHEDULE_GROUP_S", 30.0)
+    maintenance.suspend(soon(0.2))
+
+    async def scenario():
+        await push.on_stream_event(APT, missed("checkout"))
+        await asyncio.sleep(0.05)
+        await dies()
+        await asyncio.sleep(0.3)                           # the suspension is over
+        recovered = await push.recover_once()
+        await drain()
+        return recovered
+    assert run(scenario()) == 1
+    [msg] = grouped.sent
+    assert msg.data["body"] == "Durante la manutenzione 1 azione programmata non è stata eseguita"
