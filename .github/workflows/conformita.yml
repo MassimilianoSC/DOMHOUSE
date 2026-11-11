@@ -45,7 +45,9 @@ jobs:
 
       - name: Dipendenze
         run: |
-          pip install -r bff/requirements.txt -r contract/conformance/requirements.txt
+          # engine/requirements.txt too: the Shelly connector's libraries (pull request #4, D-224), its catalog tests
+          # need PyYAML
+          pip install -r bff/requirements.txt -r engine/requirements.txt -r contract/conformance/requirements.txt
 
       - name: Prove del motore e del connector (P-60)
         run: |

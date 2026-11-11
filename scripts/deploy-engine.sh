@@ -40,6 +40,11 @@ if [ -n "${DRY_RUN:-}" ]; then
   printf 'Immagine (non costruita): %s\n' "${IMAGE}"
   exit 0
 fi
+# D-214: a commit's image is built once; publishing it again (publish-all.sh after a FERMO) reuses it
+if gcloud artifacts docker images describe "${IMAGE}" --project "${PROJECT}" > /dev/null 2>&1; then
+  printf '\nImmagine già presente, non la ricostruisco: %s\n' "${IMAGE}"
+  exit 0
+fi
 gcloud builds submit "${WORK}" --project "${PROJECT}" --config "${WORK}/cloudbuild.engine.yaml" \
   --substitutions "_IMAGE=${IMAGE}" --ignore-file "${WORK}/.gcloudignore" \
   --service-account "projects/${PROJECT}/serviceAccounts/${BUILD_SA}"

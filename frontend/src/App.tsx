@@ -38,9 +38,9 @@ function Lazy({ page: Page }: { page: ComponentType }) {
 }
 
 function Protected() {
-  const { status } = useAuth();
+  const { status, problem } = useAuth();
   if (status === "loading") return <div className="p-8"><Skeleton className="h-40" /></div>;
-  if (status === "unavailable") return <PageProblem />;
+  if (status === "unavailable") return <PageProblem cause={problem} />;
   if (status === "anonymous") return <Navigate to="/login" replace />;
   return <AppShell />;
 }

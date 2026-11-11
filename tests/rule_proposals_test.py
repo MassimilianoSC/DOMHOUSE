@@ -329,3 +329,15 @@ def test_d187_the_explanation_uses_the_rules_names_not_their_codes():
     e = engine_core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
     assert "4. Nella spiegazione non citare i codici interni delle regole (rule_id): usa i loro nomi in italiano." in \
         rp.prompt(e.ruleset())
+
+
+def test_the_model_is_told_that_the_mold_rule_only_warns():
+    """Verification of 10 November 2026: the prompt said the rule «deumidifica», while the engine only writes a warning
+    (engine/mold.py, mold_action always None) and the Rules page and the guide say «non deumidifica da sola»."""
+    from engine import core as engine_core
+    from engine.mold import mold_action
+    text = rp.prompt(engine_core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False).ruleset())
+    line = next(x for x in text.splitlines() if x.startswith("- mold_protection"))
+    assert "registra un avviso nelle Decisioni" in line and "non deumidifica da sola" in line
+    assert "deumidifica sopra" not in line
+    assert mold_action("empty", 90, 65) is None              # if the engine starts to dry the air, this text changes

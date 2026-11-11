@@ -229,10 +229,24 @@ def test_catalog_and_energy_as_the_contract_wants():
                                      state={"watts": 50, "energy_total_wh": 300}))
     # a new day: of the 100 Wh used since the last reading (300 - 200), spread evenly over the 24 hours in between
     # (D-130), only the part after the local midnight is today's
-    local = tomorrow.astimezone(ZoneInfo("Europe/Rome"))
-    midnight = local.replace(hour=0, minute=0, second=0, microsecond=0)
-    expected = round(100 * (local - midnight).total_seconds() / 86400 / 1000, 3)
+    # D-212: hours really elapsed since the local midnight (a wall-clock difference would be an hour off on the day of
+    # the change, the 23- and 25-hour days)
+    midnight = tomorrow.astimezone(ZoneInfo("Europe/Rome")).replace(hour=0, minute=0, second=0, microsecond=0)
+    expected = round(100 * (tomorrow - midnight).total_seconds() / (tomorrow - t0).total_seconds() / 1000, 3)
     assert engine.devices["dev-presa"]["capabilities"]["power_meter"]["kwh_today"] == pytest.approx(expected, abs=0.002)
+
+
+@pytest.mark.parametrize("t0, today_kwh", [
+    (datetime(2026, 10, 24, 20, 0, tzinfo=UTC), 100 * 22 / 24 / 1000),   # 25-hour day: 22 of the 24 hours after midnight
+    (datetime(2026, 3, 28, 20, 0, tzinfo=UTC), 100 * 21 / 24 / 1000),    # 23-hour day: 21 of the 24
+    (datetime(2027, 3, 27, 20, 0, tzinfo=UTC), 100 * 21 / 24 / 1000),    # the next one, 28 March 2027
+])
+def test_d212_kwh_today_after_a_night_with_the_change_of_hour(t0, today_kwh):
+    """The meter's counter itself (the catalog connector above reads the real clock at its first reading)."""
+    meter = core.EnergyCounter("Europe/Rome")
+    meter.update(200, t0)
+    kwh, pieces = meter.update(300, t0 + timedelta(days=1))              # 100 Wh over the 24 hours in between
+    assert kwh == pytest.approx(today_kwh, abs=0.001) and len(pieces) == 24
 
 
 def run_commands(connector, *bodies, timeout=12.0):

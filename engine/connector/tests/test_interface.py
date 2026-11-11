@@ -1,4 +1,4 @@
-"""Tests common to EVERY connector (engine/connector/connector.md, §2 and §4). Ours: SimulatedConnector and
+"""Tests common to EVERY connector (engine/connector/connector-v2.md, §2 and §4). Ours: SimulatedConnector and
 ShellyConnector must both pass them, unchanged. Each connector is driven through its harness (see fake_device.py):
 the simulated one always, and every engine/connector/<name>/tests/harness.py found, with its make_harness() and,
 if the connector needs more than the engine's configuration to be built, connector_env(data_dir) -> dict.
@@ -96,7 +96,7 @@ METHODS = ("start", "stop", "rooms", "devices", "execute", "changes", "status")
 def test_make_connector_is_the_engines_entry_point(harness, tmp_path, monkeypatch):
     """The engine builds the connector chosen by CONNECTOR=<name> with engine.connector.<name>.make_connector(config),
     once, at start, before start() (engine/service.py): it must exist and give a Connector of the engine's
-    CONNECTOR_API_VERSION. config is a ConnectorConfig (connector.md §2.7): never the engine's key nor its settings,
+    CONNECTOR_API_VERSION. config is a ConnectorConfig (connector-v2.md §2.7): never the engine's key nor its settings,
     and of the environment only the connector's <NAME>_* variables. A connector that needs more (a catalog) adds its
     variables with connector_env(data_dir) -> dict in its harness.py, e.g. {"CATALOG_PATH": <a catalog in data_dir>}."""
     from engine.config import load_config
@@ -283,7 +283,7 @@ class Recorder:
 
 
 def test_engine_asks_only_the_device_fields(make):
-    """D-108, connector.md §2.4: the engine's command to the connector carries only the device's fields of the
+    """D-108, connector-v2.md §2.4: the engine's command to the connector carries only the device's fields of the
     capability: heating -> on; climate -> on, mode, setpoint, fan. Limits, confirmation and the boiler's setpoint stay
     with the engine, which still shows them to the app."""
     async def scenario(h, conn):

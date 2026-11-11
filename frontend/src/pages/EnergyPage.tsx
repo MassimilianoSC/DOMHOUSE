@@ -16,17 +16,13 @@ import { runAction } from "@/lib/actions";
 import { downloadEnergyReport, monthLabel, recentMonths, type EnergyReport } from "@/lib/energyExport";
 import { DEFAULT_TZ, fmtDateTime, fmtDayMonth, fmtNumber, fmtShortDateTime } from "@/lib/format";
 import { useApartmentStore } from "@/store/apartmentStore";
+import { wallDaysFromToday, wallToInstant, type Resolved } from "@/lib/zonedTime";
 
 type Period = "today" | "week" | "month" | "stay";
 
-function localMidnight(tz: string, daysBack = 0): Date {
-  const now = new Date();
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(now);
-  const get = (k: string) => Number(parts.find((p) => p.type === k)?.value);
-  const guess = Date.UTC(get("year"), get("month") - 1, get("day") - daysBack);
-  const check = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(guess));
-  const h = Number(check.find((p) => p.type === "hour")?.value), m = Number(check.find((p) => p.type === "minute")?.value);
-  return new Date(guess - (h * 60 + m) * 60_000 + (h > 12 ? 86_400_000 : 0));
+/** The start of the apartment's day, `daysBack` days ago (D-212: one conversion for the whole site). */
+export function localMidnight(tz: string, daysBack = 0, now = new Date()): Date {
+  return (wallToInstant(wallDaysFromToday(tz, -daysBack, 0, 0, now), tz) as Resolved).at;
 }
 
 function range(period: Period, tz: string, stayFrom?: string | null) {

@@ -1,0 +1,26 @@
+{
+  "displayName": "Motori: broker, troppi accessi rifiutati",
+  "documentation": {
+    "content": "Nell'ultima ora il broker dei dispositivi ha rifiutato più di 100 accessi (utente o password sbagliati, o nessun utente). La riga dice l'indirizzo e l'identificativo del client più frequenti: un relè con la password vecchia dopo una rotazione, oppure qualcuno che prova da fuori. Primo passo: SSH alla VM via IAP (docs/motore-vm.md), poi sudo bash /opt/domhouse/broker-vm.sh status e docker logs --since 1h domhouse-broker | grep 'not authorised'.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «broker auth refused» del controllo",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\\\[[0-9]+\\\\])?: broker auth refused\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "3600s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "WARNING"
+}

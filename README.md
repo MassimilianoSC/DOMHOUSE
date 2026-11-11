@@ -20,7 +20,7 @@ bff/            FastAPI: auth, proxy istanze, SSE hub, admin, webhook, push, rep
 bff/bookings/   BookingTranslator (ItalianwayTranslator = STUB, SimulatorTranslator), inoltro idempotente a POST /bookings
 bff/mock_instance/  gli appartamenti dimostrativi del BFF, fatti con il codice del motore
 engine/         il motore: API del contratto (api.py), logica (core.py), configurazione, log, Dockerfile e compose
-engine/connector/   l'interfaccia verso i dispositivi (connector.md), il connector simulato e le prove comuni
+engine/connector/   l'interfaccia verso i dispositivi (connector-v2.md in vigore, connector.md storico), il connector simulato e le prove comuni
 frontend/       PWA (React, Tailwind, shadcn/ui, i18n it)
 scripts/        set_claims.py, deploy.sh
 tests/          pytest: BFF end-to-end, suite condivisa dei repository
@@ -34,8 +34,8 @@ make dev                              # BFF :8000 (+ mock) e PWA :5173
 ```
 
 Login dev: pulsanti sulla pagina di accesso (`m.cracchiolo@hqe.it` admin, `operatore@demo.it`, `lettura@demo.it`).
-Simulatore: `/a/{apartment_id}/simulatore` (solo admin, solo sugli appartamenti con «istanza simulata», in qualunque ambiente: D-97). `MOCK_TIME_SCALE` = secondi reali per
-minuto simulato (default 1; 60 = tempo reale).
+Simulatore: `/a/{apartment_id}/simulatore` (solo admin, solo sugli appartamenti dimostrativi, che esistono in sviluppo e in staging ma non in produzione: D-202). `MOCK_TIME_SCALE` = secondi reali per
+minuto simulato: 60 (tempo reale) in staging, in produzione e nel motore; 1 se non è impostata, cioè in locale e nelle prove.
 
 Test: `python scripts/run_tests.py` (oppure `make test`) è il giro completo; richiede l'emulatore Firestore (JDK 11+ e
 `npx firebase-tools setup:emulators:firestore`): senza, il giro è rosso (P-42). Su Windows il JDK si installa da
@@ -53,7 +53,7 @@ pytest tests/backend_test.py tests/backend_phase2_test.py tests/backend_phase3_t
 ## Motore e connector sul proprio PC
 
 Il motore è un programma Python, uno per appartamento: espone all'app l'API del contratto su `/api/v1` e parla con i
-dispositivi attraverso un connector (interfaccia e regole in `engine/connector/connector.md`). Qui sotto come avviarlo
+dispositivi attraverso un connector (interfaccia e regole in `engine/connector/connector-v2.md`, in vigore dal 10 novembre 2026; `connector.md` del 21 ottobre resta come documento storico). Qui sotto come avviarlo
 sul proprio PC, prima con il connector simulato, poi con il proprio. Serve Python 3.11 o più recente (in esercizio gira
 su `python:3.11-slim`); Docker è facoltativo.
 
@@ -124,8 +124,8 @@ python -m engine
 Il motore scrive i suoi log su stdout, una riga JSON per evento (`"msg": "engine started"` all'avvio). Se non parte, lo
 dice nel log ed esce: **codice 2** se la configurazione non va (per esempio manca `API_KEY` o è troppo corta),
 **codice 3** se il connector non si può usare (`unknown connector`, `connector without make_connector`,
-`connector API version mismatch`, `connector setup failed` con il motivo nel campo `error`). Lo stato è in memoria:
-fermato il motore, si riparte dai dati iniziali.
+`connector API version mismatch`, `connector setup failed` con il motivo nel campo `error`). Lo stato è salvato in SQLite nella
+cartella dei dati (`DATA_DIR`): fermato il motore, riparte da dove era.
 
 **4. Provarlo**, da un secondo terminale, con la stessa chiave (in PowerShell `curl.exe` al posto di `curl`):
 
@@ -151,7 +151,7 @@ cd <cartella del repository>
 python -m pytest contract/conformance --base-url http://127.0.0.1:8100/api/v1 --api-key "$API_KEY" -q
 ```
 
-**5. Collegare il proprio connector** (dettagli in `engine/connector/connector.md`, §2.7). Un connector è il
+**5. Collegare il proprio connector** (dettagli in `engine/connector/connector-v2.md`, §2.7). Un connector è il
 pacchetto `engine/connector/<nome>/` (per Shelly: `engine/connector/shelly/`). Il motore lo sceglie con
 `CONNECTOR=<nome>` e lo costruisce una volta sola, all'avvio e prima di `start()`, con la funzione `make_connector`
 esposta dal pacchetto nel suo `__init__.py`:
@@ -239,7 +239,8 @@ Prerequisiti (una tantum, progetto `your-gcp-project-id`):
 Deploy (da Git Bash):
 
 ```bash
-# staging: mock integrato nel BFF, simulatore attivo, Firestore e Firebase Auth reali
+# staging: motore della VM («dev») più i dimostrativi integrati nel BFF, simulatore attivo, Firestore e Firebase Auth reali
+# (oggi si pubblica con scripts/publish.sh, che lancia deploy.sh dal commit: docs/procedura-ambienti-separati.md)
 TARGET=staging GCP_PROJECT_ID=your-gcp-project-id GCP_REGION=europe-west8 SMTP_USER=<mittente> scripts/deploy.sh
 # produzione: istanze reali del motore raggiunte via Direct VPC Egress
 TARGET=prod GCP_PROJECT_ID=your-gcp-project-id GCP_REGION=europe-west8 VPC_NETWORK=<rete> VPC_SUBNET=<subnet> SMTP_USER=<mittente> scripts/deploy.sh

@@ -127,6 +127,15 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D25 📱 | Qualsiasi | Consumi su un telefono largo (400–430 px, Android o iPhone Pro Max): scheda «Rendiconto in Excel». | Titolo e descrizione vanno a capo normalmente; la tendina del mese e «Scarica Excel» stanno sotto la descrizione, a tutta larghezza; da tablet in su stanno accanto. Stessa cosa per la riga del confronto con il soggiorno precedente. | |
 | D26 | Operatore | Panoramica: lascia la pagina aperta e in primo piano per oltre 5 minuti, poi cambia un dispositivo da un altro accesso. | Resta «In tempo reale» senza lampeggiare su «Riconnessione…» e il cambio arriva da solo. | |
 | D27 📱 | Operatore | Panoramica: passa a un'altra scheda o app per un minuto, cambia un dispositivo da un altro accesso, torna. | Lo stato è aggiornato senza ricaricare; per un attimo può comparire «Riconnessione…». | |
+| D28 | Operatore | Programmazione > «Nuova azione». In «Quando» scegli il 28/03/2027 alle 02:30 e salva; poi annulla l'azione. | Sotto il campo: «Il 28 marzo 2027 le 02:30 non esistono: quella notte gli orologi vanno avanti. L'azione verrà eseguita alle 03:30.» Nell'elenco l'azione è il 28 marzo alle 03:30. | |
+| D29 | Operatore | Come D28, con il 31/10/2027 alle 02:30. | Sotto il campo: «Il 31 ottobre 2027 le 02:30 capitano due volte: quella notte gli orologi tornano indietro. L'azione verrà eseguita la prima volta.» Nell'elenco l'azione è il 31 ottobre alle 02:30. | |
+| D30 | Operatore | Come D28, con il 28/03/2027 alle 01:30 e poi il 31/10/2027 alle 01:30. | Nessuna riga sotto il campo; nell'elenco le due azioni sono alle 01:30. | |
+| D31 📱 | Operatore | Su un appartamento dimostrativo apri «Nuova azione», scrivi in «Quando» un'ora a tua scelta e aspetta un minuto senza toccare nulla. | All'apertura il campo propone fra un'ora circa; l'ora che hai scritto resta com'è. | |
+| D32 | Operatore | Su un'azione in programma premi «Sposta». | Il campo parte dalla data e dall'ora dell'azione mostrate nell'elenco, non da «fra un'ora». | |
+| D33 | Operatore, su computer | Imposta sul computer un altro fuso orario (per esempio Londra), apri «Nuova azione», poi rimetti il fuso com'era. | Il campo propone fra un'ora in ora italiana, non in ora di Londra. | |
+| D34 | Amministratore e operatore (staging, dimostrativo) | Simulatore: metti offline la Caldaia, poi crea una prenotazione con il check-in vicino, così che il pre-arrivo parta subito; apri Decisioni. | Riga «Programma: eseguita in parte» con «Pre-arrivo eseguito in parte: 1 comando non riuscito (Caldaia: dispositivo offline, non comandato)»; sul telefono, con le Prenotazioni attive, la notifica «…: pre-arrivo con comandi non riusciti». | |
+| D35 | Amministratore e operatore (staging, dimostrativo) | Come D34, ma con tutti i dispositivi online. | Nessuna riga «eseguita in parte», nessuna notifica. | |
+| D36 | Qualsiasi | Decisioni: scorri le righe degli ultimi giorni. | Nessun codice con il trattino basso (per esempio `schedule_failed`): ogni riga ha un nome in italiano, come «Programma: non eseguita», «Sistema domotico di nuovo raggiungibile», «Finestra chiusa: riacceso». | |
 
 ## E. Amministrazione
 
@@ -163,6 +172,7 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | F7 | Nella sezione «Movimento» premi «Simula movimento» su «Sensore soggiorno». | «Movimento simulato su Sensore soggiorno»; entro pochi secondi accanto al nome «ultimo movimento» con l'ora di adesso; in Panoramica il sensore indica «Movimento rilevato». | |
 | F8 | Guarda «Ripristina…» e premilo; nella finestra di conferma guarda «Ripristina», poi premi «Annulla». | «Ripristina…» ha il contorno rosso; nella conferma «Ripristina» è rosso pieno; con «Annulla» non cambia nulla. | |
 | F9 | Simulatore: apri una finestra, poi guarda la fascia della Panoramica. | La casella «Finestre» diventa ambra con la stanza indicata; richiudendola torna verde con «Tutte chiuse». Il Simulatore a 768 px non sborda e non ha vuoti. | |
+| F10 | Simulatore di un appartamento dimostrativo, «Evento prenotazione». | Sotto i campi: «Check-in e check-out sono nell'ora dell'appartamento (Europe/Rome).» | |
 
 ## G. Dopo ogni pubblicazione
 
@@ -295,10 +305,28 @@ normale di prova con un **operatore**.
 
 Si fanno con la modalità aereo. Su iPhone controlla che anche il Wi-Fi sia spento. L'avviso compare in alto al centro, in rosso.
 
+Per un amministratore, O1, O2 e O3 vanno fatte entro 2 minuti dall'attivazione della modalità aereo: dopo, l'app rilegge il profilo e mostra la pagina di O6. «Il servizio non risponde» non si può provocare a mano: lo coprono le prove automatiche.
+
 | N. | Ruolo | Passi | Risultato atteso | Esito |
 |---|---|---|---|---|
 | O1 📱 | Qualsiasi | Apri Impostazioni. Attiva la modalità aereo. Cambia l'interruttore «Approvazioni richieste». | Subito, senza attese, compare l'avviso rosso «Server non raggiungibile» con sotto «ID richiesta» e un codice; l'interruttore torna com'era. | |
 | O2 📱 | Qualsiasi | Subito dopo O1: togli la modalità aereo, aspetta che torni la rete, cambia di nuovo lo stesso interruttore; poi rimettilo com'era. | Ogni volta «Preferenze salvate»; l'interruttore resta dove lo hai messo. | |
 | O3 | Qualsiasi (anche Sola lettura), su computer | Apri «Consumi» di un appartamento. Scollega la rete. Nella scheda «Rendiconto in Excel» premi «Scarica Excel». | Subito l'avviso rosso «Server non raggiungibile» con «ID richiesta» e un codice; nessun file scaricato; il pulsante si può premere di nuovo. | |
-| O4 📱 | Qualsiasi, su un dispositivo dove hai già aperto l'app | Chiudi del tutto l'app (o la scheda). Attiva la modalità aereo. Riapri l'app. | Compare la pagina di accesso con l'avviso rosso «Impossibile caricare il profilo, riprova tra poco» e sotto «Server non raggiungibile». Nessuna pagina bianca, nessun caricamento infinito. | |
-| O5 📱 | Qualsiasi | Subito dopo O4: togli la modalità aereo e ricarica la pagina (o chiudi e riapri l'app). | Entri senza riscrivere la password. | |
+| O4 📱 | Qualsiasi, su un dispositivo dove hai già aperto l'app | Chiudi del tutto l'app (o la scheda). Attiva la modalità aereo e controlla che anche il Wi-Fi sia spento. Riapri l'app. | «Sei senza connessione» con sotto «La pagina si riapre da sola quando torna la connessione.» e il pulsante «Ricarica». Non la pagina di accesso. | |
+| O5 📱 | Qualsiasi | Subito dopo O4: togli la modalità aereo e non toccare nulla. | Entro pochi secondi la pagina si riapre da sola e sei dentro, senza riscrivere la password. | |
+| O6 📱 | Amministratore | Dentro l'app, su una pagina qualsiasi, attiva la modalità aereo e lascia l'app aperta e in primo piano per 3 minuti. | Al posto della pagina compare «Sei senza connessione»; non la pagina di accesso. | |
+| O7 📱 | Amministratore | Subito dopo O6: togli la modalità aereo e non toccare nulla. | Entro pochi secondi si riapre da sola la stessa pagina. | |
+| O8 | Qualsiasi, telefono | Collega il telefono a un Wi-Fi senza internet (per esempio l'hotspot di un altro telefono con i dati spenti), con i dati mobili spenti. Chiudi del tutto l'app e riaprila. | Entro mezzo minuto «Non riesco ad aprire la pagina» con «Ricarica». Non la pagina di accesso. | |
+
+## P. Prima della consegna: telefoni veri (D-218)
+
+Obbligatorie prima della consegna, su un telefono Android con Chrome e su un iPhone con Safari, con l'app installata.
+
+| N. | Ruolo | Passi | Risultato atteso | Esito |
+|---|---|---|---|---|
+| P1 | Operatore, Android | Panoramica aperta in primo piano per 10 minuti; da un altro accesso cambia un dispositivo ogni 2–3 minuti. | Ogni cambio arriva da solo, senza ricaricare; al massimo per un attimo «Riconnessione…». | |
+| P2 | Operatore, iPhone | Come P1. | Come P1. | |
+| P3 | Operatore, Android | Passa a un'altra app per 2 minuti, cambia un dispositivo da un altro accesso, torna. | Lo stato è già aggiornato o si aggiorna entro pochi secondi. | |
+| P4 | Operatore, iPhone | Come P3. | Come P3. | |
+| P5 | Operatore, Android | Con le notifiche attive, chiudi l'app; fai nascere un'approvazione (Simulatore, da un altro accesso). | Arriva la notifica «…: approvazione richiesta»; toccandola si apre la pagina Approvazioni. | |
+| P6 | Operatore, iPhone | Come P5 (app installata sulla schermata Home, notifiche consentite). | Come P5. | |

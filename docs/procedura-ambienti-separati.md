@@ -184,6 +184,92 @@ cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 REPOSITORY=firestore GCP_PROJECT_ID=domotica-poc-511707 FIRESTORE_DATABASE=staging .venv/Scripts/python scripts/set_claims.py --platform-add <email>
 ```
 
+## M18. Pubblicare un lotto con un solo comando (D-214): il modo normale dal 10 novembre 2026
+
+`scripts/publish-all.sh` pubblica un lotto intero: staging, controlli, produzione, controlli, motore sulla VM se serve, riepilogo. Lo lancia il committente (D-116).
+
+### Prima di partire
+
+1. Il commit del lotto è su GitHub (`git push` fatto). Se non c'è, lo script si ferma prima di chiedere conferma.
+2. In Git Bash funzionano `gcloud` (account proprietario) e `npx firebase-tools` (accesso fatto).
+3. C'è `frontend/.env.production` (non è in Git).
+4. La VM `langbrain-dev` è accesa: lo script legge il motore via `gcloud compute ssh` (IAP).
+
+Le impostazioni (progetto, account, sito di staging, rete, mittente delle email, notifiche push, VM e appartamento del motore) sono in `scripts/publish-settings.conf`, senza segreti. Non si scrivono più a mano.
+
+### M18.1 Prova a secco (sola lettura)
+
+Cosa fa: legge lo stato vero di staging, produzione e motore, e mostra ogni passo che farebbe. Compila il sito in una copia pulita. Non scrive niente online e non chiede conferma.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+DRY_RUN=1 bash scripts/publish-all.sh <commit del lotto>
+```
+
+Verifica, da verificare al primo uso:
+
+1. Righe «ora immagine …» per `domotica-bff-staging` e `domotica-bff`, e «motore dev sulla VM: …».
+2. Una delle tre: «codice del motore invariato», «il motore è già all'immagine …», «codice del motore cambiato» con l'elenco dei file.
+3. Ultima sezione: «Riepilogo … (prova a secco: niente è stato pubblicato)».
+4. La produzione si prova a secco solo se lo staging serve già quel commit (D-203): la prima volta lo script lo dice e salta.
+
+### M18.2 Pubblicazione (scrive su Google Cloud, sul sito e sulla VM)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+bash scripts/publish-all.sh <commit del lotto>
+```
+
+Lo script mostra cosa farà e chiede una sola volta: «scrivi pubblica». Qualunque altra risposta non cambia niente.
+
+Poi, in ordine:
+
+| Passo | Cosa fa | Controllo |
+|---|---|---|
+| 1. Staging | `publish.sh TARGET=staging` | revisione nuova pronta e al 100 %, immagine del commit, `/health` 200 |
+| 2. Produzione | `publish.sh TARGET=prod` (con il suo controllo D-203) | gli stessi, più i valori attivi uguali al manifesto |
+| 3. Motore | solo se serve (sotto) | `engine-vm.sh update` aspetta `/health` 200; la VM dice l'immagine nuova |
+| 4. Riepilogo | da incollare alla memoria storica | — |
+
+Il motore si aggiorna solo se, fra il commit sulla VM e quello nuovo, cambia un file che entra nella sua immagine: `engine/` senza le cartelle `tests/` e senza i documenti `.md`, più `cloudbuild.engine.yaml` (D-215). L'immagine si costruisce una volta sola; se esiste già non si ricostruisce. `engine-vm.sh` si copia sulla VM, con `engine-vm.sh timers`, solo se la copia sulla VM è diversa da quella del commit.
+
+Esito atteso, da verificare al primo giro vero:
+
+1. Nessun FERMO.
+2. Nel riepilogo: le due righe dei servizi con l'immagine del commit al 100 %, la riga del motore («invariato» o «da … a …»), i comandi per tornare indietro, il percorso del registro.
+3. Durata stimata 15–25 minuti, non ancora misurata.
+
+### Se si ferma
+
+1. Ogni FERMO dice cosa è successo e cosa fare.
+2. Risolto il problema, si rilancia **lo stesso comando**: i passi già fatti e verificati si saltano (scrive «già fatto in un giro precedente»).
+3. La produzione non parte mai se i controlli dello staging non sono verdi.
+4. Lo script non torna mai indietro da solo. Se serve, nel FERMO e nel riepilogo c'è il comando esatto:
+   - server: `gcloud run services update-traffic <servizio> --to-revisions=<revisione di prima>=100 …`;
+   - motore: `engine-vm.sh update dev <immagine di prima>` sulla VM.
+5. Il sito di Hosting non ha un comando di ritorno nello script: si ripubblica il commit di prima, oppure si usa la console di Firebase (da verificare).
+6. Se lo script dice «C'è già una pubblicazione in corso» e non ce n'è nessuna (finestra chiusa a metà): cancellare la cartella `logs/publish.lock`, poi rilanciare.
+
+### Registro
+
+Tutta l'uscita va anche in `logs/publish-<data-ora>-<commit>.log`; lo stato dei passi di un commit in `logs/publish-state-<commit>.txt`. La cartella `logs/` non va in Git. Alla memoria storica basta incollare il riepilogo.
+
+### Cosa resta a mano
+
+1. `git push` del commit.
+2. I login di `gcloud` e `firebase`, e `frontend/.env.production`.
+3. Il broker e i suoi segreti: procedura G2 (B5 e successivi), `broker-secrets.sh`.
+4. Gli allarmi: `scripts/monitoring/setup.sh` ed `engine-alerts.sh`, quando cambiano.
+5. La prova dell'app pubblicata (checklist di collaudo).
+6. **Durante uno spegnimento con gli avvisi sospesi (M19)** una pubblicazione li riattiva senza dirlo: se serve, dopo la
+   pubblicazione si rilancia il passo 1 di M19.1. Una pubblicazione rimette anche il minimo di istanze del manifesto.
+
+M8 e M12 restano come riferimento dei singoli passi; M18 li esegue in ordine. Differenza: M18 pubblica lo staging
+sempre con le notifiche push attive (`VITE_FCM_ENABLED=true`, D-39), che il comando di M8 non passava.
+
+
 ## M8. Pubblicazione dello staging (dal commit del lotto)
 
 Cosa fa: crea il servizio `domotica-bff-staging` sul database `staging` e pubblica il sito di staging. Il commit lo indica
@@ -350,3 +436,64 @@ comando di lettura e l'elenco di ciò che va cancellato, il committente lancia l
 **Controllo e allarmi prima della produzione:** subito prima di pubblicare in produzione si lancia `scripts/monitoring/setup.sh`, che ricrea il controllo di raggiungibilità e le regole. Il monitoraggio avvisa anche quando Cloud Run rifiuta le richieste perché non ha un'istanza disponibile (al massimo un'email ogni mezz'ora). Lo script usa i componenti `alpha` e `beta` di gcloud: alla prima esecuzione gcloud chiede di installarli, rispondi sì. Se il server è spento, lo script lo aspetta fino a circa un minuto.
 
 > **Attenzione:** fino alla fine del lotto 35 non si pubblica nessun commit successivo a `8a49489` senza il via della memoria storica. Quei commit portano il tempo massimo a 300 s, e prima della chiusura degli stream lato server e della modifica del sito gli aggiornamenti in diretta cadrebbero ogni 5 minuti.
+
+## M19. Spegnimento programmato e riaccensione (D-195, D-217)
+
+Quando nessuno usa l'app per giorni, per non spendere (D-195). **Fino alla consegna la produzione resta accesa**
+(rodaggio, D-210): questa procedura vale per lo staging, per dopo la consegna o per un fermo deciso dal committente.
+I comandi li lancia il committente (D-116); la memoria storica verifica in sola lettura dopo ogni passo.
+
+### M19.1 Spegnimento, in quest'ordine
+
+1. **Sospendere gli avvisi di irraggiungibilità del sistema domotico** (D-217), così i gestori non ricevono la notifica
+   «sistema domotico non raggiungibile» per uno spegnimento voluto. Vale dal lotto 38. Si scrive l'istante di fine,
+   con il fuso (+01:00 d'inverno, +02:00 d'estate): fine prevista dello spegnimento più un margine, al massimo 30
+   giorni. Allo scadere, se il motore è ancora fermo, l'avviso parte. Git Bash:
+
+   ```
+   cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+   gcloud run services update domotica-bff-staging --project=domotica-poc-511707 --region=europe-west8 --account=m.scardovellicrac@gmail.com --update-env-vars=UNREACHABLE_ALERTS_OFF_UNTIL=<istante di fine>
+   ```
+
+   Per la produzione lo stesso comando con `domotica-bff` (solo quando D-210 lo permette). L'istante esatto lo scrive
+   la memoria storica nel comando al momento, senza segnaposto.
+
+   Verifica (sola lettura):
+
+   ```
+   gcloud run services describe domotica-bff-staging --project=domotica-poc-511707 --region=europe-west8 --account=m.scardovellicrac@gmail.com --format="value(spec.template.spec.containers[0].env)" | tr ';' '\n' | grep UNREACHABLE
+   ```
+
+   Atteso: una riga con `UNREACHABLE_ALERTS_OFF_UNTIL` e l'istante. Dopo circa un minuto, nei registri del servizio
+   la riga «unreachable alerts suspended» con la data; se compare «UNREACHABLE_ALERTS_OFF_UNTIL ignored», il valore
+   è sbagliato (senza fuso, passato o oltre 30 giorni), gli avvisi restano attivi e il comando va rilanciato
+   corretto. Una pubblicazione toglie la sospensione.
+2. Fermare la VM `langbrain-dev` (motori e broker si fermano con lei; i dati restano sul disco).
+3. Server di produzione a minimo 0 istanze (solo dopo la consegna o per un fermo deciso: oggi D-210 lo vieta).
+4. Togliere il controllo di raggiungibilità `domotica-bff-healthz` e il suo allarme, che altrimenti terrebbero sveglio
+   il server; si ricreano con `scripts/monitoring/setup.sh`.
+5. Sospendere gli allarmi della VM e dei motori per il periodo dello spegnimento.
+
+Restano attivi e costano poco: disco della VM e disco delle chiavi, snapshot, archivio delle immagini, segreti.
+
+### M19.2 Riaccensione, in quest'ordine
+
+1. Avviare la VM: motori e broker ripartono da soli (`restart: unless-stopped`; il disco delle chiavi si monta da
+   `fstab`); controllare con `broker-vm.sh status` ed `engine-vm.sh status dev` (procedura G2, B7).
+2. Server di produzione al minimo del manifesto (1), se era stato abbassato: la prossima pubblicazione lo rimette da sé.
+3. `scripts/monitoring/setup.sh` per il controllo di raggiungibilità e il suo allarme.
+4. **Riattivare gli avvisi di irraggiungibilità** (D-217). Alla fine della sospensione arriva, per ogni appartamento
+   con azioni programmate saltate, una sola notifica «Durante la manutenzione N azioni programmate non sono state
+   eseguite», che apre la Programmazione (D-219). Git Bash:
+
+   ```
+   cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+   gcloud run services update domotica-bff-staging --project=domotica-poc-511707 --region=europe-west8 --account=m.scardovellicrac@gmail.com --remove-env-vars=UNREACHABLE_ALERTS_OFF_UNTIL
+   ```
+
+   Verifica: il comando di verifica del passo 1 dello spegnimento non stampa niente. Se ci si dimentica, la
+   sospensione finisce comunque all'istante scritto. Dopo la riattivazione il server riparte: se il motore fosse
+   ancora fermo, l'avviso arriva dopo la soglia, contata da lì.
+
+I comandi esatti la memoria storica li prepara al momento, con la verifica: il modello è nella memoria del progetto
+(spegnimento del 23–24 ottobre 2026).

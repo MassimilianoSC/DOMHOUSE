@@ -1,5 +1,5 @@
 # The engine (P-60) in service: what engine/ needs, same versions as the BFF (bff/requirements.txt). A connector's own
-# libraries (e.g. the WebSocket one) are added here, approved in review (connector.md §4).
+# libraries (e.g. the MQTT client, D-196) are added here, approved in review (connector-v2.md §4).
 # For the tests also: pip install pytest httpx
 aiomqtt==2.5.1
 annotated-types==0.8.0

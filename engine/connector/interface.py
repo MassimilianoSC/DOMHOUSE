@@ -1,4 +1,4 @@
-"""The connector interface (per-youssouf/connector.md, §2). Ours: a change here is agreed with o1, and an incompatible
+"""The connector interface (engine/connector/connector-v2.md, §2). Ours: a change here is agreed with o1, and an incompatible
 one raises CONNECTOR_API_VERSION together with tests/test_interface.py.
 
 The engine decides (rules, limits, modes, the boiler's thermostat, "confirmation: power"); the connector only reports

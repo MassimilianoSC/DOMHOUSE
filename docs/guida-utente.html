@@ -979,9 +979,11 @@ sessione.</p>
 <tbody>
 <tr><td data-label="Categoria" class="align-left">«Approvazioni richieste»</td><td data-label="Notifica" class="align-left">«…: approvazione richiesta», con la proposta oppure «Il motore chiede il tuo consenso»</td><td data-label="Quando arriva" class="align-left">Quando il motore apre una richiesta (non per quelle in coda dietro un&#x27;altra)</td><td data-label="Dove porta" class="align-left">«Approvazioni»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: dispositivo offline», «… non risponde da oltre … minuti»</td><td data-label="Quando arriva" class="align-left">Dopo i minuti della regola «Avviso dispositivo offline» (15 all&#x27;inizio); regola spenta, niente avviso</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
-<tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: sistema domotico non raggiungibile», «Il connettore domotico risulta fermo»</td><td data-label="Quando arriva" class="align-left">Sistema domotico fermo oltre la stessa soglia; una volta per episodio</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall&#x27;app non arrivano e le regole automatiche potrebbero essere ferme.»</td><td data-label="Quando arriva" class="align-left">Sistema domotico fermo o irraggiungibile oltre la stessa soglia; una volta per episodio</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo»</td><td data-label="Quando arriva" class="align-left">A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio</td><td data-label="Dove porta" class="align-left">«Decisioni»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Prenotazioni»</td><td data-label="Notifica" class="align-left">«…: prenotazione annullata, appartamento rimesso a vuoto»</td><td data-label="Quando arriva" class="align-left">Disdetta dopo che l&#x27;appartamento era già stato preparato per l&#x27;arrivo</td><td data-label="Dove porta" class="align-left">«Decisioni»</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Prenotazioni» (pre-arrivo, check-out, casa vuota) oppure «Dispositivi e sistema domotico offline» (le altre)</td><td data-label="Notifica" class="align-left">«…: azione programmata non eseguita» con il motivo, oppure «N azioni programmate non eseguite. La prima: …» se più d&#x27;una entro un minuto; dopo uno spegnimento programmato «Durante la manutenzione N azioni programmate non sono state eseguite»</td><td data-label="Quando arriva" class="align-left">Un&#x27;azione programmata rifiutata alla sua ora o saltata perché il sistema era fermo (dal lotto 38); dopo uno spegnimento programmato le azioni saltate non arrivano una per una</td><td data-label="Dove porta" class="align-left">«Programmazione»</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Prenotazioni»</td><td data-label="Notifica" class="align-left">«…: pre-arrivo con comandi non riusciti» oppure «…: check-out con comandi non riusciti», con l&#x27;elenco dei dispositivi che non hanno eseguito e il motivo</td><td data-label="Quando arriva" class="align-left">Un pre-arrivo o un check-out partito ma con qualche comando non riuscito, anche per un dispositivo offline in quel momento (dal lotto 39)</td><td data-label="Dove porta" class="align-left">«Programmazione»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Riepilogo»</td><td data-label="Notifica" class="align-left">«…: riepilogo della settimana», con la prima segnalazione e «E altre … voci.»</td><td data-label="Quando arriva" class="align-left">Il lunedì mattina, solo se la settimana ha qualcosa da segnalare</td><td data-label="Dove porta" class="align-left">Il riepilogo di quella settimana</td></tr>
 </tbody></table></div>
 <blockquote class="note-info">
@@ -1196,7 +1198,7 @@ categoria nelle notifiche.</p>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa vuol dire</th></tr></thead>
 <tbody>
 <tr><td data-label="Cosa vedi" class="align-left">La pillola «In attesa» (la scelta è scritta in scuro)</td><td data-label="Cosa vuol dire" class="align-left">Le richieste aperte</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">La pillola «Tutte»</td><td data-label="Cosa vuol dire" class="align-left">Anche quelle decise negli ultimi 7 giorni</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">La pillola «Tutte»</td><td data-label="Cosa vuol dire" class="align-left">Anche quelle decise negli ultimi 7 giorni, contati dalla mezzanotte, più quelle di oggi</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">In alto: lo stato, poi chi la propone e la data</td><td data-label="Cosa vuol dire" class="align-left">«In attesa», «Approvata», «Respinta», «Scaduta»; «Motore AI», «Regola», «Assistente», «Modulo»</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">La descrizione, in grande</td><td data-label="Cosa vuol dire" class="align-left">Che cosa chiede</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Perché il motore lo propone», con il testo sotto</td><td data-label="Cosa vuol dire" class="align-left">Il motivo, senza riquadro</td></tr>
@@ -1207,6 +1209,19 @@ categoria nelle notifiche.</p>
 <tr><td data-label="Cosa vedi" class="align-left">In fondo: «Approvata da … …» o «Respinta da … …» con la nota, poi l&#x27;«ID richiesta»</td><td data-label="Cosa vuol dire" class="align-left">Solo nelle richieste già decise o scadute</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Nessuna approvazione in attesa» o «Nessuna approvazione negli ultimi 7 giorni»</td><td data-label="Cosa vuol dire" class="align-left">Non c&#x27;è nulla</td></tr>
 </tbody></table></div>
+<blockquote class="note-info">
+<p><strong>Da sapere</strong> (dal lotto 38)</p>
+<ul>
+<li>
+<p><strong>Se approvi un&#x27;azione che il sistema non può eseguire subito</strong> (dispositivo offline, collegamento ai
+dispositivi assente, azione non più valida), nelle Decisioni compare una riga «Non riuscita»: «Azione approvata ma
+non eseguita: …» con il motivo. L&#x27;approvazione resta «Approvata».</p>
+</li>
+<li>
+<p><strong>Lo stesso succede</strong> quando un&#x27;approvazione scade e si approva da sola.</p>
+</li>
+</ul>
+</blockquote>
 <blockquote class="note-info">
 <p><strong>Da sapere</strong></p>
 <ul>
@@ -1726,7 +1741,8 @@ il dispositivo è diventato irraggiungibile.</p>
 <p>«Nuova azione» apre «Programma un&#x27;azione» («L&#x27;azione verrà eseguita dal motore all&#x27;orario indicato (ora di …).»).</p>
 <ol>
 <li>
-<p><strong>Compila «Quando»</strong>: un orario futuro, nel fuso dell&#x27;appartamento.</p>
+<p><strong>Compila «Quando»</strong>: un orario futuro, sempre nell&#x27;ora dell&#x27;appartamento, come dice la scritta sopra («ora di …»),
+anche se il telefono o il computer è su un altro fuso. Il campo propone fra un&#x27;ora.</p>
 </li>
 <li>
 <p><strong>Scegli «Cosa fare»</strong>: «Cambia modalità» oppure «Comando a un dispositivo».</p>
@@ -1758,6 +1774,21 @@ il dispositivo è diventato irraggiungibile.</p>
 </li>
 </ul>
 </blockquote>
+<p><strong>Nelle due notti del cambio d&#x27;ora</strong> (dal lotto 37) sotto «Quando» compare una riga, e si salva lo stesso:</p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Ora scelta</th><th scope="col" class="align-left">Riga sotto «Quando»</th><th scope="col" class="align-left">Quando verrà eseguita</th></tr></thead>
+<tbody>
+<tr><td data-label="Ora scelta" class="align-left">Un&#x27;ora che non esiste (a marzo, dalle 02:00 alle 02:59)</td><td data-label="Riga sotto «Quando»" class="align-left">«Il 28 marzo 2027 le 02:30 non esistono: quella notte gli orologi vanno avanti. L&#x27;azione verrà eseguita alle 03:30.»</td><td data-label="Quando verrà eseguita" class="align-left">Un&#x27;ora dopo: le 02:30 diventano le 03:30</td></tr>
+<tr><td data-label="Ora scelta" class="align-left">Un&#x27;ora che capita due volte (a ottobre, dalle 02:00 alle 02:59)</td><td data-label="Riga sotto «Quando»" class="align-left">«Il 31 ottobre 2027 le 02:30 capitano due volte: quella notte gli orologi tornano indietro. L&#x27;azione verrà eseguita la prima volta.»</td><td data-label="Quando verrà eseguita" class="align-left">La prima volta, ancora con l&#x27;ora legale</td></tr>
+</tbody></table></div>
+<ul>
+<li>
+<p><strong>Data e ore della riga</strong> sono quelle che hai scelto.</p>
+</li>
+<li>
+<p><strong>Negli altri giorni</strong> non compare nessuna riga.</p>
+</li>
+</ul>
 <h3 id="programmazione-spostare-o-annullare-un-azione-a2c65817">Programmazione: spostare o annullare un&#x27;azione</h3>
 <p class="lead"><strong>Cambiare l&#x27;orario di un&#x27;azione in programma, o annullarla.</strong></p>
 <p><strong>«Sposta»</strong>, su una voce in programma:</p>
@@ -1766,7 +1797,7 @@ il dispositivo è diventato irraggiungibile.</p>
 <p><strong>Apre «Sposta l&#x27;azione»</strong>: cambia «Quando» e premi «Salva» («Orario aggiornato»).</p>
 </li>
 <li>
-<p><strong>Il modulo parte</strong> da un&#x27;ora dopo adesso, non dall&#x27;orario salvato: controlla la data.</p>
+<p><strong>Il modulo parte</strong> dalla data e dall&#x27;ora attuali dell&#x27;azione (dal lotto 37).</p>
 </li>
 <li>
 <p><strong>Si possono spostare</strong> anche le azioni nate da una prenotazione; una modifica della prenotazione può
@@ -2699,7 +2730,9 @@ una prenotazione vera fino al motore dell&#x27;appartamento. Ripetere lo stesso 
 effettivo», «Check-out effettivo».</p>
 </li>
 <li>
-<p><strong>Compila «ID prenotazione»</strong>, «Check-in», «Check-out», «Ospiti».</p>
+<p><strong>Compila «ID prenotazione»</strong>, «Check-in», «Check-out», «Ospiti».
+Check-in e check-out sono nell&#x27;ora dell&#x27;appartamento, come dice la riga sotto i campi («Check-in e check-out sono
+nell&#x27;ora dell&#x27;appartamento (…).»); i valori proposti sono domani alle 15:00 e fra tre giorni alle 10:00.</p>
 </li>
 <li>
 <p><strong>Premi «Invia evento»</strong>: leggi «Evento prenotazione inoltrato» e «… azioni programmate».</p>
@@ -3161,10 +3194,16 @@ configurato.</p>
 <p><strong>«Motori: VM muta»</strong>, «Motori: motore muto o giù».</p>
 </li>
 <li>
-<p><strong>«Motori: righe di errore»</strong>, «Motori: backup mancato».</p>
+<p><strong>«Motori: righe di errore»</strong>, «Motori: backup mancato». Dal lotto 38 un errore interno del ciclo del motore
+compare nel log come «engine loop step failed» e fa partire «Motori: righe di errore»; il motore continua con gli
+altri compiti.</p>
 </li>
 <li>
 <p><strong>«Motori: disco della VM oltre l&#x27;80 %»</strong>.</p>
+</li>
+<li>
+<p><strong>Accesso di sviluppo rifiutato</strong> (dal lotto 38): il server non parte se in staging o in produzione è impostato
+l&#x27;accesso di sviluppo, o se su Cloud Run manca l&#x27;ambiente; nel log c&#x27;è «development setting refused» con il motivo.</p>
 </li>
 </ul>
 <blockquote class="note-info">
@@ -3293,6 +3332,11 @@ dell&#x27;organizzazione assistita vengono tolti dalla scheda.</p>
 <p class="lead"><strong>Le situazioni di ogni giorno, dall&#x27;inizio alla fine.</strong></p>
 <h3 id="arriva-un-ospite-874a7ea8">Arriva un ospite</h3>
 <p class="lead"><strong>Dalla prenotazione al check-in, con il pre-arrivo automatico.</strong></p>
+<blockquote class="note-info">
+<p><strong>Da sapere</strong></p>
+<p>Con le prenotazioni reali di Italianway il pre-arrivo automatico e il risparmio al check-out non sono ancora
+disponibili: Italianway deve ancora mandare il formato vero dei suoi messaggi. Oggi funzionano con il Simulatore.</p>
+</blockquote>
 <ol>
 <li>
 <p><strong>La prenotazione arriva</strong> da Italianway (o dal Simulatore, nei dimostrativi). Nelle Decisioni leggi «Prenotazione
@@ -3401,11 +3445,18 @@ l&#x27;assistenza.</p>
 <p><strong>Compare l&#x27;avviso</strong> «Sistema domotico non raggiungibile».</p>
 </li>
 <li>
-<p><strong>Dopo la stessa soglia</strong> arriva la notifica «…: sistema domotico non raggiungibile», «Il connettore domotico
-risulta fermo».</p>
+<p><strong>Dopo la stessa soglia</strong> arriva una sola notifica «…: sistema domotico non raggiungibile». Dice «Il connettore
+domotico risulta fermo» se il sistema risponde ma ha perso i dispositivi; dal lotto 38 dice «Il sistema domotico
+non risponde da N minuti: …» se non risponde affatto (macchina spenta, rete interrotta).</p>
 </li>
 <li>
-<p><strong>Nelle Decisioni</strong>: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi ripristinato».</p>
+<p><strong>Nelle Decisioni</strong>, nel primo caso: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi
+ripristinato». Nel secondo caso (dal lotto 38), dopo un fermo più lungo della soglia: «Sistema domotico di nuovo
+raggiungibile dopo …», con la durata.</p>
+</li>
+<li>
+<p><strong>Durante uno spegnimento programmato</strong> HQE sospende questi avvisi fino a una data e ora: dopo quell&#x27;ora, se il
+sistema è ancora fermo, l&#x27;avviso arriva. Gli avvisi «dispositivo offline» non si sospendono.</p>
 </li>
 <li>
 <p><strong>Non arriva</strong> una notifica di ritorno online.</p>
@@ -3594,8 +3645,7 @@ l&#x27;appartamento agli utenti.</p>
 </ol>
 <blockquote class="note-info">
 <p><strong>Da sapere</strong></p>
-<p>Nel sito vero, fino alla consegna al cliente, i dimostrativi con il motore simulato integrato sono ammessi come
-nell&#x27;ambiente di prova.</p>
+<p>Nel sito vero i dimostrativi non si possono creare: si provano nell&#x27;ambiente di prova (dal 9 novembre 2026).</p>
 </blockquote>
 <h3 id="quando-qualcosa-non-funziona-3520305f">Quando qualcosa non funziona</h3>
 <p class="lead"><strong>Leggere l&#x27;avviso, copiare l&#x27;identificativo, annotare, segnalare.</strong></p>
@@ -3742,7 +3792,16 @@ massimo che hai scelto.</p>
 <ul>
 <li>
 <p><strong>«Finestra aperta spegne il clima»</strong>: spegne clima e riscaldamento di tutto l&#x27;appartamento, non solo della
-stanza. Sospesa durante una forzatura; alla fine riparte. L&#x27;antigelo è più forte.</p>
+stanza. Sospesa durante una forzatura; alla fine riparte. L&#x27;antigelo è più forte. Dal lotto 38, se il sistema
+domotico si riavvia con una finestra aperta, la regola riparte da sola: il clima si spegne allo scadere dei minuti
+contati da quando la finestra si è aperta; se si è aperta mentre il sistema era fermo, dalla ripartenza.
+Quando la modalità comfort accende un climatizzatore dopo la pausa del compressore, il climatizzatore resta regolato
+dal comfort (dal lotto 39).
+<strong>Alla chiusura della finestra riscaldamento e clima riprendono da soli</strong> (dal lotto 38): quando si chiude l&#x27;ultima
+finestra aperta, caldaia e clima tornano a seguire la modalità; un dispositivo acceso a mano torna com&#x27;era; se
+nel frattempo qualcuno l&#x27;ha comandato, resta come l&#x27;ha lasciato. Con una forzatura attiva non si ripristina niente.
+Il ritorno avviene circa un minuto dopo la chiusura; la caldaia può aspettare qualche minuto in più per il minimo
+fra due accensioni. Nelle Decisioni compare «Finestra chiusa: … riacceso».</p>
 </li>
 <li>
 <p><strong>«Antigelo a casa vuota»</strong>: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
@@ -3915,8 +3974,9 @@ verificato: misuratore offline».</p>
 solo con almeno il 30 % in più e almeno 5 kWh di eccedenza).</p>
 </li>
 <li>
-<p><strong>Segnalazioni</strong>: dispositivi offline da più di 24 ore, approvazioni scadute senza risposta, finestre aperte
-almeno 3 volte con il clima spento dalla regola.</p>
+<p><strong>Segnalazioni</strong>: dispositivi offline da più di 24 ore, approvazioni scadute senza risposta (tutte quelle della
+settimana, da lunedì a domenica, anche quelle del lunedì mattina; dal lotto 38), finestre aperte almeno 3 volte con
+il clima spento dalla regola.</p>
 </li>
 <li>
 <p><strong>Notifica</strong>: se c&#x27;è almeno una segnalazione arriva la notifica «Riepilogo».</p>
@@ -3987,14 +4047,25 @@ dell&#x27;email di chi comanda.</p>
 <tr><td data-label="Cosa vedi" class="align-left">«Non hai i permessi per accedere. Chiedi un invito.»</td><td data-label="Cosa significa" class="align-left">L&#x27;account esiste ma nessuno ti ha invitato in questo ambiente (un invito nell&#x27;ambiente di prova non vale nel sito vero)</td><td data-label="Cosa fare" class="align-left">Chiedi un invito a un amministratore</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Conferma il tuo indirizzo: abbiamo inviato un link a …. Aprilo e poi accedi di nuovo.»</td><td data-label="Cosa significa" class="align-left">Il tuo indirizzo non è ancora confermato</td><td data-label="Cosa fare" class="align-left">Apri il link nell&#x27;email, poi accedi di nuovo</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Devi confermare il tuo indirizzo email, ma l&#x27;invio del link non è riuscito. Riprova tra qualche minuto.»</td><td data-label="Cosa significa" class="align-left">L&#x27;email di conferma non è partita</td><td data-label="Cosa fare" class="align-left">Riprova tra qualche minuto</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Impossibile caricare il profilo, riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Il server non risponde</td><td data-label="Cosa fare" class="align-left">Riprova dopo qualche minuto</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Impossibile caricare il profilo, riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Il server ha rifiutato per un momento la richiesta (per esempio troppe richieste)</td><td data-label="Cosa fare" class="align-left">Riprova dopo qualche minuto</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Controllo dell&#x27;accesso non disponibile: riprova tra poco»</td><td data-label="Cosa significa" class="align-left">Il controllo dell&#x27;accesso non ha risposto in tempo; la sessione resta valida</td><td data-label="Cosa fare" class="align-left">Riprova dopo qualche minuto</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«Non riesco ad aprire la pagina» con «Controlla la connessione e premi Ricarica. Se il problema resta, contatta HQE.»</td><td data-label="Cosa significa" class="align-left">L&#x27;app non si è aperta entro 15 secondi, o una pagina ha dato un errore (dal lotto 37)</td><td data-label="Cosa fare" class="align-left">Premi «Ricarica»; se la risposta arriva poco dopo, l&#x27;app si apre da sola</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Sei senza connessione» con «La pagina si riapre da sola quando torna la connessione.»</td><td data-label="Cosa significa" class="align-left">Il telefono o il computer non ha rete: modalità aereo, Wi-Fi e dati spenti (dal lotto 37)</td><td data-label="Cosa fare" class="align-left">Riattiva la rete: la pagina si riapre da sola dopo un istante</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Il servizio non risponde, riprova fra poco» con «Premi Ricarica fra qualche minuto. Se il problema resta, contatta HQE.»</td><td data-label="Cosa significa" class="align-left">La rete c&#x27;è, ma il servizio DOMHOUSE ha risposto con un errore (dal lotto 37)</td><td data-label="Cosa fare" class="align-left">Premi «Ricarica» fra qualche minuto; se il problema resta, contatta HQE</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«Non riesco ad aprire la pagina» con «Controlla la connessione e premi Ricarica. Se il problema resta, contatta HQE.»</td><td data-label="Cosa significa" class="align-left">L&#x27;app non capisce se manca la rete o il servizio (per esempio un Wi-Fi senza internet), non si è aperta entro 15 secondi, o una pagina ha dato un errore (dal lotto 37)</td><td data-label="Cosa fare" class="align-left">Controlla la connessione e premi «Ricarica»; se la risposta arriva poco dopo, l&#x27;app si apre da sola</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Server non raggiungibile» dopo un&#x27;attesa</td><td data-label="Cosa significa" class="align-left">Il server non ha risposto entro 30 secondi, oppure 90 per assistente, proposte di regole, inviti, copia delle regole, verifica della connessione ed Excel (dal lotto 37)</td><td data-label="Cosa fare" class="align-left">Riprova; se era un comando, controlla prima se è già stato eseguito</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«La tua organizzazione non è attiva: contatta HQE.»</td><td data-label="Cosa significa" class="align-left">L&#x27;organizzazione non è ancora pronta</td><td data-label="Cosa fare" class="align-left">Contatta HQE</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«La tua organizzazione è sospesa: l&#x27;app non è disponibile. Per informazioni contatta l&#x27;assistenza HQE.»</td><td data-label="Cosa significa" class="align-left">HQE ha sospeso la tua organizzazione</td><td data-label="Cosa fare" class="align-left">Contatta l&#x27;assistenza HQE</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Indirizzo email non valido»</td><td data-label="Cosa significa" class="align-left">L&#x27;email scritta non è un indirizzo</td><td data-label="Cosa fare" class="align-left">Correggi l&#x27;indirizzo</td></tr>
 </tbody></table></div>
+<p><strong>Con le tre pagine «Sei senza connessione», «Il servizio non risponde» e «Non riesco ad aprire la pagina»:</strong></p>
+<ul>
+<li>
+<p><strong>Resti dentro:</strong> non serve riscrivere la password e le notifiche restano attive.</p>
+</li>
+<li>
+<p><strong>Non c&#x27;è «Esci»:</strong> per uscire dall&#x27;account aspetta che la pagina si riapra.</p>
+</li>
+</ul>
 <h3 id="in-tutte-le-pagine-d7aed8ac">In tutte le pagine</h3>
 <p class="lead"><strong>I messaggi comuni a tutta l&#x27;app.</strong></p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>

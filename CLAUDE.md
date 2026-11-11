@@ -25,10 +25,10 @@ Questo è l'**unico** file del repository che contiene valori reali: nessun segr
 | URL del BFF (produzione) | Il servizio `domotica-bff` risponde a due URL equivalenti: `https://domotica-bff-444239063209.europe-west8.run.app` (deterministico, usato per webhook Italianway e monitoraggio) e `https://domotica-bff-mgxrktwk6a-oc.a.run.app` (formato vecchio, quello che `deploy.sh` legge da `status.url`). Dal lotto 4 (16 ottobre 2026) la PWA è compilata con il primo (D-53); CORS dipende dall'origine della pagina, non dall'URL, quindi funzionano entrambi. Webhook: `https://domotica-bff-444239063209.europe-west8.run.app/webhooks/italianway` |
 | Cloud Build | `cloudbuild.yaml` nella radice: costruisce `bff/Dockerfile` con contesto la radice del repo (serve `contract/`); usa l'account `domotica-build@domotica-poc-511707.iam.gserviceaccount.com` (P-21); all'account predefinito di Compute è stato tolto il ruolo Editor |
 | Account di servizio del BFF | `domotica-bff@domotica-poc-511707.iam.gserviceaccount.com` — Agent Platform User (chiama il modello dell'assistente per conto dei motori, D-143), Cloud Datastore User, Firebase Authentication Admin, Firebase Cloud Messaging API Admin, Logs Writer; accesso ai singoli segreti (non a livello di progetto) |
-| Account di servizio della VM | `langbrain-vm@domotica-poc-511707.iam.gserviceaccount.com` — Agent Platform User (non più usato: dal passo 9 il motore raggiunge il modello attraverso il BFF, D-143; da togliere), Logs Writer, Monitoring Metric Writer; accesso a `langbrain-api-key-dev` |
-| VM del motore domotico | `langbrain-dev`, `europe-west8-a`, e2-small, Debian 12, Docker + Compose; nessun IP pubblico; SSH solo via IAP con OS Login; snapshot giornaliero del disco con conservazione 30 giorni (politica `langbrain-daily-snapshot`) |
+| Account di servizio della VM | `langbrain-vm@domotica-poc-511707.iam.gserviceaccount.com` — Logs Writer, Monitoring Metric Writer; accesso a `langbrain-api-key-dev`; Service Account Token Creator solo su `domhouse-dns-lab@` (certificato del broker, D-207); Agent Platform User tolto il 10 novembre 2026 |
+| VM del motore domotico | `langbrain-dev`, `europe-west8-a`, e2-small, Debian 12, Docker + Compose; IP pubblico statico `34.154.57.13` (`langbrain-dev-public`, dal 10 novembre 2026) aperto da internet solo su tcp 8883 per i dispositivi (regola `mqtt-tls-in`, tag `mqtt-tls`, D-209); SSH solo via IAP con OS Login; snapshot giornaliero del disco con conservazione 30 giorni (politica `langbrain-daily-snapshot`) |
 | IP interno della VM | `10.198.0.2`, statico (prenotazione `langbrain-dev-ip`) |
-| Rete | VPC `default`, subnet `default` (`10.198.0.0/20`), Private Google Access attivo, Cloud NAT `langbrain-nat`; in ingresso solo tcp 8100-8199 dalla subnet (tag `langbrain-dev`) |
+| Rete | VPC `default`, subnet `default` (`10.198.0.0/20`), Private Google Access attivo; Cloud NAT eliminato il 10 novembre 2026 (la VM esce dal suo IP pubblico; resta il router `langbrain-router`); in ingresso tcp 8100-8199 solo dalla subnet (tag `langbrain-dev`) e tcp 8883 da internet (tag `mqtt-tls`) |
 | Istanze del motore | una per appartamento, container `engine-<apartment_id>` (progetto Compose `domhouse-<apartment_id>`, immagine `europe-west8-docker.pkg.dev/domotica-poc-511707/domotica/engine:<commit>`), porta 81xx, dati in `/data/<apartment_id>` (`engine.db`, SQLite), chiave in `/etc/domhouse/<apartment_id>.env` dal segreto `langbrain-api-key-<apartment_id>`; installazione e aggiornamento con `scripts/engine-vm.sh`, procedura in `docs/motore-vm.md`; sviluppo `dev` su `http://10.198.0.2:8100` (raggiungibile solo dal BFF via VPC) |
 | Firestore | database `(default)`, Standard, Native, `europe-west8`; regole di produzione (nessun accesso dai client, scrive solo il BFF via IAM) |
 | Firebase Authentication | Email/password e Google; domini autorizzati `localhost`, `domotica-poc-511707.firebaseapp.com`, `domotica-poc-511707.web.app` |
@@ -78,10 +78,11 @@ documento «Infrastruttura Domotica PoC – riepilogo e configurazione.docx» ne
 2. **Nessun segreto né file `.env*` in Git.** Niente chiavi API, HMAC, token, chiavi JSON di service account, né `bff/.env`,
    `frontend/.env`, `frontend/.env.production`. Restano versionati solo `bff/.env.example` e `frontend/.env.example`, con
    placeholder. In caso di dubbio su un valore, va in Secret Manager o nelle variabili d'ambiente del deploy.
-3. **Il primo deploy usa `TARGET=staging`** (`bff/cloudrun.staging.yaml`: mock integrato nel BFF con `INSTANCE_MODE=mock`,
-   simulatore attivo, Firestore e Firebase Auth reali, una sola istanza perché il mock tiene lo stato in memoria).
-   **`TARGET=prod` (`bff/cloudrun.yaml`, `INSTANCE_MODE=real`, Direct VPC Egress su `default`/`default`) solo quando il motore
-   domotico sarà in esecuzione sulla VM**, cioè quando `http://10.198.0.2:8100/api/v1/health` risponde dalla rete interna.
+3. **Si pubblica prima `TARGET=staging`, poi `TARGET=prod` con lo stesso commit** (D-203; dal 10 novembre 2026 con
+   `scripts/publish-all.sh`, D-214). Staging (`bff/cloudrun.staging.yaml`): `INSTANCE_MODE=real` verso il motore `dev`
+   della VM, più i dimostrativi integrati nel BFF e il simulatore, Firestore `staging`, minimo 0 e massimo 1 istanza.
+   Produzione (`bff/cloudrun.yaml`): `INSTANCE_MODE=real`, Direct VPC Egress su `default`/`default`, minimo 1 e massimo
+   3 istanze, nessun dimostrativo (D-202).
 
 ## Deploy (riferimento rapido)
 
@@ -115,7 +116,7 @@ Prerequisiti: gcloud autenticato sul progetto, node + yarn, firebase-tools logga
 Da non ricreare: API abilitate (Cloud Run, Compute Engine, Secret Manager, Firestore, Vertex AI, Logging, Monitoring,
 Cloud Build, Artifact Registry, IAM, IAP), repository Artifact Registry `domotica`, i due account di servizio con i
 ruoli sopra, i segreti elencati sopra, Firestore `(default)`, Firebase Authentication, Hosting, coppia VAPID generata,
-VM `langbrain-dev` con rete, NAT, firewall e snapshot giornaliero. I container del motore sulla VM si installano con `scripts/engine-vm.sh` (`docs/motore-vm.md`, D-116).
+VM `langbrain-dev` con rete, firewall e snapshot giornaliero (il NAT è stato eliminato il 10 novembre 2026). I container del motore sulla VM si installano con `scripts/engine-vm.sh` (`docs/motore-vm.md`, D-116).
 
 ## Organizzazione del lavoro (dal 16 ottobre 2026)
 

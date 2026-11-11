@@ -51,10 +51,38 @@ def check_ai_location(settings) -> None:
         raise SystemExit(message)
 
 
+ENVIRONMENTS = ("dev", "staging", "prod")
+
+
+def check_access_settings(settings, environ=None) -> None:
+    """D-218: the BFF does not start with a development setting that opens the access outside development. AUTH_MODE=dev
+    (anyone is any user with the X-Dev-User header, /app/dev/users lists them) only with APP_ENV=dev; and on Cloud Run
+    (K_SERVICE set by it) APP_ENV must say staging or prod, because both default to «dev» when the variable is missing
+    (bff/config.py), and APP_ENV=dev also opens CORS to every origin. An APP_ENV outside dev, staging, prod is refused
+    everywhere: a typo must not give a half environment."""
+    import os
+    environ = os.environ if environ is None else environ
+    from .logs import error
+    problem = None
+    if settings.app_env not in ENVIRONMENTS:
+        problem = f"APP_ENV «{settings.app_env}» is not one of {', '.join(ENVIRONMENTS)}"
+    elif environ.get("K_SERVICE") and settings.app_env == "dev":
+        problem = (f"APP_ENV is «dev» (or missing) on Cloud Run (service {environ.get('K_SERVICE')}): it must be staging "
+                   f"or prod")
+    elif settings.app_env != "dev" and settings.auth_mode != "firebase":
+        problem = (f"AUTH_MODE «{settings.auth_mode}» with APP_ENV «{settings.app_env}»: outside development it must be "
+                   f"firebase (AUTH_MODE is «dev» when the variable is missing)")
+    if problem:
+        error("development setting refused", app_env=settings.app_env, auth_mode=settings.auth_mode,
+              service=environ.get("K_SERVICE"), problem=problem)
+        raise SystemExit(f"{problem}: the BFF does not start (D-218)")
+
+
 def create_app() -> FastAPI:
     setup_logging()
     setup_engine_logging(None)    # the demonstration apartments' engine logs too, with apartment_id in each line
     settings = get_settings()
+    check_access_settings(settings)
     check_ai_location(settings)
     push.register()
 

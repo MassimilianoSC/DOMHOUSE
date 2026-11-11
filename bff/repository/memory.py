@@ -194,6 +194,13 @@ class InMemoryRepository:
     async def release_work(self, key):
         self.work.pop(key, None)
 
+    async def expire_work(self, key):
+        d = self.work.get(key)
+        if not d or d["status"] != "pending" or not d["payload"]:
+            return False
+        d["lease_until"] = time.time()
+        return True
+
     async def due_work(self, now, limit=50):
         due = [(k, d) for k, d in self.work.items() if d["status"] == "pending" and d["payload"] and d["lease_until"] <= now]
         return [{"key": k, "payload": d["payload"], "attempts": d["attempts"]} for k, d in due[:limit]]

@@ -5,7 +5,8 @@
     python scripts/run_tests.py -- -k webhook       # everything after -- goes to pytest (only the pytest suites run)
 
 Uses app/.venv when it exists (create it with: python -m venv .venv, then .venv/Scripts/python -m pip install
--r bff/requirements.txt pytest requests). Each HTTP suite gets its own BFF (dev auth, built-in mock, memory repository)
+-r bff/requirements.txt -r engine/requirements.txt pytest requests; engine/requirements.txt brings the Shelly
+connector's libraries, D-224). Each HTTP suite gets its own BFF (dev auth, built-in mock, memory repository)
 on a free port: the memory repository keeps state and the suites create users and apartments, so a shared BFF would
 make results depend on the order. The repository suite needs no BFF but needs the Firestore emulator (P-42): an
 emulator already pointed to by FIRESTORE_EMULATOR_HOST, or the JAR in ~/.cache/firebase/emulators started with java
@@ -51,8 +52,18 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "tests/invite_limits_test.py", "tests/support_access_test.py",
                 "tests/actors_test.py", "tests/erasure_test.py", "tests/fields_by_role_test.py",
                 "tests/lot9_review_test.py", "tests/energy_export_test.py",
-                "tests/simulated_apartments_test.py", "tests/cloudrun_manifests_test.py", "tests/engine_vm_settings_test.py", "tests/deploy_engine_test.py", "tests/ai_gateway_test.py", "tests/environments_test.py", "tests/deploy_targets_test.py", "tests/list_demos_test.py", "tests/engine_alerts_test.py", "tests/weekly_summary_test.py", "tests/summary_job_test.py", "tests/rule_proposals_test.py", "tests/demo_variant_test.py", "tests/measure_model_test.py", "tests/net_phase_test.py", "tests/vertex_native_test.py", "tests/manager_profile_test.py", "tests/timezone_test.py", "tests/ai_stats_test.py", "tests/auth_token_test.py", "tests/stream_queue_test.py", "tests/runtime_log_test.py",
+                "tests/simulated_apartments_test.py", "tests/cloudrun_manifests_test.py", "tests/engine_vm_settings_test.py", "tests/deploy_engine_test.py", "tests/publish_all_test.py", "tests/ai_gateway_test.py", "tests/environments_test.py", "tests/deploy_targets_test.py", "tests/list_demos_test.py", "tests/engine_alerts_test.py", "tests/rodaggio_test.py", "tests/weekly_summary_test.py", "tests/summary_job_test.py", "tests/rule_proposals_test.py", "tests/demo_variant_test.py", "tests/measure_model_test.py", "tests/net_phase_test.py", "tests/vertex_native_test.py", "tests/manager_profile_test.py", "tests/timezone_test.py", "tests/ai_stats_test.py", "tests/auth_token_test.py", "tests/stream_queue_test.py", "tests/runtime_log_test.py",
                 "engine/connector/tests/test_interface.py",
+                "engine/connector/shelly/tests/test_battery.py",
+                "engine/connector/shelly/tests/test_catalog.py",
+                "engine/connector/shelly/tests/test_command.py",
+                "engine/connector/shelly/tests/test_connector.py",
+                "engine/connector/shelly/tests/test_fakes.py",
+                "engine/connector/shelly/tests/test_offline.py",
+                "engine/connector/shelly/tests/test_translate.py",
+                "engine/connector/shelly/tests/test_transport_base.py",
+                "engine/connector/shelly/tests/test_transport_mqtt.py",
+                "engine/connector/shelly/tests/test_transport_mqtt_live.py",
                 "engine/tests/test_service.py", "engine/tests/test_store.py",
                 "engine/tests/test_restart.py", "engine/tests/test_approvals.py",
                 "engine/tests/test_scheduler.py", "engine/tests/test_schedule_rules.py",
@@ -62,7 +73,13 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "engine/tests/test_approval_sources.py", "engine/tests/test_approvals_restart.py",
                 "engine/tests/test_assistant.py", "engine/tests/test_health.py",
                 "engine/tests/test_mode_temperatures.py", "engine/tests/test_priorities.py",
-                "engine/tests/test_setpoint_limits.py", "engine/tests/test_stream_queue.py"]
+                "engine/tests/test_setpoint_limits.py", "engine/tests/test_stream_queue.py",
+                # the verification of 10 November (o2) and D-198 (o1); tests/run_tests_checks_test.py is red when a
+                # test file of the repository is in no list
+                "engine/tests/test_loop_errors.py", "engine/tests/test_restart_window.py",
+                "engine/tests/test_approved_not_done.py", "engine/tests/test_approvals_window.py",
+                "engine/tests/test_schedule_failed.py", "engine/tests/test_reachability.py",
+                "engine/tests/test_window_restore.py", "engine/tests/test_schedule_partial.py"]
 SITE_SUITE = "sito"
 CONFORMANCE_SUITE = "conformita"
 CONFORMANCE_DIR = "contract/conformance"

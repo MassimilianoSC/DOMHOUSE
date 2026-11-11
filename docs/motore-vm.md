@@ -460,6 +460,11 @@ creato il segreto `langbrain-api-key-<apartment_id>` e dato a `langbrain-vm@` Se
 
 ## G. Collegare l'app al motore della VM (P-66, D-120)
 
+> **Sezione storica (ottobre 2026).** Oggi staging e produzione usano entrambi il motore della VM
+> (`INSTANCE_MODE=real`); la produzione ha fino a 3 istanze (D-201) e rifiuta i dimostrativi `mock://` (D-202), che
+> esistono solo in staging; la pubblicazione si fa con `scripts/publish.sh` (`docs/procedura-ambienti-separati.md`).
+> I passi qui sotto restano come riferimento di come è stato fatto il primo collegamento.
+
 Da qui il server dell'app (BFF su Cloud Run) passa a `TARGET=prod`: `INSTANCE_MODE=real` e Direct VPC Egress sulla rete
 `default`, così raggiunge `10.198.0.2:8100`. Gli appartamenti dimostrativi (`mock://builtin`) restano come sono, serviti
 dal BFF stesso (D-97). Prerequisiti: C3 riuscito (il motore `dev` risponde dalla rete interna) e il commit da
@@ -564,17 +569,43 @@ Verifica: G3, con `{"status":"ok","app_env":"staging"}` e `INSTANCE_MODE` `value
 
 ---
 
-## G2. Broker MQTT dei dispositivi (D-196, D-199, lotto 38)
+## G2. Broker MQTT dei dispositivi (D-196, D-199, D-207, D-208, D-209)
 
-Il broker è un solo container per tutta la VM (`domhouse-broker`). I dispositivi entrano dalla porta 8883 con TLS; i connector dalla porta interna 1883, che non è pubblicata. Cartelle: `/opt/domhouse/_broker`, `/etc/domhouse/_broker`, `/data/_broker`.
+Il broker è un solo container per tutta la VM (`domhouse-broker`). I dispositivi entrano dalla porta 8883 con TLS, ognuno con il suo utente; i connector dalla porta interna 1883, che non è pubblicata.
 
-**Prima di partire servono:** il certificato (nome `mqtt.<dominio>`), l'indirizzo della VM e la regola del firewall sulla 8883. Il broker non si installa senza un certificato valido.
+Cartelle:
+
+| Dove | Cosa | Snapshot |
+|---|---|---|
+| `/mnt/domhouse-tls` (disco `langbrain-dev-tls`) | chiavi: `broker/` (certificato servito), `acme/` (conto Let's Encrypt e certificati di lego) | no |
+| `/opt/domhouse/_broker` | compose, configurazione, impostazioni, regola del limite | sì (23:00) |
+| `/etc/domhouse/_broker` | utenti (solo hash), elenco appartamenti, `acme.settings` | sì |
+| `/data/_broker` | sessioni e messaggi in coda | sì |
+
+Regole delle chiavi (C-12):
+
+1. Le chiavi stanno solo sul disco `domhouse-tls`, dell'utente 1883, file 600 e cartelle 700.
+2. Sulla VM non c'è nessuna credenziale di Google Cloud: lego usa l'identità della VM per agire come `domhouse-dns-lab@`.
+3. Se il disco non è montato il broker non parte, nessun comando scrive chiavi, il controllo ogni 5 minuti scrive `broker down (disco delle chiavi non montato ...)` e scatta l'allarme «Motori: broker MQTT giù».
 
 `lab-01` e `shelly-lab-1` sono nomi di esempio: si sostituiscono con l'appartamento e il dispositivo veri prima di lanciare i comandi.
 
-### B1. Copiare i file sulla VM (scrive sulla VM)
+### B0. Permesso per il certificato (scrive su Google Cloud)
 
-Cosa fa: copia nella cartella `~/broker-files` gli script e la configurazione.
+Cosa fa: permette all'identità della VM di agire come l'account DNS, che può scrivere solo nella zona `domhouse-lab`. Serve a lego per la prova DNS di Let's Encrypt.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud iam service-accounts add-iam-policy-binding domhouse-dns-lab@domotica-poc-511707.iam.gserviceaccount.com \
+  --member=serviceAccount:langbrain-vm@domotica-poc-511707.iam.gserviceaccount.com \
+  --role=roles/iam.serviceAccountTokenCreator \
+  --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+```
+
+Verifica: nell'elenco stampato c'è `roles/iam.serviceAccountTokenCreator` con `serviceAccount:langbrain-vm@…`, e nessun altro membro.
+
+### B1. Copiare i file sulla VM (scrive sulla VM)
 
 ```bash
 # Git Bash
@@ -584,11 +615,54 @@ gcloud compute scp scripts/broker-vm.sh scripts/broker_accounts.py scripts/engin
   --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
 ```
 
-Verifica: il comando elenca i 6 file copiati, tutti al 100 %.
+Verifica: 6 file copiati, tutti al 100 %.
 
-### B2. Installare il broker (scrive sulla VM)
+### B2. Preparare il disco delle chiavi (scrive sulla VM; si può ripetere)
 
-Cosa fa: aggiorna il controllo ogni 5 minuti della VM, installa il broker e lo avvia. Il certificato deve già essere in `/etc/domhouse/_broker/tls`, con i nomi `fullchain.pem` e `privkey.pem`.
+Cosa fa:
+
+1. Installa `nftables` se manca.
+2. Formatta il disco `domhouse-tls` solo se è vuoto.
+3. Aggiunge una sola volta la riga in `/etc/fstab` (con UUID, `nofail`: se il disco manca la VM si avvia lo stesso).
+4. Monta il disco su `/mnt/domhouse-tls` e rende immutabile la cartella vuota sotto, così senza disco lì non si scrive niente.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --command='command -v nft > /dev/null || sudo apt-get install -y nftables; sudo bash ~/broker-files/broker-vm.sh prepare-tls-disk && grep domhouse-tls /etc/fstab && findmnt /mnt/domhouse-tls'
+```
+
+Verifica:
+
+1. L'ultima riga dello script è `disco delle chiavi pronto: /dev/sdb UUID=… su /mnt/domhouse-tls, …` (il nome `/dev/sdX` può cambiare).
+2. In `fstab` c'è una sola riga `UUID=… /mnt/domhouse-tls ext4 defaults,nofail,…`.
+3. `findmnt` mostra il disco montato.
+
+Rilanciato una seconda volta dice `già presente` e non formatta. Un disco con un file system diverso, o con dati senza file system, non viene mai formattato: lo script si ferma e lo dice.
+
+### B3. Il certificato (scrive sulla VM e chiede il certificato a Let's Encrypt)
+
+Prima di partire: il nome `mqtt.dh-lab.eu` deve risolvere da internet, e la catena DNSSEC del dominio deve essere a posto (D-206). Let's Encrypt non rilascia se la verifica DNS fallisce.
+
+Cosa fa: lego, come utente 1883, apre il conto Let's Encrypt (senza email) e ottiene il certificato con la prova DNS. Poi lo mette nella cartella del broker.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --command='sudo bash ~/broker-files/broker-vm.sh cert-new mqtt.dh-lab.eu domhouse-lab domhouse-dns-lab@domotica-poc-511707.iam.gserviceaccount.com'
+```
+
+Verifica: compaiono `broker cert new notAfter=…` e `certificato pronto in /mnt/domhouse-tls/broker: ora install`.
+
+### B4. Installare il broker (scrive sulla VM)
+
+Cosa fa:
+
+1. Aggiorna il controllo ogni 5 minuti.
+2. Installa il broker, il limite sui collegamenti nuovi alla 8883 e il timer del rinnovo quotidiano.
+3. Avvia il broker.
 
 ```bash
 # Git Bash
@@ -597,39 +671,58 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
   --command='sudo install -m 755 ~/broker-files/engine-vm.sh /opt/domhouse/engine-vm.sh && sudo bash ~/broker-files/broker-vm.sh install eclipse-mosquitto:2@sha256:75d6662dee52c947dc9dd9c29f1d8d7ffef78ddaf38001caa09755681e8bbc98'
 ```
 
-Verifica: l'ultima riga è `broker sano: healthy, porta TLS 8883 risponde`.
+Verifica:
 
-### B3. Creare i conti di un appartamento (scrive su Secret Manager)
+1. Compare `limite attivo: alla porta 8883, oltre 60 collegamenti nuovi di fila e poi 30/minute per indirizzo, …`.
+2. Compare `domhouse-broker-limit.service abilitato, timer domhouse-broker-cert.timer attivo`.
+3. L'ultima riga è `broker sano: healthy, porta TLS 8883 risponde`.
 
-Cosa fa: crea i due segreti in `europe-west8`, con password casuali che non compaiono a video, e li rende leggibili dalla VM.
+### B5. Conti di un appartamento (scrive su Secret Manager, poi sulla VM)
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 bash scripts/broker-secrets.sh add-apartment lab-01
 CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 bash scripts/broker-secrets.sh add-device lab-01 shelly-lab-1
-```
-
-Verifica: compaiono `langbrain-shelly-lab-01 creato`, `langbrain-shelly-lab-01-devices creato` e `nuova versione … scritta`. Nessuna password a video.
-
-### B4. Portare i conti sul broker (scrive sulla VM)
-
-Cosa fa: la VM legge i segreti e scrive solo gli hash. Il broker li ricarica senza riavviarsi.
-
-```bash
-# Git Bash
-cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
   --command='sudo bash /opt/domhouse/broker-vm.sh add-apartment lab-01'
 ```
 
-Verifica: `lab-01: connector e 1 dispositivi`, poi `changed` e `utenti e permessi ricaricati`.
+Verifica:
 
-Per aggiungere o togliere un dispositivo: `broker-secrets.sh add-device` o `remove-device` come in B3, poi lo stesso comando con `sync` al posto di `add-apartment lab-01`.
+1. Compaiono `langbrain-shelly-lab-01 creato`, `langbrain-shelly-lab-01-devices creato` e `nuova versione … scritta`, senza password a video.
+2. Poi `lab-01: connector e 1 dispositivi`, `changed` e `utenti e permessi ricaricati`.
 
-### B5. Allarmi del broker (scrive su Google Cloud)
+Si impostano con `MQTT.SetConfig` (o dalla pagina web dello Shelly), poi lo Shelly va **riavviato**: `MQTT.SetConfig` risponde `"restart_required": true`.
 
-Cosa fa: aggiunge le due politiche nuove. Quelle che esistono già non vengono toccate.
+| Campo | Valore | Perché |
+|---|---|---|
+| `enable` | `true` | |
+| `server` | `mqtt.dh-lab.eu:8883` | l'unico ingresso (D-209) |
+| `ssl_ca` | `"ca.pem"` | TLS verificato con le CA integrate; mai `"*"`, mai in chiaro |
+| `client_id` | uguale all'utente: `<apartment_id>.<id dispositivo>` | la riga di un accesso rifiutato dice quale dispositivo è (D-212) |
+| `user` | `<apartment_id>.<id dispositivo>` | |
+| `pass` | la password del segreto `langbrain-shelly-<apartment_id>-devices` | non compare mai in `MQTT.GetConfig` |
+| `topic_prefix` | `<apartment_id>/<id dispositivo>` | i permessi del broker sono per prefisso |
+| `rpc_ntf` | `true` | le notifiche di stato al connector |
+| `status_ntf` | `false` | il connector usa le notifiche RPC, non lo stato completo a ogni cambio |
+| `enable_rpc` | `true` | i comandi del connector arrivano come RPC |
+| `enable_control` | `false` | approvato dal committente: i comandi passano solo dalle RPC, non dai topic «di controllo» (`<prefisso>/command`…); da verificare in laboratorio che il Gen4 lo rispetti |
+
+La sessione pulita non si imposta: lo Shelly non ha questa impostazione (D-215). Il broker cancella le sessioni dopo 1 ora e il connector manda i comandi con QoS 0 (connector-v2.md §7.2).
+
+Verifiche di laboratorio, da fare la prima volta su un Gen4 vero e da scrivere nel registro:
+
+1. **Sessione:** nel log del broker, alla connessione dello Shelly, la riga «New client connected from … as <apartment_id>.<id dispositivo> (p4, c?, k…)»: `c0` = sessione persistente, `c1` = sessione pulita.
+   ```bash
+   # Git Bash
+   cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+   gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo docker logs --since 10m domhouse-broker 2>&1 | grep "New client connected"'
+   ```
+2. **Stato online conservato (retain):** abbonarsi a `<prefisso>/online` con l'utente del connector, dalla rete interna, **dopo** che lo Shelly si è collegato: se arriva subito `true`, il messaggio è conservato. Il comando lo prepara o1 al momento della prova, con l'appartamento e il dispositivo veri: serve la password del connector, che sulla VM non è in chiaro (il broker ne tiene solo l'hash) e va letta da Secret Manager senza mai mostrarla.
+3. **`enable_control false`:** pubblicare con l'utente del connector un comando sul topic `<prefisso>/command` e controllare che lo Shelly lo ignori.
+
+### B6. Allarmi del broker (scrive su Google Cloud)
 
 ```bash
 # Git Bash
@@ -637,9 +730,9 @@ cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 bash scripts/monitoring/engine-alerts.sh
 ```
 
-Verifica: `«Motori: broker MQTT giù»: creata`, `«Motori: certificato del broker in scadenza»: creata`, le altre `esiste già`.
+Verifica: «Motori: broker MQTT giù», «Motori: certificato del broker in scadenza» e «Motori: broker, troppi accessi rifiutati» risultano `creata` (o `esiste già` se c'erano); le altre `esiste già`.
 
-### B6. Controllare il broker (sola lettura)
+### B7. Controllare il broker (sola lettura)
 
 ```bash
 # Git Bash
@@ -648,33 +741,152 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
   --command='sudo bash /opt/domhouse/broker-vm.sh status'
 ```
 
-Verifica: compare `broker ok cert_days=<numero>`.
+Verifica:
+
+1. `broker ok cert_days=<numero>`.
+2. `accessi rifiutati sulla 8883 nell'ultima ora: <numero>`.
+3. `collegamenti scartati dal limite: <numero>`.
+4. Una riga del disco `/mnt/domhouse-tls`.
+
+### B8. Verifica dall'esterno dopo l'apertura della 8883 (sola lettura, da Cloud Shell)
+
+Si fa dopo i comandi della memoria storica per l'indirizzo pubblico, la regola `mqtt-tls-in` e il record DNS. Si lancia da Cloud Shell (console di Google Cloud, icona del terminale), che sta fuori dalla rete della VM.
+
+```bash
+# Cloud Shell
+cd ~
+IP=$(gcloud compute instances describe langbrain-dev --zone=europe-west8-a --project=domotica-poc-511707 --format='get(networkInterfaces[0].accessConfigs[0].natIP)'); echo "IP pubblico: $IP"
+for p in 22 1883 8100 8101 8199 8883; do timeout 3 bash -c "</dev/tcp/$IP/$p" 2>/dev/null && echo "porta $p APERTA" || echo "porta $p chiusa"; done
+sudo apt-get install -y -qq nmap > /dev/null && sudo nmap -Pn -sT -p 1-1024,1883,8100-8199,8883 "$IP"
+openssl s_client -connect "$IP:8883" -servername mqtt.dh-lab.eu -verify_return_error < /dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -enddate
+```
+
+Esito atteso:
+
+1. Solo `porta 8883 APERTA`; tutte le altre `chiusa`.
+2. `nmap` mostra `8883/tcp open` e tutte le altre porte `filtered` (nessuna `open`, nessuna `closed`). `-sT` usa il collegamento normale del sistema: l'11 novembre la scansione con pacchetti grezzi (`-sS`, quella di `sudo nmap` senza opzioni) da Cloud Shell vedeva filtrata anche la 8883, con il limite a 0 scartati. Dura qualche minuto.
+3. `openssl` stampa `subject=CN = mqtt.dh-lab.eu`, l'emittente Let's Encrypt e la scadenza.
+
+Se compare un'altra porta aperta: togliere subito la regola `mqtt-tls-in` (comando della memoria storica) e avvisare.
+
+### B9. Il NAT non serve più (sola lettura; prima di eliminarlo)
+
+Con l'indirizzo pubblico la VM esce da quello, non dal NAT. Da controllare a indirizzo attivo, **prima** dell'eliminazione:
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute routers get-nat-mapping-info langbrain-router --region=europe-west8 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud compute instances list --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format='table(name,networkInterfaces[0].accessConfigs[0].natIP)'
+gcloud logging read 'resource.type="nat_gateway"' --freshness=30m --limit=5 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format='value(timestamp,jsonPayload.connection.src_ip,jsonPayload.connection.dest_ip)'
+```
+
+Verifica:
+
+1. `get-nat-mapping-info` non elenca più `langbrain-dev`. Restano voci senza nome macchina (`instanceName: ''`, indirizzi `10.198.0.16`–`10.198.0.23`): sono le interfacce di rete di Cloud Run, che il NAT prenota per tutta la sottorete ma che non lo usano, perché i due servizi hanno `vpc-access-egress: private-ranges-only` (da ricontrollare con `gcloud run services describe`).
+2. Tutte le macchine dell'elenco hanno un indirizzo pubblico (oggi c'è solo `langbrain-dev`).
+3. Nei registri del NAT non c'è niente dopo l'attivazione dell'indirizzo.
+
+Poi, sulla VM, le uscite che usa davvero (vanno ripetute identiche dopo l'eliminazione del NAT):
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='
+echo "server (assistente): $(curl -s -o /dev/null -w %{http_code} https://domotica-bff-mgxrktwk6a-oc.a.run.app/health)"
+echo "Artifact Registry: $(curl -s -o /dev/null -w %{http_code} https://europe-west8-docker.pkg.dev/v2/)"
+echo "Docker Hub: $(curl -s -o /dev/null -w %{http_code} https://registry-1.docker.io/v2/)"
+echo "Let'"'"'s Encrypt: $(curl -s -o /dev/null -w %{http_code} https://acme-v02.api.letsencrypt.org/directory)"
+sudo apt-get update -qq && echo "apt: ok"
+sudo bash /opt/domhouse/broker-vm.sh sync | tail -1
+sudo bash /opt/domhouse/engine-vm.sh check-all | tail -2
+systemctl is-active google-cloud-ops-agent'
+```
+
+Esito atteso:
+
+| Riga | Valore |
+|---|---|
+| server (assistente) | `200` |
+| Artifact Registry | `401` (raggiunto, chiede le credenziali) |
+| Docker Hub | `401` |
+| Let's Encrypt | `200` |
+| apt | `apt: ok` |
+| `broker-vm.sh sync` (Secret Manager) | `unchanged` |
+| `check-all` | il riepilogo `N motori, 0 muti` e `broker ok cert_days=…` |
+| Ops Agent | `active` |
+
+Infine, da PC, i registri arrivano ancora (Cloud Logging):
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud logging read 'resource.type="gce_instance" AND log_id("syslog") AND jsonPayload.message:"domhouse-check"' --freshness=15m --limit=3 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format='value(timestamp,jsonPayload.message)'
+```
+
+Verifica: righe degli ultimi 5 minuti. Anche il grafico della memoria della VM (Ops Agent) continua senza buchi.
+
+### B10. Prove del certificato durante il rodaggio (scrive sulla VM, chiede certificati a Let's Encrypt)
+
+Il primo rinnovo automatico cadrebbe dopo la consegna (D-210): durante il rodaggio si provano, una volta ciascuno, il rinnovo forzato e la revoca con riemissione (D-207). Ognuno conta come un certificato nuovo nel limite di Let's Encrypt (5 alla settimana per lo stesso nome): non ripeterli.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --command='sudo bash /opt/domhouse/broker-vm.sh cert-renew force && sudo systemctl start domhouse-broker-cert.service && sudo journalctl -u domhouse-broker-cert.service -n 5 --no-pager'
+```
+
+Verifica:
+
+1. Compaiono `broker cert new notAfter=…` e `ricarica fatta: la porta 8883 serve il certificato …`, e i relè restano collegati.
+   Se il tipo di chiave cambia (per esempio da ECDSA a RSA-2048, predefinito dal 10 novembre), la ricarica non basta: compaiono `la ricarica non basta (tipo di chiave cambiato?): riavvio del broker, i dispositivi si ricollegano`, poi `broker sano…` e `riavvio fatto: la porta 8883 serve il certificato …`.
+2. Il giro del timer subito dopo dice `certificato invariato: rinnovo non ancora dovuto`.
+3. Da Cloud Shell, chiave e catena servite:
+
+```bash
+# Cloud Shell
+cd ~
+openssl s_client -connect mqtt.dh-lab.eu:8883 -servername mqtt.dh-lab.eu -showcerts < /dev/null 2>/dev/null | grep -E '^ *[0-9]+ s:|^ *i:'
+openssl s_client -connect mqtt.dh-lab.eu:8883 -servername mqtt.dh-lab.eu < /dev/null 2>/dev/null | openssl x509 -noout -text | grep -E 'Public Key Algorithm|Public-Key'
+```
+
+   Atteso (da verificare al primo rinnovo vero): `rsaEncryption`, `(2048 bit)`; catena foglia → YR1 o YR2 → Root YR con emittente ISRG Root X1 (la catena lunga, chiesta per nome con `--preferred-chain`).
+
+Revoca e riemissione: si usa quando la chiave è uscita, o potrebbe essere uscita, dalla VM.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com \
+  --command='sudo bash /opt/domhouse/broker-vm.sh cert-revoke key-compromise'
+```
+
+Verifica:
+
+1. Compaiono `broker cert revoked (mqtt.dh-lab.eu, key-compromise)`, poi `broker cert new notAfter=…` e `ricarica fatta …`.
+2. La chiave è nuova: lego ne crea una a ogni certificato.
+3. Il certificato vecchio resta archiviato in `/mnt/domhouse-tls/acme/archives`, sullo stesso disco.
+
+Per un cambio senza sospetti sulla chiave (per esempio un altro nome): `cert-revoke superseded`.
+
+### Dopo un ripristino da snapshot
+
+Il disco delle chiavi non ha snapshot: il certificato **non si ripristina, si rifà**.
+
+1. Se il disco `langbrain-dev-tls` c'è ancora, il broker riparte da solo; basta B7.
+2. Se il disco è perso:
+   1. crearne uno nuovo come in D-208;
+   2. lanciare B2: la riga di `fstab` col disco vecchio (ripristinata dallo snapshot) viene sostituita e lo script dice `sostituita (il disco … non c'è più)`; una riga diversa dalla nostra la lascia com'è e si ferma;
+   3. poi B3 (`cert-new`) e `sudo bash /opt/domhouse/broker-vm.sh restart`.
+3. Una chiave persa insieme al disco non è uscita dalla VM: non va revocata. La revoca serve solo se si sospetta che una chiave sia uscita (B10).
 
 ### Cosa si salva
 
 1. **Utenti:** la fonte sono i segreti; `sync` riscrive gli hash in qualunque momento.
-2. **Certificato:** si riemette.
-3. **`/data/_broker`:** sessioni e messaggi conservati. È già nello snapshot del disco delle 23:00; se si perde, i relè si ricollegano e il connector rilegge lo stato.
-4. **Non serve un backup nuovo.** Dopo un ripristino da snapshot il certificato potrebbe essere scaduto: va rinnovato.
-
-### Numeri misurati (`tests/broker_load.py`, 9 novembre)
-
-Broker limitato a 0,5 CPU, il valore sostenuto di una e2-small, su questo PC. Messaggi da 1 KB con QoS 1.
-
-| Situazione | Memoria del broker | Esito |
-|---|---|---|
-| Vuoto, con 5000 conti caricati | 12 MB | |
-| 100 dispositivi con TLS | 16 MB | |
-| 1000 dispositivi | 47 MB | |
-| 2000 dispositivi | 82 MB | |
-| 5000 dispositivi | 186 MB | Circa 35 KB a collegamento |
-| 5000 dispositivi, 3000 messaggi al secondo | 186 MB | 44.984 su 44.984 consegnati, 99 % entro 2,6 ms, 0,1 CPU |
-| Connector via, 50.000 messaggi in arrivo | 188 MB | La memoria non cresce; alla ripresa ne arrivano 977, il resto è scartato |
-| Ricarica con 5000 collegati | | Nessuno cade |
-| Riavvio del broker | | 3,3 s; tutti i 5000 di nuovo collegati in 15 s |
+2. **Certificato e conto ACME:** non si salvano, si rifanno (B3).
+3. **`/data/_broker`:** sessioni e messaggi conservati, già nello snapshot delle 23:00. Se si perde, i relè si ricollegano e il connector rilegge lo stato.
 
 ## H. Non ancora qui
 
-- Allarmi dai log dei container (D-104): passo 10 del piano. Il backup applicativo c'è (sezione E), insieme allo
-  snapshot giornaliero del disco della VM.
 - Righe di log del motore per i comandi riusciti (oggi solo avvio, avvisi ed errori): con gli allarmi, passo 10.

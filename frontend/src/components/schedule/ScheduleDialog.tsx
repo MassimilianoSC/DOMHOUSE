@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ApartmentMode, ScheduleItem, ScheduledAction } from "@/api/types";
 import { instanceApi } from "@/api/instance";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, Input, Label, Na
 import { t } from "@/i18n";
 import { capitalizeFirst } from "@/lib/format";
 import { runAction } from "@/lib/actions";
+import { instantToWall, wallToInstant } from "@/lib/zonedTime";
 import { useApartmentStore } from "@/store/apartmentStore";
 
 interface Props {
@@ -17,24 +18,23 @@ interface Props {
   move?: ScheduleItem;
 }
 
-/** Local wall-clock (apartment tz) → ISO UTC. The input value is interpreted in the apartment timezone. */
-function localToIso(value: string, tz: string): string | null {
-  if (!value) return null;
-  const [date, time] = value.split("T");
-  const [y, m, d] = date.split("-").map(Number);
-  const [hh, mm] = time.split(":").map(Number);
-  const guess = Date.UTC(y, m - 1, d, hh, mm);
-  const parts = new Intl.DateTimeFormat("en-US", { timeZone: tz, hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).formatToParts(new Date(guess));
-  const get = (k: string) => Number(parts.find((p) => p.type === k)?.value);
-  const asIfUtc = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"));
-  return new Date(guess - (asIfUtc - guess)).toISOString();
+/** D-212: an hour from now, on the apartment's clock (the field is read in the apartment's time zone, not the browser's). */
+function defaultLocal(tz: string): string {
+  return instantToWall(new Date(Date.now() + 3600_000), tz);
 }
 
-function defaultLocal(): string {
-  const d = new Date(Date.now() + 3600_000);
-  d.setSeconds(0, 0);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** D-212: on the nights the clocks change, what will really happen with the time chosen; nothing on the other days. */
+function DstNote({ value, tz }: { value: string; tz: string }) {
+  const resolved = wallToInstant(value, tz);
+  if (!resolved || resolved.kind === "exact") return null;
+  const [date, time] = value.split("T");
+  const day = new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`));
+  const elided = /^(8|11) /.test(day); // «L'8 marzo», «L'11 marzo», not «Il 8»
+  const onDay = elided ? t("schedule.onDayElided", { day }) : t("schedule.onDay", { day });
+  const text = resolved.kind === "skipped"
+    ? t("schedule.dstSkipped", { onDay, time: time.slice(0, 5), actual: instantToWall(resolved.at, tz).slice(11) })
+    : t("schedule.dstRepeated", { onDay, time: time.slice(0, 5) });
+  return <p className="text-xs font-medium text-foreground" role="status" data-testid="schedule-dst-note" data-kind={resolved.kind}>{text}</p>;
 }
 
 type Cmd = "turn_off" | "turn_on" | "setpoint";
@@ -42,7 +42,7 @@ type Cmd = "turn_off" | "turn_on" | "setpoint";
 export function ScheduleDialog({ aptId, tz, open, onOpenChange, onDone, move }: Props) {
   const devices = useApartmentStore((s) => s.devices);
   const controllable = useMemo(() => devices.filter((d) => d.capabilities.climate || d.capabilities.heating || d.capabilities.switch), [devices]);
-  const [runAt, setRunAt] = useState(defaultLocal);
+  const [runAt, setRunAt] = useState(() => defaultLocal(tz));
   const [type, setType] = useState<ScheduledAction["type"]>("apartment_mode");
   const [mode, setMode] = useState<ApartmentMode>("comfort");
   const [deviceId, setDeviceId] = useState("");
@@ -50,11 +50,16 @@ export function ScheduleDialog({ aptId, tz, open, onOpenChange, onDone, move }: 
   const [setpoint, setSetpoint] = useState("21");
   const [saving, setSaving] = useState(false);
 
+  // The time is set once, when the window opens: the devices update live, and before this each update put back the time
+  // proposed over the one being written. «Sposta» starts from the action's own time; a new action from an hour from now.
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (open) {
-      setRunAt(defaultLocal());
-      if (!deviceId && controllable[0]) setDeviceId(controllable[0].device_id);
-    }
+    if (open && !wasOpen.current) setRunAt(move ? instantToWall(new Date(move.run_at), tz) : defaultLocal(tz));
+    wasOpen.current = open;
+  }, [open, move, tz]);
+
+  useEffect(() => {
+    if (open && !deviceId && controllable[0]) setDeviceId(controllable[0].device_id);
   }, [open, controllable, deviceId]);
 
   const device = controllable.find((d) => d.device_id === deviceId);
@@ -68,7 +73,7 @@ export function ScheduleDialog({ aptId, tz, open, onOpenChange, onDone, move }: 
   };
 
   const save = async () => {
-    const iso = localToIso(runAt, tz);
+    const iso = wallToInstant(runAt, tz)?.at.toISOString();
     if (!iso) return;
     setSaving(true);
     const api = instanceApi(aptId);
@@ -91,6 +96,7 @@ export function ScheduleDialog({ aptId, tz, open, onOpenChange, onDone, move }: 
           <div className="space-y-1.5">
             <Label htmlFor="schedule-run-at">{t("schedule.runAt")}</Label>
             <Input id="schedule-run-at" type="datetime-local" value={runAt} onChange={(e) => setRunAt(e.target.value)} data-testid="schedule-run-at-input" />
+            <DstNote value={runAt} tz={tz} />
           </div>
           {!move && (
             <>

@@ -38,7 +38,10 @@ def test_no_answer_is_waiting_for_the_answer():
                 await net_phase.post_traced(f"http://127.0.0.1:{port}/x", json={}, headers={}, connect_s=1, read_s=0.3)
         return exc.value
     failure = run(main())
-    assert (failure.phase, failure.timeout) == (net_phase.WAIT, True) and 0.25 < failure.seconds < 2
+    # it waited the read timeout (0.3 s), and did not hang. Measured on 11 November: 0.31 s, but 1.16 s for the first
+    # call of a process (the first connection's setup) and 2.46 s in the full run of 10 November, with the PC loaded:
+    # the upper bound is there only to catch a hang (risposta 885)
+    assert (failure.phase, failure.timeout) == (net_phase.WAIT, True) and 0.25 < failure.seconds < 10
 
 
 def test_a_server_that_never_speaks_tls_stops_in_tls():

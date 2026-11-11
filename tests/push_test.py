@@ -707,3 +707,506 @@ def test_an_engine_that_does_not_answer_is_asked_again(users, fcm, monkeypatch):
     run(scenario())
     assert APT.apartment_id not in push._resumed
 
+
+
+# -------- D-217: the engine itself unreachable ------------------------------------------------------------------------
+MINUTE_S = 0.01                                    # MOCK_TIME_SCALE here: the rule's 15 minutes are 0.15 s
+
+
+@pytest.fixture
+def unreachable(users, fcm, monkeypatch):
+    """The engine does not answer (calls raise ConnectError unless `state.answers`); the rule's last minutes are 15."""
+    monkeypatch.setenv("MOCK_TIME_SCALE", str(MINUTE_S))
+    base = push.get_settings()
+    state = SimpleNamespace(answers=False, health="ok", settings=dataclasses.replace(base, instance_mode="mock"),
+                            notes=[], note_status=201)
+    monkeypatch.setattr(push, "get_settings", lambda: state.settings)
+
+    async def call(apt, method, path, **kw):
+        if not state.answers:
+            raise httpx.ConnectError("motore spento")
+        if path == "/_internal/reachability":                # D-217: the engine's note in its Decisions
+            state.notes.append((method, kw["json"]))
+            return httpx.Response(state.note_status, json={}, request=httpx.Request(method, "http://x"))
+        body = {"status": state.health} if path == "/health" else {"devices": [], "rules": [
+            {"rule_id": "offline_alert", "enabled": True, "params": {"minutes": 15}}]}
+        return httpx.Response(200, json=body, request=httpx.Request("GET", "http://x"))
+    monkeypatch.setattr(push.instances, "call", call)
+    for d in (push._unreachable, push._unreachable_timers, push._alert_minutes, push._down_timers):
+        d.clear()
+    push._resumed.clear()
+    push._alert_minutes[APT.apartment_id] = 15.0
+    return state
+
+
+def suspend(state, value: str) -> None:
+    state.settings = dataclasses.replace(state.settings, unreachable_alerts_off_until=value)
+
+
+def soon(seconds: float) -> str:
+    from datetime import UTC, datetime, timedelta
+    return (datetime.now(UTC) + timedelta(seconds=seconds)).isoformat()
+
+
+UNREACHABLE_BODY = ("Il sistema domotico non risponde da 15 minuti: i comandi dall'app non arrivano e le regole "
+                    "automatiche potrebbero essere ferme.")
+
+
+def test_unreachable_message():
+    data, headers = push.instance_unreachable_push(APT, 15, TS)
+    assert data == {"title": "Milano Centro: sistema domotico non raggiungibile", "body": UNREACHABLE_BODY,
+                    "link": "/a/apt-push", "tag": "instance:apt-push", "kind": "instance_down", "apartment_id": "apt-push",
+                    "ts": TS}
+    assert headers == {"Urgency": "high", "TTL": "86400"}
+
+
+def test_an_engine_silent_for_the_rules_minutes_is_told_once(unreachable, fcm):
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await push.on_link_change(APT, False)                 # the hub tells only changes; twice changes nothing
+        await drain()
+    run(scenario())
+    assert [m.data["body"] for m in fcm.sent] == [UNREACHABLE_BODY]
+
+
+def test_back_before_the_minutes_nothing_and_the_next_outage_is_told(unreachable, fcm):
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await asyncio.sleep(0.03)
+        unreachable.answers = True
+        await push.on_link_change(APT, True)
+        await drain()
+        assert fcm.sent == [] and APT.apartment_id not in push._unreachable_timers
+        unreachable.answers = False
+        await push.on_link_change(APT, False)
+        await drain()
+    run(scenario())
+    assert len(fcm.sent) == 1
+
+
+def test_with_the_rule_off_never(unreachable, fcm):
+    push._alert_minutes[APT.apartment_id] = None             # the last time the engine answered, the rule was off
+
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await drain()
+    run(scenario())
+    assert fcm.sent == []
+
+
+def test_an_engine_that_answers_at_the_last_check_is_not_told(unreachable, fcm):
+    """Another instance may have seen it come back, or this hub is still in its backoff."""
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await asyncio.sleep(0.05)
+        unreachable.answers = True
+        await drain()
+    run(scenario())
+    assert fcm.sent == []
+
+
+def test_two_instances_one_notification_and_the_return_frees_the_next(unreachable, fcm):
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await drain()
+        push._unreachable.clear()                            # a second instance, the same outage
+        await push.on_link_change(APT, False)
+        await drain()
+        assert len(fcm.sent) == 1
+        unreachable.answers = True
+        await push.on_link_change(APT, True)                 # back, and its connector fine: the claim goes
+        await drain()
+        unreachable.answers = False
+        await push.on_link_change(APT, False)
+        await drain()
+    run(scenario())
+    assert len(fcm.sent) == 2
+
+
+def test_one_notification_for_the_outage_whatever_its_cause(unreachable, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
+
+    async def scenario():
+        await push.on_stream_event(APT, event("instance.health", {"status": "down"}))   # first the connector
+        await drain()
+        await push.on_link_change(APT, False)                                          # then the engine itself
+        await drain()
+    run(scenario())
+    assert [m.data["body"] for m in fcm.sent] == ["Il connettore domotico risulta fermo"]
+
+
+def test_a_suspension_holds_it_until_its_end_then_an_engine_still_down_is_told(unreachable, fcm):
+    suspend(unreachable, soon(0.4))
+
+    async def scenario():
+        await push.on_link_change(APT, False)
+        await asyncio.sleep(0.25)                            # past the minutes, inside the suspension
+        assert fcm.sent == []
+        await drain()
+    run(scenario())
+    assert [m.data["body"] for m in fcm.sent] == [UNREACHABLE_BODY]
+
+
+def test_a_suspension_holds_the_connector_down_too(unreachable, fcm, monkeypatch):
+    alert_minutes(monkeypatch, 0)
+    suspend(unreachable, soon(0.3))
+
+    async def scenario():
+        await push.on_stream_event(APT, event("instance.health", {"status": "down"}))
+        await asyncio.sleep(0.1)
+        assert fcm.sent == []
+        await push.on_stream_event(APT, event("instance.health", {"status": "ok"}))    # back during the suspension
+        await drain()
+    run(scenario())
+    assert fcm.sent == []
+
+
+def test_a_suspension_that_cannot_be_read_or_is_too_long_leaves_alerts_on(unreachable):
+    from datetime import UTC, datetime
+    now = datetime(2026, 11, 20, 8, 0, tzinfo=UTC)
+    for value, on in (("", True), ("domani", True), ("2026-11-22T08:00:00", True),           # no offset
+                      ("2026-11-19T08:00:00Z", True), ("2026-12-21T08:00:00Z", True),          # past, 31 days
+                      ("2026-11-22T08:00:00Z", False), ("2026-11-22T09:00:00+01:00", False)):
+        suspend(unreachable, value)
+        assert (push.alerts_suspended_until(now) is None) is on, value
+    assert push.alerts_suspended_until(now).isoformat() == "2026-11-22T09:00:00+01:00"
+
+
+def test_the_hub_tells_the_link_changes(monkeypatch):
+    """The stream to the engine fails, then answers: the hooks hear False, then True."""
+    from bff import sse_hub
+
+    heard, attempts = [], iter(["fail", "ok"])
+
+    class Resp:
+        status_code = 200
+
+        async def aiter_lines(self):
+            await asyncio.Event().wait()
+            yield ""                                         # pragma: no cover
+
+    class Stream:
+        async def __aenter__(self):
+            if next(attempts) == "fail":
+                raise httpx.ConnectError("motore spento")
+            return Resp()
+
+        async def __aexit__(self, *exc):
+            return False
+
+    class Http:
+        def stream(self, *a, **kw):
+            return Stream()
+
+    async def headers(apt, actor):
+        return {}
+    monkeypatch.setattr(sse_hub.instances, "http", lambda: Http())
+    monkeypatch.setattr(sse_hub.instances, "instance_headers", headers)
+
+    async def hook(apt, up):
+        heard.append(up)
+
+    async def scenario():
+        hub = sse_hub.InstanceHub(APT, [], [hook])
+        hub.start(None)
+        for _ in range(300):
+            if heard == [False, True]:
+                break
+            await asyncio.sleep(0.01)
+        hub.task.cancel()
+    run(scenario())
+    assert heard == [False, True]
+
+
+def test_register_adds_the_link_hook():
+    from bff.sse_hub import hub_manager
+    push.register()
+    assert push.on_link_change in hub_manager.link_hooks
+
+
+# -------- D-217: the decision «di nuovo raggiungibile» at the return ----------------------------------------------------
+async def outage(state, seconds: float) -> None:
+    """The engine silent for `seconds`, then back."""
+    state.answers = False
+    await push.on_link_change(APT, False)
+    await asyncio.sleep(seconds)
+    state.answers = True
+    await push.on_link_change(APT, True)
+    await drain()
+
+
+def test_a_long_outage_asks_the_engine_for_its_note_once(unreachable):
+    run(outage(unreachable, 0.2))                            # longer than the 15 minutes (0.15 s)
+    assert [m for m, _ in unreachable.notes] == ["POST"]
+    body = unreachable.notes[0][1]
+    assert set(body) == {"from", "to"} and body["from"] < body["to"]
+    assert all(v.endswith("Z") and len(v) == 24 for v in body.values())   # UTC, milliseconds
+
+
+def test_a_short_drop_writes_nothing(unreachable):
+    run(outage(unreachable, 0.03))
+    assert unreachable.notes == []
+
+
+def test_one_note_for_every_instance_and_the_next_outage_has_its_own(unreachable):
+    async def scenario():
+        await outage(unreachable, 0.2)
+        push._unreachable[APT.apartment_id] = time.time() - 1   # a second instance, back from the same outage
+        await push.on_link_change(APT, True)
+        await drain()
+        assert len(unreachable.notes) == 1
+        await outage(unreachable, 0.2)                          # the next outage releases the claim
+    run(scenario())
+    assert len(unreachable.notes) == 2
+
+
+def test_also_during_a_suspension(unreachable, fcm):
+    suspend(unreachable, soon(5))
+    run(outage(unreachable, 0.2))
+    assert len(unreachable.notes) == 1 and fcm.sent == []
+
+
+def test_the_rule_off_still_uses_fifteen_minutes(unreachable):
+    push._alert_minutes[APT.apartment_id] = None
+    run(outage(unreachable, 0.05))
+    assert unreachable.notes == []
+    run(outage(unreachable, 0.2))
+    assert len(unreachable.notes) == 1
+
+
+def test_an_engine_without_the_route_is_skipped_and_not_asked_again(unreachable):
+    unreachable.note_status = 404
+
+    async def scenario():
+        await outage(unreachable, 0.2)
+        push._unreachable[APT.apartment_id] = time.time() - 1   # another instance
+        await push.on_link_change(APT, True)
+        await drain()
+    run(scenario())
+    assert len(unreachable.notes) == 1
+    assert get_repository().work[push.reachable_note_key(APT)]["status"] == "done"
+
+
+# -------- D-219: scheduled actions not done -----------------------------------------------------------------------------
+@pytest.fixture
+def grouped(users, fcm, monkeypatch):
+    """The grouping window short; bookings and offline on for the opted-in users."""
+    monkeypatch.setattr(push, "SCHEDULE_GROUP_S", 0.05)
+    push._schedule_groups.clear()
+    return fcm
+
+
+def not_done(kind: str | None, reasoning: str, action: str = "schedule_failed", decision_id: str | None = None):
+    decision_id = decision_id or f"dec-{next(_ids)}"
+    return event("decision.logged", {"decision_id": decision_id, "action": action, "outcome": "failed",
+                                     "target": {"type": "schedule"}, "new_value": kind, "reasoning": reasoning})
+
+
+PREARRIVAL = "Azione programmata (pre-arrivo) non eseguita: Il dispositivo non è raggiungibile; riprova quando torna online"
+
+
+def test_one_action_not_done_one_notification_in_its_category(grouped):
+    async def scenario():
+        await push.on_stream_event(APT, not_done("prearrival", PREARRIVAL, decision_id="dec-7"))
+        await drain()
+    run(scenario())
+    [msg] = grouped.sent
+    assert msg.data["kind"] == "schedule_failed" and msg.data["title"] == "Milano Centro: azione programmata non eseguita"
+    assert msg.data["body"] == PREARRIVAL and msg.data["link"] == "/a/apt-push/programmazione"
+    assert msg.data["tag"] == "schedule:apt-push:dec-7" and msg.webpush.headers == {"Urgency": "high", "TTL": "86400"}
+
+
+def test_the_categories():
+    assert [push.schedule_pref(k) for k in ("prearrival", "checkout", "empty", "manual", None, "altro")] == [
+        "bookings", "bookings", "bookings", "offline", "offline", "offline"]
+
+
+def test_several_close_together_are_one_notification_with_the_first_in_full(grouped):
+    async def scenario():
+        for kind in ("prearrival", "checkout", "empty"):
+            await push.on_stream_event(APT, not_done(kind, PREARRIVAL if kind == "prearrival" else f"Azione ({kind})"))
+        await push.on_stream_event(APT, not_done("manual", "Azione programmata (manuale) non eseguita: x"))
+        await drain()
+    run(scenario())
+    bodies = sorted(m.data["body"] for m in grouped.sent)
+    assert bodies == sorted([f"3 azioni programmate non eseguite. La prima: {PREARRIVAL}",
+                             "Azione programmata (manuale) non eseguita: x"])   # bookings and offline apart
+    assert {m.data["title"] for m in grouped.sent} == {"Milano Centro: azioni programmate non eseguite",
+                                                       "Milano Centro: azione programmata non eseguita"}
+
+
+def test_a_user_without_the_category_receives_nothing(grouped):
+    """Token z belongs to a user with offline off: a manual action does not reach it."""
+    async def scenario():
+        await push.on_stream_event(APT, not_done("manual", "Azione programmata (manuale) non eseguita: x"))
+        await drain()
+    run(scenario())
+    assert "tok-z" not in grouped.sent[0].tokens
+
+
+def test_two_instances_one_notification(grouped):
+    async def scenario():
+        ev = not_done("checkout", "Azione programmata (check-out) non eseguita: y", decision_id="dec-77")
+        await push.on_stream_event(APT, ev)
+        push._schedule_groups.clear()                         # a second instance receives the same event
+        await push.on_stream_event(APT, ev)
+        await drain()
+    run(scenario())
+    assert len(grouped.sent) == 1
+
+
+def test_missed_actions_during_a_suspension_are_not_notified_one_by_one(grouped, monkeypatch):
+    s = dataclasses.replace(push.get_settings(), unreachable_alerts_off_until=soon(60))
+    monkeypatch.setattr(push, "get_settings", lambda: s)
+
+    async def scenario():
+        await push.on_stream_event(APT, not_done("prearrival", "saltata", action="schedule_missed"))
+        await push.on_stream_event(APT, not_done("prearrival", PREARRIVAL))               # refused: always told
+        await drain()
+    run(scenario())
+    assert [m.data["body"] for m in grouped.sent] == [PREARRIVAL]
+
+
+# -------- D-219 (2): an action that ran with some commands not successful ------------------------------------------------
+PARTIAL = "Pre-arrivo eseguito in parte: 1 comando non riuscito (Caldaia: Il dispositivo ha rifiutato il comando)"
+
+
+def partly(kind, reasoning=PARTIAL, decision_id=None):
+    return not_done(kind, reasoning, action="schedule_partial", decision_id=decision_id)
+
+
+def test_a_prearrival_done_in_part_is_told_in_bookings(grouped):
+    async def scenario():
+        await push.on_stream_event(APT, partly("prearrival", decision_id="dec-9"))
+        await drain()
+    run(scenario())
+    [msg] = grouped.sent
+    assert msg.data["title"] == "Milano Centro: pre-arrivo con comandi non riusciti" and msg.data["body"] == PARTIAL
+    assert msg.data["kind"] == "schedule_failed" and msg.data["link"] == "/a/apt-push/programmazione"
+    assert msg.data["tag"] == "schedule:apt-push:dec-9" and "tok-z" in msg.tokens       # «Prenotazioni»
+
+
+def test_only_the_prearrival_and_the_checkout_are_told(grouped):
+    async def scenario():
+        for kind in ("empty", "manual", "assistant", None):
+            await push.on_stream_event(APT, partly(kind, "Azione programmata (…) eseguita in parte: …"))
+        await push.on_stream_event(APT, partly("checkout", "Check-out non riuscito: 2 comandi non riusciti (…)"))
+        await drain()
+    run(scenario())
+    assert [(m.data["title"], m.data["body"]) for m in grouped.sent] == [
+        ("Milano Centro: check-out con comandi non riusciti", "Check-out non riuscito: 2 comandi non riusciti (…)")]
+
+
+def test_with_an_action_not_done_close_together_one_notification(grouped):
+    async def scenario():
+        await push.on_stream_event(APT, partly("prearrival"))
+        await push.on_stream_event(APT, not_done("checkout", "Azione programmata (check-out) non eseguita: y"))
+        await drain()
+    run(scenario())
+    [msg] = grouped.sent
+    assert msg.data["title"] == "Milano Centro: azioni programmate non eseguite o eseguite in parte"
+    assert msg.data["body"].startswith(f"2 azioni programmate non eseguite o eseguite in parte. La prima: {PARTIAL[:40]}")
+
+
+def test_done_in_part_is_told_also_during_a_suspension(grouped, monkeypatch):
+    s = dataclasses.replace(push.get_settings(), unreachable_alerts_off_until=soon(60))
+    monkeypatch.setattr(push, "get_settings", lambda: s)
+
+    async def scenario():
+        await push.on_stream_event(APT, partly("prearrival"))
+        await drain()
+    run(scenario())
+    assert [m.data["body"] for m in grouped.sent] == [PARTIAL]
+
+
+# -------- D-219: the summary at the end of a planned shutdown ------------------------------------------------------------
+@pytest.fixture
+def maintenance(grouped, monkeypatch):
+    """A suspension that can be set and removed; the apartment in the registry (the start reads it)."""
+    state = SimpleNamespace(settings=push.get_settings())
+    monkeypatch.setattr(push, "get_settings", lambda: state.settings)
+    run(get_repository().upsert_apartment(APT))
+    run(get_repository().release_work(push.maintenance_key(APT)))
+    state.suspend = lambda value: setattr(state, "settings", dataclasses.replace(state.settings, unreachable_alerts_off_until=value))
+    return state
+
+
+def missed(kind):
+    return not_done(kind, "Azione programmata non eseguita: il motore era fermo", action="schedule_missed")
+
+
+def kept():
+    return get_repository().work.get(push.maintenance_key(APT))
+
+
+def test_the_missed_actions_wait_as_one_summary_until_the_end_of_the_suspension(maintenance, grouped):
+    maintenance.suspend(soon(3600))
+
+    async def scenario():
+        for kind in ("prearrival", "checkout", "manual"):
+            await push.on_stream_event(APT, missed(kind))
+        await drain()
+    run(scenario())
+    assert grouped.sent == []
+    summary = kept()
+    assert summary["status"] == "pending" and summary["payload"]["pref"] == "bookings"
+    assert summary["payload"]["data"]["body"] == "Durante la manutenzione 3 azioni programmate non sono state eseguite"
+    assert summary["payload"]["data"]["link"] == "/a/apt-push/programmazione"
+    assert 3590 < summary["lease_until"] - time.time() <= 3600                 # until the end of the suspension
+
+
+def test_the_natural_end_sends_it_once(maintenance, grouped):
+    maintenance.suspend(soon(0.2))
+
+    async def scenario():
+        await push.on_stream_event(APT, missed("manual"))
+        await drain()
+        assert await push.recover_once() == 0                                  # not yet
+        await asyncio.sleep(0.3)                                               # the suspension is over
+        first = await push.recover_once()
+        await drain()
+        return first, await push.recover_once()
+    first, second = run(scenario())
+    assert (first, second) == (1, 0)
+    [msg] = grouped.sent
+    assert msg.data["body"] == "Durante la manutenzione 1 azione programmata non è stata eseguita"
+    assert "tok-z" not in msg.tokens                                           # only manual: «Dispositivi…» category
+
+
+def test_removed_early_the_new_revision_sends_it_at_its_start(maintenance, grouped):
+    maintenance.suspend(soon(86400))
+
+    async def scenario():
+        await push.on_stream_event(APT, missed("checkout"))
+        await drain()
+        assert await push.expire_maintenance_summaries() == 0                  # still suspended: it waits
+        maintenance.suspend("")                                                # the variable removed
+        assert await push.expire_maintenance_summaries() == 1
+        return await push.recover_once()
+    assert run(scenario()) == 1 and len(grouped.sent) == 1
+
+
+def test_two_instances_keep_one_summary(maintenance, grouped):
+    maintenance.suspend(soon(0.2))
+
+    async def scenario():
+        ev = missed("prearrival")
+        await push.on_stream_event(APT, ev)
+        push._schedule_groups.clear()                                         # a second instance, the same event
+        await push.on_stream_event(APT, ev)
+        await drain()
+        await asyncio.sleep(0.3)
+        return await push.recover_once()
+    assert run(scenario()) == 1 and len(grouped.sent) == 1
+
+
+def test_the_next_shutdown_has_its_own_summary(maintenance, grouped):
+    async def one_shutdown():
+        maintenance.suspend(soon(0.2))
+        await push.on_stream_event(APT, missed("prearrival"))
+        await drain()
+        await asyncio.sleep(0.3)
+        await push.recover_once()
+    run(one_shutdown())
+    run(one_shutdown())
+    assert len(grouped.sent) == 2

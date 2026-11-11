@@ -13,18 +13,13 @@ import { resync } from "@/hooks/useApartmentStream";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { DEFAULT_TZ, fmtDateTime } from "@/lib/format";
+import { wallDaysFromToday, wallToInstant } from "@/lib/zonedTime";
 import { useApartmentStore } from "@/store/apartmentStore";
 
-const pad = (n: number) => String(n).padStart(2, "0");
-const toLocal = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 /** A new event of the simulated booking: kept until a field of the form changes (see sendBooking). */
 const newEventId = () => `sim-${crypto.randomUUID().slice(0, 8)}`;
-const plusDays = (n: number, h: number) => {
-  const d = new Date();
-  d.setDate(d.getDate() + n);
-  d.setHours(h, 0, 0, 0);
-  return d;
-};
+/** D-212: check-in and check-out are the apartment's date and time, as everywhere else in the simulator, not the browser's. */
+const toInstant = (value: string, tz: string) => wallToInstant(value, tz)?.at.toISOString() ?? new Date(value).toISOString();
 
 function Section({ icon, title, hint, children, testId }: { icon: React.ReactNode; title: string; hint: string; children: React.ReactNode; testId: string }) {
   return (
@@ -98,8 +93,8 @@ export default function SimulatorPage() {
   const [booking, setBooking] = useState<{ type: SimBookingInput["type"]; booking_id: string; checkin: string; checkout: string; guests: string }>({
     type: "booking_created",
     booking_id: `bk-sim-${Date.now().toString(36).slice(-4)}`,
-    checkin: toLocal(plusDays(1, 15)),
-    checkout: toLocal(plusDays(3, 10)),
+    checkin: wallDaysFromToday(tz, 1, 15),
+    checkout: wallDaysFromToday(tz, 3, 10),
     guests: "2",
   });
   const [lastBooking, setLastBooking] = useState<{ schedule_ids: string[]; duplicate: boolean } | null>(null);
@@ -125,8 +120,8 @@ export default function SimulatorPage() {
       event_id: eventId,
       type: booking.type,
       booking_id: booking.booking_id.trim(),
-      checkin_at: new Date(booking.checkin).toISOString(),
-      checkout_at: new Date(booking.checkout).toISOString(),
+      checkin_at: toInstant(booking.checkin, tz),
+      checkout_at: toInstant(booking.checkout, tz),
       guests: booking.guests === "" ? null : Number(booking.guests),
       ts: new Date().toISOString(),
     };
@@ -227,6 +222,7 @@ export default function SimulatorPage() {
               <Input id="sim-guests" type="number" min={0} value={booking.guests} onChange={(e) => change({ guests: e.target.value })} data-testid="sim-booking-guests" />
             </div>
           </div>
+          <p className="text-xs text-muted-foreground" data-testid="sim-booking-tz">{t("simulator.bookingTz", { tz })}</p>
           <Button onClick={sendBooking} disabled={busy !== null || !booking.booking_id.trim() || !booking.checkin || !booking.checkout} data-testid="sim-booking-send-btn">
             <CalendarPlus /> {t("simulator.sendBooking")}
           </Button>

@@ -141,13 +141,15 @@ def start_bench() -> dict:
            "-e", f"DOMHOUSE_BROKER_PORT={PORT}", "-e", "DOMHOUSE_METADATA=http://127.0.0.1:18090",
            "-e", "DOMHOUSE_SECRETS_API=http://127.0.0.1:18090/v1", "-e", "DOMHOUSE_HEALTH_TRIES=45",
            "-e", "DOMHOUSE_ACME_TEST=1", "-e", "DOMHOUSE_ACME_SERVER=https://127.0.0.1:14000/dir", "-e", "DOMHOUSE_LEGO_NETWORK=host",
+           # the limit on new connections would change this machine's own firewall: it has a privileged bench of its own
+           "-e", "DOMHOUSE_LIMIT=off", "-e", "DOMHOUSE_AUTH_ALERT_PER_HOUR=3",
            "domhouse-broker-rig", "sleep", "3600")
     rig(f"rm -rf {BENCH}/opt {BENCH}/etc {BENCH}/data {BENCH}/certs {BENCH}/secrets {BENCH}/up {BENCH}/systemd {BENCH}/finto {BENCH}/systemctl.log; "
         f"find {BENCH}/tlsdisk -mindepth 1 -delete; install -d -m 700 {TLS} {ACME}; "
         f"mkdir -p {BENCH}/up {BENCH}/opt {BENCH}/data {BENCH}/certs {BENCH}/secrets {BENCH}/systemd {BENCH}/finto; "
         f"printf '#!/bin/sh\\necho \"$*\" >> {BENCH}/systemctl.log\\n' > /usr/local/bin/systemctl; chmod 755 /usr/local/bin/systemctl; "
         f"cd /repo && cp scripts/broker-vm.sh scripts/broker_accounts.py engine/broker/compose.yaml engine/broker/mosquitto.conf "
-        f"engine/compose.broker.yaml {BENCH}/up/; sed -i 's/\\r$//' {BENCH}/up/broker-vm.sh; sed -i 's/$/\\r/' {BENCH}/up/mosquitto.conf {BENCH}/up/compose.yaml; "
+        f"engine/compose.broker.yaml {BENCH}/up/; sed -i 's/\\r$//' {BENCH}/up/broker-vm.sh; sed -i 's/$/\\r/' {BENCH}/up/compose.yaml; sed -i 's/$/\\r\\r/' {BENCH}/up/mosquitto.conf; "
         f"python3 /repo/tests/broker_rig/stub_gcp.py {BENCH}/secrets > /dev/null 2>&1 &")
     rig(f"""cd {BENCH}/certs && openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.crt -days 30 -subj /CN=CA-di-prova 2>/dev/null &&
         openssl req -x509 -newkey rsa:2048 -nodes -keyout altra.key -out altra.crt -days 30 -subj /CN=CA-estranea 2>/dev/null""")
@@ -231,7 +233,7 @@ def test_without_its_keys_folder_the_broker_does_not_start_and_docker_creates_no
 
 
 def test_files_copied_from_windows_lose_their_carriage_returns(bench):
-    assert rig(f"grep -c $'\\r' {BENCH}/up/mosquitto.conf").stdout.strip() != "0"         # the copy really had them
+    assert rig(f"grep -c $'\\r\\r$' {BENCH}/up/mosquitto.conf").stdout.strip() != "0"     # the copy really had two
     assert rig(f"grep -c $'\\r' {BENCH}/opt/_broker/mosquitto.conf", check=False).stdout.strip() == "0"
 
 
@@ -328,12 +330,26 @@ def test_a_device_cannot_leave_its_own_topics(bench, sub):
 
 
 def test_request_and_answer_between_the_connector_and_its_device(bench, sub):
+    """D-223: the answer goes on the device's own answer topic, <apartment>/<device>/connector/rpc (src
+    <apartment>/<device>/connector, the form measured in the lab), which the connector reads with one subscription."""
     device = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/rpc")
-    connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/connector/rpc")
+    connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/+/connector/rpc")
     assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "richiesta-1").returncode == 0
     assert device.wait_for("richiesta-1")
-    assert pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/rpc", "risposta-1").returncode == 0
-    assert connector.wait_for("risposta-1")
+    assert pub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/connector/rpc", "risposta-1").returncode == 0
+    assert connector.wait_for(f"{A}/a1/connector/rpc risposta-1")
+
+
+def test_a_device_cannot_answer_in_the_name_of_another(bench, sub):
+    """D-223: a1 may not write on a2's answer topic, nor on the two forms of before (D-215 and the shared one)."""
+    connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/#")
+    pub("tls", f"{A}.a1", PW["a1"], f"{A}/a2/connector/rpc", "risposta-falsa")
+    pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/a1/rpc", "risposta-d215")
+    pub("tls", f"{A}.a1", PW["a1"], f"{A}/connector/rpc", "risposta-vecchia")
+    assert pub("tls", f"{A}.a2", PW["a2"], f"{A}/a2/connector/rpc", "risposta-vera").returncode == 0
+    assert connector.wait_for("risposta-vera")
+    assert not any(word in line for line in connector.lines()
+                   for word in ("risposta-falsa", "risposta-d215", "risposta-vecchia"))
 
 
 def test_a_second_sync_with_the_same_secrets_changes_nothing(bench):
@@ -403,6 +419,28 @@ def test_a_bad_certificate_never_reaches_the_broker(bench, cert, key, reason):
     assert served_fingerprint() == served and can_connect("tls", f"{A}.a1", PW["a1"])
 
 
+def test_d215_a_request_with_qos_0_never_reaches_a_device_late(bench, sub):
+    """Risposta 744: a device with a persistent session goes away; the connector sends it a request with QoS 0 and one
+    with QoS 1; the device comes back after a couple of minutes. The QoS 1 one is waiting for it, the QoS 0 one is not:
+    with requests sent as QoS 0 a command never reaches a device late (connector-v2.md §7.2)."""
+    away = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/rpc", client_id=f"{A}.a1", persistent=True)
+    docker("rm", "-f", away.name)                                 # the device goes away, its session stays
+    time.sleep(1)
+    assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "richiesta-qos0", extra=["-q", "0"]).returncode == 0
+    assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "richiesta-qos1").returncode == 0
+    time.sleep(120)                                              # «dopo qualche minuto»
+    back = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/rpc", client_id=f"{A}.a1", persistent=True)
+    assert back.wait_for("richiesta-qos1"), "la richiesta con QoS 1 non è arrivata: la sessione non era persistente"
+    time.sleep(2)
+    assert not any("richiesta-qos0" in line for line in back.lines()), "una richiesta con QoS 0 è arrivata in ritardo"
+
+
+def test_d215_sessions_expire_after_an_hour_for_everybody():
+    conf = (ROOT / "engine/broker/mosquitto.conf").read_text(encoding="utf-8")
+    assert re.search(r"^persistent_client_expiration 1h$", conf, re.M)          # h: an hour (m would be a month)
+    assert not re.search(r"^queue_qos0_messages true", conf, re.M)
+
+
 def test_after_a_restart_clients_reconnect_and_nothing_queued_is_lost(bench, sub):
     connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/#", client_id="connettore-persistente", persistent=True)
     assert pub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/online", "true", extra=["-r"]).returncode == 0
@@ -418,7 +456,10 @@ def test_after_a_restart_clients_reconnect_and_nothing_queued_is_lost(bench, sub
 
 
 def test_the_watch_says_ok_expiring_and_down(bench):
-    assert re.search(r"^broker ok cert_days=\d+$", vm("check").stdout, re.M)
+    text = vm("check").stdout
+    assert re.search(r"^broker ok cert_days=\d+$", text, re.M)
+    started = docker("inspect", "-f", "{{.State.StartedAt}}", CONTAINER).stdout.strip()
+    assert f"broker started_at={started}" in text                        # D-210: the report counts restarts from it
     make_cert("breve", days=5)
     vm("install-cert", f"{BENCH}/certs/breve.crt", f"{BENCH}/certs/breve.key")
     text = vm("check").stdout
@@ -434,11 +475,57 @@ def test_the_watch_says_ok_expiring_and_down(bench):
     assert re.search(r"^broker down \(container: \w+, porta TLS: muta\)$", text, re.M), text
 
 
+def test_every_refused_login_leaves_a_line_and_many_raise_the_alert(bench):
+    """D-209: Mosquitto's own line names the client id and the address; the client id is the device's user name."""
+    for _ in range(4):
+        assert pub("tls", f"{A}.a1", "password-sbagliata-ma-lunga-00001", f"{A}/a1/x", extra=["-i", f"{A}.a1"]).returncode
+    for _ in range(6):            # the internal door is not the way in from the internet: these must not count
+        assert pub("internal", f"{A}.connector", "password-sbagliata-ma-lunga-00001", "x", extra=["-i", "porta-interna"]).returncode
+    logs = docker("logs", "--since", "3m", CONTAINER).stdout + docker("logs", "--since", "3m", CONTAINER).stderr
+    assert re.search(rf"Client {A}\.a1 \[[0-9a-f.:]+:\d+\] disconnected: not authorised\.", logs), logs[-800:]
+    text = vm("check").stdout
+    assert re.search(rf"^broker auth refused hour=\d+ top_ip=[0-9a-f.:]+\(\d+\) top_client={A}\.a1\([4-9]\d*\)$", text, re.M), text
+    assert re.search(r"^broker ok cert_days=\d+$", text, re.M)
+    assert "porta-interna" not in text and "domhouse-check" not in text      # nor check's own probe, every 5 minutes
+    assert re.search(r"^accessi rifiutati sulla 8883 nell'ultima ora: \d+$", vm("status").stdout, re.M)
+
+
+def test_no_anonymous_login_on_either_door():
+    """D-209: both listeners refuse a client without a user (the bench proves it too: can_connect with no user)."""
+    conf = (ROOT / "engine/broker/mosquitto.conf").read_text(encoding="utf-8")
+    listeners = re.split(r"^listener ", conf, flags=re.M)[1:]
+    assert [l.split("\n")[0] for l in listeners] == ["8883", f"1883 {INTERNAL_IP}"]
+    for section in listeners:
+        assert re.search(r"^allow_anonymous false$", section, re.M) and re.search(r"^password_file ", section, re.M)
+    assert "per_listener_settings true" in conf
+
+
 def test_data_are_written_on_the_data_folder(bench):
     docker("exec", CONTAINER, "sh", "-c", "kill -0 1")
     rig(f"docker compose --env-file {BENCH}/opt/_broker/broker.settings -f {BENCH}/opt/_broker/compose.yaml restart", timeout=90)
     time.sleep(2)
     assert "mosquitto.db" in rig(f"ls {BENCH}/data/_broker").stdout
+
+
+def test_install_restarts_the_broker_only_when_mosquitto_conf_changed(bench):
+    """Lot 39 (V3 of the lot 38 procedure, 11 November): mosquitto.conf is mounted as a single file and install replaces
+    it, so a broker already running kept reading the old one, also after a reload. Now install restarts the broker
+    when what it reads is not the installed file, and only then."""
+    in_container = lambda: docker("exec", CONTAINER, "cat", "/mosquitto/config/mosquitto.conf").stdout
+    started = lambda: docker("inspect", "-f", "{{.State.StartedAt}}", CONTAINER).stdout.strip()
+    before = started()
+    same = rig(f"bash {BENCH}/up/broker-vm.sh install {IMAGE}", timeout=200)
+    assert "il broker legge la configurazione installata" in same.stdout and started() == before, same.stdout
+    rig(f"printf '# cambio di prova\\n' >> {BENCH}/up/mosquitto.conf")
+    try:
+        changed = rig(f"bash {BENCH}/up/broker-vm.sh install {IMAGE}", timeout=200)
+        assert "configurazione cambiata: riavvio del broker" in changed.stdout and "sano" in changed.stdout, changed.stdout
+        assert "# cambio di prova" in in_container() and started() != before
+    finally:
+        rig(f"cp /repo/engine/broker/mosquitto.conf {BENCH}/up/mosquitto.conf && "
+            f"bash {BENCH}/up/broker-vm.sh install {IMAGE}", timeout=200)
+    assert "# cambio di prova" not in in_container()
+    assert can_connect("tls", f"{A}.a1", PW["a1"]) and can_connect("internal", f"{A}.connector", PW["connA"])
 
 
 def file_fingerprint(path):
@@ -450,6 +537,9 @@ def test_without_acme_settings_the_daily_renewal_does_nothing(bench):
     assert "OnCalendar=*-*-* 04:17:00" in rig(f"cat {BENCH}/systemd/domhouse-broker-cert.timer").stdout
     assert f"ExecStart=/bin/bash {BENCH}/opt/broker-vm.sh cert-renew" in rig(f"cat {BENCH}/systemd/domhouse-broker-cert.service").stdout
     assert "enable --now domhouse-broker-cert.timer" in rig(f"cat {BENCH}/systemctl.log").stdout
+    limit_unit = rig(f"cat {BENCH}/systemd/domhouse-broker-limit.service").stdout
+    assert f"ExecStart=/bin/bash {BENCH}/opt/broker-vm.sh limit" in limit_unit and "WantedBy=multi-user.target" in limit_unit
+    assert "enable domhouse-broker-limit.service" in rig(f"cat {BENCH}/systemctl.log").stdout
 
 
 def test_a_certificate_from_acme_is_served_at_once_and_renewed_only_when_due(bench):
@@ -458,7 +548,8 @@ def test_a_certificate_from_acme_is_served_at_once_and_renewed_only_when_due(ben
     assert "ricarica fatta" in done.stdout and served_fingerprint() == file_fingerprint(crt)
     settings = rig(f"cat {BENCH}/etc/_broker/acme.settings").stdout.splitlines()
     assert settings == [f"ACME_DOMAIN={HOST}", "ACME_DNS_ZONE=domhouse-lab", f"ACME_DNS_ACCOUNT={DNS_ACCOUNT}",
-                        "ACME_SERVER=https://127.0.0.1:14000/dir"]
+                        "ACME_SERVER=https://127.0.0.1:14000/dir", "ACME_KEY_TYPE=rsa2048"]
+    assert served_key() == "rsa 2048"                                  # D-212: RSA-2048 unless asked otherwise
     assert rig(f"ls {ACME}/accounts/*/domhouse-broker/domhouse-broker.key").returncode == 0      # the account key, on that disk
     assert key_modes() == ONLY_THE_BROKER
     again = vm("cert-renew")
@@ -480,6 +571,44 @@ def test_revoking_gives_a_new_key_that_the_broker_serves_at_once(bench, sub):
     assert connected.running(), "la riemissione ha fatto cadere il connector"
 
 
+def test_a_forced_renewal_gives_a_new_certificate_at_once(bench):
+    """D-210: the first automatic renewal falls after the delivery, so one is forced during the run-in."""
+    served_before = served_fingerprint()
+    assert vm("cert-renew", "now", check=False).returncode
+    done = vm("cert-renew", "force")
+    assert "broker cert new notAfter=" in done.stdout and "ricarica fatta" in done.stdout, done.stdout
+    assert served_fingerprint() != served_before and served_fingerprint() == file_fingerprint(f"{ACME}/certificates/{HOST}.crt")
+    assert "rinnovo non ancora dovuto" in vm("cert-renew").stdout
+    assert key_modes() == ONLY_THE_BROKER
+
+
+def served_key():
+    """The kind and size of the key the TLS port serves, e.g. "rsa 2048" or "ec 256"."""
+    text = rig(f"python3 {BENCH}/opt/broker_accounts.py probe 127.0.0.1 {PORT} | openssl x509 -noout -text").stdout
+    if "rsaEncryption" in text:
+        return "rsa " + re.search(r"Public-Key: \((\d+) bit\)", text).group(1)
+    return "ec " + re.search(r"Public-Key: \((\d+) bit\)", text).group(1)
+
+
+def test_d212_the_key_type_is_a_setting_and_a_missing_one_means_rsa(bench):
+    """cert-new with ec256 gives an ECDSA key; acme.settings without the line (as written on 10 November) gives RSA at
+    the next renewal, with the same ACME account; a type not foreseen is refused."""
+    assert vm("cert-new", HOST, "domhouse-lab", DNS_ACCOUNT, "rsa4096", check=False).returncode
+    # RSA -> ECDSA: the reload is enough (OpenSSL prefers the ECDSA one it now holds); the other way round it is not
+    assert re.search(r"(ricarica|riavvio) fatt", vm("cert-new", HOST, "domhouse-lab", DNS_ACCOUNT, "ec256").stdout)
+    accounts = rig(f"ls {ACME}/accounts/*/domhouse-broker/").stdout
+    assert served_key() == "ec 256" and "ACME_KEY_TYPE=ec256" in rig(f"cat {BENCH}/etc/_broker/acme.settings").stdout
+    rig(f"sed -i '/^ACME_KEY_TYPE=/d' {BENCH}/etc/_broker/acme.settings")
+    started = docker("inspect", "-f", "{{.State.StartedAt}}", CONTAINER).stdout
+    done = vm("cert-renew", "force").stdout
+    # the reload alone keeps serving the ECDSA one (D-212): the broker restarts once, and serves the RSA one
+    assert "la ricarica non basta" in done and "riavvio fatto" in done, done
+    assert docker("inspect", "-f", "{{.State.StartedAt}}", CONTAINER).stdout != started
+    assert served_key() == "rsa 2048"
+    assert rig(f"ls {ACME}/accounts/*/domhouse-broker/").stdout == accounts             # the same account
+    assert key_modes() == ONLY_THE_BROKER
+
+
 DISK_RIG = "domhouse-broker-disk-run"
 OPTIONS = "defaults,nofail,nodev,nosuid,noexec,x-systemd.device-timeout=30s,x-systemd.before=docker.service"
 
@@ -490,8 +619,9 @@ def on_disk_rig(script, check=True):
 
 @pytest.fixture(scope="module")
 def disk():
-    """A privileged bench: /vm is an ext4 loop disk standing for the VM's boot disk; four loop disks stand for the
-    keys' disk (empty), one already formatted ext2, one with data and no file system, plus a name that is no disk."""
+    """A privileged bench: /vm is an ext4 loop disk standing for the VM's boot disk; loop disks stand for the keys'
+    disk (empty), one already formatted ext2, one with data and no file system, a new keys' disk after a restore, plus
+    a name that is no disk."""
     if shutil.which("docker") is None or docker("info", check=False).returncode:
         pytest.fail("Docker non disponibile: questa prova ha bisogno di un contenitore privilegiato")
     docker("build", "-q", "-t", "domhouse-broker-rig", str(ROOT / "tests" / "broker_rig"), timeout=240)
@@ -501,7 +631,7 @@ def disk():
     try:
         on_disk_rig("mkdir -p /w /vm && truncate -s 64M /w/boot.img && mkfs.ext4 -q /w/boot.img && mount -o loop /w/boot.img /vm && "
                     "cp /repo/scripts/broker-vm.sh /w/ && sed -i 's/\\r$//' /w/broker-vm.sh")
-        for name in ("tls", "ext2", "dirty"):
+        for name in ("tls", "ext2", "dirty", "fresh"):
             on_disk_rig(f"truncate -s 16M /w/{name}.img")
             loops[name] = on_disk_rig(f"losetup -f --show /w/{name}.img").stdout.strip()
             on_disk_rig(f"ln -s {loops[name]} /w/google-{name}")
@@ -549,6 +679,96 @@ def test_a_disk_that_holds_something_is_never_formatted(disk):
     absent = prepare("nessuno", "/vm/mnt/nessuno")
     assert absent.returncode and "manca il disco" in absent.stderr
     assert not fstab_lines("/vm/mnt/altro") and not fstab_lines("/vm/mnt/sporco") and not fstab_lines("/vm/mnt/nessuno")
+
+
+LIMIT_RIG = "domhouse-broker-limit-run"
+CONNECT = """import socket, sys
+ok = 0
+for _ in range(int(sys.argv[3])):
+    s = socket.socket(); s.settimeout(0.4)
+    try:
+        s.connect((sys.argv[1], int(sys.argv[2]))); ok += 1
+    except OSError:
+        pass
+    s.close()
+print(ok)
+"""
+
+
+def on_limit_rig(script, check=True):
+    return docker("exec", LIMIT_RIG, "bash", "-c", script, check=check, timeout=120)
+
+
+LIMIT_NET, LIMIT_RIG_IP = "bench-limit", "10.98.0.2"
+
+
+def connections_from(source, count):
+    """Opens `count` connections one after the other from the address `source`: how many got in."""
+    done = docker("run", "--rm", "--network", LIMIT_NET, "--ip", source, "--entrypoint", "python3", "domhouse-broker-rig",
+                  "-c", CONNECT, LIMIT_RIG_IP, "18883", str(count), timeout=120)
+    return int(done.stdout.strip())
+
+
+@pytest.fixture(scope="module")
+def limited():
+    """A privileged bench with the VM's path: port 18883 goes through a DNAT to a server on 8883 in another network
+    namespace, as docker publishes the broker; the limit is the real broker-vm.sh limit, on the forward hook."""
+    if shutil.which("docker") is None or docker("info", check=False).returncode:
+        pytest.fail("Docker non disponibile: questa prova ha bisogno di un contenitore privilegiato")
+    docker("build", "-q", "-t", "domhouse-broker-rig", str(ROOT / "tests" / "broker_rig"), timeout=240)
+    docker("rm", "-f", LIMIT_RIG, check=False)
+    docker("network", "rm", LIMIT_NET, check=False)
+    docker("network", "create", "--subnet", "10.98.0.0/24", LIMIT_NET)
+    docker("run", "-d", "--name", LIMIT_RIG, "--privileged", "--network", LIMIT_NET, "--ip", LIMIT_RIG_IP, "-v", f"{ROOT.as_posix()}:/repo:ro", "-e", "DOMHOUSE_OPT=/w/opt",
+           "domhouse-broker-rig", "sleep", "900")
+    try:
+        on_limit_rig(
+            "mkdir -p /w && cp /repo/scripts/broker-vm.sh /w/ && sed -i 's/\\r$//' /w/broker-vm.sh && "
+            "ip netns add srv && ip link add vs type veth peer name vs-in && ip link set vs-in netns srv && "
+            "ip addr add 10.99.0.1/24 dev vs && ip link set vs up && ip netns exec srv ip addr add 10.99.0.2/24 dev vs-in && "
+            "ip netns exec srv ip link set vs-in up && ip netns exec srv ip link set lo up && "
+            "ip netns exec srv ip route add default via 10.99.0.1 && sysctl -q -w net.ipv4.ip_forward=1 && "
+            "nft add table ip docker_finto && "
+            "nft 'add chain ip docker_finto pre { type nat hook prerouting priority -100; }' && "
+            "nft add rule ip docker_finto pre tcp dport 18883 dnat to 10.99.0.2:8883")
+        on_limit_rig("ip netns exec srv python3 -c \"import socket; s = socket.socket(); "
+                     "s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1); s.bind(('0.0.0.0', 8883)); s.listen(512)\n"
+                     "while True: s.accept()[0].close()\" > /dev/null 2>&1 &")
+        yield
+    finally:
+        docker("rm", "-f", LIMIT_RIG, check=False)
+        docker("network", "rm", LIMIT_NET, check=False)
+
+
+def test_new_connections_are_limited_per_address_and_never_banned(limited):
+    assert connections_from("10.98.0.11", 10) == 10                              # the way through works without the limit
+    first = on_limit_rig("bash /w/broker-vm.sh limit")
+    assert first.returncode == 0 and "limite attivo" in first.stdout
+    on_limit_rig("bash /w/broker-vm.sh limit")                                   # a repeat leaves one copy
+    table = on_limit_rig("nft list table inet domhouse_broker").stdout
+    assert table.count('comment "domhouse-broker-limit"') == 2 and "hook forward" in table
+    assert on_limit_rig("nft list tables").stdout.count("domhouse_broker") == 1
+    flood = connections_from("10.98.0.12", 90)
+    assert 60 <= flood <= 70, f"{flood} collegamenti su 90 da un solo indirizzo"   # the burst, then 30 a minute
+    assert connections_from("10.98.0.13", 10) == 10, "un altro indirizzo è stato fermato"
+    assert int(re.search(r"counter packets (\d+)", table := on_limit_rig("nft list table inet domhouse_broker").stdout).group(1)) > 0, table
+
+
+def test_after_a_restore_with_a_new_disk_the_line_of_the_old_one_is_replaced(disk):
+    mount = "/vm/mnt/ripristino"
+    gone = f"UUID=0b5e55ed-dead-4bad-beef-000000000001 {mount} ext4 {OPTIONS} 0 2"
+    on_disk_rig(f"echo '{gone}' >> /etc/fstab")
+    done = prepare("fresh", mount)
+    assert done.returncode == 0 and "sostituita" in done.stdout, done.stdout + done.stderr
+    uuid = on_disk_rig(f"blkid -p -o value -s UUID {disk['fresh']}").stdout.strip()
+    assert fstab_lines(mount) == [f"UUID={uuid} {mount} ext4 {OPTIONS} 0 2"]
+    assert on_disk_rig("ls /etc/fstab.before-domhouse-tls-*").returncode == 0      # the previous file, kept
+    on_disk_rig(f"umount {mount}")
+    ext2 = on_disk_rig(f"blkid -p -o value -s UUID {disk['ext2']}").stdout.strip()   # a disk that is there: not ours to drop
+    on_disk_rig(f"sed -i 's#^UUID=[^ ]* {mount} #UUID={ext2} {mount} #' /etc/fstab")
+    refused = prepare("fresh", mount)
+    assert refused.returncode and "diversa da quella attesa" in refused.stderr
+    assert fstab_lines(mount) == [f"UUID={ext2} {mount} ext4 {OPTIONS} 0 2"]
 
 
 def test_the_address_of_the_internal_listener_is_the_same_everywhere():

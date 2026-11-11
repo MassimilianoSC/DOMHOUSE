@@ -3,19 +3,21 @@
 # identity, like engine-vm.sh: no gcloud there, only python3, openssl and docker. Procedure: docs/motore-vm.md, G2.
 #
 #   sudo bash broker-vm.sh prepare-tls-disk                            # once: the keys' disk (C-12); safe to repeat
-#   sudo bash broker-vm.sh cert-new <domain> <dns_zone> <dns_account>  # the first certificate, from Let's Encrypt
-#   sudo bash broker-vm.sh install <image>                             # first time; needs the certificate
+#   sudo bash broker-vm.sh cert-new <domain> <dns_zone> <dns_account> [rsa2048|ec256]   # the first certificate
+#   sudo bash broker-vm.sh install <image>                             # first time (needs the certificate) and to bring
+#                                                                      # new files; restarts the broker if mosquitto.conf changed
 #   sudo bash /opt/domhouse/broker-vm.sh update <image>                # new image, same data
 #   sudo bash /opt/domhouse/broker-vm.sh status
 #   sudo bash /opt/domhouse/broker-vm.sh restart                       # everyone reconnects: reload is enough, usually
 #   sudo bash /opt/domhouse/broker-vm.sh reload                        # SIGHUP: certificate, users and permissions
-#   sudo bash /opt/domhouse/broker-vm.sh cert-renew                    # the daily timer: renews only when due
+#   sudo bash /opt/domhouse/broker-vm.sh cert-renew [force]            # the daily timer: renews only when due
 #   sudo bash /opt/domhouse/broker-vm.sh cert-revoke <key-compromise|superseded>   # revokes, then a new key and certificate
 #   sudo bash /opt/domhouse/broker-vm.sh install-cert <fullchain> <privkey>   # a certificate from elsewhere; checks it first
 #   sudo bash /opt/domhouse/broker-vm.sh add-apartment <apartment_id>  # its accounts from Secret Manager
 #   sudo bash /opt/domhouse/broker-vm.sh remove-apartment <apartment_id>
 #   sudo bash /opt/domhouse/broker-vm.sh sync                          # rereads the secrets of every apartment
 #   sudo bash /opt/domhouse/broker-vm.sh check                         # one line for the 5-minute watch
+#   sudo bash /opt/domhouse/broker-vm.sh limit                         # (re)applies the limit on new connections
 #
 # Folders: /opt/domhouse/_broker (compose, configuration, settings), /etc/domhouse/_broker (auth, the list of
 # apartments, acme.settings), /data/_broker (the broker's persistence). The underscore on purpose: an apartment_id
@@ -28,11 +30,25 @@
 # here writes a key, the broker does not start (its folder is missing and docker is told never to create it, the
 # empty mount point is immutable) and check reports "broker down".
 #
+# Certificate key (D-212): RSA-2048 unless acme.settings says ACME_KEY_TYPE=ec256. An RSA certificate depends only on
+# ISRG Root X1 (leaf, YR1 or YR2, Root YR cross-signed by X1), the root a Shelly Gen4 is most likely to carry; the
+# chain ending at X1 is asked for by name, so a change of Let's Encrypt's default chain does not change ours. An
+# acme.settings without the line (the first certificate of 10 November was ECDSA) means RSA from the next renewal.
+#
 # Secrets: broker_accounts.py reads them with the VM's identity (langbrain-vm@, Secret Accessor) and writes only hashes.
 # Nothing here prints a password; adding them to Secret Manager is broker-secrets.sh, on the PC.
 #
 # Watch: check writes "broker ok cert_days=<n> ..." or "broker down (...)" and "broker cert expiring days=<n>" (under
 # CERT_ALERT_DAYS) with the syslog tag domhouse-check; engine-vm.sh check-all calls it when the broker is installed.
+#
+# Way in from the internet (D-209): every device has its own user, nobody enters without one, on both doors. Mosquitto
+# writes one line for each refused login, "Client <client id> [<ip>:<port>] disconnected: not authorised." (it names
+# the user only in its debug log, too large to keep on: each device's client id is set to its user name instead).
+# Above AUTH_ALERT_PER_HOUR refused logins in the last hour, check writes "broker auth refused hour=<n> ..." for the
+# alert. Mosquitto has no limit on failed logins: the limit is on new connections to 8883, per source address, in an
+# nftables table of its own (inet domhouse_broker): beyond LIMIT_BURST at once and LIMIT_RATE after, that address's
+# new connections are dropped until it slows down. No ban: the devices of an apartment share one public address, and a
+# single relay with a wrong password must not lock out its neighbours; guessing a random 192-bit password is hopeless.
 set -euo pipefail
 set +x                                   # never trace
 
@@ -61,6 +77,13 @@ ACCOUNTS="${OPT}/broker_accounts.py"
 LEGO_IMAGE="goacme/lego:v5.6.0@sha256:6f1583fc026a455ea46a7a5858c576105bb69c2e2de69db391cab7f14750350c"
 LETS_ENCRYPT="https://acme-v02.api.letsencrypt.org/directory"
 ACME_ACCOUNT_ID=domhouse-broker          # no email: Let's Encrypt sends none, and no address leaves the VM
+ACME_CHAIN="ISRG Root X1"               # the chain that ends at the root every client has; the default one today
+LIMIT="${DOMHOUSE_LIMIT:-on}"            # "off" only on the unprivileged test bench, which shares the host's network
+LIMIT_TABLE=domhouse_broker
+LIMIT_FILE="${BROKER_OPT}/limit.nft"
+LIMIT_RATE="30/minute"                   # per source address, after the first LIMIT_BURST
+LIMIT_BURST=60                           # an apartment's relays reconnecting together after a power cut
+AUTH_ALERT_PER_HOUR="${DOMHOUSE_AUTH_ALERT_PER_HOUR:-100}"   # one relay with a wrong password retrying alone stays under
 
 die() { echo "errore: $*" >&2; exit 1; }
 step() { printf '\n== %s\n' "$*"; }
@@ -143,15 +166,24 @@ reload_broker() {
   [ -z "${problem}" ] || die "ricarica non fatta: ${problem}"
   hup
   wanted="$(fingerprint_of_stdin < "${TLS_DIR}/fullchain.pem")"
+  served_is "${wanted}" && { echo "ricarica fatta: la porta $(tls_port) serve il certificato ${wanted}"; return 0; }
+  # D-212: from an ECDSA certificate to an RSA one (or back) the reload is not enough, Mosquitto keeps serving the old
+  # one (OpenSSL holds one certificate per key type and prefers ECDSA): a restart, once, and everyone reconnects
+  echo "la ricarica non basta (tipo di chiave cambiato?): riavvio del broker, i dispositivi si ricollegano"
+  compose restart
+  wait_healthy
+  served_is "${wanted}" && { echo "riavvio fatto: la porta $(tls_port) serve il certificato ${wanted}"; return 0; }
+  die "dopo ricarica e riavvio la porta non serve il certificato sul disco (servito: ${served:-nessuno})"
+}
+
+served_is() {
+  # served_is <fingerprint>: true when the TLS port serves that certificate within 10 seconds (served: the last seen)
   for _ in $(seq 1 10); do
     served="$(served_pem 2>/dev/null | fingerprint_of_stdin 2>/dev/null || true)"
-    if [ "${served}" = "${wanted}" ]; then
-      echo "ricarica fatta: la porta $(tls_port) serve il certificato ${wanted}"
-      return 0
-    fi
+    [ "${served}" = "$1" ] && return 0
     sleep 1
   done
-  die "dopo la ricarica la porta non serve il certificato sul disco (servito: ${served:-nessuno})"
+  return 1
 }
 
 put_cert() {
@@ -192,13 +224,14 @@ put_files() {
   install -m 644 "${here}/compose.broker.yaml" "${OPT}/compose.broker.yaml"
   install -m 644 "${here}/compose.yaml" "${BROKER_OPT}/compose.yaml"
   install -m 644 "${here}/mosquitto.conf" "${BROKER_OPT}/mosquitto.conf"
-  # copied from a Windows PC they may carry \r line ends, which the broker would read as part of each value
-  sed -i 's/\r$//' "${OPT}/broker_accounts.py" "${OPT}/compose.broker.yaml" "${BROKER_OPT}/compose.yaml" "${BROKER_OPT}/mosquitto.conf"
+  # copied from a Windows PC they may carry \r line ends, which the broker would read as part of each value; all of
+  # them, also two (a file converted twice, as git archive does on Windows)
+  sed -i 's/\r*$//' "${OPT}/broker_accounts.py" "${OPT}/compose.broker.yaml" "${BROKER_OPT}/compose.yaml" "${BROKER_OPT}/mosquitto.conf"
 }
 
 prepare_tls_disk() {
   # formats the disk only when it is empty, mounts it, writes its fstab line once; each step is skipped when done
-  local dev fstype uuid line current source
+  local dev fstype uuid line current source old_uuid
   for tool in blkid mkfs.ext4 mountpoint findmnt chattr mount cmp; do command -v "$tool" > /dev/null || die "manca $tool sulla VM"; done
   [ -e "${TLS_DEVICE}" ] || die "manca il disco ${TLS_DEVICE}: va creato e collegato alla VM con --device-name=domhouse-tls"
   dev="$(readlink -f "${TLS_DEVICE}")"
@@ -230,7 +263,18 @@ prepare_tls_disk() {
   elif [ "${current}" = "${line}" ]; then
     echo "già presente: ${line}"
   else
-    die "/etc/fstab ha già una riga per ${TLS_MOUNT} diversa da quella attesa: ${current}"
+    # after a restore from snapshot with a new keys' disk the line still names the old one: it is replaced only when
+    # it is our own line and its disk is gone; any other line is someone else's, and is left alone
+    old_uuid="$(printf '%s\n' "${current}" | awk 'NR == 1 {print $1}' | sed -n 's/^UUID=//p')"
+    if [ -n "${old_uuid}" ] && [ "${current}" = "UUID=${old_uuid} ${TLS_MOUNT} ext4 ${TLS_MOUNT_OPTIONS} 0 2" ] \
+       && [ -z "$(blkid -U "${old_uuid}" 2>/dev/null || true)" ]; then
+      cp -p /etc/fstab "/etc/fstab.before-domhouse-tls-$(date +%Y%m%d%H%M%S)"
+      awk -v m="${TLS_MOUNT}" -v l="${line}" '$1 !~ /^#/ && $2 == m {print l; next} {print}' /etc/fstab > /etc/fstab.domhouse-new
+      cat /etc/fstab.domhouse-new > /etc/fstab && rm -f /etc/fstab.domhouse-new
+      echo "sostituita (il disco ${old_uuid} non c'è più): ${line}"
+    else
+      die "/etc/fstab ha già una riga per ${TLS_MOUNT} diversa da quella attesa: ${current}"
+    fi
   fi
 
   if ! mountpoint -q "${TLS_MOUNT}"; then
@@ -260,12 +304,19 @@ lego() {
 }
 
 acme_get() {
-  # gets the certificate when it is missing or due; puts it in the broker's folder only when it is a new one
-  local domain crt key dns_args=(--dns gcloud)
+  # gets the certificate when it is missing or due (or at once, with --renew-force as argument); puts it in the
+  # broker's folder only when it is a new one
+  local domain crt key key_type dns_args=(--dns gcloud)
   domain="$(acme_setting ACME_DOMAIN)"
+  case "$(acme_setting ACME_KEY_TYPE)" in
+    ""|rsa2048) key_type=RSA2048 ;;
+    ec256) key_type=EC256 ;;
+    *) die "ACME_KEY_TYPE non previsto in ${ACME_SETTINGS}: $(acme_setting ACME_KEY_TYPE) (rsa2048 o ec256)" ;;
+  esac
   [ -z "${DOMHOUSE_ACME_TEST:-}" ] || dns_args=(--dns exec --dns.propagation.wait 1s)   # Pebble accepts every challenge
   crt="${ACME_DIR}/certificates/${domain}.crt"; key="${ACME_DIR}/certificates/${domain}.key"
-  if ! lego run --accept-tos -d "${domain}" --no-random-sleep "${dns_args[@]}"; then
+  if ! lego run --accept-tos -d "${domain}" --no-random-sleep --key-type "${key_type}" --preferred-chain "${ACME_CHAIN}" \
+       "${dns_args[@]}" "$@"; then
     secure_keys
     watch_line "broker cert renew failed (${domain})"
     exit 1
@@ -280,7 +331,74 @@ acme_get() {
   cert_in_place
 }
 
-install_cert_timer() {
+limit_rules() {
+  # one transaction: the table is created if missing, emptied and written again, so a repeat leaves one copy
+  cat <<NFT
+# written by broker-vm.sh limit (D-209): new connections to the broker's TLS port, per source address
+add table inet ${LIMIT_TABLE}
+delete table inet ${LIMIT_TABLE}
+table inet ${LIMIT_TABLE} {
+  set sources4 { type ipv4_addr; flags dynamic, timeout; timeout 10m; size 65536; }
+  set sources6 { type ipv6_addr; flags dynamic, timeout; timeout 10m; size 65536; }
+  chain new_connections {
+    type filter hook forward priority -5; policy accept;
+    tcp dport 8883 ct state new add @sources4 { ip saddr limit rate over ${LIMIT_RATE} burst ${LIMIT_BURST} packets } counter drop comment "domhouse-broker-limit"
+    tcp dport 8883 ct state new add @sources6 { ip6 saddr limit rate over ${LIMIT_RATE} burst ${LIMIT_BURST} packets } counter drop comment "domhouse-broker-limit"
+  }
+}
+NFT
+}
+
+apply_limit() {
+  # the published port reaches the container through docker's DNAT: the hook is forward, where the port is 8883
+  command -v nft > /dev/null || die "manca nft sulla VM (sudo apt-get install -y nftables)"
+  install -d -m 755 "${OPT}" "${BROKER_OPT}"
+  limit_rules > "${LIMIT_FILE}"
+  nft -f "${LIMIT_FILE}"
+  echo "limite attivo: alla porta 8883, oltre ${LIMIT_BURST} collegamenti nuovi di fila e poi ${LIMIT_RATE} per indirizzo, il resto è scartato"
+}
+
+limit_active() { nft list table inet "${LIMIT_TABLE}" > /dev/null 2>&1; }
+
+auth_refused_report() {
+  # the refused logins of the last hour; above AUTH_ALERT_PER_HOUR, one line with the busiest address and client id
+  local pairs n ip client
+  pairs="$(auth_refused_pairs)"
+  n="$(printf '%s' "${pairs}" | grep -c . || true)"
+  [ "${n}" -gt "${AUTH_ALERT_PER_HOUR}" ] || return 0
+  ip="$(printf '%s\n' "${pairs}" | cut -d' ' -f1 | sort | uniq -c | sort -rn | awk 'NR == 1 {print $2 "(" $1 ")"}')"
+  client="$(printf '%s\n' "${pairs}" | cut -d' ' -f2- | sort | uniq -c | sort -rn | awk 'NR == 1 {print $2 "(" $1 ")"}')"
+  watch_line "broker auth refused hour=${n} top_ip=${ip} top_client=${client}"
+}
+
+auth_refused_pairs() {
+  # "<ip> <client id>" for each refused login of the last hour that came in on 8883: the refusal line is matched to
+  # its "New connection from <ip>:<port> on port 8883." line. Left out: the internal door (the container's own health
+  # check refuses itself there every minute) and check's own probe, client id domhouse-check
+  docker logs --since 1h "${CONTAINER}" 2>&1 | awk '
+    / New connection from .* on port 8883\.$/ { for (i = 1; i < NF; i++) if ($i == "from") outside[$(i + 1)] = 1 }
+    / disconnected: not authorised\.$/ {
+      at = substr($0, index($0, "[") + 1); at = substr(at, 1, index(at, "]") - 1)
+      client = $0; sub(/^.*Client /, "", client); sub(/ \[.*$/, "", client)
+      if ((at in outside) && client != "domhouse-check") { ip = at; sub(/:[0-9]+$/, "", ip); print ip, client }
+    }'
+}
+
+install_units() {
+  step "Limite sui collegamenti a ogni avvio: domhouse-broker-limit.service"
+  cat > "${SYSTEMD}/domhouse-broker-limit.service" <<UNIT
+[Unit]
+Description=DOMHOUSE broker: limit on new connections to 8883 per source address (broker-vm.sh limit, D-209)
+After=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash ${OPT}/broker-vm.sh limit
+
+[Install]
+WantedBy=multi-user.target
+UNIT
   step "Rinnovo quotidiano del certificato: domhouse-broker-cert.timer"
   cat > "${SYSTEMD}/domhouse-broker-cert.service" <<UNIT
 [Unit]
@@ -305,8 +423,9 @@ Persistent=true
 WantedBy=timers.target
 UNIT
   systemctl daemon-reload
+  systemctl enable domhouse-broker-limit.service > /dev/null
   systemctl enable --now domhouse-broker-cert.timer > /dev/null
-  echo "timer domhouse-broker-cert.timer attivo"
+  echo "domhouse-broker-limit.service abilitato, timer domhouse-broker-cert.timer attivo"
 }
 
 check() {
@@ -315,6 +434,9 @@ check() {
   if [ -n "${problem}" ]; then
     watch_line "broker down (${problem})"
     return 0
+  fi
+  if [ "${LIMIT}" = "on" ] && ! limit_active; then          # lost (a flush of the firewall): put it back at once
+    if (apply_limit > /dev/null 2>&1); then watch_line "broker limit restored"; else watch_line "broker limit missing"; fi
   fi
   state="$(docker inspect -f '{{.State.Health.Status}}' "${CONTAINER}" 2>/dev/null || echo assente)"
   pem="$(served_pem 2>/dev/null || true)"
@@ -325,6 +447,9 @@ check() {
   days=$(( ( $(date -d "$(printf '%s\n' "${pem}" | openssl x509 -noout -enddate | sed 's/^notAfter=//')" +%s) - $(date +%s) ) / 86400 ))
   watch_line "broker ok cert_days=${days}"
   if [ "${days}" -lt "${CERT_ALERT_DAYS}" ]; then watch_line "broker cert expiring days=${days}"; fi
+  # D-210: when the container last started; the run-in report counts the different values as restarts
+  watch_line "broker started_at=$(docker inspect -f '{{.State.StartedAt}}' "${CONTAINER}" 2>/dev/null || echo '?')"
+  auth_refused_report
 }
 
 cmd="${1:-}"; shift || true
@@ -353,11 +478,24 @@ case "${cmd}" in
     [ -f "${APARTMENTS}" ] || : > "${APARTMENTS}"
     step "Utenti e permessi"
     sync_accounts
-    install_cert_timer
+    install_units
+    step "Limite sui collegamenti nuovi"
+    if [ "${LIMIT}" = "on" ]; then apply_limit; else echo "non applicato (DOMHOUSE_LIMIT=${LIMIT}, solo nelle prove)"; fi
     step "Avvio di ${CONTAINER} con ${image}"
     compose pull --quiet
     compose up -d
+    # mosquitto.conf is mounted as a single file and put_files replaces it with a new one: a broker already running
+    # keeps reading the old one, also after a reload, and compose does not recreate it for a change of content. When
+    # what the container reads is not the installed file, a restart (the lot 38 procedure, V3, 11 November)
+    if docker exec "${CONTAINER}" cat /mosquitto/config/mosquitto.conf 2>/dev/null | cmp -s - "${BROKER_OPT}/mosquitto.conf"; then
+      echo "il broker legge la configurazione installata"
+    else
+      echo "configurazione cambiata: riavvio del broker, i dispositivi si ricollegano"
+      compose restart
+    fi
     wait_healthy
+    docker exec "${CONTAINER}" cat /mosquitto/config/mosquitto.conf | cmp -s - "${BROKER_OPT}/mosquitto.conf" \
+      || die "dopo il riavvio il broker non legge ancora ${BROKER_OPT}/mosquitto.conf"
     ;;
   update)
     [ $# -eq 1 ] || die "uso: update <image>"
@@ -388,24 +526,26 @@ case "${cmd}" in
     cert_in_place
     ;;
   cert-new)
-    [ $# -eq 3 ] || die "uso: cert-new <domain> <dns_zone> <dns_account>"
+    [ $# -eq 3 ] || [ $# -eq 4 ] || die "uso: cert-new <domain> <dns_zone> <dns_account> [rsa2048|ec256]"
+    key_type="${4:-rsa2048}"
+    [[ "${key_type}" =~ ^(rsa2048|ec256)$ ]] || die "tipo di chiave non previsto: ${key_type} (rsa2048 o ec256)"
     [[ "$1" =~ ^([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$ ]] || die "nome non valido: $1"
     [[ "$2" =~ ^[a-z][a-z0-9-]{0,62}$ ]] || die "zona Cloud DNS non valida: $2"
     [[ "$3" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z0-9-]+\.iam\.gserviceaccount\.com$ ]] || die "account DNS non valido: $3"
     need_tls_disk
     install -d -m 700 "${ETC}"
     install -d -m 750 "${BROKER_ETC}"
-    printf 'ACME_DOMAIN=%s\nACME_DNS_ZONE=%s\nACME_DNS_ACCOUNT=%s\nACME_SERVER=%s\n' \
-      "$1" "$2" "$3" "${DOMHOUSE_ACME_SERVER:-${LETS_ENCRYPT}}" > "${ACME_SETTINGS}.new"
+    printf 'ACME_DOMAIN=%s\nACME_DNS_ZONE=%s\nACME_DNS_ACCOUNT=%s\nACME_SERVER=%s\nACME_KEY_TYPE=%s\n' \
+      "$1" "$2" "$3" "${DOMHOUSE_ACME_SERVER:-${LETS_ENCRYPT}}" "${key_type}" > "${ACME_SETTINGS}.new"
     mv -f "${ACME_SETTINGS}.new" "${ACME_SETTINGS}"
     cat "${ACME_SETTINGS}"
-    acme_get
+    acme_get --renew-force               # new means now: also over a valid one (another key type, another name)
     ;;
   cert-renew)
-    [ $# -eq 0 ] || die "uso: cert-renew"
+    [ $# -eq 0 ] || { [ $# -eq 1 ] && [ "$1" = "force" ]; } || die "uso: cert-renew [force]"
     if [ ! -f "${ACME_SETTINGS}" ]; then echo "nessun certificato automatico (manca ${ACME_SETTINGS}): niente da fare"; exit 0; fi
     need_tls_disk
-    acme_get
+    if [ $# -eq 1 ]; then acme_get --renew-force; else acme_get; fi   # force: the renewal tried once during the run-in (D-210)
     ;;
   cert-revoke)
     [ $# -eq 1 ] || die "uso: cert-revoke <key-compromise|superseded>"
@@ -444,6 +584,10 @@ case "${cmd}" in
     need_installed
     check
     ;;
+  limit)
+    [ $# -eq 0 ] || die "uso: limit"
+    apply_limit
+    ;;
   status)
     need_installed
     cat "${SETTINGS}"
@@ -454,9 +598,17 @@ case "${cmd}" in
     echo "connessioni sulla porta TLS: $(docker exec "${CONTAINER}" cat /proc/net/tcp /proc/net/tcp6 2>/dev/null | awk '$2 ~ /:22B3$/ && $4 == "01"' | wc -l)"
     echo "appartamenti: $(wc -l < "${APARTMENTS}")"
     for file in devices connectors; do echo "utenti ${file}: $(wc -l < "${AUTH}/${file}.passwd")"; done
+    echo "accessi rifiutati sulla 8883 nell'ultima ora: $(auth_refused_pairs | grep -c . || true)"
+    if [ "${LIMIT}" = "on" ]; then
+      if limit_active; then
+        echo "collegamenti scartati dal limite: $(nft list table inet "${LIMIT_TABLE}" | awk '{for (i = 1; i < NF; i++) if ($i == "packets") s += $(i + 1)} END {print s + 0}')"
+      else
+        echo "limite sui collegamenti assente: sudo bash /opt/domhouse/broker-vm.sh limit"
+      fi
+    fi
     check
     ;;
   *)
-    die "uso: prepare-tls-disk | cert-new | install | update | restart | reload | cert-renew | cert-revoke | install-cert | add-apartment | remove-apartment | sync | check | status (vedi l'intestazione)"
+    die "uso: prepare-tls-disk | cert-new | install | update | restart | reload | cert-renew | cert-revoke | install-cert | add-apartment | remove-apartment | sync | check | limit | status (vedi l'intestazione)"
     ;;
 esac

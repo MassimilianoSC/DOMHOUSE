@@ -102,3 +102,60 @@ def test_offline_approvals_and_windows():
                           "Approvazione scaduta senza risposta: Spegnere la caldaia.",
                           "Finestra camera aperta 3 volte con il clima spento dalla regola."]
     assert build()["notable"] is False and build()["items"] == []              # a week without news
+
+
+# ---- D-212: weeks with the change of hour ----------------------------------------------------------------------------
+def test_d212_a_week_with_the_end_of_summer_time_has_169_hours_and_ends_at_local_midnight():
+    monday = date(2026, 10, 19)                                             # 19-25 October: the 25th has 25 hours
+    now = datetime(2026, 10, 26, 8, 0, tzinfo=ROME)
+    assert ws.last_week(now, ROME) == (monday, True)
+    assert ws.last_week(now - timedelta(minutes=1), ROME) == (monday, False)
+    sunday_late = ws.iso(datetime(2026, 10, 25, 23, 30, tzinfo=ROME))       # 22:30 UTC: still the week
+    monday_early = ws.iso(datetime(2026, 10, 26, 0, 30, tzinfo=ROME))       # 23:30 UTC on the 25th: the next week
+    approvals = [{"approval_id": a, "status": "expired", "description": a, "created_at": ts}
+                 for a, ts in (("dentro", sunday_late), ("fuori", monday_early))]
+    s = ws.build("apt-prova-01", "Europe/Rome", monday, now.astimezone(UTC), nights_week=[], nights_before=[],
+                 bookings=[], devices=[], decisions=[], approvals=approvals, energy_since=None, labels={})
+    assert (s["from"], s["to"]) == ("2026-10-18T22:00:00.000Z", "2026-10-25T23:00:00.000Z")
+    assert [a["approval_id"] for a in s["approvals_expired"]] == ["dentro"]
+
+
+def test_d212_a_week_with_the_start_of_summer_time_has_167_hours():
+    s = ws.build("apt-prova-01", "Europe/Rome", date(2027, 3, 22), datetime(2027, 3, 29, 9, 0, tzinfo=UTC),
+                 nights_week=[], nights_before=[], bookings=[], devices=[], decisions=[], approvals=[],
+                 energy_since=None, labels={})
+    assert (s["from"], s["to"]) == ("2027-03-21T23:00:00.000Z", "2027-03-28T22:00:00.000Z")
+
+
+def test_d212_each_night_is_asked_from_local_midnight_to_local_midnight(monkeypatch):
+    from bff import summary_job
+    asked = []
+
+    async def fake_get(apt, path, **params):
+        asked.append((params["from"], params["to"]))
+        return {"total_kwh": 1, "by_device": []}
+    monkeypatch.setattr(summary_job, "_get", fake_get)
+    import asyncio
+    got = asyncio.run(summary_job.nights(SimpleNamespace(apartment_id="apt-prova-01"), ROME, date(2026, 10, 24), 3))
+    assert [n.day for n in got] == [date(2026, 10, 24), date(2026, 10, 25), date(2026, 10, 26)]
+    assert asked == [("2026-10-23T22:00:00.000Z", "2026-10-24T22:00:00.000Z"),
+                     ("2026-10-24T22:00:00.000Z", "2026-10-25T23:00:00.000Z"),      # the 25-hour night
+                     ("2026-10-25T23:00:00.000Z", "2026-10-26T23:00:00.000Z")]
+
+
+# ---- verification of 10 November 2026, point e: the whole week of approvals ------------------------------------------
+def test_the_approvals_expired_on_the_monday_before_reach_the_summary_made_after_eight(monkeypatch):
+    """The engine's /approvals?status=all gives the closed ones from the midnight of 7 days ago (engine/core.py
+    list_approvals): the summary made on Monday at 09:00 has the approval expired on the Monday before at 00:30, which
+    before was cut at 09:00 of that Monday."""
+    from engine import core
+    from engine.connector.simulated import SimulatedConnector
+
+    engine = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
+    created = datetime(2026, 10, 12, 0, 30, tzinfo=ROME)                     # the week's first half hour
+    engine.approvals.append({"approval_id": "apr-lun", "status": "expired", "description": "Spegnere la presa",
+                             "created_at": ws.iso(created), "expires_at": ws.iso(created + timedelta(minutes=30))})
+    monkeypatch.setattr(core, "utcnow", lambda: NOW.astimezone(UTC))
+    s = build(approvals=engine.list_approvals("all")["items"])
+    assert [a["approval_id"] for a in s["approvals_expired"]] == ["apr-lun"]
+    assert s["items"] == ["Approvazione scaduta senza risposta: Spegnere la presa."]

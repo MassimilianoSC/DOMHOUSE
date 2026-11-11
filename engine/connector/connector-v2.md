@@ -1,0 +1,516 @@
+# Il connector dei dispositivi — specifica per il motore DOMHOUSE, versione 2
+
+*10 novembre 2026, approvata da Massimiliano con quattro correzioni (D-215). Sostituisce la versione del 21 ottobre 2026
+(`engine/connector/connector.md`), che resta accanto, invariata, come documento storico. La numerazione delle sezioni
+è la stessa: i rimandi del codice e delle prove a «connector.md §x» valgono anche qui. Dove si legge «da concordare»,
+non è una decisione già presa.*
+
+## Cosa cambia rispetto al 21 ottobre
+
+| Punto | 21 ottobre | Oggi | Decisione |
+|---|---|---|---|
+| Generazione dei dispositivi | Shelly Gen2 | **Shelly Gen4** (più Plug M Gen3 e sensori BLU ZB); stessa API RPC | D-196 |
+| Trasporto | Aperto: WebSocket, MQTT o cloud Shelly | **MQTT con un broker nostro**; cloud Shelly escluso | D-196 |
+| Ingresso dei dispositivi | «Da progettare insieme» | **`mqtt.dh-lab.eu:8883`**, TLS che termina sul broker, certificato Let's Encrypt RSA-2048 | D-199, D-206, D-209 |
+| Utenti e permessi | Da concordare | **Un utente per dispositivo e uno per il connector di ogni appartamento**, permessi per prefisso | D-209, D-212 |
+| Nomi dei segreti | «Da concordare» | **`langbrain-shelly-<apartment_id>`** (connector) e **`langbrain-shelly-<apartment_id>-devices`** (dispositivi) | D-212 |
+| Soglia di offline | Unica (`SHELLY_OFFLINE_AFTER_S`) | Per tipo di apparecchio, con override per dispositivo: **accettata, entra con il ramo `soglie-offline`** | D-196 |
+
+Restano invariati: l'interfaccia del §2 (`CONNECTOR_API_VERSION = "1"`), le otto capacità, esiti e tempi, il
+perimetro del §4 e il §6.
+
+## 0. In breve
+
+Il motore domotico di DOMHOUSE lo scriviamo noi. È un programma Python (asyncio), uno per appartamento, sulla VM, che
+espone all'app l'API del contratto fra app e motore (versione 1.0.5, che non cambia). Il contratto non ti serve:
+quello che ti riguarda, cioè le otto capacità dei dispositivi, è nella tabella del §2.3.
+
+Il connector è la parte che parla con i dispositivi reali: dice al motore quali dispositivi ci sono e in che stato
+sono, e porta loro i comandi. Tu scrivi il connector per Shelly Gen4 (D-196); noi scriviamo il resto del motore. Il confine è
+un'interfaccia Python piccola e stabile, descritta qui.
+
+## 1. A cosa serve, e cosa resta nel motore
+
+```
+  app DOMHOUSE (BFF su Cloud Run)
+        │  HTTP: l'API del contratto, /api/v1/…  (chiave X-API-Key)
+        ▼
+  MOTORE (un processo per appartamento, sulla VM, dati in /data/<apartment_id>)
+   · validazione dei comandi e limiti (setpoint_min/max, regola setpoint_limits)
+   · regole (finestra aperta, antigelo, antimuffa, pausa del compressore…), priorità
+   · modalità (comfort/eco/empty), forzature, programmazioni dalle prenotazioni
+   · ciclo di vita dei comandi (command_id, stati, timeout di 10 s, idempotenza)
+   · registro delle decisioni, approvazioni, /ask, /_test/state
+   · stream degli eventi (SSE) verso l'app, SQLite, consumi orari
+        │  interfaccia Python Connector (questo documento)
+        ▼
+  CONNECTOR  ── traduzione: capacità del contratto ⇄ comandi e notifiche Shelly
+             ── trasporto: MQTT verso il broker sulla VM (§7)
+        ▼
+  dispositivi Shelly Gen4 (e quelli che il catalogo vi collega: Athom AR01 per l'infrarosso, sensori BLU, contatto termostato…)
+```
+
+Restano **nel motore**, e il connector non li deve fare:
+- validazione e limiti: un fuori limite è `422` con `setpoint_out_of_range`, deciso prima di chiamare il connector (corretto il 10
+  novembre: la versione del 21 ottobre diceva `out_of_limits`);
+- regole e priorità: `blocked_by_rule` e `blocked_by_priority` (quest'ultimo è previsto dal contratto, ma oggi il
+  motore non lo produce);
+- la regolazione della caldaia: il motore decide «acceso/spento» confrontando la temperatura con il setpoint; al
+  connector arriva solo l'acceso/spento;
+- la verifica «a consumo» dello split a infrarossi (`confirmation: power`), vedi il §2.5;
+- le decisioni (`Decision`), lo stream SSE, `/_test/state` (con il connector Shelly risponde 404) e
+  `trigger: approval`, che non passa mai dal connector;
+- l'ora locale: `kwh_today` e i consumi orari li calcola il motore; anche `since` (contatto) e `last_seen` (movimento), salvo che il connector li mandi (§2.3).
+
+## 2. L'interfaccia
+
+Python 3.11 (l'immagine è `python:3.11-slim`). Tutto asincrono: niente chiamate bloccanti nel ciclo di asyncio; le
+librerie bloccanti vanno in `asyncio.to_thread`. Date sempre «aware», in UTC.
+
+### 2.1 Il Protocol
+
+`interface.py` dichiara `CONNECTOR_API_VERSION = "1"`. Ogni connector la ripete in un attributo di classe:
+
+```python
+class ShellyConnector:
+    api_version = "1"
+```
+
+All'avvio il motore confronta `connector.api_version` con la sua `CONNECTOR_API_VERSION`. Se non coincidono **non
+parte**: scrive nel log «connector API version mismatch» con le due versioni ed esce con il codice 3. Allo stesso
+modo, con il codice 3, si ferma se il connector indicato da `CONNECTOR` non esiste («unknown connector»), se non
+offre `make_connector` («connector without make_connector», §2.7), o se `make_connector` fallisce o il suo
+pacchetto non si importa, per esempio per una libreria mancante («connector setup failed»). Il
+container riparte (`restart: unless-stopped`) e ripete l'errore finché qualcuno non allinea le versioni: si vede
+subito, invece di funzionare a metà. Il numero cambia **solo** quando cambia l'interfaccia del §2 in modo
+incompatibile (un tipo, un campo obbligatorio, il significato di un esito). Lo cambiamo noi, in una pull request
+concordata, insieme a `interface.py` e `tests/test_interface.py`.
+
+```python
+class Connector(Protocol):
+    async def start(self) -> None
+        # avvia trasporto e catalogo; ritorna quando è pronto a ricevere dispositivi.
+        # Non aspetta che siano tutti online.
+    async def stop(self) -> None
+        # chiude tutto in modo pulito (serve alle prove e allo spegnimento del container)
+    def rooms(self) -> list[Room]
+    def devices(self) -> list[DeviceInfo]
+        # il catalogo con l'ultimo stato noto; sempre tutti i dispositivi del catalogo, anche offline
+    async def execute(self, cmd: ConnectorCommand, on_progress: Callable[[str], None]) -> CommandResult
+    def changes(self) -> AsyncIterator[StateChange]
+        # un solo consumatore (il motore); non finisce finché il connector non viene fermato
+    def status(self) -> ConnectorStatus
+```
+
+Le chiamate di base sono cinque: `start`, `devices`, `execute`, `changes`, `status`; `rooms()` e `stop()` completano
+l'interfaccia.
+
+### 2.2 I tipi (dataclass frozen)
+
+```python
+Room(room_id: str, name: str)
+
+DeviceInfo(
+    device_id: str,          # stabile, scelto nel catalogo (es. "dev-clima-soggiorno"); è l'id che vede l'app
+    label: str,              # nome in italiano; il gestore lo può cambiare nell'app: quel cambio lo tiene il motore
+    room_id: str,
+    online: bool,
+    last_seen: datetime | None,
+    capabilities: dict[str, dict],   # una chiave per capacità, vedi la tabella del §2.3
+    links: dict[str, str])           # collegamenti fra dispositivi, vedi sotto; {} se non ce ne sono
+
+ConnectorCommand(
+    command_id: str, correlation_id: str,    # per i log; command_id è unico e puoi usarlo come id della RPC
+    device_id: str, capability: str,          # solo "switch", "climate", "heating"
+    target: dict,                             # lo STATO COMPLETO da raggiungere, non l'azione del contratto (§2.4)
+    deadline: datetime)                       # entro cui restituire l'esito (circa 9 s dopo la creazione)
+
+CommandResult(
+    outcome: "confirmed" | "delivered" | "failed",
+    reason: "device_offline" | "device_rejected" | "internal_error" | None,
+    state: dict | None,       # con "confirmed": lo stato riportato dal dispositivo
+    detail: str | None)       # per i log, in inglese breve; mai segreti
+
+StateChange(
+    device_id: str,
+    kind: "state" | "online",
+    capability: str | None,   # con kind="state"
+    state: dict | None,       # con kind="state": i campi del dispositivo per quella capacità (§2.3)
+    online: bool | None,      # con kind="online"
+    ts: datetime)             # quando è successo: ora del dispositivo se affidabile, altrimenti di ricezione
+
+ConnectorStatus(up: bool, connected_devices: int, last_event_at: datetime | None, detail: str | None)
+    # il motore lo copia nel suo stato di salute: up=False lo segnala all'app come motore non disponibile
+```
+
+**`links`** è un campo **separato** da `capabilities`, apposta: il motore copia `capabilities` nell'elenco dei
+dispositivi che manda all'app, mentre `links` non esce mai verso l'app. Le chiavi previste sono due:
+- `confirmation_device_id` (solo per un dispositivo con `climate` e `confirmation: power`): il `device_id` del
+  dispositivo con `power_meter` che misura lo split. Il motore lo usa per verificare i comandi (§2.5).
+- `sensor_device_id` (solo per un dispositivo con `heating`): il `device_id` del dispositivo con `temperature` che
+  il motore usa per regolare la caldaia (acceso/spento rispetto al setpoint).
+
+Entrambi devono indicare dispositivi dello stesso catalogo, con quella capacità. Il motore lo controlla all'avvio e,
+se il collegamento manca o è sbagliato, lo scrive nel log e tratta lo split come `confirmation: none` e la caldaia
+come non regolabile. Chiavi diverse da queste due: solo se concordate.
+
+### 2.3 Le otto capacità del contratto
+
+Le otto capacità sono il modo in cui l'app vede ogni dispositivo: un dispositivo ne ha una o più, ciascuna con i suoi
+campi. Questa tabella è **derivata da openapi.yaml v1.0.5, components.schemas.Cap\*** (il contratto fra l'app e il
+motore): i nomi dei campi sono esattamente quelli del contratto. Non ti serve altro del contratto.
+
+| Capacità | Schema | Campi (tipo) | Obbligatori |
+|---|---|---|---|
+| `switch` | `CapSwitch` | `on` (booleano) | `on` |
+| `power_meter` | `CapPowerMeter` | `watts` (numero), `kwh_today` (numero, dalla mezzanotte locale dell'appartamento) | tutti |
+| `climate` | `CapClimate` | `on` (booleano), `mode` (`cool` \| `heat` \| `dry` \| `fan`), `setpoint` (numero), `fan` (`auto` \| `low` \| `mid` \| `high`), `setpoint_min` (numero), `setpoint_max` (numero), `confirmation` (`power` \| `device` \| `none`) | tutti |
+| `heating` | `CapHeating` | `on` (booleano), `setpoint` (numero), `setpoint_min` (numero), `setpoint_max` (numero) | tutti |
+| `temperature` | `CapTemperature` | `celsius` (numero) | `celsius` |
+| `humidity` | `CapHumidity` | `percent` (numero) | `percent` |
+| `contact` | `CapContact` | `open` (booleano), `since` (data e ora, oppure null: da quando è nello stato attuale) | tutti |
+| `motion` | `CapMotion` | `detected` (booleano), `last_seen` (data e ora, oppure null) | tutti |
+
+Un dispositivo ha una chiave per ogni capacità presente; l'app ignora le chiavi che non conosce. `confirmation` dice
+come il motore verifica l'esito di un comando allo split: `power` = dalla variazione di potenza, `device` = conferma
+del dispositivo, `none` = nessuna verifica (si mostra lo stato richiesto).
+
+La tabella seguente dice **chi riporta cosa**. «Dispositivo» è quello che riporti tu in `StateChange.state` e in
+`DeviceInfo`; «motore» quello che calcola o tiene il motore; «catalogo» i valori fissi. `energy_total_wh` **non è un
+campo del contratto**: è il dato grezzo che passi al motore, da cui il motore calcola `kwh_today`.
+
+| Capacità | Cosa riporta chi |
+|---|---|
+| `switch` (`CapSwitch`) | dispositivo: `on` |
+| `power_meter` (`CapPowerMeter`) | dispositivo: `watts`, `energy_total_wh` (il contatore cumulativo grezzo; se riparte da zero dopo un riavvio, il motore lo riconosce dal calo) · motore: `kwh_today` (dalla mezzanotte LOCALE dell'appartamento) e i consumi orari che l'app mostra |
+| `climate` (`CapClimate`, split a infrarossi) | catalogo: `setpoint_min`, `setpoint_max`, `confirmation` (`power` \| `device` \| `none`) · motore: `on`, `mode`, `setpoint`, `fan` (l'ultimo stato richiesto: l'infrarosso non ha ritorno) · dispositivo: niente, salvo conferma vera (`confirmation: device`). Con `confirmation: power` il misuratore è quello indicato da `links.confirmation_device_id` (§2.2), non il `power_meter` dello stesso dispositivo (lo split a infrarossi di solito non ne ha uno) |
+| `heating` (`CapHeating`, caldaia con contatto del termostato oggi; pompa di calore Modbus domani) | dispositivo: `on` = **lo stato del relè** (acceso/spento in questo momento) · catalogo: `setpoint_min`, `setpoint_max` · motore: `setpoint` e la regolazione (termostato), con la temperatura del dispositivo indicato da `links.sensor_device_id` (§2.2). **Verso l'app il motore espone `on` = riscaldamento abilitato** (l'intenzione del gestore o della modalità), non il relè: il relè resta interno al motore, che lo comanda intorno al setpoint e lo rende visibile dai consumi e dalle decisioni |
+| `temperature` (`CapTemperature`) | dispositivo: `celsius` |
+| `humidity` (`CapHumidity`) | dispositivo: `percent` |
+| `contact` (`CapContact`) | dispositivo: `open` · motore: `since` (l'ora in cui `open` cambia), salvo che il connector lo mandi (vedi sotto la tabella) |
+| `motion` (`CapMotion`) | dispositivo: `detected` · motore: `last_seen` (l'ora di ogni evento con `detected=true`), salvo che il connector lo mandi (vedi sotto la tabella) |
+
+`since` e `last_seen` (deciso l'11 novembre 2026): non serve mandarli, li calcola il motore dall'ora in cui riceve il cambio. Puoi mandarli solo se li conosci con certezza, per esempio l'ora dell'ultimo evento salvata dal sensore, alla prima fotografia. Se li mandi, il motore usa i tuoi così come sono: stringa ISO 8601 in UTC (`2026-11-11T09:30:00Z`), come nel contratto, e mai l'ora della fotografia, che direbbe all'app «aperta da adesso» a ogni ricollegamento.
+
+I comandabili sono solo `switch`, `climate` e `heating`. Quale apparecchio fisico
+realizza `climate` e `heating` (blaster IR, Shelly con contatto, altro) lo decide il **catalogo**: è la tua scelta, da
+fissare presto. Capacità in più non previste dal contratto: no, se non concordate prima.
+
+### 2.4 Il comando: dal contratto al connector
+
+Nel contratto l'app manda un comando con un'azione (`turn_on`, `turn_off`, `set_climate`, `set_heating`) e
+parametri parziali (`on`, `mode`, `setpoint`, `fan`). Il motore lo valida, applica regole e limiti, e ti passa
+sempre lo **stato completo da raggiungere**:
+- `switch`: `{"on": true|false}`
+- `heating`: `{"on": true|false}` è lo stato che il **relè** deve raggiungere, deciso dal termostato del motore (non l'interruttore «riscaldamento abilitato» dell'app: quello resta nel motore). Il setpoint non ti arriva mai: la regolazione è del motore.
+- `climate`: `{"on", "mode", "setpoint", "fan"}` tutti presenti (il motore completa quelli mancanti con lo stato
+  attuale); con `on=false` gli altri campi sono indicativi.
+
+Il tuo compito: far raggiungere quello stato al dispositivo, e dire come è andata.
+
+### 2.5 Esiti e tempi
+
+Nel contratto un comando passa per `pending → sent → verifying → acked | failed | timeout`, con un timeout di
+10 secondi. Ruoli:
+- `pending` lo mette il motore, alla creazione.
+- `on_progress("sent")`: chiamalo appena il comando è consegnato al trasporto (RPC inviata, frame infrarosso spedito).
+  Obiettivo: entro 1 s.
+- `on_progress("verifying")`: chiamalo se aspetti una conferma dal dispositivo.
+- Il risultato:
+  - `"confirmed"` + `state`: il dispositivo ha confermato (per esempio `Switch.Set` seguito dallo stato dell'uscita) →
+    il motore mette `acked`;
+  - `"delivered"`: consegnato, ma il dispositivo non può confermare (infrarosso). Il motore decide con
+    `confirmation`: `power` → guarda i `watts` del dispositivo indicato da `links.confirmation_device_id`: se
+    cambiano in modo coerente con il comando entro i 10 s (in su per un'accensione, verso zero per uno spegnimento),
+    `acked`; altrimenti `timeout` con reason `no_confirmation`. Senza quel collegamento il motore tratta il caso come
+    `none` e lo scrive nel log. `none` → `acked` con lo stato richiesto. **Il misuratore indicato da
+    `links.confirmation_device_id` deve mandare in `changes()` ogni variazione di `watts` entro 2 secondi da quando
+    avviene** (notifica di stato del dispositivo, non la lettura periodica al minuto): è da lì che arriva la conferma.
+    Il motore conferma un'accensione se i `watts` salgono di almeno 20 W rispetto a prima del comando, e uno
+    spegnimento se scendono sotto 15 W, entro 10 secondi dalla creazione del comando, cioè circa 8 secondi dopo che
+    hai restituito `delivered`. Se lo split assorbe più tardi, il comando risulta non confermato (`timeout`,
+    `no_confirmation`) anche se lo split si è acceso. Le due soglie si cambiano per appartamento nella configurazione
+    del motore (`CONFIRM_ON_WATTS`, predefinita 20, e `CONFIRM_OFF_WATTS`, predefinita 15): se nelle tue prove uno split impiega di più, dillo con i tempi misurati. Se il misuratore collegato è
+    offline nel momento del comando, il motore accetta il comando senza verifica e lo scrive nelle decisioni;
+  - `"failed"` + `reason`: `device_offline` (offline, o lo diventa durante il comando), `device_rejected` (il
+    dispositivo ha risposto con un errore RPC), `internal_error` (errore del trasporto o tuo). Il `detail` va nei log.
+- **La scadenza**: restituisci l'esito ENTRO `cmd.deadline`. Se non ce la fai, il motore annulla la tua coroutine
+  (`asyncio.CancelledError`: gestiscila senza lasciare nulla a metà) e mette `timeout`.
+- **Ripetizioni**: puoi ritentare a livello di trasporto dentro la scadenza (i comandi sono stati da raggiungere,
+  quindi idempotenti); oltre la scadenza mai.
+- Il motore ti manda **al massimo un comando alla volta per dispositivo**: non serve gestire la concorrenza sullo
+  stesso dispositivo.
+- **Niente coda per i dispositivi offline**: il contratto risponde 409 al motore, non a te; tu rispondi
+  `failed/device_offline` subito.
+
+### 2.6 Casi limite
+
+- **Offline durante la verifica**: restituisci `failed/device_offline` ed emetti
+  `StateChange(kind="online", online=False)`.
+- **Quando sei offline**: messaggio `online` = `false` del dispositivo (l'ultimo messaggio che il broker pubblica
+  quando il dispositivo cade, §7.2) → `online=False` subito. Silenzio oltre `offline_after_s` → `online=False`.
+  È un requisito del tuo connector (oggi nel repository non c'è codice che lo applichi): nella versione del 21 ottobre
+  la soglia era unica (`SHELLY_OFFLINE_AFTER_S`, predefinita 120 s); con il ramo `soglie-offline` diventa **per tipo
+  di apparecchio, con override per dispositivo**, in un file di configurazione senza segreti (D-196: il Motion a
+  riposo trasmette ogni 900 s, con 120 s risulterebbe sempre offline). Questo punto si aggiorna quando quel ramo entra.
+- **Segnala offline appena lo sai** (D-225, 11 novembre 2026): il motore mostra il dispositivo «non in linea»
+  nell'app subito, e i minuti della regola «Avviso dispositivo offline» li conta il motore solo per la decisione e la
+  notifica. Non aspettare quei minuti nel connector. (La frase del contratto dell'app su `device.online`, «offline dopo
+  offline_alert.minutes», è superata da questo comportamento: il contratto non si modifica.)
+- **Riconnessione**: emetti `online=True` e poi una **fotografia completa**, cioè uno `StateChange` `"state"` per ogni
+  capacità del dispositivo, letto dallo stato completo (es. `Shelly.GetStatus`). Il motore si riallinea su quella.
+- **Ordine**: per uno stesso dispositivo, nell'ordine in cui accadono, senza riordinare. Fra dispositivi diversi
+  nessuna garanzia.
+- **Duplicati**: puoi mandare lo stesso stato più volte, il motore li scarta. Non sopprimere stati diversi per
+  «risparmiare».
+- **Notifiche parziali** (Shelly manda solo i campi cambiati): riempi tu lo stato completo dei campi «dispositivo»
+  della capacità, partendo dall'ultimo noto.
+- **Dispositivi sconosciuti** (non nel catalogo): ignorali, con un warn nel log. Mai inventare `device_id`.
+- **Unità**: °C, %, W, Wh. Numeri come float.
+
+### 2.7 Il punto di aggancio: `make_connector`
+
+È così che il motore trova e costruisce il tuo connector. Con `CONNECTOR=shelly` (§5) il motore importa il modulo
+`engine.connector.shelly`, cioè `engine/connector/shelly/__init__.py`, e vi cerca questa funzione:
+
+```python
+def make_connector(config: ConnectorConfig) -> Connector
+```
+
+- **`config`** è un `ConnectorConfig` (dataclass frozen in `interface.py`), costruito dal motore e già verificato:
+  - `apartment_id: str`;
+  - `data_dir: pathlib.Path`: la cartella dei dati dell'appartamento (`DATA_DIR`, predefinita `/data/<apartment_id>`);
+  - `catalog_path: pathlib.Path`: il catalogo (`CATALOG_PATH`, predefinito `<data_dir>/catalog.yaml`, §5);
+  - `env: Mapping[str, str]`: **solo le tue variabili d'ambiente**, cioè quelle con il prefisso del nome del
+    connector in maiuscolo più «_»: per `CONNECTOR=shelly` tutte e sole le `SHELLY_*` (`SHELLY_OFFLINE_AFTER_S`,
+    quelle del trasporto MQTT del §7.3, con i nomi originali.
+
+  In `config` trovi le tue variabili (prefisso `SHELLY_`); **la chiave dell'API del motore non ti arriva**, e
+  nemmeno le altre impostazioni del motore (`APARTMENT_ID`, `API_KEY`, `CONNECTOR`, `HOST`, `PORT`, `DATA_DIR`,
+  `CATALOG_PATH`, `MOCK_*`, `DOMOTICA_*`). Le tue variabili segrete seguono le regole del §5: mai nel catalogo, mai nei log.
+- **Restituisce** il connector: un oggetto con `api_version` (§2.1) e i metodi del Protocol.
+- **La chiama il motore, una volta sola, all'avvio**, prima di `start()`. È sincrona.
+- **Cosa può fare:** leggere e verificare il catalogo, che è un file locale e veloce. **Cosa non fa:** aprire
+  connessioni o avviare il trasporto. Quelle stanno solo in `start()`.
+- **Catalogo mancante o sbagliato:** `make_connector` solleva un'eccezione con un messaggio chiaro. Il messaggio dice
+  **quale campo e quale dispositivo** sono sbagliati, **mai il valore trovato**: «device dev-caldaia:
+  links.sensor_device_id non esiste nel catalogo», non «valore "xyz" non valido». È la stessa regola dei log (§5),
+  valida anche per gli errori: così il motore può riportare il messaggio nel log senza rischi. Il motore non
+  parte: scrive nel log «connector setup failed» con i campi `connector`, `error_type` ed `error` (il messaggio, al
+  massimo 300 caratteri) ed esce con il codice 3, come per gli altri casi del §2.1. Così un catalogo rotto si vede
+  all'avvio, non alla prima chiamata.
+- **La prova comune** `test_make_connector_is_the_engines_entry_point` (in `tests/test_interface.py`) importa il tuo
+  modulo, chiama `make_connector` come fa il motore e verifica versione e metodi: senza `make_connector` non passa.
+  Verifica anche che `config` sia un `ConnectorConfig` senza la chiave dell'API e che in `env` ci siano solo le tue
+  variabili.
+  Il modello è `make_connector` in fondo a `simulated.py`.
+
+## 3. Isolamento del trasporto
+
+Il trasporto è **MQTT con il broker nostro** (D-196, §7). Sta comunque in **un** modulo, dietro un'interfaccia interna
+tua, così le prove del connector non dipendono dal trasporto:
+
+```python
+class Transport(Protocol):
+    async def start(self) -> None
+    async def stop(self) -> None
+    async def call(self, shelly_id, method, params, timeout_s) -> dict
+        # una RPC; errori TransportOffline, TransportTimeout, RpcError(code, message)
+    def notifications(self) -> AsyncIterator[Notification]
+        # NotifyStatus / NotifyFullStatus / NotifyEvent con shelly_id e received_at
+    def connected(self) -> set[str]
+```
+
+Struttura (pacchetto del motore `engine/`, accanto al server `bff/` nella radice dell'app):
+
+```
+engine/connector/
+  interface.py           # il Protocol, i tipi del §2, ConnectorConfig e CONNECTOR_API_VERSION (nostri)
+  simulated.py           # SimulatedConnector e SimulatedDevice, il dispositivo finto (nostri, §4)
+  shelly/                # IL TUO PERIMETRO
+    __init__.py          # make_connector(config): il punto di aggancio (§2.7)
+    catalog.py           # lettura e verifica del catalogo (§5), links compresi
+    translate.py         # capacità ⇄ RPC e notifiche: funzioni pure, senza I/O
+    connector.py         # ShellyConnector: catalogo, online/offline, execute, changes
+    transport/
+      base.py            # il Protocol Transport e gli errori
+      mqtt.py            # il trasporto in uso (D-196)
+    tests/               # le tue prove: translate, ShellyConnector con FakeTransport, trasporto
+      harness.py         # make_harness(): così le prove comuni girano anche sul ShellyConnector
+      fake_device.py     # dispositivo Shelly finto: risponde alle RPC e manda notifiche
+      fake_transport.py
+  tests/
+    test_interface.py    # le prove comuni a OGNI connector (nostre); trova da sola ogni <nome>/tests/harness.py
+    fake_device.py       # l'harness del simulato: connector più set_online e set_state (nostro, modello per il tuo)
+```
+
+Collaudo: alla domanda **«se cambiamo trasporto, quali file cambiano?»** la risposta è **«uno: il modulo in
+`transport/`, più una riga di configurazione. I test del connector non cambiano»**, perché usano `FakeTransport`. Le
+prove del trasporto stanno a parte, accanto al suo modulo.
+
+## 4. Come si lavora
+
+- Codice nel repository dell'app, cartella `engine/connector/` (il pacchetto del motore `engine/` sta accanto al
+  server `bff/`; dentro c'è anche il motore simulato, che il server importa per gli appartamenti dimostrativi).
+  Prove con pytest nella stessa cartella.
+- **Il perimetro:** tuo è `engine/connector/shelly/`, con il catalogo (`catalog.py`) e le sue prove; nostri sono
+  `interface.py`, `simulated.py` e la cartella `tests/` con le prove comuni. Le modifiche ai file
+  nostri si propongono con una pull request a parte (la nota di consegna `README-youssouf.md`, sezione 7).
+- Un ramo tuo (es. `connector-shelly`) e pull request verso `main`; niente push diretti. Revisione di Massimiliano
+  prima dell'unione. La cartella `contract/` del repository (contratto e prove di conformità) non si tocca.
+- La CI su GitHub, a ogni push, esegue anche le prove del connector (pytest su `engine/connector/`) e la suite di
+  conformità contro il motore in modalità simulata. Si unisce solo con tutto verde.
+- Dipendenze nuove (es. la libreria del client MQTT): dichiarate nei requisiti e approvate in revisione.
+- I modelli da cui partire, già nel repository: `SimulatedConnector` e il dispositivo finto `SimulatedDevice` in
+  `simulated.py` (catalogo seminato, esecuzione con le attese 0,3/0,2/1,0 s, stati di prova), estratti dal motore
+  simulato dell'app con le prove dell'app e della conformità verdi; l'harness del simulato in `tests/fake_device.py`.
+  Il `ShellyConnector` deve passare le stesse prove comuni di `tests/test_interface.py`: basta che tu scriva
+  `shelly/tests/harness.py` sul modello di `tests/fake_device.py`, e le prove comuni lo trovano da sole.
+  `harness.py` offre:
+  - `make_harness()`, obbligatoria: il connector con il suo dispositivo finto, per le prove;
+  - `connector_env(data_dir) -> dict`, facoltativa: serve se `make_connector` ha bisogno di qualcosa oltre la
+    configurazione del motore. Riceve la cartella dei dati temporanea della prova (`pathlib.Path`) e restituisce le
+    variabili d'ambiente da aggiungere: per lo Shelly scrive un catalogo di prova in `data_dir` e restituisce
+    `{"CATALOG_PATH": str(data_dir / "catalog.yaml")}`. Se scrivi il catalogo proprio in
+    `data_dir/catalog.yaml` basta anche restituire `{}`, perché quello è il percorso predefinito.
+
+## 5. Configurazione, segreti, log
+
+- **Catalogo**: un file per appartamento, `/data/<apartment_id>/catalog.yaml`, sul volume dell'istanza. Contiene le
+  stanze, i dispositivi (`device_id`, `label`, `room_id`, capacità con i valori del catalogo: limiti e
+  `confirmation`) e, per ognuno, una sezione `shelly:` (id del dispositivo Shelly, canale, componente; per `climate` il
+  blaster e il `power_meter` collegato). Niente segreti nel catalogo. Il formato lo proponi tu; lo leggono
+  `catalog.py` e il motore attraverso `devices()` e `rooms()`.
+
+  **Esempio indicativo, ancora con gli id della versione del 21 ottobre: il formato definitivo e gli id dei
+  dispositivi Gen4 li proponi tu.**
+
+  ```yaml
+  rooms:
+    - {room_id: soggiorno, name: Soggiorno}
+    - {room_id: camera, name: Camera}
+  devices:
+    - {device_id: dev-presa-camera, label: Presa stufetta, room_id: camera, capabilities: {switch: {}, power_meter: {}}, shelly: {id: shellyplus1pm-a8032ab1c2d3, channel: 0}}
+    - {device_id: dev-finestra-camera, label: Finestra camera, room_id: camera, capabilities: {contact: {}}, shelly: {id: shellyblu-door-7c2f, ble: true}}
+    - {device_id: dev-clima-soggiorno, label: Climatizzatore, room_id: soggiorno, capabilities: {climate: {setpoint_min: 16, setpoint_max: 24, confirmation: power}}, links: {confirmation_device_id: dev-misura-clima}, shelly: {id: <Athom AR01, vedi §7.3 punto 5>, ir_profile: <modello split>}}
+    - {device_id: dev-misura-clima, label: Misuratore clima, room_id: soggiorno, capabilities: {power_meter: {}}, shelly: {id: shellypmmini-b1c2d3, channel: 0}}
+    - {device_id: dev-caldaia, label: Caldaia, room_id: soggiorno, capabilities: {heating: {setpoint_min: 7, setpoint_max: 23}}, links: {sensor_device_id: dev-ambiente-soggiorno}, shelly: {id: shellyplus1-e4f5a6, channel: 0}}
+    - {device_id: dev-ambiente-soggiorno, label: Sensore soggiorno, room_id: soggiorno, capabilities: {temperature: {}, humidity: {}}, shelly: {id: shellyhtg3-a1b2c3}}
+  ```
+
+  Gli id Shelly sono inventati; per lo split l'apparecchio a infrarossi lo sceglie il catalogo.
+- **Configurazione del processo** (variabili d'ambiente, lette una volta all'avvio):
+  - del motore: `APARTMENT_ID`, `API_KEY` e `CONNECTOR=shelly|simulated` sono **obbligatorie**. `API_KEY` è la
+    chiave d'accesso che l'app deve mandare, **di almeno 16 caratteri**: se manca o è più corta il motore non parte
+    ed esce con il codice 2, scritto nel log. Facoltative: `HOST`, `PORT` (predefinita 8100), `DATA_DIR`
+    (predefinita `/data/<apartment_id>`), `CATALOG_PATH` (predefinito `<DATA_DIR>/catalog.yaml`);
+  - del connector: tutte con il prefisso `SHELLY_`, cioè `SHELLY_OFFLINE_AFTER_S` e quelle del trasporto MQTT (nomi
+    da concordare, §7.3). Le leggi da `config.env` in `make_connector` (§2.7): una variabile senza il prefisso non ti
+    arriva.
+- **Segreti**: in Secret Manager, due per appartamento (D-212): `langbrain-shelly-<apartment_id>` con la password del
+  connector, e `langbrain-shelly-<apartment_id>-devices` con le password dei dispositivi
+  (`{"<id del dispositivo>": "<password>", ...}`). Li crea lo script di messa in servizio `scripts/broker-secrets.sh`;
+  il broker ne conserva solo gli hash. Il prefisso `langbrain-` resta solo perché è quello degli identificativi già
+  creati su Google Cloud, e non indica il motore.
+  **Al connector serve solo il primo** (la sua password): il secondo è per il broker e la messa in servizio, e non va
+  passato al motore. **Da fare (o1):** oggi la VM passa al motore solo la chiave dell'API (`langbrain-api-key-<id>`);
+  il segreto del connector andrà letto con l'identità della VM e passato come variabile d'ambiente, con i nomi del
+  §7.3, punto 3. Mai nel catalogo, nel repository o nei log.
+- **Log**: una riga JSON per evento su stdout, con `ts`, `level`, `msg` (breve, in inglese, stabile: gli allarmi
+  leggono i messaggi), `apartment_id` e, nei comandi, `correlation_id`, `command_id`, `device_id`. Usa la funzione di
+  log del motore, `engine/log.py`: `info(msg, **campi)`, `warn(msg, **campi)`, `error(msg, **campi)`, per esempio
+  `from engine.log import info` e poi `info("command sent", correlation_id=..., command_id=..., device_id=...)`.
+  `apartment_id` lo aggiunge da sola: il motore la prepara all'avvio. I campi con key, token, password, secret o
+  authorization nel nome escono come `[redacted]`, ma è solo una rete di sicurezza: mai payload RPC con credenziali.
+
+## 6. Cosa il connector NON deve fare
+
+- Decidere: niente regole, limiti, priorità, modalità, programmazioni, termostato, approvazioni, decisioni.
+- Esporre API verso l'app o scrivere nell'archivio del motore (SQLite): passa tutto dall'interfaccia.
+- Accodare comandi per dispositivi offline, o ritentare oltre la scadenza.
+- Calcolare l'ora locale, `kwh_today` o i consumi orari.
+- Leggere `X-Actor` o dati delle persone: il connector non sa chi ha chiesto il comando.
+- Bloccare il ciclo di asyncio, usare stato globale (due connector nello stesso processo devono poter coesistere nelle
+  prove), terminare il processo per un errore di un dispositivo (al più `status().up=False` con `detail`).
+- Aprire porte verso internet: l'unico ingresso dei dispositivi è il broker su `mqtt.dh-lab.eu:8883` (§7). Il
+  connector è un client del broker sulla rete interna e non espone niente.
+- Toccare la cartella `contract/` del repository.
+
+## 7. Ingresso dei dispositivi e broker MQTT (nuovo)
+
+### 7.1 Deciso e già installato sulla VM (10 novembre 2026)
+
+| Cosa | Valore | Decisione |
+|---|---|---|
+| Nome e porta per i dispositivi | `mqtt.dh-lab.eu:8883` (dominio di servizio per le prove; per gli appartamenti veri il dominio del cliente) | D-206, D-209 |
+| Cifratura | TLS che termina sul broker; certificato Let's Encrypt RSA-2048, catena fino a ISRG Root X1; nei dispositivi `ssl_ca: "ca.pem"` (mai `"*"`, mai in chiaro) | D-207, D-212 |
+| Broker | Mosquitto 2.1.2, un solo container per la VM (`domhouse-broker`), nessun accesso anonimo | D-209, D-212 |
+| Porta del connector | `1883` sulla rete Docker interna `domhouse-broker-internal` (172.30.83.2), non pubblicata | D-212 |
+| Utenti | `<apartment_id>.<id del dispositivo>` per ogni dispositivo; `<apartment_id>.connector` per il connector | D-212 |
+| Permessi del dispositivo | legge e scrive **solo** `<apartment_id>/<id del dispositivo>/#`, dove stanno anche le sue risposte alle RPC del connector (`<apartment_id>/<id del dispositivo>/connector/rpc`): non può scrivere nello spazio di un altro dispositivo. Forma del connector di Youssouf, adottata l'11 novembre (D-223) al posto di quella del 10 (D-215); la riga di scrittura in più del broker si toglie nel lotto 39 (o1) | D-212, D-215, D-223 |
+| Permessi del connector | legge e scrive `<apartment_id>/#`, cioè solo il suo appartamento | D-212 |
+| Client ID del dispositivo | **convenzione** impostata su ogni Shelly alla messa in servizio (procedura G2, B5): uguale al suo utente, così la riga di un accesso rifiutato dice quale dispositivo è. Il broker non lo controlla | D-212 |
+| Instradamento | nessuno all'ingresso: un solo broker per la VM, ogni connector si abbona solo al proprio prefisso | D-209 |
+| Id del dispositivo nel broker | `[A-Za-z0-9][A-Za-z0-9_-]{0,63}`; `connector` è riservato; il punto non è ammesso, perché separa appartamento e dispositivo nell'utente | D-212 |
+| Password dei dispositivi | almeno 24 caratteri; lo script di messa in servizio ne genera 32 | D-212 |
+| Limite d'ingresso | sulla 8883, per indirizzo: oltre 60 collegamenti nuovi di fila, poi 30 al minuto; il resto è scartato, senza blocchi | D-209, D-212 |
+
+### 7.1 bis Cosa ne segue per il connector
+
+- **Porta interna in chiaro**: l'ascoltatore 1883 è MQTT senza TLS, sulla sola rete interna; il motore la raggiunge
+  solo con `CONNECTOR` diverso da `simulated` (`engine/compose.broker.yaml`). Il trasporto deve permettere il
+  collegamento in chiaro verso 172.30.83.2:1883; il TLS vale solo fra dispositivi e broker.
+- **Molti dispositivi dietro lo stesso indirizzo**: un appartamento con più di 60 apparecchi, dopo un blackout, ne
+  ricollega 60 subito e gli altri a 30 al minuto. Serve che i dispositivi ritentino con attesa crescente.
+- **Certificato che cambia**: si rinnova circa ogni 60 giorni con una chiave nuova (già provati un rinnovo e una
+  revoca). I dispositivi verificano con la CA (`ssl_ca: "ca.pem"`) e non fissano certificato o chiave. Un cambio di
+  tipo di chiave riavvia il broker: tutti si ricollegano.
+- **Code del broker**: al massimo 1000 messaggi o 1 MB per client, oltre si scarta; 20 messaggi in volo. Se il
+  connector resta indietro o scollegato perde notifiche: alla ripresa rifà la fotografia (`Shelly.GetStatus`, §2.6).
+
+### 7.2 RPC e notifiche su MQTT (dalla documentazione Shelly e dal DESIGN.md di Youssouf, da verificare in laboratorio)
+
+- Il prefisso di ogni dispositivo (`topic_prefix`) è `<apartment_id>/<id del dispositivo>`.
+- Richieste: il connector pubblica su `<prefisso>/rpc` con `src` = `<apartment_id>/<id del dispositivo>/connector`;
+  la risposta arriva su `<apartment_id>/<id del dispositivo>/connector/rpc`, dentro lo spazio del dispositivo (D-223).
+  Così ogni dispositivo può rispondere solo per sé. Misurato su Shelly Gen4 veri (Shelly 1 ed EM Mini) nella cattura del
+  laboratorio di Youssouf del 10 novembre.
+- Notifiche su `<prefisso>/events/rpc`; stato online su `<prefisso>/online` (`true` alla connessione, `false` come
+  ultimo messaggio se il dispositivo cade).
+- Livello di consegna (QoS), D-215 e risposta 744:
+  - **richieste RPC del connector: QoS 0**. Il broker non accoda mai un messaggio QoS 0 per chi è scollegato: un comando mandato a un dispositivo che non c'è si perde, non arriva in ritardo al suo ritorno. Il connector se ne accorge dalla scadenza (`failed/device_offline` o `timeout`, §2.5) e il motore non ripete.
+  - **risposte e notifiche del dispositivo: QoS 1**, come le manda lo Shelly (la documentazione dice «The supported Quality of service level is 1»). I duplicati sono possibili e vanno bene, perché i comandi sono stati da raggiungere (§2.5, §2.6).
+  - Provato sul broker vero, nel repository: una richiesta QoS 0 a un dispositivo con sessione persistente scollegato non gli arriva al ritorno; la stessa richiesta con QoS 1 gli arriva (tests/broker_container_test.py, `test_d215_a_request_with_qos_0_never_reaches_a_device_late`).
+- Sessioni: il broker cancella **ogni** sessione persistente (dispositivi e connector) dopo **1 ora** di assenza (`persistent_client_expiration 1h`, risposta 744). È un'impostazione di tutto il broker: Mosquitto non la permette per un solo utente o per un solo ascoltatore (provato sull'immagine vera, D-215). Per il connector vuol dire che, se resta via più di un'ora, perde le notifiche accodate: alla ripresa rifà comunque la fotografia con `Shelly.GetStatus` (§2.6).
+- Alla riconnessione il connector chiede lo stato completo (`Shelly.GetStatus`) per la fotografia del §2.6.
+
+### 7.3 Da concordare con Youssouf
+
+1. **Risolto (D-223):** `topic_prefix` accetta la barra e vale anche per le richieste RPC (cattura dei Gen4 del 10
+   novembre).
+2. **Risolto (D-223):** il campo `src` accetta le barre (stessa cattura).
+3. I nomi delle variabili del trasporto, per esempio `SHELLY_MQTT_HOST`, `SHELLY_MQTT_PORT`, `SHELLY_MQTT_USER`,
+   `SHELLY_MQTT_PASSWORD` (con «PASSWORD» nel nome, così il registro dei log la nasconde comunque). Valori di oggi:
+   host 172.30.83.2, porta 1883, utente `<apartment_id>.connector`. Oggi la VM non le passa ancora al motore.
+4. L'«id del dispositivo» del broker è dell'**apparecchio fisico**, non il `device_id` del catalogo: un account per
+   ogni Shelly, anche quando ospita più dispositivi del catalogo (per esempio il ponte dei sensori BLU). Anche il
+   segreto `-devices` è indicizzato così. Come si lega al `device_id` del catalogo.
+5. Come entra nel broker l'Athom AR01 (Tasmota), con il suo schema di topic, dentro gli stessi permessi.
+6. Keep-alive e dimensione massima dei messaggi dei dispositivi: oggi nessun limite sul keep-alive e pacchetti fino a
+   256 KB.
+7. La cifratura dei sensori BLU negli appartamenti (D-196, punto c).
+8. **Comandi accodati per i dispositivi offline: deciso (D-215, risposta 744).**
+   - Richieste RPC con QoS 0, risposte e notifiche con QoS 1 (§7.2): un comando non può arrivare in ritardo, qualunque sia la sessione del dispositivo.
+   - Scadenza delle sessioni del broker a 1 ora, per tutti (Mosquitto non la permette solo per i dispositivi).
+   - La **sessione pulita sugli Shelly non è impostabile**: la documentazione ufficiale del componente MQTT non ha nessuna impostazione di sessione (`MQTT.SetConfig`: enable, server, client_id, user, pass, ssl_ca, topic_prefix, rpc_ntf, status_ntf, use_client_cert, enable_rpc, enable_control). Da verificare in laboratorio: il flag della sessione del Gen4 nel log del broker alla connessione (`c0` = sessione persistente, `c1` = pulita, nella riga «New client connected … (p4, cX, kY …)»).
+9. **Risposte a nome di un altro dispositivo: risolto (D-215, forma di D-223).** Ogni dispositivo risponde dentro il
+   suo spazio (§7.1, §7.2) e non può scrivere in quello degli altri.
+10. Se il Gen4 pubblica `<prefisso>/online` come messaggio conservato (retain): da questo dipende cosa vede il
+    connector quando riparte, prima della prima notifica.
+11. La lunghezza massima della password MQTT accettata da uno Shelly Gen4 (lo script ne genera 32 caratteri).
+
+### 7.4 Ancora da provare
+
+- **Bloccante:** che uno Shelly Gen4 accetti il certificato di `mqtt.dh-lab.eu` senza installare niente.
+- Il passaggio completo di un dispositivo vero: utenti del primo appartamento di laboratorio (procedura G2, passo B5),
+  poi il connector.

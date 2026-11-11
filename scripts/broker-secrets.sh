@@ -24,9 +24,19 @@ LOCATION="${SECRET_LOCATION:-europe-west8}"
 VM_ACCOUNT="${VM_ACCOUNT:-langbrain-vm@${P}.iam.gserviceaccount.com}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ACCOUNTS="${HERE}/broker_accounts.py"
-if [ -x "${HERE}/../.venv/Scripts/python" ]; then PY="${HERE}/../.venv/Scripts/python"; elif command -v python3 > /dev/null; then PY=python3; else PY=python; fi
 
 die() { echo "errore: $*" >&2; exit 1; }
+
+# The first Python that really answers. On Windows `python3` can be the Microsoft Store alias: command -v finds it, but
+# it is no Python and every call fails (the full run of 10 November, in a clean copy without .venv). An array, so that
+# «py -3» works too.
+works() { "$@" -c 'import sys' > /dev/null 2>&1; }
+if works "${HERE}/../.venv/Scripts/python"; then PY=("${HERE}/../.venv/Scripts/python")
+elif works "${HERE}/../.venv/bin/python"; then PY=("${HERE}/../.venv/bin/python")
+elif works python3; then PY=(python3)
+elif works python; then PY=(python)
+elif works py -3; then PY=(py -3)
+else die "nessun Python funzionante (provati .venv, python3, python, py -3)"; fi
 say() { printf '== %s\n' "$*"; }
 valid_id() { [[ "$2" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]] || die "$1 non valido: $2"; }
 exists() { gcloud secrets describe "$1" --project="${P}" --format='value(name)' > /dev/null 2>&1; }
@@ -59,7 +69,7 @@ edit_devices() {
   valid_id device_id "$3"
   if [ -n "${DRY_RUN}" ]; then echo "(prova a secco) $1-device $3 in ${secret}: nessuna lettura né scrittura"; return 0; fi
   current="$(gcloud secrets versions access latest --secret="${secret}" --project="${P}")" || die "${secret} non leggibile"
-  new="$(printf '%s' "${current}" | "${PY}" "${ACCOUNTS}" "$1-device" "$3")" || die "$1-device non fatto: niente è cambiato"
+  new="$(printf '%s' "${current}" | "${PY[@]}" "${ACCOUNTS}" "$1-device" "$3")" || die "$1-device non fatto: niente è cambiato"
   add_version "${secret}" "${new}"
   current=""; new=""
   next_step
@@ -75,7 +85,7 @@ case "${cmd}" in
     say "Segreti di $1"
     create_if_missing "${connector}"
     create_if_missing "${devices}"
-    if has_version "${connector}"; then echo "${connector} ha già una versione: la lascio"; else add_version "${connector}" "$("${PY}" "${ACCOUNTS}" new-password)"; fi
+    if has_version "${connector}"; then echo "${connector} ha già una versione: la lascio"; else add_version "${connector}" "$("${PY[@]}" "${ACCOUNTS}" new-password)"; fi
     if has_version "${devices}"; then echo "${devices} ha già una versione: la lascio"; else add_version "${devices}" "{}"; fi
     grant_vm "${connector}"
     grant_vm "${devices}"
@@ -89,7 +99,7 @@ case "${cmd}" in
     [ $# -eq 1 ] || die "uso: rotate-connector <apartment_id>"
     valid_id apartment_id "$1"
     if [ -n "${DRY_RUN}" ]; then echo "(prova a secco) nuova password in langbrain-shelly-$1"; exit 0; fi
-    add_version "langbrain-shelly-$1" "$("${PY}" "${ACCOUNTS}" new-password)"
+    add_version "langbrain-shelly-$1" "$("${PY[@]}" "${ACCOUNTS}" new-password)"
     next_step
     ;;
   *)

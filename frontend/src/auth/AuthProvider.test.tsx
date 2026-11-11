@@ -40,11 +40,13 @@ function answerMe(status: number, body: unknown) {
 }
 
 function Probe() {
-  const { status, me } = useAuth();
+  const { status, problem, me, refreshMe } = useAuth();
   const { isAdmin, hasTenant } = useRole();
   return (
     <>
       <div data-testid="auth-status">{status}{me ? ` ${me.user.email}` : ""}</div>
+      <div data-testid="auth-problem">{problem ?? ""}</div>
+      <button type="button" data-testid="refresh-me" onClick={() => void refreshMe()}>rileggi</button>
       <div data-testid="auth-role">{`admin=${isAdmin} tenant=${hasTenant}`}</div>
     </>
   );
@@ -123,12 +125,89 @@ describe("accesso: risposta di /app/me", () => {
     expect(fb.signOut).not.toHaveBeenCalled();
   });
 
-  it("500: avvisa «Impossibile caricare il profilo» senza uscire da Firebase", async () => {
+  it("500: non va alla pagina di accesso, la pagina dice che il servizio non risponde (D-211); resta in Firebase", async () => {
     answerMe(500, { error: "internal", message: "Errore interno" });
     await signIn();
-    expect(screen.getByTestId("auth-status")).toHaveTextContent("anonymous");
-    expect(toast.error).toHaveBeenCalledWith(t("login.bffError"), expect.objectContaining({ description: "Errore interno" }));
+    expect(screen.getByTestId("auth-status")).toHaveTextContent("unavailable");
+    expect(screen.getByTestId("auth-problem")).toHaveTextContent("server");
+    expect(toast.error).not.toHaveBeenCalled();
     expect(fb.signOut).not.toHaveBeenCalled();
+  });
+
+  it("rete assente all'avvio: non va alla pagina di accesso, la causa è la rete (D-211)", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    }));
+    await signIn();
+    expect(screen.getByTestId("auth-status")).toHaveTextContent("unavailable");
+    expect(screen.getByTestId("auth-problem")).toHaveTextContent("network");
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(fb.signOut).not.toHaveBeenCalled();
+  });
+
+  it("token scaduto e niente rete all'avvio: la stessa pagina, non l'accesso senza messaggi", async () => {
+    const getIdToken = vi.spyOn(fb.user, "getIdToken").mockRejectedValue(Object.assign(new Error("offline"), { code: "auth/network-request-failed" }));
+    vi.stubGlobal("fetch", vi.fn());
+    await signIn();
+    expect(screen.getByTestId("auth-status")).toHaveTextContent("unavailable");
+    expect(screen.getByTestId("auth-problem")).toHaveTextContent("network");
+    getIdToken.mockRestore();
+  });
+
+  it("altri rifiuti (per esempio 429): come prima, pagina di accesso con «Impossibile caricare il profilo»", async () => {
+    answerMe(429, { error: "rate_limited", message: "Troppe richieste" });
+    await signIn();
+    expect(screen.getByTestId("auth-status")).toHaveTextContent("anonymous");
+    expect(screen.getByTestId("auth-problem")).toHaveTextContent(/^$/);
+    expect(toast.error).toHaveBeenCalledWith(t("login.bffError"), expect.objectContaining({ description: "Troppe richieste" }));
+  });
+});
+
+describe("rilettura del profilo durante l'uso (D-211)", () => {
+  const ME = { user: { uid: "u1", email: "gestore@esempio.it", display_name: "" }, role: "operator", tenant: { tenant_id: "t1", name: "Demo" }, env: {} };
+
+  async function inside() {
+    answerMe(200, ME);
+    await signIn();
+    expect(screen.getByTestId("auth-status")).toHaveTextContent("authenticated");
+    localStorage.setItem("domotica.pushToken", "tok-u1");
+    localStorage.setItem("domotica.pushTokenOwner", "u1");
+  }
+
+  async function reread() {
+    await act(async () => {
+      screen.getByTestId("refresh-me").click();
+    });
+  }
+
+  it("niente rete: la pagina «Ricarica», non l'accesso; la persona resta, notifiche comprese", async () => {
+    await inside();
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new TypeError("Failed to fetch");
+    }));
+    await reread();
+    await waitFor(() => expect(screen.getByTestId("auth-status")).toHaveTextContent("unavailable gestore@esempio.it"));
+    expect(screen.getByTestId("auth-problem")).toHaveTextContent("network");
+    expect(fb.signOut).not.toHaveBeenCalled();
+    expect(fb.deleteToken).not.toHaveBeenCalled();
+    expect(localStorage.getItem("domotica.pushToken")).toBe("tok-u1");
+  });
+
+  it("503: la pagina «Il servizio non risponde»", async () => {
+    await inside();
+    answerMe(503, { error: "unavailable", message: "Servizio non disponibile" });
+    await reread();
+    await waitFor(() => expect(screen.getByTestId("auth-problem")).toHaveTextContent("server"));
+    expect(screen.getByTestId("auth-status")).toHaveTextContent("unavailable");
+    expect(toast.error).not.toHaveBeenCalled();
+  });
+
+  it("401: come prima, si esce e il token delle notifiche è tolto", async () => {
+    await inside();
+    answerMe(401, { error: "unauthorized", message: "Sessione scaduta" });
+    await reread();
+    await waitFor(() => expect(screen.getByTestId("auth-status")).toHaveTextContent("anonymous"));
+    await waitFor(() => expect(fb.deleteToken).toHaveBeenCalledTimes(1));
   });
 });
 

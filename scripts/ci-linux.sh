@@ -53,7 +53,7 @@ SUM="$(sed -n 's/^  CONTRACT_SHA256: *//p' .github/workflows/conformita.yml)"
 echo "$SUM  contract/openapi.yaml" | sha256sum -c - ; step contratto $?
 
 python -m venv /tmp/venv && . /tmp/venv/bin/activate \
-  && pip install -q --disable-pip-version-check -r bff/requirements.txt -r contract/conformance/requirements.txt
+  && pip install -q --disable-pip-version-check -r bff/requirements.txt -r engine/requirements.txt -r contract/conformance/requirements.txt
 rc=$?; step dipendenze $rc
 [ $rc -eq 0 ] || finish
 

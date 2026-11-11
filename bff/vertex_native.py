@@ -1,4 +1,5 @@
-"""Vertex's own generateContent behind the BFF's model gateway (D-182: gemini-3.8-flash, location eu, native endpoint,
+"""Vertex's own generateContent behind the BFF's model gateway (D-182, models of D-187: AI_MODEL gemini-3.5-flash with
+its twin gemini-3.5-flash-lite, location eu, native endpoint,
 reasoning off): the engine and the rules' proposals keep speaking the OpenAI-compatible chat format to the BFF; this
 module translates the request to Vertex's native format and the answer back. The host of a multi-region is Google's
 aiplatform.<eu|us>.rep.googleapis.com (docs: vertex-ai/generative-ai/docs/learn/locations).

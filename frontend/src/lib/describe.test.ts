@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { t } from "@/i18n";
 import { capitalizeFirst } from "@/lib/format";
 import { actionLabel, DECISION_ACTIONS, decisionValue, describeActor, personLabel } from "./describe";
@@ -83,6 +85,25 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     expect(actionLabel("frost_inactive")).toBe("Antigelo non attivo");
     // limiti del gestore fuori da quelli del dispositivo, D-174 (f586b7d)
     expect(actionLabel("setpoint_limits_ignored")).toBe("Limiti del setpoint ignorati");
+    // lotto 38: azione programmata rifiutata (0e1d04a), motore di nuovo raggiungibile (D-217), finestra chiusa (D-218)
+    expect(actionLabel("schedule_failed")).toBe("Programma: non eseguita");
+    expect(actionLabel("instance_reachable")).toBe("Sistema domotico di nuovo raggiungibile");
+    expect(actionLabel("window_restore")).toBe("Finestra chiusa: riacceso");
+    // lotto 39: azione programmata eseguita in parte (D-219, aggiunta 2)
+    expect(actionLabel("schedule_partial")).toBe("Programma: eseguita in parte");
+  });
+
+  it("ogni azione che il motore scrive nelle decisioni è nell'elenco del sito (controllo automatico, lotto 39)", () => {
+    // Nel lotto 38 tre azioni nuove del motore arrivavano nelle Decisioni col codice grezzo: nessuno le aveva aggiunte
+    // qui. Si leggono i nomi scritti per esteso nelle chiamate self.log(attore, bersaglio, "azione", …) del motore.
+    const source = readFileSync(resolve(process.cwd(), "../engine/core.py"), "utf8");
+    const written = new Set<string>();
+    for (const call of source.split("self.log(").slice(1)) {
+      const args = call.replace(/\{[^{}]*\}/g, "{}").split(",");     // the target {…} is one argument
+      for (const literal of (args[2] ?? "").matchAll(/(?<!\[)["']([a-z_]+)["'](?!\])/g)) written.add(literal[1]);   // not cmd["action"]
+    }
+    expect(written.size).toBeGreaterThan(20);
+    expect([...written].filter((code) => !(DECISION_ACTIONS as readonly string[]).includes(code))).toEqual([]);
   });
 
   it("un'azione che il motore aggiungerà e il sito non conosce ancora: il codice, la pagina non si rompe", () => {

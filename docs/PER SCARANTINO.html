@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DOMHOUSE — come è fatto e come funziona</title>
+<style>
+:root{
+--bg:#faf6ef;--surface:#fffdf9;--surface2:#f2eadd;--ink:#2a2420;--muted:#665a50;--line:#dfd3c2;--accent:#93421f;
+--sito:#2b5a85;--sito-bg:#e5edf5;--server:#65457f;--server-bg:#eee7f3;--motore:#9c4a25;--motore-bg:#f8e7dc;
+--connector:#49652a;--connector-bg:#e8efdc;--broker:#6f5408;--broker-bg:#f5ebcf;--disp:#1b6660;--disp-bg:#dcefec;
+--c:#2a6435;--c-bg:#e0efe1;--d:#2b5a85;--d-bg:#e2ebf5;--e:#7d5100;--e-bg:#f8eaca;
+--upd:#933a1d;--upd-bg:#fbe8dd;--opn:#742b50;--opn-bg:#f6e3ed;--sim:#564d43;--sim-bg:#ebe3d6;
+--serif:"Iowan Old Style","Palatino Linotype",Palatino,"Book Antiqua",Georgia,serif;
+--sans:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+--mono:ui-monospace,"Cascadia Mono",Consolas,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+--bg:#1b1815;--surface:#24201c;--surface2:#2e2823;--ink:#ece5da;--muted:#b9ad9e;--line:#463d33;--accent:#eba27c;
+--sito:#93bfe6;--sito-bg:#1e2a36;--server:#c8addf;--server-bg:#2b2334;--motore:#eba27c;--motore-bg:#38251b;
+--connector:#b0cc8a;--connector-bg:#232b19;--broker:#e0c060;--broker-bg:#30290f;--disp:#7fd0c8;--disp-bg:#152c2a;
+--c:#9bd3a3;--c-bg:#1c2e20;--d:#93bfe6;--d-bg:#1e2a36;--e:#e8c06a;--e-bg:#33290f;
+--upd:#f2ab8e;--upd-bg:#3a2118;--opn:#eeabcf;--opn-bg:#351d2a;--sim:#d2c7b7;--sim-bg:#38322b;
+}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:1.0625rem/1.65 var(--serif)}
+a{color:var(--accent)}
+code{font:.86em var(--mono);background:var(--surface2);padding:.05em .3em;border-radius:.25em;overflow-wrap:anywhere}
+h1,h2,h3,h4{font-family:var(--serif);line-height:1.2;font-weight:600;letter-spacing:-.005em}
+h1{font-size:clamp(2rem,5vw,3rem);margin:.2rem 0 .6rem}
+h2{font-size:clamp(1.5rem,3.2vw,2rem);margin:0 0 1rem;padding-top:1rem;border-top:3px solid var(--line)}
+h3{font-size:1.35rem;margin:2.6rem 0 .8rem}
+h4{font-size:1.05rem;margin:0 0 .4rem}
+p,ul,ol{margin:0 0 1rem}
+main>section>p,main>section>ul,main>section>ol,.prose{max-width:70ch}
+section{margin:0 0 4rem;scroll-margin-top:1rem}
+h3[id],li[id],tr[id]{scroll-margin-top:1.2rem}
+main{padding:2rem 1.2rem 5rem;max-width:66rem;margin:0 auto}
+
+/* indice */
+nav#idx{font:.9rem/1.35 var(--sans);background:var(--surface);border-bottom:1px solid var(--line);padding:1rem 1.2rem}
+nav#idx strong{display:block;font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:.5rem}
+nav#idx ol{list-style:none;margin:0;padding:0;columns:2;column-gap:1.5rem}
+nav#idx li{break-inside:avoid}
+nav#idx a{display:block;padding:.28rem .5rem;border-left:3px solid transparent;color:var(--ink);text-decoration:none;border-radius:0 .3rem .3rem 0}
+nav#idx a.sub{padding-left:1.3rem;font-size:.85rem;color:var(--muted)}
+nav#idx a:hover{background:var(--surface2)}
+nav#idx a.on{border-left-color:var(--accent);background:var(--surface2);color:var(--accent);font-weight:600}
+@media (min-width:1100px){
+nav#idx{position:fixed;top:0;left:0;bottom:0;width:16.5rem;overflow:auto;border-bottom:0;border-right:1px solid var(--line);padding:1.5rem .9rem}
+nav#idx ol{columns:1}
+main{margin-left:16.5rem;padding:2.5rem 2.5rem 6rem;max-width:none}
+main>*{max-width:62rem}
+}
+.top{position:fixed;right:1rem;bottom:1rem;font:600 .85rem var(--sans);background:var(--ink);color:var(--bg);padding:.55rem .8rem;border-radius:2rem;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,.25);z-index:5}
+
+/* testata */
+.kicker{font:600 .8rem var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);margin:0}
+.version{font-size:1.1rem;color:var(--muted);max-width:60ch}
+.meta{list-style:none;padding:0;font:.9rem/1.5 var(--sans);color:var(--muted);max-width:75ch}
+.meta li{margin:.2rem 0}
+.banner{border:1px solid var(--upd);background:var(--upd-bg);border-radius:.6rem;padding:.9rem 1.1rem;max-width:70ch;margin:1.2rem 0}
+.banner p{margin:0}
+.call{border-left:4px solid var(--line);background:var(--surface);padding:.8rem 1.1rem;border-radius:0 .5rem .5rem 0;max-width:72ch;margin:1.2rem 0}
+.call.u{border-left-color:var(--upd)}.call.o{border-left-color:var(--opn)}.call.w{border-left-color:var(--e)}
+.call>:last-child{margin-bottom:0}
+.key{display:flex;flex-wrap:wrap;gap:.5rem 1.1rem;list-style:none;padding:0;font:.85rem var(--sans);max-width:none}
+.key li{display:flex;align-items:center;gap:.35rem}
+
+/* etichette */
+.tg,.upd,.opn,.sim,.pc,.st{font:600 .7rem/1.2 var(--sans);display:inline-block;padding:.14rem .42rem;border-radius:.35rem;vertical-align:.08em;white-space:nowrap;border:1px solid}
+.tg.c{color:var(--c);background:var(--c-bg);border-color:var(--c)}
+.tg.d{color:var(--d);background:var(--d-bg);border-color:var(--d)}
+.tg.e{color:var(--e);background:var(--e-bg);border-color:var(--e)}
+.upd{color:var(--upd);background:var(--upd-bg);border-color:var(--upd);white-space:normal;font-weight:400}
+.upd b{font-weight:700}
+.upd code{background:none;padding:0}
+.opn{color:var(--opn);background:var(--opn-bg);border-color:var(--opn);text-decoration:none}
+.opn:hover{text-decoration:underline}
+.sim{color:var(--sim);background:var(--sim-bg);border-color:var(--sim);border-style:dashed}
+.st{color:var(--muted);border-color:var(--muted);background:transparent}
+.src{font:.76rem/1.4 var(--sans);color:var(--muted)}
+.src code{font-size:.95em;background:none;padding:0}
+.pc{color:var(--pc);background:var(--pbg);border-color:var(--pc)}
+.p-sito{--pc:var(--sito);--pbg:var(--sito-bg)}.p-server{--pc:var(--server);--pbg:var(--server-bg)}
+.p-motore{--pc:var(--motore);--pbg:var(--motore-bg)}.p-connector{--pc:var(--connector);--pbg:var(--connector-bg)}
+.p-broker{--pc:var(--broker);--pbg:var(--broker-bg)}.p-disp{--pc:var(--disp);--pbg:var(--disp-bg)}
+
+/* tabelle */
+table.t{border-collapse:collapse;width:100%;font:.88rem/1.5 var(--sans);margin:1rem 0 1.6rem}
+table.t th{position:sticky;top:0;z-index:2;background:var(--surface2);text-align:left;padding:.55rem .65rem;border-bottom:2px solid var(--line);font-size:.78rem;letter-spacing:.03em;text-transform:uppercase}
+table.t td{padding:.6rem .65rem;vertical-align:top;border-bottom:1px solid var(--line)}
+table.t tbody tr:nth-child(even){background:var(--surface)}
+table.t td:first-child{font-weight:600}
+table.t.plain td:first-child{font-weight:400}
+@media (max-width:760px){
+table.t thead{position:absolute;left:-999em}
+table.t,table.t tbody,table.t tr,table.t td{display:block}
+table.t tr{border:1px solid var(--line);border-radius:.5rem;margin:.8rem 0;padding:.5rem .8rem;background:var(--surface)}
+table.t td{border:0;padding:.3rem 0}
+table.t td[data-l]::before{content:attr(data-l);display:block;font:600 .68rem var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+}
+
+/* schema dei pezzi */
+figure{margin:1.5rem 0}
+figcaption{font:.82rem/1.5 var(--sans);color:var(--muted);max-width:60ch}
+svg.pz{width:100%;max-width:26rem;height:auto;display:block}
+svg.pz rect{fill:var(--pbg);stroke:var(--pc);stroke-width:1.6}
+svg.pz .dash{stroke-dasharray:5 4}
+svg.pz text{font-family:var(--sans);fill:var(--ink)}
+svg.pz .n{font-size:13.5px;font-weight:700;fill:var(--pc)}
+svg.pz .s{font-size:10.5px;fill:var(--muted)}
+svg.pz .l{font-size:10.5px;fill:var(--muted);font-style:italic}
+svg.pz .ar{stroke:var(--muted);stroke-width:1.6;fill:none}
+svg.pz .ah{fill:var(--muted)}
+svg.pz .b{fill:var(--ink)}
+svg.pz .bt{fill:var(--bg);font-size:10px;font-weight:700}
+
+/* percorso fisico */
+figure.fis{container-type:inline-size}
+svg.fz{width:100%;height:auto;display:block}
+svg.fz.t{max-width:24rem}
+svg.fz.w{display:none}
+@container (min-width:880px){svg.fz.w{display:block}svg.fz.t{display:none}}
+svg.fz text{font-family:var(--sans);fill:var(--ink)}
+svg.fz .bx{fill:var(--pbg);stroke:var(--pc);stroke-width:1.6}
+svg.fz .dash{stroke-dasharray:5 4}
+svg.fz .n{font-size:13.5px;font-weight:700;fill:var(--pc)}
+svg.fz .s{font-size:11px;fill:var(--muted)}
+svg.fz .l{font-size:11px;fill:var(--muted);font-style:italic}
+svg.fz .cl{font-size:11px;fill:var(--accent);font-style:italic}
+svg.fz .lg{font-size:11.5px}
+svg.fz .zl{font-size:10px;letter-spacing:.08em;fill:var(--muted);font-weight:600}
+svg.fz .zn{fill:none;stroke:var(--muted);stroke-width:1;stroke-dasharray:2 5;opacity:.7}
+svg.fz .ar{stroke:var(--ink);stroke-width:1.6;fill:none}
+svg.fz .ah{fill:var(--ink)}
+svg.fz .cm{stroke:var(--accent);stroke-width:1.6;fill:none;stroke-dasharray:5 4}
+svg.fz .ch{fill:var(--accent)}
+.nt{--pc:var(--muted);--pbg:var(--surface)}
+svg.fz .nt .n{fill:var(--ink)}
+dl.f.k{margin-top:.75rem;padding-top:.65rem;border-top:1px dashed var(--line)}
+dl.f.k dt{color:var(--pc)}
+h4{margin-top:1.6rem}
+.ex{max-width:100%;overflow-wrap:anywhere}
+dl.f dd,table.t td{min-width:0;overflow-wrap:break-word}
+.card h4,.ck h4,.mc h4,.tl h4{margin-top:0}
+/* percorso */
+.route{max-width:none;list-style:none;margin:1.5rem 0 2rem;padding:0}
+.stop{display:grid;grid-template-columns:10.5rem 1fr;gap:0 1.2rem}
+.rail{position:relative;display:flex;flex-direction:column;align-items:center;padding-bottom:.2rem}
+.rail::before{content:"";position:absolute;top:0;bottom:0;left:50%;width:3px;margin-left:-1.5px;background:var(--line)}
+.stop:first-child .rail::before{top:1.2rem}
+.stop:last-child .rail::before{bottom:auto;height:3rem}
+.num{position:relative;z-index:1;width:2rem;height:2rem;border-radius:50%;background:var(--pc);color:var(--bg);font:700 .95rem/2rem var(--sans);text-align:center;margin-top:.5rem}
+.num::after{content:"";position:absolute;left:50%;top:100%;margin-left:-.4rem;border:.4rem solid transparent;border-top-color:var(--pc);border-bottom:0}
+.node{position:relative;z-index:1;width:100%;margin-top:.55rem;background:var(--pbg);border:2px solid var(--pc);border-radius:.6rem;padding:.5rem .5rem;text-align:center;font-family:var(--sans)}
+.node b{display:block;color:var(--pc);font-size:.95rem}
+.node small{display:block;font-size:.72rem;color:var(--muted);line-height:1.3}
+.simd .node{border-style:dashed}
+.sbody{padding:.5rem 0 1.4rem;min-width:0}
+.via{font:italic .82rem/1.4 var(--sans);color:var(--muted);margin:0 0 .45rem}
+.via::before{content:"↓ ";font-style:normal;font-weight:700;color:var(--pc)}
+.card{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--pc);border-radius:.5rem;padding:.8rem 1rem}
+.simd .card{border-style:dashed;border-left-style:solid}
+dl.f{margin:0;display:grid;grid-template-columns:9.5rem 1fr;gap:.35rem .9rem;font:.88rem/1.5 var(--sans)}
+dl.f dt{font-weight:600;font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted);padding-top:.18rem}
+dl.f dd{margin:0}
+.ex{display:inline-block;font:.82rem/1.4 var(--mono);background:var(--pbg,var(--surface2));border:1px solid var(--pc,var(--line));border-radius:.3rem;padding:.12rem .45rem;margin:.1rem .2rem .1rem 0}
+@media (max-width:760px){
+.stop{grid-template-columns:1fr}
+.rail{flex-direction:row;gap:.6rem;align-items:center}
+.rail::before{display:none}
+.num{margin:0;flex:none}.num::after{display:none}
+.node{margin:0;text-align:left;display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap}
+.sbody{padding-top:.4rem}
+dl.f{grid-template-columns:1fr;gap:.1rem}
+dl.f dd{margin-bottom:.45rem}
+}
+
+/* schemi a caratteri */
+pre.schema{font:.8rem/1.35 var(--mono);background:var(--surface);border:1px solid var(--line);border-radius:.5rem;padding:.8rem 1rem;margin:1rem 0 1.4rem;overflow-x:auto;max-width:100%;white-space:pre}
+.qa{max-width:76ch;margin:0 0 1.4rem;padding-left:1rem;border-left:3px solid var(--line)}
+.qa .q{font-weight:600;font-style:italic;margin-bottom:.5rem}
+.qa table.t{margin-top:.4rem}
+.vedi{font:.85rem/1.5 var(--sans);color:var(--muted);max-width:74ch}
+ol.passi{font:.95rem/1.6 var(--sans);columns:2;column-gap:2rem;max-width:64ch}
+@media (max-width:560px){ol.passi{columns:1}}
+nav#idx a.hl{font-weight:700;color:var(--accent)}
+.banner p+p{margin-top:.6rem}
+
+/* cicli */
+.clock{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:1rem;margin:1.2rem 0}
+.ck{background:var(--pbg);border:2px solid var(--pc);border-radius:.6rem;padding:.8rem 1rem;font:.88rem/1.5 var(--sans)}
+.ck h4{color:var(--pc);font-family:var(--sans)}
+.ck ul{margin:0;padding-left:1.1rem}
+
+/* giornata */
+.tl{list-style:none;margin:1.5rem 0;padding:0;max-width:46rem}
+.tl li{display:grid;grid-template-columns:4.6rem 1fr;gap:0 1.3rem;position:relative}
+.tl time{font:700 1rem var(--sans);color:var(--accent);text-align:right;padding-top:.05rem}
+.tl .td{border-left:3px solid var(--line);padding:0 0 1.6rem 1.3rem;position:relative}
+.tl .td::before{content:"";position:absolute;left:-.48rem;top:.35rem;width:.7rem;height:.7rem;border-radius:50%;background:var(--bg);border:3px solid var(--accent)}
+.tl li:last-child .td{padding-bottom:0}
+.tl p{margin:0 0 .45rem}
+.who{display:flex;flex-wrap:wrap;gap:.35rem}
+@media (max-width:560px){.tl li{grid-template-columns:1fr}.tl time{text-align:left;padding-left:1.5rem}}
+
+/* schede */
+.menu{max-width:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(17.5rem,1fr));gap:1rem;list-style:none;padding:0;margin:1.5rem 0}
+.mc{background:var(--surface);border:1px solid var(--line);border-radius:.7rem;padding:1rem 1.1rem 1rem 4.2rem;position:relative;font:.88rem/1.5 var(--sans)}
+.mc .mn{position:absolute;left:.9rem;top:.8rem;width:2.5rem;height:2.5rem;border-radius:50%;background:var(--accent);color:var(--bg);font:700 1.25rem/2.5rem var(--sans);text-align:center}
+.mc h4{font-size:1.05rem}
+.mc p{margin:0 0 .5rem}
+.mc .lb{display:block;font:600 .68rem var(--sans);letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.mc .dp{font-weight:600;color:var(--muted)}
+
+.disc{padding-left:1.4rem;max-width:74ch}
+.disc li{margin-bottom:1rem}
+.disc .sta{font:.86rem/1.5 var(--sans);margin:.3rem 0 0}
+.two{font:.92rem/1.55 var(--sans)}
+.g{border-bottom:1px dotted var(--muted);cursor:help}
+.g:focus{outline:2px solid var(--accent);outline-offset:2px}
+#tip{position:absolute;z-index:20;max-width:21rem;background:var(--ink);color:var(--bg);font:.82rem/1.45 var(--sans);padding:.55rem .75rem;border-radius:.45rem;box-shadow:0 4px 14px rgba(0,0,0,.3);display:none}
+#tip b{display:block;margin-bottom:.15rem}
+
+@media print{
+:root{--bg:#fff;--surface:#fff;--surface2:#fff;--ink:#000;--muted:#333;--line:#999;--accent:#000;
+--sito:#1d4266;--sito-bg:#fff;--server:#4a2f61;--server-bg:#fff;--motore:#7a3516;--motore-bg:#fff;--connector:#324a17;--connector-bg:#fff;--broker:#4f3b00;--broker-bg:#fff;--disp:#0f4a45;--disp-bg:#fff;
+--c:#1c4a25;--c-bg:#fff;--d:#1d4266;--d-bg:#fff;--e:#5a3a00;--e-bg:#fff;--upd:#6e2710;--upd-bg:#fff;--opn:#561c3a;--opn-bg:#fff;--sim:#333;--sim-bg:#fff}
+nav#idx,.top,#tip{display:none!important}
+main{margin:0;padding:0;max-width:none}
+main>*{max-width:none}
+body{font-size:10.5pt}
+section{margin-bottom:1.5rem}
+h2{break-after:avoid}h3,h4{break-after:avoid}
+table.t th{position:static}
+.stop,.card,.mc,.tl li,table.t tr,.ck,.call,pre.schema{break-inside:avoid}
+pre.schema{white-space:pre-wrap}
+.g{border:0}
+a{color:inherit;text-decoration:none}
+.num{border:1px solid #000;color:#000;background:#fff}
+.mc .mn{border:2px solid #000;color:#000;background:#fff}
+}
+
+/* numeri del sistema */
+.nums{display:grid;grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr));gap:.7rem;list-style:none;padding:0;margin:1.2rem 0 1.6rem;max-width:none}
+.nums li{background:var(--surface);border:1px solid var(--line);border-radius:.6rem;padding:.6rem .75rem;font:.82rem/1.35 var(--sans);color:var(--muted)}
+.nums b{display:block;font:700 1.6rem/1.1 var(--sans);color:var(--accent);margin-bottom:.15rem}
+</style>
+</head>
+<body>
+<nav id="idx" aria-label="Indice">
+<strong>Indice</strong>
+<ol>
+<li><a href="#riassunto">In breve</a></li>
+<li><a href="#leggere">Come leggere questo documento</a></li>
+<li><a href="#architettura">1. Come è fatto</a></li>
+<li><a class="sub" href="#zone">Tre zone</a></li>
+<li><a class="sub" href="#percorso">Il percorso fisico</a></li>
+<li><a class="sub" href="#perche">Perché il dato va dalla casa alla centrale</a></li>
+<li><a class="sub" href="#pezzi">I sei pezzi</a></li>
+<li><a class="sub" href="#modelli">Dispositivi, codice di fabbrica, catalogo</a></li>
+<li><a class="sub" href="#bacheca">MQTT, la bacheca</a></li>
+<li><a class="sub" href="#traduttore">Il traduttore</a></li>
+<li><a href="#dato">2. Il viaggio di un dato</a></li>
+<li><a class="sub" href="#tappe-dato">Dal sensore allo schermo</a></li>
+<li><a href="#comando">3. Il viaggio di un comando</a></li>
+<li><a class="sub" href="#tappe-comando">Dallo schermo al relè</a></li>
+<li><a class="sub" href="#casi">Caldaia, climatizzatore, modalità</a></li>
+<li><a href="#guasti">4. Quando qualcosa si guasta</a></li>
+<li><a href="#automatismi">5. Che cosa succede da solo</a></li>
+<li><a class="sub" href="#regole">Le regole automatiche</a></li>
+<li><a class="sub" href="#tappe-finestra">Una finestra che si apre</a></li>
+<li><a class="sub" href="#prenotazioni">Le prenotazioni</a></li>
+<li><a class="sub" href="#notifiche">Approvazioni, notifiche, riepilogo</a></li>
+<li><a href="#giornata">6. Una giornata di un appartamento</a></li>
+<li><a href="#servizio">7. Mettere in servizio un appartamento</a></li>
+<li><a href="#sicurezza">8. Sicurezza, privacy, backup, allarmi</a></li>
+<li><a href="#costi">9. Costi</a></li>
+<li><a href="#faq">Domande frequenti</a></li>
+<li><a class="hl" href="#serve">Cosa serve ancora prima dell'uso negli appartamenti</a></li>
+<li><a href="#glossario">Glossario</a></li>
+</ol>
+</nav>
+<main>
+<header id="top" class="nog">
+<p class="kicker">DOMHOUSE · Descrizione del progetto · 11 novembre 2026</p>
+<h1>DOMHOUSE — come è fatto e come funziona</h1>
+<p class="version"><strong>Descrizione del progetto.</strong> DOMHOUSE è la domotica per gli appartamenti in affitto breve. Questo documento la spiega da un capo all'altro: quanti pezzi ci sono, come dialogano, che cosa succede quando qualcosa si guasta, la sicurezza, gli automatismi, le prenotazioni e i costi.</p>
+<ul class="meta">
+<li><b>Data:</b> 11 novembre 2026.</li>
+<li><b>Per chi:</b> Flatsharing, che userà DOMHOUSE nei suoi appartamenti.</li>
+</ul>
+<div class="banner"><p><strong>Perché questo documento.</strong> Da fuori DOMHOUSE sembra semplice: una presa che si accende dal telefono. Dietro quel tocco, però, lavorano tre zone, sei pezzi diversi, due reti, una bacheca di messaggi, un traduttore, un motore per ogni appartamento, otto regole automatiche e un collegamento con Italianway. Ogni pezzo deve sapere che cosa fare quando un altro si ferma. Le pagine che seguono lo mostrano, passo per passo.</p></div>
+<ul class="nums" aria-label="DOMHOUSE in numeri">
+<li><b>3</b>zone: casa, centrale nel cloud, web app</li>
+<li><b>6</b>pezzi che si parlano</li>
+<li><b>6</b>modelli di dispositivi previsti</li>
+<li><b>8</b>capacità dei dispositivi</li>
+<li><b>8</b>regole automatiche fisse</li>
+<li><b>3</b>modalità dell'appartamento</li>
+<li><b>7</b>tipi di aggiornamento in diretta</li>
+<li><b>7</b>tipi di notifica sul telefono</li>
+<li><b>11</b>allarmi via email</li>
+<li><b>3</b>ruoli degli utenti</li>
+<li><b>11</b>tappe per mettere in servizio un appartamento</li>
+<li><b>9 s</b>attesa massima per la conferma di un comando</li>
+<li><b>16</b>scenari di prova del dialogo fra app e motore</li>
+<li><b>oltre 2000</b>prove automatiche</li>
+</ul>
+<ul class="key">
+<li>Colori dei pezzi: <span class="pc p-sito">sito</span> <span class="pc p-server">server</span> <span class="pc p-motore">motore</span> <span class="pc p-connector">traduttore</span> <span class="pc p-broker">broker</span> <span class="pc p-disp">dispositivi</span></li>
+<li><span class="sim">da provare con dispositivi veri</span> tappa provata finora solo con dispositivi simulati</li>
+</ul>
+</header>
+
+<section id="riassunto">
+<h2>In breve</h2>
+<ol>
+<li>DOMHOUSE attraversa <strong>tre zone</strong>: l'appartamento, una «centrale» nel cloud di Google e la web app che il gestore usa sul telefono o sul computer.</li>
+<li>I pezzi sono <strong>sei</strong>: il <strong>sito</strong>, il <strong>server</strong>, un <strong>motore</strong> per ogni appartamento, il <strong>traduttore</strong> fra motore e dispositivi, il <strong>broker</strong> (il «centralino» dei messaggi) e i <strong>dispositivi</strong> in casa.</li>
+<li>I dispositivi parlano con la centrale attraverso <strong>MQTT</strong>, una specie di bacheca con tante caselle. Il broker tiene la bacheca e controlla chi può scrivere dove.</li>
+<li>Ogni dispositivo ha un <strong>codice di fabbrica</strong> unico. Un <strong>catalogo</strong> per appartamento dice che cosa fa ogni dispositivo in quella casa: nome, stanza, a che cosa è legato.</li>
+<li>Il <strong>motore</strong> decide tutto da solo: regole, termostato, prenotazioni, approvazioni. Il <strong>server</strong> controlla chi entra, inoltra le richieste, manda le notifiche e prepara il riepilogo del lunedì.</li>
+<li>Un comando dal telefono attraversa <strong>sei passaggi</strong> prima di arrivare alla presa, e la conferma rifà la strada al contrario. Il motore aspetta la conferma <strong>al massimo 9 secondi</strong>.</li>
+<li>Se qualcosa si guasta, ogni pezzo ha un comportamento previsto: il dispositivo risulta «non in linea» subito, la notifica parte dopo i minuti della regola, al ritorno <strong>tutto si ricollega da solo</strong>. I comandi non restano mai in coda.</li>
+<li>Senza che nessuno tocchi l'app, il motore applica <strong>otto regole</strong>, segue le <strong>prenotazioni di Italianway</strong>, chiede <strong>approvazioni</strong> al gestore e scrive ogni scelta nella pagina «Decisioni».</li>
+<li>La <strong>sicurezza</strong> è a più livelli: accesso personale, tre ruoli, organizzazioni separate, una chiave per ogni motore, un utente per ogni dispositivo, collegamenti cifrati, allarmi via email, backup giornalieri.</li>
+<li>Tutto il percorso è <strong>costruito e provato con dispositivi simulati</strong>. Per l'uso negli appartamenti servono ancora alcune cose, elencate in fondo: <a href="#serve">Cosa serve ancora</a>.</li>
+</ol>
+</section>
+
+<section id="leggere">
+<h2>Come leggere questo documento</h2>
+<ul>
+<li>Ogni pezzo ha un <strong>colore</strong>, lo stesso in tutta la pagina: <span class="pc p-sito">sito</span> <span class="pc p-server">server</span> <span class="pc p-motore">motore</span> <span class="pc p-connector">traduttore</span> <span class="pc p-broker">broker</span> <span class="pc p-disp">dispositivi</span></li>
+<li><span class="sim">da provare con dispositivi veri</span> = la tappa funziona e ha le sue prove automatiche, ma finora gira solo con dispositivi simulati. Negli schemi questi pezzi hanno il bordo <strong>tratteggiato</strong>.</li>
+<li>Gli <strong>esempi di messaggi</strong> sono semplificati: i nomi dei campi sono quelli veri, i valori sono inventati ma realistici. Il codice di fabbrica negli esempi è finto (per esempio <code>shellyplugmg3-a1b2c3d4e5f6</code>).</li>
+<li>Le parole con la <span style="border-bottom:1px dotted var(--muted)">sottolineatura a puntini</span> hanno una spiegazione: compare passando con il mouse o toccando la parola. Tutte le spiegazioni sono anche nel <a href="#glossario">Glossario</a>.</li>
+<li>Ogni tappa dei percorsi ha la voce <strong>«Come si controlla»</strong>: una domanda o una prova concreta, da fare senza leggere il codice.</li>
+</ul>
+</section>
+
+<section id="architettura">
+<h2>1. Come è fatto: tre zone e sei pezzi</h2>
+
+<h3 id="zone">Tre zone</h3>
+<p>Il percorso fra la presa elettrica nell'appartamento e il telefono del gestore attraversa tre zone.</p>
+<pre class="schema" aria-label="Schema delle tre zone: appartamento, centrale, web app">
+ ZONA 1                  ZONA 2                         ZONA 3
+ L'APPARTAMENTO          LA "CENTRALE"                  LA WEB APP
+ (in casa)               (una macchina nel cloud        (quello che usa
+                          di Google, a Milano)            il gestore)
+ ┌──────────────┐        ┌──────────────────────┐       ┌───────────────┐
+ │ presa        │◄──────►│ broker               │       │ server        │
+ │ relè         │internet│   ▲                  │       │ database      │
+ │ sensori      │        │   ▼                  │       │ sito sul      │
+ │              │        │ traduttore ◄► motore │◄─────►│ telefono      │
+ └──────────────┘        └──────────────────────┘       └───────────────┘
+</pre>
+<table class="t">
+<thead><tr><th>Zona</th><th>Che cosa c'è</th><th>Chi se ne occupa</th></tr></thead>
+<tbody>
+<tr><td>1. L'appartamento</td><td>Le piccole scatole Shelly (presa, relè dietro la caldaia, misuratori, sensori) con il loro <strong>firmware</strong>, cioè il programma del produttore che sta dentro ogni dispositivo</td><td>L'<strong>elettricista</strong> monta fisicamente tutti i dispositivi. Il <strong>tecnico dei dispositivi</strong> sceglie i modelli insieme a Flatsharing e li configura</td></tr>
+<tr><td>2. La centrale</td><td>Una macchina virtuale (in breve <strong>VM</strong>) nel cloud di Google, sempre accesa. Dentro: il <strong>motore</strong>, il «cervello» di ogni appartamento; il <strong>broker</strong>, il «centralino» a cui i dispositivi telefonano; il <strong>traduttore</strong> fra la lingua dei dispositivi e quella del motore</td><td>Il <strong>gestore della piattaforma</strong>. La traduzione dei singoli modelli è del tecnico dei dispositivi</td></tr>
+<tr><td>3. La web app</td><td>Il sito sul telefono, il server che controlla chi entra, il database con utenti e appartamenti</td><td>Il gestore della piattaforma</td></tr>
+</tbody></table>
+<p class="prose"><strong>L'idea chiave:</strong> il mondo della web app e il mondo dei dispositivi non si toccano direttamente. Si incontrano nella centrale, e le regole dell'incontro sono scritte in un documento tecnico: il contratto del traduttore. Così si può cambiare un modello di dispositivo senza toccare l'app, e cambiare l'app senza toccare i dispositivi.</p>
+
+<h3 id="percorso">Il percorso fisico, in un disegno</h3>
+<p>La strada vera che fa un dato, dall'appartamento fino al telefono del gestore. I <strong>dati salgono</strong> (frecce piene), i <strong>comandi scendono</strong> (frecce tratteggiate), lungo la stessa strada.</p>
+<figure class="fis">
+<svg class="fz w" viewBox="0 0 1060 450" role="img" aria-label="Percorso fisico del dato: dispositivi nell’appartamento, Wi-Fi di casa, router, internet, broker nella centrale, una macchina nel cloud a Milano, connector e motore, rete privata di Google, server nel cloud di Google con il suo database, Italianway con le prenotazioni, telefono del gestore. I dati salgono verso il telefono, i comandi scendono verso i dispositivi."><defs><marker id="wd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path class="ah" d="M0 0L10 5L0 10z"/></marker><marker id="wc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path class="ch" d="M0 0L10 5L0 10z"/></marker></defs><rect class="zn" x="8" y="30" width="292" height="250" rx="10"/><text class="zl" x="20" y="48" text-anchor="start">APPARTAMENTO</text><rect class="zn" x="412" y="30" width="448" height="402" rx="10"/><text class="zl" x="424" y="48" text-anchor="start">GOOGLE CLOUD</text><rect class="zn" x="424" y="62" width="424" height="190" rx="10"/><text class="zl" x="436" y="80" text-anchor="start">CENTRALE · UN MOTORE PER APPARTAMENTO</text><rect class="zn" x="876" y="268" width="176" height="164" rx="10"/><text class="zl" x="888" y="286" text-anchor="start">FUORI</text><g class="p-disp"><rect class="bx dash" x="20" y="58" width="140" height="44" rx="7"/><text class="n" x="90.0" y="77.0" text-anchor="middle">Sensori BLU</text><text class="s" x="90.0" y="93.0" text-anchor="middle">a batteria</text></g><g class="p-disp"><rect class="bx dash" x="20" y="133" width="140" height="50" rx="7"/><text class="n" x="90.0" y="155.0" text-anchor="middle">Shelly Gen4</text><text class="s" x="90.0" y="171.0" text-anchor="middle">relè · misuratori · ponte</text></g><g class="p-disp"><rect class="bx dash" x="20" y="214" width="140" height="44" rx="7"/><text class="n" x="90.0" y="233.0" text-anchor="middle">Infrarossi</text><text class="s" x="90.0" y="249.0" text-anchor="middle">comando dello split</text></g><g class="nt"><rect class="bx" x="192" y="133" width="100" height="50" rx="7"/><text class="n" x="242.0" y="155.0" text-anchor="middle">Router</text><text class="s" x="242.0" y="171.0" text-anchor="middle">Wi-Fi di casa</text></g><path class="ar" d="M90 102V131" marker-end="url(#wd)"/><text class="l" x="98" y="122" text-anchor="start">Bluetooth</text><path class="ar" d="M160 149H190" marker-end="url(#wd)"/><path class="cm" d="M192 169H162" marker-end="url(#wc)"/><path class="cm" d="M242 183V236H162" marker-end="url(#wc)"/><path class="ar" d="M292 149H312" marker-end="url(#wd)"/><path class="cm" d="M314 169H294" marker-end="url(#wc)"/><ellipse class="zn" cx="356" cy="159" rx="44" ry="28"/><text class="s" x="356" y="163" text-anchor="middle">internet</text><text class="l" x="356" y="104" text-anchor="middle">in uscita dalla casa</text><text class="l" x="356" y="118" text-anchor="middle">cifrato, con certificato</text><path class="ar" d="M399 149H430" marker-end="url(#wd)"/><path class="cm" d="M432 169H401" marker-end="url(#wc)"/><g class="p-broker"><rect class="bx dash" x="432" y="130" width="140" height="56" rx="7"/><text class="n" x="502.0" y="155.0" text-anchor="middle">Broker MQTT</text><text class="s" x="502.0" y="171.0" text-anchor="middle">indirizzo protetto</text></g><g class="p-connector"><rect class="bx dash" x="602" y="130" width="104" height="56" rx="7"/><text class="n" x="654.0" y="155.0" text-anchor="middle">Connector</text><text class="s" x="654.0" y="171.0" text-anchor="middle">traduce</text></g><g class="p-motore"><rect class="bx" x="730" y="130" width="110" height="56" rx="7"/><text class="n" x="785.0" y="155.0" text-anchor="middle">Motore</text><text class="s" x="785.0" y="171.0" text-anchor="middle">regole · decisioni</text></g><path class="ar" d="M572 149H600" marker-end="url(#wd)"/><path class="cm" d="M602 169H574" marker-end="url(#wc)"/><text class="l" x="587" y="120" text-anchor="middle">rete interna della centrale</text><path class="ar" d="M706 149H728" marker-end="url(#wd)"/><path class="cm" d="M730 169H708" marker-end="url(#wc)"/><text class="l" x="722" y="120" text-anchor="middle">stesso programma</text><g class="p-server"><rect class="bx" x="602" y="300" width="130" height="56" rx="7"/><text class="n" x="667.0" y="325.0" text-anchor="middle">Server</text><text class="s" x="667.0" y="341.0" text-anchor="middle">cloud Google, Milano</text></g><g class="nt"><rect class="bx" x="432" y="300" width="140" height="56" rx="7"/><text class="n" x="502.0" y="325.0" text-anchor="middle">Database</text><text class="s" x="502.0" y="341.0" text-anchor="middle">utenti e organizzazioni</text></g><path class="ar" d="M602 320H574" marker-end="url(#wd)"/><path class="ar" d="M572 338H600" marker-end="url(#wd)"/><path class="ar" d="M775 186L692 298" marker-end="url(#wd)"/><path class="cm" d="M712 300L795 188" marker-end="url(#wc)"/><text class="l" x="708" y="266" text-anchor="end">rete privata di Google</text><path class="ar" d="M732 318H884" marker-end="url(#wd)"/><text class="l" x="808" y="310" text-anchor="middle">in diretta · notifiche</text><path class="cm" d="M886 340H734" marker-end="url(#wc)"/><text class="cl" x="808" y="356" text-anchor="middle">comandi</text><g class="p-sito"><rect class="bx" x="886" y="300" width="156" height="56" rx="7"/><text class="n" x="964.0" y="325.0" text-anchor="middle">Telefono</text><text class="s" x="964.0" y="341.0" text-anchor="middle">del gestore · il sito</text></g><g class="nt"><rect class="bx" x="886" y="380" width="156" height="46" rx="7"/><text class="n" x="964.0" y="400.0" text-anchor="middle">Italianway</text><text class="s" x="964.0" y="416.0" text-anchor="middle">prenotazioni</text></g><path class="ar" d="M886 403H667V358" marker-end="url(#wd)"/><text class="l" x="776" y="397" text-anchor="middle">prenotazioni, con firma</text><path class="ar" d="M20 316H60" marker-end="url(#wd)"/><text class="lg" x="70" y="320" text-anchor="start">dati che salgono verso il telefono</text><path class="cm" d="M60 340H20" marker-end="url(#wc)"/><text class="lg" x="70" y="344" text-anchor="start">comandi che scendono verso i dispositivi</text><text class="lg" x="20" y="376" text-anchor="start">Il router lascia uscire, non lascia entrare:</text><text class="lg" x="20" y="392" text-anchor="start">sono i dispositivi a collegarsi al broker.</text></svg>
+<svg class="fz t" viewBox="0 0 360 884" role="img" aria-label="Percorso fisico del dato: dispositivi nell’appartamento, Wi-Fi di casa, router, internet, broker nella centrale, una macchina nel cloud a Milano, connector e motore, rete privata di Google, server nel cloud di Google con il suo database, Italianway con le prenotazioni, telefono del gestore. I dati salgono verso il telefono, i comandi scendono verso i dispositivi."><defs><marker id="td" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path class="ah" d="M0 0L10 5L0 10z"/></marker><marker id="tc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto"><path class="ch" d="M0 0L10 5L0 10z"/></marker></defs><rect class="zn" x="8" y="8" width="344" height="92" rx="10"/><text class="zl" x="342" y="25" text-anchor="end">FUORI</text><g class="p-sito"><rect class="bx" x="18" y="34" width="170" height="50" rx="7"/><text class="n" x="103.0" y="56.0" text-anchor="middle">Telefono</text><text class="s" x="103.0" y="72.0" text-anchor="middle">del gestore · il sito</text></g><g class="nt"><rect class="bx" x="214" y="34" width="128" height="50" rx="7"/><text class="n" x="278.0" y="56.0" text-anchor="middle">Italianway</text><text class="s" x="278.0" y="72.0" text-anchor="middle">prenotazioni</text></g><path class="ar" d="M40 160V86" marker-end="url(#td)"/><path class="cm" d="M62 84V158" marker-end="url(#tc)"/><text class="l" x="72" y="118" text-anchor="start">internet</text><path class="ar" d="M278 84V124H150V158" marker-end="url(#td)"/><text class="l" x="216" y="119" text-anchor="middle">con firma</text><rect class="zn" x="8" y="140" width="344" height="372" rx="10"/><text class="zl" x="342" y="155" text-anchor="end">GOOGLE CLOUD</text><g class="p-server"><rect class="bx" x="18" y="160" width="170" height="50" rx="7"/><text class="n" x="103.0" y="182.0" text-anchor="middle">Server</text><text class="s" x="103.0" y="198.0" text-anchor="middle">cloud Google, Milano</text></g><g class="nt"><rect class="bx" x="214" y="160" width="128" height="50" rx="7"/><text class="n" x="278.0" y="182.0" text-anchor="middle">Database</text><text class="s" x="278.0" y="198.0" text-anchor="middle">utenti e organizzazioni</text></g><path class="ar" d="M214 178H190" marker-end="url(#td)"/><path class="ar" d="M188 194H212" marker-end="url(#td)"/><path class="ar" d="M40 280V212" marker-end="url(#td)"/><path class="cm" d="M62 210V278" marker-end="url(#tc)"/><text class="l" x="72" y="240" text-anchor="start">rete privata di Google</text><rect class="zn" x="14" y="256" width="332" height="250" rx="10"/><text class="zl" x="336" y="272" text-anchor="end">CENTRALE · UN MOTORE PER APPARTAMENTO</text><g class="p-motore"><rect class="bx" x="18" y="280" width="200" height="50" rx="7"/><text class="n" x="118.0" y="302.0" text-anchor="middle">Motore</text><text class="s" x="118.0" y="318.0" text-anchor="middle">regole · decisioni</text></g><path class="ar" d="M40 364V332" marker-end="url(#td)"/><path class="cm" d="M62 330V362" marker-end="url(#tc)"/><text class="l" x="72" y="351" text-anchor="start">stesso programma</text><g class="p-connector"><rect class="bx dash" x="18" y="364" width="200" height="50" rx="7"/><text class="n" x="118.0" y="386.0" text-anchor="middle">Connector</text><text class="s" x="118.0" y="402.0" text-anchor="middle">traduce</text></g><path class="ar" d="M40 448V416" marker-end="url(#td)"/><path class="cm" d="M62 414V446" marker-end="url(#tc)"/><text class="l" x="72" y="435" text-anchor="start">rete interna della centrale</text><g class="p-broker"><rect class="bx dash" x="18" y="448" width="200" height="50" rx="7"/><text class="n" x="118.0" y="470.0" text-anchor="middle">Broker MQTT</text><text class="s" x="118.0" y="486.0" text-anchor="middle">indirizzo protetto</text></g><path class="ar" d="M40 596V500" marker-end="url(#td)"/><path class="cm" d="M62 498V594" marker-end="url(#tc)"/><text class="l" x="72" y="538" text-anchor="start">internet, cifrato, con certificato</text><text class="l" x="72" y="553" text-anchor="start">la connessione parte dalla casa</text><rect class="zn" x="8" y="574" width="344" height="254" rx="10"/><text class="zl" x="342" y="590" text-anchor="end">APPARTAMENTO</text><g class="nt"><rect class="bx" x="18" y="596" width="200" height="46" rx="7"/><text class="n" x="118.0" y="616.0" text-anchor="middle">Router</text><text class="s" x="118.0" y="632.0" text-anchor="middle">Wi-Fi di casa</text></g><path class="ar" d="M40 680V644" marker-end="url(#td)"/><path class="cm" d="M62 642V678" marker-end="url(#tc)"/><text class="l" x="72" y="665" text-anchor="start">Wi-Fi</text><path class="cm" d="M218 619H278V678" marker-end="url(#tc)"/><g class="p-disp"><rect class="bx dash" x="18" y="680" width="170" height="50" rx="7"/><text class="n" x="103.0" y="702.0" text-anchor="middle">Shelly Gen4</text><text class="s" x="103.0" y="718.0" text-anchor="middle">relè · misuratori · ponte</text></g><g class="p-disp"><rect class="bx dash" x="214" y="680" width="128" height="50" rx="7"/><text class="n" x="278.0" y="702.0" text-anchor="middle">Infrarossi</text><text class="s" x="278.0" y="718.0" text-anchor="middle">comando dello split</text></g><path class="ar" d="M40 764V732" marker-end="url(#td)"/><text class="l" x="50" y="751" text-anchor="start">Bluetooth</text><g class="p-disp"><rect class="bx dash" x="18" y="764" width="170" height="46" rx="7"/><text class="n" x="103.0" y="784.0" text-anchor="middle">Sensori BLU</text><text class="s" x="103.0" y="800.0" text-anchor="middle">a batteria</text></g><path class="ar" d="M18 848H58" marker-end="url(#td)"/><text class="lg" x="68" y="852" text-anchor="start">dati che salgono</text><path class="cm" d="M58 870H18" marker-end="url(#tc)"/><text class="lg" x="68" y="874" text-anchor="start">comandi che scendono</text></svg>
+<figcaption>Il percorso fisico. I sensori a batteria parlano in Bluetooth con uno Shelly vicino, che fa da «ponte». Gli Shelly escono dal Wi-Fi di casa, passano dal router e da internet e si collegano al broker, su un indirizzo protetto da certificato. Nella centrale il broker passa i messaggi al traduttore, che sta dentro il motore. Il motore parla con il server sulla rete privata di Google. Il server, con il suo database, parla con il telefono del gestore e riceve le prenotazioni da Italianway. I riquadri tratteggiati sono i pezzi non ancora provati con dispositivi veri.</figcaption>
+</figure>
+
+<h3 id="perche">Perché il dato va dalla casa alla centrale</h3>
+<p><strong>Il router di casa lascia uscire e non lascia entrare.</strong> Da fuori nessuno può «chiamare» un dispositivo dentro l'appartamento: né il server, né il motore. Per questo <strong>sono i dispositivi a collegarsi al broker, e mai il contrario</strong>. La connessione la apre il dispositivo; su quella stessa connessione salgono i dati e scendono i comandi.</p>
+<p>Ne vengono quattro conseguenze:</p>
+<ol>
+<li><strong>Serve un punto fisso a cui collegarsi.</strong> È il broker nella centrale, su un indirizzo protetto da certificato. La centrale ha un indirizzo pubblico, ma da internet è aperta una sola porta: quella cifrata dei dispositivi.</li>
+<li><strong>Ogni dispositivo dimostra chi è.</strong> Entra con nome utente e password suoi; il suo nome sul broker è il codice di fabbrica. Non ci sono accessi anonimi, e ogni dispositivo legge e scrive solo nelle sue caselle.</li>
+<li><strong>Se la casa perde internet, i comandi non si accumulano.</strong> Il broker annuncia «non c'è più» per il dispositivo che cade; il motore rifiuta i comandi con «dispositivo non raggiungibile» e non li mette in coda. I comandi viaggiano <strong>non conservati</strong>: un comando non arriva in ritardo a un dispositivo che torna. Al ritorno il traduttore chiede al dispositivo la «fotografia» completa del suo stato.</li>
+<li><strong>Il cloud del produttore non c'entra.</strong> I dispositivi parlano con il broker della centrale, non con i server del produttore.</li>
+</ol>
+
+<h3 id="pezzi">I sei pezzi, in breve</h3>
+<figure>
+<svg class="pz" viewBox="0 0 340 476" role="img" aria-label="Schema dei sei pezzi di DOMHOUSE e dei tre flussi"><g class="p-sito"><rect class="" x="50" y="8" width="240" height="46" rx="8"/><text class="n" x="170" y="28" text-anchor="middle">Sito</text><text class="s" x="170" y="44" text-anchor="middle">nel browser del gestore</text></g><path class="ar" d="M72 91V62"/><path class="ah" d="M72 56l-5 8h10z"/><path class="ar" d="M268 55V84"/><path class="ah" d="M268 90l-5-8h10z"/><circle class="b" cx="54" cy="73" r="8"/><text class="bt" x="54" y="76.5" text-anchor="middle">1</text><circle class="b" cx="286" cy="73" r="8"/><text class="bt" x="286" y="76.5" text-anchor="middle">2</text><text class="l" x="170" y="77" text-anchor="middle">internet</text><g class="p-server"><rect class="" x="50" y="92" width="240" height="46" rx="8"/><text class="n" x="170" y="112" text-anchor="middle">Server</text><text class="s" x="170" y="128" text-anchor="middle">nel cloud di Google, Milano</text></g><path class="ar" d="M72 175V146"/><path class="ah" d="M72 140l-5 8h10z"/><path class="ar" d="M268 139V168"/><path class="ah" d="M268 174l-5-8h10z"/><circle class="b" cx="54" cy="157" r="8"/><text class="bt" x="54" y="160.5" text-anchor="middle">1</text><circle class="b" cx="286" cy="157" r="8"/><text class="bt" x="286" y="160.5" text-anchor="middle">2</text><text class="l" x="170" y="161" text-anchor="middle">rete privata di Google</text><g class="p-motore"><rect class="" x="50" y="176" width="240" height="46" rx="8"/><text class="n" x="170" y="196" text-anchor="middle">Motore</text><text class="s" x="170" y="212" text-anchor="middle">uno per appartamento, nella centrale</text></g><path class="ar" d="M72 259V230"/><path class="ah" d="M72 224l-5 8h10z"/><path class="ar" d="M268 223V252"/><path class="ah" d="M268 258l-5-8h10z"/><circle class="b" cx="54" cy="241" r="8"/><text class="bt" x="54" y="244.5" text-anchor="middle">1</text><circle class="b" cx="286" cy="241" r="8"/><text class="bt" x="286" y="244.5" text-anchor="middle">2</text><text class="l" x="170" y="245" text-anchor="middle">dentro lo stesso programma</text><g class="p-connector"><rect class="dash" x="50" y="260" width="240" height="46" rx="8"/><text class="n" x="170" y="280" text-anchor="middle">Connector</text><text class="s" x="170" y="296" text-anchor="middle">il traduttore, dentro il motore</text></g><path class="ar" d="M72 343V314"/><path class="ah" d="M72 308l-5 8h10z"/><path class="ar" d="M268 307V336"/><path class="ah" d="M268 342l-5-8h10z"/><circle class="b" cx="54" cy="325" r="8"/><text class="bt" x="54" y="328.5" text-anchor="middle">1</text><circle class="b" cx="286" cy="325" r="8"/><text class="bt" x="286" y="328.5" text-anchor="middle">2</text><text class="l" x="170" y="329" text-anchor="middle">rete interna della centrale</text><g class="p-broker"><rect class="dash" x="50" y="344" width="240" height="46" rx="8"/><text class="n" x="170" y="364" text-anchor="middle">Broker MQTT</text><text class="s" x="170" y="380" text-anchor="middle">il centralino, nella centrale</text></g><path class="ar" d="M72 427V398"/><path class="ah" d="M72 392l-5 8h10z"/><path class="ar" d="M268 391V420"/><path class="ah" d="M268 426l-5-8h10z"/><circle class="b" cx="54" cy="409" r="8"/><text class="bt" x="54" y="412.5" text-anchor="middle">1</text><circle class="b" cx="286" cy="409" r="8"/><text class="bt" x="286" y="412.5" text-anchor="middle">2</text><text class="l" x="170" y="413" text-anchor="middle">internet cifrato</text><g class="p-disp"><rect class="dash" x="50" y="428" width="240" height="46" rx="8"/><text class="n" x="170" y="448" text-anchor="middle">Dispositivi</text><text class="s" x="170" y="464" text-anchor="middle">nell’appartamento</text></g><path class="ar" d="M290 190h22a9 9 0 0 1 0 18h-14"/><path class="ah" d="M291 208l8-5v10z"/><circle class="b" cx="326" cy="199" r="8"/><text class="bt" x="326" y="202.5" text-anchor="middle">3</text></svg>
+<figcaption>I sei pezzi e le strade fra loro. <b>1</b> è il percorso dal sensore allo schermo (sale); <b>2</b> è il percorso dallo schermo al relè (scende); <b>3</b> sono gli automatismi, che nascono dentro il motore. I riquadri tratteggiati sono i pezzi non ancora provati con dispositivi veri.</figcaption>
+</figure>
+<table class="t">
+<thead><tr><th>Pezzo</th><th>Che cosa fa</th><th>Dove gira</th></tr></thead>
+<tbody>
+<tr><td><span class="pc p-sito">Sito</span> (app web installabile)</td><td>Quello che vede il gestore: schede dei dispositivi, comandi, regole, decisioni, approvazioni, consumi</td><td>Nel browser del telefono o del computer</td></tr>
+<tr><td><span class="pc p-server">Server</span></td><td>Controlla chi entra, inoltra le richieste al motore giusto, rilancia gli aggiornamenti in diretta, manda le notifiche, prepara il riepilogo settimanale, riceve le prenotazioni</td><td>Nel cloud di Google, a Milano. In uso vero tiene accese da 1 a 3 copie, secondo il carico</td></tr>
+<tr><td><span class="pc p-motore">Motore</span></td><td>Governa un appartamento: stato dei dispositivi, regole, comandi, prenotazioni, approvazioni, consumi. Ne esiste <strong>uno per ogni appartamento</strong>, con i suoi dati salvati</td><td>Nella centrale</td></tr>
+<tr><td><span class="pc p-connector">Traduttore</span> (in inglese «connector»)</td><td>Traduce fra la lingua dei dispositivi e quella del motore</td><td>Dentro il motore</td></tr>
+<tr><td><span class="pc p-broker">Broker MQTT</span></td><td>Il «centralino» a cui si collegano i dispositivi e i traduttori</td><td>Nella centrale, uno solo per tutti gli appartamenti</td></tr>
+<tr><td><span class="pc p-disp">Dispositivi</span></td><td>Prese, relè, misuratori, sensori, telecomando a infrarossi. Dentro c'è il firmware del produttore</td><td>Nell'appartamento</td></tr>
+</tbody></table>
+<p>Per le prove e le dimostrazioni esiste anche un <strong>traduttore simulato</strong>, con dispositivi finti dentro di sé, e una pagina <strong>Simulatore</strong> che li muove (apre finestre, simula movimento, stacca dispositivi, crea prenotazioni). Per il motore il traduttore simulato e quello dei dispositivi veri sono intercambiabili: rispettano lo stesso contratto e superano le stesse prove comuni.</p>
+
+<h3 id="modelli">Dispositivi, codice di fabbrica, catalogo</h3>
+<p><strong>Il modello dice che cosa un dispositivo <em>sa</em> fare.</strong> I modelli previsti:</p>
+<table class="t">
+<thead><tr><th>Modello</th><th>Che cosa sa fare</th></tr></thead>
+<tbody>
+<tr><td>Plug M Gen3 (presa)</td><td>Accende e spegne ciò che ci si attacca e ne misura il consumo</td></tr>
+<tr><td>Shelly 1 Gen4 (relè)</td><td>Interruttore nascosto dietro un apparecchio, per esempio la caldaia</td></tr>
+<tr><td>EM Mini Gen4</td><td>Misura il consumo di una linea, per esempio quella del climatizzatore</td></tr>
+<tr><td>BLU H&amp;T</td><td>Sensore di temperatura e umidità, a batteria</td></tr>
+<tr><td>BLU Door/Window</td><td>Sensore di apertura di una finestra, a batteria</td></tr>
+<tr><td>Athom AR01 (non Shelly)</td><td>Telecomando a infrarossi del climatizzatore</td></tr>
+</tbody></table>
+<ul>
+<li>Ogni apparecchio ha un <strong>codice di fabbrica unico</strong>, come una targa: per esempio <code>shellyplugmg3-A1B2C3D4E5F6</code>. È anche il suo nome sul broker. Il gestore non lo vede mai.</li>
+<li><strong>Il catalogo dice che cosa quel dispositivo <em>fa</em> in quell'appartamento.</strong> È una tabella per appartamento, scritta dal tecnico dei dispositivi guardando la casa reale: per ogni codice di fabbrica il nome che vedrà il gestore, la stanza, che cosa fa e i legami (per esempio «la caldaia si regola con il sensore del soggiorno»).</li>
+</ul>
+<table class="t">
+<thead><tr><th>Codice di fabbrica</th><th>Nome nell'app</th><th>Stanza</th><th>Che cosa fa</th></tr></thead>
+<tbody>
+<tr><td><code>shelly1g4-…</code></td><td>Caldaia</td><td>Soggiorno</td><td>Accende e spegne la caldaia, regolata dal sensore del soggiorno</td></tr>
+<tr><td><code>shellyplugmg3-…</code></td><td>Presa stufetta</td><td>Camera</td><td>Accende e spegne, misura il consumo</td></tr>
+<tr><td>sensore BLU <code>…</code></td><td>Sensore soggiorno</td><td>Soggiorno</td><td>Temperatura e umidità</td></tr>
+</tbody></table>
+<ul>
+<li>Il catalogo sta nella centrale: lo leggono il traduttore, per capire chi sta parlando, e il motore. La web app riceve solo il risultato pulito: «Caldaia, soggiorno, accesa».</li>
+<li>Già fissati nel contratto: le <strong>otto capacità</strong> (accende e spegne, consumo, climatizzatore, caldaia, temperatura, umidità, finestra, movimento), i <strong>due legami</strong> (caldaia con il suo sensore, climatizzatore con il suo misuratore) e le <strong>regole del catalogo</strong> (codici unici, nessuna password, una stanza per dispositivo).</li>
+<li><strong>Lo stile dei nomi:</strong> che cosa è, più la stanza se ce n'è più d'uno: «Caldaia», «Climatizzatore soggiorno», «Presa stufetta camera», «Finestra camera», «Sensore soggiorno». Il gestore può poi cambiarli dall'app: il motore ricorda il nome nuovo.</li>
+</ul>
+<div class="call w"><p><strong>La rete Wi-Fi di installazione.</strong> Uno Shelly acceso e non ancora configurato crea una sua piccola rete Wi-Fi (per esempio «ShellyPlugMG3-A1B2C3»). Serve solo alla prima installazione: per dirgli a quale Wi-Fi di casa collegarsi e a quale broker telefonare. La vede solo chi è vicino; la centrale e la web app no. Negli appartamenti va <strong>spenta alla fine della messa in servizio</strong>, altrimenti un ospite potrebbe collegarsi e cambiare le impostazioni. Allo stesso modo sui dispositivi si spegne il canale di comando secondario, così l'unica strada per comandarli resta quella della centrale.</p></div>
+
+<h3 id="bacheca">MQTT, la bacheca con le caselle</h3>
+<p>MQTT è la lingua fra i dispositivi e il broker. Funziona come una <strong>bacheca con tante caselle</strong>: chi scrive mette un messaggio in una casella; chi è iscritto a quella casella lo riceve subito; il broker tiene la bacheca e controlla chi può scrivere dove. Ogni casella ha un indirizzo, detto <strong>topic</strong>. Le caselle di una presa:</p>
+<table class="t">
+<thead><tr><th>Casella</th><th>Che cosa ci passa</th><th>Chi scrive</th></tr></thead>
+<tbody>
+<tr><td><code>&lt;appartamento&gt;/&lt;codice presa&gt;/events/rpc</code></td><td>Le novità: «consumo 12,3 W»</td><td>La presa</td></tr>
+<tr><td><code>&lt;appartamento&gt;/&lt;codice presa&gt;/online</code></td><td>«Sono collegata» / «non ci sono più»</td><td>La presa (o il broker per lei, se cade)</td></tr>
+<tr><td><code>&lt;appartamento&gt;/&lt;codice presa&gt;/rpc</code></td><td>I comandi: «accenditi»</td><td>Il traduttore</td></tr>
+<tr><td><code>&lt;appartamento&gt;/&lt;codice presa&gt;/connector/rpc</code></td><td>La risposta: «fatto, sono accesa»</td><td>La presa</td></tr>
+</tbody></table>
+<p>Ogni presa scrive solo nelle caselle che cominciano con il suo codice: non può parlare a nome di un'altra. Ogni traduttore legge solo le caselle del suo appartamento.</p>
+<p><strong>Conservato o non conservato.</strong> MQTT permette due modi di consegna. «Non conservato» (in termini tecnici QoS 0): se il destinatario non è collegato, il messaggio si perde. «Conservato» (QoS 1): il messaggio arriva almeno una volta, anche più tardi, a volte doppio. DOMHOUSE usa il primo per i <strong>comandi</strong> e il secondo per le <strong>novità</strong> dei dispositivi. La regola è semplice: <strong>meglio un rifiuto subito che un comando eseguito un'ora dopo</strong>, per esempio una stufa che si accende quando nessuno se lo aspetta. Le sessioni sul broker scadono dopo un'ora, così nessun messaggio vecchio resta in attesa.</p>
+
+<h3 id="traduttore">Il traduttore: un interprete con un dizionario</h3>
+<p>Il traduttore dei dispositivi veri è fatto di due parti.</p>
+<ul>
+<li><strong>L'interprete</strong>, la parte più difficile, vale per tutti i modelli: collegarsi al broker e restare collegato, leggere il catalogo, capire quando un dispositivo sparisce (con soglie di silenzio diverse per tipo), mandare un comando e aspettarne la conferma, rifare la «fotografia» quando un dispositivo si ricollega, leggere il livello delle batterie.</li>
+<li><strong>Il dizionario</strong>, una pagina per ogni modello: come quel modello parla e che cosa significano i suoi messaggi, con prove e messaggi registrati in laboratorio. Oggi c'è la pagina della presa Plug M Gen3.</li>
+</ul>
+<table class="t">
+<thead><tr><th>Pagina del dizionario</th><th>Quanto è diversa dalla presa</th></tr></thead>
+<tbody>
+<tr><td>Shelly 1 Gen4, relè della caldaia</td><td>Poco: molto simile alla presa</td></tr>
+<tr><td>EM Mini Gen4, misuratore del climatizzatore</td><td>Poco: solo consumo</td></tr>
+<tr><td>Sensori Bluetooth (temperatura e umidità, finestra, movimento)</td><td>Abbastanza: passano da uno Shelly «ponte» e hanno un formato diverso; il catalogo deve saper descrivere un ponte con più sensori</td></tr>
+<tr><td>Athom AR01, telecomando a infrarossi</td><td>Molto: non è uno Shelly e parla un altro dialetto (Tasmota), con caselle diverse</td></tr>
+</tbody></table>
+<p><strong>Che cosa il traduttore non deve fare:</strong> decidere (regole, limiti, modalità), mettere in coda comandi per dispositivi non raggiungibili, calcolare l'ora locale o i consumi, conoscere le persone, aprire porte verso internet. Le decisioni restano tutte nel motore.</p>
+</section>
+
+<section id="dato">
+<h2>2. Il viaggio di un dato</h2>
+<p>Esempio: <strong>«la presa sta consumando 12 watt»</strong>. Dalla presa al telefono il dato attraversa sette tappe.</p>
+<pre class="schema" aria-label="Schema del viaggio di un dato dalla presa al telefono, in sette tappe">
+ ZONA 1               ZONA 2 (la centrale)                           ZONA 3 (web app)
+ presa ──①──► ②─internet─► ③ broker ──► ④ traduttore ──► ⑤ motore ──► ⑥ server ──► ⑦ telefono
+</pre>
+<table class="t">
+<thead><tr><th>Tappa</th><th>Che cosa succede</th></tr></thead>
+<tbody>
+<tr><td>① In casa</td><td>La presa misura 12,3 W; il suo firmware decide da solo di avvisare, quando il valore cambia e a intervalli regolari</td></tr>
+<tr><td>② Verso la centrale</td><td>All'accensione la presa «telefona» una volta al broker, su una linea cifrata, con il suo nome utente e la sua chiave d'accesso, e la linea resta aperta. Percorso: Wi-Fi di casa, router, internet, centrale. Scrive nel suo dialetto: «io sono <code>shellyplugmg3-…</code>, la mia uscita 0 consuma 12,3 W»</td></tr>
+<tr><td>③ Il broker</td><td>Controlla che la presa scriva solo nelle sue caselle e passa il messaggio a chi ascolta: il traduttore di quell'appartamento. Frazioni di secondo</td></tr>
+<tr><td>④ Il traduttore</td><td>Guarda nel catalogo chi è <code>shellyplugmg3-…</code> e riscrive nella lingua del motore: «Presa stufetta: consumo 12,3 W»</td></tr>
+<tr><td>⑤ Il motore</td><td>Aggiorna lo stato e i kWh di oggi, salva, controlla le regole e annuncia la novità con un numero progressivo</td></tr>
+<tr><td>⑥ Il server</td><td>Ascolta gli annunci del motore e li inoltra ai telefoni dei gestori che hanno il permesso di vedere quell'appartamento</td></tr>
+<tr><td>⑦ Il sito</td><td>Aggiorna la scheda, «Presa stufetta · 12,3 W», senza ricaricare la pagina</td></tr>
+</tbody></table>
+<p class="prose">Dalla presa al telefono: in genere pochi secondi. Conta soprattutto quando il dispositivo decide di avvisare.</p>
+
+<h3 id="tappe-dato">Dal sensore allo schermo, tappa per tappa</h3>
+<p>Qui il dato seguito è <strong>la temperatura del soggiorno che sale a 22 gradi</strong>. Lo stesso percorso vale per una finestra che si apre. La differenza con la presa: il sensore è a batteria e parla in Bluetooth con uno Shelly vicino, che fa da ponte. A sinistra il pezzo in cui si trova il dato, a destra che cosa succede in quel punto.</p>
+<ol class="route">
+<li class="stop p-disp simd"><div class="rail"><span class="num">1</span><div class="node"><b>Sensore</b><small>nell'appartamento</small></div></div><div class="sbody"><div class="card"><h4>Il dato nasce <span class="sim">da provare con dispositivi veri</span></h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel sensore del soggiorno, un sensore BLU a batteria, che da solo non parla con internet.</dd>
+<dt>Che forma ha</dt><dd>Un breve segnale Bluetooth nel formato <strong>BTHome</strong>. Lo Shelly vicino lo riceve. Esempio, la batteria al 93 %: <span class="ex">{"id": 200, "obj_id": 1, "value": 93}</span> Con un altro <code>obj_id</code> è la temperatura, l'umidità o la finestra.</dd>
+<dt>Quanto ci mette</dt><dd>Un segnale ogni 60 s per temperatura e finestra; ogni 15 minuti per il movimento a riposo; subito su apertura o movimento.</dd>
+<dt>Se qui si rompe</dt><dd>Se un dispositivo tace oltre una soglia, il traduttore lo dichiara «non in linea». Le soglie previste: relè 120 s, sensori 200 s, sensore di movimento 2720 s.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>«In quali stanze c'è un sensore di temperatura, e qual è la sua riga nel catalogo?» In laboratorio: scaldando il sensore con la mano, il numero cambia entro un minuto circa?</dd>
+</dl></div></div></li>
+<li class="stop p-broker simd"><div class="rail"><span class="num">2</span><div class="node"><b>Broker MQTT</b><small>nella centrale</small></div></div><div class="sbody"><p class="via">Bluetooth, Shelly «ponte», Wi-Fi, router, internet cifrato</p><div class="card"><h4>Il dispositivo arriva al broker <span class="sim">da provare con dispositivi veri</span></h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Lo Shelly «ponte» si collega al broker su una linea cifrata (<strong>TLS</strong>, la stessa protezione delle pagine web con il lucchetto), con un utente suo. Il broker presenta un certificato rilasciato da un'autorità riconosciuta.</dd>
+<dt>Che forma ha</dt><dd>Un messaggio nella casella delle novità del dispositivo: <span class="ex">apt-001/shelly1g4-a1b2c3d4e5f6/events/rpc</span> <span class="ex">{"method": "NotifyStatus", "params": {"bthomesensor:201": {"id": 201, "value": 22.0}}}</span> Nella casella <code>…/online</code> lo Shelly scrive <code>true</code>; se cade, il broker scrive <code>false</code> per lui. Un esempio vero, registrato da una presa in laboratorio: <span class="ex">…/events/rpc → NotifyStatus · switch:0 · output true · apower 12,3 W · aenergy total 15,088 Wh</span></dd>
+<dt>Quanto ci mette</dt><dd>Frazioni di secondo. Le novità viaggiano «conservate»: sono possibili doppioni, e vanno bene. Al massimo 1000 messaggi o 1 MB in attesa per dispositivo; le sessioni scadono dopo un'ora.</dd>
+<dt>Se qui si rompe</dt><dd>Se il dispositivo cade, il broker pubblica «non c'è più» al suo posto.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Da internet è aperta solo la porta cifrata dei dispositivi? Una scansione da fuori dice di sì. Un dispositivo vero accetta il certificato del broker? È la prima prova da fare con un dispositivo vero.</dd>
+</dl></div></div></li>
+<li class="stop p-connector simd"><div class="rail"><span class="num">3</span><div class="node"><b>Traduttore</b><small>dentro il motore</small></div></div><div class="sbody"><p class="via">rete interna della centrale</p><div class="card"><h4>Il traduttore traduce <span class="sim">da provare con dispositivi veri</span></h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel traduttore di quell'appartamento, iscritto a tutte le caselle dell'appartamento e solo a quelle.</dd>
+<dt>Che forma ha</dt><dd>Un «cambio di stato» nella lingua del motore: <span class="ex">{"device_id": "dev-ambiente-soggiorno", "capability": "temperature", "state": {"celsius": 22.0}}</span> Ogni capacità ha i suoi campi: gradi per la temperatura, percentuale per l'umidità, aperto o chiuso per la finestra, watt e kWh totali per il misuratore.</dd>
+<dt>Quanto ci mette</dt><dd>Subito. Per il misuratore del climatizzatore il requisito è riportare ogni variazione entro 2 s.</dd>
+<dt>Se qui si rompe</dt><dd>Lo Shelly manda solo i campi cambiati: il traduttore completa lo stato partendo dall'ultimo noto. Quando un dispositivo si ricollega, chiede lo stato completo, la «fotografia».</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Il traduttore supera le prove comuni a ogni traduttore? A voce: «Cosa succede se lo stesso messaggio arriva due volte?»</dd>
+</dl></div></div></li>
+<li class="stop p-motore"><div class="rail"><span class="num">4</span><div class="node"><b>Motore</b><small>nella centrale</small></div></div><div class="sbody"><p class="via">dentro lo stesso programma</p><div class="card"><h4>Il motore elabora</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel motore dell'appartamento, che lo salva.</dd>
+<dt>Che forma ha</dt><dd>Lo stato del dispositivo, più i dati che calcola il motore: i kWh di oggi, da quando una finestra è aperta, l'ultimo movimento visto. <span class="ex">{"device_id": "dev-ambiente-soggiorno", "online": true, "capabilities": {"temperature": {"celsius": 22.0}}}</span> Il motore fa anche partire le regole.</dd>
+<dt>Quanto ci mette</dt><dd>Subito.</dd>
+<dt>Se qui si rompe</dt><dd>Un errore su un singolo dato viene scritto nel registro tecnico e si passa al successivo. Se il traduttore cade: decisione «collegamento ai dispositivi perso» e stato di salute «giù».</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>I 16 scenari di prova del dialogo fra app e motore sono tutti verdi? Dal Simulatore: aperta una finestra, la scheda la mostra «aperta da …»?</dd>
+</dl></div></div></li>
+<li class="stop p-motore"><div class="rail"><span class="num">5</span><div class="node"><b>Motore</b><small>annuncia la novità</small></div></div><div class="sbody"><p class="via">dentro lo stesso programma</p><div class="card"><h4>Il motore annuncia</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Sulla «linea in diretta» del motore: una connessione che resta aperta (in termini tecnici <strong>stream</strong>).</dd>
+<dt>Che forma ha</dt><dd>Una riga di testo con un numero progressivo: <span class="ex">id: 4182 · event: device.state</span> <span class="ex">data: {"apartment_id": "apt-001", "data": {"device_id": "dev-ambiente-soggiorno", "capability": "temperature", "state": {"celsius": 22.0}}}</span> I tipi di aggiornamento sono sette: stato di un dispositivo, in linea o non in linea, avanzamento di un comando, nuova decisione, approvazione in attesa, cambio dell'appartamento, salute del sistema.</dd>
+<dt>Quanto ci mette</dt><dd>Subito. Gli aggiornamenti restano disponibili per un'ora, per chi si ricollega; un segnale di vita parte ogni 25 s. Il numero cresce anche dopo un riavvio.</dd>
+<dt>Se qui si rompe</dt><dd>Se un lettore resta indietro di 1000 aggiornamenti, il motore chiude la sua linea: il lettore si ricollega e rilegge tutto.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Dopo un riavvio del motore l'app riprende da sola, senza buchi? In una prova di spegnimento e riaccensione della centrale tutto è ripartito da solo in pochi secondi.</dd>
+</dl></div></div></li>
+<li class="stop p-server"><div class="rail"><span class="num">6</span><div class="node"><b>Server</b><small>cloud Google, Milano</small></div></div><div class="sbody"><p class="via">linea in diretta, rete privata di Google</p><div class="card"><h4>Il server riceve</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel server, che tiene una linea aperta per ogni appartamento.</dd>
+<dt>Che forma ha</dt><dd>Gli stessi aggiornamenti. Cambiano solo le persone: il motore conosce gli utenti solo con un codice anonimo; il server lo ritrasforma nel nome dell'utente, e solo per la sua organizzazione.</dd>
+<dt>Quanto ci mette</dt><dd>Se la linea cade si ricollega dopo un'attesa da 1 a 30 s e riprende dall'ultimo aggiornamento visto.</dd>
+<dt>Se qui si rompe</dt><dd>Se il motore non risponde, il server riprova. Dopo i minuti della regola «avviso dispositivo offline» manda la notifica «sistema domotico non raggiungibile». Al ritorno dice al motore «non ti ho raggiunto da … a …», e il motore scrive nelle Decisioni «Sistema domotico di nuovo raggiungibile dopo …».</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Fermando un motore di prova: arriva la notifica? Al ritorno, c'è la riga nelle Decisioni?</dd>
+</dl></div></div></li>
+<li class="stop p-server"><div class="rail"><span class="num">7</span><div class="node"><b>Server</b><small>inoltra al sito</small></div></div><div class="sbody"><p class="via">dentro lo stesso programma</p><div class="card"><h4>Il server inoltra al sito</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel server, che lo passa ai telefoni dei gestori con il permesso di vedere l'appartamento. Lo stesso aggiornamento passa anche alla parte che decide le notifiche.</dd>
+<dt>Che forma ha</dt><dd>Le stesse righe della tappa 5. Il sito si presenta con il suo permesso di accesso nascosto nella richiesta, mai scritto nell'indirizzo della pagina.</dd>
+<dt>Quanto ci mette</dt><dd>La linea si chiude e si riapre ogni 4 minuti; segnale di vita ogni 25 s; i permessi vengono ricontrollati ogni 30 s.</dd>
+<dt>Se qui si rompe</dt><dd>Se il permesso non vale più, la linea si chiude.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Tolto un appartamento a un operatore, la sua pagina smette di aggiornarsi entro mezzo minuto?</dd>
+</dl></div></div></li>
+<li class="stop p-sito"><div class="rail"><span class="num">8</span><div class="node"><b>Sito</b><small>sul telefono del gestore</small></div></div><div class="sbody"><p class="via">aggiornamento in diretta, internet</p><div class="card"><h4>Il sito mostra</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel sito, sul telefono o sul computer del gestore.</dd>
+<dt>Che forma ha</dt><dd>Un numero sulla scheda del dispositivo: «Sensore soggiorno» passa da 21,5 a <span class="ex">22,0 °C</span> In generale: °C, %, W, kWh di oggi, «aperta da …».</dd>
+<dt>Quanto ci mette</dt><dd>Subito. Se la linea cade, il sito la riapre con un'attesa da 1 a 30 s e a ogni riapertura rilegge tutto. I consumi vengono riletti ogni 60 s.</dd>
+<dt>Se qui si rompe</dt><dd>«Riconnessione…», scheda «non in linea», comandi disattivati, avviso «sistema domotico non raggiungibile». Con la pagina in sottofondo non arrivano aggiornamenti. Non c'è un avviso di «dato vecchio»: si vede «visto X fa».</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Con l'app aperta su un telefono vero, Android e iPhone, il numero cambia da solo senza ricaricare la pagina?</dd>
+</dl></div></div></li>
+</ol>
+<div class="call"><p><strong>Da sapere.</strong> Con i dispositivi veri il ritardo dal sensore allo schermo dipenderà soprattutto dal sensore (fino a 60 s per la temperatura). La parte della piattaforma (motore, server, sito) aggiunge di solito pochi secondi. I tempi reali sull'intero percorso si misureranno nella prova con dispositivi veri.</p></div>
+</section>
+
+<section id="comando">
+<h2>3. Il viaggio di un comando</h2>
+<p>Esempio: <strong>«il gestore accende la presa dal telefono»</strong>. Il comando fa la strada al contrario, e la conferma torna indietro.</p>
+<pre class="schema" aria-label="Schema del viaggio di un comando dal telefono alla presa e della conferma che torna">
+ ZONA 3 (web app)                       ZONA 2 (la centrale)                          ZONA 1
+ telefono ─①─► server ─②─► motore ─③─► traduttore ─④─► broker ─⑤─internet─► presa
+     ▲                                                                           │
+     └──────────── ⑥ la conferma torna indietro per la strada del dato ──────────┘
+</pre>
+<table class="t">
+<thead><tr><th>Tappa</th><th>Che cosa succede</th></tr></thead>
+<tbody>
+<tr><td>① Il tocco</td><td>Il gestore tocca «Accendi»; il sito manda la richiesta al server con un codice per seguirla; sulla scheda compare «in corso»</td></tr>
+<tr><td>② Il server</td><td>Controlla chi è, se può comandare (chi ha la sola lettura no), se vede l'appartamento; passa la richiesta al motore giusto</td></tr>
+<tr><td>③ Il motore</td><td>Controlla le regole (con una finestra aperta non accende il riscaldamento); se il dispositivo non è raggiungibile risponde subito di no; altrimenti dice al traduttore lo <strong>stato da raggiungere</strong>: «la presa deve essere accesa»</td></tr>
+<tr><td>④ Il traduttore</td><td>Riscrive nel dialetto della presa e mette il comando nella sua casella, <strong>non conservato</strong>: se la presa non è collegata il comando si perde invece di restare in attesa</td></tr>
+<tr><td>⑤ Il broker e la presa</td><td>Il broker consegna il comando sulla linea che la presa tiene aperta; la presa scatta</td></tr>
+<tr><td>⑥ La conferma</td><td>La presa risponde nella sua casella di risposta («fatto, sono accesa») e manda la novità («uscita accesa»); i messaggi rifanno la strada del dato; la scheda passa a «eseguito»</td></tr>
+</tbody></table>
+<p class="prose"><strong>Tempi:</strong> il motore aspetta la conferma <strong>al massimo 9 secondi</strong>; poi il comando risulta «nessuna risposta» e il gestore lo vede. Con una presa vera in un Wi-Fi normale ci si aspetta uno o due secondi.</p>
+
+<h3 id="tappe-comando">Dallo schermo al relè, tappa per tappa</h3>
+<p>Qui il comando seguito è <strong>il gestore che accende la caldaia</strong>. Il percorso è lo stesso della presa; la caldaia però ha una particolarità, segnata nella tappa «termostato».</p>
+<ol class="route">
+<li class="stop p-sito"><div class="rail"><span class="num">1</span><div class="node"><b>Sito</b><small>sul telefono del gestore</small></div></div><div class="sbody"><div class="card"><h4>Il gestore tocca</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel sito. Sulla scheda compare l'etichetta «in corso».</dd>
+<dt>Che forma ha</dt><dd>Una richiesta di comando, con un codice di tracciamento nuovo: <span class="ex">{"capability": "heating", "action": "set_heating", "params": {"on": true, "setpoint": 21}}</span> Per una presa è più corta: <span class="ex">{"capability": "switch", "action": "turn_on"}</span></dd>
+<dt>Quanto ci mette</dt><dd>Il sito aspetta il server al massimo 30 s.</dd>
+<dt>Se qui si rompe</dt><dd>«Server non raggiungibile». Un comando scaduto può essere andato a buon fine: non viene ritentato da solo.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>L'etichetta resta «in corso» finché il motore non conferma?</dd>
+</dl></div></div></li>
+<li class="stop p-server"><div class="rail"><span class="num">2</span><div class="node"><b>Server</b><small>cloud Google, Milano</small></div></div><div class="sbody"><p class="via">richiesta con codice di tracciamento</p><div class="card"><h4>Il server controlla e inoltra</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel server.</dd>
+<dt>Che forma ha</dt><dd>La stessa richiesta, dopo tre controlli: la strada richiesta è fra quelle ammesse; il ruolo può comandare; l'appartamento è visibile a quell'utente. Verso il motore aggiunge la chiave di quel motore e il codice anonimo di chi comanda.</dd>
+<dt>Quanto ci mette</dt><dd>Aspetta il motore al massimo 10 s.</dd>
+<dt>Se qui si rompe</dt><dd>«Sistema domotico non raggiungibile». Senza la chiave giusta il motore rifiuta la richiesta.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Un utente con la sola lettura prova a comandare: viene rifiutato? Un utente di un'altra organizzazione vede «non trovato»?</dd>
+</dl></div></div></li>
+<li class="stop p-motore"><div class="rail"><span class="num">3</span><div class="node"><b>Motore</b><small>nella centrale</small></div></div><div class="sbody"><p class="via">chiamata con la chiave del motore</p><div class="card"><h4>Il motore accetta o rifiuta</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel motore dell'appartamento.</dd>
+<dt>Che forma ha</dt><dd>Una risposta immediata: «accettato, in corso»; oppure «Il dispositivo non è raggiungibile; riprova quando torna online»; oppure «temperatura fuori dai limiti», con i limiti scritti (per esempio da 16 a 24 °C).</dd>
+<dt>Quanto ci mette</dt><dd>Subito. Lo stesso invio ripetuto entro 60 s non crea un secondo comando.</dd>
+<dt>Se qui si rompe</dt><dd>Se il traduttore non funziona, il comando è rifiutato come «non raggiungibile». I comandi non vengono mai messi in coda.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Chiedi una temperatura fuori dai limiti: il rifiuto arriva subito, con i limiti nel messaggio? Dal Simulatore: staccato un dispositivo, il comando viene rifiutato?</dd>
+</dl></div></div></li>
+<li class="stop p-motore"><div class="rail"><span class="num">4</span><div class="node"><b>Motore</b><small>regole e priorità</small></div></div><div class="sbody"><p class="via">dentro lo stesso programma</p><div class="card"><h4>Il motore applica regole e priorità</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel motore.</dd>
+<dt>Che forma ha</dt><dd>Un comando in lavorazione. Con una finestra aperta, oppure durante la pausa del compressore del climatizzatore, il comando si ferma senza toccare il dispositivo: «bloccato da una regola».</dd>
+<dt>Quanto ci mette</dt><dd>Subito. Un solo comando alla volta per dispositivo. La pausa del compressore dura 3 minuti.</dd>
+<dt>Se qui si rompe</dt><dd>L'etichetta sulla scheda mostra il motivo, per esempio «riprova tra N secondi».</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Dal Simulatore: aperta una finestra, provi ad accendere il clima. L'etichetta dice «bloccato da una regola»?</dd>
+</dl></div></div></li>
+<li class="stop p-motore"><div class="rail"><span class="num">◆</span><div class="node"><b>Motore</b><small>termostato (solo caldaia)</small></div></div><div class="sbody"><p class="via">dentro lo stesso programma</p><div class="card"><h4>Caso particolare: per la caldaia decide il termostato</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel termostato del motore. Il pulsante dell'app non accende il relè: dice «riscaldamento abilitato, a 21 °C».</dd>
+<dt>Che forma ha</dt><dd>Un'impostazione: <span class="ex">riscaldamento abilitato · 21 °C</span> La temperatura voluta non arriva mai al traduttore: al traduttore arriva solo «relè acceso» o «relè spento», deciso dal termostato.</dd>
+<dt>Quanto ci mette</dt><dd>Il termostato decide ogni minuto, con un margine di 0,5 °C e almeno 5 minuti fra due cambi.</dd>
+<dt>Se qui si rompe</dt><dd>Se la stanza è già a 22 °C, «accendi» non fa scattare niente: è giusto così. Senza sensore di temperatura la caldaia non si accende da sola.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>A voce: «Il relè comanda la caldaia o il termostato della caldaia?» Con la stanza già calda, «accendi a 21» non fa scattare il relè.</dd>
+</dl></div></div></li>
+<li class="stop p-connector simd"><div class="rail"><span class="num">5</span><div class="node"><b>Traduttore</b><small>dentro il motore</small></div></div><div class="sbody"><p class="via">un comando alla volta per dispositivo, entro 9 secondi</p><div class="card"><h4>Il traduttore esegue <span class="sim">da provare con dispositivi veri</span></h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel traduttore.</dd>
+<dt>Che forma ha</dt><dd>Dal motore arriva lo <strong>stato completo da raggiungere</strong>, non l'azione: «acceso». Il traduttore lo riscrive come richiesta al dispositivo, nella sua casella dei comandi: <span class="ex">apt-001/shellyplugmg3-a1b2c3d4e5f6/rpc</span> <span class="ex">{"id": 1017, "src": "apt-001/shellyplugmg3-a1b2c3d4e5f6/connector", "method": "Switch.Set", "params": {"id": 0, "on": true}}</span></dd>
+<dt>Quanto ci mette</dt><dd>Scadenza: 9 s dalla creazione del comando. Con i dispositivi simulati la conferma arriva in circa 1,5 s.</dd>
+<dt>Se qui si rompe</dt><dd>Il comando viaggia <strong>non conservato</strong>: se il dispositivo non è collegato si perde, invece di aspettare. Gli esiti possibili sono «confermato», «consegnato» o «fallito», con il motivo: «nessuna conferma», «non raggiungibile», «rifiutato dal dispositivo», «errore interno».</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>A voce: «Cosa succede se mando due comandi in un secondo?» Risposta: uno alla volta per dispositivo.</dd>
+</dl></div></div></li>
+<li class="stop p-disp simd"><div class="rail"><span class="num">◆</span><div class="node"><b>Relè della caldaia</b><small>nell'appartamento</small></div></div><div class="sbody"><p class="via">broker, internet cifrato</p><div class="card"><h4>Il relè risponde <span class="sim">da provare con dispositivi veri</span></h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nello Shelly che comanda la caldaia.</dd>
+<dt>Che forma ha</dt><dd>Prima la risposta, nell'unica casella di risposta che quel dispositivo può scrivere: <span class="ex">{"id": 1017, "result": {"was_on": false}}</span> Poi la novità con il nuovo stato dell'uscita: <span class="ex">{"method": "NotifyStatus", "params": {"switch:0": {"id": 0, "output": true}}}</span> Il traduttore avvisa il motore dei passi («consegnato», «in verifica») e poi dà l'esito.</dd>
+<dt>Quanto ci mette</dt><dd>Con un Wi-Fi normale ci si aspetta uno o due secondi; si misurerà con i dispositivi veri.</dd>
+<dt>Se qui si rompe</dt><dd>Se il dispositivo risponde con un errore: «rifiutato dal dispositivo». Se non risponde: «non raggiungibile». Provato sul broker: un comando non conservato non arriva a un dispositivo che torna dopo essere stato scollegato.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>In laboratorio: un relè sulla scrivania, collegato al broker della centrale, acceso e spento dal motore.</dd>
+</dl></div></div></li>
+<li class="stop p-motore"><div class="rail"><span class="num">6</span><div class="node"><b>Motore</b><small>verifica (solo climatizzatore)</small></div></div><div class="sbody"><p class="via">esito: confermato, consegnato o fallito</p><div class="card"><h4>Il motore verifica: solo per il climatizzatore a infrarossi</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel motore, con la <strong>conferma a consumo</strong>. Non riguarda la caldaia.</dd>
+<dt>Che forma ha</dt><dd>Il telecomando a infrarossi «spara» il comando ma non sa se è arrivato. Il traduttore risponde solo «consegnato», e il motore guarda i watt del misuratore sulla linea del climatizzatore: <span class="ex">{"watts": 870, "energy_total_wh": 812400.0}</span></dd>
+<dt>Quanto ci mette</dt><dd><strong>Accensione confermata se il consumo sale di almeno 20 W entro 9,5 s</strong> dal comando; <strong>spegnimento confermato se scende sotto 15 W</strong>. Dentro questa finestra il misuratore deve riportare ogni variazione entro 2 s.</dd>
+<dt>Se qui si rompe</dt><dd>Nessuna variazione: «nessuna conferma». Misuratore non raggiungibile: «eseguito», con la decisione «comando non verificato».</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>A voce: «Come sappiamo che il climatizzatore si è acceso: c'è un misuratore sulla sua linea?» In laboratorio si misura in quanti secondi sale il consumo dopo il comando.</dd>
+</dl></div></div></li>
+<li class="stop p-sito"><div class="rail"><span class="num">7</span><div class="node"><b>Motore → Server → Sito</b><small>la conferma torna</small></div></div><div class="sbody"><p class="via">linea in diretta, poi internet</p><div class="card"><h4>La conferma torna</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Dal motore al server e poi al sito.</dd>
+<dt>Che forma ha</dt><dd>Tre aggiornamenti di seguito, con lo stesso codice di tracciamento partito dal sito: l'avanzamento del comando <span class="ex">in attesa → inviato → in verifica → confermato</span> il nuovo stato del dispositivo, e una riga nelle Decisioni: «Comando manuale dall'app», con il nome di chi ha comandato e l'esito.</dd>
+<dt>Quanto ci mette</dt><dd>Pochi secondi.</dd>
+<dt>Se qui si rompe</dt><dd>L'etichetta mostra «in corso» nei primi tre stati, «eseguito» alla conferma, l'errore con il motivo negli altri casi. Se la linea è caduta, il sito rilegge tutto alla riapertura.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Nella pagina Decisioni compare la riga con il nome di chi ha comandato e l'esito?</dd>
+</dl></div></div></li>
+</ol>
+
+<h3 id="casi">Tre casi particolari: caldaia, climatizzatore, modalità</h3>
+<ol>
+<li><strong>La caldaia non si comanda come la presa.</strong> Il gestore non dice «accendi il relè», dice «riscaldamento abilitato a 21 °C». Poi il motore, ogni minuto, confronta la temperatura del sensore con i 21 °C e dà al relè l'ordine «accenditi» o «spegniti», con un margine di 0,5 °C e almeno 5 minuti fra due cambi. Così la caldaia segue la temperatura anche quando nessuno guarda l'app.</li>
+<li><strong>Il climatizzatore a infrarossi non può confermare.</strong> Il motore guarda il consumo sulla sua linea: +20 W entro 9,5 s vuol dire acceso; sotto 15 W vuol dire spento. Per questo ogni climatizzatore ha bisogno di un misuratore sulla sua linea.</li>
+<li><strong>Le modalità</strong> (comfort, eco, casa vuota). Cambiare modalità vuol dire, per il motore, creare un comando per ogni dispositivo interessato. La <strong>forzatura</strong> fissa una modalità per 30 minuti, 2 ore o 6 ore (al massimo 12 ore) e sospende alcune regole; si può annullare in ogni momento.</li>
+</ol>
+</section>
+
+<section id="guasti">
+<h2>4. Quando qualcosa si guasta</h2>
+<p>Ogni pezzo può fermarsi. Per ognuno è previsto che cosa vede il motore, che cosa vede il gestore e se parte una notifica.</p>
+<table class="t">
+<thead><tr><th>Che cosa si ferma</th><th>Che cosa succede</th><th>Che cosa vede il gestore</th><th>Notifica</th></tr></thead>
+<tbody>
+<tr><td>Una presa si stacca (spina tolta, guasto)</td><td>Il broker avvisa subito «non c'è più» per lei</td><td>La scheda passa subito a «non in linea»; i comandi a quella presa vengono rifiutati</td><td>Sì, se resta così più dei minuti della regola «Avviso dispositivo offline» (15 di base)</td></tr>
+<tr><td>Un sensore a batteria tace (batteria scarica)</td><td>Dopo una soglia di silenzio diversa per tipo (un sensore di movimento a riposo parla solo ogni 15 minuti, quindi la sua soglia è più lunga)</td><td>«Non in linea»; dal livello della batteria si capisce se è scarica</td><td>Come sopra</td></tr>
+<tr><td>Cade internet in casa</td><td>Tutti i dispositivi dell'appartamento «non ci sono più»</td><td>Tutte le schede «non in linea». In casa le cose restano come sono: la presa accesa resta accesa</td><td>Sì, dopo i minuti della regola</td></tr>
+<tr><td>Si ferma il traduttore</td><td>Il motore registra «collegamento ai dispositivi perso»; i comandi vengono rifiutati, il termostato aspetta</td><td>Avviso «sistema domotico non raggiungibile» e riga nelle Decisioni</td><td>Sì</td></tr>
+<tr><td>Si ferma un motore</td><td>Si riavvia da solo. Lo stato è salvato a ogni scrittura. Al riavvio: un comando a metà risulta «fallito»; un'azione programmata recente viene eseguita, una in ritardo di oltre 30 minuti viene saltata e registrata. Le regole si riarmano (anche per le finestre già aperte) e la pausa del compressore continua</td><td>«Sistema domotico non raggiungibile» finché non torna</td><td>Sì, se resta irraggiungibile più dei minuti della regola</td></tr>
+<tr><td>Si ferma la centrale (motori e broker)</td><td>Si fermano <strong>tutti i motori</strong> insieme: è un limite accettato di avere una sola macchina</td><td>«Sistema domotico non raggiungibile»</td><td>Sì, dopo i minuti della regola</td></tr>
+<tr><td>Si ferma il broker</td><td>Alla ripresa il traduttore rilegge lo stato di tutti i dispositivi</td><td>Dispositivi «non in linea»</td><td>Allarme email «broker giù»</td></tr>
+<tr><td>Si ferma il server della web app</td><td>La casa continua a funzionare: il motore governa da solo, regole e programmazioni vanno avanti</td><td>L'app non si apre o mostra «Server non raggiungibile»</td><td>No sul telefono; email di allarme a chi gestisce la piattaforma</td></tr>
+<tr><td>Si ferma il database degli utenti</td><td>L'accesso e le pagine dell'app non funzionano; il motore continua da solo</td><td>L'app non si apre</td><td>Allarme email</td></tr>
+</tbody></table>
+<ul>
+<li><strong>Al ritorno ognuno si ricollega da solo:</strong> i dispositivi richiamano il broker, il traduttore rifà la «fotografia» dello stato di tutti i dispositivi, il server si ricollega al motore. In una prova di spegnimento e riaccensione della centrale tutto è ripartito da solo in pochi secondi.</li>
+<li><strong>«Non in linea» subito, notifica dopo:</strong> il motore segna un dispositivo «non in linea» appena il traduttore lo sa, così l'app mostra sempre la verità e non dice «in linea» per una presa che rifiuta i comandi. I minuti della regola servono solo a decidere quando mandare la notifica, per non disturbare il gestore per un'interruzione di pochi secondi.</li>
+<li><strong>I comandi dati mentre un dispositivo è irraggiungibile non restano in coda:</strong> vengono rifiutati subito. Meglio un rifiuto chiaro che una stufa accesa ore dopo.</li>
+</ul>
+<div class="call"><p><strong>Come ci si accorge dei guasti: undici allarmi via email</strong> a chi gestisce la piattaforma. Fra questi: centrale muta da 10 minuti, motore muto o fermo, righe di errore, backup mancato da oltre 26 ore, disco oltre l'80 %, broker fermo, certificato in scadenza, troppi accessi rifiutati, server non raggiungibile, server senza copie disponibili, scrittura non riuscita.</p></div>
+</section>
+
+<section id="automatismi">
+<h2>5. Che cosa succede da solo</h2>
+<p>Il motore di ogni appartamento ha un orologio interno che gira <strong>ogni secondo</strong> e reagisce a quello che gli raccontano i dispositivi. Il server ha due orologi suoi: uno per le notifiche (ogni minuto) e uno per il riepilogo settimanale (ogni ora). Nessun programma esterno li comanda.</p>
+<div class="clock">
+<div class="ck p-motore"><h4>Motore, ogni secondo</h4><ul>
+<li>Il traduttore è ancora collegato? Se cade: decisione e «sistema giù».</li>
+<li>Ogni minuto, termostato: antigelo, comfort, eco; clima in comfort.</li>
+<li>Ogni minuto, controlli: antimuffa (avviso), dispositivi non in linea oltre 15 minuti, consumo a casa vuota.</li>
+<li>Forzatura scaduta? Torna la modalità normale.</li>
+<li>Approvazioni scadute? Chiude con l'esito previsto.</li>
+<li>Azioni programmate in scadenza? Pre-arrivo (comfort), check-out (casa vuota).</li>
+</ul></div>
+<div class="ck p-disp"><h4>Eventi dalla casa</h4><ul>
+<li>Finestra aperta: dopo 5 minuti spegne clima e caldaia.</li>
+<li>Finestra chiusa: dopo circa un minuto li riaccende.</li>
+<li>Prenotazione da Italianway: server, poi motore, poi nuove azioni programmate.</li>
+</ul></div>
+<div class="ck p-server"><h4>Server</h4><ul>
+<li>Ascolta gli aggiornamenti dei motori e manda le notifiche sul telefono.</li>
+<li>Conta da quanto non sente più un motore, e avvisa.</li>
+<li>Ogni ora: se è lunedì dopo le 8, prepara il riepilogo settimanale.</li>
+</ul></div>
+</div>
+
+<h3 id="regole">Le regole automatiche</h3>
+<p>Le regole sono <strong>otto e fisse</strong>: dall'app se ne regolano le soglie, non se ne aggiungono di nuove. Sette si cambiano dalla pagina Regole; la pausa del compressore no. Altri valori tecnici (margini del termostato, scadenza delle approvazioni, soglia di 300 W) si cambiano solo nella centrale.</p>
+<table class="t">
+<thead><tr><th>Regola</th><th>Che cosa fa</th><th>Soglie di partenza</th><th>Da quale dispositivo dipende</th></tr></thead>
+<tbody>
+<tr><td>Finestra aperta</td><td>Dopo l'attesa spegne <strong>clima e caldaia di tutto l'appartamento</strong>. Finché è aperta, ogni accensione viene bloccata, anche quella del gestore. Quando si chiude l'ultima finestra aperta, clima e caldaia ripartono da soli</td><td>5 minuti (da 1 a 30)</td><td>Sensore della finestra</td></tr>
+<tr><td>Antigelo</td><td>A casa vuota tiene almeno 8 °C: accende sotto 8 °C, spegne sopra 8,5 °C. Vale anche con caldaia «spenta», con forzatura e con finestra aperta</td><td>8 °C (da 5 a 12); un cambio ogni 5 minuti al massimo</td><td>Sensore di temperatura e relè della caldaia</td></tr>
+<tr><td>Antimuffa</td><td>A casa vuota, umidità oltre la soglia: <strong>solo un avviso</strong> nelle Decisioni, uno al giorno. Non deumidifica e non accende niente</td><td>65 % (da 50 a 80)</td><td>Sensore di umidità</td></tr>
+<tr><td>Pausa del compressore</td><td>Dopo lo spegnimento del climatizzatore, la riaccensione aspetta. Un comando automatico viene rimandato; uno del gestore viene rifiutato con «riprova tra N secondi»</td><td>3 minuti, non modificabile dall'app</td><td>Nessuno: protegge il climatizzatore</td></tr>
+<tr><td>Consumo a casa vuota</td><td>Se un apparecchio consuma oltre la soglia per più di 15 minuti a casa vuota, chiede al gestore se spegnerlo (mai la caldaia)</td><td>300 W</td><td>Presa o misuratore</td></tr>
+<tr><td>Avviso dispositivo offline</td><td>«Non in linea» subito; decisione e notifica dopo i minuti della regola</td><td>15 minuti</td><td>Tutti</td></tr>
+<tr><td>Pre-arrivo e check-out</td><td>Dalle prenotazioni: comfort 2 ore prima del check-in, casa vuota 30 minuti dopo il check-out</td><td>2 ore, 30 minuti</td><td>Collegamento con Italianway</td></tr>
+</tbody></table>
+<p><strong>Le modalità:</strong> comfort, eco e casa vuota decidono la temperatura e che cosa resta acceso. Il gestore può anche <strong>bloccare gli automatismi</strong> per 30 minuti, 2 ore o 6 ore; l'antigelo resta comunque attivo.</p>
+<p><strong>Il legame con i dispositivi:</strong> quasi tutte le regole funzionano solo se i dispositivi danno i dati giusti. Senza sensore della finestra non scatta «finestra aperta»; senza sensore di temperatura niente antigelo né regolazione della caldaia; senza sensore di movimento niente approvazione al check-out. In un appartamento vero è il catalogo a decidere quali regole possono funzionare.</p>
+<p><strong>Ordine di forza fra le regole</strong>, dalla più forte:</p>
+<ol>
+<li>Sicurezza (antigelo, limiti del dispositivo): mai sospesa.</li>
+<li>Finestra aperta (se non c'è una forzatura): blocca ogni accensione.</li>
+<li>Pausa del compressore.</li>
+<li>Forzatura: sospende la regola della finestra, la regolazione in comfort, la richiesta per consumo a casa vuota e l'antimuffa; rimanda le azioni programmate di modalità.</li>
+<li>Modalità.</li>
+<li>Un comando del gestore toglie quel dispositivo alla regolazione automatica fino al cambio di modalità successivo.</li>
+</ol>
+
+<h3 id="tappe-finestra">Una finestra che si apre, tappa per tappa</h3>
+<p>Il dato seguito: <strong>una finestra che si apre</strong>, fino allo spegnimento del clima e alla riga nelle Decisioni.</p>
+<ol class="route">
+<li class="stop p-disp simd"><div class="rail"><span class="num">1</span><div class="node"><b>Sensore della finestra</b><small>nell'appartamento</small></div></div><div class="sbody"><div class="card"><h4>La finestra si apre <span class="sim">da provare con dispositivi veri</span></h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel sensore sulla finestra della camera, a batteria.</dd>
+<dt>Che forma ha</dt><dd>Un segnale Bluetooth nel formato BTHome, come per la temperatura.</dd>
+<dt>Quanto ci mette</dt><dd>Subito all'apertura, poi un segnale ogni 60 s.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>A voce: «Quali finestre hanno il sensore?»</dd>
+</dl></div></div></li>
+<li class="stop p-broker simd"><div class="rail"><span class="num">2</span><div class="node"><b>Broker MQTT</b><small>nella centrale</small></div></div><div class="sbody"><p class="via">Shelly «ponte», Wi-Fi, router, internet cifrato</p><div class="card"><h4>Il broker <span class="sim">da provare con dispositivi veri</span></h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nella casella delle novità dello Shelly «ponte».</dd>
+<dt>Quanto ci mette</dt><dd>Frazioni di secondo, come per la temperatura.</dd>
+</dl></div></div></li>
+<li class="stop p-connector simd"><div class="rail"><span class="num">3</span><div class="node"><b>Traduttore</b><small>dentro il motore</small></div></div><div class="sbody"><p class="via">rete interna della centrale</p><div class="card"><h4>Il traduttore traduce <span class="sim">da provare con dispositivi veri</span></h4><dl class="f">
+<dt>Che forma ha</dt><dd><span class="ex">{"device_id": "dev-finestra-camera", "capability": "contact", "state": {"open": true}}</span></dd>
+<dt>Se qui si rompe</dt><dd>«Da quando è aperta» lo calcola il motore; il traduttore può mandarlo se lo conosce.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>In laboratorio: apri il sensore; l'evento arriva al motore entro pochi secondi?</dd>
+</dl></div></div></li>
+<li class="stop p-motore"><div class="rail"><span class="num">4</span><div class="node"><b>Motore</b><small>segna l'apertura</small></div></div><div class="sbody"><p class="via">dentro lo stesso programma</p><div class="card"><h4>Il motore segna da quando è aperta</h4><dl class="f">
+<dt>Che forma ha</dt><dd>Uno stato salvato e annunciato con l'ora di apertura: <span class="ex">{"open": true, "since": "2026-11-10T18:30:00Z"}</span> Il motore fa partire la regola «finestra aperta».</dd>
+<dt>Quanto ci mette</dt><dd>Subito. Da questo momento ogni accensione di clima e caldaia viene bloccata, anche quella del gestore.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Dal Simulatore: aperta la finestra, la scheda mostra «aperta da …» e le accensioni vengono bloccate?</dd>
+</dl></div></div></li>
+<li class="stop p-motore"><div class="rail"><span class="num">5</span><div class="node"><b>Motore</b><small>aspetta 5 minuti</small></div></div><div class="sbody"><p class="via">l'orologio interno, ogni secondo</p><div class="card"><h4>L'attesa</h4><dl class="f">
+<dt>Che forma ha</dt><dd>Un conto alla rovescia sulla finestra aperta.</dd>
+<dt>Quanto ci mette</dt><dd>5 minuti (regolabili da 1 a 30).</dd>
+<dt>Se qui si rompe</dt><dd>Con una forzatura la regola è sospesa e riparte alla fine. Dopo un riavvio del motore la regola si riarma anche per le finestre già aperte.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Dal Simulatore: lasciata la finestra aperta per il tempo della regola, clima e caldaia si spengono?</dd>
+</dl></div></div></li>
+<li class="stop p-connector simd"><div class="rail"><span class="num">6</span><div class="node"><b>Motore → Traduttore</b><small>spegne clima e caldaia</small></div></div><div class="sbody"><p class="via">comandi, come per il percorso di un comando</p><div class="card"><h4>Lo spegnimento <span class="sim">da provare con dispositivi veri</span></h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Dal motore al traduttore, per <strong>clima e caldaia di tutto l'appartamento</strong>.</dd>
+<dt>Quanto ci mette</dt><dd>Come ogni comando: scadenza 9 s; per il climatizzatore la conferma arriva dal consumo, sotto 15 W.</dd>
+<dt>Se qui si rompe</dt><dd>Come ogni comando. L'antigelo resta valido anche con la finestra aperta.</dd>
+</dl></div></div></li>
+<li class="stop p-motore"><div class="rail"><span class="num">7</span><div class="node"><b>Motore</b><small>scrive la Decisione</small></div></div><div class="sbody"><p class="via">dentro lo stesso programma</p><div class="card"><h4>La riga nelle Decisioni</h4><dl class="f">
+<dt>Che forma ha</dt><dd>Una riga con chi ha fatto cosa, perché e con che esito: <span class="ex">regola «finestra aperta» · spento · «Finestra camera aperta da oltre 5 minuti …» · applicato</span></dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Nella pagina Decisioni c'è la riga della regola, con il motivo scritto in chiaro?</dd>
+</dl></div></div></li>
+<li class="stop p-sito"><div class="rail"><span class="num">8</span><div class="node"><b>Server → Sito</b><small>nessuna notifica</small></div></div><div class="sbody"><p class="via">linea in diretta, poi internet</p><div class="card"><h4>Che cosa vede il gestore</h4><dl class="f">
+<dt>Dove si trova il dato</dt><dd>Nel sito: le schede di clima e caldaia mostrano «spento», la pagina Decisioni mostra la riga.</dd>
+<dt>Che forma ha</dt><dd><strong>Nessuna notifica sul telefono</strong>: è voluto, per non disturbare il gestore ogni volta che un ospite apre una finestra. Il lunedì il riepilogo settimanale può citarlo.</dd>
+<dt>Se qui si rompe</dt><dd>Se il gestore o l'ospite prova ad accendere il clima con la finestra aperta, il comando è «bloccato da una regola».</dd>
+</dl></div></div></li>
+<li class="stop p-motore"><div class="rail"><span class="num">◆</span><div class="node"><b>Motore</b><small>quando la finestra si chiude</small></div></div><div class="sbody"><p class="via">dentro lo stesso programma</p><div class="card"><h4>E quando la finestra si chiude?</h4><dl class="f">
+<dt>Che forma ha</dt><dd>Quando si chiude l'ultima finestra aperta, <strong>caldaia e clima tornano da soli</strong>, e nelle Decisioni compare <span class="ex">Finestra chiusa: … riacceso</span></dd>
+<dt>Quanto ci mette</dt><dd>Circa un minuto dopo la chiusura. La caldaia rispetta il minimo fra due accensioni, il clima la pausa del compressore.</dd>
+<dt>Se qui si rompe</dt><dd>Un dispositivo che era stato acceso a mano torna com'era; uno comandato nel frattempo resta com'è; con una forzatura non torna niente.</dd>
+</dl><dl class="f k">
+<dt>Come si controlla</dt><dd>Dal Simulatore, in comfort e con la stanza sotto la temperatura voluta: finestra aperta 5 minuti, poi chiusa. Dopo circa un minuto la caldaia riparte da sola?</dd>
+</dl></div></div></li>
+</ol>
+
+<h3 id="prenotazioni">Le prenotazioni e il collegamento con Italianway</h3>
+<ul>
+<li><strong>2 ore prima del check-in</strong> parte il <strong>pre-arrivo</strong>: l'appartamento passa in comfort.</li>
+<li><strong>30 minuti dopo il check-out</strong> l'appartamento passa a <strong>casa vuota</strong>.</li>
+<li>Se al check-out il sensore di movimento ha visto qualcuno, il motore non agisce da solo: <strong>chiede al gestore</strong>. Senza risposta entro 30 minuti la richiesta è approvata e l'appartamento va a casa vuota.</li>
+<li>Una disdetta annulla le azioni programmate. Uno spostamento di orario le sposta.</li>
+</ul>
+<p>Il collegamento con Italianway funziona con un <strong>webhook</strong>, che è come un campanello: ogni volta che una prenotazione nasce, cambia o viene annullata, il server di Italianway manda un messaggio a un indirizzo fisso del server di DOMHOUSE. DOMHOUSE non va a chiedere: aspetta che lo avvisino.</p>
+<table class="t">
+<thead><tr><th>Tappa</th><th>Chi</th><th>Che cosa succede</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Italianway</td><td>Un ospite prenota, cambia le date o annulla</td></tr>
+<tr><td>2</td><td>Italianway</td><td>Il loro server manda il messaggio all'indirizzo fisso del server di DOMHOUSE</td></tr>
+<tr><td>3</td><td>Server</td><td>Controlla la <strong>firma</strong>: un timbro fatto con una chiave che conoscono solo DOMHOUSE e Italianway. Senza la firma giusta il messaggio è scartato, così nessuno può inventare prenotazioni</td></tr>
+<tr><td>4</td><td>Server</td><td>Dal <strong>codice Italianway</strong> scritto nel messaggio trova l'appartamento</td></tr>
+<tr><td>5</td><td>Server</td><td>Il traduttore delle prenotazioni trasforma il messaggio nel formato di DOMHOUSE: arrivo, partenza, ospiti, tipo di evento (creata, modificata, disdetta, check-in, check-out)</td></tr>
+<tr><td>6</td><td>Server → motore</td><td>Passa la prenotazione al motore di quell'appartamento, con 3 tentativi se non risponde. Lo stesso messaggio arrivato due volte è riconosciuto come doppione</td></tr>
+<tr><td>7</td><td>Motore</td><td>Programma da solo pre-arrivo e casa vuota</td></tr>
+</tbody></table>
+<ul>
+<li><strong>Il codice dell'appartamento.</strong> Il campanello è uno solo per tutti gli appartamenti di tutte le organizzazioni. Nel messaggio Italianway scrive il <strong>suo</strong> codice dell'appartamento (per esempio «IW-4711»). L'«ID Italianway» nella scheda dell'appartamento è il cartellino che collega quel codice all'appartamento di DOMHOUSE («Bologna – via Indipendenza»). Lo scrive una volta, all'attivazione, il gestore della piattaforma; l'amministratore dell'organizzazione lo vede ma non lo cambia. Senza cartellino la prenotazione è scartata (resta nel registro dei messaggi); lo stesso codice non può stare su due appartamenti.</li>
+<li><strong>Privacy:</strong> dei messaggi si tengono solo date, numero di ospiti e codici, mai nomi e contatti. Il registro dei messaggi ricevuti dura 90 giorni.</li>
+<li><strong>Già costruito:</strong> indirizzo, controllo della firma, collegamento al codice, passaggio al motore, registro. Si prova con il Simulatore.</li>
+<li><strong>Manca, e dipende da Italianway:</strong> il formato vero dei loro messaggi (il traduttore delle prenotazioni oggi si basa su un'ipotesi), la chiave definitiva della firma, una prova insieme, l'elenco dei codici degli appartamenti. E prima ancora: sanno mandare webhook? Se no, ci sono due strade, oggi non costruite: leggere il loro calendario in formato iCal (solo le date, senza il numero di ospiti) oppure interrogare il loro sistema a intervalli. Fino al formato vero, il pre-arrivo automatico con prenotazioni reali non è disponibile.</li>
+</ul>
+
+<h3 id="notifiche">Approvazioni, notifiche, riepilogo, assistente</h3>
+<table class="t">
+<thead><tr><th>Automatismo</th><th>Che cosa fa</th><th>Tempi e soglie</th><th>Se si rompe</th></tr></thead>
+<tbody>
+<tr><td>Approvazioni</td><td>Quando un'azione è delicata, il motore propone e il gestore decide dal telefono. Tre casi: check-out con movimento recente; a casa vuota un apparecchio consuma oltre 300 W da 15 minuti; l'assistente con ospiti in casa o per più azioni insieme. Una sola richiesta aperta per volta, le altre in coda</td><td>Scadenza 30 minuti. Senza risposta: al check-out <strong>approvata</strong>; per il consumo <strong>respinta</strong>; per l'assistente <strong>respinta</strong></td><td>Se l'azione approvata poi non parte (dispositivo non raggiungibile), l'errore viene registrato come tale</td></tr>
+<tr><td>Notifiche</td><td>Il server ascolta i motori e manda la notifica a chi la vuole, ha il ruolo giusto e vede l'appartamento. Il tocco apre la pagina giusta dell'app</td><td>Sette tipi: approvazione richiesta, dispositivo non in linea (dopo 15 minuti), sistema domotico non raggiungibile, prenotazione disdetta, antigelo non attivo, riepilogo, azione programmata non eseguita o eseguita in parte. Fino a 5 tentativi; ogni notifica resta consegnabile per un'ora</td><td><strong>Nessuna notifica</strong>, per scelta, per: antigelo acceso o spento, antimuffa, spegnimento per finestra, approvazione scaduta. Con più copie del server, un meccanismo evita le notifiche doppie</td></tr>
+<tr><td>Riepilogo settimanale</td><td>Ogni lunedì dalle 8 (ora dell'appartamento) il server legge dal motore consumi, decisioni, approvazioni e dispositivi, e prepara il riepilogo. Lo conserva 12 mesi</td><td>La notifica parte solo se c'è qualcosa da segnalare. Consumo «alto» se almeno +30 % <strong>e</strong> almeno +5 kWh rispetto alle 4 settimane prima: servono 5 settimane di dati</td><td>Se il motore non risponde, riprova un'ora dopo</td></tr>
+<tr><td>Assistente e proposte di regole</td><td>Il gestore può scrivere all'assistente («abbassa il clima a 20»). Senza ospiti l'assistente esegue; con ospiti chiede approvazione per spegnere clima o caldaia, cambiare modalità o fare più azioni insieme. Le proposte di regole non cambiano niente finché il gestore non preme «Applica»</td><td>Usa un modello di intelligenza artificiale di Google (Gemini). 50 domande al giorno; risposta entro 28 s; tetto di spesa 20 € al mese</td><td>Senza modello disponibile risponde un assistente più semplice, «a parole chiave»</td></tr>
+</tbody></table>
+</section>
+
+<section id="giornata">
+<h2>6. Una giornata di un appartamento</h2>
+<p><em>Appartamento in via Roma, in inverno: soggiorno con climatizzatore a infrarossi e caldaia, camera con presa stufetta e finestra. Giulia è la gestrice (ruolo «operatore» in Flatsharing). Partono due ospiti, ne arrivano due nuovi.</em></p>
+<div class="call w"><p><strong>Da sapere.</strong> Ogni passo di questa storia funziona oggi con dispositivi simulati. I passi segnati con ⚠ dipendono da cose ancora da completare: i dispositivi veri collegati alla centrale, o il formato definitivo dei messaggi di Italianway. I nomi dei dispositivi sono di esempio: quelli veri vengono dal catalogo di ogni appartamento.</p></div>
+<ol class="tl">
+<li><time>07:00</time><div class="td"><h4>1. Notte finita, gli ospiti dormono.</h4><p>La casa è in comfort, il sensore del soggiorno legge 20,6 °C. Ogni minuto il termostato confronta la temperatura con 21 °C e accende la caldaia. ⚠ Con dispositivi veri il sensore manda la temperatura ogni 60 secondi.</p><p class="who"><span class="pc p-motore">motore · termostato</span><span class="pc p-connector">traduttore</span></p></div></li>
+<li><time>10:00</time><div class="td"><h4>2. Partenza.</h4><p>L'orario di check-out arriva da Italianway (⚠ formato provvisorio). Il motore ha già programmato il «risparmio al check-out» per le 10:30.</p><p class="who"><span class="pc p-server">server · webhook</span><span class="pc p-motore">motore · programmazione</span></p></div></li>
+<li><time>10:20</time><div class="td"><h4>3. Un ospite torna a prendere il caricabatterie.</h4><p>Il sensore di movimento lo vede.</p><p class="who"><span class="pc p-connector">traduttore</span><span class="pc p-motore">motore</span></p></div></li>
+<li><time>10:30</time><div class="td"><h4>4. Il motore non mette subito «casa vuota».</h4><p>C'è stato movimento dopo la partenza, quindi chiede: «Mettere l'appartamento a vuoto dopo il check-out?». Giulia riceve una notifica sul telefono.</p><p class="who"><span class="pc p-motore">motore · approvazione al check-out</span><span class="pc p-server">server · notifiche</span></p></div></li>
+<li><time>11:00</time><div class="td"><h4>5. Giulia è in riunione e non risponde.</h4><p>Dopo 30 minuti la richiesta si approva da sola. L'appartamento passa a «casa vuota»: clima spento, caldaia ad antigelo.</p><p class="who"><span class="pc p-motore">motore · scadenza dell'approvazione e modalità</span></p></div></li>
+<li><time>11:20</time><div class="td"><h4>6. La stufetta è rimasta accesa.</h4><p>Consuma 1200 W da 15 minuti a casa vuota. Il motore chiede: «Spegnere Presa stufetta camera?». Giulia tocca «Sì» dall'app. Dopo circa un secondo l'etichetta diventa «eseguito». Se non avesse risposto, dopo 30 minuti la richiesta sarebbe stata respinta e la stufetta sarebbe rimasta accesa.</p><p class="who"><span class="pc p-motore">motore · approvazione per consumo</span><span class="pc p-server">server · notifica</span><span class="pc p-sito">sito</span><span class="pc p-connector">traduttore</span></p></div></li>
+<li><time>13:00</time><div class="td"><h4>7. Fuori fa freddo.</h4><p>Il soggiorno scende a 7,8 °C: l'antigelo accende la caldaia e scrive «Antigelo: caldaia accesa» nelle Decisioni, senza notifica. A 8,5 °C la spegne.</p><p class="who"><span class="pc p-motore">motore · antigelo</span></p></div></li>
+<li><time>13:30</time><div class="td"><h4>8. Umidità al 70 %.</h4><p>Il motore scrive «Avviso antimuffa» nelle Decisioni, una sola volta oggi. Non accende niente e non manda notifiche.</p><p class="who"><span class="pc p-motore">motore · antimuffa</span></p></div></li>
+<li><time>14:00</time><div class="td"><h4>9. Italianway sposta l'arrivo dei nuovi ospiti dalle 17:00 alle 18:00.</h4><p>Il server riceve la modifica e la inoltra; il motore sposta il pre-arrivo dalle 15:00 alle 16:00 (⚠ formato Italianway provvisorio).</p><p class="who"><span class="pc p-server">server</span><span class="pc p-motore">motore</span></p></div></li>
+<li><time>16:00</time><div class="td"><h4>10. Pre-arrivo.</h4><p>Il motore mette l'appartamento in comfort: caldaia abilitata a 21 °C; il clima del soggiorno segue il sensore della stanza. Il comando al clima viene confermato dal misuratore: i watt salgono di più di 20 W (⚠ con dispositivi veri).</p><p class="who"><span class="pc p-motore">motore · programmazione e modalità</span><span class="pc p-motore">motore · conferma a consumo</span></p></div></li>
+<li><time>18:05</time><div class="td"><h4>11. Arrivano gli ospiti.</h4><p>Italianway comunica il check-in effettivo: l'app passa da «Prenotato» a «Occupato».</p><p class="who"><span class="pc p-server">server</span><span class="pc p-motore">motore</span></p></div></li>
+<li><time>18:30</time><div class="td"><h4>12. Un ospite apre la finestra della camera per fumare.</h4><p>Alle 18:35 il motore spegne clima e caldaia di tutto l'appartamento e lo scrive nelle Decisioni, senza notifica. Se l'ospite prova ad accendere il clima, viene bloccato.</p><p class="who"><span class="pc p-motore">motore · regola finestra</span></p></div></li>
+<li><time>18:50</time><div class="td"><h4>13. La finestra si chiude.</h4><p>Circa un minuto dopo, clima e caldaia ripartono da soli: la caldaia rispetta il minimo fra due accensioni, il clima la pausa del compressore. Nelle Decisioni compare «Finestra chiusa: … riacceso».</p><p class="who"><span class="pc p-motore">motore · termostato</span></p></div></li>
+<li><time>21:00</time><div class="td"><h4>14. Giulia chiede all'assistente: «Abbassa il clima a 20».</h4><p>Con ospiti in casa l'assistente esegue i comandi semplici e chiede approvazione solo per spegnere clima o caldaia, cambiare modalità o fare più azioni insieme.</p><p class="who"><span class="pc p-motore">motore · assistente</span></p></div></li>
+<li><time>Lunedì 8:00</time><div class="td"><h4>15. Il riepilogo.</h4><p>Giulia riceve il «Riepilogo»: consumi per notte con ospiti e senza ospiti, una finestra che ha spento il clima, un'approvazione scaduta. Per il confronto dei consumi servono 5 settimane di dati.</p><p class="who"><span class="pc p-server">server · riepilogo settimanale</span></p></div></li>
+</ol>
+</section>
+
+<section id="servizio">
+<h2>7. Mettere in servizio un appartamento</h2>
+<p>Ogni appartamento vero ha <strong>tre «gemelli»</strong>, che vanno creati e collegati fra loro:</p>
+<ol>
+<li><strong>in casa:</strong> i dispositivi montati e collegati al Wi-Fi;</li>
+<li><strong>nella centrale:</strong> il suo posto sul broker (utenti e chiavi d'accesso) e il suo motore;</li>
+<li><strong>nella web app:</strong> la sua scheda, collegata al motore e a Italianway.</li>
+</ol>
+<table class="t">
+<thead><tr><th>Tappa</th><th>Chi</th><th>Che cosa</th><th>Dove</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Flatsharing con il tecnico dei dispositivi</td><td>Scegliere i dispositivi di quell'appartamento (prese, relè della caldaia, sensori delle finestre, misuratore del clima…)</td><td>Sopralluogo</td></tr>
+<tr><td>2</td><td>Flatsharing</td><td>Dare la rete Wi-Fi di casa (nome e password) e l'accesso all'appartamento</td><td>Casa</td></tr>
+<tr><td>3</td><td>L'elettricista</td><td>Montare fisicamente tutti i dispositivi, anche prese e sensori a batteria, seguendo le indicazioni del tecnico dei dispositivi</td><td>Casa</td></tr>
+<tr><td>4</td><td>Il tecnico dei dispositivi</td><td>Accendere ogni dispositivo, leggere il codice di fabbrica, collegarlo al Wi-Fi di casa, spegnere la rete Wi-Fi di installazione</td><td>Casa</td></tr>
+<tr><td>5</td><td>Il tecnico dei dispositivi</td><td>Scrivere il catalogo dell'appartamento: quale codice è quale dispositivo, stanza, nome, legami</td><td>Catalogo</td></tr>
+<tr><td>6</td><td>Il gestore della piattaforma</td><td>Creare sul broker gli utenti dell'appartamento e dei dispositivi; le chiavi d'accesso restano in una cassaforte di chiavi nel cloud</td><td>Centrale</td></tr>
+<tr><td>7</td><td>Il tecnico dei dispositivi</td><td>Scrivere in ogni dispositivo l'indirizzo del broker, l'utente e la chiave d'accesso; riavviarlo</td><td>Casa o da remoto</td></tr>
+<tr><td>8</td><td>Il gestore della piattaforma</td><td>Creare il motore dell'appartamento nella centrale, con il traduttore, il catalogo e la chiave del motore</td><td>Centrale</td></tr>
+<tr><td>9</td><td>Il gestore della piattaforma</td><td>Creare l'appartamento nella web app: nome, collegamento al motore, ID Italianway</td><td>Web app</td></tr>
+<tr><td>10</td><td>L'amministratore dell'organizzazione</td><td>Invitare gli utenti, controllare le regole</td><td>Web app</td></tr>
+<tr><td>11</td><td>Tutti</td><td>Collaudo: ogni dispositivo in linea, un comando a ciascuno, finestra, caldaia, una prenotazione di prova</td><td>Casa e web app</td></tr>
+</tbody></table>
+
+<h3 id="chifa">Chi fa ogni passo del percorso, e come si controlla</h3>
+<table class="t">
+<thead><tr><th>Passo</th><th>Chi lo fa</th><th>Come si controlla</th></tr></thead>
+<tbody>
+<tr><td><span class="pc p-disp">Dispositivi</span> nell'appartamento</td><td>L'elettricista li monta. Il tecnico dei dispositivi sceglie i modelli con Flatsharing, li configura, compila il catalogo</td><td>Chiedere il catalogo: una riga per dispositivo, con modello, codice, posizione, alimentazione, che cosa misura o comanda. Domande: «Il relè comanda la caldaia o il suo termostato?» «Quali finestre hanno il sensore?»</td></tr>
+<tr><td>Wi-Fi di casa e router</td><td>Flatsharing dà rete e password; il tecnico dei dispositivi collega i dispositivi e spegne la rete di installazione</td><td>Finita la messa in servizio, dal telefono non si vede più nessuna rete «Shelly…». Staccato il Wi-Fi, il dispositivo risulta «non in linea» entro il tempo previsto?</td></tr>
+<tr><td>Ingresso dalla rete</td><td>Il gestore della piattaforma: indirizzo pubblico, protezione della rete, dominio, certificato</td><td>Una scansione da fuori trova aperta solo la porta cifrata dei dispositivi? Un dispositivo vero accetta il certificato?</td></tr>
+<tr><td><span class="pc p-broker">Broker</span></td><td>Il gestore della piattaforma: broker, utenti e chiavi dei dispositivi</td><td>«Un dispositivo può rispondere al posto di un altro?» Una prova automatica dice di no. L'allarme «broker giù» arriva via email?</td></tr>
+<tr><td><span class="pc p-connector">Traduttore</span></td><td>La parte comune e le prove comuni sono della piattaforma; le pagine del dizionario per ogni modello sono del tecnico dei dispositivi</td><td>Le prove comuni sono verdi? In laboratorio: acceso il relè dal motore, arriva «eseguito»; staccato il relè, il comando dopo è «non raggiungibile»</td></tr>
+<tr><td><span class="pc p-motore">Motore</span>, rete privata, <span class="pc p-server">server</span>, <span class="pc p-sito">sito</span></td><td>Il gestore della piattaforma</td><td>I 16 scenari di prova sono verdi? Chi vede cosa, chi può fare cosa, cosa succede quando qualcosa non risponde. Un utente di un'altra organizzazione vede «non trovato»?</td></tr>
+<tr><td>Italianway</td><td>Italianway manda le prenotazioni; Flatsharing chiede il formato vero</td><td>Una prenotazione di prova fa nascere il pre-arrivo?</td></tr>
+</tbody></table>
+</section>
+
+<section id="sicurezza">
+<h2>8. Sicurezza, privacy, ruoli, backup e allarmi</h2>
+<h3 id="accessi">Chi può entrare</h3>
+<ol>
+<li><strong>Accesso personale</strong> con email e password, oppure con l'account Google. Ogni richiesta controlla l'accesso; se un accesso viene chiuso, l'effetto arriva entro 60 secondi.</li>
+<li><strong>Tre ruoli</strong> in ogni organizzazione: <strong>amministratore</strong> (gestisce utenti e regole), <strong>operatore</strong> (comanda; può vedere solo gli appartamenti che gli sono assegnati), <strong>sola lettura</strong> (guarda, non comanda).</li>
+<li><strong>Organizzazioni separate.</strong> Un'organizzazione non vede mai quelle degli altri. Un appartamento non visibile risponde «non trovato», come se non esistesse.</li>
+<li><strong>Il gestore della piattaforma non vede i dati delle organizzazioni.</strong> Per l'assistenza apre un accesso temporaneo (da 1 a 24 ore), visibile agli amministratori e registrato.</li>
+<li><strong>Gli ospiti non sono utenti.</strong> Il motore non riceve mai le email degli utenti: solo un codice anonimo.</li>
+<li><strong>Una chiave per ogni motore</strong>, custodita in una cassaforte di chiavi nel cloud. Senza la chiave giusta il motore non accetta richieste.</li>
+<li><strong>Sul broker:</strong> niente accessi anonimi, un utente per dispositivo, ogni dispositivo legge e scrive solo nelle sue caselle, dispositivi solo sulla linea cifrata. Ogni dispositivo ha la sua password, custodita nella stessa cassaforte di chiavi.</li>
+<li><strong>Una sola porta aperta.</strong> Da internet la centrale mostra solo la porta cifrata dei dispositivi; i motori ascoltano solo sulla rete interna.</li>
+<li><strong>Nessuna scorciatoia.</strong> Il server si rifiuta di partire in modalità di sviluppo (senza accesso vero) nell'app di prova e in quella vera.</li>
+<li><strong>Nei dispositivi:</strong> rete Wi-Fi di installazione spenta, canale di comando secondario spento, cloud del produttore non usato.</li>
+</ol>
+<h3 id="privacy">Privacy e conservazione dei dati</h3>
+<ul>
+<li>Dalle prenotazioni si tengono solo date, numero di ospiti e codici: mai nomi e contatti degli ospiti.</li>
+<li>Il registro dei messaggi ricevuti da Italianway dura 90 giorni.</li>
+<li>I riepiloghi settimanali si conservano 12 mesi.</li>
+<li>Nelle Decisioni il nome di chi ha comandato è visibile solo all'interno della sua organizzazione.</li>
+</ul>
+<h3 id="backup">Backup e allarmi</h3>
+<ul>
+<li><strong>Backup:</strong> una copia giornaliera dei dati dei motori, conservata 7 giorni, e una fotografia completa del disco della centrale, conservata 30 giorni.</li>
+<li><strong>Allarmi:</strong> undici allarmi via email a chi gestisce la piattaforma (elenco nella sezione <a href="#guasti">Quando qualcosa si guasta</a>).</li>
+<li><strong>Il certificato</strong> del broker si rinnova; se si perde non si ripristina da un backup, si rifà.</li>
+<li><strong>Un limite accettato:</strong> motori e broker stanno su una sola macchina. Se si ferma, si fermano tutti gli appartamenti insieme, finché non riparte; nel frattempo i dispositivi restano nello stato in cui sono.</li>
+</ul>
+</section>
+
+<section id="costi">
+<h2>9. Costi</h2>
+<p class="prose">Le cifre vengono dal listino di Google e dalla fatturazione reale. «Stimato» vuol dire calcolato dal listino; «misurato» vuol dire letto in fattura.</p>
+<h3>Costi del cloud, ogni mese, con tutto acceso</h3>
+<table class="t">
+<thead><tr><th>Voce</th><th>Costo indicativo</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>Server della web app (app vera)</td><td><strong>40–60 € al mese</strong></td><td>Sempre accesa almeno una copia, fino a 3 se serve. È la voce più grande</td></tr>
+<tr><td>Server dell'app di prova</td><td>Quasi zero</td><td>Si spegne da solo quando nessuno la usa</td></tr>
+<tr><td>Centrale (la macchina dei motori e del broker, con il suo disco)</td><td><strong>circa 16–18 € al mese</strong></td><td>Una sola macchina per tutti gli appartamenti; quanti ne regge si misura con una prova di carico</td></tr>
+<tr><td>Fotografie del disco della centrale (backup)</td><td>circa 0,3 € al mese</td><td>Conservate 30 giorni</td></tr>
+<tr><td>Disco separato per le chiavi del certificato</td><td>0,42 € al mese</td><td>Tenuto fuori dai backup, per sicurezza</td></tr>
+<tr><td>Indirizzo pubblico fisso della centrale, per i dispositivi</td><td>circa 3,3 € al mese</td><td>Ha sostituito un servizio di uscita verso internet che costava circa 4 € al mese</td></tr>
+<tr><td>Zona del dominio</td><td>circa 0,18 € al mese</td><td></td></tr>
+<tr><td>Assistente (modello di intelligenza artificiale)</td><td>circa 2 € al mese per appartamento, con 20 domande al giorno</td><td>Tetto di spesa <strong>20 € al mese</strong> per tutto il sistema; al massimo 50 domande al giorno per appartamento. Oltre il limite risponde l'assistente «a parole chiave»</td></tr>
+<tr><td>Database, cassaforte delle chiavi, registri, controlli, archivio dei programmi</td><td>meno di 1 € al mese</td><td>A consumo</td></tr>
+<tr><td>Pubblicazione del sito, notifiche, verifica in due passaggi</td><td>0 €</td><td>Gratuiti</td></tr>
+<tr><td><strong>Totale</strong></td><td><strong>circa 60 € al mese</strong></td><td>Proiezione con tutto acceso, dai costi reali</td></tr>
+</tbody></table>
+<h3>Costi misurati</h3>
+<ul class="prose">
+<li><strong>Dal 12 ottobre al 10 novembre 2026: 18,47 €</strong>, con il sistema quasi tutto spento per due settimane. Da lì viene la proiezione di circa 60 € al mese con tutto acceso.</li>
+<li><strong>Ottobre, fino al 23: 18,85 €</strong>, quasi tutti costi fissi di risorse sempre accese, non costi d'uso.</li>
+</ul>
+<h3>Costi una tantum e fuori dal cloud</h3>
+<table class="t">
+<thead><tr><th>Voce</th><th>Costo</th><th>Note</th></tr></thead>
+<tbody>
+<tr><td>Kit di laboratorio (Shelly, sensori, telecomando a infrarossi)</td><td><strong>131,30 €</strong>, una volta</td><td>Serve a provare ogni modello prima di usarlo negli appartamenti</td></tr>
+<tr><td>Dominio dell'indirizzo dei dispositivi</td><td>0 € il primo anno</td><td>Rinnovo annuale; il prezzo del rinnovo va controllato prima di novembre 2027</td></tr>
+</tbody></table>
+<h3>Controlli sulla spesa e crescita</h3>
+<ul class="prose">
+<li><strong>Budget di 50 € al mese</strong> sul cloud, con avvisi automatici al 50, 90 e 100 %.</li>
+<li><strong>Quando l'app non serve</strong> si può spegnere quasi tutto: restano solo disco, backup e chiavi, circa 0,2–0,3 € al giorno.</li>
+<li><strong>Con molti dispositivi</strong>, l'ingresso dei dispositivi passerà a un servizio di bilanciamento di Google, circa 16 € al mese in più, senza toccare i dispositivi.</li>
+<li><strong>Con molti appartamenti</strong>, servirà una centrale più grande o una seconda centrale: il punto lo dirà la prova di carico.</li>
+</ul>
+<p class="prose">Queste cifre non comprendono i dispositivi di ogni appartamento, il montaggio e la messa in servizio.</p>
+</section>
+
+<section id="faq">
+<h2>Domande frequenti</h2>
+<div class="qa">
+<p class="q">Quando si accende un dispositivo nuovo compare una rete Wi-Fi «Shelly…». Chi la vede?</p>
+<p>Solo chi è vicino, in casa. Serve alla prima installazione e va spenta alla fine della messa in servizio, altrimenti un ospite potrebbe collegarsi e cambiare le impostazioni. La centrale e la web app non la vedono: per loro un dispositivo esiste solo quando telefona al broker con il suo utente.</p>
+</div>
+<div class="qa">
+<p class="q">I nomi dei dispositivi che si vedono oggi nell'app, come «Presa stufetta camera», sono quelli veri?</p>
+<p>No: vengono dagli appartamenti dimostrativi, che hanno dispositivi finti. I nomi veri li scrive il tecnico dei dispositivi nel catalogo di ogni appartamento, guardando la casa reale. Il gestore può poi cambiarli dall'app.</p>
+</div>
+<div class="qa">
+<p class="q">Come si fanno le prove senza dispositivi veri?</p>
+<p>Con il traduttore simulato, che contiene dispositivi finti, e con la pagina Simulatore, che li muove. Per il motore il traduttore simulato e quello dei dispositivi veri sono intercambiabili. Tutte le prove automatiche usano dispositivi simulati; con i dispositivi veri si prova in laboratorio e poi in appartamento.</p>
+</div>
+<div class="qa">
+<p class="q">Perché collegare un nuovo modello di dispositivo non è immediato?</p>
+<p>Ogni modello parla un suo dialetto. Il traduttore ha una parte comune (l'interprete) e una pagina di dizionario per ogni modello. Ogni pagina nuova va scritta, provata in laboratorio con messaggi veri e descritta nel catalogo. Il telecomando a infrarossi è il caso più diverso, perché non è uno Shelly.</p>
+</div>
+<div class="qa">
+<p class="q">Se tutto è automatico, a che cosa serve l'«ID Italianway» nella scheda dell'appartamento?</p>
+<p>Serve proprio all'automatismo: collega il codice che Italianway usa per l'appartamento all'appartamento di DOMHOUSE. Senza, il server non sa a quale appartamento appartiene una prenotazione e la scarta.</p>
+</div>
+<div class="qa">
+<p class="q">Chi monta fisicamente i dispositivi?</p>
+<p>L'elettricista, tutti, anche le prese e i sensori a batteria. Il tecnico dei dispositivi li configura e scrive il catalogo.</p>
+</div>
+<div class="qa">
+<p class="q">Che cosa succede se tocco due volte «Accendi» in un secondo?</p>
+<p>Il motore esegue un comando alla volta per dispositivo, e lo stesso invio ripetuto entro 60 secondi non crea un secondo comando.</p>
+</div>
+<div class="qa">
+<p class="q">Perché quando una finestra spegne il clima non arriva una notifica?</p>
+<p>È voluto: succederebbe troppo spesso. La regola scrive una riga nelle Decisioni e il riepilogo del lunedì può citarla. Le notifiche sono riservate a ciò che chiede un'azione o segnala un guasto.</p>
+</div>
+<div class="qa">
+<p class="q">Se si ferma l'app, si ferma anche la casa?</p>
+<p>No. Il motore di ogni appartamento lavora da solo: regole, termostato e programmazioni vanno avanti. Chi gestisce la piattaforma riceve un'email di allarme.</p>
+</div>
+<div class="qa">
+<p class="q">Perché «accendi la caldaia» a volte non accende niente?</p>
+<p>Perché il pulsante non accende il relè: abilita il riscaldamento a una temperatura. Se la stanza è già più calda, il termostato non ha motivo di accendere. Lo farà quando la temperatura scende.</p>
+</div>
+</section>
+
+<section id="serve">
+<h2>Cosa serve ancora prima dell'uso negli appartamenti</h2>
+<h3 id="punto">A che punto è ogni pezzo</h3>
+<table class="t">
+<thead><tr><th>Pezzo</th><th>A che punto è</th></tr></thead>
+<tbody>
+<tr><td>Sito, server, motore, regole, approvazioni, riepilogo, assistente</td><td>Costruiti e provati con prove automatiche, con dispositivi simulati</td></tr>
+<tr><td>Aggiornamenti in diretta e notifiche</td><td>Costruiti e provati, ma non ancora su telefoni veri</td></tr>
+<tr><td>Broker e ingresso protetto</td><td>Installati nella centrale e provati, senza dispositivi veri. Da internet è aperta solo la porta cifrata dei dispositivi</td></tr>
+<tr><td>Traduttore dei dispositivi veri</td><td>Pronto per la presa Plug M Gen3 e provato con messaggi registrati da una presa vera; non ancora in uso in un motore. Mancano gli altri modelli</td></tr>
+<tr><td>Catalogo</td><td>Formato definito; da scrivere per ogni appartamento</td></tr>
+<tr><td>Dispositivi</td><td>Scelti e presenti in laboratorio; mai collegati alla centrale</td></tr>
+<tr><td>Collegamento con Italianway</td><td>Costruito e provato con il Simulatore; traduzione dei messaggi provvisoria</td></tr>
+<tr><td>Verifica in due passaggi per l'accesso</td><td>Decisa, da fare</td></tr>
+</tbody></table>
+<h3 id="elenco">L'elenco</h3>
+<ol>
+<li><strong>Primo dispositivo vero collegato alla centrale</strong>, con la verifica che accetti il certificato del broker. È la prova che sblocca tutte le altre.</li>
+<li><strong>Prova completa con dispositivi veri:</strong> dispositivo in linea; comando dal telefono, con il tempo fra il tocco e «eseguito»; misura del consumo; spina staccata, con «non in linea» subito, la notifica dopo i minuti della regola e il ritorno da solo. Con la stessa prova si verifica che i comandi viaggino non conservati.</li>
+<li><strong>Traduzione degli altri modelli di dispositivi:</strong> relè della caldaia con il legame al suo sensore; misuratore del climatizzatore; sensori Bluetooth con lo Shelly «ponte» (il catalogo deve saper descrivere un ponte con più sensori); telecomando a infrarossi, con il legame al misuratore e la misura di quanto sale il consumo dopo il comando.</li>
+<li><strong>Soglie di silenzio dei sensori a batteria</strong>, una per tipo, e il comportamento dei sensori quando cade il loro ponte.</li>
+<li><strong>Le regole provate una alla volta con i dispositivi veri:</strong> prima finestra e presa, poi caldaia e climatizzatore.</li>
+<li><strong>Esempi dei messaggi dei dispositivi</strong> confermati in laboratorio (oggi molti vengono dalla documentazione pubblica del produttore), compresa l'impostazione delle sessioni sui dispositivi e lo spegnimento del canale di comando secondario.</li>
+<li><strong>Il catalogo di ogni appartamento</strong>, con i nomi veri nello stile previsto.</li>
+<li><strong>Italianway:</strong> formato vero dei messaggi, chiave definitiva della firma, prova insieme, elenco dei codici degli appartamenti. Se Italianway non manda webhook, va costruita un'altra strada (calendario iCal o interrogazione a intervalli).</li>
+<li><strong>La procedura di messa in servizio scritta per intero</strong>, partendo da quello che si impara in laboratorio, compreso lo spegnimento della rete Wi-Fi di installazione.</li>
+<li><strong>Un modo sicuro per consegnare le chiavi d'accesso dei dispositivi</strong> a chi li configura, senza passare da chat o email.</li>
+<li><strong>L'accordo operativo con Flatsharing:</strong> elettricista, Wi-Fi di casa, accesso agli appartamenti, primo gruppo di appartamenti, chi gestisce il Wi-Fi di casa nel tempo.</li>
+<li><strong>Aggiornamenti in diretta e notifiche provati su telefoni veri</strong>, Android e iPhone.</li>
+<li><strong>Verifica in due passaggi</strong> per l'accesso all'app.</li>
+<li><strong>Prova di carico:</strong> quanti motori regge la centrale.</li>
+<li><strong>Revisione complessiva del codice</strong> prima della consegna.</li>
+<li><strong>A chi arrivano le email di allarme</strong> dopo la consegna, e chi ha i permessi di amministratore sulla centrale.</li>
+<li><strong>Da decidere:</strong> se cifrare i segnali dei sensori Bluetooth negli appartamenti; se l'antimuffa, oltre ad avvisare, debba anche deumidificare.</li>
+</ol>
+</section>
+
+<section id="glossario">
+<h2>Glossario</h2>
+<p>Nel testo i termini del glossario hanno una sottolineatura a puntini: la spiegazione compare passando con il mouse o toccando la parola.</p>
+<table class="t">
+<thead><tr><th>Termine</th><th>Significato in questo progetto</th></tr></thead>
+<tbody>
+<tr data-g="[Ss]ito|[Aa]pp"><td>App / sito</td><td>L'applicazione web installabile che usano i gestori, su telefono e computer</td></tr>
+<tr data-g="[Ss]erver"><td>Server</td><td>Il programma nel cloud di Google fra l'app e i motori: accesso, permessi, inoltro, notifiche, riepiloghi, prenotazioni</td></tr>
+<tr data-g="[Mm]otor[ei]"><td>Motore</td><td>Il programma che governa un appartamento: uno per appartamento, nella centrale, con i suoi dati</td></tr>
+<tr data-g="[Cc]entrale"><td>Centrale</td><td>La macchina virtuale nel cloud di Google su cui girano i motori e il broker</td></tr>
+<tr data-g="VM"><td>VM</td><td>Macchina virtuale: un computer «in affitto» dentro il cloud. In DOMHOUSE è la centrale</td></tr>
+<tr data-g="[Tt]raduttor[ei]|[Cc]onnector"><td>Traduttore (connector)</td><td>Il pezzo del motore che parla con i dispositivi e traduce i loro messaggi nella lingua del motore</td></tr>
+<tr data-g="[Bb]roker"><td>Broker</td><td>Il «centralino» MQTT nella centrale a cui si collegano i dispositivi e i traduttori</td></tr>
+<tr data-g="MQTT"><td>MQTT</td><td>Il linguaggio con cui dispositivi e traduttore si scambiano messaggi attraverso il broker. Funziona come una bacheca con tante caselle: chi scrive mette un messaggio in una casella, chi è iscritto lo riceve subito, il broker tiene la bacheca e controlla chi può scrivere dove</td></tr>
+<tr data-g="[Tt]opic"><td>Topic</td><td>L'«indirizzo» di una casella MQTT, per esempio &lt;appartamento&gt;/&lt;dispositivo&gt;/rpc</td></tr>
+<tr data-g="QoS \d"><td>QoS</td><td>Il modo di consegna di un messaggio MQTT. QoS 0, «non conservato»: chi è scollegato non lo riceve più tardi. QoS 1, «conservato»: arriva almeno una volta, con possibili doppioni</td></tr>
+<tr data-g="TLS"><td>TLS</td><td>La cifratura dei collegamenti, la stessa delle pagine web con il lucchetto. Si basa su un certificato</td></tr>
+<tr data-g="[Cc]atalogo"><td>Catalogo</td><td>L'elenco dei dispositivi di un appartamento: per ogni codice di fabbrica il nome che vede il gestore, la stanza, che cosa fa, i legami</td></tr>
+<tr data-g="[Cc]odic[ei] di fabbrica"><td>Codice di fabbrica</td><td>L'identificativo unico di un apparecchio, scritto dal produttore. È anche il suo nome sul broker; il gestore non lo vede mai</td></tr>
+<tr data-g="[Ff]irmware"><td>Firmware</td><td>Il programma del produttore dentro ogni dispositivo</td></tr>
+<tr data-g="[Cc]apacità"><td>Capacità</td><td>Una delle otto cose che un dispositivo sa fare o misurare: interruttore, misuratore, clima, caldaia, temperatura, umidità, contatto, movimento</td></tr>
+<tr data-g="Decision[ei]"><td>Decisione</td><td>Una riga del registro del motore: chi ha fatto cosa, perché e con che esito. Si vede nella pagina «Decisioni»</td></tr>
+<tr data-g="[Aa]pprovazion[ei]"><td>Approvazione</td><td>Una domanda del motore al gestore prima di agire; scade dopo 30 minuti con un esito già previsto</td></tr>
+<tr data-g="[Ff]orzatur[ae]"><td>Forzatura</td><td>Una modalità fissata a mano per 30 minuti, 2 ore o 6 ore (al massimo 12 ore); sospende alcune regole</td></tr>
+<tr data-g="[Mm]odalità(?! di sviluppo)"><td>Modalità</td><td>Comfort, eco o casa vuota: decide temperature e clima dell'appartamento</td></tr>
+<tr data-g="[Pp]rogrammazion[ei]"><td>Programmazione</td><td>Un'azione a un orario (pre-arrivo, check-out, a mano o dall'assistente)</td></tr>
+<tr data-g="[Rr]egol[ae]"><td>Regola</td><td>Uno degli otto comportamenti automatici fissi, con soglie modificabili</td></tr>
+<tr data-g="[Oo]rganizzazion[ei]"><td>Organizzazione</td><td>Un'azienda cliente con i suoi utenti e appartamenti, per esempio Flatsharing; i dati non si mescolano</td></tr>
+<tr data-g="[Gg]estore della piattaforma"><td>Gestore della piattaforma</td><td>Chi gestisce DOMHOUSE: crea le organizzazioni, gli appartamenti e i motori, apre gli accessi di assistenza, senza vedere i dati delle organizzazioni</td></tr>
+<tr data-g="[Dd]imostrativ[oi]"><td>Dimostrativo</td><td>Un appartamento finto, con dispositivi simulati, per prove e dimostrazioni; esiste solo nell'app di prova</td></tr>
+<tr data-g="Simulatore"><td>Simulatore</td><td>La pagina, per gli amministratori, che muove i dispositivi finti (finestre, movimento, dispositivi staccati, prenotazioni)</td></tr>
+<tr data-g="[Ss]tream"><td>Stream</td><td>La linea aperta su cui arrivano gli aggiornamenti in diretta</td></tr>
+<tr data-g="[Cc]ontratto"><td>Contratto</td><td>Il documento tecnico che fissa come due pezzi si parlano (app e motore, oppure motore e traduttore); non si cambia alla leggera</td></tr>
+<tr data-g="[Cc]odice di tracciamento"><td>Codice di tracciamento</td><td>Il codice che accompagna ogni richiesta dal sito fino al dispositivo, mostrato anche negli errori</td></tr>
+<tr data-g="[Ww]ebhook"><td>Webhook</td><td>La chiamata con cui Italianway avvisa il server di una prenotazione nuova, cambiata o annullata</td></tr>
+<tr data-g="iCal"><td>iCal</td><td>Un formato standard di calendario: contiene le date delle prenotazioni, non il numero di ospiti</td></tr>
+</tbody></table>
+</section>
+</main>
+
+<a class="top" href="#top" aria-label="Torna all'inizio">↑ Inizio</a>
+<div id="tip" role="tooltip"></div>
+<script>
+(function(){
+"use strict";
+var main=document.querySelector('main');
+/* etichette delle colonne per la vista stretta */
+document.querySelectorAll('table.t').forEach(function(t){
+  var h=[].map.call(t.querySelectorAll('thead th'),function(x){return x.textContent.trim()});
+  t.querySelectorAll('tbody tr').forEach(function(r){[].forEach.call(r.cells,function(c,i){if(h[i])c.setAttribute('data-l',h[i])})});
+});
+/* indice: evidenzia la sezione che si sta leggendo */
+var links=[].slice.call(document.querySelectorAll('#idx a')),map={};
+links.forEach(function(a){map[a.getAttribute('href').slice(1)]=a});
+var targets=Object.keys(map).map(function(id){return document.getElementById(id)}).filter(Boolean);
+function spy(){
+  var y=window.scrollY+window.innerHeight*0.25,cur=targets[0];
+  targets.forEach(function(t){if(t.getBoundingClientRect().top+window.scrollY<=y)cur=t});
+  links.forEach(function(a){a.classList.remove('on');a.removeAttribute('aria-current')});
+  if(cur){var a=map[cur.id];a.classList.add('on');a.setAttribute('aria-current','true');
+    var p=a.closest('#idx');if(p&&p.scrollHeight>p.clientHeight&&getComputedStyle(p).position==='fixed'){var r=a.offsetTop;if(r<p.scrollTop||r>p.scrollTop+p.clientHeight-40)p.scrollTop=r-80}}
+}
+var tick=false;window.addEventListener('scroll',function(){if(!tick){tick=true;requestAnimationFrame(function(){spy();tick=false})}},{passive:true});spy();
+/* glossario */
+var terms=[];
+document.querySelectorAll('#glossario tr[data-g]').forEach(function(r){
+  try{
+    var c=r.cells[1].cloneNode(true);c.querySelectorAll('.upd').forEach(function(u){u.remove()});
+    terms.push({re:new RegExp('(?<![\\p{L}\\p{N}_-])(?:'+r.getAttribute('data-g')+')(?![\\p{L}\\p{N}_])','u'),t:r.cells[0].textContent.trim(),d:c.textContent.trim()});
+  }catch(e){}
+});
+var SKIP='script,style,code,pre,a,nav,h1,h2,h3,h4,th,svg,button,time,dt,.tg,.upd,.opn,.sim,.src,.st,.g,.num,.node,.ex,.pc,.nog,#glossario,#fonti,.mn,.key';
+var BL='p,li,td,dd';
+if(terms.length){
+  main.querySelectorAll(BL).forEach(function(b){
+    var seen={},w=document.createTreeWalker(b,4,null),ns=[],n;
+    while((n=w.nextNode())){var pe=n.parentElement;if(!pe||pe.closest(SKIP))continue;if(pe.closest(BL)!==b)continue;ns.push(n)}
+    ns.forEach(function(node){
+      var guard=0;
+      while(node&&guard++<40){
+        var s=node.nodeValue,best=null,bi=-1;
+        for(var i=0;i<terms.length;i++){if(seen[i])continue;var m=terms[i].re.exec(s);if(m&&(best===null||m.index<best.index||(m.index===best.index&&m[0].length>best[0].length))){best=m;bi=i}}
+        if(!best)break;
+        seen[bi]=1;
+        var mid=node.splitText(best.index),rest=mid.splitText(best[0].length);
+        var sp=document.createElement('span');sp.className='g';sp.tabIndex=0;sp.setAttribute('data-g',bi);sp.setAttribute('aria-describedby','tip');
+        mid.parentNode.replaceChild(sp,mid);sp.appendChild(mid);node=rest;
+      }
+    });
+  });
+}
+var tip=document.getElementById('tip'),cur=null;
+function show(el){
+  var t=terms[+el.getAttribute('data-g')];if(!t)return;cur=el;
+  tip.textContent='';var b=document.createElement('b');b.textContent=t.t;tip.appendChild(b);tip.appendChild(document.createTextNode(t.d));
+  tip.style.display='block';
+  var r=el.getBoundingClientRect(),tw=tip.offsetWidth,th=tip.offsetHeight,vw=document.documentElement.clientWidth;
+  var x=Math.max(8,Math.min(r.left,vw-tw-8))+window.scrollX,y=r.bottom+6;
+  if(y+th>window.innerHeight&&r.top-th-6>0)y=r.top-th-6;
+  tip.style.left=x+'px';tip.style.top=(y+window.scrollY)+'px';
+}
+function hide(){tip.style.display='none';cur=null}
+document.addEventListener('mouseover',function(e){var g=e.target.closest&&e.target.closest('.g');if(g)show(g)});
+document.addEventListener('mouseout',function(e){var g=e.target.closest&&e.target.closest('.g');if(g)hide()});
+document.addEventListener('focusin',function(e){var g=e.target.closest&&e.target.closest('.g');if(g)show(g)});
+document.addEventListener('focusout',function(e){if(e.target.closest&&e.target.closest('.g'))hide()});
+document.addEventListener('click',function(e){var g=e.target.closest&&e.target.closest('.g');if(g){if(cur===g&&e.detail===0)hide();else show(g)}else hide()});
+document.addEventListener('keydown',function(e){if(e.key==='Escape')hide()});
+})();
+</script>
+</body>
+</html>

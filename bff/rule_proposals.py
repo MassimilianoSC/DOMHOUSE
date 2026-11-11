@@ -48,7 +48,9 @@ MEANING = {
                         "e il clima scaldano a comfort_celsius, il clima raffresca a comfort_cool_celsius; in eco la "
                         "caldaia sta a eco_celsius"),
     "frost_protection": "con la casa vuota mantiene almeno celsius gradi",
-    "mold_protection": "con la casa vuota deumidifica sopra humidity_percent di umidità",
+    # verification of 10 November 2026: it said «deumidifica», but the engine only warns (engine/mold.py)
+    "mold_protection": ("con la casa vuota, se l'umidità supera humidity_percent, registra un avviso nelle Decisioni, al "
+                        "massimo uno al giorno; non deumidifica da sola"),
     "prearrival": "porta la casa in comfort hours_before ore prima dell'arrivo degli ospiti",
     "checkout_eco": ("passa a casa vuota minutes_after minuti dopo il check-out; se il sensore di movimento ha visto "
                      "qualcuno negli ultimi presence_minutes minuti dopo l'orario di partenza, chiede prima al gestore"),

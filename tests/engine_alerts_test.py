@@ -1,4 +1,5 @@
-"""scripts/monitoring/engine-alerts.sh and its policies (P-60 step 10c, D-104, D-148): the seven policy files are valid,
+"""scripts/monitoring/engine-alerts.sh and its policies (P-60 step 10c, D-104, D-148): the eight policy files (the
+broker's three included, D-209) are valid,
 their filters and label extractors match the real lines of engine-vm.sh check-all (with or without the PID rsyslog may
 add to the tag), and the script creates only what is missing (DRY_RUN creates nothing), with gcloud replaced by a
 stand-in that records what it is asked."""
@@ -25,10 +26,10 @@ def regex_of(flt: str) -> str:
     return re.search(r'=~"((?:[^"\\]|\\.)*)"', flt).group(1).replace("\\\\", "\\")
 
 
-def test_seven_policies_on_the_bff_channel():
+def test_eight_policies_on_the_bff_channel():
     found = policies()
     assert set(found) == {"vm-muta.json", "motore-muto.json", "motore-errori.json", "backup-mancato.json", "disco-vm.json",
-                          "broker-giu.json", "broker-certificato.json"}
+                          "broker-giu.json", "broker-certificato.json", "broker-accessi-rifiutati.json"}
     for name, p in found.items():
         assert p["displayName"].startswith("Motori: ") and p["notificationChannels"] == ["__CHANNEL__"], name
         assert p["severity"] in ("CRITICAL", "ERROR", "WARNING") and p["documentation"]["content"], name
@@ -36,6 +37,7 @@ def test_seven_policies_on_the_bff_channel():
     assert found["motore-muto.json"]["alertStrategy"]["notificationRateLimit"]["period"] == "1800s"
     assert found["motore-errori.json"]["alertStrategy"]["notificationRateLimit"]["period"] == "1800s"
     assert found["backup-mancato.json"]["alertStrategy"]["notificationRateLimit"]["period"] == "43200s"
+    assert found["broker-accessi-rifiutati.json"]["alertStrategy"]["notificationRateLimit"]["period"] == "3600s"
     threshold = found["disco-vm.json"]["conditions"][0]["conditionThreshold"]
     assert (threshold["thresholdValue"], threshold["comparison"], threshold["duration"]) == (80, "COMPARISON_GT", "600s")
 
@@ -57,12 +59,19 @@ def test_the_filters_match_the_watchs_real_lines(tag):
     assert re.search(re.search(r'"(.*)"', backup["labelExtractors"]["apartment"]).group(1), line).group(1) == "dev"
     summary = re.search(r"METRIC_FILTER='(.*)'", SCRIPT.read_text(encoding="utf-8")).group(1)
     assert re.search(regex_of(summary), f"{HOST}{tag}domhouse-check: 3 motori, 0 muti")
+    # the check service's own copy of its output («bash[pid]: …», until StandardOutput=null) is never counted
+    copy = f"{HOST}bash[105352]: "
+    assert not re.search(regex_of(summary), f"{copy}domhouse-check: 3 motori, 0 muti")
+    assert not re.search(regex_of(silent["filter"]), f"{copy}engine silent dev (nessuna risposta, codice 000)")
     down = found["broker-giu.json"]["conditions"][0]["conditionMatchedLog"]["filter"]
     expiring = found["broker-certificato.json"]["conditions"][0]["conditionMatchedLog"]["filter"]
     assert re.search(regex_of(down), f"{HOST}{tag}broker down (container: assente, porta TLS: muta)")
     assert re.search(regex_of(expiring), f"{HOST}{tag}broker cert expiring days=9")
     assert not re.search(regex_of(down), f"{HOST}{tag}broker ok cert_days=60")
     assert not re.search(regex_of(expiring), f"{HOST}{tag}broker ok cert_days=60")
+    refused = found["broker-accessi-rifiutati.json"]["conditions"][0]["conditionMatchedLog"]["filter"]
+    assert re.search(regex_of(refused), f"{HOST}{tag}broker auth refused hour=140 top_ip=203.0.113.7(120) top_client=lab-01.r1(118)")
+    assert not re.search(regex_of(refused), f"{HOST}{tag}broker ok cert_days=60")
     errors = found["motore-errori.json"]["conditions"][0]["conditionMatchedLog"]
     assert 'log_id("domhouse_engine")' in errors["filter"] and 'jsonPayload.level="error"' in errors["filter"]
 
@@ -105,7 +114,10 @@ def alerts(tmp_path):
     def run(dry=False):
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; '
                f'{"DRY_RUN=1 " if dry else ""}GCP_PROJECT_ID=progetto bash "{posix(SCRIPT)}"')
-        out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=60)
+        # one run starts about 40 processes (python3, gcloud, sed, mktemp for each of 8 policies): 5.3-6.5 s with the PC
+        # at rest (11 November), over 60 s in the full run of 10 November, with Docker and the other suites running.
+        # The limit is there only to catch a hang (risposta 885)
+        out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=300)
         calls = (stubs / "calls.log").read_text(encoding="utf-8") if (stubs / "calls.log").exists() else ""
         created = (stubs / "created.json").read_text(encoding="utf-8") if (stubs / "created.json").exists() else ""
         for f in ("calls.log", "created.json"):
@@ -119,12 +131,12 @@ def alerts(tmp_path):
 def test_dry_run_creates_nothing_and_the_real_run_creates_what_is_missing(alerts):
     out, calls, created = alerts(dry=True)
     assert out.returncode == 0, out.stderr
-    assert "create" not in calls and created == "" and out.stdout.count("(prova a secco) la creerei da") == 7
+    assert "create" not in calls and created == "" and out.stdout.count("(prova a secco) la creerei da") == 8
     out, calls, created = alerts()
     assert out.returncode == 0, out.stderr
-    assert "logging metrics create domhouse_check_runs" in calls and calls.count("policies create") == 7
-    assert "__CHANNEL__" not in created and created.count("notificationChannels/9514864875489091801") == 7
+    assert "logging metrics create domhouse_check_runs" in calls and calls.count("policies create") == 8
+    assert "__CHANNEL__" not in created and created.count("notificationChannels/9514864875489091801") == 8
     (alerts.stubs / "metric-exists").write_text("", encoding="utf-8")
     (alerts.stubs / "policies-exist").write_text("", encoding="utf-8")
     out, calls, created = alerts()                                      # again: everything exists, nothing changes
-    assert out.returncode == 0 and "create" not in calls and out.stdout.count("esiste già") == 8
+    assert out.returncode == 0 and "create" not in calls and out.stdout.count("esiste già") == 9

@@ -395,9 +395,11 @@ Tutte hanno il nome dell'appartamento davanti.
 |---|---|---|---|
 | «Approvazioni richieste» | «…: approvazione richiesta», con la proposta oppure «Il motore chiede il tuo consenso» | Quando il motore apre una richiesta (non per quelle in coda dietro un'altra) | «Approvazioni» |
 | «Dispositivi e sistema domotico offline» | «…: dispositivo offline», «… non risponde da oltre … minuti» | Dopo i minuti della regola «Avviso dispositivo offline» (15 all'inizio); regola spenta, niente avviso | «Panoramica» |
-| «Dispositivi e sistema domotico offline» | «…: sistema domotico non raggiungibile», «Il connettore domotico risulta fermo» | Sistema domotico fermo oltre la stessa soglia; una volta per episodio | «Panoramica» |
+| «Dispositivi e sistema domotico offline» | «…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall'app non arrivano e le regole automatiche potrebbero essere ferme.» | Sistema domotico fermo o irraggiungibile oltre la stessa soglia; una volta per episodio | «Panoramica» |
 | «Dispositivi e sistema domotico offline» | «…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo» | A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio | «Decisioni» |
 | «Prenotazioni» | «…: prenotazione annullata, appartamento rimesso a vuoto» | Disdetta dopo che l'appartamento era già stato preparato per l'arrivo | «Decisioni» |
+| «Prenotazioni» (pre-arrivo, check-out, casa vuota) oppure «Dispositivi e sistema domotico offline» (le altre) | «…: azione programmata non eseguita» con il motivo, oppure «N azioni programmate non eseguite. La prima: …» se più d'una entro un minuto; dopo uno spegnimento programmato «Durante la manutenzione N azioni programmate non sono state eseguite» | Un'azione programmata rifiutata alla sua ora o saltata perché il sistema era fermo (dal lotto 38); dopo uno spegnimento programmato le azioni saltate non arrivano una per una | «Programmazione» |
+| «Prenotazioni» | «…: pre-arrivo con comandi non riusciti» oppure «…: check-out con comandi non riusciti», con l'elenco dei dispositivi che non hanno eseguito e il motivo | Un pre-arrivo o un check-out partito ma con qualche comando non riuscito, anche per un dispositivo offline in quel momento (dal lotto 39) | «Programmazione» |
 | «Riepilogo» | «…: riepilogo della settimana», con la prima segnalazione e «E altre … voci.» | Il lunedì mattina, solo se la settimana ha qualcosa da segnalare | Il riepilogo di quella settimana |
 
 > **Da sapere**
@@ -566,7 +568,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | Cosa vedi | Cosa vuol dire |
 |---|---|
 | La pillola «In attesa» (la scelta è scritta in scuro) | Le richieste aperte |
-| La pillola «Tutte» | Anche quelle decise negli ultimi 7 giorni |
+| La pillola «Tutte» | Anche quelle decise negli ultimi 7 giorni, contati dalla mezzanotte, più quelle di oggi |
 | In alto: lo stato, poi chi la propone e la data | «In attesa», «Approvata», «Respinta», «Scaduta»; «Motore AI», «Regola», «Assistente», «Modulo» |
 | La descrizione, in grande | Che cosa chiede |
 | «Perché il motore lo propone», con il testo sotto | Il motivo, senza riquadro |
@@ -576,6 +578,13 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | Sotto una riga: «Nota (facoltativa)» e i pulsanti | Solo nelle richieste in attesa, per chi può decidere |
 | In fondo: «Approvata da … …» o «Respinta da … …» con la nota, poi l'«ID richiesta» | Solo nelle richieste già decise o scadute |
 | «Nessuna approvazione in attesa» o «Nessuna approvazione negli ultimi 7 giorni» | Non c'è nulla |
+
+> **Da sapere** (dal lotto 38)
+>
+> - **Se approvi un'azione che il sistema non può eseguire subito** (dispositivo offline, collegamento ai
+>   dispositivi assente, azione non più valida), nelle Decisioni compare una riga «Non riuscita»: «Azione approvata ma
+>   non eseguita: …» con il motivo. L'approvazione resta «Approvata».
+> - **Lo stesso succede** quando un'approvazione scade e si approva da sola.
 
 > **Da sapere**
 >
@@ -939,7 +948,8 @@ Nelle Decisioni compare «Approvazione scaduta».
 
 «Nuova azione» apre «Programma un'azione» («L'azione verrà eseguita dal motore all'orario indicato (ora di …).»).
 
-1. **Compila «Quando»**: un orario futuro, nel fuso dell'appartamento.
+1. **Compila «Quando»**: un orario futuro, sempre nell'ora dell'appartamento, come dice la scritta sopra («ora di …»),
+   anche se il telefono o il computer è su un altro fuso. Il campo propone fra un'ora.
 2. **Scegli «Cosa fare»**: «Cambia modalità» oppure «Comando a un dispositivo».
 3. **Con «Cambia modalità»** scegli «Modalità»: «comfort», «eco», «casa vuota».
 4. **Con «Comando a un dispositivo»** scegli «Dispositivo» e «Comando» (tabella sotto).
@@ -955,6 +965,16 @@ Nelle Decisioni compare «Approvazione scaduta».
 > - **Un orario passato** dà «L'orario deve essere nel futuro».
 > - **Un cambio di modalità programmato** durante una forzatura aspetta la sua fine.
 
+**Nelle due notti del cambio d'ora** (dal lotto 37) sotto «Quando» compare una riga, e si salva lo stesso:
+
+| Ora scelta | Riga sotto «Quando» | Quando verrà eseguita |
+|---|---|---|
+| Un'ora che non esiste (a marzo, dalle 02:00 alle 02:59) | «Il 28 marzo 2027 le 02:30 non esistono: quella notte gli orologi vanno avanti. L'azione verrà eseguita alle 03:30.» | Un'ora dopo: le 02:30 diventano le 03:30 |
+| Un'ora che capita due volte (a ottobre, dalle 02:00 alle 02:59) | «Il 31 ottobre 2027 le 02:30 capitano due volte: quella notte gli orologi tornano indietro. L'azione verrà eseguita la prima volta.» | La prima volta, ancora con l'ora legale |
+
+- **Data e ore della riga** sono quelle che hai scelto.
+- **Negli altri giorni** non compare nessuna riga.
+
 ### Programmazione: spostare o annullare un'azione
 
 **Cambiare l'orario di un'azione in programma, o annullarla.**
@@ -962,7 +982,7 @@ Nelle Decisioni compare «Approvazione scaduta».
 **«Sposta»**, su una voce in programma:
 
 - **Apre «Sposta l'azione»**: cambia «Quando» e premi «Salva» («Orario aggiornato»).
-- **Il modulo parte** da un'ora dopo adesso, non dall'orario salvato: controlla la data.
+- **Il modulo parte** dalla data e dall'ora attuali dell'azione (dal lotto 37).
 - **Si possono spostare** anche le azioni nate da una prenotazione; una modifica della prenotazione può
   ricalcolarle.
 
@@ -1563,6 +1583,8 @@ una prenotazione vera fino al motore dell'appartamento. Ripetere lo stesso invio
 1. **Scegli «Tipo evento»**: «Prenotazione creata», «Prenotazione modificata», «Prenotazione annullata», «Check-in
    effettivo», «Check-out effettivo».
 2. **Compila «ID prenotazione»**, «Check-in», «Check-out», «Ospiti».
+   Check-in e check-out sono nell'ora dell'appartamento, come dice la riga sotto i campi («Check-in e check-out sono
+   nell'ora dell'appartamento (…).»); i valori proposti sono domani alle 15:00 e fra tre giorni alle 10:00.
 3. **Premi «Invia evento»**: leggi «Evento prenotazione inoltrato» e «… azioni programmate».
 
 > **Da sapere**
@@ -1868,8 +1890,12 @@ tolti).»
 - **«BFF non raggiungibile»**: server dell'app fermo per 5 minuti, con l'email di chiusura quando torna.
 - **«BFF: scrittura non riuscita»**.
 - **«Motori: VM muta»**, «Motori: motore muto o giù».
-- **«Motori: righe di errore»**, «Motori: backup mancato».
+- **«Motori: righe di errore»**, «Motori: backup mancato». Dal lotto 38 un errore interno del ciclo del motore
+  compare nel log come «engine loop step failed» e fa partire «Motori: righe di errore»; il motore continua con gli
+  altri compiti.
 - **«Motori: disco della VM oltre l'80 %»**.
+- **Accesso di sviluppo rifiutato** (dal lotto 38): il server non parte se in staging o in produzione è impostato
+  l'accesso di sviluppo, o se su Cloud Run manca l'ambiente; nel log c'è «development setting refused» con il motivo.
 
 > **Da sapere**
 >
@@ -1960,6 +1986,11 @@ all'amministratore. Non serve un'approvazione preventiva.
 
 **Dalla prenotazione al check-in, con il pre-arrivo automatico.**
 
+> **Da sapere**
+>
+> Con le prenotazioni reali di Italianway il pre-arrivo automatico e il risparmio al check-out non sono ancora
+> disponibili: Italianway deve ancora mandare il formato vero dei suoi messaggi. Oggi funzionano con il Simulatore.
+
 1. **La prenotazione arriva** da Italianway (o dal Simulatore, nei dimostrativi). Nelle Decisioni leggi «Prenotazione
    creata».
 2. **In «Programmazione»** compare l'azione «pre-arrivo» con origine «prenotazione»: comfort 2 ore prima del check-in
@@ -2020,9 +2051,14 @@ all'amministratore. Non serve un'approvazione preventiva.
 
 - **La striscia di salute** dice «Ferma» e «Sistema domotico non raggiungibile».
 - **Compare l'avviso** «Sistema domotico non raggiungibile».
-- **Dopo la stessa soglia** arriva la notifica «…: sistema domotico non raggiungibile», «Il connettore domotico
-  risulta fermo».
-- **Nelle Decisioni**: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi ripristinato».
+- **Dopo la stessa soglia** arriva una sola notifica «…: sistema domotico non raggiungibile». Dice «Il connettore
+  domotico risulta fermo» se il sistema risponde ma ha perso i dispositivi; dal lotto 38 dice «Il sistema domotico
+  non risponde da N minuti: …» se non risponde affatto (macchina spenta, rete interrotta).
+- **Nelle Decisioni**, nel primo caso: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi
+  ripristinato». Nel secondo caso (dal lotto 38), dopo un fermo più lungo della soglia: «Sistema domotico di nuovo
+  raggiungibile dopo …», con la durata.
+- **Durante uno spegnimento programmato** HQE sospende questi avvisi fino a una data e ora: dopo quell'ora, se il
+  sistema è ancora fermo, l'avviso arriva. Gli avvisi «dispositivo offline» non si sospendono.
 - **Non arriva** una notifica di ritorno online.
 
 ### Approvare una richiesta
@@ -2136,8 +2172,7 @@ Vedi la parte 5, «Approvazioni: approvare o respingere». In breve:
 
 > **Da sapere**
 >
-> Nel sito vero, fino alla consegna al cliente, i dimostrativi con il motore simulato integrato sono ammessi come
-> nell'ambiente di prova.
+> Nel sito vero i dimostrativi non si possono creare: si provano nell'ambiente di prova (dal 9 novembre 2026).
 
 ### Quando qualcosa non funziona
 
@@ -2237,7 +2272,16 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 **L'effetto reale di ogni regola, oltre la descrizione.**
 
 - **«Finestra aperta spegne il clima»**: spegne clima e riscaldamento di tutto l'appartamento, non solo della
-  stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte.
+  stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte. Dal lotto 38, se il sistema
+  domotico si riavvia con una finestra aperta, la regola riparte da sola: il clima si spegne allo scadere dei minuti
+  contati da quando la finestra si è aperta; se si è aperta mentre il sistema era fermo, dalla ripartenza.
+  Quando la modalità comfort accende un climatizzatore dopo la pausa del compressore, il climatizzatore resta regolato
+  dal comfort (dal lotto 39).
+  **Alla chiusura della finestra riscaldamento e clima riprendono da soli** (dal lotto 38): quando si chiude l'ultima
+  finestra aperta, caldaia e clima tornano a seguire la modalità; un dispositivo acceso a mano torna com'era; se
+  nel frattempo qualcuno l'ha comandato, resta come l'ha lasciato. Con una forzatura attiva non si ripristina niente.
+  Il ritorno avviene circa un minuto dopo la chiusura; la caldaia può aspettare qualche minuto in più per il minimo
+  fra due accensioni. Nelle Decisioni compare «Finestra chiusa: … riacceso».
 - **«Antigelo a casa vuota»**: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
   0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve
   un sensore: senza, «Antigelo non attivo».
@@ -2339,8 +2383,9 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 - **Quando**: ogni lunedì dalle 8 (ora dell'appartamento), per la settimana da lunedì a domenica.
 - **Consumi**: per notte con ospiti e per notte vuota, confrontati con la mediana delle 4 settimane prima («Alto»
   solo con almeno il 30 % in più e almeno 5 kWh di eccedenza).
-- **Segnalazioni**: dispositivi offline da più di 24 ore, approvazioni scadute senza risposta, finestre aperte
-  almeno 3 volte con il clima spento dalla regola.
+- **Segnalazioni**: dispositivi offline da più di 24 ore, approvazioni scadute senza risposta (tutte quelle della
+  settimana, da lunedì a domenica, anche quelle del lunedì mattina; dal lotto 38), finestre aperte almeno 3 volte con
+  il clima spento dalla regola.
 - **Notifica**: se c'è almeno una segnalazione arriva la notifica «Riepilogo».
 - **Settimana senza novità**: il riepilogo dice «Settimana senza novità» e non manda avvisi.
 
@@ -2402,13 +2447,20 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | «Non hai i permessi per accedere. Chiedi un invito.» | L'account esiste ma nessuno ti ha invitato in questo ambiente (un invito nell'ambiente di prova non vale nel sito vero) | Chiedi un invito a un amministratore |
 | «Conferma il tuo indirizzo: abbiamo inviato un link a …. Aprilo e poi accedi di nuovo.» | Il tuo indirizzo non è ancora confermato | Apri il link nell'email, poi accedi di nuovo |
 | «Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto.» | L'email di conferma non è partita | Riprova tra qualche minuto |
-| «Impossibile caricare il profilo, riprova tra poco» | Il server non risponde | Riprova dopo qualche minuto |
+| «Impossibile caricare il profilo, riprova tra poco» | Il server ha rifiutato per un momento la richiesta (per esempio troppe richieste) | Riprova dopo qualche minuto |
 | «Controllo dell'accesso non disponibile: riprova tra poco» | Il controllo dell'accesso non ha risposto in tempo; la sessione resta valida | Riprova dopo qualche minuto |
-| «Non riesco ad aprire la pagina» con «Controlla la connessione e premi Ricarica. Se il problema resta, contatta HQE.» | L'app non si è aperta entro 15 secondi, o una pagina ha dato un errore (dal lotto 37) | Premi «Ricarica»; se la risposta arriva poco dopo, l'app si apre da sola |
+| «Sei senza connessione» con «La pagina si riapre da sola quando torna la connessione.» | Il telefono o il computer non ha rete: modalità aereo, Wi-Fi e dati spenti (dal lotto 37) | Riattiva la rete: la pagina si riapre da sola dopo un istante |
+| «Il servizio non risponde, riprova fra poco» con «Premi Ricarica fra qualche minuto. Se il problema resta, contatta HQE.» | La rete c'è, ma il servizio DOMHOUSE ha risposto con un errore (dal lotto 37) | Premi «Ricarica» fra qualche minuto; se il problema resta, contatta HQE |
+| «Non riesco ad aprire la pagina» con «Controlla la connessione e premi Ricarica. Se il problema resta, contatta HQE.» | L'app non capisce se manca la rete o il servizio (per esempio un Wi-Fi senza internet), non si è aperta entro 15 secondi, o una pagina ha dato un errore (dal lotto 37) | Controlla la connessione e premi «Ricarica»; se la risposta arriva poco dopo, l'app si apre da sola |
 | «Server non raggiungibile» dopo un'attesa | Il server non ha risposto entro 30 secondi, oppure 90 per assistente, proposte di regole, inviti, copia delle regole, verifica della connessione ed Excel (dal lotto 37) | Riprova; se era un comando, controlla prima se è già stato eseguito |
 | «La tua organizzazione non è attiva: contatta HQE.» | L'organizzazione non è ancora pronta | Contatta HQE |
 | «La tua organizzazione è sospesa: l'app non è disponibile. Per informazioni contatta l'assistenza HQE.» | HQE ha sospeso la tua organizzazione | Contatta l'assistenza HQE |
 | «Indirizzo email non valido» | L'email scritta non è un indirizzo | Correggi l'indirizzo |
+
+**Con le tre pagine «Sei senza connessione», «Il servizio non risponde» e «Non riesco ad aprire la pagina»:**
+
+- **Resti dentro:** non serve riscrivere la password e le notifiche restano attive.
+- **Non c'è «Esci»:** per uscire dall'account aspetta che la pagina si riapra.
 
 ### In tutte le pagine
 

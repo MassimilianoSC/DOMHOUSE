@@ -52,15 +52,21 @@ def test_energy_days_start_at_local_midnight(monkeypatch, first, last, starts):
         assert datetime.fromisoformat(s["ts"].replace("Z", "+00:00")).astimezone(ROME).time().hour == 0
 
 
-@pytest.mark.parametrize("now_local, text, expected_utc", [
-    # 02:30 on 29 March does not exist (02:00 -> 03:00): the action runs at 03:30 local time, 01:30 UTC
-    (datetime(2026, 3, 28, 20, 0), "alle 2:30 metti eco", "2026-03-29T01:30:00.000Z"),
+@pytest.mark.parametrize("now_local, text, expected_utc, said", [
+    # 02:30 on 29 March does not exist (02:00 -> 03:00): the action runs at 03:30 local time, 01:30 UTC, and the
+    # answer says so (D-212: it used to say «alle 02:30»)
+    (datetime(2026, 3, 28, 20, 0), "alle 2:30 metti eco", "2026-03-29T01:30:00.000Z",
+     "alle 03:30: quel giorno le 02:30 non esistono, per il passaggio all'ora legale."),
     # 02:30 on 25 October happens twice: the first one, in summer time (00:30 UTC)
-    (datetime(2026, 10, 24, 20, 0), "alle 2:30 metti eco", "2026-10-25T00:30:00.000Z"),
+    (datetime(2026, 10, 24, 20, 0), "alle 2:30 metti eco", "2026-10-25T00:30:00.000Z",
+     "alle 02:30, la prima delle due volte (ancora con l'ora legale)."),
     # an ordinary hour the day after the change: local time, the new offset
-    (datetime(2026, 10, 25, 20, 0), "alle 18 metti eco", "2026-10-26T17:00:00.000Z"),
+    (datetime(2026, 10, 25, 20, 0), "alle 18 metti eco", "2026-10-26T17:00:00.000Z", "alle 18:00."),
+    # the next change, 28 March 2027
+    (datetime(2027, 3, 27, 21, 0), "alle 2:15 metti eco", "2027-03-28T01:15:00.000Z",
+     "alle 03:15: quel giorno le 02:15 non esistono, per il passaggio all'ora legale."),
 ])
-def test_assistant_hours_are_the_apartments_local_hours(monkeypatch, now_local, text, expected_utc):
+def test_assistant_hours_are_the_apartments_local_hours(monkeypatch, now_local, text, expected_utc, said):
     at(monkeypatch, now_local.replace(tzinfo=ROME))
     e = engine()
     monkeypatch.setattr(core.asyncio, "sleep", _no_wait)
@@ -73,6 +79,7 @@ def test_assistant_hours_are_the_apartments_local_hours(monkeypatch, now_local, 
     assert answer["status"] == "answered", answer
     item = e.schedule[answer["actions"][0]["schedule_id"]]
     assert item["run_at"] == expected_utc and item["action"] == {"type": "apartment_mode", "mode": "eco"}
+    assert answer["answer"] == f"Ho programmato la modalità eco {said}", answer["answer"]
 
 
 async def _no_wait(_seconds):
@@ -92,6 +99,39 @@ def test_actions_due_together_run_once_in_creation_order(monkeypatch):
     assert e.schedule[first["schedule_id"]]["status"] == e.schedule[second["schedule_id"]]["status"] == "done"
     modes = [d["new_value"] for d in e.decisions if d["action"] == "set_mode"]
     assert modes == ["eco", "comfort"] and e.mode == "comfort"     # the older first, the newer wins; each once
+
+
+def test_d212_an_action_at_0230_on_the_autumn_night_runs_once_whoever_planned_it(monkeypatch):
+    """D-212, the committente's request: on 25 October 2026 02:30 comes twice (00:30 and 01:30 UTC). An action for
+    02:30 runs once, not at both: from the app (one UTC instant), the assistant (the first 02:30) and a booking (the
+    check-out at 02:00 winter time plus 30 minutes falls on the second). The clock goes through the whole night."""
+    clock = {"now": datetime(2026, 10, 24, 20, 0, tzinfo=UTC)}
+    monkeypatch.setattr(core, "utcnow", lambda: clock["now"])
+    monkeypatch.setattr(core.asyncio, "sleep", _no_wait)
+    first, second = datetime(2026, 10, 25, 0, 30, tzinfo=UTC), datetime(2026, 10, 25, 1, 30, tzinfo=UTC)
+    assert f"{first.astimezone(ROME):%H:%M}" == f"{second.astimezone(ROME):%H:%M}" == "02:30"
+    e = engine()
+    app = e.create_schedule({"run_at": core.iso(first), "action": {"type": "apartment_mode", "mode": "eco"}}, ACTOR, CORR)
+
+    async def ask():
+        a = e.create_ask({"text": "alle 2:30 metti comfort"}, ACTOR, CORR)
+        await asyncio.gather(*e.tasks)
+        return e.asks[a["ask_id"]]
+    assistant = e.schedule[asyncio.run(ask())["actions"][0]["schedule_id"]]
+    booking(e, "booking_created", datetime(2026, 10, 24, 22, 0, tzinfo=UTC), datetime(2026, 10, 25, 1, 0, tzinfo=UTC), 1)
+    checkout = items_of(e, "checkout")[0]
+    assert (app["run_at"], assistant["run_at"], checkout["run_at"]) == (core.iso(first), core.iso(first), core.iso(second))
+    planned = [app["schedule_id"], assistant["schedule_id"], checkout["schedule_id"]]
+    runs = []
+    while clock["now"] < datetime(2026, 10, 25, 4, 0, tzinfo=UTC):           # every 5 minutes, through both 02:30
+        clock["now"] += timedelta(minutes=5)
+        before = {sid: e.schedule[sid]["executed_at"] for sid in planned}
+        tick(e)
+        runs += [sid for sid in planned if e.schedule[sid]["executed_at"] != before[sid]]
+    assert sorted(runs) == sorted(planned), runs                                # each one exactly once
+    assert [e.schedule[sid]["status"] for sid in planned] == ["done", "done", "done"]
+    assert e.schedule[app["schedule_id"]]["executed_at"] == e.schedule[assistant["schedule_id"]]["executed_at"] == \
+        core.iso(first) and e.schedule[checkout["schedule_id"]]["executed_at"] == core.iso(second)
 
 
 # ---- what changes an action while it is planned ---------------------------------------------------------------------

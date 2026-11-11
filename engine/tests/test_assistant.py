@@ -9,7 +9,7 @@ Run: python -m pytest engine/tests -q
 import asyncio
 import json
 import re
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -570,3 +570,42 @@ def test_the_model_call_says_which_question_to_the_bff(monkeypatch):
     with pytest.raises(assistant.ModelRefused):
         asyncio.run(client.chat([{"role": "user", "content": "x"}], []))
     assert sent[0]["X-Ask-Id"] == "ask-03ed" and "X-Ask-Id" not in sent[1]
+
+
+# ---- D-212: the change of hour ---------------------------------------------------------------------------------------
+@pytest.mark.parametrize("quando, expected_utc, said", [
+    ("2027-03-28T02:30:00", "2027-03-28T01:30:00.000Z", "03:30"),          # does not exist that day: an hour later
+    ("2027-10-31T02:30:00", "2027-10-31T00:30:00.000Z", "02:30"),          # comes twice: the first, summer time
+    ("2027-03-28T10:00:00+01:00", "2027-03-28T08:00:00.000Z", "10:00"),    # winter offset after the change: dropped
+    ("2027-10-31T10:00:00Z", "2027-10-31T09:00:00.000Z", "10:00"),         # an offset the prompt never asked: dropped
+])
+def test_d212_the_models_hour_is_the_apartments_wall_clock_across_the_change(monkeypatch, quando, expected_utc, said):
+    """The prompt asks «quando» in the apartment's local time without a zone: that wall clock is what runs."""
+    monkeypatch.setattr(core, "utcnow", lambda: datetime(2027, 3, 20, 12, 0, tzinfo=UTC))
+    e = engine(Script(js("Programmo eco.", plan(quando, "eco"))))
+    a = ask(e, "programma eco")
+    assert a["status"] == "answered" and a["actions"][0]["type"] == "schedule", a["answer"]
+    assert e.schedule[a["actions"][0]["schedule_id"]]["run_at"] == expected_utc
+    assert f"alle {said}" in a["answer"], a["answer"]
+
+
+@pytest.mark.parametrize("asked, outcomes", [
+    # 25 October 2026 has 25 hours: 00:30 and 23:30 are the same local day although 24 hours apart (two UTC dates)
+    ([(2026, 10, 25, 0, 30), (2026, 10, 25, 23, 30), (2026, 10, 25, 23, 50), (2026, 10, 26, 0, 10)],
+     ["answered", "answered", "daily_limit", "answered"]),
+    # 29 March 2026 has 23 hours: 23:55 is still that day, 00:05 is the next (both on the same UTC date)
+    ([(2026, 3, 29, 0, 10), (2026, 3, 29, 23, 50), (2026, 3, 29, 23, 55), (2026, 3, 30, 0, 5)],
+     ["answered", "answered", "daily_limit", "answered"]),
+])
+def test_d212_the_daily_limit_counts_local_days_of_23_and_25_hours(monkeypatch, asked, outcomes):
+    clock = {}
+    monkeypatch.setattr(core, "utcnow", lambda: clock["now"])
+    rome = assistant.ZoneInfo("Europe/Rome")
+    clock["now"] = datetime(*asked[0], tzinfo=rome).astimezone(UTC)
+    e = engine(Script(*(js(f"Risposta {i}.") for i in range(len(asked)))), ASK_DAILY_LIMIT=2)
+    got = []
+    for moment in asked:
+        clock["now"] = datetime(*moment, tzinfo=rome).astimezone(UTC)
+        a = ask(e, "una domanda")
+        got.append("daily_limit" if a.get("reason") == "daily_limit" else a["status"])
+    assert got == outcomes

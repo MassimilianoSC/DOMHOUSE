@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { ApiError, bffFetch, setAuthResolver, setBlockedHandler } from "@/api/bff";
 import { platformApi } from "@/api/platform";
 import type { Me } from "@/api/types";
+import type { ProblemCause } from "@/components/layout/PageProblem";
 import { t } from "@/i18n";
 import { reloadOnce } from "@/lib/lazyPage";
 import { disablePush, forgetPushResume } from "@/lib/push";
@@ -28,6 +29,8 @@ type Status = "loading" | "unavailable" | "anonymous" | "authenticated";
 
 interface AuthContextValue {
   status: Status;
+  /** With status "unavailable": what went wrong, if the app knows it (D-211). */
+  problem: ProblemCause | undefined;
   me: Me | null;
   /** Firebase sign-in providers of the current user ("password", "google.com"); empty in dev mode. */
   providers: string[];
@@ -82,6 +85,8 @@ setAuthResolver(async (): Promise<Record<string, string>> => {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>("loading");
   const [me, setMe] = useState<Me | null>(null);
+  /** Why the status is "unavailable", when the profile said it (D-211); unknown for a start that never answered. */
+  const [problem, setProblem] = useState<ProblemCause | undefined>(undefined);
   const [providers, setProviders] = useState<string[]>([]);
   const queryClient = useQueryClient();
   const lastUid = useRef<string | null>(null);
@@ -124,7 +129,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   /** /app/me refused or unreachable: decide whether the session is over and what to tell the person. */
   const profileFailed = useCallback(async (err: unknown) => {
-    // Only the BFF can say the session is over (401, 403); no network or a 5xx (cold start) is a hiccup (N2).
+    // D-211: no network, no answer in time or a 5xx, at the start or while in the app, is a hiccup, not the end of the
+    // session: nothing is emptied, push stays on (N2), and the page says so with «Ricarica» instead of showing the sign-in.
+    if (err instanceof ApiError && (err.status === 0 || err.status >= 500)) {
+      setProblem(err.status === 0 ? "network" : "server");
+      setStatus("unavailable");
+      return;
+    }
+    // Only the BFF can say the session is over (401, 403).
     signedOut(err instanceof ApiError && (err.status === 401 || err.status === 403));
     if (!(err instanceof ApiError) || err.status === 401) return; // no session yet / expired: the login page is enough
     if (err.status === 403 && err.code === "email_not_verified") {
@@ -254,6 +266,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
+      problem,
       me,
       providers,
       devLogin: async (email) => {
@@ -315,7 +328,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (uid) forgetPushResume(uid); // the account is gone: nothing to bring back (P-44)
       },
     }),
-    [status, me, providers, loadMe, signedOut, leaveSupport, queryClient],
+    [status, problem, me, providers, loadMe, signedOut, leaveSupport, queryClient],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

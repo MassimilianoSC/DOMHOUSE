@@ -6,7 +6,11 @@
 #   /etc/domhouse/<apartment_id>.settings.env   per esempio CONFIRM_ON_WATTS=30; facoltativo
 # e poi lancia, per quell'appartamento:
 #   docker compose --env-file /opt/domhouse/<apartment_id>.settings -f /opt/domhouse/compose.yaml up -d
-# Porta 81xx sull'IP interno della VM (quella dell'indirizzo dell'istanza nell'app), dati in /data/<apartment_id>
+# Porta 81xx pubblicata sul solo indirizzo interno della VM (D-218), quello dell'istanza nell'app: ENGINE_BIND_IP, che
+# engine-vm.sh legge dai metadati della VM. Né su loopback né sulle reti Docker. Da internet la protegge comunque il
+# firewall VPC (langbrain-allow-internal la apre solo a 10.198.0.0/20, langbrain-deny-other-ingress chiude il resto):
+# su Google Cloud l'indirizzo pubblico non sta sulla scheda della VM, arriva tradotto su quello interno. Dati in
+# /data/<apartment_id>
 # (proprietario uid 10001, l'utente del container), restart: unless-stopped (D-104), log JSON di Docker ruotati.
 # L'istanza «dev» (porta 8100) resta PER SEMPRE con CONNECTOR=simulated: è l'ambiente di prova, anche dopo il
 # connector Shelly (D-118). Gli appartamenti veri sono istanze a parte, ciascuna con il suo apartment_id, la sua porta
@@ -28,7 +32,7 @@ services:
       - path: /etc/domhouse/${APARTMENT_ID}.settings.env
         required: false
     ports:
-      - "${PORT}:${PORT}"
+      - "${ENGINE_BIND_IP:?ENGINE_BIND_IP}:${PORT}:${PORT}"
     volumes:
       - /data/${APARTMENT_ID}:/data/${APARTMENT_ID}
     logging:

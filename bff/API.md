@@ -257,21 +257,31 @@ Regole:
 - Il valore sta nel record dell'utente (nel repository `None` = tutti, quindi nessuna migrazione), non nei claim
   Firebase: un cambiamento vale dalla richiesta successiva, senza nuovo accesso.
 
-## Appartamenti dimostrativi (D-97, D-98)
+## Appartamenti dimostrativi (D-97, D-98, D-202)
 
-D-188 (23 ottobre, rivede D-136 per questa fase): i dimostrativi (`mock://builtin`, con o senza variante) sono accettati
-anche in produzione, dove i collaboratori provano l'app finché non viene svuotata dei dati di prova prima della consegna
-al cliente; prima di D-188 la produzione li rifiutava («I dimostrativi stanno nell'ambiente di prova: in produzione solo
-appartamenti veri»). Il resto non cambia: niente codice Italianway su un dimostrativo in produzione (D-98), Simulatore
-solo per gli amministratori e solo sui dimostrativi, assistente vero con `AI_DEMOS`.
+D-202 (9 novembre, rivede D-188): i dimostrativi (`mock://builtin`, con o senza variante) stanno **solo in staging e in
+sviluppo**, che hanno una sola istanza. Il motore simulato integrato vive nella memoria di ogni istanza: in produzione,
+con fino a 3 istanze, lo stesso dimostrativo sarebbe tre appartamenti diversi. Le prove dei collaboratori si fanno in
+staging. In produzione (`APP_ENV=prod`, `instances.demo_refused`):
 
-Il motore simulato integrato è montato in OGNI modalità, anche in produzione (`INSTANCE_MODE=real`), per gli
-appartamenti dimostrativi accanto a quelli veri; resta del solo BFF: da internet `/mock` risponde 404 (F2), e la sua
-chiave, casuale per processo (mai `INSTANCE_API_KEY_FALLBACK` nei file di Cloud Run: una prova lo controlla), è
-controllata anche nella chiamata interna (N1). Per un appartamento `mock://` URL, chiave e controlli dipendono dallo
-schema dell'URL, non dalla modalità: in real `mock://builtin` è accettato (lo collega solo la piattaforma, D-77). Lo
-stato del motore simulato è in memoria: una sola istanza (D-35), e un riavvio o un deploy riporta i dimostrativi allo
-stato iniziale.
+- la piattaforma rifiuta un collegamento `mock://` (POST e PATCH `/app/platform/tenants/{tid}/apartments`) con 422
+  `invalid_instance_url` e il messaggio «In produzione i dimostrativi non sono disponibili: si provano in staging. Qui
+  serve l'indirizzo di un sistema domotico vero»;
+- un dimostrativo rimasto da prima di D-202, finché non viene tolto, riceve lo stesso messaggio con 409
+  `demo_not_available` su ogni rotta `/app/apartments/{id}/…`; nessuna chiamata raggiunge il motore integrato
+  (`instances.call` alza `DemoRefused`), «Verifica connessione» dice il motivo e le push non aprono il suo stream;
+- resta in produzione l'appartamento `dev`/«Sviluppo», che usa il motore sulla VM (non è un `mock://`).
+
+Prove: `tests/environments_test.py` (`test_d202_*`). Dal 23 ottobre al 9 novembre (D-188) la produzione li accettava.
+In staging e in sviluppo il resto non cambia: Simulatore solo per gli amministratori e solo sui dimostrativi, assistente
+vero con `AI_DEMOS` (`false` in produzione).
+
+Il motore simulato integrato è montato in ogni modalità, anche con `INSTANCE_MODE=real`, ma in produzione nessuna
+chiamata lo raggiunge (D-202). Resta del solo BFF: da internet `/mock` risponde 404 (F2), e la sua chiave, casuale per
+processo (mai `INSTANCE_API_KEY_FALLBACK` nei file di Cloud Run: una prova lo controlla), è controllata anche nella
+chiamata interna (N1). Per un appartamento `mock://` URL, chiave e controlli dipendono dallo schema dell'URL, non dalla
+modalità: in staging (real) `mock://builtin` è accettato (lo collega solo la piattaforma, D-77). Lo stato del motore
+simulato è in memoria: una sola istanza (D-35), e un riavvio o un deploy riporta i dimostrativi allo stato iniziale.
 
 `simulated` (salvato nell'appartamento, nelle righe della piattaforma, in #18 e nei riepiloghi #7, #8): lo imposta la
 piattaforma (POST e PATCH `/app/platform/tenants/{tid}/apartments`, `simulated`); `mock://` è sempre `true` (anche per i
@@ -280,9 +290,10 @@ simulata, che a sua volta rifiuta `_test` se non lo è); ricollegando da `mock:/
 `simulated: true` esplicito. Ogni cambio va nel registro (`apartment_simulated_changed`).
 
 Il simulatore (proxy `_test/*`, #11, #35) è dell'admin sugli appartamenti `simulated`, in ogni ambiente: altrimenti 403
-`forbidden` (non admin) o `not_simulated`. `env.simulator` di `/app/me` non esiste più. D-98: in produzione la
+`forbidden` (non admin) o `not_simulated`. `env.simulator` di `/app/me` non esiste più. D-98 (valeva quando la produzione
+accettava i dimostrativi; dopo D-202 copre solo i record di prima): in produzione la
 piattaforma non dà un codice Italianway a un appartamento `mock://` (409 `italianway_on_demo`, anche ricollegando); in
-staging resta permesso. D-99 F1: se un dimostrativo ha comunque un codice (dato in staging o prima di D-98), in produzione il webhook (#30) rifiuta le sue prenotazioni con 409 `italianway_on_demo` e il BFF lo scrive nel log a ogni avvio («demo apartment with an Italianway code»). Le push dei dimostrativi partono come le altre. Da internet anche `/mock` senza barra finale risponde 404 (D-99 N1); nell'immagine non entra mai un `bff/.env` locale (N3).
+staging resta permesso. D-99 F1: se un dimostrativo ha comunque un codice (dato in staging o prima di D-98), in produzione il webhook (#30) rifiuta le sue prenotazioni con 409 `italianway_on_demo` e il BFF lo scrive nel log a ogni avvio («demo apartment with an Italianway code»). Le push dei dimostrativi partono come le altre (in staging). Da internet anche `/mock` senza barra finale risponde 404 (D-99 N1); nell'immagine non entra mai un `bff/.env` locale (N3).
 
 Ripristino (#35, solo `mock://builtin`): il motore simulato di quell'appartamento riparte dallo stato iniziale
 (dispositivi, regole, modalità, forzatura, programmazioni, decisioni, approvazioni, comandi, prenotazioni del motore);
@@ -415,28 +426,81 @@ La notifica la mostra il service worker della PWA, che ignora le chiavi in più.
 
 | Chiave di `data` (tutte stringhe) | Quando | Valore |
 |---|---|---|
-| `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: sistema domotico non raggiungibile» / «…: prenotazione annullata, appartamento rimesso a vuoto» / «…: riepilogo della settimana» / «…: antigelo non attivo» |
+| `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: sistema domotico non raggiungibile» / «…: prenotazione annullata, appartamento rimesso a vuoto» / «…: riepilogo della settimana» / «…: antigelo non attivo» / «…: azione programmata non eseguita» («…: azioni programmate non eseguite» se più d'una) |
 | `body` | sempre | testo breve, tagliato a 200 caratteri con «…» |
-| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking), `/a/<apartment_id>/riepiloghi/<week>` (summary), `/a/<apartment_id>/decisioni` (frost_inactive) |
-| `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>`, `booking:<decision_id>`, `summary:<apartment_id>:<week>`, `frost:<apartment_id>:<device_id>` |
-| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` \| `summary` \| `frost_inactive` |
+| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking), `/a/<apartment_id>/riepiloghi/<week>` (summary), `/a/<apartment_id>/decisioni` (frost_inactive), `/a/<apartment_id>/programmazione` (schedule_failed) |
+| `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>`, `booking:<decision_id>`, `summary:<apartment_id>:<week>`, `frost:<apartment_id>:<device_id>`, `schedule:<apartment_id>:<decision_id della prima>` |
+| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` \| `summary` \| `frost_inactive` \| `schedule_failed` |
 | `apartment_id` | sempre | |
 | `approval_id` | solo `approval` | |
 | `device_id` | solo `device_offline` e `frost_inactive` | |
 | `ts` | se l'evento del motore lo porta | `ts` dell'evento, ISO 8601 UTC |
 
 `webpush.headers`: `Urgency: high` (`normal` per `summary`, che non è un allarme); `TTL` (secondi, stringa) `3600` per
-`approval`, `86400` per `device_offline`, `instance_down` e `booking`, `604800` (una settimana) per `summary`, `86400` per `frost_inactive`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
+`approval`, `86400` per `device_offline`, `instance_down` e `booking`, `604800` (una settimana) per `summary`, `86400` per `frost_inactive` e `schedule_failed`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
 
 Preferenze: `approval` ← `notification_prefs.approvals`; `device_offline` e `instance_down` ← `notification_prefs.offline`;
 `booking` ← `notification_prefs.bookings` («Prenotazioni», D-123, attiva di default anche per chi aveva già salvato le
 preferenze); `frost_inactive` ← `notification_prefs.offline` (D-164: caldaia senza sensore di temperatura utilizzabile a «casa vuota», l'antigelo non può agire; parte dalla decisione `frost_inactive`, una per episodio, il `body` è il suo testo); `summary` ← `notification_prefs.summary` («Riepilogo», D-150, attiva di default allo stesso modo).
+`schedule_failed` (D-219) parte dalle decisioni `schedule_failed` (azione programmata rifiutata dal motore alla sua
+ora) e `schedule_missed` (saltata perché il motore era fermo all'ora prevista). Categoria dal tipo dell'azione in
+`new_value`: `prearrival`, `checkout`, `empty` ← `notification_prefs.bookings`; `manual`, l'assistente o un tipo che il
+motore non dice ← `notification_prefs.offline`. Le decisioni dello stesso appartamento e della stessa categoria entro
+60 secondi dalla prima sono una notifica sola: `body` il testo della decisione, oppure «N azioni programmate non
+eseguite. La prima: <testo>»; la chiave in `work_claims` è quella dell'evento della prima, uguale per ogni istanza.
+Durante una sospensione D-217 le `schedule_missed` non si notificano una per una (dopo uno spegnimento programmato il
+motore ne scrive una per ogni azione saltata); le `schedule_failed` sempre. Le `schedule_missed` della sospensione,
+raccolte per 60 secondi, diventano un riassunto per appartamento: `kind` `schedule_failed`, `title` «…: azioni
+programmate non eseguite», `body` «Durante la manutenzione N azioni programmate non sono state eseguite» («1 azione
+programmata non è stata eseguita»), `link` la Programmazione, `tag` `maintenance:<apartment_id>`; categoria
+«Prenotazioni» se almeno una nasceva da una prenotazione, altrimenti `offline`. Resta in `work_claims` (chiave
+`push:maintenance:<apartment_id>`, con il messaggio) fino alla fine della sospensione, al massimo 6 giorni; poi
+`recover_once` lo manda, da una sola istanza. Se la sospensione viene tolta prima (nuova revisione senza
+`UNREACHABLE_ALERTS_OFF_UNTIL`), all'avvio il server lo rende dovuto subito (`expire_work`) e parte entro un minuto.
+Uno per appartamento: le istanze dopo la prima trovano la chiave presa; alla manutenzione dopo, la chiave consegnata si
+libera e si riprende.
+Stesso `kind` `schedule_failed` anche per la decisione `schedule_partial` (D-219, aggiunta 2, lotto 39): un'azione
+programmata partita i cui comandi non sono riusciti tutti; il motore la scrive quando l'ultimo comando dell'azione è
+finito (compresa l'accensione del clima rimandata per la pausa del compressore), con `target`
+`{type: schedule, schedule_id}` e il testo «Pre-arrivo eseguito in parte: N comandi non riusciti (<dispositivo>: <motivo>;
+…)» («… non riuscito» se nessun comando è riuscito). Notificata **solo** per `prearrival` e `checkout` (categoria
+«Prenotazioni»), con `title` «…: pre-arrivo con comandi non riusciti» («check-out»), `body` il testo della decisione;
+entra nel raggruppamento di 60 secondi delle altre (`title` allora «…: azioni programmate non eseguite o eseguite in
+parte»); non si sospende con D-217.
 `booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
 annullata dopo il pre-arrivo, con l'appartamento rimesso a vuoto dal motore (D-121); il `body` è il testo della decisione.
 `device_offline` parte se il dispositivo è ancora offline dopo i minuti della regola `offline_alert` (15 se non
-leggibile); `instance_down` (evento `instance.health` con `status` `down`: istanza irraggiungibile o connector del
-motore giù, D-131) parte se resta giù per gli stessi minuti della regola `offline_alert`, mai con la regola spenta, una
-volta sola finché l'istanza non torna su: una caduta seguita da un ritorno prima dei minuti non manda niente.
+leggibile). Lo stato «non in linea» invece arriva subito (D-225, 11 novembre): l'evento `device.online` con
+`online: false` parte appena il connector dice offline, cioè alla caduta del collegamento del dispositivo o dopo la
+soglia di silenzio del suo tipo (connector-v2.md §2.6), e da lì `GET /devices` e lo stream lo mostrano. I minuti di
+`offline_alert` contano solo per la decisione «offline da oltre N minuti» del motore e per questa notifica. La frase del
+contratto su `device.online` («offline dopo `offline_alert.minutes` senza messaggi») è superata da questo
+comportamento; il contratto non si modifica (limiti-noti.md). Così l'app non mostra «in linea» un dispositivo che
+rifiuterebbe i comandi con 409 `device_offline`. `instance_down` ha due cause, con una notifica sola per episodio qualunque sia (stesso `tag`
+`instance:<apartment_id>` e stessa chiave `push:instance_down:<apartment_id>` in `work_claims`):
+- connector del motore giù (D-131): evento `instance.health` con `status` `down`, dal motore che risponde. Parte se
+  resta giù per gli stessi minuti della regola `offline_alert`, mai con la regola spenta. `body` «Il connettore
+  domotico risulta fermo».
+- motore irraggiungibile (D-217): lo stream verso il motore fallisce (macchina o processo fermi, rete interrotta).
+  Ogni istanza del server conta dalla sua prima connessione fallita; vale l'ultimo valore della regola `offline_alert`
+  letto quando il motore rispondeva (15 se mai letto, niente con la regola spenta). Allo scadere chiede ancora
+  `GET /health` (5 s): se risponde, niente. `body` «Il sistema domotico non risponde da <N> minuti: i comandi
+  dall'app non arrivano e le regole automatiche potrebbero essere ferme.».
+Una caduta seguita da un ritorno prima dei minuti non manda niente. Al ritorno non parte nessuna notifica: il server
+rilegge `GET /health` e libera la chiave se il connector è su, così l'episodio dopo avvisa di nuovo.
+Decisione al ritorno (D-217): se il motore è stato irraggiungibile almeno per i minuti della regola (15 con la regola
+spenta o mai letta), anche durante una sospensione, una sola istanza (chiave `note:reachable:<apartment_id>` in
+`work_claims`, liberata all'inizio dell'episodio dopo) chiama `POST /_internal/reachability` con
+`{"from": <prima connessione fallita>, "to": <ritorno>}`, istanti UTC ISO 8601 con `Z`. È una route del motore fuori
+dal contratto: il motore scrive nelle Decisioni «Sistema domotico di nuovo raggiungibile dopo <durata>». Un 404
+(motore senza la route) si salta con la riga «reachability note skipped: the engine has no route»; ogni altro errore
+si scrive e non si riprova.
+Sospensione (D-217, procedura M19): `UNREACHABLE_ALERTS_OFF_UNTIL`, un istante ISO 8601 con il fuso (per esempio
+`2026-11-23T08:00:00+01:00`), al massimo 30 giorni avanti. Fino a quell'istante le due notifiche `instance_down`
+aspettano; poi, se il problema c'è ancora, partono. Un valore illeggibile, senza fuso, passato o oltre i 30 giorni è
+ignorato: gli avvisi restano attivi e il log all'avvio lo dice («UNREACHABLE_ALERTS_OFF_UNTIL ignored»). Si imposta con
+`gcloud run services update … --update-env-vars`, si toglie con `--remove-env-vars`; una pubblicazione (`services
+replace` dal manifesto) la toglie. `device_offline` non è sospesa.
 
 D-170: la vecchia preferenza `decisions` («Decisioni del motore») non esiste più: non faceva niente. Un corpo di #28 o un
 record salvato che la contiene è accettato e la chiave è ignorata; `GET /app/push/status` e `/app/me` non la mandano più.
@@ -447,8 +511,8 @@ utente»).
 Token tolti dopo un invio: solo quelli che non funzioneranno mai (`UnregisteredError`, `SenderIdMismatchError`).
 Un `INVALID_ARGUMENT` riguarda il messaggio, non il token: i token restano.
 
-Un'istanza Cloud Run sola (`maxScale: 1`, decisione D-35): con più istanze ogni notifica arriverebbe una volta per
-istanza.
+Istanze: la produzione ne ha fino a 3 (`maxScale: 3`, D-201), lo staging una (D-202). Il vincolo di D-35 (una sola
+istanza, altrimenti una notifica per istanza) non vale più: lo sostituisce la prenotazione descritta qui sotto.
 
 Con più istanze (D-201) ogni evento arriva a ognuna: una prenotazione atomica su Firestore (`work_claims`, scadenza 7 giorni) fa
 partire una sola notifica. La prenotazione contiene il messaggio e dura `NOTIFICATION_LEASE_S` (60 s): se l'istanza cade o FCM
@@ -722,8 +786,8 @@ started» dice `model` e `reason` (`silenzio` o `errore`), «assistant model cal
 `AI_TWIN_MODEL` la gemella è lo stesso modello e un errore rapido torna subito, come prima.
 
 Modello e chiamata (D-182, modelli di D-187): nei due manifesti `gemini-3.5-flash` (`AI_MODEL`) con la gemella
-`gemini-3.5-flash-lite` (`AI_TWIN_MODEL`) dopo 3 s (`AI_HEDGE_AFTER_S`); senza le variabili il BFF usa ancora i valori
-di D-182 (`gemini-3.8-flash`, 6 s). Località `eu`, endpoint nativo di Vertex (`AI_API`
+`gemini-3.5-flash-lite` (`AI_TWIN_MODEL`) dopo 3 s (`AI_HEDGE_AFTER_S`); gli stessi valori, prezzi compresi, sono anche
+i predefiniti del BFF senza le variabili (D-212). Località `eu`, endpoint nativo di Vertex (`AI_API`
 `nativo`, predefinito; `openai` torna all'endpoint compatibile): `generateContent` su
 `aiplatform.eu.rep.googleapis.com/v1/projects/<progetto>/locations/eu/publishers/google/models/<modello>`.
 Ragionamento spento: `thinkingConfig.thinkingBudget` = `AI_THINKING_BUDGET` (0; -1 non lo manda). Il BFF traduce dal

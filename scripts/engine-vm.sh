@@ -14,14 +14,18 @@
 #   sudo bash /opt/domhouse/engine-vm.sh set <apartment_id> NOME=VALORE          # an engine setting, restart
 #   sudo bash /opt/domhouse/engine-vm.sh unset <apartment_id> NOME               # back to its default, restart
 #   sudo bash /opt/domhouse/engine-vm.sh check-all                               # the 5-minute watch (timer)
-#   sudo bash /opt/domhouse/engine-vm.sh timers                                  # (re)install the two timers
+#   sudo bash /opt/domhouse/engine-vm.sh timers                                  # (re)install the timers and the boot unit
+#   sudo bash /opt/domhouse/engine-vm.sh start-all                               # after a boot: start what is down
 #   sudo bash /opt/domhouse/engine-vm.sh logs-agent                              # engines' logs to Cloud Logging
 #
 # Watch (P-60 step 10, D-104, D-148): every 5 minutes the timer domhouse-engine-check.timer runs check-all, which asks
 # every installed engine for its /health and looks at the age of its newest backup, and writes to the VM's syslog (that
 # the Ops Agent already sends to Cloud Logging) one line per apartment, "engine ok <id>", "engine down <id>" (answers 503)
 # or "engine silent <id>" (does not answer), "backup missing <id> age_h=<n>" (newest backup older than BACKUP_ALERT_H),
-# then "domhouse-check: <n> motori, <m> muti" and, if the broker is installed, its line (scripts/broker-vm.sh check). The alerts read those lines (scripts/monitoring/engine-alerts.sh): the
+# then "domhouse-check: <n> motori, <m> muti", "vm mem_used_pct=<n> disk_used_pct=<n>" (the weekly run-in report,
+# D-210), once an hour "egress ok|failed server=<code> registry=<code> acme=<code>" (the ways out the VM uses since
+# the NAT went, 10 November: the server the assistant asks, Artifact Registry, Let's Encrypt; Cloud Logging is proved by
+# these very lines arriving) and, if the broker is installed, its line (scripts/broker-vm.sh check). The alerts read those lines (scripts/monitoring/engine-alerts.sh): the
 # watch writes only while the VM is alive, so a silent VM gives one email, never one per apartment. The daily backup
 # writes "backup ok <id>". logs-agent adds to the Ops Agent a receiver for the engines' container logs (docker json-file,
 # parsed: level, msg, apartment_id) as the log "domhouse_engine", keeping the previous configuration as a copy; the
@@ -51,12 +55,21 @@ ETC="${DOMHOUSE_ETC:-/etc/domhouse}"
 DATA="${DOMHOUSE_DATA:-/data}"
 SYSTEMD="${DOMHOUSE_SYSTEMD:-/etc/systemd/system}"
 OPS_CONFIG="${DOMHOUSE_OPS_CONFIG:-/etc/google-cloud-ops-agent/config.yaml}"
+MEMINFO="${DOMHOUSE_MEMINFO:-/proc/meminfo}"   # moved only by the tests (Windows has no Linux /proc)
+EGRESS_EVERY_S=3600                      # the ways out, once an hour (D-212)
+REGISTRY_URL="https://europe-west8-docker.pkg.dev/v2/"           # 401 without credentials: reached
+ACME_URL="https://acme-v02.api.letsencrypt.org/directory"
 BACKUP_ALERT_H=26                        # D-148 (c): no backup for longer than this -> "backup missing"
 ENGINE_UID=10001
 METADATA=http://metadata.google.internal/computeMetadata/v1
 SECRET_PREFIX="${SECRET_PREFIX:-langbrain-api-key-}"
+SECRETS_API="${DOMHOUSE_SECRETS_API:-https://secretmanager.googleapis.com/v1}"   # moved only by the tests
+MQTT_SECRET_PREFIX=langbrain-shelly-     # the connector's password on the broker (broker-secrets.sh, D-212)
+BROKER_INTERNAL_HOST=172.30.83.2         # the broker's internal door, on domhouse-broker-internal (compose.broker.yaml)
+BROKER_INTERNAL_PORT=1883
 BACKUP_DAYS=7
 BACKUP_AT="22:30:00 UTC"                 # before the daily snapshot of the disk (23:00 UTC)
+ADDRESS_WAIT_S="${DOMHOUSE_ADDRESS_WAIT_S:-120}"   # start-all: how long a boot may take to put the internal address
 
 die() { echo "errore: $*" >&2; exit 1; }
 step() { printf '\n== %s\n' "$*"; }
@@ -76,20 +89,54 @@ token() {
 
 project() { curl -sf -H "Metadata-Flavor: Google" "${METADATA}/project/project-id"; }
 
+BIND_IP="${DOMHOUSE_BIND_IP:-}"          # moved only by the tests
+resolve_bind_ip() {
+  # D-218: the engines' ports are published on the VM's internal address only, the one the app's instance URL names.
+  # Read once, in the main shell, before any command that reaches an engine (a failure inside $(...) would not stop us)
+  [ -n "${BIND_IP}" ] || BIND_IP="$(curl -sf -H "Metadata-Flavor: Google" "${METADATA}/instance/network-interfaces/0/ip" || true)"
+  [[ "${BIND_IP}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "non leggo l'indirizzo interno della VM dal server dei metadati"
+}
+
+read_secret() {
+  # read_secret <secret>: its latest value on stdout, for a variable of the caller; never printed nor logged
+  local tok url
+  tok="$(token)" || return 1
+  url="${SECRETS_API}/projects/$(project)/secrets/$1/versions/latest:access"
+  curl -sf -H "Authorization: Bearer ${tok}" "${url}" |
+    python3 -c 'import base64, json, sys; print(base64.b64decode(json.load(sys.stdin)["payload"]["data"]).decode().strip())'
+}
+
 write_key() {
-  local apt="$1" secret="${SECRET_PREFIX}$1" tok url key
+  # the engine's key, and for CONNECTOR=shelly the broker account of its connector (lot 39, D-221/D-223): the names
+  # are those of Youssouf's transport (connector-v2.md §7.3 point 3); host and port are the broker's internal door
+  # (engine/broker/mosquitto.conf, compose.broker.yaml), the user is <apartment_id>.connector (broker_accounts.py)
+  local apt="$1" secret="${SECRET_PREFIX}$1" key connector mqtt=""
   step "Chiave dal segreto ${secret} -> ${ETC}/${apt}.env (permessi 600)"
-  tok="$(token)" || die "token della VM non disponibile"
-  url="https://secretmanager.googleapis.com/v1/projects/$(project)/secrets/${secret}/versions/latest:access"
-  key="$(curl -sf -H "Authorization: Bearer ${tok}" "${url}" |
-         python3 -c 'import base64, json, sys; print(base64.b64decode(json.load(sys.stdin)["payload"]["data"]).decode().strip())')" ||
+  key="$(read_secret "${secret}")" ||
     die "segreto ${secret} non leggibile dalla VM (esiste? langbrain-vm@ ha Secret Accessor su di lui?)"
+  connector="$(sed -n 's/^CONNECTOR=//p' "$(settings_file "${apt}")" 2>/dev/null || true)"
+  if [ "${connector}" = "shelly" ]; then
+    step "Conto del connector sul broker dal segreto ${MQTT_SECRET_PREFIX}${apt}"
+    mqtt="$(read_secret "${MQTT_SECRET_PREFIX}${apt}")" ||
+      die "segreto ${MQTT_SECRET_PREFIX}${apt} non leggibile dalla VM (broker-secrets.sh add-apartment ${apt} fatto?)"
+    # what compose reads from an env file must be one plain word: the passwords of broker-secrets.sh are token_urlsafe
+    [[ "${mqtt}" =~ ^[A-Za-z0-9_-]{24,}$ ]] || die "la password del connector in ${MQTT_SECRET_PREFIX}${apt} non ha la forma prevista"
+  fi
   install -d -m 700 -o root -g root "${ETC}"
-  (umask 077; printf 'API_KEY=%s\n' "${key}" > "${ETC}/${apt}.env.new")
+  (
+    umask 077                            # before the file exists: it is never readable by others, not even for a moment
+    {
+      printf 'API_KEY=%s\n' "${key}"
+      if [ -n "${mqtt}" ]; then
+        printf 'SHELLY_MQTT_HOST=%s\nSHELLY_MQTT_PORT=%s\nSHELLY_MQTT_TLS=false\nSHELLY_MQTT_USERNAME=%s.connector\nSHELLY_MQTT_PASSWORD=%s\n' \
+          "${BROKER_INTERNAL_HOST}" "${BROKER_INTERNAL_PORT}" "${apt}" "${mqtt}"
+      fi
+    } > "${ETC}/${apt}.env.new"
+  )
   mv -f "${ETC}/${apt}.env.new" "${ETC}/${apt}.env"
   chmod 600 "${ETC}/${apt}.env"
-  key=""
-  echo "scritto ${ETC}/${apt}.env"
+  key=""; mqtt=""
+  echo "scritto ${ETC}/${apt}.env$([ "${connector}" = "shelly" ] && echo ' (chiave e conto del connector sul broker)')"
 }
 
 registry_login() {
@@ -100,6 +147,16 @@ registry_login() {
     die "login rifiutato: langbrain-vm@ ha Artifact Registry Reader sul repository?"
   echo "ok"
 }
+
+lock_engines() {
+  # one change to the engines at a time: install, update, key, restore, set, unset and start-all wait here; the
+  # 5-minute watch never waits, it skips its restart while someone holds the lock (a restore stops an engine on purpose)
+  install -d -m 755 "${OPT}"
+  exec 9> "${OPT}/.engines.lock"
+  flock 9
+}
+
+container_state() { docker inspect -f '{{.State.Status}}' "engine-$1" 2>/dev/null || true; }
 
 settings_file() { echo "${OPT}/$1.settings"; }
 engine_settings_file() { echo "${ETC}/$1.settings.env"; }
@@ -156,17 +213,17 @@ compose() {
   if [ "$(sed -n 's/^CONNECTOR=//p' "$(settings_file "${apt}")")" != "simulated" ] && [ -f "${OPT}/compose.broker.yaml" ]; then
     files+=(-f "${OPT}/compose.broker.yaml")
   fi
-  docker compose --env-file "$(settings_file "${apt}")" "${files[@]}" "$@"
+  ENGINE_BIND_IP="${BIND_IP:?}" docker compose --env-file "$(settings_file "${apt}")" "${files[@]}" "$@"
 }
 
 wait_healthy() {
   local apt="$1" port code
   port="$(sed -n 's/^PORT=//p' "$(settings_file "${apt}")")"
-  step "Attesa di http://127.0.0.1:${port}/api/v1/health"
+  step "Attesa di http://${BIND_IP}:${port}/api/v1/health"
   for _ in $(seq 1 "${DOMHOUSE_HEALTH_TRIES:-30}"); do      # 30 tries, 2 s apart (fewer only in the tests)
-    code="$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:${port}/api/v1/health" || true)"
+    code="$(curl -s -o /dev/null -w '%{http_code}' "http://${BIND_IP}:${port}/api/v1/health" || true)"
     if [ "${code}" = "200" ]; then
-      curl -s "http://127.0.0.1:${port}/api/v1/health" | python3 -c \
+      curl -s "http://${BIND_IP}:${port}/api/v1/health" | python3 -c \
         'import json, sys; h = json.load(sys.stdin); print("health 200:", h["status"], h["implementation"], "connector", h["connector"]["status"])'
       return 0
     fi
@@ -232,6 +289,9 @@ Description=DOMHOUSE engine: health of every engine and age of its backups, to t
 [Service]
 Type=oneshot
 ExecStart=/bin/bash ${OPT}/engine-vm.sh check-all
+# the lines reach the syslog through logger (tag domhouse-check); the service's own copy of the output, «bash[pid]:
+# …», doubled each of them (seen on 10 November). Errors still go to the journal
+StandardOutput=null
 UNIT
   cat > "${SYSTEMD}/domhouse-engine-check.timer" <<UNIT
 [Unit]
@@ -244,7 +304,22 @@ OnCalendar=*:0/5
 [Install]
 WantedBy=timers.target
 UNIT
+  step "Avvio dei motori dopo un riavvio della VM: domhouse-engines-start.service (lotto 39)"
+  cat > "${SYSTEMD}/domhouse-engines-start.service" <<UNIT
+[Unit]
+Description=DOMHOUSE engines: after a boot, start the engines docker could not (engine-vm.sh start-all)
+After=docker.service network-online.target
+Wants=network-online.target docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash ${OPT}/engine-vm.sh start-all
+
+[Install]
+WantedBy=multi-user.target
+UNIT
   systemctl daemon-reload
+  systemctl enable domhouse-engines-start.service > /dev/null       # at the next boot; nothing to start now
   systemctl enable --now domhouse-engine-backup.timer domhouse-engine-check.timer > /dev/null
   systemctl list-timers domhouse-engine-backup.timer domhouse-engine-check.timer --no-pager | sed -n 1,3p
 }
@@ -262,11 +337,12 @@ check_all() {
     apt="$(basename "${settings}" .settings)"
     total=$((total + 1))
     port="$(sed -n 's/^PORT=//p' "${settings}")"
-    code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://127.0.0.1:${port}/api/v1/health" 2>/dev/null || true)"
+    code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://${BIND_IP}:${port}/api/v1/health" 2>/dev/null || true)"
     case "${code}" in
       200) watch_line "engine ok ${apt}" ;;
       503) watch_line "engine down ${apt} (risponde 503: connector o database)"; silent=$((silent + 1)) ;;
-      *)   watch_line "engine silent ${apt} (nessuna risposta, codice ${code:-nessuno})"; silent=$((silent + 1)) ;;
+      *)   watch_line "engine silent ${apt} (nessuna risposta, codice ${code:-nessuno})"; silent=$((silent + 1))
+           restart_stopped "${apt}" ;;
     esac
     newest="$(ls -1t "${DATA}/${apt}/backup"/engine-*.db 2>/dev/null | head -1 || true)"
     if [ -n "${newest}" ]; then
@@ -281,9 +357,82 @@ check_all() {
     fi
   done
   watch_line "domhouse-check: ${total} motori, ${silent} muti"
+  vm_line
+  egress_line
   # after the summary: a stuck broker check must never look like a silent VM
   if [ -f "${OPT}/_broker/broker.settings" ]; then
     bash "${OPT}/broker-vm.sh" check || watch_line "broker down (controllo non riuscito)"
+  fi
+}
+
+restart_stopped() {
+  # lot 39: an engine whose container is not running (exited, created, dead) is started again by the watch. Docker
+  # never retries a container that failed to start (its restart policy applies only after a successful start): after a
+  # boot with the internal address late, the engine would stay down until someone came. Skipped while another command
+  # holds the lock. A container stopped by hand with docker stop is started again too: there is no «stopped on purpose»
+  restart_stopped_state="$(container_state "$1")"
+  case "${restart_stopped_state}" in exited|created|dead) ;; *) return 0 ;; esac
+  (
+    flock -n 9 || exit 0
+    if compose "$1" up -d > /dev/null 2>&1; then
+      watch_line "engine restarted $1 (il contenitore era ${restart_stopped_state})"
+    else
+      watch_line "engine restart failed $1 (contenitore ${restart_stopped_state})"
+    fi
+  ) 9> "${OPT}/.engines.lock"
+}
+
+start_all() {
+  # after a boot (domhouse-engines-start.service): wait until the internal address is on the network card, then start
+  # every engine that is not running. Docker starts them itself, but one whose port could not be bound yet is never
+  # retried (see restart_stopped); the watch would catch it within 5 minutes, this within seconds
+  local settings apt state waited=0
+  until ip -4 -o addr show 2>/dev/null | grep -qF " ${BIND_IP}/"; do
+    if [ "${waited}" -ge "${ADDRESS_WAIT_S}" ]; then
+      watch_line "engines start: indirizzo ${BIND_IP} non sulla scheda dopo ${waited} s"
+      break
+    fi
+    sleep 2
+    waited=$((waited + 2))
+  done
+  shopt -s nullglob
+  for settings in "${OPT}"/*.settings; do
+    apt="$(basename "${settings}" .settings)"
+    state="$(container_state "${apt}")"
+    [ "${state}" != "running" ] || continue
+    if compose "${apt}" up -d > /dev/null 2>&1; then
+      watch_line "engine started ${apt} (all'avvio della VM, il contenitore era ${state:-assente})"
+    else
+      watch_line "engine start failed ${apt} (all'avvio della VM, contenitore ${state:-assente})"
+    fi
+  done
+}
+
+vm_line() {
+  # D-210: memory in use (what the kernel cannot hand out at once) and the boot disk, for the weekly run-in report
+  local mem disk
+  mem="$(awk '/^MemTotal:/ {t = $2} /^MemAvailable:/ {a = $2} END {if (t > 0 && a != "") printf "%d", (t - a) * 100 / t; else print "?"}' "${MEMINFO}" 2>/dev/null || true)"
+  disk="$(df --output=pcent / 2>/dev/null | tail -1 | tr -dc '0-9' || true)"
+  watch_line "vm mem_used_pct=${mem:-?} disk_used_pct=${disk:-?}"
+}
+
+probe_code() { curl -s -o /dev/null -m 10 -w '%{http_code}' "$1" 2>/dev/null || true; }
+
+egress_line() {
+  # D-212: once an hour, the ways out the VM really uses; the hour is kept in a file, so a 5-minute timer is enough
+  local now last url server registry acme
+  now=$(date +%s)
+  last=$(cat "${OPT}/.egress-checked" 2>/dev/null || echo 0)
+  [ $((now - last)) -ge "${EGRESS_EVERY_S}" ] || return 0
+  echo "${now}" > "${OPT}/.egress-checked"
+  url="$(cat "${ETC}"/*.settings.env 2>/dev/null | sed -n 's/^MODEL_BASE_URL=//p' | head -1)"
+  if [ -n "${url}" ]; then server="$(probe_code "${url%/}/health")"; else server="nessuno"; fi
+  registry="$(probe_code "${REGISTRY_URL}")"
+  acme="$(probe_code "${ACME_URL}")"
+  if [[ "${server}" =~ ^(200|nessuno)$ ]] && [[ "${registry}" =~ ^(200|401)$ ]] && [ "${acme}" = "200" ]; then
+    watch_line "egress ok server=${server:-000} registry=${registry:-000} acme=${acme:-000}"
+  else
+    watch_line "egress failed server=${server:-000} registry=${registry:-000} acme=${acme:-000}"
   fi
 }
 
@@ -328,11 +477,13 @@ start() {
 }
 
 cmd="${1:-}"; shift || true
+case "${cmd}" in backup|backup-all|timers|logs-agent|"") ;; *) resolve_bind_ip ;; esac
 case "${cmd}" in
   install)
     [ $# -ge 3 ] || die "uso: install <apartment_id> <port> <image> [connector]"
     apt="$1"; port="$2"; image="$3"; connector="${4:-simulated}"
     valid_id "${apt}"; valid_port "${port}"
+    lock_engines
     here="$(cd "$(dirname "$0")" && pwd)"
     [ -f "${here}/compose.yaml" ] || die "compose.yaml deve stare accanto a questo script"
     step "File del motore in ${OPT}"
@@ -352,6 +503,7 @@ case "${cmd}" in
   update)
     [ $# -eq 2 ] || die "uso: update <apartment_id> <image>"
     apt="$1"; image="$2"; valid_id "${apt}"
+    lock_engines
     [ -f "$(settings_file "${apt}")" ] || die "${apt} non è installato (manca $(settings_file "${apt}"))"
     previous="$(sed -n 's/^ENGINE_IMAGE=//p' "$(settings_file "${apt}")")"
     sed -i "s#^ENGINE_IMAGE=.*#ENGINE_IMAGE=${image}#" "$(settings_file "${apt}")"
@@ -361,6 +513,7 @@ case "${cmd}" in
   key)
     [ $# -eq 1 ] || die "uso: key <apartment_id>"
     apt="$1"; valid_id "${apt}"
+    lock_engines
     write_key "${apt}"
     compose "${apt}" up -d --force-recreate
     wait_healthy "${apt}"
@@ -382,6 +535,7 @@ case "${cmd}" in
   restore)
     [ $# -eq 2 ] || die "uso: restore <apartment_id> <file di backup>"
     apt="$1"; src="$2"; valid_id "${apt}"
+    lock_engines
     [ -f "$(settings_file "${apt}")" ] || die "${apt} non è installato"
     [ -f "${src}" ] || src="${DATA}/${apt}/backup/${src}"
     [ -f "${src}" ] || die "file di backup non trovato: $2"
@@ -406,21 +560,27 @@ case "${cmd}" in
     corr="$(python3 -c 'import uuid; print(uuid.uuid4())')"
     curl -s -w '\nHTTP %{http_code}\n' -X "${method}" -H @<(sed -n 's/^API_KEY=/X-API-Key: /p' "${ETC}/${apt}.env") \
       -H "X-Actor: system:vm-admin" -H "X-Correlation-Id: ${corr}" -H "Content-Type: application/json" \
-      ${body:+--data "${body}"} "http://127.0.0.1:${port}/api/v1${path}"
+      ${body:+--data "${body}"} "http://${BIND_IP}:${port}/api/v1${path}"
     ;;
   set)
     [ $# -eq 2 ] && [[ "$2" == *=* ]] || die "uso: set <apartment_id> NOME=VALORE"
     apt="$1"; name="${2%%=*}"; value="${2#*=}"; valid_id "${apt}"; valid_setting_name "${name}"
     [[ "${value}" =~ ^[A-Za-z0-9._:/-]{1,128}$ ]] || die "valore non valido per ${name}: lettere, cifre e . _ : / -"
+    lock_engines
     change_setting "${apt}" "${name}" "${value}"
     ;;
   unset)
     [ $# -eq 2 ] || die "uso: unset <apartment_id> NOME"
     apt="$1"; name="$2"; valid_id "${apt}"; valid_setting_name "${name}"
+    lock_engines
     change_setting "${apt}" "${name}"
     ;;
   check-all)
     check_all
+    ;;
+  start-all)
+    lock_engines
+    start_all
     ;;
   timers)
     install_timer
@@ -442,6 +602,6 @@ case "${cmd}" in
     wait_healthy "${apt}"
     ;;
   *)
-    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | timers | logs-agent (vedi l'intestazione)"
+    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | start-all | timers | logs-agent (vedi l'intestazione)"
     ;;
 esac
