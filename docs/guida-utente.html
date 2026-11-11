@@ -1122,7 +1122,7 @@ lettura».</p>
 <tr><td data-label="Casella" class="align-left">«Modalità»</td><td data-label="Cosa vedi" class="align-left">Comfort, Eco o Casa vuota; durante una forzatura, sotto, «forzata fino alle …»</td><td data-label="Di che colore è" class="align-left">Il colore della modalità: Comfort arancione chiaro, Eco verde salvia, Casa vuota azzurro ardesia</td></tr>
 <tr><td data-label="Casella" class="align-left">«Occupazione»</td><td data-label="Cosa vedi" class="align-left">«Vuoto», «Occupato» o «Prenotato»</td><td data-label="Di che colore è" class="align-left">«Occupato» verde, «Prenotato» ambra, «Vuoto» tortora</td></tr>
 <tr><td data-label="Casella" class="align-left">«Prossimo check-in» o «Prossimo check-out»</td><td data-label="Cosa vedi" class="align-left">Il primo fra arrivo e partenza; senza nessuno dei due, «Prossimo evento» con un trattino</td><td data-label="Di che colore è" class="align-left">Bianca</td></tr>
-<tr><td data-label="Casella" class="align-left">«Finestre»</td><td data-label="Cosa vedi" class="align-left">«Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore»</td><td data-label="Di che colore è" class="align-left">Verde se sono tutte chiuse, ambra se una è aperta; bianca senza sensori</td></tr>
+<tr><td data-label="Casella" class="align-left">«Finestre»</td><td data-label="Cosa vedi" class="align-left">«Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore». Dal lotto 40, se un sensore è senza segnale: «Stato non noto» (o «Nessuna aperta» se gli altri sono chiusi) con la riga «Senza segnale: …» e le stanze</td><td data-label="Di che colore è" class="align-left">Verde se sono tutte chiuse, ambra se una è aperta; bianca senza sensori; neutra se un sensore è senza segnale, perché di quella finestra non si sa nulla</td></tr>
 <tr><td data-label="Casella" class="align-left">«Consumo di oggi»</td><td data-label="Cosa vedi" class="align-left">I kWh di oggi; un trattino se la funzione Consumi è spenta</td><td data-label="Di che colore è" class="align-left">Bianca, con il numero in arancione</td></tr>
 <tr><td data-label="Casella" class="align-left">«Dispositivi online»</td><td data-label="Cosa vedi" class="align-left">Quanti rispondono, per esempio 5/6; sotto, «… offline» se qualcuno manca</td><td data-label="Di che colore è" class="align-left">Verde se rispondono tutti, ambra se qualcuno è offline</td></tr>
 </tbody></table></div>
@@ -1210,7 +1210,7 @@ categoria nelle notifiche.</p>
 <tr><td data-label="Cosa vedi" class="align-left">La descrizione, in grande</td><td data-label="Cosa vuol dire" class="align-left">Che cosa chiede</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Perché il motore lo propone», con il testo sotto</td><td data-label="Cosa vuol dire" class="align-left">Il motivo, senza riquadro</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Azione proposta» seguita dall&#x27;azione in grassetto</td><td data-label="Cosa vuol dire" class="align-left">Che cosa partirà</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta»</td><td data-label="Cosa vuol dire" class="align-left">Quanto tempo resta per decidere</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta»</td><td data-label="Cosa vuol dire" class="align-left">Quanto tempo resta per decidere; dal lotto 40, a «scaduta» i pulsanti si disattivano</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">Accanto: «Alla scadenza verrà respinta», «Alla scadenza verrà eseguita» o «Alla scadenza resta in attesa»</td><td data-label="Cosa vuol dire" class="align-left">Cosa succede se nessuno decide</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">Sotto una riga: «Nota (facoltativa)» e i pulsanti</td><td data-label="Cosa vuol dire" class="align-left">Solo nelle richieste in attesa, per chi può decidere</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">In fondo: «Approvata da … …» o «Respinta da … …» con la nota, poi l&#x27;«ID richiesta»</td><td data-label="Cosa vuol dire" class="align-left">Solo nelle richieste già decise o scadute</td></tr>
@@ -1604,7 +1604,8 @@ dispositivi e le Decisioni.</p>
 </li>
 <li>
 <p><strong>Se c&#x27;è una finestra aperta</strong>, prima di partire l&#x27;app avvisa con «Finestra aperta» e «Finestra aperta in …:
-durante la forzatura il clima resta acceso.» (o «Finestre aperte in …: …»): scegli «Forza comunque» o «Annulla».</p>
+durante la forzatura il clima resta acceso.» (o «Finestre aperte in …: …»): scegli «Forza comunque» o «Annulla».
+Dal lotto 40 avvisa anche se un sensore è senza segnale: «Sensore della finestra senza segnale in …».</p>
 </li>
 <li>
 <p><strong>Compare</strong> «Forzatura … attiva fino alle …» con «ancora …» e il pulsante «Annulla forzatura».</p>
@@ -1949,7 +1950,8 @@ tocca un suggerimento.</p>
 <p><strong>La tua domanda</strong> compare a destra, in una bolla colorata.</p>
 </li>
 <li>
-<p><strong>Leggi</strong> «Sto elaborando…», poi la risposta a sinistra sotto il nome «Assistente», senza bolla né icona.</p>
+<p><strong>Leggi</strong> «Sto elaborando…», poi la risposta a sinistra sotto il nome «Assistente», senza bolla né icona.
+Dal lotto 40 la risposta arriva anche se nel frattempo cambi pagina o ricarichi.</p>
 </li>
 <li>
 <p><strong>Un badge compare solo se serve</strong>: «Richiede approvazione» (poi «Approvata», «Respinta» o «Scaduta») oppure
@@ -2496,7 +2498,7 @@ appartamento può avere un&#x27;eccezione.».</p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa puoi fare</th><th scope="col" class="align-left">Cosa succede</th></tr></thead>
 <tbody>
-<tr><td data-label="Cosa vedi" class="align-left">Nove interruttori in colonna, con i nomi del menu e una riga di spiegazione sotto ciascuno (tabella sotto)</td><td data-label="Cosa puoi fare" class="align-left">Accendere o spegnere una funzione per tutta l&#x27;organizzazione</td><td data-label="Cosa succede" class="align-left">Ogni cambio si salva subito («Funzioni aggiornate»)</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">Nove interruttori in colonna, con i nomi del menu e una riga di spiegazione sotto ciascuno (tabella sotto)</td><td data-label="Cosa puoi fare" class="align-left">Accendere o spegnere una funzione per tutta l&#x27;organizzazione</td><td data-label="Cosa succede" class="align-left">Ogni cambio si salva subito («Funzioni aggiornate»); dal lotto 40, mentre salva, gli interruttori sono grigi</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Ripristina tutte»</td><td data-label="Cosa puoi fare" class="align-left">Riaccendere tutto</td><td data-label="Cosa succede" class="align-left">Tutte le funzioni tornano accese</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">Lo stesso elenco per ogni appartamento, compatto e senza spiegazioni, con «eredita dall&#x27;organizzazione» oppure «eccezione per questo appartamento»</td><td data-label="Cosa puoi fare" class="align-left">Fare un&#x27;eccezione per un appartamento</td><td data-label="Cosa succede" class="align-left">L&#x27;eccezione sostituisce la scelta dell&#x27;organizzazione e può anche riaccendere una funzione spenta per tutti</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Torna all&#x27;organizzazione»</td><td data-label="Cosa puoi fare" class="align-left">Togliere l&#x27;eccezione</td><td data-label="Cosa succede" class="align-left">L&#x27;appartamento segue di nuovo l&#x27;organizzazione</td></tr>

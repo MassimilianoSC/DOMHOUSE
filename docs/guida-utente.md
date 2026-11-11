@@ -506,7 +506,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | «Modalità» | Comfort, Eco o Casa vuota; durante una forzatura, sotto, «forzata fino alle …» | Il colore della modalità: Comfort arancione chiaro, Eco verde salvia, Casa vuota azzurro ardesia |
 | «Occupazione» | «Vuoto», «Occupato» o «Prenotato» | «Occupato» verde, «Prenotato» ambra, «Vuoto» tortora |
 | «Prossimo check-in» o «Prossimo check-out» | Il primo fra arrivo e partenza; senza nessuno dei due, «Prossimo evento» con un trattino | Bianca |
-| «Finestre» | «Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore» | Verde se sono tutte chiuse, ambra se una è aperta; bianca senza sensori |
+| «Finestre» | «Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore». Dal lotto 40, se un sensore è senza segnale: «Stato non noto» (o «Nessuna aperta» se gli altri sono chiusi) con la riga «Senza segnale: …» e le stanze | Verde se sono tutte chiuse, ambra se una è aperta; bianca senza sensori; neutra se un sensore è senza segnale, perché di quella finestra non si sa nulla |
 | «Consumo di oggi» | I kWh di oggi; un trattino se la funzione Consumi è spenta | Bianca, con il numero in arancione |
 | «Dispositivi online» | Quanti rispondono, per esempio 5/6; sotto, «… offline» se qualcuno manca | Verde se rispondono tutti, ambra se qualcuno è offline |
 
@@ -578,7 +578,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | La descrizione, in grande | Che cosa chiede |
 | «Perché il motore lo propone», con il testo sotto | Il motivo, senza riquadro |
 | «Azione proposta» seguita dall'azione in grassetto | Che cosa partirà |
-| «… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta» | Quanto tempo resta per decidere |
+| «… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta» | Quanto tempo resta per decidere; dal lotto 40, a «scaduta» i pulsanti si disattivano |
 | Accanto: «Alla scadenza verrà respinta», «Alla scadenza verrà eseguita» o «Alla scadenza resta in attesa» | Cosa succede se nessuno decide |
 | Sotto una riga: «Nota (facoltativa)» e i pulsanti | Solo nelle richieste in attesa, per chi può decidere |
 | In fondo: «Approvata da … …» o «Respinta da … …» con la nota, poi l'«ID richiesta» | Solo nelle richieste già decise o scadute |
@@ -855,6 +855,7 @@ lavora con un accesso di assistenza.
 1. **Sotto «Forza per…»** premi «30 min», «2 h» o «6 h».
 2. **Se c'è una finestra aperta**, prima di partire l'app avvisa con «Finestra aperta» e «Finestra aperta in …:
    durante la forzatura il clima resta acceso.» (o «Finestre aperte in …: …»): scegli «Forza comunque» o «Annulla».
+   Dal lotto 40 avvisa anche se un sensore è senza segnale: «Sensore della finestra senza segnale in …».
 3. **Compare** «Forzatura … attiva fino alle …» con «ancora …» e il pulsante «Annulla forzatura».
 
 **Che cosa fa la forzatura:**
@@ -1087,6 +1088,7 @@ riquadro: la conversazione e, in fondo, il campo per scrivere.
    tocca un suggerimento.
 2. **La tua domanda** compare a destra, in una bolla colorata.
 3. **Leggi** «Sto elaborando…», poi la risposta a sinistra sotto il nome «Assistente», senza bolla né icona.
+   Dal lotto 40 la risposta arriva anche se nel frattempo cambi pagina o ricarichi.
 4. **Un badge compare solo se serve**: «Richiede approvazione» (poi «Approvata», «Respinta» o «Scaduta») oppure
    «Non riuscita». Una risposta normale non ha badge.
 5. **Se dopo 30 secondi** non c'è risposta leggi «Nessuna risposta dall'assistente: riprova».
@@ -1439,7 +1441,7 @@ appartamento può avere un'eccezione.».
 
 | Cosa vedi | Cosa puoi fare | Cosa succede |
 |---|---|---|
-| Nove interruttori in colonna, con i nomi del menu e una riga di spiegazione sotto ciascuno (tabella sotto) | Accendere o spegnere una funzione per tutta l'organizzazione | Ogni cambio si salva subito («Funzioni aggiornate») |
+| Nove interruttori in colonna, con i nomi del menu e una riga di spiegazione sotto ciascuno (tabella sotto) | Accendere o spegnere una funzione per tutta l'organizzazione | Ogni cambio si salva subito («Funzioni aggiornate»); dal lotto 40, mentre salva, gli interruttori sono grigi |
 | «Ripristina tutte» | Riaccendere tutto | Tutte le funzioni tornano accese |
 | Lo stesso elenco per ogni appartamento, compatto e senza spiegazioni, con «eredita dall'organizzazione» oppure «eccezione per questo appartamento» | Fare un'eccezione per un appartamento | L'eccezione sostituisce la scelta dell'organizzazione e può anche riaccendere una funzione spenta per tutti |
 | «Torna all'organizzazione» | Togliere l'eccezione | L'appartamento segue di nuovo l'organizzazione |
