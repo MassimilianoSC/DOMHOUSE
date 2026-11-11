@@ -182,6 +182,63 @@ def test_set_claims_writes_one_environment_and_keeps_the_flat_ones_for_the_old_b
     assert (migrated["tenant_id"], migrated["role"]) == (TENANT, "admin") and migrated["prod"]["role"] == "admin"
 
 
+def test_orphan_claims_lists_removed_people_and_not_members_nor_waiting_invitations():
+    """R4-1: the people removed before the fix kept their claims; the list names them, never a member nor a person
+    with an invitation waiting in that organisation, and reads each environment's own claims only."""
+    from bff.repository import User
+    from bff.repository.memory import InMemoryRepository
+    sc = _set_claims()
+    repo = InMemoryRepository()
+    repo.users["u-member"] = User(uid="u-member", email="m@x.it", tenant_id="t-a", role="admin")
+    repo.users["u-moved"] = User(uid="u-moved", email="mv@x.it", tenant_id="t-b", role="viewer")
+    repo.users["inv-w"] = User(uid="inv-w", email="w@x.it", tenant_id="t-a", role="operator")
+    acc = lambda uid, email, claims: SimpleNamespace(uid=uid, email=email, custom_claims=claims)
+    accounts_list = [
+        acc("u-member", "m@x.it", {"prod": {"tenant_id": "t-a", "role": "admin"}}),          # member: fine
+        acc("u-gone", "g@x.it", {"prod": {"tenant_id": "t-a", "role": "operator"}}),         # removed: listed
+        acc("u-flat", "f@x.it", {"tenant_id": "t-a", "role": "admin"}),                      # removed, flat: listed
+        acc("u-moved", "mv@x.it", {"prod": {"tenant_id": "t-a", "role": "admin"}}),          # record elsewhere: listed
+        acc("u-wait", "w@x.it", {"prod": {"tenant_id": "t-a", "role": "operator"}}),         # invitation waiting: fine
+        acc("u-stg", "s@x.it", {"staging": {"tenant_id": "t-s", "role": "viewer"}}),         # staging only
+        acc("u-none", "n@x.it", None),
+    ]
+    found = run(sc.orphans(repo, accounts_list, "prod"))
+    assert [(u.uid, t, r) for u, t, r, _ in found] == [("u-gone", "t-a", "operator"), ("u-flat", "t-a", "admin"),
+                                                         ("u-moved", "t-a", "admin")]
+    assert found[2][3].tenant_id == "t-b"
+    staging = run(sc.orphans(repo, accounts_list, "staging"))
+    assert [u.uid for u, *_ in staging] == ["u-stg"]                   # the flat ones never count in staging
+
+
+def test_orphan_claims_apply_removes_one_persons_claims_and_revokes_in_production(monkeypatch):
+    from bff.repository import User
+    from bff.repository.memory import InMemoryRepository
+    sc = _set_claims()
+    repo = InMemoryRepository()
+    repo.users["u-ok"] = User(uid="u-ok", email="ok@x.it", tenant_id="t-a", role="admin")
+    people = {"u-gone": SimpleNamespace(uid="u-gone", email="g@x.it", custom_claims={
+                  "prod": {"tenant_id": "t-a", "role": "admin"}, "tenant_id": "t-a", "role": "admin",
+                  "staging": {"tenant_id": "t-s", "role": "viewer"}}),
+              "u-ok": SimpleNamespace(uid="u-ok", email="ok@x.it", custom_claims={"prod": {"tenant_id": "t-a", "role": "admin"}})}
+    calls = []
+    fake = SimpleNamespace(
+        list_users=lambda: SimpleNamespace(iterate_all=lambda: iter(people.values())),
+        set_custom_user_claims=lambda uid, c: (calls.append(("claims", uid)), setattr(people[uid], "custom_claims", c)),
+        revoke_refresh_tokens=lambda uid: calls.append(("revoke", uid)))
+    monkeypatch.setattr(sc, "auth", fake)
+    monkeypatch.setattr(sc, "init", lambda: None)
+    monkeypatch.setattr(sc, "_firestore_repository", lambda option: repo)
+    assert sc.orphan_command("prod", False, None) == 1 and calls == []           # the list writes nothing
+    with pytest.raises(SystemExit):
+        sc.orphan_command("prod", True, "ok@x.it")                                # a member: refused
+    with pytest.raises(SystemExit):
+        sc.orphan_command("prod", True, None)                                     # never everybody at once
+    assert sc.orphan_command("prod", True, "G@x.it") == 1
+    assert people["u-gone"].custom_claims == {"staging": {"tenant_id": "t-s", "role": "viewer"}}
+    assert calls == [("claims", "u-gone"), ("revoke", "u-gone")]
+    assert people["u-ok"].custom_claims == {"prod": {"tenant_id": "t-a", "role": "admin"}}
+
+
 # -------- D-180: the model in the European Union, for every model and environment --------
 def test_the_model_location_must_be_european():
     import dataclasses
