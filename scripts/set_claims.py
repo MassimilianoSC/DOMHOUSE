@@ -262,11 +262,14 @@ def main() -> None:
     p.add_argument("--create", action="store_true", help="create the Firebase user if missing")
     p.add_argument("--send-reset-link", action="store_true", help="print a password setup link")
     p.add_argument("--from-repo", action="store_true", help="process every invited (inv-*) user in the repository")
-    p.add_argument("--env", choices=ENVS, default="prod", help="the environment of the claims (P-67), prod by default")
+    p.add_argument("--env", choices=ENVS, default=None,
+                   help="the environment of the claims (P-67), prod by default; required with --from-repo (D26)")
     p.add_argument("--migrate-claims", action="store_true", help="rewrite the flat claims per environment (P-67)")
     p.add_argument("--apply", action="store_true", help="with --migrate-claims or --orphan-claims: write (without: only show)")
     p.add_argument("--orphan-claims", action="store_true", help="R4-1: claims naming an organisation without the record")
     a = p.parse_args()
+    explicit_env = a.env
+    a.env = a.env or "prod"
     if a.orphan_claims:
         if a.tenant or a.role or a.from_repo or a.migrate_claims or a.tenant_name is not None or a.platform_add:
             p.error("--orphan-claims va usato solo con --env, --apply e --email")
@@ -288,6 +291,16 @@ def main() -> None:
         return
     init()
     if a.from_repo:
+        # D26 (P-83): the invitations are read from the database open now; their claims must be written for that same
+        # environment, said explicitly, or a staging invitation became production's (and production sessions revoked)
+        if explicit_env is None:
+            p.error("--from-repo vuole --env prod oppure --env staging, quello del database da cui legge gli inviti")
+        from bff.config import get_settings
+        database = get_settings().firestore_database
+        if get_settings().repository != "firestore" or (explicit_env == "staging") != (database == "staging"):
+            raise SystemExit(f"--from-repo --env {explicit_env} con il database «{database}»: per lo staging "
+                             "REPOSITORY=firestore FIRESTORE_DATABASE=staging e --env staging, per la produzione "
+                             "REPOSITORY=firestore e --env prod. Niente è stato scritto")
         asyncio.run(from_repo(a.create, a.send_reset_link, a.env))
     elif a.email and a.tenant and a.role:
         set_claims(a.email, a.tenant, a.role, a.create, a.send_reset_link, a.env)

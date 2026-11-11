@@ -323,3 +323,43 @@ def test_both_manifests_start(monkeypatch):
         e = manifest_env(manifest)
         settings = dataclasses.replace(config.get_settings(), app_env=e["APP_ENV"], auth_mode=e["AUTH_MODE"])
         main.check_access_settings(settings, {"K_SERVICE": "domotica-bff"})
+
+
+@pytest.mark.parametrize("argv, database", [(["--from-repo"], "staging"),                      # no --env: refused
+                                            (["--from-repo", "--env", "prod"], "staging"),     # the wrong database
+                                            (["--from-repo", "--env", "staging"], "(default)")])
+def test_from_repo_needs_its_environment_and_the_matching_database(monkeypatch, argv, database):
+    """D26 (P-83): --from-repo wrote production claims (the default --env) for the invitations of whatever database was
+    open, and revoked sessions: with the staging database, a staging invitation became a production admin, or locked a
+    production account out. Now --env is required and must match the database; nothing is written otherwise."""
+    import sys
+
+    from bff import config as bff_config
+    sc = _set_claims()
+    s = dataclasses.replace(bff_config.get_settings(), repository="firestore", firestore_database=database)
+    monkeypatch.setattr(bff_config, "get_settings", lambda: s)
+    written = []
+    monkeypatch.setattr(sc, "set_claims", lambda *a, **k: written.append(a))
+    monkeypatch.setattr(sc, "init", lambda: None)
+    monkeypatch.setattr(sys, "argv", ["set_claims.py", *argv])
+    with pytest.raises(SystemExit):
+        sc.main()
+    assert written == []
+
+
+def test_from_repo_with_its_environment_goes_on(monkeypatch):
+    import sys
+
+    from bff import config as bff_config
+    sc = _set_claims()
+    s = dataclasses.replace(bff_config.get_settings(), repository="firestore", firestore_database="staging")
+    monkeypatch.setattr(bff_config, "get_settings", lambda: s)
+    seen = []
+
+    async def fake_from_repo(create, send_reset_link, env="prod"):
+        seen.append(env)
+    monkeypatch.setattr(sc, "from_repo", fake_from_repo)
+    monkeypatch.setattr(sc, "init", lambda: None)
+    monkeypatch.setattr(sys, "argv", ["set_claims.py", "--from-repo", "--env", "staging"])
+    sc.main()
+    assert seen == ["staging"]

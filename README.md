@@ -259,7 +259,7 @@ Primo amministratore e utenti invitati:
 
 ```bash
 python scripts/set_claims.py --email admin@azienda.it --tenant t-flatsharing-demo --role admin --create --send-reset-link
-python scripts/set_claims.py --from-repo     # claim per tutti gli utenti invitati dall'area Amministrazione
+REPOSITORY=firestore GCP_PROJECT_ID=your-gcp-project-id python scripts/set_claims.py --from-repo --env prod   # claim per tutti gli invitati del database di produzione (D26: --env obbligatorio e uguale al database)
 ```
 
 Un utente invitato dall'area Amministrazione riceve un'email (link all'app, «Accedi con Google» e un link Firebase per
