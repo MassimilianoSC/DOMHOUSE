@@ -199,3 +199,47 @@ l'infrarosso se ci sono climatizzatori.
 | Noi (o1), committente | Creare sulla VM il motore di `lab-01` con il traduttore Shelly e il catalogo | Prima della tappa B |
 | Committente | Rivalutare i permessi di Youssouf sulla VM (D-47) | Prima della consegna |
 | Youssouf | Le pagine del dizionario per gli altri modelli: relè della caldaia, misuratore, sensori Bluetooth con il ponte, infrarosso Athom; e il catalogo con gli Shelly «ponte» | Prima di un appartamento vero; stima da chiedergli |
+
+---
+
+## Passo 3. Il viaggio inverso: «il gestore accende la presa dal telefono»
+
+```
+ ZONA 3 (web app)                       ZONA 2 (la centrale)                        ZONA 1
+ telefono ─①─► server ─②─► motore ─③─► connector ─④─► broker ─⑤─internet─► presa
+     ▲                                                                         │
+     └──────────── ⑥ la conferma torna indietro per la strada del passo 2 ─────┘
+```
+
+| Tappa | Cosa succede | Di chi è |
+|---|---|---|
+| ① Il tocco | Il gestore tocca «Accendi»; il sito manda la richiesta al server con un codice per seguirla; sulla scheda compare «in corso» | Noi |
+| ② Il server | Controlla chi è, se può comandare (la sola lettura no), se vede l'appartamento; passa la richiesta al motore giusto | Noi |
+| ③ Il motore | Controlla le regole (con una finestra aperta non accende il riscaldamento); se il dispositivo è offline risponde subito «non raggiungibile»; altrimenti dice al traduttore lo **stato da raggiungere**: «la presa deve essere accesa» | Noi |
+| ④ Il connector | Riscrive in dialetto Shelly e mette il comando nella casella della presa (`lab-01/<codice presa>/rpc`), nel modo **«non conservato»**: se la presa non è collegata il comando si perde invece di restare in attesa, così una stufa non si accende un'ora dopo | Youssouf (correzione di una riga da fare) |
+| ⑤ Il broker e la presa | Il broker consegna il comando sulla linea aperta; la presa scatta | Noi il broker, il produttore la presa |
+| ⑥ La conferma | La presa risponde nella sua casella di risposta («fatto, sono accesa») e manda la novità («uscita accesa»); i messaggi rifanno la strada del passo 2; la scheda passa a «eseguito» | Tutti |
+
+**Tempi:** il motore aspetta la conferma al massimo 9 secondi, poi il comando risulta «nessuna risposta» e il gestore
+lo vede. Con una presa vera in un Wi-Fi normale ci aspettiamo uno o due secondi: si misurerà nel test vero.
+
+**Due casi speciali:**
+
+- **La caldaia non si comanda come la presa.** Il gestore non dice «accendi il relè», dice «riscaldamento abilitato a
+  21 °C». Poi il motore, ogni minuto, confronta la temperatura del sensore con i 21 °C e dà al relè l'ordine «accenditi»
+  o «spegniti». Così la caldaia segue la temperatura anche quando nessuno guarda l'app.
+- **Il climatizzatore a infrarossi non può confermare:** il telecomando «spara» il comando ma non sa se è arrivato.
+  Il motore guarda il **consumo** sulla linea del climatizzatore: se sale, si è acceso. Per questo nel laboratorio c'è
+  anche il misuratore EM Mini.
+
+**Cosa è provato:** da ① a ③ e il ritorno al telefono funzionano da settimane con il connector simulato; ④ e ⑤ con una
+presa vera sono il cuore della tappa B.
+
+### Cosa resta da fare (passo 3)
+
+| Chi | Che cosa | Per quando |
+|---|---|---|
+| Youssouf | Mandare i comandi nel modo «non conservato» (QoS 0) nel suo connector, con le sue prove | Prima del primo comando vero (tappa B) |
+| Youssouf | Per il relè della caldaia: la pagina del dizionario dello Shelly 1 Gen4 e il legame con il sensore nel catalogo | Prima di un appartamento vero |
+| Youssouf | Per il climatizzatore: la pagina dell'Athom e il legame con il misuratore EM Mini nel catalogo; misurare in laboratorio in quanti secondi sale il consumo dopo il comando (il motore aspetta un aumento di 20 W entro circa 8 secondi) | Prima di un appartamento con climatizzatori |
+| Noi (tutti) | Misurare nel test vero il tempo fra il tocco e «eseguito» | Tappa B |
