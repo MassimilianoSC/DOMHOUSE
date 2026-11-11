@@ -470,7 +470,13 @@ parte»); non si sospende con D-217.
 `booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
 annullata dopo il pre-arrivo, con l'appartamento rimesso a vuoto dal motore (D-121); il `body` è il testo della decisione.
 `device_offline` parte se il dispositivo è ancora offline dopo i minuti della regola `offline_alert` (15 se non
-leggibile). `instance_down` ha due cause, con una notifica sola per episodio qualunque sia (stesso `tag`
+leggibile). Lo stato «non in linea» invece arriva subito (D-225, 11 novembre): l'evento `device.online` con
+`online: false` parte appena il connector dice offline, cioè alla caduta del collegamento del dispositivo o dopo la
+soglia di silenzio del suo tipo (connector-v2.md §2.6), e da lì `GET /devices` e lo stream lo mostrano. I minuti di
+`offline_alert` contano solo per la decisione «offline da oltre N minuti» del motore e per questa notifica. La frase del
+contratto su `device.online` («offline dopo `offline_alert.minutes` senza messaggi») è superata da questo
+comportamento; il contratto non si modifica (limiti-noti.md). Così l'app non mostra «in linea» un dispositivo che
+rifiuterebbe i comandi con 409 `device_offline`. `instance_down` ha due cause, con una notifica sola per episodio qualunque sia (stesso `tag`
 `instance:<apartment_id>` e stessa chiave `push:instance_down:<apartment_id>` in `work_claims`):
 - connector del motore giù (D-131): evento `instance.health` con `status` `down`, dal motore che risponde. Parte se
   resta giù per gli stessi minuti della regola `offline_alert`, mai con la regola spenta. `body` «Il connettore
