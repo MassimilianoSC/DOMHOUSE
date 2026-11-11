@@ -127,3 +127,13 @@ def test_memory_store_keeps_the_demonstration_as_before():
     assert isinstance(engine.store, MemoryStore) and not engine.restored
     assert engine.bookings and engine.decisions          # the demonstration's history
     assert engine.emit("apartment.changed", {}, CORR)["id"] == "4101"
+
+
+def test_every_commit_reaches_the_disk(tmp_path):
+    """D34 (P-83): with WAL and synchronous NORMAL a crash of the VM (not of the process) could lose the last commits:
+    a scheduled action closed as done could come back «planned» and run again. FULL syncs the WAL at every commit."""
+    from engine.store import SqliteStore
+    store = SqliteStore(tmp_path / "engine.db")
+    assert store.db.execute("PRAGMA synchronous").fetchone()[0] == 2           # FULL
+    assert store.db.execute("PRAGMA journal_mode").fetchone()[0] == "wal"
+    store.close()
