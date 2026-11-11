@@ -30,6 +30,7 @@ message into its log. They never chain the original exception either.
 yaml is imported only by load_catalog: parse_catalog works on a mapping, so the package and the tests' harness import
 without PyYAML.
 """
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -159,12 +160,24 @@ def _channel(shelly: Mapping, where: str) -> int:
     return channel
 
 
+# The broker's rule for a device id (connector-v2.md §7.1): the same expression as ID_RE in scripts/broker_accounts.py,
+# copied, not imported (scripts/ is outside the engine's package). Change one, change the other: an id the catalog
+# accepts and the broker refuses would show only when the device is put into service. Checked with fullmatch, so a
+# trailing newline is refused too. "connector" is the connector's own user (<apartment_id>.connector): reserved.
+BROKER_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
+BROKER_RESERVED_ID = "connector"
+
+
 def _shelly_id(shelly: Mapping, where: str) -> str:
     shelly_id = shelly.get("id")
     if not _text(shelly_id):
         raise CatalogError(f"{where}: shelly.id is missing or not a text")
-    if shelly_id != shelly_id.strip() or any(c in shelly_id for c in "/+#") or not shelly_id.isprintable():
-        raise CatalogError(f"{where}: shelly.id must be one MQTT topic level (no spaces, /, + or #)")
+    if not BROKER_ID_RE.fullmatch(shelly_id):
+        raise CatalogError(f"{where}: shelly.id must be one MQTT topic level and a broker id: letters, digits, "
+                           f"_ and -, starting with a letter or a digit, at most 64 characters "
+                           f"(^[A-Za-z0-9][A-Za-z0-9_-]{{0,63}}$)")
+    if shelly_id == BROKER_RESERVED_ID:
+        raise CatalogError(f"{where}: shelly.id must not be connector, the broker's name for the connector itself")
     return shelly_id
 
 

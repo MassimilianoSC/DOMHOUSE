@@ -21,6 +21,7 @@ from engine.connector.interface import ConnectorConfig
 from engine.connector.shelly.translate import MAX_CLOCK_SKEW_S, notification_ts
 from engine.connector.shelly.transport.base import (ConnectionEvent, Notification, RpcError, TransportOffline,
                                                     TransportTimeout)
+from engine.connector.shelly.transport import mqtt as mqtt_module
 from engine.connector.shelly.transport.mqtt import (MqttConfigError, MqttSettings, MqttTransport, settings_from_env)
 
 from .fake_mqtt import FakeBroker, capture_answers, capture_responder, load_capture
@@ -271,7 +272,7 @@ def test_switch_set_round_trip_from_the_capture():
         assert await t.call(SID, "Switch.Set", {"id": 0, "on": True}, 1) == {"was_on": False}
         topic, payload, qos = broker.published[0]
         request = json.loads(payload)
-        assert (topic, qos) == (f"dev/{SID}/rpc", 1)
+        assert (topic, qos) == (f"dev/{SID}/rpc", 0)       # QoS 0: never queued for an absent device (§7.2)
         assert request["src"] == f"dev/{SID}/connector"
         assert (request["method"], request["params"]) == ("Switch.Set", {"id": 0, "on": False})
         assert isinstance(request["id"], int)
@@ -398,6 +399,45 @@ def test_request_ids_are_unique_across_transports():
         await a.stop()
         await b.stop()
     run(scenario)
+
+
+def request_ids_from(monkeypatch, first: int | None, n: int = 3) -> list[int]:
+    """The ids of n requests of a process whose counter starts at first (None: the random start of a real run)."""
+    monkeypatch.setattr(mqtt_module, "_request_ids", mqtt_module._request_id_counter(first))
+
+    async def scenario():
+        broker = FakeBroker()
+        broker.set_online(APT, SID, True)
+        t = await started(broker)
+        await settle()
+        for _ in range(n):
+            await t.call(SID, "Switch.Set", {"id": 0, "on": False}, 1)
+        await t.stop()
+        return [r["id"] for r in broker.requests()]
+    return run(scenario)
+
+
+def test_request_ids_start_from_the_chosen_value_and_grow_by_one(monkeypatch):
+    ids = request_ids_from(monkeypatch, 734_512_001)
+    assert ids == [734_512_001, 734_512_002, 734_512_003]
+    assert len(set(ids)) == 3 and all(isinstance(i, int) and not isinstance(i, bool) for i in ids)
+
+
+def test_two_starts_give_different_ids(monkeypatch):
+    """A late answer of the previous run (QoS 1, sessions kept up to an hour) must not match a new request."""
+    before = request_ids_from(monkeypatch, 1_000)
+    after = request_ids_from(monkeypatch, 52_000_000)
+    assert not set(before) & set(after)
+
+
+def test_the_start_of_a_run_is_random(monkeypatch):
+    starts = []
+    monkeypatch.setattr(mqtt_module.secrets, "randbelow", lambda n: starts.append(n) or 41)
+    assert next(mqtt_module._request_id_counter()) == 42              # randbelow(2**30) + 1
+    assert starts == [mqtt_module.REQUEST_ID_FIRST_MAX] and mqtt_module.REQUEST_ID_FIRST_MAX == 2**30
+    monkeypatch.undo()
+    firsts = {next(mqtt_module._request_id_counter()) for _ in range(5)}
+    assert len(firsts) > 1 and all(1 <= f <= 2**30 for f in firsts)    # not 1 every time
 
 
 # --- broker drop -------------------------------------------------------------------------------------------------

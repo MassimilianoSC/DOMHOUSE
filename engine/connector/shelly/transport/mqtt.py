@@ -3,7 +3,7 @@
 Topics, all under the apartment's prefix (ConnectorConfig.apartment_id), as measured on the bench (PR #1, 10 November
 2026) with a Plug M Gen3 on Mosquitto:
 
-  <apartment_id>/<shelly_id>/rpc                the device receives the RPC requests (we publish, QoS 1)
+  <apartment_id>/<shelly_id>/rpc                the device receives the RPC requests (we publish, QoS 0)
   <apartment_id>/<shelly_id>/events/rpc         NotifyStatus / NotifyFullStatus / NotifyEvent (we subscribe, QoS 1)
   <apartment_id>/<shelly_id>/online             "true" / "false", retained; "false" is the device's last will
   <apartment_id>/<shelly_id>/connector/rpc      the answers to our RPCs (we subscribe, QoS 1)
@@ -67,15 +67,31 @@ ENV_PASSWORD = "SHELLY_MQTT_PASSWORD"
 ENV_TLS = "SHELLY_MQTT_TLS"
 ENV_CA_FILE = "SHELLY_MQTT_CA_FILE"
 
-QOS = 1                     # the devices publish with QoS 1
+# Delivery levels (connector-v2.md §7.2, D-215). The connector's requests go with QoS 0: the broker never queues a
+# QoS 0 message for a client that is away, so a command sent to an absent device is lost (the call times out, as
+# before) instead of reaching it late when it comes back. The subscriptions stay at QoS 1, the level at which the
+# Shelly devices publish their answers and notifications.
+REQUEST_QOS = 0
+SUBSCRIPTION_QOS = 1
 KEEPALIVE_S = 60
 CONNECT_TIMEOUT_S = 10.0    # one connection attempt to the broker
 START_WAIT_S = 15.0         # start() waits at most this for the first attempt to end
 RECONNECT_FIRST_S = 1.0
 RECONNECT_MAX_S = 30.0
 
-# one counter for the whole process: two transports of the same apartment in one process must not mix their answers
-_request_ids = itertools.count(1)
+# one counter for the whole process: two transports of the same apartment in one process must not mix their answers.
+# It starts from a random number chosen at start: answers are QoS 1 and the broker keeps a session up to an hour
+# (§7.2), so a late answer to a request of the previous run must not carry the id of a new request, as it would if
+# every run counted from 1. Below 2**30, the counter stays a small positive integer for a billion requests.
+REQUEST_ID_FIRST_MAX = 2**30
+
+
+def _request_id_counter(first: int | None = None) -> "itertools.count[int]":
+    """The process's request ids: from `first` (the tests), else from a random number in 1..REQUEST_ID_FIRST_MAX."""
+    return itertools.count(secrets.randbelow(REQUEST_ID_FIRST_MAX) + 1 if first is None else first)
+
+
+_request_ids = _request_id_counter()
 _STOP = object()
 
 
@@ -254,7 +270,7 @@ class MqttTransport:
         self._queue = asyncio.Queue()
         self._first_attempt = asyncio.Event()
         self._waiting_since = self._clock()
-        self._task =asyncio.create_task(self._run(), name=f"mqtt-transport-{self._apartment_id}")
+        self._task = asyncio.create_task(self._run(), name=f"mqtt-transport-{self._apartment_id}")
         try:
             async with asyncio.timeout(START_WAIT_S):
                 await self._first_attempt.wait()
@@ -296,7 +312,7 @@ class MqttTransport:
             async with asyncio.timeout(timeout_s):
                 try:
                     await client.publish(f"{self._apartment_id}/{shelly_id}/rpc",
-                                         json.dumps(request, separators=(",", ":")), qos=QOS)
+                                         json.dumps(request, separators=(",", ":")), qos=REQUEST_QOS)
                 except Exception:
                     raise TransportOffline() from None
                 return await future
@@ -314,7 +330,7 @@ class MqttTransport:
             try:
                 async with self._factory(self._settings, self._client_id) as client:
                     for topic in self._subscriptions():
-                        await client.subscribe(topic, qos=QOS)
+                        await client.subscribe(topic, qos=SUBSCRIPTION_QOS)
                     self._client, reached = client, True
                     delay = RECONNECT_FIRST_S
                     # every (re)connection, with how long the connector waited for the broker: until then status().up
