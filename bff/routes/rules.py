@@ -22,6 +22,16 @@ def err(status: int, error: str, message: str, **details) -> JSONResponse:
     return JSONResponse(body, status_code=status)
 
 
+NOT_AVAILABLE = "Funzione non disponibile per questo appartamento"
+
+
+async def _has_rules(apt) -> bool:
+    """D19 (P-83): «rules» enabled for the apartment (or its organisation), as the proxy checks it (#9)."""
+    from ..features import configured_features
+    tenant = await get_repository().get_tenant(apt.tenant_id)
+    return "rules" in configured_features(tenant.enabled_features if tenant else None, apt.enabled_features)
+
+
 async def _writer_apartment(user: CurrentUser, apartment_id: str):
     """The apartment, for an operator or an admin; a JSONResponse to answer otherwise."""
     apt = await get_tenant_apartment(user, apartment_id)
@@ -30,6 +40,8 @@ async def _writer_apartment(user: CurrentUser, apartment_id: str):
         return None, err(403, "forbidden", "Il tuo ruolo consente solo la lettura")
     if not apt.enabled:
         return None, err(409, "apartment_disabled", "Appartamento disattivato")
+    if not await _has_rules(apt):                        # D19: as the proxy answers to GET/PUT /rules
+        return None, err(501, "not_implemented", NOT_AVAILABLE)
     return apt, None
 
 
@@ -189,6 +201,8 @@ async def _read_all(targets: list) -> dict:
     async def one(t):
         if not t.enabled:
             return t.apartment_id, None
+        if not await _has_rules(t):                      # D19: never read nor written
+            return t.apartment_id, NOT_AVAILABLE
         async with gate:
             try:
                 return t.apartment_id, await _rules(t)
@@ -201,6 +215,8 @@ async def _source(apt):
     """The source's RuleSet, or the JSONResponse to answer."""
     if not apt.enabled:
         return None, err(409, "apartment_disabled", "Appartamento disattivato")
+    if not await _has_rules(apt):                        # D19
+        return None, err(501, "not_implemented", NOT_AVAILABLE)
     try:
         return await _rules(apt), None
     except Exception as exc:
@@ -225,6 +241,8 @@ async def copy_preview(apartment_id: str, request: Request, user: CurrentUser = 
         got = read[t.apartment_id]
         if got is None:
             row.update(status="disabled", message="Appartamento disattivato")
+        elif got == NOT_AVAILABLE:
+            row.update(status="refused", message=NOT_AVAILABLE)
         elif isinstance(got, Exception):
             row.update(status="unreachable", message="Sistema domotico non raggiungibile")
         else:
@@ -267,6 +285,8 @@ async def copy_rules(apartment_id: str, request: Request, user: CurrentUser = De
         got = read[t.apartment_id]
         if got is None:
             return {**row, "outcome": "disabled", "message": "Appartamento disattivato"}
+        if got == NOT_AVAILABLE:
+            return {**row, "outcome": "refused", "message": NOT_AVAILABLE}
         if isinstance(got, Exception):
             return {**row, "outcome": "unreachable", "message": "Sistema domotico non raggiungibile"}
         if got["updated_at"] != based_on.get(t.apartment_id):
