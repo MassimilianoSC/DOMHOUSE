@@ -310,7 +310,9 @@ class InMemoryRepository:
 
     # P-36 point 14: no await between the check and the write, so atomic within the (single) process
     def _other_admins(self, tenant_id, uid):
-        return [u for u in self.users.values() if u.tenant_id == tenant_id and u.role == "admin" and u.uid != uid]
+        # D39 (P-83): an invitation (inv-…) is nobody who can sign in: it never counts as an admin
+        return [u for u in self.users.values() if u.tenant_id == tenant_id and u.role == "admin" and u.uid != uid
+                and not u.uid.startswith("inv-")]
 
     async def upsert_user_keeping_an_admin(self, user):
         current = self.users.get(user.uid)

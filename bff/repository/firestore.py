@@ -502,7 +502,8 @@ class FirestoreRepository:
 
         @firestore.async_transactional
         async def txn(tx):
-            admins = [d.id async for d in self._admins_query(user.tenant_id).stream(transaction=tx)]
+            admins = [d.id async for d in self._admins_query(user.tenant_id).stream(transaction=tx)
+                      if not d.id.startswith("inv-")]                      # D39: invitations never count
             if user.role != "admin" and user.uid in admins and len(admins) == 1:
                 return False
             tx.set(ref, user.model_dump())
@@ -522,7 +523,8 @@ class FirestoreRepository:
             if not snap.exists:
                 return "not_found"
             if snap.get("role") == "admin":
-                admins = [d.id async for d in self._admins_query(snap.get("tenant_id")).stream(transaction=tx)]
+                admins = [d.id async for d in self._admins_query(snap.get("tenant_id")).stream(transaction=tx)
+                          if not d.id.startswith("inv-")]                  # D39: invitations never count
                 if admins == [uid]:
                     return "last_admin"
             tx.delete(ref)

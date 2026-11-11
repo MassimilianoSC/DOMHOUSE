@@ -225,6 +225,19 @@ def test_last_admin_concurrent_deletions(repo):
     assert run(repo.delete_user_keeping_an_admin("tc2-viewer")) == "deleted"      # non-admins are never blocked
 
 
+def test_an_invitation_never_counts_as_an_admin(repo):
+    """D39 (P-83, = R4-3): the only real admin A with a pending admin invitation (inv-…) could delete or demote
+    themselves: the invitation counted as «another admin», and the organisation was left with nobody able to sign in
+    as admin. Now invitations never count; deleting or demoting an invitation itself is never blocked."""
+    run(repo.upsert_user(User(uid="tc3-a", email="a@tc3.it", tenant_id="tc3", role="admin")))
+    run(repo.upsert_user(User(uid="inv-tc3-x", email="x@tc3.it", tenant_id="tc3", role="admin")))
+    assert run(repo.delete_user_keeping_an_admin("tc3-a")) == "last_admin"
+    demoted = run(repo.get_user("tc3-a")).model_copy(update={"role": "viewer"})
+    assert run(repo.upsert_user_keeping_an_admin(demoted)) is False
+    assert run(repo.get_user("tc3-a")).role == "admin"
+    assert run(repo.delete_user_keeping_an_admin("inv-tc3-x")) == "deleted"
+
+
 def test_last_platform_manager_concurrent_removals(repo):
     from bff.repository import PlatformMember
 
