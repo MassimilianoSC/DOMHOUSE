@@ -91,6 +91,11 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     expect(actionLabel("window_restore")).toBe("Finestra chiusa: riacceso");
     // lotto 39: azione programmata eseguita in parte (D-219, aggiunta 2)
     expect(actionLabel("schedule_partial")).toBe("Programma: eseguita in parte");
+    // P-83, o1 6cfa5f8: check-out con il prossimo ospite vicino (D05), arrivo spostato dopo il pre-arrivo (D06),
+    // evento di prenotazione arrivato in ritardo (D07)
+    expect(actionLabel("checkout_kept_comfort")).toBe("Check-out: casa non svuotata");
+    expect(actionLabel("booking_moved_reset")).toBe("Arrivo spostato: casa vuota");
+    expect(actionLabel("booking_event_stale")).toBe("Prenotazione: evento vecchio ignorato");
   });
 
   it("ogni azione che il motore scrive nelle decisioni è nell'elenco del sito (controllo automatico, lotto 39)", () => {

@@ -62,6 +62,7 @@ export const DECISION_ACTIONS = [
   "schedule_create", "schedule_move", "schedule_cancel", "schedule_missed", "schedule_deferred",
   "schedule_failed", "schedule_partial",
   "booking_created", "booking_changed", "booking_cancelled", "checkin", "checkout", "booking_cancel_reset",
+  "checkout_kept_comfort", "booking_moved_reset", "booking_event_stale",
   "offline_alert", "mold_warning", "frost_heating_on", "frost_heating_off", "thermostat_sensor",
   "window_rule_suspended", "command_unverified", "connector_down", "connector_up", "auto_regulation_off", "frost_inactive",
   "setpoint_limits_ignored", "instance_reachable", "window_restore",
