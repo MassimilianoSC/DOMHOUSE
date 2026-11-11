@@ -34,7 +34,8 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
     only, at /api/v1; without, any apartment at /{apartment_id}/api/v1."""
     enabled = list(features)
     ping = ping_seconds
-    app = FastAPI(title=title, lifespan=lifespan)
+    # D61 (P-83): no /docs, /redoc, /openapi.json: they answered without the key (the contract is contract/openapi.yaml)
+    app = FastAPI(title=title, lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     single = apartment_id
     router = APIRouter(prefix="/api/v1" if single else "/{apartment_id}/api/v1")
     contract_path = re.compile(r"^/api/v1(/.*)?$" if single else r"^/[^/]+/api/v1(/.*)?$")

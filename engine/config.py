@@ -7,7 +7,7 @@
     HOST, PORT     optional   where to listen; 127.0.0.1 and 8100 by default (in the container 0.0.0.0)
     DATA_DIR       optional   the apartment's data, /data/<apartment_id> by default (SQLite from step 3)
     CATALOG_PATH   optional   the devices' catalog, <DATA_DIR>/catalog.yaml by default (read by the connector)
-    MODEL_BASE_URL optional   P-60 step 9: the BFF's address (https://..., its POST /internal/ai/chat): the assistant
+    MODEL_BASE_URL optional   P-60 step 9: the BFF's address (https:// only, D35; its POST /internal/ai/chat): the assistant
                               answers with the real model; without it /ask is the keyword one (simulated) or 501
 
 The settings of the rules (D-131, D-133), optional, per apartment (on the VM in <apartment_id>.settings.env, written by
@@ -188,7 +188,8 @@ def load_config(env: Mapping[str, str] | None = None) -> EngineConfig:
         problems.append("TIMEZONE must be a time zone name, e.g. Europe/Rome")
     settings["TIMEZONE"] = timezone
     model_base_url = env.get("MODEL_BASE_URL", "").strip() or None
-    if model_base_url and not model_base_url.startswith(("https://", "http://")):
+    # D35 (P-83): only https: the engine's key (X-API-Key) goes with every request, never in clear
+    if model_base_url and not (model_base_url.lower().startswith("https://") and len(model_base_url) > len("https://")):
         problems.append("MODEL_BASE_URL must be the BFF's address, https://...")
     if problems:
         raise ConfigError("\n".join(problems))

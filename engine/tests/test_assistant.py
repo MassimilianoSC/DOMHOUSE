@@ -298,6 +298,15 @@ def test_settings_of_the_assistant():
         load_config({**base, "MODEL_BASE_URL": "domotica-bff"})
 
 
+def test_the_model_address_must_be_https():
+    """D35 (P-83): the engine sends its key (X-API-Key) to MODEL_BASE_URL: http:// would send it in clear."""
+    base = {"APARTMENT_ID": "apt-prova-01", "API_KEY": "k" * 16, "CONNECTOR": "simulated"}
+    for url in ("http://domotica-bff.example", "HTTP://domotica-bff.example", "https://"):
+        with pytest.raises(ConfigError, match="MODEL_BASE_URL"):
+            load_config({**base, "MODEL_BASE_URL": url})
+    assert load_config({**base, "MODEL_BASE_URL": "HTTPS://domotica-bff.example"}).model_base_url
+
+
 def test_the_demonstrations_get_the_model_from_the_registry():
     """D-132 point 5: the BFF's demonstration apartments with the real assistant (AI_DEMOS), the keywords without."""
     script = Script(js("Ciao dal modello."))

@@ -156,6 +156,14 @@ def test_real_mode_has_no_test_hooks_and_no_ask(tmp_path):
         assert client.get("/api/v1/apartment", headers=HEADERS).json()["current_booking_id"] is None   # no demo history
 
 
+def test_no_schema_pages_without_the_key(tmp_path):
+    """D61 (P-83): /docs, /redoc and /openapi.json answered 200 without a key, listing every path of the engine."""
+    with TestClient(create_engine_app(config(DATA_DIR=str(tmp_path)))) as client:
+        for path in ("/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"):
+            assert client.get(path).status_code == 404, path
+            assert client.get(path, headers=HEADERS).status_code == 404, path
+
+
 # ---- what reaches the app ------------------------------------------------------------------------------------------
 class CatalogConnector:
     """A connector as a real one starts: a catalog with few fields, then changes. Commands follow `behaviour`."""
