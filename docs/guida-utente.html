@@ -1651,7 +1651,7 @@ regole ripartono.</p>
 <tr><td data-label="Dispositivo" class="align-left">Prese e interruttori</td><td data-label="Cosa puoi fare" class="align-left">Tocca l&#x27;interruttore («Accendi …» / «Spegni …»)</td><td data-label="Cosa succede" class="align-left">Lo stato diventa «Acceso» o «Spento»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Caldaia</td><td data-label="Cosa puoi fare" class="align-left">«Attiva …» / «Disattiva …» abilita o disabilita il riscaldamento</td><td data-label="Cosa succede" class="align-left">Leggi «Riscaldamento abilitato» / «Riscaldamento disabilitato»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Caldaia e climatizzatore</td><td data-label="Cosa puoi fare" class="align-left">«Diminuisci temperatura» e «Aumenta temperatura» accanto a «Temperatura», a passi di 0,5 °C, entro «da … a … °C»</td><td data-label="Cosa succede" class="align-left">Fuori dai limiti il comando è rifiutato («Il setpoint deve essere tra … e …»)</td></tr>
-<tr><td data-label="Dispositivo" class="align-left">Climatizzatore</td><td data-label="Cosa puoi fare" class="align-left">L&#x27;interruttore</td><td data-label="Cosa succede" class="align-left">Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all&#x27;inizio)</td></tr>
+<tr><td data-label="Dispositivo" class="align-left">Climatizzatore</td><td data-label="Cosa puoi fare" class="align-left">L&#x27;interruttore</td><td data-label="Cosa succede" class="align-left">Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all&#x27;inizio). Dal lotto 40 un climatizzatore a infrarossi con misuratore risulta acceso se assorbe corrente, anche quando il comando era «non confermato»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Climatizzatore, «Modo»</td><td data-label="Cosa puoi fare" class="align-left">Scegli dalla tendina: Caldo, Freddo, Deumidifica, Ventilazione</td><td data-label="Cosa succede" class="align-left">Il modo cambia</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Climatizzatore, «Ventola»</td><td data-label="Cosa puoi fare" class="align-left">Scegli dalla tendina: Auto, Bassa, Media, Alta</td><td data-label="Cosa succede" class="align-left">La ventola cambia</td></tr>
 </tbody></table></div>
@@ -1884,7 +1884,8 @@ modifica, tu la controlli e la applichi. Niente cambia finché non premi «Appli
 «…/… caratteri») e premi «Proponi».</p>
 </li>
 <li>
-<p><strong>Leggi</strong> «Preparo la proposta…», poi «Modifiche proposte».</p>
+<p><strong>Leggi</strong> «Preparo la proposta…», poi «Modifiche proposte». Dal lotto 40 una frase con un numero cambia il valore
+(«dopo 10 minuti» cambia i minuti) e non spegne la regola; la spegne solo una frase senza numeri e senza «non».</p>
 </li>
 <li>
 <p><strong>Controlla</strong> regola, campo, valore prima e dopo (per esempio «Finestra aperta spegne il clima, Minuti da 5 a
@@ -2124,6 +2125,10 @@ oppure una modalità, senza «non», condizioni od orari.</p>
 </li>
 <li>
 <p><strong>Con ospiti dentro</strong> chiede conferma come sempre.</p>
+</li>
+<li>
+<p><strong>Una presa</strong> si comanda solo nominandola con una parola del suo nome, per esempio «la stufetta» (dal lotto 40):
+«accendi la luce» non accende più una presa qualsiasi.</p>
 </li>
 <li>
 <p><strong>In fondo alla risposta</strong> leggi «Risposta rapida: l&#x27;assistente completo non ha risposto in tempo.» (oppure «… non
@@ -3367,7 +3372,8 @@ comfort; il climatizzatore, se nella stanza c&#x27;è un sensore, scalda o raffr
 <p><strong>Quando Italianway comunica l&#x27;arrivo effettivo</strong> («Check-in» nelle Decisioni) l&#x27;occupazione diventa «Occupato».</p>
 </li>
 <li>
-<p><strong>Da ora</strong> l&#x27;assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità.</p>
+<p><strong>Da ora</strong> l&#x27;assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità. Dal lotto 40 la
+chiede già dall&#x27;inizio della prenotazione, anche se l&#x27;arrivo effettivo non è stato comunicato.</p>
 </li>
 <li>
 <p><strong>Se vuoi scaldare prima</strong> o cambiare qualcosa, usa «Modalità» o i comandi in Panoramica, oppure l&#x27;assistente.</p>
@@ -3805,6 +3811,9 @@ massimo che hai scelto.</p>
 stanza. Sospesa durante una forzatura; alla fine riparte. L&#x27;antigelo è più forte. Dal lotto 38, se il sistema
 domotico si riavvia con una finestra aperta, la regola riparte da sola: il clima si spegne allo scadere dei minuti
 contati da quando la finestra si è aperta; se si è aperta mentre il sistema era fermo, dalla ripartenza.
+Dal lotto 40, finché il sensore non si è fatto risentire dopo il riavvio la finestra resta «aperta» e la caldaia
+resta spenta; la regola tiene spenti clima e caldaia per tutto il tempo in cui la finestra resta aperta, anche se
+un dispositivo era offline o lo spegnimento non era riuscito.
 Quando la modalità comfort accende un climatizzatore dopo la pausa del compressore, il climatizzatore resta regolato
 dal comfort (dal lotto 39).
 <strong>Alla chiusura della finestra riscaldamento e clima riprendono da soli</strong> (dal lotto 38): quando si chiude l&#x27;ultima
@@ -3832,11 +3841,15 @@ prenotazioni che arrivano o cambiano dopo: le azioni già in programma non vengo
 </li>
 <li>
 <p><strong>«Pausa minima del compressore»</strong>: dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico
-viene rimandato, uno di una persona o dell&#x27;assistente può essere rifiutato se manca più di qualche secondo.</p>
+viene rimandato, uno di una persona o dell&#x27;assistente può essere rifiutato se manca più di qualche secondo.
+Dal lotto 40 vale anche se lo spegnimento è ancora in corso («riprova tra N secondi»), e un&#x27;accensione rimandata
+non parte se nel frattempo è cambiata la modalità, è iniziata una forzatura o qualcuno ha comandato il clima
+(«rimandata … e non eseguita»).</p>
 </li>
 <li>
 <p><strong>«Avviso dispositivo offline»</strong>: dopo la soglia scrive «Dispositivo offline» nelle Decisioni e manda la notifica;
-la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto.</p>
+la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto. Dal lotto 40
+vale anche per un dispositivo già scollegato quando il sistema riparte, e l&#x27;app mostra quando è stato visto l&#x27;ultima volta.</p>
 </li>
 </ul>
 <p><strong>«Limiti del setpoint»</strong> (con effetto dal lotto 31):</p>
@@ -3936,6 +3949,11 @@ casa vuota»).</p>
 </li>
 <li>
 <p><strong>Un cambio di modalità programmato durante una forzatura</strong> aspetta la sua fine («Azione rimandata»).</p>
+</li>
+<li>
+<p><strong>Un cambio di modalità con un dispositivo non raggiungibile</strong> (dal lotto 40): la caldaia prende subito la
+temperatura della nuova modalità; il climatizzatore riceve il comando quando torna raggiungibile, salvo un altro
+cambio o un comando di una persona nel frattempo («Modalità: comando in sospeso»).</p>
 </li>
 <li>
 <p><strong>Dopo un riavvio del sistema</strong>, un&#x27;azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).</p>

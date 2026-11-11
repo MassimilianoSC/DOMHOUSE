@@ -886,7 +886,7 @@ I comandi funzionano solo sui dispositivi online e con la funzione «Comandi» a
 | Prese e interruttori | Tocca l'interruttore («Accendi …» / «Spegni …») | Lo stato diventa «Acceso» o «Spento» |
 | Caldaia | «Attiva …» / «Disattiva …» abilita o disabilita il riscaldamento | Leggi «Riscaldamento abilitato» / «Riscaldamento disabilitato» |
 | Caldaia e climatizzatore | «Diminuisci temperatura» e «Aumenta temperatura» accanto a «Temperatura», a passi di 0,5 °C, entro «da … a … °C» | Fuori dai limiti il comando è rifiutato («Il setpoint deve essere tra … e …») |
-| Climatizzatore | L'interruttore | Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all'inizio) |
+| Climatizzatore | L'interruttore | Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all'inizio). Dal lotto 40 un climatizzatore a infrarossi con misuratore risulta acceso se assorbe corrente, anche quando il comando era «non confermato» |
 | Climatizzatore, «Modo» | Scegli dalla tendina: Caldo, Freddo, Deumidifica, Ventilazione | Il modo cambia |
 | Climatizzatore, «Ventola» | Scegli dalla tendina: Auto, Bassa, Media, Alta | La ventola cambia |
 
@@ -1045,7 +1045,8 @@ modifica, tu la controlli e la applichi. Niente cambia finché non premi «Appli
 
 1. **Scrivi in italiano** (esempio «la finestra aperta spegne dopo 10 minuti»; al massimo 500 caratteri, contatore
    «…/… caratteri») e premi «Proponi».
-2. **Leggi** «Preparo la proposta…», poi «Modifiche proposte».
+2. **Leggi** «Preparo la proposta…», poi «Modifiche proposte». Dal lotto 40 una frase con un numero cambia il valore
+   («dopo 10 minuti» cambia i minuti) e non spegne la regola; la spegne solo una frase senza numeri e senza «non».
 3. **Controlla** regola, campo, valore prima e dopo (per esempio «Finestra aperta spegne il clima, Minuti da 5 a
    10», «Stato» «attiva» o «spenta») e la spiegazione.
 4. **Premi «Applica»** («Regole aggiornate come proposto») o «Scarta».
@@ -1193,6 +1194,8 @@ riquadro: la conversazione e, in fondo, il campo per scrivere.
 - **Esegue il comando** solo se la frase è inequivocabile: un verbo e un solo dispositivo (per tipo, stanza o nome)
   oppure una modalità, senza «non», condizioni od orari.
 - **Con ospiti dentro** chiede conferma come sempre.
+- **Una presa** si comanda solo nominandola con una parola del suo nome, per esempio «la stufetta» (dal lotto 40):
+  «accendi la luce» non accende più una presa qualsiasi.
 - **In fondo alla risposta** leggi «Risposta rapida: l'assistente completo non ha risposto in tempo.» (oppure «… non
   è raggiungibile ora.» o «… ha raggiunto il limite mensile.»).
 
@@ -2007,7 +2010,8 @@ all'amministratore. Non serve un'approvazione preventiva.
    comfort; il climatizzatore, se nella stanza c'è un sensore, scalda o raffresca da solo.
 4. **Nella scheda** l'occupazione è «Prenotato».
 5. **Quando Italianway comunica l'arrivo effettivo** («Check-in» nelle Decisioni) l'occupazione diventa «Occupato».
-6. **Da ora** l'assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità.
+6. **Da ora** l'assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità. Dal lotto 40 la
+   chiede già dall'inizio della prenotazione, anche se l'arrivo effettivo non è stato comunicato.
 7. **Se vuoi scaldare prima** o cambiare qualcosa, usa «Modalità» o i comandi in Panoramica, oppure l'assistente.
 
 > **Da sapere**
@@ -2283,6 +2287,9 @@ Tutte partono attive. Sette si modificano dall'app, una no.
   stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte. Dal lotto 38, se il sistema
   domotico si riavvia con una finestra aperta, la regola riparte da sola: il clima si spegne allo scadere dei minuti
   contati da quando la finestra si è aperta; se si è aperta mentre il sistema era fermo, dalla ripartenza.
+  Dal lotto 40, finché il sensore non si è fatto risentire dopo il riavvio la finestra resta «aperta» e la caldaia
+  resta spenta; la regola tiene spenti clima e caldaia per tutto il tempo in cui la finestra resta aperta, anche se
+  un dispositivo era offline o lo spegnimento non era riuscito.
   Quando la modalità comfort accende un climatizzatore dopo la pausa del compressore, il climatizzatore resta regolato
   dal comfort (dal lotto 39).
   **Alla chiusura della finestra riscaldamento e clima riprendono da soli** (dal lotto 38): quando si chiude l'ultima
@@ -2301,8 +2308,12 @@ Tutte partono attive. Sette si modificano dall'app, una no.
   «Mettere l'appartamento a vuoto dopo il check-out»; senza risposta la approva.
 - **«Pausa minima del compressore»**: dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico
   viene rimandato, uno di una persona o dell'assistente può essere rifiutato se manca più di qualche secondo.
+  Dal lotto 40 vale anche se lo spegnimento è ancora in corso («riprova tra N secondi»), e un'accensione rimandata
+  non parte se nel frattempo è cambiata la modalità, è iniziata una forzatura o qualcuno ha comandato il clima
+  («rimandata … e non eseguita»).
 - **«Avviso dispositivo offline»**: dopo la soglia scrive «Dispositivo offline» nelle Decisioni e manda la notifica;
-  la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto.
+  la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto. Dal lotto 40
+  vale anche per un dispositivo già scollegato quando il sistema riparte, e l'app mostra quando è stato visto l'ultima volta.
 
 **«Limiti del setpoint»** (con effetto dal lotto 31):
 
@@ -2358,6 +2369,9 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 - **Un messaggio di prenotazione arrivato in ritardo**, più vecchio dell'ultimo già applicato, viene ignorato
   (dal lotto 40, «Prenotazione: evento vecchio ignorato»).
 - **Un cambio di modalità programmato durante una forzatura** aspetta la sua fine («Azione rimandata»).
+- **Un cambio di modalità con un dispositivo non raggiungibile** (dal lotto 40): la caldaia prende subito la
+  temperatura della nuova modalità; il climatizzatore riceve il comando quando torna raggiungibile, salvo un altro
+  cambio o un comando di una persona nel frattempo («Modalità: comando in sospeso»).
 - **Dopo un riavvio del sistema**, un'azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).
 - **L'occupazione «Occupato»** richiede il check-in effettivo comunicato da Italianway; la sola prenotazione dà
   «Prenotato».
