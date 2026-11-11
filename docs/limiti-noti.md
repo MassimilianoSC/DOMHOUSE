@@ -41,6 +41,8 @@
 | **A server spento** | Niente notifiche, e gli eventi di quel periodo non si recuperano | Voluto |
 | **Dimostrativi** | Ripartono dai valori iniziali a ogni avvio del server | Voluto |
 | **Nessun backup del database** | Il database dello staging non ha backup pianificati: contiene solo dati di prova | Voluto |
+| **Stessa identità della produzione (D04)** | Lo staging gira con lo stesso account della produzione: potrebbe scrivere anche nel database della produzione e leggerne i segreti | In lavorazione: comandi pronti (o1, 11 nov), da lanciare prima del primo appartamento vero |
+| **Accessi condivisi** | Anche dopo D04, staging e produzione usano lo stesso Firebase Authentication: lo staging può ancora gestire gli account di accesso della produzione. Si separa solo con un secondo progetto Firebase | Accettato |
 
 ## Aggiornamenti in diretta
 
