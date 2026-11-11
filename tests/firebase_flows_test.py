@@ -445,3 +445,20 @@ def test_an_invitation_elsewhere_is_not_consumed_when_the_claims_cannot_be_moved
         run(_from_claims(repo, fresh_token(prod, "u-r41-d")))
     assert e.value.status_code == 503
     assert run(repo.get_user("inv-r41-d")) is not None and run(repo.get_user("u-r41-d")) is None   # untouched
+
+
+def test_a_role_change_in_staging_never_signs_the_person_out_of_production(fb, monkeypatch):
+    """D40 (P-83, = R4-4): one Firebase Auth for both environments (P-67): a revocation made by staging closes the
+    person's production sessions too. set_role_claim already avoided it in staging; patch_user revoked anyway."""
+    from bff import config
+    staging = dataclasses.replace(get_settings(), app_env="staging", auth_mode="firebase")
+    for module in (config, auth, accounts):
+        monkeypatch.setattr(module, "get_settings", lambda: staging)
+    repo = get_repository()
+    fb.add("u-d40", "d40@fb.it", {"staging": {"tenant_id": "t-fb", "role": "admin"}}, email_verified=True)
+    run(repo.upsert_user(User(uid="u-d40", email="d40@fb.it", tenant_id="t-fb", role="admin")))
+    run(repo.upsert_user(User(uid="u-d40-boss", email="boss@d40.it", tenant_id="t-fb", role="admin")))
+    out = run(admin.patch_user("u-d40", admin.UserPatch(role="viewer"), CurrentUser("u-d40-boss", "boss@d40.it", "t-fb", "admin")))
+    assert out["role"] == "viewer"
+    assert ("revoke", "u-d40") not in fb.calls
+    assert fb.users["u-d40"].custom_claims["staging"]["role"] == "viewer"      # the new role reaches the next token

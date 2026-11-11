@@ -138,8 +138,13 @@ async def patch_user(uid: str, body: UserPatch, user: CurrentUser = Depends(requ
             return err(502, "auth_unavailable", "Ruolo non aggiornato, riprova tra poco")
         # F3 (D-70): a user without claims (recognised by the record) keeps a valid token with the old role; revoke the
         # sessions so the new role takes effect and any open stream ends. set_role_claim already revokes when it has claims.
+        # D40 (P-83): never in staging: one Firebase Auth for both environments (P-67), a revocation from staging
+        # would sign the person out of production too. The new role applies anyway: the record wins over a token's
+        # copy of the claims that Firebase no longer confirms (R4-1, bff/auth.py)
         try:
-            await asyncio.to_thread(accounts.revoke_sessions, target.uid)
+            from .. import config
+            if config.get_settings().app_env != "staging":
+                await asyncio.to_thread(accounts.revoke_sessions, target.uid)
         except Exception as exc:  # N5 (D-71): the change stays (the record rules the next request and the stream
             warn("admin: sessions not revoked after a role change", uid=target.uid, error=str(exc))  # re-check)
     who = audit.by_user(user)
