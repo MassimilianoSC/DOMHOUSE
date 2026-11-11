@@ -46,6 +46,9 @@ STUBS = {
     # health: 200 unless the test put a file "unhealthy" (503) or "code-<port>" (that code) next to the stand-ins
     "curl": ('#!/usr/bin/env bash\n'
              'echo "$*" >> "$STUB_DIR/curl.log"\n'
+             # D51: an engine that accepts and never answers: with -m curl gives up (28), without it hangs
+             'if [ -f "$STUB_DIR/silent" ] && [[ "$*" == *"/api/v1/health"* ]]; then '
+             'case " $* " in *" -m "*) exit 28 ;; *) command -p sleep 600; exit 28 ;; esac; fi\n'
              # the metadata server and Secret Manager (write_key): a secret is the file secret-<name>
              'case "$*" in *service-accounts/default/token*) echo \'{"access_token": "tok"}\'; exit 0 ;; '
              '*project/project-id*) printf progetto; exit 0 ;; '
@@ -139,6 +142,18 @@ def test_an_engine_that_does_not_come_back_gets_the_previous_settings(vm):
     # T3c-1 (P-83): recreated with the new value, then again with the previous one: two recreations, not one
     assert (vm.stubs / "docker.log").read_text(encoding="utf-8").count("up -d --force-recreate") == 2
     assert vm.settings.read_text(encoding="utf-8") == "CONFIRM_ON_WATTS=30\n"
+
+
+def test_a_silent_engine_never_holds_the_script_nor_the_lock(vm):
+    """D51 (P-83): an engine that accepts the connection and never answers held wait_healthy for ever (curl without -m)
+    and with it the engines' lock (flock without -w): every later install, set or restart waited behind it."""
+    (vm.stubs / "silent").write_text("", encoding="utf-8")
+    r = vm("set", APT, "CONFIRM_ON_WATTS=30")                 # would hang until the 60 s of the test without -m
+    assert r.returncode != 0 and "impostazione CONFIRM_ON_WATTS non applicata" in r.stderr
+    health = [line for line in (vm.stubs / "curl.log").read_text(encoding="utf-8").splitlines() if "/api/v1/health" in line]
+    assert health and all(" -m " in f" {line} " for line in health), health
+    locks = (vm.stubs / "flock.log").read_text(encoding="utf-8").splitlines()
+    assert locks and all(line.startswith(("-w ", "-n ")) for line in locks), locks
 
 
 def test_compose_reads_the_settings_file_as_optional():
@@ -385,7 +400,7 @@ def test_the_watch_leaves_a_stopped_engine_alone_while_another_command_holds_the
 def test_commands_that_stop_or_recreate_an_engine_take_the_lock(vm):
     assert vm("set", APT, "CONFIRM_ON_WATTS=30").returncode == 0
     assert vm("unset", APT, "CONFIRM_ON_WATTS").returncode == 0
-    assert (vm.stubs / "flock.log").read_text(encoding="utf-8").splitlines() == ["9", "9"]   # waits (no -n)
+    assert (vm.stubs / "flock.log").read_text(encoding="utf-8").splitlines() == ["-w 600 9", "-w 600 9"]   # waits (no -n), at most 10 minutes (D51)
 
 
 def test_after_a_boot_start_all_waits_for_the_address_then_starts_what_is_down(vm):
@@ -420,3 +435,26 @@ def test_timers_also_installs_the_boot_unit_of_the_engines(vm):
     assert "After=docker.service network-online.target" in unit and "engine-vm.sh start-all" in unit
     assert "WantedBy=multi-user.target" in unit
     assert "enable domhouse-engines-start.service" in (vm.stubs / "systemctl.log").read_text(encoding="utf-8")
+
+
+def test_no_backup_ever_counts_from_the_installation_not_from_the_database(vm):
+    """D52 (P-83): an engine never backed up counted the age from engine.db's modification time, renewed by every WAL
+    checkpoint and restart: a quiet engine without backups never raised «backup missing». Now from the installation
+    (INSTALLED_AT, written by install); an engine installed before it keeps the old rule."""
+    import os
+    import time
+    settings = vm.opt / f"{APT}.settings"
+    installed = int(time.time() - 30 * 3600)
+    settings.write_text(settings.read_text(encoding="utf-8") + f"INSTALLED_AT={installed}\n", encoding="utf-8", newline="\n")
+    (vm.data / APT).mkdir(parents=True, exist_ok=True)
+    (vm.data / APT / "engine.db").write_text("x", encoding="utf-8")              # renewed now: a checkpoint
+    assert vm("check-all").returncode == 0
+    assert f"-t domhouse-check backup missing {APT} age_h=30" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+
+
+def test_install_writes_its_time():
+    """install needs compose.yaml next to the script, which this harness does not run: the line it writes is checked
+    in the script itself (one printf with the four settings and INSTALLED_AT)."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    install = text[text.index("  install)"):text.index("  update)")]
+    assert "printf 'APARTMENT_ID=%s\\nPORT=%s\\nCONNECTOR=%s\\nENGINE_IMAGE=%s\\nINSTALLED_AT=%s\\n'" in install, install

@@ -153,7 +153,8 @@ lock_engines() {
   # 5-minute watch never waits, it skips its restart while someone holds the lock (a restore stops an engine on purpose)
   install -d -m 755 "${OPT}"
   exec 9> "${OPT}/.engines.lock"
-  flock 9
+  # D51 (P-83): never waits for ever behind a command that hangs
+  flock -w 600 9 || die "un altro comando sui motori tiene il blocco da oltre 10 minuti (${OPT}/.engines.lock): riprova più tardi"
 }
 
 container_state() { docker inspect -f '{{.State.Status}}' "engine-$1" 2>/dev/null || true; }
@@ -221,9 +222,9 @@ wait_healthy() {
   port="$(sed -n 's/^PORT=//p' "$(settings_file "${apt}")")"
   step "Attesa di http://${BIND_IP}:${port}/api/v1/health"
   for _ in $(seq 1 "${DOMHOUSE_HEALTH_TRIES:-30}"); do      # 30 tries, 2 s apart (fewer only in the tests)
-    code="$(curl -s -o /dev/null -w '%{http_code}' "http://${BIND_IP}:${port}/api/v1/health" || true)"
+    code="$(curl -s -m 5 -o /dev/null -w '%{http_code}' "http://${BIND_IP}:${port}/api/v1/health" || true)"   # D51: -m
     if [ "${code}" = "200" ]; then
-      curl -s "http://${BIND_IP}:${port}/api/v1/health" | python3 -c \
+      curl -s -m 5 "http://${BIND_IP}:${port}/api/v1/health" | python3 -c \
         'import json, sys; h = json.load(sys.stdin); print("health 200:", h["status"], h["implementation"], "connector", h["connector"]["status"])'
       return 0
     fi
@@ -314,6 +315,8 @@ Wants=network-online.target docker.service
 [Service]
 Type=oneshot
 ExecStart=/bin/bash ${OPT}/engine-vm.sh start-all
+# D51: a boot never waits for ever on it (the address up to ADDRESS_WAIT_S, then one compose up per engine)
+TimeoutStartSec=15min
 
 [Install]
 WantedBy=multi-user.target
@@ -331,7 +334,7 @@ watch_line() {
 }
 
 check_all() {
-  local total=0 silent=0 settings apt port code newest age_h
+  local total=0 silent=0 settings apt port code newest age_h installed
   shopt -s nullglob
   for settings in "${OPT}"/*.settings; do
     apt="$(basename "${settings}" .settings)"
@@ -344,10 +347,16 @@ check_all() {
       *)   watch_line "engine silent ${apt} (nessuna risposta, codice ${code:-nessuno})"; silent=$((silent + 1))
            restart_stopped "${apt}" ;;
     esac
-    newest="$(ls -1t "${DATA}/${apt}/backup"/engine-*.db 2>/dev/null | head -1 || true)"
+    # D52: find, not ls with a glob: with nullglob on and no backup the glob vanished and «ls -1t» listed the current
+    # folder (/ for the service): the «newest backup» was any file there
+    newest="$(find "${DATA}/${apt}/backup" -maxdepth 1 -name 'engine-*.db' -printf '%T@ %p\n' 2>/dev/null \
+      | sort -rn | head -1 | cut -d' ' -f2- || true)"
+    installed="$(sed -n 's/^INSTALLED_AT=//p' "${settings}" | head -1)"
     if [ -n "${newest}" ]; then
       age_h=$(( ( $(date +%s) - $(stat -c %Y "${newest}") ) / 3600 ))
-    elif [ -f "$(db_of "${apt}")" ]; then           # never backed up: count from the database's age
+    elif [[ "${installed}" =~ ^[0-9]+$ ]]; then     # D52: never backed up: count from the installation (engine.db's
+      age_h=$(( ( $(date +%s) - installed ) / 3600 ))  # time is renewed by every checkpoint and restart)
+    elif [ -f "$(db_of "${apt}")" ]; then           # installed before INSTALLED_AT: count from the database's age
       age_h=$(( ( $(date +%s) - $(stat -c %Y "$(db_of "${apt}")") ) / 3600 ))
     else
       age_h=0
@@ -490,8 +499,9 @@ case "${cmd}" in
     install -d -m 755 "${OPT}"
     [ "${here}" = "${OPT}" ] || install -m 755 "$0" "${OPT}/engine-vm.sh"
     [ "${here}" = "${OPT}" ] || install -m 644 "${here}/compose.yaml" "${OPT}/compose.yaml"
-    printf 'APARTMENT_ID=%s\nPORT=%s\nCONNECTOR=%s\nENGINE_IMAGE=%s\n' "${apt}" "${port}" "${connector}" "${image}" \
-      > "$(settings_file "${apt}")"
+    # D52 (P-83): INSTALLED_AT, the time the watch counts from while the engine has no backup yet
+    printf 'APARTMENT_ID=%s\nPORT=%s\nCONNECTOR=%s\nENGINE_IMAGE=%s\nINSTALLED_AT=%s\n' "${apt}" "${port}" "${connector}" \
+      "${image}" "$(date +%s)" > "$(settings_file "${apt}")"
     cat "$(settings_file "${apt}")"
     step "Dati in ${DATA}/${apt} (proprietario ${ENGINE_UID})"
     install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${DATA}/${apt}" "${DATA}/${apt}/backup"

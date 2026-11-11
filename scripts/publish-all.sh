@@ -281,7 +281,7 @@ if [ -n "${COMPOSE_NEW}" ] && [ -z "${ENGINE_NEEDED}" ]; then
   if [ -n "${DRY_RUN}" ]; then
     note "prova a secco: poi engine-vm.sh update ${ENGINE_APARTMENT} ${VM_IMAGE} (stessa immagine, per compose.yaml)"
   else
-    on_vm "sudo bash /opt/domhouse/engine-vm.sh update ${ENGINE_APARTMENT} ${VM_IMAGE} > /dev/null 2>&1 && echo update-ok" \
+    on_vm "sudo timeout 900 bash /opt/domhouse/engine-vm.sh update ${ENGINE_APARTMENT} ${VM_IMAGE} > /dev/null 2>&1 && echo update-ok" \
       | grep -q update-ok || stop "Il motore ${ENGINE_APARTMENT} non è tornato sano dopo il nuovo compose.yaml.
 Guarda engine-vm.sh status ${ENGINE_APARTMENT} sulla VM; il compose.yaml di prima è nel commit del motore sulla VM (${VM_TAG})."
     finished compose
@@ -294,7 +294,7 @@ if [ -n "${ENGINE_NEEDED}" ]; then
   if [ -n "${DRY_RUN}" ]; then
     note "prova a secco: poi engine-vm.sh update ${ENGINE_APARTMENT} ${ENGINE_IMAGE}"
   else
-    on_vm "sudo bash /opt/domhouse/engine-vm.sh update ${ENGINE_APARTMENT} ${ENGINE_IMAGE} > /dev/null 2>&1 && echo update-ok" \
+    on_vm "sudo timeout 900 bash /opt/domhouse/engine-vm.sh update ${ENGINE_APARTMENT} ${ENGINE_IMAGE} > /dev/null 2>&1 && echo update-ok" \
       | grep -q update-ok || stop "Il motore ${ENGINE_APARTMENT} non è tornato sano con ${ENGINE_IMAGE}.
 Per tornare all'immagine di prima (lo decidi tu):
   gcloud compute ssh ${VM_NAME} --zone ${VM_ZONE} --tunnel-through-iap --project ${GCP_PROJECT_ID} --command='sudo bash /opt/domhouse/engine-vm.sh update ${ENGINE_APARTMENT} $(recall prima-motore)'"
