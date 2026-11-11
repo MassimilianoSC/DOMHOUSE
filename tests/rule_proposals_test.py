@@ -308,6 +308,24 @@ def test_temperatura_alone_is_a_question_not_a_limit(engines):
     assert propose("comfort 22").json()["changes"][0]["field"] == "comfort_celsius"
 
 
+@pytest.mark.parametrize("value", ["0", "false", "1", "sì", None, [], 2, 0.5])
+def test_d69_attiva_is_only_a_number_0_or_1(value):
+    """D69 (P-83): «attiva» went through bool(): "0" and "false" turned a rule ON, a missing value turned it OFF."""
+    row = {"rule_id": "frost_protection", "parametro": rp.ENABLED_FIELD}
+    if value is not None:
+        row["valore"] = value
+    patches, said = rp.from_answer({"choices": [{"message": {"content": json.dumps({"modifiche": [row],
+                                                                                      "spiegazione": "x"})}}]})
+    assert patches is None and said == "x"                    # nothing proposed: the sentence stays
+
+
+@pytest.mark.parametrize("value, enabled", [(1, True), (0, False), (True, True), (False, False), (1.0, True)])
+def test_d69_attiva_0_or_1_still_switches(value, enabled):
+    row = {"rule_id": "frost_protection", "parametro": rp.ENABLED_FIELD, "valore": value}
+    patches, _ = rp.from_answer({"choices": [{"message": {"content": json.dumps({"modifiche": [row]})}}]})
+    assert patches == [{"rule_id": "frost_protection", "enabled": enabled}]
+
+
 def test_d182_the_proposal_is_the_json_of_the_text():
     """D-182: no tools; the JSON object of the text (also in a ```json block), an empty one says why, prose too; a tool
     call from an older model is still read."""

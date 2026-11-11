@@ -199,10 +199,14 @@ def from_answer(answer: dict) -> tuple[list | None, str]:
         for row in args.get("modifiche") or []:
             if not isinstance(row, dict) or not isinstance(row.get("rule_id"), str):
                 continue
-            patch = by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"]})
             if row.get("parametro") == ENABLED_FIELD:
-                patch["enabled"] = bool(row.get("valore"))
+                # D69 (P-83): only 0 or 1 (or a JSON boolean); bool() read "0" and "false" as on, a missing value as off
+                value = row.get("valore")
+                if not (isinstance(value, bool) or (isinstance(value, (int, float)) and value in (0, 1))):
+                    continue
+                by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"]})["enabled"] = bool(value)
             elif isinstance(row.get("parametro"), str):
+                patch = by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"]})
                 patch.setdefault("params", {})[row["parametro"]] = row.get("valore")
         said = str(args.get("spiegazione") or "").strip()
         if not by_rule:                          # nothing proposed: the model's sentence says why
