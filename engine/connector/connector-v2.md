@@ -441,7 +441,7 @@ prove del trasporto stanno a parte, accanto al suo modulo.
 | Broker | Mosquitto 2.1.2, un solo container per la VM (`domhouse-broker`), nessun accesso anonimo | D-209, D-212 |
 | Porta del connector | `1883` sulla rete Docker interna `domhouse-broker-internal` (172.30.83.2), non pubblicata | D-212 |
 | Utenti | `<apartment_id>.<id del dispositivo>` per ogni dispositivo; `<apartment_id>.connector` per il connector | D-212 |
-| Permessi del dispositivo | legge e scrive `<apartment_id>/<id del dispositivo>/#`; scrive **solo** `<apartment_id>/connector/<id del dispositivo>/rpc` (le sue risposte alle RPC del connector). **Deciso il 10 novembre (D-215), da applicare al broker (o1):** oggi il broker installato lascia scrivere `<apartment_id>/connector/rpc` | D-212, D-215 |
+| Permessi del dispositivo | legge e scrive **solo** `<apartment_id>/<id del dispositivo>/#`, dove stanno anche le sue risposte alle RPC del connector (`<apartment_id>/<id del dispositivo>/connector/rpc`): non può scrivere nello spazio di un altro dispositivo. Forma del connector di Youssouf, adottata l'11 novembre (D-223) al posto di quella del 10 (D-215); la riga di scrittura in più del broker si toglie nel lotto 39 (o1) | D-212, D-215, D-223 |
 | Permessi del connector | legge e scrive `<apartment_id>/#`, cioè solo il suo appartamento | D-212 |
 | Client ID del dispositivo | **convenzione** impostata su ogni Shelly alla messa in servizio (procedura G2, B5): uguale al suo utente, così la riga di un accesso rifiutato dice quale dispositivo è. Il broker non lo controlla | D-212 |
 | Instradamento | nessuno all'ingresso: un solo broker per la VM, ogni connector si abbona solo al proprio prefisso | D-209 |
@@ -465,9 +465,10 @@ prove del trasporto stanno a parte, accanto al suo modulo.
 ### 7.2 RPC e notifiche su MQTT (dalla documentazione Shelly e dal DESIGN.md di Youssouf, da verificare in laboratorio)
 
 - Il prefisso di ogni dispositivo (`topic_prefix`) è `<apartment_id>/<id del dispositivo>`.
-- Richieste: il connector pubblica su `<prefisso>/rpc` con `src` = `<apartment_id>/connector/<id del dispositivo>`;
-  la risposta arriva su `<apartment_id>/connector/<id del dispositivo>/rpc` (D-215). Così ogni dispositivo può
-  rispondere solo per sé.
+- Richieste: il connector pubblica su `<prefisso>/rpc` con `src` = `<apartment_id>/<id del dispositivo>/connector`;
+  la risposta arriva su `<apartment_id>/<id del dispositivo>/connector/rpc`, dentro lo spazio del dispositivo (D-223).
+  Così ogni dispositivo può rispondere solo per sé. Misurato su Shelly Gen4 veri (Shelly 1 ed EM Mini) nella cattura del
+  laboratorio di Youssouf del 10 novembre.
 - Notifiche su `<prefisso>/events/rpc`; stato online su `<prefisso>/online` (`true` alla connessione, `false` come
   ultimo messaggio se il dispositivo cade).
 - Livello di consegna (QoS), D-215 e risposta 744:
@@ -479,9 +480,9 @@ prove del trasporto stanno a parte, accanto al suo modulo.
 
 ### 7.3 Da concordare con Youssouf
 
-1. Se `topic_prefix` accetta la barra `/` e se vale anche per il topic delle richieste RPC: se no, si adattano i
-   permessi del §7.1.
-2. Se il campo `src` accetta le barre: `<apartment_id>/connector/<id del dispositivo>` (D-215).
+1. **Risolto (D-223):** `topic_prefix` accetta la barra e vale anche per le richieste RPC (cattura dei Gen4 del 10
+   novembre).
+2. **Risolto (D-223):** il campo `src` accetta le barre (stessa cattura).
 3. I nomi delle variabili del trasporto, per esempio `SHELLY_MQTT_HOST`, `SHELLY_MQTT_PORT`, `SHELLY_MQTT_USER`,
    `SHELLY_MQTT_PASSWORD` (con «PASSWORD» nel nome, così il registro dei log la nasconde comunque). Valori di oggi:
    host 172.30.83.2, porta 1883, utente `<apartment_id>.connector`. Oggi la VM non le passa ancora al motore.
@@ -496,9 +497,8 @@ prove del trasporto stanno a parte, accanto al suo modulo.
    - Richieste RPC con QoS 0, risposte e notifiche con QoS 1 (§7.2): un comando non può arrivare in ritardo, qualunque sia la sessione del dispositivo.
    - Scadenza delle sessioni del broker a 1 ora, per tutti (Mosquitto non la permette solo per i dispositivi).
    - La **sessione pulita sugli Shelly non è impostabile**: la documentazione ufficiale del componente MQTT non ha nessuna impostazione di sessione (`MQTT.SetConfig`: enable, server, client_id, user, pass, ssl_ca, topic_prefix, rpc_ntf, status_ntf, use_client_cert, enable_rpc, enable_control). Da verificare in laboratorio: il flag della sessione del Gen4 nel log del broker alla connessione (`c0` = sessione persistente, `c1` = pulita, nella riga «New client connected … (p4, cX, kY …)»).
-9. **Risposte a nome di un altro dispositivo: risolto (D-215).** Ogni dispositivo risponde su un topic suo
-   (§7.1, §7.2) e non può scrivere su quello degli altri. Da verificare con Youssouf solo che il Gen4 accetti le
-   barre in `src` (punto 2).
+9. **Risposte a nome di un altro dispositivo: risolto (D-215, forma di D-223).** Ogni dispositivo risponde dentro il
+   suo spazio (§7.1, §7.2) e non può scrivere in quello degli altri.
 10. Se il Gen4 pubblica `<prefisso>/online` come messaggio conservato (retain): da questo dipende cosa vede il
     connector quando riparte, prima della prima notifica.
 11. La lunghezza massima della password MQTT accettata da uno Shelly Gen4 (lo script ne genera 32 caratteri).
