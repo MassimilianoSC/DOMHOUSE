@@ -370,7 +370,11 @@ Le notifiche arrivano anche ad app chiusa, se le attivi su quel dispositivo.
   le «Decisioni» (prenotazione annullata, antigelo non attivo) o il riepilogo della settimana.
 - **Se l'app è già aperta**, la notifica compare come avviso in alto con il pulsante «Apri» (su iPhone arriva
   comunque come notifica del telefono).
-- **Se stai già guardando quell'appartamento** non compare un secondo avviso.
+- **Se stai già guardando quell'appartamento**, approvazioni e dispositivi offline non compaiono una seconda volta,
+  perché la pagina li mostra già. Gli altri avvisi compaiono comunque (dal lotto 40): antigelo non attivo, azioni
+  programmate non eseguite, prenotazioni, riepiloghi, sistema domotico non raggiungibile.
+- **Se una notifica sostituisce una precedente** (per esempio lo stesso dispositivo di nuovo offline), il telefono
+  suona di nuovo (dal lotto 40).
 - **Se non sei collegato**, prima devi accedere e poi aprire la pagina da solo.
 
 **Uscita e rientro:**
@@ -485,6 +489,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | In alto | Il nome e «In tempo reale» | La pagina si aggiorna da sola |
 | In alto | «Riconnessione…» | Sta ricollegandosi: non prendere per buono un valore vecchio |
 | In alto, quando torni sulla pagina | «Riconnessione…» per un attimo | Con la pagina in sottofondo l'app non si aggiorna in tempo reale; quando torni si rimette in pari da sola |
+| In alto (dal lotto 40) | «Dati non aggiornati» al posto di «In tempo reale», con «Sistema domotico non raggiungibile» | Il collegamento col server c'è, ma il sistema domotico non risponde: i valori mostrati possono essere vecchi |
 | La striscia di salute | «In salute», «Degradata» o «Ferma», poi «… dispositivi connessi» | Lo stato del sistema domotico e il collegamento con i dispositivi |
 | La striscia di salute | «Dettagli tecnici» | Apre «Connettore» («attivo» o «fermo»), «Modello», «Versione» con il contratto e «Ultimo evento» |
 | La striscia di salute | «Sistema domotico non raggiungibile» | Il sistema domotico non risponde |
