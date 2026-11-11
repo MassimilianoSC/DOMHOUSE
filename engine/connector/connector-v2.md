@@ -60,7 +60,7 @@ Restano **nel motore**, e il connector non li deve fare:
 - la verifica «a consumo» dello split a infrarossi (`confirmation: power`), vedi il §2.5;
 - le decisioni (`Decision`), lo stream SSE, `/_test/state` (con il connector Shelly risponde 404) e
   `trigger: approval`, che non passa mai dal connector;
-- l'ora locale: `kwh_today`, i consumi orari e le date «since» li calcola il motore.
+- l'ora locale: `kwh_today` e i consumi orari li calcola il motore; anche `since` (contatto) e `last_seen` (movimento), salvo che il connector li mandi (§2.3).
 
 ## 2. L'interfaccia
 
@@ -187,8 +187,10 @@ campo del contratto**: è il dato grezzo che passi al motore, da cui il motore c
 | `heating` (`CapHeating`, caldaia con contatto del termostato oggi; pompa di calore Modbus domani) | dispositivo: `on` = **lo stato del relè** (acceso/spento in questo momento) · catalogo: `setpoint_min`, `setpoint_max` · motore: `setpoint` e la regolazione (termostato), con la temperatura del dispositivo indicato da `links.sensor_device_id` (§2.2). **Verso l'app il motore espone `on` = riscaldamento abilitato** (l'intenzione del gestore o della modalità), non il relè: il relè resta interno al motore, che lo comanda intorno al setpoint e lo rende visibile dai consumi e dalle decisioni |
 | `temperature` (`CapTemperature`) | dispositivo: `celsius` |
 | `humidity` (`CapHumidity`) | dispositivo: `percent` |
-| `contact` (`CapContact`) | dispositivo: `open` · motore: `since` |
-| `motion` (`CapMotion`) | dispositivo: `detected` · motore: `last_seen` (dagli eventi con `detected=true`) |
+| `contact` (`CapContact`) | dispositivo: `open` · motore: `since` (l'ora in cui `open` cambia), salvo che il connector lo mandi (vedi sotto la tabella) |
+| `motion` (`CapMotion`) | dispositivo: `detected` · motore: `last_seen` (l'ora di ogni evento con `detected=true`), salvo che il connector lo mandi (vedi sotto la tabella) |
+
+`since` e `last_seen` (deciso l'11 novembre 2026): non serve mandarli, li calcola il motore dall'ora in cui riceve il cambio. Puoi mandarli solo se li conosci con certezza, per esempio l'ora dell'ultimo evento salvata dal sensore, alla prima fotografia. Se li mandi, il motore usa i tuoi così come sono: stringa ISO 8601 in UTC (`2026-11-11T09:30:00Z`), come nel contratto, e mai l'ora della fotografia, che direbbe all'app «aperta da adesso» a ogni ricollegamento.
 
 I comandabili sono solo `switch`, `climate` e `heating`. Quale apparecchio fisico
 realizza `climate` e `heating` (blaster IR, Shelly con contatto, altro) lo decide il **catalogo**: è la tua scelta, da
