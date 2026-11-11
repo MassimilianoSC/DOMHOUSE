@@ -92,7 +92,8 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "engine/tests/test_guests_in_by_booking.py",
                 "engine/tests/test_approval_expired_long_ago.py", "engine/tests/test_window_rule_reenabled.py",
                 "engine/tests/test_command_queued_state.py", "engine/tests/test_approved_after_its_time.py",
-                "engine/tests/test_question_text_not_kept.py", "engine/tests/test_schedule_partial.py"]
+                "engine/tests/test_question_text_not_kept.py", "engine/tests/test_schedule_partial.py",
+                "engine/tests/test_approval_values.py"]
 SITE_SUITE = "sito"
 CONFORMANCE_SUITE = "conformita"
 CONFORMANCE_DIR = "contract/conformance"

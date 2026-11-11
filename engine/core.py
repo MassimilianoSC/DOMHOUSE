@@ -2550,8 +2550,15 @@ class ApartmentEngine:
         if pa["type"] == "apartment_mode":
             action, old, new = "set_mode", self.mode, pa["mode"]
         else:
-            state = self.devices.get(pa["device_id"], {}).get("capabilities", {}).get(pa["capability"], {})
-            action, old, new = pa["action"], ("on" if state.get("on") else "off"), "off"
+            # D76 (P-83): described like the commands' own decisions, the new value from the state the command gives
+            # (the new value was always "off": «from off to off» for a socket turned on)
+            device, cap = self.devices.get(pa["device_id"]), pa["capability"]
+            if device and cap in device["capabilities"]:
+                state = device["capabilities"][cap]
+                action, old = pa["action"], describe(cap, state)
+                new = describe(cap, self.target_state(device, cap, pa["action"], pa.get("params") or {}))
+            else:
+                action, old, new = pa["action"], "off", "on" if pa["action"] == "turn_on" else "off"
         self.log(self._approval_actor(approval), self._approval_target(approval), action, old, new, approval["reason"],
                  "pending_approval", approval["correlation_id"], approval_id=approval["approval_id"])
 
