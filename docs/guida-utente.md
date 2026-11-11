@@ -399,7 +399,7 @@ Tutte hanno il nome dell'appartamento davanti.
 |---|---|---|---|
 | «Approvazioni richieste» | «…: approvazione richiesta», con la proposta oppure «Il motore chiede il tuo consenso» | Quando il motore apre una richiesta (non per quelle in coda dietro un'altra) | «Approvazioni» |
 | «Dispositivi e sistema domotico offline» | «…: dispositivo offline», «… non risponde da oltre … minuti» | Dopo i minuti della regola «Avviso dispositivo offline» (15 all'inizio); regola spenta, niente avviso | «Panoramica» |
-| «Dispositivi e sistema domotico offline» | «…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall'app non arrivano e le regole automatiche potrebbero essere ferme.» | Sistema domotico fermo o irraggiungibile oltre la stessa soglia; una volta per episodio | «Panoramica» |
+| «Dispositivi e sistema domotico offline» | «…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall'app non arrivano e le regole automatiche potrebbero essere ferme.» (dopo due ore «N ore», dopo due giorni «N giorni»: è il tempo da quando tace, D75) | Sistema domotico fermo o irraggiungibile oltre la stessa soglia; una volta per episodio | «Panoramica» |
 | «Dispositivi e sistema domotico offline» | «…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo» | A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio | «Decisioni» |
 | «Prenotazioni» | «…: prenotazione annullata, appartamento rimesso a vuoto» | Disdetta dopo che l'appartamento era già stato preparato per l'arrivo | «Decisioni» |
 | «Prenotazioni» (pre-arrivo, check-out, casa vuota) oppure «Dispositivi e sistema domotico offline» (le altre) | «…: azione programmata non eseguita» con il motivo, oppure «N azioni programmate non eseguite. La prima: …» se più d'una entro un minuto; dopo uno spegnimento programmato «Durante la manutenzione N azioni programmate non sono state eseguite» | Un'azione programmata rifiutata alla sua ora o saltata perché il sistema era fermo (dal lotto 38); dopo uno spegnimento programmato le azioni saltate non arrivano una per una | «Programmazione» |
@@ -2066,6 +2066,8 @@ all'amministratore. Non serve un'approvazione preventiva.
 - **Dopo la stessa soglia** arriva una sola notifica «…: sistema domotico non raggiungibile». Dice «Il connettore
   domotico risulta fermo» se il sistema risponde ma ha perso i dispositivi; dal lotto 38 dice «Il sistema domotico
   non risponde da N minuti: …» se non risponde affatto (macchina spenta, rete interrotta).
+- **La durata è il tempo da quando tace** (D75): «N minuti» fino a due ore, poi «N ore», dopo due giorni «N giorni».
+  Dopo una sospensione degli avvisi può dire, per esempio, «da 3 giorni».
 - **Nelle Decisioni**, nel primo caso: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi
   ripristinato». Nel secondo caso (dal lotto 38), dopo un fermo più lungo della soglia: «Sistema domotico di nuovo
   raggiungibile dopo …», con la durata.

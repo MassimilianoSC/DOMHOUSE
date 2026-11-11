@@ -455,6 +455,14 @@ gcloud alpha monitoring policies list --project=domotica-poc-511707 --format="va
 | `sudo bash /opt/domhouse/engine-vm.sh api dev GET /apartment` | una chiamata al motore con la sua chiave (mai mostrata) |
 | `sudo bash /opt/domhouse/engine-vm.sh backup dev` | un backup subito (sezione E) |
 
+**Se il motore non parte**, il codice d'uscita del container dice perché (`sudo docker inspect engine-dev --format '{{.State.ExitCode}}'`):
+
+| Codice | Causa |
+|---|---|
+| 2 | configurazione non valida (variabili d'ambiente) |
+| 3 | connettore non preparato: nome sconosciuto, catalogo dei dispositivi mancante o sbagliato, versione non compatibile; riga JSON «connector setup failed» (o simile) |
+| 4 | avvio fallito (D36): database, collegamento ai dispositivi o porta già occupata; righe JSON «engine start failed» e «engine did not start» |
+
 Un nuovo appartamento sulla stessa VM: C2 con il suo `apartment_id` e la sua porta 81xx (8101, 8102, …), dopo aver
 creato il segreto `langbrain-api-key-<apartment_id>` e dato a `langbrain-vm@` Secret Accessor su di esso.
 
@@ -554,6 +562,8 @@ Simulatore funziona e un comando va a buon fine come prima. Sono serviti dal BFF
 dopo la pubblicazione ripartono dallo stato iniziale, come a ogni pubblicazione.
 
 **G7. Tornare indietro a staging** (scrive su Google Cloud), se qualcosa non va.
+> Pagina storica: oggi staging e produzione si pubblicano insieme con `scripts/publish-all.sh` (D-214). Se si usa
+> ancora `publish.sh` o `deploy.sh` per lo staging, serve `STAGING_SITE=domhouse-staging`: senza, dal D53 si fermano.
 Cosa fa: ripubblica lo stesso commit con `TARGET=staging` (`bff/cloudrun.staging.yaml`: `INSTANCE_MODE=mock`, niente
 rete VPC). I dati in Firestore non cambiano; l'appartamento `dev` resta, ma in staging il BFF raggiunge solo
 `mock://` e la sua verifica fallisce finché non si torna a prod.
@@ -561,7 +571,7 @@ rete VPC). I dati in Firestore non cambiano; l'appartamento `dev` resta, ma in s
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com TARGET=staging GCP_PROJECT_ID=domotica-poc-511707 GCP_REGION=europe-west8 \
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com TARGET=staging STAGING_SITE=domhouse-staging GCP_PROJECT_ID=domotica-poc-511707 GCP_REGION=europe-west8 \
   SMTP_USER=m.scardovellicrac@gmail.com VITE_FCM_ENABLED=true scripts/publish.sh <COMMIT>
 ```
 
