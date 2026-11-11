@@ -1,0 +1,282 @@
+{
+ "_note": "Shelly.GetComponents {\"dynamic_only\": true, \"offset\": 0 | 10}: the REAL answers of the Shelly 1 Gen4 bridge (firmware 2.0.3, bench of 11 November 2026, cfg_rev 26, last packets at 1794397064), in the middle of blu_bridge_mqtt_capture.jsonl. MACs replaced with the invented ones of the capture; nothing else changed. never_heard: the Motion's two components right after its pairing, before its first packet (bthomedevice all null; bthomesensor value null, last_updated_ts 0).",
+ "pages": [
+  {
+   "components": [
+    {
+     "key": "bthomedevice:200",
+     "status": {
+      "id": 200,
+      "rssi": -65,
+      "battery": 100,
+      "packet_id": 67,
+      "last_updated_ts": 1794397064,
+      "key": false,
+      "paired": true,
+      "rpc": false,
+      "rsv": -1,
+      "fw_ver": "v1.1.4"
+     },
+     "config": {
+      "id": 200,
+      "addr": "02:00:00:00:a1:01",
+      "name": null,
+      "meta": {
+       "ui": {
+        "view": "regular"
+       }
+      }
+     },
+     "attrs": {
+      "model_id": 17
+     }
+    },
+    {
+     "key": "bthomedevice:201",
+     "status": {
+      "id": 201,
+      "rssi": -58,
+      "battery": 100,
+      "packet_id": 15,
+      "last_updated_ts": 1794396871,
+      "key": false,
+      "paired": true,
+      "rpc": false,
+      "rsv": -1,
+      "fw_ver": "v1.2.20"
+     },
+     "config": {
+      "id": 201,
+      "addr": "02:00:00:00:a1:02",
+      "name": null,
+      "meta": {
+       "ui": {
+        "view": "regular"
+       }
+      }
+     },
+     "attrs": {
+      "model_id": 19
+     }
+    },
+    {
+     "key": "bthomedevice:202",
+     "status": {
+      "id": 202,
+      "rssi": -46,
+      "battery": 100,
+      "packet_id": 34,
+      "last_updated_ts": 1794397019,
+      "key": false,
+      "paired": true,
+      "rpc": false,
+      "rsv": -1,
+      "fw_ver": "v1.2.14"
+     },
+     "config": {
+      "id": 202,
+      "addr": "02:00:00:00:a1:03",
+      "name": null,
+      "meta": {
+       "ui": {
+        "view": "regular"
+       }
+      }
+     },
+     "attrs": {
+      "model_id": 20
+     }
+    },
+    {
+     "key": "bthomesensor:200",
+     "status": {
+      "id": 200,
+      "value": 100,
+      "last_updated_ts": 1794397064
+     },
+     "config": {
+      "id": 200,
+      "addr": "02:00:00:00:a1:01",
+      "name": null,
+      "obj_id": 1,
+      "idx": 0,
+      "meta": null
+     }
+    },
+    {
+     "key": "bthomesensor:201",
+     "status": {
+      "id": 201,
+      "value": 53,
+      "last_updated_ts": 1794397064
+     },
+     "config": {
+      "id": 201,
+      "addr": "02:00:00:00:a1:01",
+      "name": null,
+      "obj_id": 46,
+      "idx": 0,
+      "meta": null
+     }
+    },
+    {
+     "key": "bthomesensor:202",
+     "status": {
+      "id": 202,
+      "value": 21.4,
+      "last_updated_ts": 1794397064
+     },
+     "config": {
+      "id": 202,
+      "addr": "02:00:00:00:a1:01",
+      "name": null,
+      "obj_id": 69,
+      "idx": 0,
+      "meta": null
+     }
+    },
+    {
+     "key": "bthomesensor:203",
+     "status": {
+      "id": 203,
+      "value": 100,
+      "last_updated_ts": 1794396871
+     },
+     "config": {
+      "id": 203,
+      "addr": "02:00:00:00:a1:02",
+      "name": null,
+      "obj_id": 1,
+      "idx": 0,
+      "meta": null
+     }
+    },
+    {
+     "key": "bthomesensor:204",
+     "status": {
+      "id": 204,
+      "value": false,
+      "last_updated_ts": 1794396871
+     },
+     "config": {
+      "id": 204,
+      "addr": "02:00:00:00:a1:02",
+      "name": null,
+      "obj_id": 33,
+      "idx": 0,
+      "meta": null
+     }
+    },
+    {
+     "key": "bthomesensor:205",
+     "status": {
+      "id": 205,
+      "value": 1,
+      "last_updated_ts": 1794396871
+     },
+     "config": {
+      "id": 205,
+      "addr": "02:00:00:00:a1:02",
+      "name": null,
+      "obj_id": 100,
+      "idx": 0,
+      "meta": null
+     }
+    },
+    {
+     "key": "bthomesensor:206",
+     "status": {
+      "id": 206,
+      "value": 100,
+      "last_updated_ts": 1794397019
+     },
+     "config": {
+      "id": 206,
+      "addr": "02:00:00:00:a1:03",
+      "name": null,
+      "obj_id": 1,
+      "idx": 0,
+      "meta": null
+     }
+    }
+   ],
+   "cfg_rev": 26,
+   "offset": 0,
+   "total": 13
+  },
+  {
+   "components": [
+    {
+     "key": "bthomesensor:207",
+     "status": {
+      "id": 207,
+      "value": false,
+      "last_updated_ts": 1794397019
+     },
+     "config": {
+      "id": 207,
+      "addr": "02:00:00:00:a1:03",
+      "name": null,
+      "obj_id": 45,
+      "idx": 0,
+      "meta": null
+     }
+    },
+    {
+     "key": "bthomesensor:208",
+     "status": {
+      "id": 208,
+      "value": 0.0,
+      "last_updated_ts": 1794397019
+     },
+     "config": {
+      "id": 208,
+      "addr": "02:00:00:00:a1:03",
+      "name": null,
+      "obj_id": 63,
+      "idx": 0,
+      "meta": null
+     }
+    },
+    {
+     "key": "bthomesensor:209",
+     "status": {
+      "id": 209,
+      "value": 1,
+      "last_updated_ts": 1794397019
+     },
+     "config": {
+      "id": 209,
+      "addr": "02:00:00:00:a1:03",
+      "name": null,
+      "obj_id": 100,
+      "idx": 0,
+      "meta": null
+     }
+    }
+   ],
+   "cfg_rev": 26,
+   "offset": 10,
+   "total": 13
+  }
+ ],
+ "never_heard": {
+  "bthomedevice": {
+   "id": 201,
+   "rssi": null,
+   "battery": null,
+   "packet_id": null,
+   "last_updated_ts": null,
+   "key": false,
+   "paired": true,
+   "rpc": false,
+   "rsv": -1,
+   "fw_ver": "v1.2.20"
+  },
+  "bthomesensor": {
+   "id": 204,
+   "value": null,
+   "last_updated_ts": 0
+  }
+ }
+}

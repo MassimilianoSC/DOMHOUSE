@@ -28,6 +28,16 @@ def battery_from_bthome_sensor(status: dict) -> float | None:
     return float(min(100, max(0, value)))
 
 
+def battery_from_bthome_device(status: dict) -> float | None:
+    """The battery level in a BTHomeDevice status (`{"id": 200, "battery": 100, "packet_id": 16, ...}`), the source
+    the ShellyConnector uses for the BLU sensors (the same level as the obj_id 1 sensor, one component per sensor), or
+    None when the status carries none (the notifications carry it only now and then)."""
+    value = status.get("battery") if isinstance(status, dict) else None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(min(100, max(0, value)))
+
+
 @dataclass
 class BatteryTracker:
     """Last known level per device and the «warn once» rule.

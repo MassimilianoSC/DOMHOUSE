@@ -1,7 +1,8 @@
 """Capabilities <-> Shelly RPC and notifications (engine/connector/shelly/translate.py, connector.md §2.3-§2.6).
 
 The samples are the Plug M Gen3 on the bench (firmware 1.8.99, 10 November 2026) with invented ids (connector.md §5);
-the Shelly 1 Gen4 and the EM Mini Gen4 come from tests/fixtures/g4_relay_emmini_mqtt_capture.jsonl (session C).
+the Shelly 1 Gen4 and the EM Mini Gen4 come from tests/fixtures/g4_relay_emmini_mqtt_capture.jsonl (session C); the
+BLU sensors from tests/fixtures/blu_bridge_mqtt_capture.jsonl (session D) and blu_get_components_pages.json.
 Run: python -m pytest engine/connector/shelly/tests -q
 """
 import asyncio
@@ -12,10 +13,11 @@ from pathlib import Path
 
 import pytest
 
-from engine.connector.shelly.translate import (PROFILES, UnknownModel, apply_notify_status, capabilities_from_status,
-                                               capabilities_touched, command_call, confirmed_result, error_result,
-                                               merge_partial, notification_ts, profile_for, read_back_call,
-                                               supported_models)
+from engine.connector.shelly.translate import (BLU_MODELS, BTHOME_IGNORED, PROFILES, UnknownModel, apply_notify_status,
+                                               blu_reading, bthome_components, bthome_ts, capabilities_from_status,
+                                               capabilities_touched, command_call, component_event_targets,
+                                               confirmed_result, error_result, merge_partial, normalize_mac,
+                                               notification_ts, profile_for, read_back_call, supported_models)
 from engine.connector.shelly.transport.base import RpcError, TransportOffline, TransportTimeout
 
 PLUG = profile_for("PlugMG3")
@@ -353,3 +355,140 @@ def test_supported_models_lists_the_three():
     assert supported_models() == ("Shelly Plug M Gen3 (type plug: power_meter, switch); "
                                   "Shelly 1 Gen4 (type relay: heating or switch); "
                                   "Shelly EM Mini Gen4 (type energy_meter: power_meter)")
+
+
+# --- Shelly BLU sensors through a bridge, from the bench capture (session D, 11 November 2026) ------------------
+
+BLU_CAPTURE = Path(__file__).with_name("fixtures") / "blu_bridge_mqtt_capture.jsonl"
+BLU_PAGES = Path(__file__).with_name("fixtures") / "blu_get_components_pages.json"
+ADDR_HT, ADDR_MOTION, ADDR_DOOR = "02:00:00:00:a1:01", "02:00:00:00:a1:02", "02:00:00:00:a1:03"
+MODEL_OF = {ADDR_HT: BLU_MODELS["blu_ht"], ADDR_MOTION: BLU_MODELS["blu_motion"],
+            ADDR_DOOR: BLU_MODELS["blu_door_window"]}
+
+
+def blu_messages() -> list[tuple[datetime, dict]]:
+    out = []
+    for line in BLU_CAPTURE.read_text(encoding="utf-8").splitlines():
+        record = json.loads(line)
+        if record["topic"].endswith("/online"):
+            continue
+        received = datetime.strptime(record["received_at"], "%Y-%m-%dT%H:%M:%S%z").astimezone(UTC)
+        out.append((received, json.loads(record["payload"])))
+    return out
+
+
+def blu_map() -> dict:
+    pages = json.loads(BLU_PAGES.read_text(encoding="utf-8"))["pages"]
+    return bthome_components([c for page in pages for c in page["components"]])
+
+
+def readings_from_the_capture() -> list[tuple[str, str, dict]]:
+    """(addr, capability, fields) for every bthomesensor notification of the capture, through the map."""
+    components, out = blu_map(), []
+    for _, message in blu_messages():
+        if message["method"] != "NotifyStatus":
+            continue
+        for key, change in message["params"].items():
+            component = components.get(key)
+            if component is None or component.obj_id is None or "value" not in change:
+                continue
+            reading = blu_reading(MODEL_OF[component.addr], component.obj_id, change["value"])
+            if reading is not None:
+                out.append((component.addr, *reading))
+    return out
+
+
+def test_the_two_pages_of_get_components_hold_the_three_sensors():
+    pages = json.loads(BLU_PAGES.read_text(encoding="utf-8"))["pages"]
+    assert [(p["offset"], len(p["components"]), p["total"]) for p in pages] == [(0, 10, 13), (10, 3, 13)]
+    components = blu_map()
+    assert len(components) == 13
+    by_addr = {}
+    for c in components.values():
+        by_addr.setdefault(c.addr, set()).add(c.obj_id)
+    assert by_addr == {ADDR_HT: {None, 1, 46, 69}, ADDR_MOTION: {None, 1, 33, 100}, ADDR_DOOR: {None, 1, 45, 63, 100}}
+    # the Door/Window's open sensor is on the second page
+    assert components["bthomesensor:207"].addr == ADDR_DOOR and components["bthomesensor:207"].obj_id == 45
+    assert "bthomesensor:207" in {c["key"] for c in pages[1]["components"]}
+
+
+def test_the_capture_gives_the_four_capabilities():
+    readings = readings_from_the_capture()
+    seen = {(addr, cap) for addr, cap, _ in readings}
+    assert seen == {(ADDR_HT, "temperature"), (ADDR_HT, "humidity"), (ADDR_MOTION, "motion"), (ADDR_DOOR, "contact")}
+    temps = [f["celsius"] for a, c, f in readings if c == "temperature"]
+    assert temps[0] == 27.9 and all(isinstance(t, float) and 15 < t < 35 for t in temps)
+    assert all(isinstance(f["percent"], float) and 0 <= f["percent"] <= 100 for _, c, f in readings if c == "humidity")
+
+
+def test_motion_and_contact_are_booleans_in_the_order_of_the_capture():
+    readings = readings_from_the_capture()
+    motion = [f["detected"] for a, c, f in readings if c == "motion"]
+    contact = [f["open"] for a, c, f in readings if c == "contact"]
+    assert all(isinstance(v, bool) for v in motion + contact)
+    assert motion[:4] == [False, True, False, True]
+    # the window opened and closed, also 4 s apart (1794396993 open, 1794396997 closed, 1794397001 open)
+    assert contact[:9] == [True, False, True, False, True, False, True, False, True]
+
+
+def test_rotation_light_level_battery_and_unknown_objects_are_ignored():
+    door, motion = BLU_MODELS["blu_door_window"], BLU_MODELS["blu_motion"]
+    assert BTHOME_IGNORED == {1, 63, 100}
+    assert blu_reading(door, 63, 36.5) is None                 # rotation, degrees
+    assert blu_reading(door, 100, 1) is None                   # light level 0-2
+    assert blu_reading(motion, 100, 2) is None
+    assert blu_reading(motion, 1, 100) is None                 # battery: from bthomedevice
+    assert blu_reading(motion, 0x2E, 50) is None               # humidity on a Motion: not its object
+    assert blu_reading(door, 250, 1) is None                   # unknown
+    # the capture's rotation and light notifications give nothing
+    components = blu_map()
+    ignored = [(k, ch) for _, m in blu_messages() if m["method"] == "NotifyStatus"
+               for k, ch in m["params"].items() if k in components and components[k].obj_id in (63, 100)]
+    assert len(ignored) > 10
+    assert all(blu_reading(MODEL_OF[components[k].addr], components[k].obj_id, ch["value"]) is None
+               for k, ch in ignored)
+
+
+def test_wrong_types_and_null_give_no_reading():
+    ht, door = BLU_MODELS["blu_ht"], BLU_MODELS["blu_door_window"]
+    assert blu_reading(ht, 69, None) is None                    # no packet yet
+    assert blu_reading(ht, 69, True) is None and blu_reading(ht, 69, "21.5") is None
+    assert blu_reading(door, 45, 1) is None                     # not a boolean
+    assert blu_reading(ht, 69, 21) == ("temperature", {"celsius": 21.0})
+
+
+def test_component_events_of_the_capture():
+    targets = [t for _, m in blu_messages() if m["method"] == "NotifyEvent"
+               for t in component_event_targets(m["params"])]
+    assert targets[:4] == ["bthomedevice:200", "bthomesensor:200", "bthomesensor:201", "bthomesensor:202"]
+    assert "bthomesensor:209" in targets
+    other = {"events": [{"component": "sys", "event": "component_added", "target": "boolean:200"},
+                        {"component": "bthome", "event": "device_discovered"}]}
+    assert component_event_targets(other) == []
+
+
+def test_mac_and_last_updated_ts():
+    assert normalize_mac("02:00:00:00:A1:01") == ADDR_HT
+    assert normalize_mac("02:00:00:00:a1:01,p") == ADDR_HT        # as the ble component lists it
+    assert normalize_mac("02:00:00:00:a1") is None and normalize_mac(None) is None
+    assert normalize_mac("02:00:00:00:a1:zz") is None
+    received = datetime.fromtimestamp(1794394038, UTC)
+    assert bthome_ts(1794394038, received) == received
+    assert bthome_ts(None, received) is None and bthome_ts(0, received) is None
+    assert bthome_ts(1794394038 - 3600, received) == received     # beyond the trusted skew: our reception
+
+
+def test_never_heard_components_of_the_real_answer_give_nothing():
+    """bthomesensor value null and last_updated_ts 0, bthomedevice all null: no packet time, no reading."""
+    never = json.loads(BLU_PAGES.read_text(encoding="utf-8"))["never_heard"]
+    received = datetime.fromtimestamp(1794397100, UTC)
+    components = bthome_components([
+        {"key": "bthomedevice:201", "status": never["bthomedevice"],
+         "config": {"id": 201, "addr": ADDR_MOTION, "name": None, "meta": {"ui": {"view": "regular"}}},
+         "attrs": {"model_id": 19}},
+        {"key": "bthomesensor:204", "status": never["bthomesensor"],
+         "config": {"id": 204, "addr": ADDR_MOTION, "name": None, "obj_id": 33, "idx": 0, "meta": None}}])
+    device, sensor = components["bthomedevice:201"], components["bthomesensor:204"]
+    assert sensor.last_updated_ts == 0 and device.last_updated_ts is None
+    assert bthome_ts(sensor.last_updated_ts, received) is None and bthome_ts(device.last_updated_ts, received) is None
+    assert blu_reading(BLU_MODELS["blu_motion"], sensor.obj_id, sensor.status["value"]) is None

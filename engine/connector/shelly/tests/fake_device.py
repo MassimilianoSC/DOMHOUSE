@@ -25,6 +25,16 @@ It reports only when the test asks: report_power() sends the em1:0 NotifyStatus 
 with its "ts" em1_delay_s seconds BEFORE now (13.5 s by default, as in the capture); report_energy() sends the
 em1data:0 NotifyStatus and then its NotifyEvent "data", with the ts of now. set_load and add_energy change the meter
 silently, as the real one waits for its next cycle. When it comes back online it sends nothing: no NotifyFullStatus.
+
+BLU sensors (bench of 11 November 2026, tests/fixtures/blu_bridge_mqtt_capture.jsonl): any of the three can be the
+bridge of FakeBluHT, FakeBluMotion and FakeBluDoorWindow. pair() adds a bthomedevice and a bthomesensor per object,
+numbered by the bridge from 200 in the order of pairing (so the same sensor gets other numbers on another bridge or
+after a new pairing), with a sys component_added for each; unpair() removes them with component_removed.
+Shelly.GetComponents answers with the dynamic components, 10 a page, from "offset", with "total". Packets leave only
+when the test says so: blu_packet() updates the components and notifies a bthomesensor only when its value changes;
+blu_device_report() sends the bthomedevice notification (the real one sends it at most once a minute, with the last
+packet already received). A device with nothing paired answers GetComponents with an empty list; nothing else of the
+three models changes.
 """
 import copy
 from collections import defaultdict, deque
@@ -45,6 +55,35 @@ MINIEMG4_DEVICE_INFO = {"name": None, "id": "shellyemminig4-000000000003", "mac"
                         "ver": "1.7.0-miniemg4prod0", "app": "MiniEMG4", "auth_en": False, "auth_domain": None,
                         "matter": True}
 EM1_DELAY_S = 13.5           # in the capture, em1:0's ts is about this much before its arrival
+BTHOME_DEVICE, BTHOME_SENSOR = "bthomedevice", "bthomesensor"
+COMPONENTS_PAGE = 10         # Shelly.GetComponents gives 10 components a page (bench of 11 November 2026)
+
+
+class FakeBlu:
+    """A Shelly BLU sensor: its MAC and its BTHome objects, in the order the bridge numbers them (battery first, as in
+    the capture of 11 November 2026). values holds the last value of each object it sent, None before the first."""
+    objects: tuple[int, ...] = ()
+    model_id = 0                     # attrs.model_id of its bthomedevice
+    fw_ver = ""                      # status.fw_ver of its bthomedevice, as in the real answers
+
+    def __init__(self, addr: str):
+        self.addr = addr
+        self.values: dict[int, object] = {obj_id: None for obj_id in self.objects}
+
+
+class FakeBluHT(FakeBlu):
+    objects = (1, 46, 69)            # battery %, humidity %, temperature °C
+    model_id, fw_ver = 17, "v1.1.4"
+
+
+class FakeBluMotion(FakeBlu):
+    objects = (1, 33, 100)           # battery %, motion, illuminance level 0-2
+    model_id, fw_ver = 19, "v1.2.20"
+
+
+class FakeBluDoorWindow(FakeBlu):
+    objects = (1, 45, 63, 100)       # battery %, open, rotation in degrees, illuminance level 0-2
+    model_id, fw_ver = 20, "v1.2.14"
 
 
 def utcnow() -> datetime:
@@ -61,6 +100,12 @@ class _FakeShelly:
         self._uptime = 0
         self._faults: dict[str, deque] = defaultdict(deque)
         self._sinks: list[Callable[[Notification], None]] = []
+        # BLU sensors paired with this device (pair): its dynamic components, as Shelly.GetComponents gives them
+        self._components: dict[str, dict] = {}
+        self._paired: dict[str, tuple["FakeBlu", list[str]]] = {}
+        self._numbers = {BTHOME_DEVICE: 199, BTHOME_SENSOR: 199}
+        self._reported_battery: dict[str, float] = {}
+        self._cfg_rev = 10
 
     # --- what the transport needs -------------------------------------------------------------------------------
 
@@ -78,7 +123,99 @@ class _FakeShelly:
             return copy.deepcopy(self.device_info() | {"id": self.shelly_id, "mac": self._mac()})
         if method == "Shelly.GetStatus":
             return self.full_status()
+        if method == "Shelly.GetComponents":
+            return self._get_components(params)
         return self._handle_own(method, params)
+
+    # --- BLU sensors paired with this device, its bridge (bench of 11 November 2026) ----------------------------
+
+    def pair(self, sensor: "FakeBlu") -> None:
+        """Pairs a BLU sensor: a bthomedevice and one bthomesensor per object, numbered from 200 by this bridge (the
+        numbers are the bridge's, never stable), each announced by a sys component_added. Before the first packet the
+        shape is the real one (tests/fixtures/blu_get_components_pages.json, never_heard): the bthomedevice has
+        rssi, battery, packet_id and last_updated_ts null; a bthomesensor has value null but last_updated_ts 0."""
+        device_n = self._next_number(BTHOME_DEVICE)
+        self._components[f"{BTHOME_DEVICE}:{device_n}"] = {
+            "status": {"id": device_n, "rssi": None, "battery": None, "packet_id": None, "last_updated_ts": None,
+                       "key": False, "paired": True, "rpc": False, "rsv": -1, "fw_ver": sensor.fw_ver},
+            "config": {"id": device_n, "addr": sensor.addr, "name": None, "meta": {"ui": {"view": "regular"}}},
+            "attrs": {"model_id": sensor.model_id}}
+        keys = [f"{BTHOME_DEVICE}:{device_n}"]
+        for obj_id in sensor.objects:
+            n = self._next_number(BTHOME_SENSOR)
+            self._components[f"{BTHOME_SENSOR}:{n}"] = {
+                "status": {"id": n, "value": None, "last_updated_ts": 0},
+                "config": {"id": n, "addr": sensor.addr, "name": None, "obj_id": obj_id, "idx": 0, "meta": None}}
+            keys.append(f"{BTHOME_SENSOR}:{n}")
+        self._paired[sensor.addr] = (sensor, keys)
+        for key in keys:
+            self._component_event("component_added", key)
+
+    def unpair(self, addr: str) -> None:
+        """As the real one: the sensors' component_removed first, then the device's."""
+        _, keys = self._paired.pop(addr)
+        for key in keys[1:] + keys[:1]:
+            del self._components[key]
+            self._component_event("component_removed", key)
+
+    def blu_packet(self, addr: str, values: dict, *, battery: float | None = None, rssi: int = -60) -> None:
+        """A packet of the sensor reaches the bridge, with its objects' values ({obj_id: value}; the others keep
+        theirs). Every object in the packet gets last_updated_ts = now; a bthomesensor is notified ONLY when its value
+        changes. The bthomedevice is updated silently: its notification is blu_device_report()."""
+        sensor, keys = self._paired[addr]
+        now = int(self._clock().timestamp())
+        sensor.values.update(values)
+        if battery is not None and 1 in sensor.values:
+            sensor.values[1] = battery                     # the obj_id 1 sensor carries the same level
+        device = self._components[keys[0]]["status"]
+        device["packet_id"] = (device["packet_id"] or 0) + 1
+        device.update(last_updated_ts=now, rssi=rssi)
+        if battery is not None:
+            device["battery"] = battery
+        for key in keys[1:]:
+            status, obj_id = self._components[key]["status"], self._components[key]["config"]["obj_id"]
+            if sensor.values.get(obj_id) is None:
+                continue
+            old = status["value"]
+            status.update(value=sensor.values[obj_id], last_updated_ts=now)
+            if old != status["value"] or type(old) is not type(status["value"]):
+                self._notify("NotifyStatus", {key: {"last_updated_ts": now, "value": status["value"]}})
+
+    def blu_device_report(self, addr: str) -> None:
+        """The bthomedevice NotifyStatus (at most one a minute on the real one): the last packet already received,
+        its last_updated_ts, and the battery when it changed since the last report."""
+        _, keys = self._paired[addr]
+        status = self._components[keys[0]]["status"]
+        report = {k: status[k] for k in ("last_updated_ts", "packet_id", "rssi")}
+        if status["battery"] is not None and status["battery"] != self._reported_battery.get(addr):
+            report["battery"] = self._reported_battery[addr] = status["battery"]
+        self._notify("NotifyStatus", {keys[0]: report})
+
+    def blu_keys(self, addr: str) -> list[str]:
+        """The component keys of a paired sensor: the bthomedevice first, then a bthomesensor per object."""
+        return list(self._paired[addr][1])
+
+    def _next_number(self, kind: str) -> int:
+        self._numbers[kind] += 1
+        return self._numbers[kind]
+
+    def _component_event(self, event: str, key: str) -> None:
+        self._cfg_rev += 1
+        now = round(self._clock().timestamp(), 2)
+        self._notify("NotifyEvent", {"events": [{"component": "sys", "event": event, "target": key,
+                                                 "restart_required": False, "ts": now, "cfg_rev": self._cfg_rev}]})
+
+    def _get_components(self, params: dict) -> dict:
+        """Shelly.GetComponents: the dynamic components only (dynamic_only), 10 a page from offset, ordered by key
+        type then number, as the real one."""
+        if not params.get("dynamic_only"):
+            raise RpcError(-103, "fake bridge: only dynamic_only is served")
+        offset = params.get("offset", 0)
+        if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+            raise RpcError(-103, "Invalid argument 'offset'")
+        ordered = sorted(self._components, key=lambda k: (k.split(":")[0], int(k.split(":")[1])))
+        page = [{"key": k, **copy.deepcopy(self._components[k])} for k in ordered[offset:offset + COMPONENTS_PAGE]]
+        return {"components": page, "cfg_rev": self._cfg_rev, "offset": offset, "total": len(ordered)}
 
     # --- faults -------------------------------------------------------------------------------------------------
 

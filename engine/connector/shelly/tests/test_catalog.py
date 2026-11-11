@@ -294,3 +294,116 @@ def test_combinations_the_gen4_models_do_not_have(device, capabilities):
                       f"catalog device {names[device]}", "shelly.type and capabilities are not supported")
     assert "Shelly 1 Gen4 (type relay: heating or switch)" in message
     assert "Shelly EM Mini Gen4 (type energy_meter: power_meter)" in message
+
+
+# --- BLU sensors through a bridge --------------------------------------------------------------------------------
+
+BLU_YAML = THREE_YAML + """\
+  - device_id: dev-ambiente-soggiorno
+    label: Sensore soggiorno
+    room_id: soggiorno
+    capabilities: {temperature: {}, humidity: {}}
+    shelly: {addr: "02:00:00:00:A1:01", bridge: shelly1g4-000000000002, type: blu_ht}
+  - device_id: dev-movimento-ingresso
+    label: Movimento ingresso
+    room_id: soggiorno
+    capabilities: {motion: {}}
+    shelly: {addr: "02:00:00:00:a1:02", bridge: shelly1g4-000000000002, type: blu_motion}
+  - device_id: dev-finestra-soggiorno
+    label: Finestra soggiorno
+    room_id: soggiorno
+    capabilities: {contact: {}}
+    shelly: {addr: "02:00:00:00:a1:03", bridge: shelly1g4-000000000002, type: blu_door_window, offline_after_s: 1000}
+"""
+HT, MOTION, DOOR = 3, 4, 5      # their places in BLU_YAML's devices
+
+
+def blu() -> dict:
+    import yaml
+    return yaml.safe_load(BLU_YAML)
+
+
+def blu_with(change) -> dict:
+    data = blu()
+    change(data)
+    return data
+
+
+def test_catalog_with_a_bridge_and_three_blu_sensors(tmp_path: Path):
+    path = tmp_path / "catalog.yaml"
+    path.write_text(BLU_YAML, encoding="utf-8")
+    cat = load_catalog(path, THRESHOLDS)
+    by_id = cat.by_device_id()
+    ht, motion, door = by_id["dev-ambiente-soggiorno"], by_id["dev-movimento-ingresso"], by_id["dev-finestra-soggiorno"]
+    assert ht.blu.addr == "02:00:00:00:a1:01"                       # lower case, whatever the catalog wrote
+    assert {d.blu.bridge for d in (ht, motion, door)} == {"shelly1g4-000000000002"}
+    assert (ht.shelly_id, ht.profile, ht.blu.model.device_type) == (None, None, "blu_ht")
+    assert ht.capabilities == {"temperature": {}, "humidity": {}} and motion.capabilities == {"motion": {}}
+    assert ht.offline_after_s == THRESHOLDS.by_type["blu_ht"] == 200.0
+    assert motion.offline_after_s == THRESHOLDS.by_type["blu_motion"] == 2720.0
+    assert THRESHOLDS.by_type["blu_door_window"] == 920.0 and door.offline_after_s == 1000.0    # the override
+    assert set(cat.by_shelly_id()) == {"shellyplugmg3-000000000001", "shelly1g4-000000000002",
+                                       "shellyemminig4-000000000003"}      # the sensors have no shelly_id
+    assert by_id["dev-rele-soggiorno"].blu is None
+
+
+def test_an_ht_may_be_temperature_only_and_regulate_the_boiler():
+    def change(d):
+        d["devices"][1]["capabilities"] = {"heating": {"setpoint_min": 7, "setpoint_max": 23}}
+        d["devices"][1]["links"] = {"sensor_device_id": "dev-ambiente-soggiorno"}
+        d["devices"][HT]["capabilities"] = {"temperature": {}}
+    cat = parse_catalog(blu_with(change), THRESHOLDS)
+    assert cat.by_device_id()["dev-rele-soggiorno"].links == {"sensor_device_id": "dev-ambiente-soggiorno"}
+
+
+@pytest.mark.parametrize("place, capabilities", [
+    (HT, {"motion": {}}), (HT, {"temperature": {}, "contact": {}}), (HT, {"switch": {}}),
+    (MOTION, {"motion": {}, "temperature": {}}), (MOTION, {"contact": {}}),
+    (DOOR, {"contact": {}, "motion": {}}), (DOOR, {"temperature": {}}),
+], ids=["ht-motion", "ht-temperature+contact", "ht-switch", "motion+temperature", "motion-contact",
+        "door-contact+motion", "door-temperature"])
+def test_capabilities_a_blu_sensor_does_not_measure_are_refused(place, capabilities):
+    message = refused(blu_with(lambda d: d["devices"][place].update(capabilities=capabilities)),
+                      f"catalog device {blu()['devices'][place]['device_id']}",
+                      "capabilities are not measured by this BLU sensor")
+    assert "Shelly BLU H&T (type blu_ht: humidity, temperature)" in message
+
+
+@pytest.mark.parametrize("change, expected", [
+    (lambda s: s.update(bridge=SENTINEL), "shelly.bridge is not the shelly.id of a device of the catalog"),
+    (lambda s: s.pop("bridge"), "shelly.bridge is missing"),
+    (lambda s: s.update(bridge=7), "shelly.bridge is missing or not a text"),
+    (lambda s: s.pop("addr"), "shelly.addr is missing or not a Bluetooth MAC"),
+    (lambda s: s.update(addr=SENTINEL), "shelly.addr is missing or not a Bluetooth MAC"),
+    (lambda s: s.update(addr="02:00:00:00:a1:01,p"), "shelly.addr is missing or not a Bluetooth MAC"),
+    (lambda s: s.pop("type"), "shelly.type is missing"),
+    (lambda s: s.update(type="relay"), "shelly.type is not a BLU sensor type"),
+    (lambda s: s.update(type=SENTINEL), "shelly.type is not one of the known device types"),
+    (lambda s: s.update(id="shellyblu-000000000004"), "unknown key (id)"),
+    (lambda s: s.update(channel=0), "unknown key (channel)"),
+    (lambda s: s.update(key=SENTINEL), "unknown key (key)"),
+], ids=lambda x: x if isinstance(x, str) else None)
+def test_blu_section_errors(change, expected):
+    refused(blu_with(lambda d: change(d["devices"][MOTION]["shelly"])), "catalog device dev-movimento-ingresso",
+            expected)
+
+
+def test_a_bridge_that_is_a_blu_sensor_is_not_a_bridge():
+    """The bridge is a Shelly of the catalog (its shelly.id), never another device_id nor a sensor."""
+    refused(blu_with(lambda d: d["devices"][MOTION]["shelly"].update(bridge="dev-rele-soggiorno")),
+            "shelly.bridge is not the shelly.id of a device of the catalog")
+    refused(blu_with(lambda d: d["devices"][MOTION]["shelly"].update(bridge="02:00:00:00:a1:01")),
+            "shelly.bridge is not the shelly.id of a device of the catalog")
+
+
+def test_the_same_mac_twice_is_refused_whatever_the_case():
+    message = refused(blu_with(lambda d: d["devices"][DOOR]["shelly"].update(addr="02:00:00:00:A1:02")),
+                      "catalog device dev-finestra-soggiorno",
+                      "shelly.addr is the same as device dev-movimento-ingresso")
+    assert "a1:02" not in message.lower()
+
+
+def test_a_shelly_with_a_blu_type_but_no_bridge_is_refused():
+    """Without addr and bridge the section is a Shelly's: no Shelly model is a blu_ht."""
+    refused(blu_with(lambda d: d["devices"][HT].update(shelly={"id": "shellyblu-000000000004", "type": "blu_ht"})),
+            "catalog device dev-ambiente-soggiorno", "not supported by any Shelly model")

@@ -3,6 +3,8 @@
 Run: python -m pytest engine/connector/shelly/tests -q
 """
 import asyncio
+import json
+from pathlib import Path
 
 import pytest
 
@@ -11,7 +13,7 @@ from engine.connector.shelly.translate import (apply_notify_status, capabilities
 from engine.connector.shelly.transport.base import (ConnectionEvent, Notification, RpcError, TransportOffline,
                                                     TransportTimeout)
 
-from .fake_device import FakePlugMG3
+from .fake_device import FakeBluDoorWindow, FakeBluHT, FakeBluMotion, FakePlugMG3, FakeS1G4
 from .fake_transport import FakeTransport
 
 SID = "shellyplugmg3-000000000001"
@@ -208,3 +210,101 @@ def test_two_transports_do_not_see_each_other():
         assert await drain(tb) == []
         assert tb.connected() == {"shellyplugmg3-000000000002"}
     asyncio.run(main())
+
+
+# --- BLU sensors paired with a fake bridge ----------------------------------------------------------------------
+
+def test_fake_bridge_pairs_numbers_and_pages_its_components():
+    bridge = FakeS1G4()
+    assert bridge.handle("Shelly.GetComponents", {"dynamic_only": True}) == {
+        "components": [], "cfg_rev": 10, "offset": 0, "total": 0}       # nothing paired: an empty answer
+    sent = []
+    bridge.subscribe(sent.append)
+    for sensor in (FakeBluHT("02:00:00:00:a1:01"), FakeBluMotion("02:00:00:00:a1:02"),
+                   FakeBluDoorWindow("02:00:00:00:a1:03")):
+        bridge.pair(sensor)
+    targets = [n.params["events"][0]["target"] for n in sent]
+    assert targets[:4] == ["bthomedevice:200", "bthomesensor:200", "bthomesensor:201", "bthomesensor:202"]
+    assert len(targets) == 13 and all(n.params["events"][0]["event"] == "component_added" for n in sent)
+    first = bridge.handle("Shelly.GetComponents", {"dynamic_only": True, "offset": 0})
+    second = bridge.handle("Shelly.GetComponents", {"dynamic_only": True, "offset": 10})
+    assert (len(first["components"]), first["total"], len(second["components"]), second["offset"]) == (10, 13, 3, 10)
+    keys = [c["key"] for c in first["components"] + second["components"]]
+    assert keys[:3] == ["bthomedevice:200", "bthomedevice:201", "bthomedevice:202"] and keys[-1] == "bthomesensor:209"
+    door = second["components"][0]
+    assert door["config"] == {"id": 207, "addr": "02:00:00:00:a1:03", "name": None, "obj_id": 45, "idx": 0,
+                              "meta": None}
+    assert door["status"] == {"id": 207, "value": None, "last_updated_ts": 0}         # no packet yet: 0, not null
+    sent.clear()
+    bridge.unpair("02:00:00:00:a1:02")
+    assert [(n.params["events"][0]["event"], n.params["events"][0]["target"]) for n in sent] == [
+        ("component_removed", "bthomesensor:203"), ("component_removed", "bthomesensor:204"),
+        ("component_removed", "bthomesensor:205"), ("component_removed", "bthomedevice:201")]
+
+
+def test_fake_bridge_notifies_a_measure_only_when_it_changes():
+    bridge = FakeS1G4()
+    bridge.pair(FakeBluHT("02:00:00:00:a1:01"))
+    sent = []
+    bridge.subscribe(sent.append)
+    bridge.blu_packet("02:00:00:00:a1:01", {69: 21.5, 46: 48}, battery=100)
+    assert [sorted(k for k in n.params if k != "ts") for n in sent] == [
+        ["bthomesensor:200"], ["bthomesensor:201"], ["bthomesensor:202"]]   # battery, humidity, temperature
+    sent.clear()
+    bridge.blu_packet("02:00:00:00:a1:01", {69: 21.5, 46: 49})
+    assert [list(k for k in n.params if k != "ts") for n in sent] == [["bthomesensor:201"]]
+    sent.clear()
+    bridge.blu_device_report("02:00:00:00:a1:01")
+    report = sent[0].params["bthomedevice:200"]
+    assert set(report) == {"last_updated_ts", "packet_id", "rssi", "battery"} and report["packet_id"] == 2
+    sent.clear()
+    bridge.blu_device_report("02:00:00:00:a1:01")                        # battery unchanged: not repeated
+    assert set(sent[0].params["bthomedevice:200"]) == {"last_updated_ts", "packet_id", "rssi"}
+
+
+REAL_PAGES = Path(__file__).with_name("fixtures") / "blu_get_components_pages.json"
+
+
+def shape(value):
+    """Field names in order and the type of every leaf: what must match the real answers, values aside."""
+    if isinstance(value, dict):
+        return [(k, shape(v)) for k, v in value.items()]
+    if isinstance(value, list):
+        return [shape(v) for v in value]
+    return type(value).__name__
+
+
+def test_fake_bridge_answers_with_the_shape_of_the_real_get_components():
+    """Same envelope, same components in the same order, same fields in the same order with the same types, as the
+    real answers of the Shelly 1 Gen4 (fixture), once the fake's sensors sent the values the real ones had."""
+    real = json.loads(REAL_PAGES.read_text(encoding="utf-8"))["pages"]
+    bridge = FakeS1G4()
+    sensors = {s.addr: s for s in (FakeBluHT("02:00:00:00:a1:01"), FakeBluMotion("02:00:00:00:a1:02"),
+                                   FakeBluDoorWindow("02:00:00:00:a1:03"))}
+    for sensor in sensors.values():
+        bridge.pair(sensor)
+    for component in (c for page in real for c in page["components"] if c["key"].startswith("bthomesensor")):
+        battery = component["status"]["value"] if component["config"]["obj_id"] == 1 else None
+        bridge.blu_packet(component["config"]["addr"], {component["config"]["obj_id"]: component["status"]["value"]},
+                          battery=battery, rssi=-60)
+    fake = [bridge.handle("Shelly.GetComponents", {"dynamic_only": True, "offset": page["offset"]}) for page in real]
+    assert [c["key"] for p in fake for c in p["components"]] == [c["key"] for p in real for c in p["components"]]
+    for fake_page, real_page in zip(fake, real):
+        assert list(fake_page) == list(real_page)                      # components, cfg_rev, offset, total
+        assert (fake_page["offset"], fake_page["total"]) == (real_page["offset"], real_page["total"])
+        for f, r in zip(fake_page["components"], real_page["components"]):
+            assert shape(f) == shape(r), f["key"]
+            assert f["config"] == r["config"], f["key"]                # ids, MAC, obj_id, idx, meta: the same
+
+
+def test_fake_sensor_never_heard_is_the_real_one():
+    """Right after the pairing, before the first packet: the bthomedevice all null, the bthomesensor value null and
+    last_updated_ts 0 (not null), exactly as the real Motion."""
+    never = json.loads(REAL_PAGES.read_text(encoding="utf-8"))["never_heard"]
+    bridge = FakeS1G4()
+    bridge.pair(FakeBluHT("02:00:00:00:a1:01"))           # the real Motion was the second pairing: 201, 203-205
+    bridge.pair(FakeBluMotion("02:00:00:00:a1:02"))
+    components = {c["key"]: c for c in bridge.handle("Shelly.GetComponents", {"dynamic_only": True})["components"]}
+    assert components["bthomedevice:201"]["status"] == never["bthomedevice"]
+    assert components["bthomesensor:204"]["status"] == never["bthomesensor"]
+    assert never["bthomesensor"]["last_updated_ts"] == 0 and never["bthomesensor"]["value"] is None

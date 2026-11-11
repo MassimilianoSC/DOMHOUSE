@@ -7,8 +7,9 @@ import pytest
 from engine.connector.shelly.offline import (CONTRACT_DEFAULT_S, DEFAULT_PATH, DEVICE_TYPES, OfflineThresholdsError,
                                              is_offline, load_thresholds)
 
-# the beacon intervals from the official Shelly BLU documentation (docs-ble, 5 November 2026)
-BEACON_S = {"blu_ht": 60, "blu_door_window": 60, "blu_motion": 900}
+# the beacon intervals from the official Shelly BLU documentation (docs-ble, 5 November 2026), except the
+# Door/Window's: the documentation said 60 s, the sensor measured on the bench sends every ~300 s (11 November 2026)
+BEACON_S = {"blu_ht": 60, "blu_door_window": 300, "blu_motion": 900}
 # the rule of offline_thresholds.toml: three beacon periods plus 20 s of radio delay for the third beacon
 MARGIN_S = 20
 

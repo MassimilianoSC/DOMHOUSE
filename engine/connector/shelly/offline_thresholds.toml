@@ -6,7 +6,8 @@
 # Motion sano tre volte all'ora; se alta, nasconde per ore un relè caduto.
 #
 # Regola usata per i valori: tre beacon persi più 20 s di margine. Gli intervalli vengono dalla documentazione
-# ufficiale Shelly (shelly-api-docs.shelly.cloud/docs-ble, pagine dei singoli sensori, lette il 5 novembre 2026).
+# ufficiale Shelly (shelly-api-docs.shelly.cloud/docs-ble, pagine dei singoli sensori, lette il 5 novembre 2026),
+# salvo dove la misura in laboratorio (11 novembre 2026, sensori associati a uno Shelly 1 Gen4) li ha smentiti.
 #
 # Ogni dispositivo del catalogo deve avere `shelly.type`: senza, il catalogo è rifiutato (nessuna soglia di ripiego).
 # Precedenza (offline.py): `shelly.offline_after_s` del singolo dispositivo nel catalogo > valore del suo
@@ -22,8 +23,9 @@ energy_meter = 120
 ir_blaster = 120
 # BLU H&T ZB: beacon ogni 60 s (3 × 60 + 20)
 blu_ht = 200
-# BLU Door/Window ZB: beacon ogni 60 s, più invio immediato su apertura/chiusura (3 × 60 + 20)
-blu_door_window = 200
+# BLU Door/Window ZB: la documentazione dava un beacon ogni 60 s, ma il contatto misurato a riposo trasmette ogni
+# ~300 s (302 s, due volte, laboratorio dell'11 novembre 2026), più invio immediato su apertura/chiusura (3 × 300 + 20)
+blu_door_window = 920
 # BLU Motion ZB: beacon ogni 900 s in modalità normale, più invio immediato su movimento (3 × 900 + 20).
 # Con la «beacon mode» attiva il sensore manda ogni 30 s: in quel caso abbassare la soglia sul singolo dispositivo.
 blu_motion = 2720
