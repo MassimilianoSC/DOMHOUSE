@@ -343,8 +343,9 @@ class ApartmentLink(BaseModel):
 
 def _demo_code_refused(url: str, code: str | None) -> JSONResponse | None:
     """D-98 (d3): in production a demonstration apartment (mock://) never gets an Italianway code, which would route
-    real bookings into a simulated engine. In staging it stays allowed."""
-    if code and instances.is_mock(url) and get_settings().instance_mode == "real":
+    real bookings into a simulated engine. In staging it stays allowed. D66 (P-83): production is APP_ENV=prod; staging
+    has real engines too (INSTANCE_MODE=real, D-203) and was refused with «In produzione…»."""
+    if code and instances.is_mock(url) and get_settings().app_env == "prod":
         return err(409, "italianway_on_demo", "In produzione un appartamento dimostrativo non può avere un codice Italianway")
     return None
 
