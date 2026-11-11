@@ -607,7 +607,7 @@ per 24 mesi.
 |---|---|
 | Prima linea, in nero: il tipo di azione e i valori prima → dopo | Per esempio «Modalità» con «comfort → casa vuota» |
 | Il tipo di azione, in italiano | Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata» |
-| Altri esempi di tipo | «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo» |
+| Altri esempi di tipo | «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo»; dal lotto 40 «Modalità: comando in sospeso» (un dispositivo non raggiungibile durante il cambio di modalità: il comando parte quando torna raggiungibile) |
 | A destra della prima linea: l'esito, in un badge colorato | «Applicata» verde; «Respinta» e «Non riuscita» rosso mattone; «in attesa di approvazione» ambra; «Informativa» tortora |
 | Seconda linea, in grigio: la data · chi ha deciso · su cosa | «Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; «appartamento», «dispositivo», «regole», «programmazione» |
 | Chi ha deciso, se ha eliminato l'account | «utente rimosso» |
@@ -677,7 +677,7 @@ per 24 mesi.
 
 | Cosa vedi | Cosa puoi fare | Cosa succede |
 |---|---|---|
-| Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso» | Toccare una delle pillole: la scelta è scritta in scuro | «Soggiorno in corso» compare solo con ospiti dentro e una prenotazione conosciuta dall'app |
+| Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso» | Toccare una delle pillole: la scelta è scritta in scuro | «Soggiorno in corso» compare durante una prenotazione conosciuta dall'app; dal lotto 40 anche se il check-in non è stato registrato, e sparisce al check-out |
 | La casella «Totale periodo» in «kWh», con il numero in arancione | Leggere il totale | I numeri si aggiornano ogni minuto |
 | La casella «Ora con più consumo» (oggi) o «Giorno con più consumo» (periodi più lunghi) | Leggere il picco | Sotto il valore, «ore …» oppure la data |
 | La casella «Ore di clima evitate» | Leggere le ore | Compare solo quando il motore le calcola; oggi non compare |
