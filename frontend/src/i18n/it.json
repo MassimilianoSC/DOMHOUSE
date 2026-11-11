@@ -235,6 +235,7 @@
       "checkout_kept_comfort": "Check-out: casa non svuotata",
       "booking_moved_reset": "Arrivo spostato: casa vuota",
       "booking_event_stale": "Prenotazione: evento vecchio ignorato",
+      "mode_device_pending": "Modalità: comando in sospeso",
       "offline_alert": "Dispositivo offline",
       "mold_warning": "Avviso antimuffa",
       "frost_heating_on": "Antigelo: caldaia accesa",

@@ -96,6 +96,8 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     expect(actionLabel("checkout_kept_comfort")).toBe("Check-out: casa non svuotata");
     expect(actionLabel("booking_moved_reset")).toBe("Arrivo spostato: casa vuota");
     expect(actionLabel("booking_event_stale")).toBe("Prenotazione: evento vecchio ignorato");
+    // P-83, D16 (o1): dispositivo non raggiungibile durante il passaggio di modalità, il comando parte al suo ritorno
+    expect(actionLabel("mode_device_pending")).toBe("Modalità: comando in sospeso");
   });
 
   it("ogni azione che il motore scrive nelle decisioni è nell'elenco del sito (controllo automatico, lotto 39)", () => {
