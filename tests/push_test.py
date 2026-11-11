@@ -1067,6 +1067,58 @@ def test_missed_actions_during_a_suspension_are_not_notified_one_by_one(grouped,
     assert [m.data["body"] for m in grouped.sent] == [PREARRIVAL]
 
 
+# -------- D-219 (2): an action that ran with some commands not successful ------------------------------------------------
+PARTIAL = "Pre-arrivo eseguito in parte: 1 comando non riuscito (Caldaia: Il dispositivo ha rifiutato il comando)"
+
+
+def partly(kind, reasoning=PARTIAL, decision_id=None):
+    return not_done(kind, reasoning, action="schedule_partial", decision_id=decision_id)
+
+
+def test_a_prearrival_done_in_part_is_told_in_bookings(grouped):
+    async def scenario():
+        await push.on_stream_event(APT, partly("prearrival", decision_id="dec-9"))
+        await drain()
+    run(scenario())
+    [msg] = grouped.sent
+    assert msg.data["title"] == "Milano Centro: pre-arrivo con comandi non riusciti" and msg.data["body"] == PARTIAL
+    assert msg.data["kind"] == "schedule_failed" and msg.data["link"] == "/a/apt-push/programmazione"
+    assert msg.data["tag"] == "schedule:apt-push:dec-9" and "tok-z" in msg.tokens       # «Prenotazioni»
+
+
+def test_only_the_prearrival_and_the_checkout_are_told(grouped):
+    async def scenario():
+        for kind in ("empty", "manual", "assistant", None):
+            await push.on_stream_event(APT, partly(kind, "Azione programmata (…) eseguita in parte: …"))
+        await push.on_stream_event(APT, partly("checkout", "Check-out non riuscito: 2 comandi non riusciti (…)"))
+        await drain()
+    run(scenario())
+    assert [(m.data["title"], m.data["body"]) for m in grouped.sent] == [
+        ("Milano Centro: check-out con comandi non riusciti", "Check-out non riuscito: 2 comandi non riusciti (…)")]
+
+
+def test_with_an_action_not_done_close_together_one_notification(grouped):
+    async def scenario():
+        await push.on_stream_event(APT, partly("prearrival"))
+        await push.on_stream_event(APT, not_done("checkout", "Azione programmata (check-out) non eseguita: y"))
+        await drain()
+    run(scenario())
+    [msg] = grouped.sent
+    assert msg.data["title"] == "Milano Centro: azioni programmate non eseguite o eseguite in parte"
+    assert msg.data["body"].startswith(f"2 azioni programmate non eseguite o eseguite in parte. La prima: {PARTIAL[:40]}")
+
+
+def test_done_in_part_is_told_also_during_a_suspension(grouped, monkeypatch):
+    s = dataclasses.replace(push.get_settings(), unreachable_alerts_off_until=soon(60))
+    monkeypatch.setattr(push, "get_settings", lambda: s)
+
+    async def scenario():
+        await push.on_stream_event(APT, partly("prearrival"))
+        await drain()
+    run(scenario())
+    assert [m.data["body"] for m in grouped.sent] == [PARTIAL]
+
+
 # -------- D-219: the summary at the end of a planned shutdown ------------------------------------------------------------
 @pytest.fixture
 def maintenance(grouped, monkeypatch):

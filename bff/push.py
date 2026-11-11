@@ -39,6 +39,9 @@ ALERT_MINUTES_DEFAULT = 15.0
 SCHEDULE_GROUP_S = 60.0
 SCHEDULE_FAILURES = ("schedule_failed", "schedule_missed")
 BOOKING_KINDS = ("prearrival", "checkout", "empty")       # the actions born from the bookings: category «Prenotazioni»
+# D-219 (2): an action that ran with some commands not successful is told only for these (the guest's arrival and the
+# end of the stay); the others stay in the Decisions
+PARTIAL_KINDS = {"prearrival": "pre-arrivo", "checkout": "check-out"}
 _schedule_groups: dict[tuple[str, str], dict] = {}
 SUSPENSION_MAX_DAYS = 30           # UNREACHABLE_ALERTS_OFF_UNTIL further than this is refused: alerts stay on
 
@@ -83,12 +86,20 @@ def instance_unreachable_push(apt: Apartment, minutes: float, ts: str | None):
                       f"instance:{apt.apartment_id}", ts)
 
 
-def schedule_failed_push(apt: Apartment, first_decision_id: str, reasonings: list[str], ts: str | None):
+def schedule_failed_push(apt: Apartment, first_decision_id: str, reasonings: list[str], ts: str | None,
+                         partial: list[str | None] | None = None):
     """D-219: one or more scheduled actions not done (refused at their time, or missed with the engine down). Several
-    of the same apartment and category close together are one notification, with the first in full."""
+    of the same apartment and category close together are one notification, with the first in full. partial: for each
+    one, the kind of an action that ran with some commands not successful (D-219 (2), schedule_partial), else None."""
     n = len(reasonings)
-    if n == 1:
+    partial = partial or [None] * n
+    if n == 1 and partial[0]:
+        title, body = f"{apt.name}: {PARTIAL_KINDS.get(partial[0], 'azione programmata')} con comandi non riusciti", reasonings[0]
+    elif n == 1:
         title, body = f"{apt.name}: azione programmata non eseguita", reasonings[0]
+    elif any(partial):
+        title = f"{apt.name}: azioni programmate non eseguite o eseguite in parte"
+        body = f"{n} azioni programmate non eseguite o eseguite in parte. La prima: {reasonings[0]}"
     else:
         title, body = f"{apt.name}: azioni programmate non eseguite", f"{n} azioni programmate non eseguite. La prima: {reasonings[0]}"
     return build_push("schedule_failed", apt, title, body or "Azione programmata non eseguita",
@@ -512,14 +523,18 @@ def _schedule_not_done(apt: Apartment, ev: SseEvent, data: dict, ts: str | None)
             _spawn(_keep_maintenance_summary(apt, key), "maintenance summary", apt.apartment_id)
         group["kinds"].append(data.get("new_value"))
         return
+    partial = data.get("action") == "schedule_partial"
+    if partial and data.get("new_value") not in PARTIAL_KINDS:
+        return                                     # D-219 (2): only the pre-arrival and the check-out are told
     pref = schedule_pref(data.get("new_value"))
     key = (apt.apartment_id, pref)
     group = _schedule_groups.get(key)
     if group is None:
         group = _schedule_groups[key] = {"first": str(data.get("decision_id", "")), "claim": event_key(apt, ev, ts),
-                                         "ts": ts, "reasonings": []}
+                                         "ts": ts, "reasonings": [], "partial": []}
         _spawn(_flush_schedule_group(apt, key), "schedule_failed", apt.apartment_id)
     group["reasonings"].append(str(data.get("reasoning") or "").strip())
+    group["partial"].append(data.get("new_value") if partial else None)
 
 
 async def _flush_schedule_group(apt: Apartment, key: tuple[str, str]) -> None:
@@ -528,7 +543,7 @@ async def _flush_schedule_group(apt: Apartment, key: tuple[str, str]) -> None:
     if not group:
         return
     await notify_once(f"{group['claim']}:schedule:{key[1]}", apt.tenant_id, key[1],
-                      *schedule_failed_push(apt, group["first"], group["reasonings"], group["ts"]))
+                      *schedule_failed_push(apt, group["first"], group["reasonings"], group["ts"], group.get("partial")))
 
 
 async def _keep_maintenance_summary(apt: Apartment, key: tuple[str, str]) -> None:
@@ -587,7 +602,7 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
         decision_id = str(data.get("decision_id", ""))
         _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "bookings", *booking_reset_push(apt, decision_id, data.get("reasoning"), ts)),
                "booking", apt.apartment_id)
-    elif ev.event == "decision.logged" and data.get("action") in SCHEDULE_FAILURES:     # D-219
+    elif ev.event == "decision.logged" and data.get("action") in (*SCHEDULE_FAILURES, "schedule_partial"):   # D-219
         _schedule_not_done(apt, ev, data, ts)
     elif ev.event == "decision.logged" and data.get("action") == "frost_inactive":     # D-164
         device_id = str((data.get("target") or {}).get("device_id", ""))

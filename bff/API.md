@@ -448,6 +448,14 @@ programmata non è stata eseguita»), `link` la Programmazione, `tag` `maintenan
 `UNREACHABLE_ALERTS_OFF_UNTIL`), all'avvio il server lo rende dovuto subito (`expire_work`) e parte entro un minuto.
 Uno per appartamento: le istanze dopo la prima trovano la chiave presa; alla manutenzione dopo, la chiave consegnata si
 libera e si riprende.
+Stesso `kind` `schedule_failed` anche per la decisione `schedule_partial` (D-219, aggiunta 2, lotto 39): un'azione
+programmata partita i cui comandi non sono riusciti tutti; il motore la scrive quando l'ultimo comando dell'azione è
+finito (compresa l'accensione del clima rimandata per la pausa del compressore), con `target`
+`{type: schedule, schedule_id}` e il testo «Pre-arrivo eseguito in parte: N comandi non riusciti (<dispositivo>: <motivo>;
+…)» («… non riuscito» se nessun comando è riuscito). Notificata **solo** per `prearrival` e `checkout` (categoria
+«Prenotazioni»), con `title` «…: pre-arrivo con comandi non riusciti» («check-out»), `body` il testo della decisione;
+entra nel raggruppamento di 60 secondi delle altre (`title` allora «…: azioni programmate non eseguite o eseguite in
+parte»); non si sospende con D-217.
 `booking` parte dall'evento `decision.logged` con `action` `booking_cancel_reset`: una prenotazione
 annullata dopo il pre-arrivo, con l'appartamento rimesso a vuoto dal motore (D-121); il `body` è il testo della decisione.
 `device_offline` parte se il dispositivo è ancora offline dopo i minuti della regola `offline_alert` (15 se non

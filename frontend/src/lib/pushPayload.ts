@@ -9,7 +9,8 @@
 //                     "booking:<decision_id>", "summary:<apartment_id>:<week>")
 //   kind              "approval" | "device_offline" | "instance_down" | "booking" (D-123) | "summary" (D-150) |
 //                     "frost_inactive" (lotto 30, tag "frost:<apartment_id>:<device_id>") |
-//                     "schedule_failed" (D-219, tag "schedule:<apartment_id>:<decision_id>");
+//                     "schedule_failed" (D-219, also an action done in part; tag "schedule:<apartment_id>:<decision_id>",
+//                     "maintenance:<apartment_id>" for the summary after a planned shutdown);
 //                     not used to filter
 //   apartment_id      always; approval_id / device_id / ts when relevant
 // Extra keys are ignored. A push is never silent: a missing title/body/link gives a generic notification opening "/".

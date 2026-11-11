@@ -306,6 +306,12 @@ class ApartmentEngine:
         self.approval_queue: list[dict] = []
         self.approval_schedules: dict[str, str] = {}   # D-170: approval -> the time of the scheduled action it asks
         self.deferred: dict[str, str] = {}      # schedule_id -> the hold's end, for mode actions waiting for it (D-122)
+        # D-219 (2): a scheduled action whose commands are not all over yet: schedule_id -> {"corr", "refused" (device
+        # and why, the commands never created), "waiting" (devices whose start waits for the compressor's pause)};
+        # command_schedule is the index command -> its action, rebuilt from the items' command_ids at a restart
+        self.schedule_open: dict[str, dict] = {}
+        self.command_schedule: dict[str, str] = {}
+        self._schedule_run: str | None = None   # the scheduled action whose commands are being created now
         self.compressor_off: dict[str, float] = {}   # climate device -> when it went off (monotonic), R4
         self.offline_watch: dict[str, object] = {}   # device -> the offline episode being watched, R5
         self.links: dict[str, dict[str, str]] = {}   # device -> its links (connector-v2.md §2.2), never shown to the app
@@ -514,6 +520,9 @@ class ApartmentEngine:
         self.approval_queue = st.get_meta("approval_queue", [])
         self.approval_schedules = st.get_meta("approval_schedules", {}) or {}
         self.deferred = st.get_meta("deferred", {})
+        self.schedule_open = dict(st.get_meta("schedule_open", {}) or {})
+        self.command_schedule = {c: sid for sid in self.schedule_open
+                                 for c in (self.schedule.get(sid) or {}).get("command_ids") or []}
         # D-218: the compressors' pauses, from the UTC instant each one went off (the in-memory clock starts again)
         for device_id, at in (st.get_meta("compressor_off", {}) or {}).items():
             elapsed = (utcnow() - parse_dt(at)).total_seconds()
@@ -558,6 +567,16 @@ class ApartmentEngine:
                      f"Azione programmata ({SCHEDULE_LABELS.get(schedule_kind(item), schedule_kind(item))}) non eseguita: "
                      f"il motore era fermo all'orario previsto, alle {local:%H:%M} del {local:%d/%m}, "
                      f"oltre {fmt_num(self.setting('MISSED_AFTER_MINUTES'))} minuti fa", "failed", str(uuid.uuid4()))
+        # D-219 (2): an action whose commands the restart interrupted is judged now; a start that waited for the
+        # compressor's pause died with the process: it did not happen
+        for sid, run in list(self.schedule_open.items()):
+            for device_id in run.get("waiting") or []:
+                run.setdefault("refused", []).append(
+                    [device_id, "motore riavviato prima dell'accensione rimandata per la pausa del compressore"])
+            run["waiting"] = []
+            self._schedule_check(sid)
+        if self.schedule_open:
+            self.store.put_meta("schedule_open", self.schedule_open)
 
     def spawn(self, coro) -> asyncio.Task:
         task = asyncio.get_running_loop().create_task(coro)
@@ -1339,6 +1358,9 @@ class ApartmentEngine:
         for d in self.devices.values():
             caps = d["capabilities"]
             if not d["online"]:
+                if self._schedule_run and self._mode_would_command(d, mode):
+                    # D-219 (2): a device of a scheduled action that is offline at its time is a command not done
+                    self._schedule_refused(self._schedule_run, d["device_id"], "dispositivo offline, non comandato")
                 continue
             if "climate" in caps:
                 c = caps["climate"]
@@ -1366,6 +1388,21 @@ class ApartmentEngine:
                                              "params": {"on": True, "setpoint": sp}}))
         return out
 
+    def _mode_would_command(self, device: dict, mode: str) -> bool:
+        """Whether the mode would send this device a command if it were online (the same choice as mode_commands,
+        without its decisions): a boiler always; a climate off outside comfort, in comfort only with its room's
+        temperature outside the comfort band."""
+        caps = device["capabilities"]
+        if "heating" in caps:
+            return True
+        if "climate" not in caps:
+            return False
+        if mode != "comfort":
+            return True
+        room = self.room_temperature(device)
+        sl = self.rule("setpoint_limits")["params"]
+        return room is not None and (room < sl["comfort_celsius"] or room > sl["comfort_cool_celsius"])
+
     def _heating_set_by(self, device_id: str, mode: bool) -> None:
         (self.heating_by_mode.add if mode else self.heating_by_mode.discard)(device_id)
         self.store.put_meta("heating_by_mode", sorted(self.heating_by_mode))
@@ -1392,7 +1429,9 @@ class ApartmentEngine:
                                               reasoning=f"Modalità {mode}")
                     if cmd:
                         command_ids.append(cmd["command_id"])
-                except MockError:
+                except MockError as exc:
+                    if self._schedule_run:                     # D-219 (2): a command of a scheduled action not sent
+                        self._schedule_refused(self._schedule_run, device_id, exc.message)
                     continue
                 if body["capability"] == "heating":
                     self._heating_set_by(device_id, mode=True)        # D-164: a mode's intention, never unregulated
@@ -1543,13 +1582,32 @@ class ApartmentEngine:
                          f"{reasoning or 'Accensione automatica'}: rimandata di {int(wait) + 1} s per la pausa minima "
                          f"del compressore", "informational", correlation_id)
 
+                # the start after the pause is the same automatic command: of the mode or of the regulation as it was
+                # (before, it counted as a person's and took the climate away from comfort, D-169), of the scheduled
+                # action it belongs to (D-219 (2))
+                auto, frost, window_cmd, sid = (self._auto_climate, self._frost_command, self._window_command,
+                                                self._schedule_run)
+                if sid:
+                    self._schedule_wait(sid, device_id)
+
                 async def later():
                     await asyncio.sleep(wait)
+                    saved = (self._auto_climate, self._frost_command, self._window_command, self._schedule_run)
+                    self._auto_climate, self._frost_command, self._window_command, self._schedule_run = \
+                        auto, frost, window_cmd, sid
                     try:
-                        self.create_command(device_id, body, actor, correlation_id, decision_actor, reasoning)
+                        cmd = self.create_command(device_id, body, actor, correlation_id, decision_actor, reasoning)
+                        if sid and cmd:
+                            self._schedule_link(sid, cmd["command_id"])
                     except MockError as exc:
                         logs.warn("deferred command not created", apartment_id=self.apartment_id, device_id=device_id,
                                   error=exc.error)
+                        if sid:
+                            self._schedule_refused(sid, device_id, exc.message)
+                    finally:
+                        self._auto_climate, self._frost_command, self._window_command, self._schedule_run = saved
+                        if sid:
+                            self._schedule_wait(sid, device_id, done=True)
                 self.spawn(later())
                 return None
         now = iso(utcnow())
@@ -1592,6 +1650,14 @@ class ApartmentEngine:
         self.emit("device.state", {"device_id": device["device_id"], "capability": cap, "state": state}, correlation_id)
 
     async def _run_command(self, cmd: dict, decision_actor: str, reasoning: str) -> None:
+        try:
+            await self._execute_command(cmd, decision_actor, reasoning)
+        finally:
+            # D-219 (2): the last command of a scheduled action judges it (an interrupted one at the restart)
+            if (sid := self.command_schedule.get(cmd["command_id"])) and cmd["status"] in FINAL:
+                self._schedule_check(sid)
+
+    async def _execute_command(self, cmd: dict, decision_actor: str, reasoning: str) -> None:
         device = self.devices[cmd["device_id"]]
         cap = cmd["capability"]
         target = {"type": "device", "device_id": device["device_id"]}
@@ -2754,6 +2820,9 @@ class ApartmentEngine:
             self._save_schedule(item)
             self.apartment_changed(corr)
             return
+        sid = item["schedule_id"]
+        self.schedule_open[sid] = {"corr": corr, "refused": [], "waiting": []}
+        self._schedule_run = sid
         try:
             if act["type"] == "apartment_mode":
                 item["command_ids"] = self.set_mode(act["mode"], "system:engine", corr, reasoning, "system")
@@ -2764,10 +2833,92 @@ class ApartmentEngine:
             item["status"] = "done"
         except MockError as exc:
             item["status"] = "failed"
+            self.schedule_open.pop(sid, None)            # refused as a whole: schedule_failed says it
             self._schedule_not_done(item, corr, exc.message)
+        finally:
+            self._schedule_run = None
         item["executed_at"] = iso(now)
         self._save_schedule(item)
+        if sid in self.schedule_open:
+            for command_id in item["command_ids"]:
+                self.command_schedule[command_id] = sid
+            self.store.put_meta("schedule_open", self.schedule_open)
+            self._schedule_check(sid)                    # nothing sent, or everything refused: judged at once
         self.apartment_changed(corr)
+
+    # ---- D-219 (2): a scheduled action whose commands did not all succeed --------------------------------------------
+    def _schedule_refused(self, sid: str, device_id: str, why: str) -> None:
+        run = self.schedule_open.get(sid)
+        if run is not None:
+            run["refused"].append([device_id, why])
+            self.store.put_meta("schedule_open", self.schedule_open)
+
+    def _schedule_wait(self, sid: str, device_id: str, done: bool = False) -> None:
+        """A start of the action waits for the compressor's pause (done=False), or is over (created or refused)."""
+        run = self.schedule_open.get(sid)
+        if run is None:
+            return
+        if not done:
+            run["waiting"].append(device_id)
+        elif device_id in run["waiting"]:
+            run["waiting"].remove(device_id)
+        self.store.put_meta("schedule_open", self.schedule_open)
+        if done:
+            self._schedule_check(sid)
+
+    def _schedule_link(self, sid: str, command_id: str) -> None:
+        """The start that waited for the compressor's pause is a command of the action (in GET /schedule too)."""
+        item = self.schedule.get(sid)
+        if item is None or sid not in self.schedule_open:
+            return
+        item["command_ids"] = [*(item.get("command_ids") or []), command_id]
+        self.command_schedule[command_id] = sid
+        self._save_schedule(item)
+
+    def _command_failure(self, cmd: dict) -> str:
+        """Why a command did not succeed, in the words of its decision; its code when there is none."""
+        for d in reversed(self.decisions):
+            if d.get("command_id") == cmd["command_id"] and d["outcome"] in ("failed", "rejected"):
+                return d["reasoning"]
+        return {"device_offline": "dispositivo offline", "device_rejected": "rifiutato dal dispositivo",
+                "blocked_by_rule": "bloccato da una regola", "no_confirmation": "nessuna conferma"}.get(
+            cmd.get("reason"), "errore interno")
+
+    def _schedule_check(self, sid: str) -> None:
+        """When the last command of a scheduled action is over (and no start waits for the compressor): with at least
+        one that did not succeed, the decision schedule_partial lists them («Pre-arrivo eseguito in parte: 2 comandi
+        non riusciti (…)»); new_value is the action's kind, as in schedule_failed, for the BFF's notification."""
+        run, item = self.schedule_open.get(sid), self.schedule.get(sid)
+        if run is None:
+            return
+        cmds = [self.commands.get(c) for c in (item or {}).get("command_ids") or []]
+        if item is not None and (run["waiting"] or any(c is not None and c["status"] not in FINAL for c in cmds)):
+            return
+        del self.schedule_open[sid]
+        for c in [c for c, s in self.command_schedule.items() if s == sid]:
+            del self.command_schedule[c]
+        self.store.put_meta("schedule_open", self.schedule_open)
+        if item is None:
+            return
+        def label(device_id: str) -> str:
+            return self.devices.get(device_id, {}).get("label", device_id)
+        failed = [(label(d), why) for d, why in run["refused"]]
+        failed += [(label(c["device_id"]), self._command_failure(c)) for c in cmds if c is not None and c["status"] != "acked"]
+        if not failed:
+            return
+        some_done = any(c is not None and c["status"] == "acked" for c in cmds)
+        kind = schedule_kind(item)
+        if kind in ("prearrival", "checkout"):
+            name = SCHEDULE_LABELS[kind].capitalize()
+            head = f"{name} eseguito in parte" if some_done else f"{name} non riuscito"
+        else:
+            name = f"Azione programmata ({SCHEDULE_LABELS.get(kind, kind)})"
+            head = f"{name} eseguita in parte" if some_done else f"{name} non riuscita"
+        n = len(failed)
+        count = "1 comando non riuscito" if n == 1 else f"{n} comandi non riusciti"
+        details = "; ".join(f"{who}: {why}" for who, why in failed)
+        self.log("system", {"type": "schedule", "schedule_id": sid}, "schedule_partial", item["run_at"], kind,
+                 f"{head}: {count} ({details})", "failed", run.get("corr") or str(uuid.uuid4()))
 
     def _schedule_not_done(self, item: dict, correlation_id: str, why: str) -> None:
         """A scheduled action the engine refused at its time (devices or their connection unreachable, an action no
