@@ -412,6 +412,7 @@ Un valore già salvato nei record vecchi viene ignorato.
 - Con `INSTANCE_MODE=real` si accetta `http://` o `https://` con un host, e `mock://builtin` per gli appartamenti dimostrativi (D-97). Altro → 422
   `invalid_instance_url`, messaggio «Indirizzo non valido: deve cominciare con http:// o https://».
 - Il controllo vale solo per creazione e modifica: gli appartamenti già salvati non vengono toccati.
+- D04 (P-83): nello staging `INSTANCE_ALLOWED` elenca i motori raggiungibili (`host:porta` o `host:prima-ultima`, oggi dev 8100 e i motori della prova di carico 8150-8169 sulla VM; `deploy.sh` mette l'indirizzo). Un altro indirizzo o un'altra porta → 422 `invalid_instance_url` «In questo ambiente di prova si collegano solo il motore di sviluppo e quelli della prova di carico: indirizzo e porta non ammessi», in creazione e in modifica (#114, #115, con la porta del campo `port`). Vale anche per i record già salvati: nessuna chiamata, nessuno stream e nessuna chiave letta (il proxy risponde 502 `instance_unreachable`, `verify` riporta lo stesso messaggio). Lo staging con `INSTANCE_MODE=real` non parte senza l'elenco. In produzione l'elenco non c'è e nulla cambia.
 - `verify` (#22), campo `error`: lo stesso messaggio se l'URL salvato non va bene nel modo attuale (nessuna chiamata);
   «Sistema domotico non raggiungibile» se la chiamata fallisce (il tipo di errore tecnico va solo nel log); `null` se risponde.
 

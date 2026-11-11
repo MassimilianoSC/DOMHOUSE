@@ -83,7 +83,7 @@ def pub(tmp_path):
     (r / "scripts" / "publish-settings.conf").write_text(
         "# di prova\nGCP_PROJECT_ID=progetto-prova\nGCP_REGION=europe-west8\nARTIFACT_REPO=domotica\n"
         "CLOUDSDK_CORE_ACCOUNT=prova@example.com\nSTAGING_SITE=sito-prova\nVPC_NETWORK=default\nVPC_SUBNET=default\n"
-        "SMTP_USER=mittente@example.com\nVITE_FCM_ENABLED=true\nENGINE_APARTMENT=dev\nVM_NAME=vm-prova\nVM_ZONE=europe-west8-a\n",
+        "SMTP_USER=mittente@example.com\nVITE_FCM_ENABLED=true\nENGINE_APARTMENT=dev\nVM_NAME=vm-prova\nVM_ZONE=europe-west8-a\nVM_INTERNAL_IP=10.0.0.9\n",
         encoding="utf-8", newline="\n")
     (r / "scripts" / "engine-vm.sh").write_text("echo motore v1\n", encoding="utf-8", newline="\n")
     (r / "engine" / "core.py").write_text("x = 1\n", encoding="utf-8", newline="\n")

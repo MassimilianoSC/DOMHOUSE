@@ -90,6 +90,8 @@ spec:
               value: https://your-staging-site.web.app,https://your-staging-site.firebaseapp.com
             - name: SECRET_MANAGER_PREFIX
               value: langbrain-api-key-
+            - name: INSTANCE_ALLOWED       # D04 (P-83): only dev and the load test's engines (scripts/load), filled by deploy.sh
+              value: your-vm-internal-ip:8100,your-vm-internal-ip:8150-8169
             - name: INSTANCE_TIMEOUT_S
               value: "10"
             - name: ITALIANWAY_SIGNATURE_HEADER

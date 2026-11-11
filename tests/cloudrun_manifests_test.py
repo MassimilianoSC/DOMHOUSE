@@ -30,9 +30,14 @@ def annotation(manifest: str, key: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
+ONLY_STAGING = {"INSTANCE_ALLOWED"}      # D04 (P-83): the engines staging may reach; production has no list
+
+
 def test_same_variables_and_secrets():
     staging, prod = env(STAGING), env(PROD)
+    staging = {k: v for k, v in staging.items() if k not in ONLY_STAGING}
     assert set(staging) == set(prod), f"only staging: {set(staging) - set(prod)}; only prod: {set(prod) - set(staging)}"
+    assert ONLY_STAGING <= set(env(STAGING)) and not ONLY_STAGING & set(prod)
     for name in staging:
         if name in WANTED:
             assert (staging[name], prod[name]) == WANTED[name], name

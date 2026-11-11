@@ -35,6 +35,11 @@ case "${TARGET}" in
   *)       echo "TARGET must be staging or prod" >&2; exit 1 ;;
 esac
 : "${VPC_NETWORK:?set VPC_NETWORK (the VM is reached through Direct VPC egress)}" "${VPC_SUBNET:?set VPC_SUBNET}"
+# D04 (P-83): staging reaches only the engines listed in its INSTANCE_ALLOWED, on the VM's internal address
+if grep -q "your-vm-internal-ip" "${MANIFEST}"; then
+  [[ "${VM_INTERNAL_IP:-}" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] \
+    || { echo "set VM_INTERNAL_IP (the VM's internal address, for ${MANIFEST}'s INSTANCE_ALLOWED)" >&2; exit 1; }
+fi
 # the manifest must be the TARGET's: a production published on the staging database (or the reverse) stops here
 grep -q "^  name: ${SERVICE}\$" "${MANIFEST}" || { echo "${MANIFEST} is not the service ${SERVICE}" >&2; exit 1; }
 grep -A1 "name: FIRESTORE_DATABASE" "${MANIFEST}" | grep -qF "${DATABASE}" \
@@ -102,6 +107,7 @@ sed -e "s#europe-west8-docker.pkg.dev/your-gcp-project-id/domotica/bff:latest#${
     -e "s#europe-west8#${REGION}#g" \
     -e "s#your-vpc-network#${VPC_NETWORK:-}#g" \
     -e "s#your-vpc-subnet#${VPC_SUBNET:-}#g" \
+    -e "s#your-vm-internal-ip#${VM_INTERNAL_IP:-}#g" \
     -e "s#your-staging-site#${SITE}#g" \
     -e "s#your-smtp-user@example.com#${SMTP_USER:-}#g" \
     "${MANIFEST}" > "${RENDERED}"

@@ -72,6 +72,9 @@ class Settings:
     # D-217: until this instant (ISO 8601 with its offset, at most 30 days ahead) the «sistema domotico non
     # raggiungibile» notifications wait: a planned shutdown (procedure M19). Empty: on. Read by bff/push.py
     unreachable_alerts_off_until: str = ""
+    # D04 (P-83): in staging, the engines it may reach, «host:porta» or «host:prima-ultima» separated by commas; empty =
+    # any (production). Checked before any key is read (bff/instances.py target_problem)
+    instance_allowed: str = ""
 
     @property
     def mail_configured(self) -> bool:
@@ -109,6 +112,7 @@ def get_settings() -> Settings:
         # key of the built-in mock (F2, D-70): when not configured, a random one per process, never a fixed placeholder
         instance_api_key_fallback=e("INSTANCE_API_KEY_FALLBACK") or secrets.token_urlsafe(24),
         instance_timeout_s=float(e("INSTANCE_TIMEOUT_S", "10")),
+        instance_allowed=e("INSTANCE_ALLOWED", "").strip(),
         italianway_webhook_secret=e("ITALIANWAY_WEBHOOK_SECRET", ""),
         italianway_signature_header=e("ITALIANWAY_SIGNATURE_HEADER", "X-Signature"),
         port=int(e("PORT", "8000")),

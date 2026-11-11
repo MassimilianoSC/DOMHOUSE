@@ -65,7 +65,7 @@ def repo(tmp_path):
 
     def run(target, env="SKIP_BUILD=1"):
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(r)}" && '
-               f'TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default {env} '
+               f'TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default VM_INTERNAL_IP=10.0.0.9 {env} '
                f'bash scripts/deploy.sh')
         out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=60)
         calls = (stubs / "calls.log").read_text(encoding="utf-8") if (stubs / "calls.log").exists() else ""
@@ -90,6 +90,18 @@ def test_staging_publishes_its_service_database_and_site(repo):
     assert "PWA: https://progetto-prova-staging.web.app" in out.stdout
     assert (repo.root / "frontend" / ".firebaserc").read_text(encoding="utf-8") == \
         (ROOT / "frontend" / ".firebaserc").read_text(encoding="utf-8")    # put back as committed
+
+
+def test_staging_lists_only_the_engines_it_may_reach_and_needs_the_vms_address(repo):
+    """D04 (P-83): INSTANCE_ALLOWED of the staging manifest filled with the VM's internal address; without it, no deploy."""
+    out, calls, rendered = repo("staging")
+    assert out.returncode == 0, out.stderr
+    assert "value: 10.0.0.9:8100,10.0.0.9:8150-8169" in rendered
+    out, calls, _ = repo("staging", env="SKIP_BUILD=1 VM_INTERNAL_IP=")
+    assert out.returncode != 0 and "set VM_INTERNAL_IP" in out.stderr and "services replace" not in calls
+    out, _, rendered = repo("prod", env="SKIP_BUILD=1 VM_INTERNAL_IP=")
+    assert out.returncode == 0, out.stderr                                 # production has no list: not needed
+    assert "INSTANCE_ALLOWED" not in rendered
 
 
 def test_production_publishes_its_own(repo):
@@ -218,7 +230,7 @@ def publish(tmp_path):
     def run(target, env="DRY_RUN=1"):
         (stubs / "calls.log").unlink(missing_ok=True)
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(r)}" && '
-               f'{env} TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default '
+               f'{env} TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default VM_INTERNAL_IP=10.0.0.9 '
                f'ENV_FILE="{posix(env_file)}" bash scripts/publish.sh')
         out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=120, stdin=subprocess.DEVNULL)
         return out, (stubs / "calls.log").read_text(encoding="utf-8") if (stubs / "calls.log").exists() else ""

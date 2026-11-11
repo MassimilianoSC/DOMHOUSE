@@ -93,6 +93,43 @@ def instance_url_problem(raw: str) -> str | None:
     return None
 
 
+MSG_NOT_ALLOWED = ("In questo ambiente di prova si collegano solo il motore di sviluppo e quelli della prova di carico: "
+                   "indirizzo e porta non ammessi")
+
+
+class TargetRefused(Exception):
+    """D04: an engine this environment may not reach (INSTANCE_ALLOWED): no key is read, no call is made."""
+
+
+def allowed_targets(spec: str) -> list[tuple[str, int, int]]:
+    """«10.0.0.2:8100,10.0.0.2:8150-8169» -> [(host, first port, last port)]; a malformed item is never allowed."""
+    out = []
+    for item in (x.strip() for x in spec.split(",")):
+        host, _, ports = item.rpartition(":")
+        first, _, last = ports.partition("-")
+        if host and first.isdigit() and (not last or last.isdigit()):
+            out.append((host.lower(), int(first), int(last or first)))
+    return out
+
+
+def target_problem(raw: str, port: int | None = None) -> str | None:
+    """D04 (P-83): with INSTANCE_ALLOWED set (staging) only those engines, host and port, the port of the link or the
+    apartment's or the scheme's; mock:// is in this process and always allowed. None when allowed."""
+    spec = get_settings().instance_allowed
+    v = normalize_instance_url(raw)
+    if not spec or v.startswith("mock://"):
+        return None
+    parts = urlsplit(v)
+    try:
+        number = parts.port or port or (443 if parts.scheme == "https" else 80)
+    except ValueError:
+        return MSG_NOT_ALLOWED
+    host = (parts.hostname or "").lower()
+    if any(host == h and lo <= number <= hi for h, lo, hi in allowed_targets(spec)):
+        return None
+    return MSG_NOT_ALLOWED
+
+
 def base_url(apt: Apartment) -> str:
     s = get_settings()
     url = normalize_instance_url(apt.instance_url)
@@ -183,6 +220,8 @@ def correlation_id(incoming: str | None) -> str:
 
 
 async def instance_headers(apt: Apartment, actor: str, correlation_id: str | None = None) -> dict[str, str]:
+    if target_problem(apt.instance_url, apt.port):        # D04: before the key is read, for every call and stream
+        raise TargetRefused(apt.apartment_id)
     headers = {
         "X-API-Key": await api_key(apt),
         "X-Actor": actor,
@@ -276,6 +315,8 @@ async def verify(apt: Apartment, actor: str) -> dict:
                  "contract_version": None, "features": [], "ok": False}
     if problem := instance_url_problem(apt.instance_url):
         out["error"] = problem  # saved before the check existed: no call would work, say what to write instead
+    elif problem := target_problem(apt.instance_url, apt.port):
+        out["error"] = problem  # D04: an engine this environment may not reach; no key is read
     elif problem := await _secret_problem(apt):
         out["error"], out["secret_problem"] = problem, True
     else:
