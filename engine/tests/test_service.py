@@ -129,6 +129,31 @@ def test_main_exits_3_with_a_log_line(monkeypatch, capsys, tmp_path):
 
 
 # ---- the contract at /api/v1 ---------------------------------------------------------------------------------------
+def test_main_exits_4_with_a_log_line_when_the_start_fails(monkeypatch, capsys, tmp_path):
+    """D36 (P-83): a failure inside the start (here an engine.db of a newer schema) gave uvicorn's exit 3 (the code of
+    the connector), a traceback on stderr and no JSON line: the «righe di errore» alarm saw nothing."""
+    import socket
+    import sqlite3
+    from engine.__main__ import main
+    from engine.service import DB_NAME
+    db = sqlite3.connect(tmp_path / DB_NAME)
+    db.execute("PRAGMA user_version=99")
+    db.close()
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    for name, value in {**ENV, "MOCK_TIME_SCALE": "1", "DATA_DIR": str(tmp_path), "PORT": str(port),
+                        "HOST": "127.0.0.1"}.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(log, "_apartment_id", None)
+    monkeypatch.setattr(log.logger, "handlers", [])
+    assert main() == 4
+    lines = [json.loads(x) for x in capsys.readouterr().out.strip().splitlines() if x.startswith("{")]
+    failed = [x for x in lines if x["msg"] == "engine start failed"]
+    assert failed and failed[0]["level"] == "error" and "schema 99" in failed[0]["error"]
+    assert KEY not in json.dumps(lines)
+
+
 def test_simulated_service(tmp_path):
     with TestClient(create_engine_app(config(DATA_DIR=str(tmp_path)))) as client:
         version = client.get("/api/v1/version").json()
