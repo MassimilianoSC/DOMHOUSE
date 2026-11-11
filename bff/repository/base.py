@@ -410,7 +410,8 @@ def apply_booking_event(existing: BookingRecord | None, apartment_id: str, ev: d
         return rec                          # D07: sent again after newer ones (a retry after a 502): seen, not applied
     rec.last_event_ts = ev.get("ts") or rec.last_event_ts
     rec.last_event_type = ev["type"]
-    rec.guests = ev.get("guests", rec.guests)
+    if ev.get("guests") is not None:        # D67 (P-83): an event without the number leaves the one known
+        rec.guests = ev["guests"]
     rec.source = ev["source"]
     if ev["type"] == "booking_cancelled":
         rec.status = "cancelled"
