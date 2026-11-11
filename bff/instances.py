@@ -14,6 +14,8 @@ from .repository import Apartment, get_repository
 BFF_ACTOR = "system:bff"
 _http: httpx.AsyncClient | None = None
 _version_cache: dict[str, tuple[float, dict]] = {}
+# D27 (P-83): (apartment, engine address) -> the last /version that answered: the summary's features when it does not
+_version_known: dict[tuple[str, str], dict] = {}
 _secret_cache: dict[str, tuple[float, str]] = {}
 
 
@@ -349,7 +351,13 @@ async def get_version(apt: Apartment, *, timeout: float | None = None) -> dict:
     resp.raise_for_status()
     data = resp.json()
     _version_cache[apt.apartment_id] = (time.monotonic() + 60, data)
+    _version_known[(apt.apartment_id, base_url(apt))] = data
     return data
+
+
+def known_version(apt: Apartment) -> dict | None:
+    """D27: the last /version this engine (same apartment, same address) answered; None for a new link."""
+    return _version_known.get((apt.apartment_id, base_url(apt)))
 
 
 def invalidate_version(apartment_id: str) -> None:
@@ -437,7 +445,17 @@ async def summary(apt: Apartment, actor: str, tz_midnight_utc: str | None = None
     out["health"] = health_out(health) if reachable else None
     out["online"] = health_code == 200 and version is not None
     if not version:
-        return out
+        # D27 (P-83): an engine that does not answer keeps the features it had (never «non disponibile» everywhere);
+        # online stays False. Down altogether: no other call to wait for
+        known = known_version(apt)
+        if known is None:
+            return out
+        version = known
+        if not reachable:
+            out["contract_version"] = version.get("contract_version")
+            out["features"] = effective_features(version.get("features", []), tenant.enabled_features if tenant else None,
+                                                 apt.enabled_features)
+            return out
     out["contract_version"] = version.get("contract_version")
     feats = effective_features(version.get("features", []), tenant.enabled_features if tenant else None, apt.enabled_features)
     out["features"] = feats

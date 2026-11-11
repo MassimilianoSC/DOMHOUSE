@@ -592,6 +592,8 @@ c. **Campi inviati ma non letti, da valutare** (misura del 16 ottobre 2026; togl
    - `WebhookLog`: `source`, `tenant_id`;
    - il parametro `booking_id` di `list_bookings` non è usato dalla PWA.
 
+d. D27 (P-83): quando il motore non risponde, `ApartmentSummary` (#7, #8) tiene `features` e `contract_version` dell'ultimo `/version` riuscito per quello stesso collegamento (appartamento e indirizzo del motore; un collegamento nuovo parte vuoto), con `online: false`; se non risponde nemmeno `/health` non si fanno le altre chiamate (`apartment`, `pending_approvals`, `kwh_today` restano null).
+
 ## Riepilogo settimanale (P-60 passo 11, D-150)
 
 Ogni lunedì alle 08:00 (ora dell'appartamento) è pronto il riepilogo della settimana appena finita, da lunedì a
