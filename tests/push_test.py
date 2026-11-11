@@ -766,7 +766,9 @@ def test_an_engine_silent_for_the_rules_minutes_is_told_once(unreachable, fcm):
         await push.on_link_change(APT, False)                 # the hub tells only changes; twice changes nothing
         await drain()
     run(scenario())
-    assert [m.data["body"] for m in fcm.sent] == [UNREACHABLE_BODY]
+    # D75: the time since it went silent; here a minute is 0.01 s and the last check can add one
+    [body] = [m.data["body"] for m in fcm.sent]
+    assert body in (UNREACHABLE_BODY, UNREACHABLE_BODY.replace("15 minuti", "16 minuti"))
 
 
 def test_back_before_the_minutes_nothing_and_the_next_outage_is_told(unreachable, fcm):
@@ -844,7 +846,26 @@ def test_a_suspension_holds_it_until_its_end_then_an_engine_still_down_is_told(u
         assert fcm.sent == []
         await drain()
     run(scenario())
-    assert [m.data["body"] for m in fcm.sent] == [UNREACHABLE_BODY]
+    # D75 (P-83): told at the end of the suspension, it says how long the engine has been silent (about 40 minutes
+    # here), not the rule's 15
+    [body] = [m.data["body"] for m in fcm.sent]
+    minutes = int(body.split("non risponde da ")[1].split(" minuti")[0])
+    assert 39 <= minutes <= 60 and body == UNREACHABLE_BODY.replace("15 minuti", f"{minutes} minuti")
+
+
+@pytest.mark.parametrize("minutes, said", [(15, "15 minuti"), (119.9, "119 minuti"), (150, "2 ore"), (47 * 60 + 59, "47 ore"),
+                                           (3 * 1440 + 5, "3 giorni"), (30 * 1440, "30 giorni")])
+def test_d75_the_message_says_how_long(minutes, said):
+    data, _ = push.instance_unreachable_push(APT, minutes, TS)
+    assert data["body"].startswith(f"Il sistema domotico non risponde da {said}: ")
+
+
+def test_d75_an_engine_silent_for_three_days_says_three_days(unreachable, fcm):
+    """D75 (P-83): told after a long suspension (up to 30 days), the text still said the rule's minutes."""
+    since = time.time() - 3 * 1440 * push._minute_s() - 1
+    push._unreachable[APT.apartment_id] = since
+    run(push._unreachable_watch(APT, since))
+    assert [m.data["body"].split(":")[0] for m in fcm.sent] == ["Il sistema domotico non risponde da 3 giorni"]
 
 
 def test_a_suspension_holds_the_connector_down_too(unreachable, fcm, monkeypatch):

@@ -77,11 +77,20 @@ def instance_down_push(apt: Apartment, ts: str | None):
                       f"/a/{apt.apartment_id}", f"instance:{apt.apartment_id}", ts)
 
 
+def how_long(minutes: float) -> str:
+    """D75 (P-83): minutes up to two hours, then hours up to two days, then days."""
+    if minutes < 120:
+        return f"{int(minutes)} minuti"
+    if minutes < 48 * 60:
+        return f"{int(minutes // 60)} ore"
+    return f"{int(minutes // 1440)} giorni"
+
+
 def instance_unreachable_push(apt: Apartment, minutes: float, ts: str | None):
     """D-217: the server does not reach the engine itself (machine or process stopped, network cut). Same kind, tag and
-    claim as instance_down: one notification per outage whatever its cause."""
+    claim as instance_down: one notification per outage whatever its cause. `minutes`: how long it has been silent."""
     return build_push("instance_down", apt, f"{apt.name}: sistema domotico non raggiungibile",
-                      f"Il sistema domotico non risponde da {int(minutes)} minuti: i comandi dall'app non arrivano e "
+                      f"Il sistema domotico non risponde da {how_long(minutes)}: i comandi dall'app non arrivano e "
                       f"le regole automatiche potrebbero essere ferme.", f"/a/{apt.apartment_id}",
                       f"instance:{apt.apartment_id}", ts)
 
@@ -371,7 +380,9 @@ async def _unreachable_watch(apt: Apartment, since: float) -> None:
     if apartment_id not in _unreachable or await _engine_answers(apt):
         return                                     # back meanwhile, maybe before this process saw it
     ts = datetime.fromtimestamp(since, UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-    await notify_once(instance_down_key(apt), apt.tenant_id, "offline", *instance_unreachable_push(apt, minutes, ts))
+    # D75 (P-83): the time since it went silent (after a suspension of up to 30 days the rule's minutes were wrong)
+    silent = max(minutes, (time.time() - since) / _minute_s())
+    await notify_once(instance_down_key(apt), apt.tenant_id, "offline", *instance_unreachable_push(apt, silent, ts))
 
 
 def reachable_note_key(apt: Apartment) -> str:

@@ -490,8 +490,10 @@ rifiuterebbe i comandi con 409 `device_offline`. `instance_down` ha due cause, c
 - motore irraggiungibile (D-217): lo stream verso il motore fallisce (macchina o processo fermi, rete interrotta).
   Ogni istanza del server conta dalla sua prima connessione fallita; vale l'ultimo valore della regola `offline_alert`
   letto quando il motore rispondeva (15 se mai letto, niente con la regola spenta). Allo scadere chiede ancora
-  `GET /health` (5 s): se risponde, niente. `body` «Il sistema domotico non risponde da <N> minuti: i comandi
-  dall'app non arrivano e le regole automatiche potrebbero essere ferme.».
+  `GET /health` (5 s): se risponde, niente. `body` «Il sistema domotico non risponde da <durata>: i comandi
+  dall'app non arrivano e le regole automatiche potrebbero essere ferme.». D75 (P-83): la durata è il tempo
+  trascorso dalla prima connessione fallita, non i minuti della regola (dopo una sospensione può essere di giorni):
+  «N minuti» fino a due ore, poi «N ore» fino a due giorni, poi «N giorni».
 Una caduta seguita da un ritorno prima dei minuti non manda niente. Al ritorno non parte nessuna notifica: il server
 rilegge `GET /health` e libera la chiave se il connector è su, così l'episodio dopo avvisa di nuovo.
 Decisione al ritorno (D-217): se il motore è stato irraggiungibile almeno per i minuti della regola (15 con la regola
