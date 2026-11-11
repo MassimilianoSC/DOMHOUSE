@@ -2,7 +2,7 @@
 
 | Stato | Preparato | Da approvare |
 |---|---|---|
-| **Proposta** | 11 novembre 2026, memoria storica | dal committente, una decisione alla volta |
+| **Approvato con sette aggiunte** (risposta 1067, 11 novembre 2026, 14:16) | 11 novembre 2026, memoria storica | committente |
 
 ## 1. Lo scopo
 
@@ -41,18 +41,40 @@
 | 9 | **Coerenza fra le parti** | il sito manda un campo che il server non conosce |
 | 10 | **Testi che ingannano l'utente** | il sito dice «fatto» quando il comando non è stato confermato |
 | 11 | **Prove che non provano** | una prova verde che non controlla davvero ciò che dice |
+| 12 | **Valori predefiniti pericolosi** | un'impostazione che, se manca, lascia aperto un accesso o accende un dispositivo |
+| 13 | **Porte senza guardia** | un indirizzo dell'API raggiungibile senza controllo, a partire da `/_internal/reachability` del motore |
 
-## 4. Come si divide il lavoro: tre fasi
+**Regole per ogni segnalazione:**
+- **Senza uno scenario concreto non entra.** Lo scenario dice da quale stato si parte, che cosa arriva e quale risultato sbagliato ne esce.
+- **Al massimo dieci segnalazioni per revisore,** ordinate per gravità.
+- **Che cosa leggono i revisori:**
+  - sì: `limiti-noti.md`, il contratto (`contract/`) e `engine/connector/connector-v2.md`;
+  - no: le conclusioni del registro, perché non devono partire già convinti.
+
+## 4. Come si divide il lavoro: quattro fasi
 
 Dalla spiegazione dell'app (P-82) abbiamo imparato una cosa: i cinque difetti veri sono usciti **seguendo un percorso dall'inizio alla fine**, non leggendo un file alla volta. Per questo le divisioni sono due: per parti e per percorsi.
 
-### Fase 1: per parti (8 revisori)
+### Fase 0: strumenti automatici, prima degli agenti
+
+| Controllo | Strumento | Chi |
+|---|---|---|
+| Librerie Python con vulnerabilità note | `pip-audit` su `bff/requirements.txt` ed `engine/requirements.txt` | memoria storica |
+| Librerie del sito con vulnerabilità note | audit di `yarn.lock` | memoria storica |
+| Segreti nella storia del repository | ricerca su tutti i commit; si stampano solo file, commit e tipo, **mai il valore** | memoria storica |
+| Analisi statica di sicurezza | `bandit` sul codice Python | memoria storica |
+| **Infrastruttura viva**, in sola lettura: permessi IAM, firewall, chi può invocare Cloud Run, chi può leggere i segreti | comandi `gcloud` di sola lettura, nella forma di D-116 (mai il valore di un segreto) | **li lancia il committente**; la memoria storica li prepara e legge gli esiti |
+
+Gli esiti vanno nello stesso elenco dei difetti, con le stesse regole.
+
+### Fase 1: per parti (9 revisori)
 
 Ognuno legge **per intero** i suoi file e li confronta con la lista della sezione 3.
 
 | Revisore | Che cosa legge | Righe circa |
 |---|---|---|
-| R1 | Cuore del motore: `engine/core.py` | 3.000 |
+| R1a | Cuore del motore, `engine/core.py`: **regole, termostato e priorità** | 3.000 |
+| R1b | Cuore del motore, `engine/core.py`, con un revisore indipendente da R1a: **comandi, approvazioni, programmazioni e riavvio** | 3.000 |
 | R2 | Resto del motore: conferme, antimuffa, archivio, API, assistente, configurazione | 4.000 |
 | R3 | Collegamento ai dispositivi: connector simulato e Shelly, broker e sue regole di accesso | 2.400 |
 | R4 | Server, accessi e dati: autenticazione, pagine dell'API, Firestore | 4.000 |
@@ -66,13 +88,13 @@ Ognuno legge **per intero** i suoi file e li confronta con la lista della sezion
 | Revisore | Tema |
 |---|---|
 | T1 | **Sicurezza e dati personali**, su tutto il codice |
-| T2 | **Percorsi completi**, uno per volta dall'inizio alla fine: (a) comando dal telefono al dispositivo e ritorno; (b) prenotazione → comfort → risparmio; (c) finestra aperta → caldaia e clima; (d) dispositivo che si stacca → avviso → ritorno; (e) riavvio del motore o della VM; (f) invito e primo accesso di un utente |
+| T2 | **Percorsi completi**, uno per volta dall'inizio alla fine: (a) comando dal telefono al dispositivo e ritorno; (b) prenotazione → comfort → risparmio; (c) finestra aperta → caldaia e clima; (d) dispositivo che si stacca → avviso → ritorno; (e) riavvio del motore o della VM; (f) invito e primo accesso di un utente; (g) assistente con ospiti → approvazione → esecuzione; (h) rimozione di un utente e cancellazione dei dati; (i) spegnimento programmato, avvisi sospesi, riassunto finale; (j) la notte del cambio d'ora; (k) pubblicazione interrotta a metà |
 | T3 | **Coerenza fra le parti e prove**: contratto ↔ server ↔ sito ↔ motore, e se le prove controllano davvero ciò che dicono |
 
 ### Fase 3: verifica di ogni difetto
 
 - **Ogni difetto segnalato va a un verificatore nuovo,** che non ha visto il lavoro del revisore e **cerca di smentirlo**.
-- Un difetto **confermato** passa poi a o1 (motore, server, script) o a o2 (sito), con questo ordine:
+- Un difetto **confermato** passa poi a o1 (motore, server, script), a o2 (sito) o a **Youssouf** (tutto ciò che sta in `engine/connector/shelly/`), con questo ordine:
   1. prima una prova che lo dimostra e fallisce;
   2. poi la correzione;
   3. poi la stessa prova, che deve passare.
@@ -95,7 +117,7 @@ Ognuno legge **per intero** i suoi file e li confronta con la lista della sezion
 
 | Livello | Significato | Quando si ripara |
 |---|---|---|
-| 1 | Pericolo fisico, perdita di dati, accesso indebito | subito, con pubblicazione dedicata se serve |
+| 1 | Pericolo fisico, perdita di dati, accesso indebito | subito, **prima di qualunque altro lavoro di o1** (anche dello strumento della prova di carico), con pubblicazione dedicata se serve |
 | 2 | Funzione sbagliata che l'utente nota | nel lotto in corso |
 | 3 | Robustezza: succede solo in casi rari | nel lotto in corso |
 | 4 | Minore | si decide caso per caso; se non si ripara, va in `limiti-noti.md` |
@@ -104,10 +126,11 @@ Ognuno legge **per intero** i suoi file e li confronta con la lista della sezion
 
 | Chi | Che cosa |
 |---|---|
-| Memoria storica | copia ferma; lancia revisori e verificatori in sola lettura (D-84); mappa della copertura; elenco dei difetti; riepilogo per il committente in parole semplici |
-| o1 | prove e correzioni di motore, server e script, **dopo lo strumento della prova di carico** |
+| Memoria storica | copia ferma; fase 0 (tranne i comandi `gcloud`); lancia revisori e verificatori in sola lettura (D-84); mappa della copertura; elenco dei difetti; riepilogo per il committente in parole semplici |
+| o1 | prove e correzioni di motore, server e script: il livello 1 subito, prima di tutto; gli altri dopo lo strumento della prova di carico |
 | o2 | prove e correzioni del sito, subito |
-| Committente | approva il piano; legge il riepilogo; decide sui difetti di livello 4 e sulla pubblicazione delle correzioni |
+| Youssouf | correzioni in `engine/connector/shelly/`, con una pull request |
+| Committente | approva il piano; lancia i comandi di sola lettura sull'infrastruttura; legge il riepilogo; decide sui difetti di livello 4 e sulla pubblicazione delle correzioni |
 
 ## 8. Dopo: niente più revisioni complete
 
@@ -119,8 +142,8 @@ Ognuno legge **per intero** i suoi file e li confronta con la lista della sezion
 - **Tempo:**
   - revisori e verificatori: circa mezza giornata o una giornata di lavoro degli agenti;
   - correzioni: dipendono da quanti difetti si trovano.
-- **Consumo:** 11 revisori più un verificatore per ogni difetto, di solito 20–40. È qualche milione di token in tutto. È la voce più cara, ma si paga una volta sola grazie alla sezione 8.
+- **Consumo:** 12 revisori più un verificatore per ogni difetto, al massimo 120 segnalazioni prima dei doppioni, di solito 20–40 dopo. È qualche milione di token in tutto. È la voce più cara, ma si paga una volta sola grazie alla sezione 8.
 - **Per il committente:**
-  - nessun comando;
+  - i comandi di sola lettura sull'infrastruttura;
   - una decisione all'inizio;
   - la lettura del riepilogo alla fine.
