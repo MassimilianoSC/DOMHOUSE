@@ -257,21 +257,31 @@ Regole:
 - Il valore sta nel record dell'utente (nel repository `None` = tutti, quindi nessuna migrazione), non nei claim
   Firebase: un cambiamento vale dalla richiesta successiva, senza nuovo accesso.
 
-## Appartamenti dimostrativi (D-97, D-98)
+## Appartamenti dimostrativi (D-97, D-98, D-202)
 
-D-188 (23 ottobre, rivede D-136 per questa fase): i dimostrativi (`mock://builtin`, con o senza variante) sono accettati
-anche in produzione, dove i collaboratori provano l'app finché non viene svuotata dei dati di prova prima della consegna
-al cliente; prima di D-188 la produzione li rifiutava («I dimostrativi stanno nell'ambiente di prova: in produzione solo
-appartamenti veri»). Il resto non cambia: niente codice Italianway su un dimostrativo in produzione (D-98), Simulatore
-solo per gli amministratori e solo sui dimostrativi, assistente vero con `AI_DEMOS`.
+D-202 (9 novembre, rivede D-188): i dimostrativi (`mock://builtin`, con o senza variante) stanno **solo in staging e in
+sviluppo**, che hanno una sola istanza. Il motore simulato integrato vive nella memoria di ogni istanza: in produzione,
+con fino a 3 istanze, lo stesso dimostrativo sarebbe tre appartamenti diversi. Le prove dei collaboratori si fanno in
+staging. In produzione (`APP_ENV=prod`, `instances.demo_refused`):
 
-Il motore simulato integrato è montato in OGNI modalità, anche in produzione (`INSTANCE_MODE=real`), per gli
-appartamenti dimostrativi accanto a quelli veri; resta del solo BFF: da internet `/mock` risponde 404 (F2), e la sua
-chiave, casuale per processo (mai `INSTANCE_API_KEY_FALLBACK` nei file di Cloud Run: una prova lo controlla), è
-controllata anche nella chiamata interna (N1). Per un appartamento `mock://` URL, chiave e controlli dipendono dallo
-schema dell'URL, non dalla modalità: in real `mock://builtin` è accettato (lo collega solo la piattaforma, D-77). Lo
-stato del motore simulato è in memoria: una sola istanza (D-35), e un riavvio o un deploy riporta i dimostrativi allo
-stato iniziale.
+- la piattaforma rifiuta un collegamento `mock://` (POST e PATCH `/app/platform/tenants/{tid}/apartments`) con 422
+  `invalid_instance_url` e il messaggio «In produzione i dimostrativi non sono disponibili: si provano in staging. Qui
+  serve l'indirizzo di un sistema domotico vero»;
+- un dimostrativo rimasto da prima di D-202, finché non viene tolto, riceve lo stesso messaggio con 409
+  `demo_not_available` su ogni rotta `/app/apartments/{id}/…`; nessuna chiamata raggiunge il motore integrato
+  (`instances.call` alza `DemoRefused`), «Verifica connessione» dice il motivo e le push non aprono il suo stream;
+- resta in produzione l'appartamento `dev`/«Sviluppo», che usa il motore sulla VM (non è un `mock://`).
+
+Prove: `tests/environments_test.py` (`test_d202_*`). Dal 23 ottobre al 9 novembre (D-188) la produzione li accettava.
+In staging e in sviluppo il resto non cambia: Simulatore solo per gli amministratori e solo sui dimostrativi, assistente
+vero con `AI_DEMOS` (`false` in produzione).
+
+Il motore simulato integrato è montato in ogni modalità, anche con `INSTANCE_MODE=real`, ma in produzione nessuna
+chiamata lo raggiunge (D-202). Resta del solo BFF: da internet `/mock` risponde 404 (F2), e la sua chiave, casuale per
+processo (mai `INSTANCE_API_KEY_FALLBACK` nei file di Cloud Run: una prova lo controlla), è controllata anche nella
+chiamata interna (N1). Per un appartamento `mock://` URL, chiave e controlli dipendono dallo schema dell'URL, non dalla
+modalità: in staging (real) `mock://builtin` è accettato (lo collega solo la piattaforma, D-77). Lo stato del motore
+simulato è in memoria: una sola istanza (D-35), e un riavvio o un deploy riporta i dimostrativi allo stato iniziale.
 
 `simulated` (salvato nell'appartamento, nelle righe della piattaforma, in #18 e nei riepiloghi #7, #8): lo imposta la
 piattaforma (POST e PATCH `/app/platform/tenants/{tid}/apartments`, `simulated`); `mock://` è sempre `true` (anche per i
@@ -280,9 +290,10 @@ simulata, che a sua volta rifiuta `_test` se non lo è); ricollegando da `mock:/
 `simulated: true` esplicito. Ogni cambio va nel registro (`apartment_simulated_changed`).
 
 Il simulatore (proxy `_test/*`, #11, #35) è dell'admin sugli appartamenti `simulated`, in ogni ambiente: altrimenti 403
-`forbidden` (non admin) o `not_simulated`. `env.simulator` di `/app/me` non esiste più. D-98: in produzione la
+`forbidden` (non admin) o `not_simulated`. `env.simulator` di `/app/me` non esiste più. D-98 (valeva quando la produzione
+accettava i dimostrativi; dopo D-202 copre solo i record di prima): in produzione la
 piattaforma non dà un codice Italianway a un appartamento `mock://` (409 `italianway_on_demo`, anche ricollegando); in
-staging resta permesso. D-99 F1: se un dimostrativo ha comunque un codice (dato in staging o prima di D-98), in produzione il webhook (#30) rifiuta le sue prenotazioni con 409 `italianway_on_demo` e il BFF lo scrive nel log a ogni avvio («demo apartment with an Italianway code»). Le push dei dimostrativi partono come le altre. Da internet anche `/mock` senza barra finale risponde 404 (D-99 N1); nell'immagine non entra mai un `bff/.env` locale (N3).
+staging resta permesso. D-99 F1: se un dimostrativo ha comunque un codice (dato in staging o prima di D-98), in produzione il webhook (#30) rifiuta le sue prenotazioni con 409 `italianway_on_demo` e il BFF lo scrive nel log a ogni avvio («demo apartment with an Italianway code»). Le push dei dimostrativi partono come le altre (in staging). Da internet anche `/mock` senza barra finale risponde 404 (D-99 N1); nell'immagine non entra mai un `bff/.env` locale (N3).
 
 Ripristino (#35, solo `mock://builtin`): il motore simulato di quell'appartamento riparte dallo stato iniziale
 (dispositivi, regole, modalità, forzatura, programmazioni, decisioni, approvazioni, comandi, prenotazioni del motore);
