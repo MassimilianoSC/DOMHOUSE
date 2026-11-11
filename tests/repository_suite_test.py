@@ -160,7 +160,9 @@ def test_webhook_logs_per_tenant_newest_first(repo, monkeypatch):
     t1 = run(repo.list_webhook_logs("t1"))
     assert [x.log_id for x in t1] == ["wh-0011", "wh-0009", "wh-0007", "wh-0005"]      # newest first, 4 kept
     none = run(repo.list_webhook_logs(None))
-    assert [x.log_id for x in none] == ["wh-0010", "wh-0008", "wh-0006", "wh-0004"] and all(x.tenant_id is None for x in none)
+    # D54: the unsigned call wh-0000 stays in its own room, the signed ones keep their 4
+    assert [x.log_id for x in none] == ["wh-0010", "wh-0008", "wh-0006", "wh-0004", "wh-0000"]
+    assert all(x.tenant_id is None for x in none)
     assert [x.log_id for x in run(repo.list_webhook_logs("t2"))] == ["wh-0020"]        # not pushed out by t1
     assert run(repo.list_webhook_logs("t3")) == []
     assert len(run(repo.list_webhook_logs("t1", limit=2))) == 2
@@ -263,6 +265,23 @@ def test_a_change_never_brings_a_deleted_user_back(repo):
     assert run(repo.update_user_if_present("tc4-u", lambda u: u)) is None and run(repo.get_user("tc4-u")) is None
     gone = User(uid="tc4-u", email="u@tc4.it", tenant_id="tc4", role="viewer")
     assert run(repo.upsert_user_keeping_an_admin(gone)) is None and run(repo.get_user("tc4-u")) is None
+
+
+def test_calls_without_a_valid_signature_never_push_out_a_real_unattributed_call(repo):
+    """D54 (P-83): 120 POSTs without a signature filled the unattributed log and pushed out the one real call signed
+    with an unknown code (the very row the diagnosis needs). Now the unsigned ones have their own small room."""
+    from bff.repository import WebhookLog
+    from bff.repository.base import UNSIGNED_LOG_LIMIT
+    real = WebhookLog(log_id="wh-real", received_at="2026-11-11T09:00:00.000Z", signature_ok=True, status_code=404,
+                      outcome="unknown_apartment", correlation_id="c-real")
+    run(repo.add_webhook_log(real))
+    for i in range(UNSIGNED_LOG_LIMIT + 30):
+        run(repo.add_webhook_log(WebhookLog(log_id=f"wh-x{i:03d}", received_at=f"2026-11-11T10:{i // 60:02d}:{i % 60:02d}.000Z",
+                                            signature_ok=False, status_code=401, outcome="invalid_signature",
+                                            correlation_id=f"c-{i}")))
+    logs = run(repo.list_webhook_logs(None))
+    assert "wh-real" in [x.log_id for x in logs]
+    assert len([x for x in logs if not x.signature_ok]) == UNSIGNED_LOG_LIMIT
 
 
 def test_last_platform_manager_concurrent_removals(repo):

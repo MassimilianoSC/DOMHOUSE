@@ -160,6 +160,9 @@ class WebhookLog(BaseModel):
 
 
 WEBHOOK_LOG_LIMIT = 100
+# D54 (P-83): calls without a valid signature (nobody's organisation) keep their own few rows: a flood of them never
+# pushes out the unattributed calls signed with an unknown code, the ones the diagnosis needs
+UNSIGNED_LOG_LIMIT = 20
 EMPTY_AI_USAGE = {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0, "alerted": False}
 
 

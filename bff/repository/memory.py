@@ -1,6 +1,6 @@
 import time
 
-from .base import (EMPTY_AI_USAGE, ai_stats_added, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
 
 
@@ -127,8 +127,10 @@ class InMemoryRepository:
 
     async def add_webhook_log(self, log):
         self.webhook_logs.append(log.model_copy(deep=True))
-        same = [i for i, l in enumerate(self.webhook_logs) if l.tenant_id == log.tenant_id]
-        for i in reversed(same[:-WEBHOOK_LOG_LIMIT]):
+        unsigned = log.tenant_id is None and not log.signature_ok      # D54: their own room
+        same = [i for i, l in enumerate(self.webhook_logs) if l.tenant_id == log.tenant_id
+                and (log.tenant_id is not None or (not l.signature_ok) == unsigned)]
+        for i in reversed(same[:-(UNSIGNED_LOG_LIMIT if unsigned else WEBHOOK_LOG_LIMIT)]):
             del self.webhook_logs[i]
         return log
 

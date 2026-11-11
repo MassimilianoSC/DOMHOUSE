@@ -13,7 +13,7 @@ from google.cloud import firestore
 
 from .. import retention
 
-from .base import (EMPTY_AI_USAGE, ai_stats_added, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email, now_iso)
 
 
@@ -166,16 +166,20 @@ class FirestoreRepository:
         return await txn(self.db.transaction())
 
     # webhook logs (last WEBHOOK_LOG_LIMIT overall; older documents are deleted on insert)
-    async def _tenant_logs(self, tenant_id):
-        # equality filter only (automatic single-field index, no composite index to deploy); at most
-        # WEBHOOK_LOG_LIMIT+1 documents per tenant, sorted here
+    async def _tenant_logs(self, tenant_id, signature_ok=None):
+        # equality filters only (automatic single-field indexes, no composite index to deploy); at most
+        # WEBHOOK_LOG_LIMIT+1 documents per tenant (D54: of the unattributed ones, per signature_ok), sorted here
         q = self._col("webhook_logs").where(filter=firestore.FieldFilter("tenant_id", "==", tenant_id))
+        if signature_ok is not None:
+            q = q.where(filter=firestore.FieldFilter("signature_ok", "==", signature_ok))
         docs = [d async for d in q.stream()]
         return sorted(docs, key=lambda d: d.get("received_at"), reverse=True)
 
     async def add_webhook_log(self, log):
         await self._put("webhook_logs", log.log_id, log, retention.webhook(log.model_dump()))
-        for stale in (await self._tenant_logs(log.tenant_id))[WEBHOOK_LOG_LIMIT:]:
+        unsigned = log.tenant_id is None and not log.signature_ok      # D54: their own room
+        part = None if log.tenant_id is not None else log.signature_ok
+        for stale in (await self._tenant_logs(log.tenant_id, part))[UNSIGNED_LOG_LIMIT if unsigned else WEBHOOK_LOG_LIMIT:]:
             await stale.reference.delete()
         return log
 
