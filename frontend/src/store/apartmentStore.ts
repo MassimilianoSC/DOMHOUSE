@@ -14,6 +14,10 @@ interface ApartmentStore extends LiveState {
   track: (cmd: TrackedCommand) => void;
   setDeviceError: (deviceId: string, err: DeviceError) => void;
   setConnected: (v: boolean) => void;
+  /** P-83, D72: a command request for this device is on its way (true) or answered (false). */
+  setSending: (deviceId: string, on: boolean) => void;
+  /** P-83, D27: the server does not reach the engine; the health kept from before is dropped. */
+  setUnreachable: (apartmentId: string) => void;
 }
 
 export const useApartmentStore = create<ApartmentStore>((set) => ({
@@ -28,10 +32,19 @@ export const useApartmentStore = create<ApartmentStore>((set) => ({
       rooms: snap.rooms ?? s.rooms,
       devices: snap.devices ?? s.devices,
       health: snap.health !== undefined ? snap.health : s.health,
+      unreachable: snap.health ? false : s.unreachable,
       loaded: true,
     })),
   apply: (env) => set((s) => applyEvent(s, env)),
   track: (cmd) => set((s) => trackCommand(s, cmd)),
   setDeviceError: (deviceId, err) => set((s) => ({ deviceErrors: { ...s.deviceErrors, [deviceId]: err } })),
   setConnected: (connected) => set({ connected }),
+  setSending: (deviceId, on) =>
+    set((s) => {
+      const sending = { ...s.sending };
+      if (on) sending[deviceId] = true;
+      else delete sending[deviceId];
+      return { sending };
+    }),
+  setUnreachable: (apartmentId) => set((s) => (s.apartmentId !== apartmentId ? s : { health: null, unreachable: true })),
 }));

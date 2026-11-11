@@ -547,6 +547,7 @@
     "noDevices": "Nessun dispositivo in questo appartamento",
     "liveOn": "In tempo reale",
     "liveOff": "Riconnessione…",
+    "liveStale": "Dati non aggiornati",
     "band": {
       "title": "Come sta la casa adesso",
       "holdUntil": "forzata fino alle {until}",

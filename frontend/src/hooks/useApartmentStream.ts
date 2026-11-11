@@ -2,25 +2,64 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
 import { fetchEventSource } from "@microsoft/fetch-event-source";
-import { authHeaders, buildUrl } from "@/api/bff";
+import { ApiError, authHeaders, buildUrl } from "@/api/bff";
 import { instanceApi } from "@/api/instance";
 import { STREAM_EVENTS, type Approval, type StreamEnvelope } from "@/api/types";
 import { useApartmentStore } from "@/store/apartmentStore";
+import { isInProgress } from "@/store/streamReducer";
 import { t } from "@/i18n";
 
 const settle = <T,>(p: Promise<T>) => p.then((v) => v, () => undefined);
 const EVENTS = new Set<string>(STREAM_EVENTS);
 
-/** Re-reads apartment, devices and health, as after a reconnection; also after a simulator reset (D-97). */
-export async function resync(aptId: string) {
+/** The server reached, the engine not (502 instance_unreachable, or another 5xx of the proxy). */
+const engineUnreachable = (err: unknown) => err instanceof ApiError && err.status >= 500;
+
+/**
+ * Re-reads apartment, devices and health, as after a reconnection; also after a simulator reset (D-97).
+ * current: false once a newer re-read has started (P-83, D46): this one's older photo is then dropped, it would undo
+ * events applied meanwhile. Returns whether the photo was applied.
+ */
+export async function resync(aptId: string, current: () => boolean = () => true): Promise<boolean> {
   const api = instanceApi(aptId);
-  const [devices, apartment, health] = await Promise.all([settle(api.getDevices()), settle(api.getApartment()), settle(api.getHealth())]);
-  useApartmentStore.getState().setSnapshot({
+  let healthFailure: unknown;
+  const [devices, apartment, health] = await Promise.all([
+    settle(api.getDevices()),
+    settle(api.getApartment()),
+    api.getHealth().catch((err: unknown) => {
+      healthFailure = err;
+      return undefined;
+    }),
+  ]);
+  if (!current()) return false;
+  const store = useApartmentStore.getState();
+  // P-83, D27: the server says it does not reach the engine: the health kept from before («In salute») is void.
+  if (engineUnreachable(healthFailure)) store.setUnreachable(aptId);
+  store.setSnapshot({
     devices: devices?.devices,
     rooms: devices?.rooms,
     apartment: apartment ?? undefined,
     health: health ?? undefined,
   }, aptId);
+  void rereadCommands(aptId);
+  return true;
+}
+
+/**
+ * P-83, D48: a command still «in corso» here may have ended while the stream was closed (phone locked over the
+ * server's replay window, another server instance): its outcome is read again, so the card does not stay busy.
+ */
+async function rereadCommands(aptId: string) {
+  const { commands } = useApartmentStore.getState();
+  const open = Object.values(commands).filter((c) => isInProgress(c.status));
+  if (!open.length) return;
+  const api = instanceApi(aptId);
+  await Promise.all(open.map(async (c) => {
+    const cmd = await settle(api.getCommand(c.command_id));
+    const store = useApartmentStore.getState();
+    if (!cmd || store.apartmentId !== aptId || !isInProgress(store.commands[c.command_id]?.status)) return;
+    store.apply({ event: "command.updated", data: { command_id: cmd.command_id, device_id: cmd.device_id, status: cmd.status, reason: cmd.reason ?? null } } as unknown as StreamEnvelope);
+  }));
 }
 
 class FatalStreamError extends Error {}
@@ -55,6 +94,7 @@ export function useApartmentStream(aptId: string | undefined, onApproval?: (a: A
     let refused = false; // 401, 403, 404: never reopened, not even when the page comes back
     let lastEventId: string | undefined;
     let hideTimer: number | undefined;
+    let resyncs = 0; // P-83, D46: only the latest re-read applies its photo and opens the queue
 
     const dispatch = (env: StreamEnvelope) => {
       useApartmentStore.getState().apply(env);
@@ -85,14 +125,15 @@ export function useApartmentStream(aptId: string | undefined, onApproval?: (a: A
         void queryClient.invalidateQueries({ queryKey: ["schedule", aptId] });
         void queryClient.invalidateQueries({ queryKey: ["bookings", aptId] });
       }
-      if (env.event === "apartment.changed" || env.event === "approval.pending" || env.event === "decision.logged") {
+      if (env.event === "apartment.changed" || env.event === "approval.pending" || env.event === "decision.logged" || env.event === "instance.health") {
         void queryClient.invalidateQueries({ queryKey: ["apartment-summary", aptId] });
       }
     };
 
     const doResync = async () => {
+      const mine = ++resyncs;
       ready = false;
-      await resync(aptId);
+      if (!(await resync(aptId, () => mine === resyncs))) return;
       ready = true;
       const pending = queue;
       queue = [];

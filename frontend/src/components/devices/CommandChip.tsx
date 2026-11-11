@@ -10,9 +10,12 @@ export function reasonText(reason: string | null | undefined): string {
   return `${tOr(`command.reason.${reason}`, reason)} · ${reason}`;
 }
 
-/** Inline status of the last command of a device: in corso → eseguito, or the error with its reason. */
+/**
+ * Inline status of the last command of a device: in corso → eseguito, or the error with its reason. An error wins over
+ * the command (P-83, D47): a new command clears it, so the error present is always the latest attempt.
+ */
 export function CommandChip({ command, error, testId }: { command?: TrackedCommand; error?: DeviceError; testId: string }) {
-  if (error && !command) {
+  if (error) {
     return (
       <span data-testid={testId} data-status="error" role="status" className={chip("err")}>
         <TriangleAlert className="h-3.5 w-3.5" aria-hidden /> {error.message}

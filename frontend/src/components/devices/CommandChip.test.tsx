@@ -67,9 +67,10 @@ describe("CommandChip, lo stato dell'ultimo comando di un dispositivo", () => {
     expect(screen.queryByTestId(`${TEST_ID}-correlation`)).toBeNull();
   });
 
-  it("con un comando e un errore vince il comando, che è più recente", () => {
+  it("con un comando e un errore vince l'errore (P-83, D47): un nuovo comando cancella l'errore, quindi l'errore che c'è è il più recente", () => {
     show(cmd({ status: "acked" }), { message: "Server non raggiungibile", code: "NETWORK", correlationId: null });
-    expect(chip()).toHaveTextContent(/^eseguito$/);
+    expect(chip()).toHaveTextContent(/^Server non raggiungibile$/);
+    expect(chip()).toHaveAttribute("data-status", "error");
   });
 });
 
