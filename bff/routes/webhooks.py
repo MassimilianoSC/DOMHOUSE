@@ -83,7 +83,9 @@ def verify_signature(raw: bytes, header_value: str | None, secret: str) -> bool:
     provided = header_value.strip()
     if provided.lower().startswith("sha256="):
         provided = provided[7:]
-    return hmac.compare_digest(expected.lower(), provided.lower())
+    if not provided.isascii():                     # D65 (P-83): compare_digest raised TypeError on it (500, no entry)
+        return False
+    return hmac.compare_digest(expected.lower().encode(), provided.lower().encode())
 
 
 async def report_demo_codes() -> None:
