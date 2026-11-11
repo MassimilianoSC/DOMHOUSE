@@ -3,7 +3,7 @@
 # as root (sudo), with the VM's own identity: no gcloud needed there, only curl, python3 and docker (procedure and the
 # commands to launch it from the PC: docs/motore-vm.md).
 #
-#   sudo bash engine-vm.sh install <apartment_id> <port> <image> [connector]   # first time; connector: simulated
+#   sudo bash engine-vm.sh install <apartment_id> <port> <image> <connector>   # first time; connector: simulated
 #   sudo bash /opt/domhouse/engine-vm.sh update <apartment_id> <image>          # new image, same data
 #   sudo bash /opt/domhouse/engine-vm.sh key <apartment_id>                     # rewrite the key file, restart
 #   sudo bash /opt/domhouse/engine-vm.sh status <apartment_id>
@@ -211,6 +211,12 @@ compose() {
   # the simulated engines never depend on the broker
   local apt="$1"; shift
   local files=(-f "${OPT}/compose.yaml")
+  # D62 (P-83): compose.yaml has no default for CONNECTOR any more; a settings file written before the line existed
+  # (only simulated engines then) gets it once, said on stderr (this function's stdout can be read by the caller)
+  if ! grep -q '^CONNECTOR=' "$(settings_file "${apt}")"; then
+    echo "CONNECTOR=simulated" >> "$(settings_file "${apt}")"
+    echo "${apt}: CONNECTOR=simulated aggiunto a $(settings_file "${apt}") (scritto prima che la riga esistesse)" >&2
+  fi
   if [ "$(sed -n 's/^CONNECTOR=//p' "$(settings_file "${apt}")")" != "simulated" ] && [ -f "${OPT}/compose.broker.yaml" ]; then
     files+=(-f "${OPT}/compose.broker.yaml")
   fi
@@ -489,9 +495,11 @@ cmd="${1:-}"; shift || true
 case "${cmd}" in backup|backup-all|timers|logs-agent|"") ;; *) resolve_bind_ip ;; esac
 case "${cmd}" in
   install)
-    [ $# -ge 3 ] || die "uso: install <apartment_id> <port> <image> [connector]"
-    apt="$1"; port="$2"; image="$3"; connector="${4:-simulated}"
+    # D62 (P-83): the connector is always said (simulated or shelly): it was simulated when forgotten
+    [ $# -eq 4 ] || die "uso: install <apartment_id> <port> <image> <connector> (simulated per le prove, shelly per un appartamento vero)"
+    apt="$1"; port="$2"; image="$3"; connector="$4"
     valid_id "${apt}"; valid_port "${port}"
+    [[ "${connector}" =~ ^[a-z][a-z0-9_]*$ ]] || die "connector non valido: ${connector}"
     lock_engines
     here="$(cd "$(dirname "$0")" && pwd)"
     [ -f "${here}/compose.yaml" ] || die "compose.yaml deve stare accanto a questo script"

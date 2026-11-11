@@ -24,7 +24,7 @@ services:
     restart: unless-stopped
     environment:
       APARTMENT_ID: ${APARTMENT_ID}
-      CONNECTOR: ${CONNECTOR:-simulated}
+      CONNECTOR: ${CONNECTOR:?CONNECTOR}     # D62 (P-83): no default, a real apartment never starts simulated
       PORT: ${PORT:?PORT}
     env_file:
       - path: /etc/domhouse/${APARTMENT_ID}.env

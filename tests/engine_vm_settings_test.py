@@ -458,3 +458,30 @@ def test_install_writes_its_time():
     text = SCRIPT.read_text(encoding="utf-8")
     install = text[text.index("  install)"):text.index("  update)")]
     assert "printf 'APARTMENT_ID=%s\\nPORT=%s\\nCONNECTOR=%s\\nENGINE_IMAGE=%s\\nINSTALLED_AT=%s\\n'" in install, install
+
+
+def test_install_needs_the_connector(vm):
+    """D62 (P-83): the fourth argument was «simulated» when missing: a real apartment installed without it ran
+    simulated, with no error."""
+    r = vm("install", "apt-nuovo", "8101", "registro/engine:abc")
+    assert r.returncode != 0 and "uso: install <apartment_id> <port> <image> <connector>" in r.stderr, r.stderr
+    assert not (vm.opt / "apt-nuovo.settings").exists()
+
+
+def test_compose_has_no_default_connector():
+    """D62: compose.yaml stops when CONNECTOR is missing instead of starting a simulated engine."""
+    text = (ROOT / "engine" / "compose.yaml").read_text(encoding="utf-8")
+    assert "CONNECTOR: ${CONNECTOR:?CONNECTOR}" in text and "CONNECTOR:-" not in text
+
+
+def test_an_old_settings_file_without_the_connector_gets_simulated_once(vm):
+    """D62: a settings file written before CONNECTOR existed (only simulated engines then) gets the line, said in the
+    output; without it compose (now without a default) would stop, and the broker's file was added (empty ≠ simulated)."""
+    path = vm.opt / f"{APT}.settings"
+    path.write_text(path.read_text(encoding="utf-8").replace("CONNECTOR=simulated\n", ""), encoding="utf-8", newline="\n")
+    (vm.opt / "compose.broker.yaml").write_text("services: {}\n", encoding="utf-8", newline="\n")
+    r = vm("set", APT, "CONFIRM_ON_WATTS=30")
+    assert r.returncode == 0, r.stderr
+    assert path.read_text(encoding="utf-8").count("CONNECTOR=simulated") == 1
+    assert "CONNECTOR=simulated aggiunto" in r.stdout + r.stderr
+    assert "compose.broker.yaml" not in (vm.stubs / "docker.log").read_text(encoding="utf-8")
