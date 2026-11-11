@@ -356,6 +356,8 @@ class ApartmentEngine:
         self._window_command = False                # the rule's own turn_off: not a person's (the mode is kept)
         self.commanded_at: dict[str, float] = {}    # D13: device -> monotonic of its last non-automatic command
         self._mode_in_progress: str | None = None   # D13: the mode set_mode is setting (its commands are made first)
+        # D16 (P-83): device -> {"body", "mode", "at"}: a mode's command for a device unreachable when it was set
+        self.mode_pending: dict[str, dict] = {}
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode
@@ -471,6 +473,15 @@ class ApartmentEngine:
             self.store.put_meta("approval_schedules", self.approval_schedules)
         return run_at
 
+    def guests_in(self) -> bool:
+        """D18 (P-83): guests in now, for the assistant's approvals: the occupancy says so (a check-in), or a booking in
+        course, not cancelled and not checked out, says so (Italianway may never send the check-in)."""
+        if self.apartment().get("occupancy") == "occupied":
+            return True
+        now = utcnow()
+        return any(not b["cancelled"] and not b["checked_out"] and b["checkin"] <= now < b["checkout"]
+                   for b in self.bookings.values())
+
     def occupied_at(self, when: datetime) -> bool:
         """D-170: the bookings' calendar says guests are in at that time (a booking not cancelled covering it)."""
         return any(not b["cancelled"] and b["checkin"] <= when < b["checkout"] for b in self.bookings.values())
@@ -494,6 +505,7 @@ class ApartmentEngine:
         self.heating_by_mode = set(st.get_meta("heating_by_mode", []) or [])
         self.climate_by_mode = set(st.get_meta("climate_by_mode", []) or [])
         self.window_off = dict(st.get_meta("window_off", {}) or {})
+        self.mode_pending = {k: {**v, "at": float("-inf")} for k, v in (st.get_meta("mode_pending", {}) or {}).items()}
         self.meters ={k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
         profile = st.get_meta("energy_profile")
         self.profile_until = parse_dt(profile["until"]) if profile else None
@@ -516,7 +528,12 @@ class ApartmentEngine:
                             if f in old["capabilities"][cap]:
                                 device["capabilities"][cap][f] = old["capabilities"][cap][f]
                 contact, was = device["capabilities"].get("contact"), old["capabilities"].get("contact")
-                if contact and was and contact.get("open") != was.get("open"):
+                if contact and was and "open" not in (info.capabilities.get("contact") or {}):
+                    # D15 / P7a-2 (P-83): not read yet (a BLU contact behind its bridge): the saved value stays until a
+                    # reading arrives; before, open False was invented and the window rule's return brought the
+                    # boiler back with the window open
+                    contact["open"], contact["since"] = was.get("open", False), was.get("since", contact.get("since"))
+                elif contact and was and contact.get("open") != was.get("open"):
                     contact["since"] = iso(utcnow())    # it changed while the engine was down
                 if device["last_seen"] is None and old.get("last_seen"):
                     device["last_seen"] = old["last_seen"]     # D12: the connector does not know it yet
@@ -948,7 +965,10 @@ class ApartmentEngine:
                 logs.warn("split without confirmation meter", apartment_id=self.apartment_id, device_id=info.device_id,
                           treated_as="confirmation none")
             if "heating" in info.capabilities:
-                self.relay[info.device_id] = bool(info.capabilities["heating"].get("on"))
+                if "on" in info.capabilities["heating"]:
+                    self.relay[info.device_id] = bool(info.capabilities["heating"]["on"])
+                else:                                # P7a-1 (P-83): not read (a failed snapshot): unknown, not open
+                    self.relay.pop(info.device_id, None)
                 if "sensor_device_id" not in kept:
                     logs.warn("boiler without sensor", apartment_id=self.apartment_id, device_id=info.device_id,
                               treated_as="not regulated")
@@ -1010,6 +1030,7 @@ class ApartmentEngine:
         connector down nothing can be switched: it waits for it (D-131)."""
         if not self.connector_was_up:
             return
+        self._mode_pending_send()                            # D16: what the mode could not send before
         self._restore_after_window()                         # D-218 point 1: first, so the boiler's relay follows now
         self._keep_window_off()                              # D03: and what is still on with the window open goes off
         in_force = self.window_in_force()
@@ -1026,8 +1047,8 @@ class ApartmentEngine:
             want, temperature, setpoint, frost = self.thermostat(device)
             if want and in_force and not frost:
                 want = False                                 # D03: never closed by the thermostat with the window open
-            if want == self.relay.get(device_id, False):
-                continue
+            if device_id in self.relay and want == self.relay[device_id]:
+                continue                                     # P7a-1: an unknown relay is commanded either way
             since = time.monotonic() - self.relay_switched.get(device_id, -1e18)
             if since < self.setting("THERMOSTAT_MIN_SWITCH_MINUTES") * seconds_per_minute():
                 continue
@@ -1374,7 +1395,8 @@ class ApartmentEngine:
                 return float(t["celsius"])
         return None
 
-    def mode_commands(self, mode: str, correlation_id: str | None = None) -> list[tuple[str, dict]]:
+    def mode_commands(self, mode: str, correlation_id: str | None = None,
+                      include_offline: bool = False) -> list[tuple[str, dict]]:
         """The commands of a mode (D-161, D-162). Boiler: comfort_celsius, eco_celsius, or the frost protection's in
         «casa vuota». Climate: off in eco and «casa vuota»; in comfort by the room's sensor: heating to
         comfort_celsius under it, cooling to comfort_cool_celsius over that, nothing in between; without a sensor no
@@ -1387,7 +1409,7 @@ class ApartmentEngine:
             self.no_sensor_noted.clear()
         for d in self.devices.values():
             caps = d["capabilities"]
-            if not d["online"]:
+            if not d["online"] and not include_offline:
                 if self._schedule_run and self._mode_would_command(d, mode):
                     # D-219 (2): a device of a scheduled action that is offline at its time is a command not done
                     self._schedule_refused(self._schedule_run, d["device_id"], "dispositivo offline, non comandato")
@@ -1433,6 +1455,49 @@ class ApartmentEngine:
         sl = self.rule("setpoint_limits")["params"]
         return room is not None and (room < sl["comfort_celsius"] or room > sl["comfort_cool_celsius"])
 
+    def _mode_wait(self, device_id: str, body: dict, mode: str, correlation_id: str) -> None:
+        """D16 (P-83): a device the mode could not reach (offline, or the connector down). The boiler's intention is the
+        engine's: it takes the mode's now and the relay follows when the boiler is back (regulate). A climate's command
+        waits (mode_pending) and goes when the climate is reachable again (_mode_pending_send). A decision says it."""
+        device = self.devices[device_id]
+        if body["capability"] == "heating":
+            heating = device["capabilities"]["heating"]
+            heating.update(on=bool(body["params"].get("on")), setpoint=body["params"].get("setpoint", heating.get("setpoint")))
+            self._heating_set_by(device_id, mode=True)
+            self._save_device(device)
+            self.emit("device.state", {"device_id": device_id, "capability": "heating", "state": heating}, correlation_id)
+            what = "impostata ora, il relè la segue quando torna raggiungibile"
+        else:
+            self.mode_pending[device_id] = {"body": copy.deepcopy(body), "mode": mode, "at": time.monotonic()}
+            what = "il comando parte quando torna raggiungibile"
+        self.log("system", {"type": "device", "device_id": device_id}, "mode_device_pending", None, mode,
+                 f"{device['label']} non raggiungibile durante il passaggio a {mode}: {what}", "informational",
+                 correlation_id)
+
+    def _mode_pending_send(self) -> None:
+        """D16: the waiting commands of the mode, for the devices reachable again; dropped when the mode changed or
+        someone commanded the device meanwhile (D13's commanded_at)."""
+        if not self.mode_pending or not self.connector_up():
+            return
+        for device_id, wait in list(self.mode_pending.items()):
+            device = self.devices.get(device_id)
+            if device is None or wait["mode"] != self.mode or self.commanded_at.get(device_id, float("-inf")) > wait["at"]:
+                self.mode_pending.pop(device_id, None)
+                continue
+            if not device["online"]:
+                continue
+            self.mode_pending.pop(device_id, None)
+            self._auto_climate = True
+            try:
+                self.create_command(device_id, wait["body"], "system:engine", str(uuid.uuid4()), decision_actor="system",
+                                    reasoning=f"Modalità {self.mode}: {device['label']} di nuovo raggiungibile")
+            except MockError as exc:
+                logs.warn("waiting mode command not sent", apartment_id=self.apartment_id, device_id=device_id,
+                          error=exc.error)
+            finally:
+                self._auto_climate = False
+        self.store.put_meta("mode_pending", {k: {"body": v["body"], "mode": v["mode"]} for k, v in self.mode_pending.items()})
+
     def _heating_set_by(self, device_id: str, mode: bool) -> None:
         (self.heating_by_mode.add if mode else self.heating_by_mode.discard)(device_id)
         self.store.put_meta("heating_by_mode", sorted(self.heating_by_mode))
@@ -1454,18 +1519,24 @@ class ApartmentEngine:
         self._frost_command = mode == "empty"
         self._mode_in_progress = mode
         try:
+            self.mode_pending = {}                       # D16: a new mode replaces what the previous one left waiting
+            sent: set[str] = set()
             for device_id, body in self.mode_commands(mode, correlation_id):
                 try:
                     cmd = self.create_command(device_id, body, actor, correlation_id, decision_actor=decision_actor,
                                               reasoning=f"Modalità {mode}")
                     if cmd:
                         command_ids.append(cmd["command_id"])
+                    sent.add(device_id)
                 except MockError as exc:
                     if self._schedule_run:                     # D-219 (2): a command of a scheduled action not sent
                         self._schedule_refused(self._schedule_run, device_id, exc.message)
                     continue
                 if body["capability"] == "heating":
                     self._heating_set_by(device_id, mode=True)        # D-164: a mode's intention, never unregulated
+            for device_id, body in self.mode_commands(mode, correlation_id, include_offline=True):
+                if device_id not in sent:
+                    self._mode_wait(device_id, body, mode, correlation_id)
         finally:
             self._auto_climate = False
             self._frost_command = False
@@ -1474,6 +1545,7 @@ class ApartmentEngine:
         self.climate_by_mode = ({d["device_id"] for d in self.devices.values() if "climate" in d["capabilities"]}
                                 if mode == "comfort" else set())
         self.store.put_meta("climate_by_mode", sorted(self.climate_by_mode))
+        self.store.put_meta("mode_pending", {k: {"body": v["body"], "mode": v["mode"]} for k, v in self.mode_pending.items()})
         old = self.mode
         self.mode = mode
         self._save_apartment()
@@ -2826,7 +2898,7 @@ class ApartmentEngine:
         off = re.search(r"\b(spegni|disattiva)\b", text)
         try:
             # D-189: with guests in only switching the boiler off asks first; switching it on or a temperature does not
-            if "caldaia" in text and off and self.apartment()["occupancy"] == "occupied":
+            if "caldaia" in text and off and self.guests_in():      # D18
                 pending = self.pending_approval()
                 if pending:
                     ask.update(status="answered", approval_id=pending["approval_id"],

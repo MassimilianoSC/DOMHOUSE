@@ -55,6 +55,7 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "tests/simulated_apartments_test.py", "tests/cloudrun_manifests_test.py", "tests/engine_vm_settings_test.py", "tests/deploy_engine_test.py", "tests/publish_all_test.py", "tests/ai_gateway_test.py", "tests/environments_test.py", "tests/deploy_targets_test.py", "tests/list_demos_test.py", "tests/engine_alerts_test.py", "tests/rodaggio_test.py", "tests/weekly_summary_test.py", "tests/summary_job_test.py", "tests/rule_proposals_test.py", "tests/demo_variant_test.py", "tests/measure_model_test.py", "tests/net_phase_test.py", "tests/vertex_native_test.py", "tests/manager_profile_test.py", "tests/timezone_test.py", "tests/ai_stats_test.py", "tests/auth_token_test.py", "tests/stream_queue_test.py", "tests/runtime_log_test.py",
                 "tests/load_tool_test.py", "tests/load_environment_test.py", "tests/load_vm_test.py",
                 "tests/staging_targets_test.py", "tests/booking_order_test.py",
+                "tests/rule_recognizer_off_test.py", "tests/publish_resume_test.py", "tests/summary_known_features_test.py",
                 "engine/connector/tests/test_interface.py",
                 "engine/connector/shelly/tests/test_battery.py",
                 "engine/connector/shelly/tests/test_catalog.py",
@@ -83,7 +84,10 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "engine/tests/test_schedule_failed.py", "engine/tests/test_reachability.py",
                 "engine/tests/test_window_restore.py", "engine/tests/test_window_kept_off.py", "engine/tests/test_window_mode_change.py",
                 "engine/tests/test_back_to_back.py", "engine/tests/test_booking_changed.py", "engine/tests/test_booking_order.py",
-                "engine/tests/test_approval_during_hold.py", "engine/tests/test_compressor_in_flight.py", "engine/tests/test_offline_at_start.py", "engine/tests/test_deferred_start.py", "engine/tests/test_ir_climate_state.py", "engine/tests/test_schedule_partial.py"]
+                "engine/tests/test_approval_during_hold.py", "engine/tests/test_compressor_in_flight.py", "engine/tests/test_offline_at_start.py", "engine/tests/test_deferred_start.py", "engine/tests/test_ir_climate_state.py",
+                "engine/tests/test_contact_unread_at_start.py", "engine/tests/test_relay_unknown.py",
+                "engine/tests/test_mode_device_offline.py", "engine/tests/test_quick_socket_words.py",
+                "engine/tests/test_guests_in_by_booking.py", "engine/tests/test_schedule_partial.py"]
 SITE_SUITE = "sito"
 CONFORMANCE_SUITE = "conformita"
 CONFORMANCE_DIR = "contract/conformance"

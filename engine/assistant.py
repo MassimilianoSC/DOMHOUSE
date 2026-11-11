@@ -393,7 +393,7 @@ class Assistant:
             return "errore" not in self.tool("cambia_modalita", {"modalita": m}, proposals)
         kinds = [cap for cap, words in (("climate", r"\b(clima|climatizzatore|condizionatore|split)\b"),
                                         ("heating", r"\b(caldaia|riscaldamento|termosifoni?)\b"),
-                                        ("switch", r"\b(presa|prese|stufetta|luce)\b")) if re.search(words, t)]
+                                        ("switch", r"\b(presa|prese|stufetta)\b")) if re.search(words, t)]
         if len(kinds) > 1 or sum(bool(x) for x in (off, on, number)) != 1:
             return False
         rooms = {r["room_id"] for r in self.e.rooms if f" {r['name'].lower()} " in t}
@@ -404,6 +404,10 @@ class Assistant:
                 continue
             if rooms and d["room_id"] not in rooms:
                 continue
+            room_words = {w for r in self.e.rooms for w in r["name"].lower().split()}
+            if (kinds[0] if kinds else caps[0]) == "switch" and not any(
+                    f" {w} " in t for w in re.findall(r"[a-zàèéìòù]{4,}", d["label"].lower()) if w not in room_words):
+                continue          # D17 (P-83): a socket only by a word of its own name («stufetta» is not any socket)
             candidates.append((d, kinds[0] if kinds else caps[0]))
         if not kinds and number:                          # «porta il soggiorno a 21 gradi»: the room's climate
             candidates = [(d, c) for d, c in candidates if c == "climate"]
@@ -572,7 +576,7 @@ class Assistant:
         """D-154 point 2: the approval asked as a question in the chat, answered with «Sì» / «No» under it (the same
         call as the Approvals page, so the same record) or from the Approvals page."""
         tail = " Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni."
-        if self.e.apartment().get("occupancy") == "occupied":
+        if self.e.guests_in():                       # D18: also a booking in course without its check-in
             if what.startswith("spegnere "):
                 return f"Spengo {what[len('spegnere '):]} con ospiti presenti?{tail}"
             if what.startswith("modalità "):
@@ -609,7 +613,7 @@ class Assistant:
             return True
         if policy == "multiple":
             return False
-        if self.e.apartment().get("occupancy") != "occupied":
+        if not self.e.guests_in():                   # D18
             return False
         if p["type"] == "mode":
             return True
