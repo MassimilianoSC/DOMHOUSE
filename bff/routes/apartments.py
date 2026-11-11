@@ -222,6 +222,17 @@ async def _shown(resp, tenant_id: str, path: str = "") -> bytes:
 
 async def _event(ev: SseEvent, tenant_id: str) -> str:
     """The same rewrite for the stream (decision.logged, approval.*, the apartment's hold)."""
+    if ev.event == "instance.health":
+        # D81 (P-83): what GET .../instance/health leaves out (D-90) never goes in the frame either
+        try:
+            payload = json.loads(ev.data)
+        except ValueError:
+            return ev.encode()
+        if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+            payload["data"] = instances.health_out(payload["data"])
+            return SseEvent(id=ev.id, event=ev.event, data=json.dumps(payload, ensure_ascii=False),
+                            received=ev.received).encode()
+        return ev.encode()
     if not any(m in ev.data for m in actors.MARKERS):
         return ev.encode()
     try:

@@ -88,6 +88,25 @@ def test_stream_events_are_rewritten():
     assert run(_event(plain, TENANT)) == plain.encode()
 
 
+def test_d81_the_health_event_of_the_stream_leaves_out_what_the_app_never_shows():
+    """D81 (P-83): GET .../instance/health already left out devices, uptime, database, ids (D-90); the stream's
+    instance.health frame carried them all."""
+    import json
+
+    from bff.instances import HEALTH_UNUSED
+    from bff.routes.apartments import _event
+    from bff.sse_hub import SseEvent
+
+    health = {"status": "ok", "connector": {"status": "up"}, "devices": [{"device_id": "dev-1"}], "uptime_s": 99,
+              "database": {"size_mb": 1}, "checked_at": "2026-11-11T10:00:00Z", "apartment_id": "apt-x"}
+    env = {"id": "9", "event": "instance.health", "apartment_id": "apt-x", "data": health}
+    out = run(_event(SseEvent(id="9", event="instance.health", data=json.dumps(env), received=0.0), TENANT))
+    assert out.startswith("id: 9\nevent: instance.health\n")
+    sent = json.loads(out.split("data: ", 1)[1].strip())
+    assert sent["apartment_id"] == "apt-x" and sent["data"]["connector"] == {"status": "up"}
+    assert not any(k in sent["data"] for k in HEALTH_UNUSED), sent
+
+
 def test_the_pseudonym_belongs_to_the_person_not_to_an_organisation():
     """Fable on D-87: a manager inside an organisation through a support access has no record there; their pseudonym
     is bound to their uid and still shows their real identity (D-86), in any organisation they assist."""
