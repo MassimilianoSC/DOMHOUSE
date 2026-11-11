@@ -121,6 +121,7 @@ def utcnow() -> datetime:
 
 # D-219: what a scheduled action is, in the decisions schedule_failed and schedule_missed (new_value) and in their text.
 # An action the assistant planned is a manual one in the schedule (kind "manual", source "assistant"): here it has its own.
+CHECKOUT_APPROVAL = "Mettere l'appartamento a vuoto dopo il check-out"   # F1 (D-137); D05 recognises it at expiry
 SCHEDULE_LABELS = {"prearrival": "pre-arrivo", "checkout": "check-out", "empty": "casa vuota", "manual": "manuale",
                    "assistant": "dell'assistente"}
 
@@ -1047,7 +1048,7 @@ class ApartmentEngine:
             if not device["online"] or any(r[0] == device_id for r in self.inflight):
                 continue                                     # later, when it can be reached
             state = device["capabilities"][cap]
-            if state.get("on"):
+            if state.get("on") and not entry.get("mode_blocked"):
                 self.window_off.pop(device_id, None)         # already back on (by itself, or the mode)
                 continue
             by_mode = device_id in (self.heating_by_mode if cap == "heating" else self.climate_by_mode)
@@ -1694,8 +1695,17 @@ class ApartmentEngine:
         old = describe(cap, device["capabilities"][cap])
         new_state = self.target_state(device, cap, cmd["action"], cmd["params"])
         window = self.window_open()
-        if cap in ("climate", "heating") and new_state["on"] and window and self.window_rule_active():
+        current = device["capabilities"][cap]
+        lowering = (cap == "heating" and current.get("on") and isinstance(new_state.get("setpoint"), (int, float))
+                    and isinstance(current.get("setpoint"), (int, float)) and new_state["setpoint"] <= current["setpoint"])
+        if cap in ("climate", "heating") and new_state["on"] and window and self.window_rule_active() and not lowering:
             # the engine's rule: the device is never asked; the app sees the same steps as before P-60 (sent, failed)
+            if device["device_id"] in (self.heating_by_mode if cap == "heating" else self.climate_by_mode):
+                # D08 (P-83): a mode's command (the mode's own heating or climate): it applies when the windows are
+                # closed again, with the mode of that moment, also when the window closes before the rule's minutes
+                self.window_off[device["device_id"]] = {"cap": cap, "by_mode": True, "mode_blocked": True, "state": {
+                    k: new_state[k] for k in ("on", "mode", "setpoint", "fan") if k in new_state}}
+                self.store.put_meta("window_off", self.window_off)
             await asyncio.sleep(0.3)
             self._set_status(cmd, "sent")
             await asyncio.sleep(0.2)
@@ -1907,6 +1917,11 @@ class ApartmentEngine:
 
     def _window_turn_off(self, window_id: str, why: str, skip: set[str] | frozenset = frozenset()) -> None:
         self.window_fired.add(window_id)                     # D03: the rule now holds while this window stays open
+        # D08 (P-83): a device with a command still running (the mode's turn_off or its new setpoint) is left to it: a
+        # turn_off made now would carry the state of before (a boiler back to 21 °C), and one being turned off would be
+        # remembered as «on» and come back on when the window closes, in «casa vuota» too. The next regulation's minute
+        # looks again (_keep_window_off, D03)
+        skip = set(skip) | {c["device_id"] for c in self.commands.values() if c["status"] not in FINAL}
         corr = str(uuid.uuid4())
         frost = self.mode == "empty" and self.rule("frost_protection")["enabled"]
         for d in list(self.devices.values()):
@@ -2137,16 +2152,28 @@ class ApartmentEngine:
             raise bad_request("source non valido")
         try:
             checkin, checkout = parse_dt(ev["checkin_at"]), parse_dt(ev["checkout_at"])
-            parse_dt(ev["ts"])
+            ts = parse_dt(ev["ts"])
         except ValueError:
             raise bad_request("Date non valide")
         if checkout <= checkin:
             raise MockError(422, "invalid_dates", "Il check-out deve essere successivo al check-in")
         bid = ev["booking_id"]
+        known = self.bookings.get(bid)
+        if known is not None and known.get("last_ts") and ts < parse_dt(known["last_ts"]):
+            # D07 (P-83): older than the last event applied to this booking (a retry after a 502 arriving late):
+            # acknowledged, so it is not sent again, and changes nothing
+            result = {"event_id": ev["event_id"], "accepted": True, "duplicate": False, "schedule_ids": []}
+            self.processed_events[ev["event_id"]] = result
+            self._save_processed(ev["event_id"], result, known["checkout"])
+            self.log("system", {"type": "schedule"}, "booking_event_stale", None, bid,
+                     f"Evento «{ev['type']}» della prenotazione {bid} più vecchio dell'ultimo applicato: ignorato",
+                     "informational", correlation_id, emit=emit)
+            return 200, result
         booking = self.bookings.setdefault(bid, {"booking_id": bid, "checkin": checkin, "checkout": checkout,
                                                  "cancelled": False, "checked_in": False, "checked_out": False})
         items = [s for s in self.schedule.values() if s["booking_id"] == bid]
         ids: list[str] = []
+        moved_reset = False
         reset = False
         if ev["type"] == "booking_cancelled":
             booking["cancelled"] = True
@@ -2177,14 +2204,25 @@ class ApartmentEngine:
             co = self.rule("checkout_eco")
             if co["enabled"]:
                 plan.append(("checkout", checkout + timedelta(minutes=co["params"]["minutes_after"]), "empty"))
+            now = utcnow()
             for kind, run_at, mode in plan:
                 existing = next((s for s in items if s["kind"] == kind and s["status"] == "planned"), None)
+                done = any(s["kind"] == kind and s["status"] == "done" for s in items)
                 if existing:
                     existing["run_at"] = iso(run_at)
                     ids.append(existing["schedule_id"])
-                else:
-                    ids.append(self.add_schedule(run_at, {"type": "apartment_mode", "mode": mode}, kind, "booking", bid)["schedule_id"])
+                    continue
+                if done and (run_at <= now or booking["checked_in"] or booking["checked_out"]):
+                    continue        # D06 (P-83): already done for this booking, its time past or the guests in or gone
+                if done and kind == "prearrival" and not moved_reset and not self._booking_needs_comfort(bid):
+                    # D06: the arrival moved to the future after the prearrival: back to empty now, as a cancellation
+                    # does (D-121), through the scheduler; warmed again at the new time
+                    ids.append(self.add_schedule(now, {"type": "apartment_mode", "mode": "empty"}, "empty", "booking",
+                                                 bid)["schedule_id"])
+                    moved_reset = True
+                ids.append(self.add_schedule(run_at, {"type": "apartment_mode", "mode": mode}, kind, "booking", bid)["schedule_id"])
             reasoning = f"Prenotazione {bid} {'ricevuta' if ev['type'] == 'booking_created' else 'modificata'}: pre-arrivo e check-out programmati"
+        booking["last_ts"] = iso(ts)                     # D07: the time of the last event applied
         result = {"event_id": ev["event_id"], "accepted": True, "duplicate": False, "schedule_ids": ids}
         self.processed_events[ev["event_id"]] = result
         self._save_booking(booking)
@@ -2193,6 +2231,11 @@ class ApartmentEngine:
                 self._save_schedule(item)
         self._save_processed(ev["event_id"], result, booking["checkout"])
         self.log("system", {"type": "schedule"}, ev["type"], None, bid, reasoning, "informational", correlation_id, emit=emit)
+        if moved_reset:
+            arrival = booking["checkin"].astimezone(ZoneInfo(self.timezone)).strftime("%d/%m %H:%M")
+            self.log("system", {"type": "apartment"}, "booking_moved_reset", self.mode, "empty",
+                     f"Arrivo della prenotazione {bid} spostato al {arrival}, dopo il pre-arrivo: appartamento rimesso a "
+                     f"vuoto, si riscalda al nuovo pre-arrivo", "informational", correlation_id, emit=emit)
         if reset:   # its own decision, which the BFF turns into a push to the managers (D-121)
             self.log("system", {"type": "apartment"}, "booking_cancel_reset", self.mode, "empty",
                      f"Prenotazione {bid} annullata dopo il pre-arrivo: appartamento rimesso a vuoto", "informational",
@@ -2201,17 +2244,35 @@ class ApartmentEngine:
             self.apartment_changed(correlation_id)
         return 202, result
 
-    def _booking_needs_comfort(self, cancelled_id: str) -> bool:
-        """Another booking, not cancelled nor checked out, that is in course now or whose prearrival already ran."""
+    def _booking_needs_comfort(self, other_than: str | None) -> bool:
+        return self._booking_needing_comfort(other_than) is not None
+
+    def _booking_needing_comfort(self, other_than: str | None) -> dict | None:
+        """Another booking, not cancelled nor checked out, that is in course now, whose prearrival already ran, or
+        (D05, P-83) whose arrival is within the prearrival's hours: its warmth must not be taken away."""
         now = utcnow()
-        for b in self.bookings.values():
-            if b["booking_id"] == cancelled_id or b["cancelled"] or b["checked_out"]:
-                continue
-            if b["checkin"] <= now < b["checkout"] or any(
+        pre = self.rule("prearrival")
+        soon = timedelta(hours=pre["params"]["hours_before"]) if pre["enabled"] else None
+        for b in sorted(self.bookings.values(), key=lambda b: b["checkin"]):
+            if b["booking_id"] == other_than or b["cancelled"] or b["checked_out"] or b["checkout"] <= now:
+                continue                                     # D05: a stay already over needs nothing
+            if b["checkin"] <= now < b["checkout"] or (soon is not None and now < b["checkin"] <= now + soon) or any(
                     s["booking_id"] == b["booking_id"] and s["kind"] == "prearrival" and s["status"] == "done"
                     for s in self.schedule.values()):
-                return True
-        return False
+                return b
+        return None
+
+    def _checkout_keeps_comfort(self, booking_id: str | None, correlation_id: str) -> bool:
+        """D05 (P-83): a check-out about to empty the apartment while another booking needs it (back to back): the mode
+        stays, and a decision says why. True when it stays."""
+        other = self._booking_needing_comfort(booking_id)
+        if other is None:
+            return False
+        arrival = other["checkin"].astimezone(ZoneInfo(self.timezone)).strftime("%d/%m %H:%M")
+        self.log("system", {"type": "apartment"}, "checkout_kept_comfort", self.mode, self.mode,
+                 f"Check-out della prenotazione {booking_id or '?'}: l'appartamento non va a vuoto, c'è la prenotazione "
+                 f"{other['booking_id']} (arrivo {arrival})", "informational", correlation_id)
+        return True
 
     # ---- approvals ---------------------------------------------------------
     def pending_approval(self) -> dict | None:
@@ -2353,7 +2414,7 @@ class ApartmentEngine:
         booking = self.bookings[item["booking_id"]]
         departure = booking["checkout"].astimezone(ZoneInfo(self.timezone)).strftime("%H:%M")
         minutes = max(int((utcnow() - last).total_seconds() // 60), 0)
-        self._new_approval("rule", "Mettere l'appartamento a vuoto dopo il check-out",
+        self._new_approval("rule", CHECKOUT_APPROVAL,
                            f"Movimento rilevato {minutes} minuti fa da «{sensor['label']}», dopo l'orario di partenza "
                            f"delle {departure}: gli ospiti potrebbero essere ancora in casa",
                            dict(item["action"]), "approve", correlation_id)
@@ -2820,7 +2881,16 @@ class ApartmentEngine:
                  "pending", "expired", f"Approvazione scaduta senza risposta: {outcome}", "informational", corr,
                  approval_id=a["approval_id"])
         try:
-            if a["expires_action"] == "approve":
+            if a["expires_action"] == "approve" and a["description"] == CHECKOUT_APPROVAL and \
+                    self._checkout_keeps_comfort(None, corr):
+                pass                                     # D05: approved at expiry, but the next guest arrived meanwhile
+            elif a["expires_action"] == "approve" and self.hold and a["proposed_action"].get("type") == "apartment_mode":
+                # D09 (P-83): like a scheduled mode change (D-122), it waits for the end of the hold: an action due now,
+                # which the scheduler defers with the decision «rimandata per la forzatura»
+                pa = dict(a["proposed_action"])           # kind and source within the contract's values
+                self.add_schedule(utcnow(), pa, "empty" if pa.get("mode") == "empty" else "manual",
+                                  "booking" if a["description"] == CHECKOUT_APPROVAL else "manual")
+            elif a["expires_action"] == "approve":
                 self._execute_proposed(a, "system:engine", corr, "system")
             else:
                 self._take_schedule(a["approval_id"])
@@ -2847,6 +2917,12 @@ class ApartmentEngine:
         if self.deferred.pop(item["schedule_id"], None) is not None:
             self.store.put_meta("deferred", self.deferred)
             reasoning += " (rimandata per la forzatura)"
+        if (item["kind"] == "checkout" and act["type"] == "apartment_mode" and act.get("mode") == "empty"
+                and self._checkout_keeps_comfort(item["booking_id"], corr)):
+            item.update(status="done", command_ids=[], executed_at=iso(now))   # D05: the next guest keeps the warmth
+            self._save_schedule(item)
+            self.apartment_changed(corr)
+            return
         if item["kind"] == "checkout" and act["type"] == "apartment_mode" and (seen := self._presence_after_checkout(item)):
             self._propose_checkout(item, seen, corr)      # F1 (D-137): the manager decides; approved at expiry
             item.update(status="done", command_ids=[], executed_at=iso(now))

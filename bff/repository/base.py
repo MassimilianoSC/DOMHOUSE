@@ -112,6 +112,7 @@ class BookingRecord(BaseModel):
     status: BookingStatus = "booked"
     event_ids: list[str] = Field(default_factory=list)
     last_event_type: str = ""
+    last_event_ts: str = ""                 # D07 (P-83): the ts of the last event applied; an older one changes nothing
     updated_at: str = Field(default_factory=now_iso)
 
     @property
@@ -379,6 +380,15 @@ class Repository(Protocol):
     async def remove_platform_member(self, email: str) -> bool: ...
 
 
+def _when(ts: str | None) -> datetime:
+    """An event's ts as an instant (ISO 8601, Z or offset); a missing or unreadable one counts as the oldest."""
+    try:
+        moment = datetime.fromisoformat((ts or "").replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=UTC)
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+
+
 def apply_booking_event(existing: BookingRecord | None, apartment_id: str, ev: dict) -> BookingRecord:
     """Folds a forwarded BookingEvent into the archived record (idempotent on event_id)."""
     rec = existing or BookingRecord(apartment_id=apartment_id, booking_id=ev["booking_id"], checkin_at=ev["checkin_at"],
@@ -386,6 +396,9 @@ def apply_booking_event(existing: BookingRecord | None, apartment_id: str, ev: d
     if ev["event_id"] in rec.event_ids:
         return rec
     rec.event_ids = rec.event_ids + [ev["event_id"]]
+    if rec.last_event_ts and _when(ev.get("ts")) < _when(rec.last_event_ts):
+        return rec                          # D07: sent again after newer ones (a retry after a 502): seen, not applied
+    rec.last_event_ts = ev.get("ts") or rec.last_event_ts
     rec.last_event_type = ev["type"]
     rec.guests = ev.get("guests", rec.guests)
     rec.source = ev["source"]
