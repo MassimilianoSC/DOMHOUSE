@@ -114,7 +114,10 @@ def alerts(tmp_path):
     def run(dry=False):
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; '
                f'{"DRY_RUN=1 " if dry else ""}GCP_PROJECT_ID=progetto bash "{posix(SCRIPT)}"')
-        out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=60)
+        # one run starts about 40 processes (python3, gcloud, sed, mktemp for each of 8 policies): 5.3-6.5 s with the PC
+        # at rest (11 November), over 60 s in the full run of 10 November, with Docker and the other suites running.
+        # The limit is there only to catch a hang (risposta 885)
+        out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=300)
         calls = (stubs / "calls.log").read_text(encoding="utf-8") if (stubs / "calls.log").exists() else ""
         created = (stubs / "created.json").read_text(encoding="utf-8") if (stubs / "created.json").exists() else ""
         for f in ("calls.log", "created.json"):
