@@ -67,7 +67,7 @@ def repo(tmp_path):
 
     def run(target, env="SKIP_BUILD=1"):
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(r)}" && '
-               f'TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default VM_INTERNAL_IP=10.0.0.9 {env} '
+               f'TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default VM_INTERNAL_IP=10.0.0.9 STAGING_SITE=progetto-prova-staging {env} '
                f'bash scripts/deploy.sh')
         out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=60)
         calls = (stubs / "calls.log").read_text(encoding="utf-8") if (stubs / "calls.log").exists() else ""
@@ -104,6 +104,19 @@ def test_staging_lists_only_the_engines_it_may_reach_and_needs_the_vms_address(r
     out, _, rendered = repo("prod", env="SKIP_BUILD=1 VM_INTERNAL_IP=")
     assert out.returncode == 0, out.stderr                                 # production has no list: not needed
     assert "INSTANCE_ALLOWED" not in rendered
+
+
+def test_staging_without_its_site_stops_before_writing_anything(repo):
+    """D53 (P-83): STAGING_SITE missing used to become «<project>-staging», not the staging site: CORS, APP_PUBLIC_URL
+    and the Cloud Run service were written with it before Hosting failed. Now it stops first."""
+    out, calls, rendered = repo("staging", env="SKIP_BUILD=1 STAGING_SITE=")
+    assert out.returncode != 0 and "set STAGING_SITE" in out.stderr
+    assert "services replace" not in calls and not any(w in calls for w in ("add-iam-policy-binding", "deploy --only"))
+
+
+def test_publish_staging_without_its_site_stops_too(publish):
+    out, calls = publish("staging", env="DRY_RUN=1 STAGING_SITE=")
+    assert out.returncode != 0 and "Serve STAGING_SITE" in out.stderr
 
 
 def test_production_publishes_its_own(repo):
@@ -232,7 +245,7 @@ def publish(tmp_path):
     def run(target, env="DRY_RUN=1"):
         (stubs / "calls.log").unlink(missing_ok=True)
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(r)}" && '
-               f'{env} TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default VM_INTERNAL_IP=10.0.0.9 '
+               f'STAGING_SITE=progetto-prova-staging {env} TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default VM_INTERNAL_IP=10.0.0.9 '
                f'ENV_FILE="{posix(env_file)}" bash scripts/publish.sh')
         out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=120, stdin=subprocess.DEVNULL)
         return out, (stubs / "calls.log").read_text(encoding="utf-8") if (stubs / "calls.log").exists() else ""

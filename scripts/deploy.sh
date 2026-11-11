@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Builds and deploys the BFF to Cloud Run and the PWA to Firebase Hosting.
 #
-#   TARGET=staging GCP_PROJECT_ID=<project> scripts/deploy.sh      # mock engine built into the BFF, simulator on
+#   TARGET=staging GCP_PROJECT_ID=<project> VPC_NETWORK=<net> VPC_SUBNET=<subnet> VM_INTERNAL_IP=<ip> STAGING_SITE=<site> scripts/deploy.sh
 #   TARGET=prod    GCP_PROJECT_ID=<project> VPC_NETWORK=<net> VPC_SUBNET=<subnet> scripts/deploy.sh
+# (scripts/publish-all.sh passes them from scripts/publish-settings.conf)
 #
 # Optional: GCP_REGION (default europe-west8), ARTIFACT_REPO (default domotica), VITE_FCM_ENABLED (default false),
 #           SKIP_BUILD=1 to redeploy the last image, SKIP_HOSTING=1 to deploy the BFF only,
@@ -29,7 +30,10 @@ IMAGE="${REGION}-docker.pkg.dev/${PROJECT}/${REPO}/bff:${TAG}"
 # site; Firebase Auth is shared (claims per environment). Both reach the VM through Direct VPC egress.
 case "${TARGET}" in
   staging) MANIFEST="${ROOT}/bff/cloudrun.staging.yaml"; SERVICE=domotica-bff-staging; DATABASE=staging
-           HOSTING_TARGET=staging; SITE="${STAGING_SITE:-${PROJECT}-staging}" ;;
+           HOSTING_TARGET=staging; SITE="${STAGING_SITE:-}"
+           # D53 (P-83): no guessed site: «<project>-staging» is not the staging site, and CORS, APP_PUBLIC_URL and the
+           # Cloud Run service were written with it before Hosting failed
+           [ -n "${SITE}" ] || { echo "set STAGING_SITE (the staging Hosting site, e.g. the one in scripts/publish-settings.conf)" >&2; exit 1; } ;;
   prod)    MANIFEST="${ROOT}/bff/cloudrun.yaml"; SERVICE=domotica-bff; DATABASE="(default)"
            HOSTING_TARGET=prod; SITE="${PROJECT}" ;;
   *)       echo "TARGET must be staging or prod" >&2; exit 1 ;;

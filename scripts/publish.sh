@@ -52,7 +52,8 @@ case "${TARGET}" in
 esac
 # P-67 (D-136): what each TARGET publishes; deploy.sh checks that the commit's manifest says the same
 case "${TARGET}" in
-  staging) echo "ambiente di prova: servizio domotica-bff-staging, database staging, sito ${STAGING_SITE:-${PROJECT}-staging}" ;;
+  staging) [ -n "${STAGING_SITE:-}" ] || stop "Serve STAGING_SITE, il sito Hosting dello staging (D53): publish-all.sh lo passa da scripts/publish-settings.conf."
+           echo "ambiente di prova: servizio domotica-bff-staging, database staging, sito ${STAGING_SITE}" ;;
   prod)    echo "produzione: servizio domotica-bff, database (default), sito ${PROJECT}" ;;
 esac
 
