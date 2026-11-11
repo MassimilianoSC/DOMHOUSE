@@ -346,6 +346,8 @@ class ApartmentEngine:
         # device -> {"cap", "by_mode", "state"}; kept in the store. The wait of each open window, cancelled when it closes
         self.window_off: dict[str, dict] = {}
         self.window_reflexes: dict[str, asyncio.Task] = {}
+        # D03 (P-83): the open windows whose rule's minutes ran out; while one stays open the rule holds (window_in_force)
+        self.window_fired: set[str] = set()
         self.windows_closed_at = float("-inf")      # monotonic: when the last open window closed
         self._window_command = False                # the rule's own turn_off: not a person's (the mode is kept)
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
@@ -985,6 +987,8 @@ class ApartmentEngine:
         if not self.connector_was_up:
             return
         self._restore_after_window()                         # D-218 point 1: first, so the boiler's relay follows now
+        self._keep_window_off()                              # D03: and what is still on with the window open goes off
+        in_force = self.window_in_force()
         for device in self.devices.values():
             if "heating" not in device["capabilities"] or not device["online"]:
                 continue
@@ -996,6 +1000,8 @@ class ApartmentEngine:
             if device_id in self.relay_busy or any(r[0] == device_id for r in self.inflight):
                 continue
             want, temperature, setpoint, frost = self.thermostat(device)
+            if want and in_force and not frost:
+                want = False                                 # D03: never closed by the thermostat with the window open
             if want == self.relay.get(device_id, False):
                 continue
             since = time.monotonic() - self.relay_switched.get(device_id, -1e18)
@@ -1551,6 +1557,30 @@ class ApartmentEngine:
     def window_rule_active(self) -> bool:
         return self.rule("window_open_off")["enabled"] and self.hold is None
 
+    def window_in_force(self) -> dict | None:
+        """D03 (P-83): an open window whose rule's minutes ran out, with the rule active (no hold): what it turned off
+        must stay off, not only be turned off once."""
+        if not self.window_rule_active():
+            return None
+        for window_id in sorted(self.window_fired):
+            d = self.devices.get(window_id)
+            contact = d["capabilities"].get("contact") if d else None
+            if contact and contact.get("open"):
+                return d
+        return None
+
+    def _keep_window_off(self) -> None:
+        """D03 (P-83): once a regulation's minute, while a window is in force, every climate and boiler still on and
+        reachable is turned off again: one offline when the minutes ran out, one whose turn_off failed or was not
+        confirmed. Never twice at once (a command of its still running), at most once a minute (the regulation)."""
+        window = self.window_in_force()
+        if window is None:
+            return
+        minutes = self.rule("window_open_off")["params"]["minutes"]
+        busy = {c["device_id"] for c in self.commands.values() if c["status"] not in FINAL}
+        self._window_turn_off(window["device_id"], f"{window['label']} aperta da oltre {fmt_num(minutes)} minuti",
+                              skip=busy | {r[0] for r in self.inflight} | set(self.relay_busy))
+
     def create_command(self, device_id: str, body: dict, actor: str, correlation_id: str,
                        decision_actor: str | None = None, reasoning: str | None = None) -> dict | None:
         """A command, or None when an automatic one waits for the compressor's pause (R4) and starts after it."""
@@ -1841,6 +1871,7 @@ class ApartmentEngine:
         comes back at the regulation's next round, after a minute with the windows closed (_restore_after_window)."""
         if (task := self.window_reflexes.pop(device_id, None)) and not task.done():
             task.cancel()
+        self.window_fired.discard(device_id)
         if not self.window_open():
             self.windows_closed_at = time.monotonic()
 
@@ -1874,20 +1905,22 @@ class ApartmentEngine:
             open_s = (utcnow() - parse_dt(contact["since"])).total_seconds() if contact.get("since") else 0.0
             self._arm_window(d["device_id"], delay=max(0.0, minutes * seconds_per_minute() - open_s))
 
-    def _window_turn_off(self, window_id: str, why: str) -> None:
+    def _window_turn_off(self, window_id: str, why: str, skip: set[str] | frozenset = frozenset()) -> None:
+        self.window_fired.add(window_id)                     # D03: the rule now holds while this window stays open
         corr = str(uuid.uuid4())
         frost = self.mode == "empty" and self.rule("frost_protection")["enabled"]
         for d in list(self.devices.values()):
             for cap in ("climate", "heating"):
                 st = d["capabilities"].get(cap)
-                if st and st["on"] and d["online"]:
+                if st and st["on"] and d["online"] and d["device_id"] not in skip:
                     # R8: safety stays stronger than the window: in an empty apartment the frost protection goes on
                     extra = "; l'antigelo resta attivo" if cap == "heating" and frost else ""
                     device_id = d["device_id"]
-                    # D-218 point 1: remembered to bring back, and not a person's command (the mode keeps it)
+                    # D-218 point 1: remembered to bring back, and not a person's command (the mode keeps it); D03: a
+                    # second try keeps what was remembered the first time
                     by_mode = device_id in (self.heating_by_mode if cap == "heating" else self.climate_by_mode)
-                    self.window_off[device_id] = {"cap": cap, "by_mode": by_mode, "state": {
-                        k: st[k] for k in ("on", "mode", "setpoint", "fan") if k in st}}
+                    self.window_off.setdefault(device_id, {"cap": cap, "by_mode": by_mode, "state": {
+                        k: st[k] for k in ("on", "mode", "setpoint", "fan") if k in st}})
                     self._window_command = True
                     try:
                         self.create_command(device_id, {"capability": cap, "action": "turn_off"}, "system:engine", corr,
