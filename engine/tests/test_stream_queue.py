@@ -40,10 +40,17 @@ def test_a_full_queue_ends_that_reader_only():
     assert len(drained(reading)) == 3 and reading in e.subscribers
 
 
+def every_route(routes):
+    """The routes one by one: from FastAPI 0.16x (D58) include_router keeps the router whole (original_router)."""
+    for r in routes:
+        inner = getattr(r, "original_router", None)
+        yield from every_route(inner.routes) if inner is not None else (r,)
+
+
 def stream_route(e):
     app = create_contract_app(lambda apartment_id: e, "k" * 16, features=core.ALL_FEATURES, simulated=True,
                               implementation={"name": "prova", "version": "0"}, ping_seconds=5)
-    return next(r for r in app.routes if getattr(r, "path", "").endswith("/stream")).endpoint
+    return next(r for r in every_route(app.routes) if getattr(r, "path", "").endswith("/stream")).endpoint
 
 
 def request(last_id=None):

@@ -101,7 +101,9 @@ describe.each(["mock", "real"])("Amministrazione > Appartamenti, ambiente %s: li
     expect(screen.queryByTestId("apt-form-instance_url")).not.toBeInTheDocument();
     expect(screen.queryByTestId("apt-form-port")).not.toBeInTheDocument();
     expect(screen.queryByTestId("apt-form-italianway_id")).not.toBeInTheDocument();
-    expect(within(dialog).getByTestId("apt-form-connection-locked")).toHaveTextContent("http://10.198.0.2:8101:8101");
+    // P-83, T3d-5: the address already has the port, which is not repeated (before: «…:8101:8101»)
+    expect(within(dialog).getByTestId("apt-form-connection-locked")).toHaveTextContent("http://10.198.0.2:8101");
+    expect(within(dialog).getByTestId("apt-form-connection-locked")).not.toHaveTextContent(":8101:8101");
     expect(within(dialog).getByTestId("apt-form-connection-locked")).toHaveTextContent(t("admin.apartments.connectionByPlatform"));
     expect(within(dialog).getByTestId("apt-form-italianway-locked")).toHaveTextContent("IW-7");
     expect(within(dialog).getByTestId("apt-form-italianway-locked")).toHaveTextContent(t("admin.apartments.italianwayByPlatform"));

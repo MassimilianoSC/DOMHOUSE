@@ -28,7 +28,11 @@ function Probe() {
 function bff() {
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const path = new URL(url).pathname;
-    calls.push(`${init?.method ?? "GET"} ${path}`);
+    // P-83, T3d-2: the token's removal counts only with the identity of the person leaving; without it the real BFF
+    // answers 401 and the token stays on the account
+    const who = (init?.headers as Record<string, string> | undefined)?.["X-Dev-User"];
+    calls.push(`${init?.method ?? "GET"} ${path}${path === "/app/push/subscribe" && !who ? " SENZA IDENTITÀ" : ""}`);
+    if (path === "/app/push/subscribe" && !who) return new Response(JSON.stringify({ error: "unauthorized", message: "Sessione assente" }), { status: 401 });
     if (path === "/app/me") {
       const email = (init?.headers as Record<string, string>)["X-Dev-User"];
       const uid = email?.split("@")[0];

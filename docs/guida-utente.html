@@ -941,7 +941,13 @@ le «Decisioni» (prenotazione annullata, antigelo non attivo) o il riepilogo de
 comunque come notifica del telefono).</p>
 </li>
 <li>
-<p><strong>Se stai già guardando quell&#x27;appartamento</strong> non compare un secondo avviso.</p>
+<p><strong>Se stai già guardando quell&#x27;appartamento</strong>, approvazioni e dispositivi offline non compaiono una seconda volta,
+perché la pagina li mostra già. Gli altri avvisi compaiono comunque (dal lotto 40): antigelo non attivo, azioni
+programmate non eseguite, prenotazioni, riepiloghi, sistema domotico non raggiungibile.</p>
+</li>
+<li>
+<p><strong>Se una notifica sostituisce una precedente</strong> (per esempio lo stesso dispositivo di nuovo offline), il telefono
+suona di nuovo (dal lotto 40).</p>
 </li>
 <li>
 <p><strong>Se non sei collegato</strong>, prima devi accedere e poi aprire la pagina da solo.</p>
@@ -979,7 +985,7 @@ sessione.</p>
 <tbody>
 <tr><td data-label="Categoria" class="align-left">«Approvazioni richieste»</td><td data-label="Notifica" class="align-left">«…: approvazione richiesta», con la proposta oppure «Il motore chiede il tuo consenso»</td><td data-label="Quando arriva" class="align-left">Quando il motore apre una richiesta (non per quelle in coda dietro un&#x27;altra)</td><td data-label="Dove porta" class="align-left">«Approvazioni»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: dispositivo offline», «… non risponde da oltre … minuti»</td><td data-label="Quando arriva" class="align-left">Dopo i minuti della regola «Avviso dispositivo offline» (15 all&#x27;inizio); regola spenta, niente avviso</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
-<tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall&#x27;app non arrivano e le regole automatiche potrebbero essere ferme.»</td><td data-label="Quando arriva" class="align-left">Sistema domotico fermo o irraggiungibile oltre la stessa soglia; una volta per episodio</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
+<tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall&#x27;app non arrivano e le regole automatiche potrebbero essere ferme.» (dopo due ore «N ore», dopo due giorni «N giorni»: è il tempo da quando tace, D75)</td><td data-label="Quando arriva" class="align-left">Sistema domotico fermo o irraggiungibile oltre la stessa soglia; una volta per episodio</td><td data-label="Dove porta" class="align-left">«Panoramica»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Dispositivi e sistema domotico offline»</td><td data-label="Notifica" class="align-left">«…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo»</td><td data-label="Quando arriva" class="align-left">A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio</td><td data-label="Dove porta" class="align-left">«Decisioni»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Prenotazioni»</td><td data-label="Notifica" class="align-left">«…: prenotazione annullata, appartamento rimesso a vuoto»</td><td data-label="Quando arriva" class="align-left">Disdetta dopo che l&#x27;appartamento era già stato preparato per l&#x27;arrivo</td><td data-label="Dove porta" class="align-left">«Decisioni»</td></tr>
 <tr><td data-label="Categoria" class="align-left">«Prenotazioni» (pre-arrivo, check-out, casa vuota) oppure «Dispositivi e sistema domotico offline» (le altre)</td><td data-label="Notifica" class="align-left">«…: azione programmata non eseguita» con il motivo, oppure «N azioni programmate non eseguite. La prima: …» se più d&#x27;una entro un minuto; dopo uno spegnimento programmato «Durante la manutenzione N azioni programmate non sono state eseguite»</td><td data-label="Quando arriva" class="align-left">Un&#x27;azione programmata rifiutata alla sua ora o saltata perché il sistema era fermo (dal lotto 38); dopo uno spegnimento programmato le azioni saltate non arrivano una per una</td><td data-label="Dove porta" class="align-left">«Programmazione»</td></tr>
@@ -1099,6 +1105,7 @@ lettura».</p>
 <tr><td data-label="Zona della pagina" class="align-left">In alto</td><td data-label="Cosa vedi" class="align-left">Il nome e «In tempo reale»</td><td data-label="Cosa vuol dire" class="align-left">La pagina si aggiorna da sola</td></tr>
 <tr><td data-label="Zona della pagina" class="align-left">In alto</td><td data-label="Cosa vedi" class="align-left">«Riconnessione…»</td><td data-label="Cosa vuol dire" class="align-left">Sta ricollegandosi: non prendere per buono un valore vecchio</td></tr>
 <tr><td data-label="Zona della pagina" class="align-left">In alto, quando torni sulla pagina</td><td data-label="Cosa vedi" class="align-left">«Riconnessione…» per un attimo</td><td data-label="Cosa vuol dire" class="align-left">Con la pagina in sottofondo l&#x27;app non si aggiorna in tempo reale; quando torni si rimette in pari da sola</td></tr>
+<tr><td data-label="Zona della pagina" class="align-left">In alto (dal lotto 40)</td><td data-label="Cosa vedi" class="align-left">«Dati non aggiornati» al posto di «In tempo reale», con «Sistema domotico non raggiungibile»</td><td data-label="Cosa vuol dire" class="align-left">Il collegamento col server c&#x27;è, ma il sistema domotico non risponde: i valori mostrati possono essere vecchi</td></tr>
 <tr><td data-label="Zona della pagina" class="align-left">La striscia di salute</td><td data-label="Cosa vedi" class="align-left">«In salute», «Degradata» o «Ferma», poi «… dispositivi connessi»</td><td data-label="Cosa vuol dire" class="align-left">Lo stato del sistema domotico e il collegamento con i dispositivi</td></tr>
 <tr><td data-label="Zona della pagina" class="align-left">La striscia di salute</td><td data-label="Cosa vedi" class="align-left">«Dettagli tecnici»</td><td data-label="Cosa vuol dire" class="align-left">Apre «Connettore» («attivo» o «fermo»), «Modello», «Versione» con il contratto e «Ultimo evento»</td></tr>
 <tr><td data-label="Zona della pagina" class="align-left">La striscia di salute</td><td data-label="Cosa vedi" class="align-left">«Sistema domotico non raggiungibile»</td><td data-label="Cosa vuol dire" class="align-left">Il sistema domotico non risponde</td></tr>
@@ -1115,7 +1122,7 @@ lettura».</p>
 <tr><td data-label="Casella" class="align-left">«Modalità»</td><td data-label="Cosa vedi" class="align-left">Comfort, Eco o Casa vuota; durante una forzatura, sotto, «forzata fino alle …»</td><td data-label="Di che colore è" class="align-left">Il colore della modalità: Comfort arancione chiaro, Eco verde salvia, Casa vuota azzurro ardesia</td></tr>
 <tr><td data-label="Casella" class="align-left">«Occupazione»</td><td data-label="Cosa vedi" class="align-left">«Vuoto», «Occupato» o «Prenotato»</td><td data-label="Di che colore è" class="align-left">«Occupato» verde, «Prenotato» ambra, «Vuoto» tortora</td></tr>
 <tr><td data-label="Casella" class="align-left">«Prossimo check-in» o «Prossimo check-out»</td><td data-label="Cosa vedi" class="align-left">Il primo fra arrivo e partenza; senza nessuno dei due, «Prossimo evento» con un trattino</td><td data-label="Di che colore è" class="align-left">Bianca</td></tr>
-<tr><td data-label="Casella" class="align-left">«Finestre»</td><td data-label="Cosa vedi" class="align-left">«Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore»</td><td data-label="Di che colore è" class="align-left">Verde se sono tutte chiuse, ambra se una è aperta; bianca senza sensori</td></tr>
+<tr><td data-label="Casella" class="align-left">«Finestre»</td><td data-label="Cosa vedi" class="align-left">«Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore». Dal lotto 40, se un sensore è senza segnale: «Stato non noto» (o «Nessuna aperta» se gli altri sono chiusi) con la riga «Senza segnale: …» e le stanze</td><td data-label="Di che colore è" class="align-left">Verde se sono tutte chiuse, ambra se una è aperta; bianca senza sensori; neutra se un sensore è senza segnale, perché di quella finestra non si sa nulla</td></tr>
 <tr><td data-label="Casella" class="align-left">«Consumo di oggi»</td><td data-label="Cosa vedi" class="align-left">I kWh di oggi; un trattino se la funzione Consumi è spenta</td><td data-label="Di che colore è" class="align-left">Bianca, con il numero in arancione</td></tr>
 <tr><td data-label="Casella" class="align-left">«Dispositivi online»</td><td data-label="Cosa vedi" class="align-left">Quanti rispondono, per esempio 5/6; sotto, «… offline» se qualcuno manca</td><td data-label="Di che colore è" class="align-left">Verde se rispondono tutti, ambra se qualcuno è offline</td></tr>
 </tbody></table></div>
@@ -1203,7 +1210,7 @@ categoria nelle notifiche.</p>
 <tr><td data-label="Cosa vedi" class="align-left">La descrizione, in grande</td><td data-label="Cosa vuol dire" class="align-left">Che cosa chiede</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Perché il motore lo propone», con il testo sotto</td><td data-label="Cosa vuol dire" class="align-left">Il motivo, senza riquadro</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Azione proposta» seguita dall&#x27;azione in grassetto</td><td data-label="Cosa vuol dire" class="align-left">Che cosa partirà</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta»</td><td data-label="Cosa vuol dire" class="align-left">Quanto tempo resta per decidere</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta»</td><td data-label="Cosa vuol dire" class="align-left">Quanto tempo resta per decidere; dal lotto 40, a «scaduta» i pulsanti si disattivano</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">Accanto: «Alla scadenza verrà respinta», «Alla scadenza verrà eseguita» o «Alla scadenza resta in attesa»</td><td data-label="Cosa vuol dire" class="align-left">Cosa succede se nessuno decide</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">Sotto una riga: «Nota (facoltativa)» e i pulsanti</td><td data-label="Cosa vuol dire" class="align-left">Solo nelle richieste in attesa, per chi può decidere</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">In fondo: «Approvata da … …» o «Respinta da … …» con la nota, poi l&#x27;«ID richiesta»</td><td data-label="Cosa vuol dire" class="align-left">Solo nelle richieste già decise o scadute</td></tr>
@@ -1242,7 +1249,7 @@ per 24 mesi.</p>
 <tbody>
 <tr><td data-label="Ogni voce mostra" class="align-left">Prima linea, in nero: il tipo di azione e i valori prima → dopo</td><td data-label="Valori possibili" class="align-left">Per esempio «Modalità» con «comfort → casa vuota»</td></tr>
 <tr><td data-label="Ogni voce mostra" class="align-left">Il tipo di azione, in italiano</td><td data-label="Valori possibili" class="align-left">Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata»</td></tr>
-<tr><td data-label="Ogni voce mostra" class="align-left">Altri esempi di tipo</td><td data-label="Valori possibili" class="align-left">«Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo»</td></tr>
+<tr><td data-label="Ogni voce mostra" class="align-left">Altri esempi di tipo</td><td data-label="Valori possibili" class="align-left">«Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo»; dal lotto 40 «Modalità: comando in sospeso» (un dispositivo non raggiungibile durante il cambio di modalità: il comando parte quando torna raggiungibile)</td></tr>
 <tr><td data-label="Ogni voce mostra" class="align-left">A destra della prima linea: l&#x27;esito, in un badge colorato</td><td data-label="Valori possibili" class="align-left">«Applicata» verde; «Respinta» e «Non riuscita» rosso mattone; «in attesa di approvazione» ambra; «Informativa» tortora</td></tr>
 <tr><td data-label="Ogni voce mostra" class="align-left">Seconda linea, in grigio: la data · chi ha deciso · su cosa</td><td data-label="Valori possibili" class="align-left">«Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; «appartamento», «dispositivo», «regole», «programmazione»</td></tr>
 <tr><td data-label="Ogni voce mostra" class="align-left">Chi ha deciso, se ha eliminato l&#x27;account</td><td data-label="Valori possibili" class="align-left">«utente rimosso»</td></tr>
@@ -1345,7 +1352,7 @@ un colpo solo («Ricerca per ID richiesta in tutto lo storico · risultati: …�
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa puoi fare</th><th scope="col" class="align-left">Cosa succede</th></tr></thead>
 <tbody>
-<tr><td data-label="Cosa vedi" class="align-left">Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso»</td><td data-label="Cosa puoi fare" class="align-left">Toccare una delle pillole: la scelta è scritta in scuro</td><td data-label="Cosa succede" class="align-left">«Soggiorno in corso» compare solo con ospiti dentro e una prenotazione conosciuta dall&#x27;app</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso»</td><td data-label="Cosa puoi fare" class="align-left">Toccare una delle pillole: la scelta è scritta in scuro</td><td data-label="Cosa succede" class="align-left">«Soggiorno in corso» compare durante una prenotazione conosciuta dall&#x27;app; dal lotto 40 anche se il check-in non è stato registrato, e sparisce al check-out</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">La casella «Totale periodo» in «kWh», con il numero in arancione</td><td data-label="Cosa puoi fare" class="align-left">Leggere il totale</td><td data-label="Cosa succede" class="align-left">I numeri si aggiornano ogni minuto</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">La casella «Ora con più consumo» (oggi) o «Giorno con più consumo» (periodi più lunghi)</td><td data-label="Cosa puoi fare" class="align-left">Leggere il picco</td><td data-label="Cosa succede" class="align-left">Sotto il valore, «ore …» oppure la data</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">La casella «Ore di clima evitate»</td><td data-label="Cosa puoi fare" class="align-left">Leggere le ore</td><td data-label="Cosa succede" class="align-left">Compare solo quando il motore le calcola; oggi non compare</td></tr>
@@ -1597,7 +1604,8 @@ dispositivi e le Decisioni.</p>
 </li>
 <li>
 <p><strong>Se c&#x27;è una finestra aperta</strong>, prima di partire l&#x27;app avvisa con «Finestra aperta» e «Finestra aperta in …:
-durante la forzatura il clima resta acceso.» (o «Finestre aperte in …: …»): scegli «Forza comunque» o «Annulla».</p>
+durante la forzatura il clima resta acceso.» (o «Finestre aperte in …: …»): scegli «Forza comunque» o «Annulla».
+Dal lotto 40 avvisa anche se un sensore è senza segnale: «Sensore della finestra senza segnale in …».</p>
 </li>
 <li>
 <p><strong>Compare</strong> «Forzatura … attiva fino alle …» con «ancora …» e il pulsante «Annulla forzatura».</p>
@@ -1617,10 +1625,27 @@ cui riparte).</p>
 </li>
 <li>
 <p><strong>Un cambio di modalità programmato</strong> (per esempio il check-out) aspetta la fine della forzatura (nelle Decisioni
-«Azione rimandata», «rimandata per la forzatura»).</p>
+«Azione rimandata», «rimandata per la forzatura»). Dal lotto 40 aspetta anche una richiesta di approvazione che
+scade durante la forzatura con «Alla scadenza verrà eseguita».</p>
 </li>
 <li>
 <p><strong>L&#x27;antigelo</strong> resta attivo.</p>
+</li>
+</ul>
+<p><strong>Se durante la forzatura cambi modalità a mano</strong> (D09, risposta 1085):</p>
+<ul>
+<li>
+<p><strong>Vale per:</strong> i pulsanti della modalità, un&#x27;approvazione accolta a mano, una richiesta all&#x27;assistente.</p>
+</li>
+<li>
+<p><strong>La forzatura continua</strong> fino alla stessa ora, nella modalità nuova: il riquadro diventa «Forzatura eco attiva fino
+alle …».</p>
+</li>
+<li>
+<p><strong>Nelle Decisioni:</strong> «Forzatura», con «comfort → eco fino alle …».</p>
+</li>
+<li>
+<p><strong>Alla fine</strong> resta la modalità scelta. Non compare «Forzatura annullata».</p>
 </li>
 </ul>
 <p><strong>Quando finisce:</strong></p>
@@ -1642,7 +1667,7 @@ regole ripartono.</p>
 <tr><td data-label="Dispositivo" class="align-left">Prese e interruttori</td><td data-label="Cosa puoi fare" class="align-left">Tocca l&#x27;interruttore («Accendi …» / «Spegni …»)</td><td data-label="Cosa succede" class="align-left">Lo stato diventa «Acceso» o «Spento»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Caldaia</td><td data-label="Cosa puoi fare" class="align-left">«Attiva …» / «Disattiva …» abilita o disabilita il riscaldamento</td><td data-label="Cosa succede" class="align-left">Leggi «Riscaldamento abilitato» / «Riscaldamento disabilitato»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Caldaia e climatizzatore</td><td data-label="Cosa puoi fare" class="align-left">«Diminuisci temperatura» e «Aumenta temperatura» accanto a «Temperatura», a passi di 0,5 °C, entro «da … a … °C»</td><td data-label="Cosa succede" class="align-left">Fuori dai limiti il comando è rifiutato («Il setpoint deve essere tra … e …»)</td></tr>
-<tr><td data-label="Dispositivo" class="align-left">Climatizzatore</td><td data-label="Cosa puoi fare" class="align-left">L&#x27;interruttore</td><td data-label="Cosa succede" class="align-left">Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all&#x27;inizio)</td></tr>
+<tr><td data-label="Dispositivo" class="align-left">Climatizzatore</td><td data-label="Cosa puoi fare" class="align-left">L&#x27;interruttore</td><td data-label="Cosa succede" class="align-left">Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all&#x27;inizio). Dal lotto 40 un climatizzatore a infrarossi con misuratore risulta acceso se assorbe corrente, anche quando il comando era «non confermato»</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Climatizzatore, «Modo»</td><td data-label="Cosa puoi fare" class="align-left">Scegli dalla tendina: Caldo, Freddo, Deumidifica, Ventilazione</td><td data-label="Cosa succede" class="align-left">Il modo cambia</td></tr>
 <tr><td data-label="Dispositivo" class="align-left">Climatizzatore, «Ventola»</td><td data-label="Cosa puoi fare" class="align-left">Scegli dalla tendina: Auto, Bassa, Media, Alta</td><td data-label="Cosa succede" class="align-left">La ventola cambia</td></tr>
 </tbody></table></div>
@@ -1875,7 +1900,8 @@ modifica, tu la controlli e la applichi. Niente cambia finché non premi «Appli
 «…/… caratteri») e premi «Proponi».</p>
 </li>
 <li>
-<p><strong>Leggi</strong> «Preparo la proposta…», poi «Modifiche proposte».</p>
+<p><strong>Leggi</strong> «Preparo la proposta…», poi «Modifiche proposte». Dal lotto 40 una frase con un numero cambia il valore
+(«dopo 10 minuti» cambia i minuti) e non spegne la regola; la spegne solo una frase senza numeri e senza «non».</p>
 </li>
 <li>
 <p><strong>Controlla</strong> regola, campo, valore prima e dopo (per esempio «Finestra aperta spegne il clima, Minuti da 5 a
@@ -1942,7 +1968,8 @@ tocca un suggerimento.</p>
 <p><strong>La tua domanda</strong> compare a destra, in una bolla colorata.</p>
 </li>
 <li>
-<p><strong>Leggi</strong> «Sto elaborando…», poi la risposta a sinistra sotto il nome «Assistente», senza bolla né icona.</p>
+<p><strong>Leggi</strong> «Sto elaborando…», poi la risposta a sinistra sotto il nome «Assistente», senza bolla né icona.
+Dal lotto 40 la risposta arriva anche se nel frattempo cambi pagina o ricarichi.</p>
 </li>
 <li>
 <p><strong>Un badge compare solo se serve</strong>: «Richiede approvazione» (poi «Approvata», «Respinta» o «Scaduta») oppure
@@ -2114,6 +2141,10 @@ oppure una modalità, senza «non», condizioni od orari.</p>
 </li>
 <li>
 <p><strong>Con ospiti dentro</strong> chiede conferma come sempre.</p>
+</li>
+<li>
+<p><strong>Una presa</strong> si comanda solo nominandola con una parola del suo nome, per esempio «la stufetta» (dal lotto 40):
+«accendi la luce» non accende più una presa qualsiasi.</p>
 </li>
 <li>
 <p><strong>In fondo alla risposta</strong> leggi «Risposta rapida: l&#x27;assistente completo non ha risposto in tempo.» (oppure «… non
@@ -2489,7 +2520,7 @@ appartamento può avere un&#x27;eccezione.».</p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa puoi fare</th><th scope="col" class="align-left">Cosa succede</th></tr></thead>
 <tbody>
-<tr><td data-label="Cosa vedi" class="align-left">Nove interruttori in colonna, con i nomi del menu e una riga di spiegazione sotto ciascuno (tabella sotto)</td><td data-label="Cosa puoi fare" class="align-left">Accendere o spegnere una funzione per tutta l&#x27;organizzazione</td><td data-label="Cosa succede" class="align-left">Ogni cambio si salva subito («Funzioni aggiornate»)</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">Nove interruttori in colonna, con i nomi del menu e una riga di spiegazione sotto ciascuno (tabella sotto)</td><td data-label="Cosa puoi fare" class="align-left">Accendere o spegnere una funzione per tutta l&#x27;organizzazione</td><td data-label="Cosa succede" class="align-left">Ogni cambio si salva subito («Funzioni aggiornate»); dal lotto 40, mentre salva, gli interruttori sono grigi</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Ripristina tutte»</td><td data-label="Cosa puoi fare" class="align-left">Riaccendere tutto</td><td data-label="Cosa succede" class="align-left">Tutte le funzioni tornano accese</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">Lo stesso elenco per ogni appartamento, compatto e senza spiegazioni, con «eredita dall&#x27;organizzazione» oppure «eccezione per questo appartamento»</td><td data-label="Cosa puoi fare" class="align-left">Fare un&#x27;eccezione per un appartamento</td><td data-label="Cosa succede" class="align-left">L&#x27;eccezione sostituisce la scelta dell&#x27;organizzazione e può anche riaccendere una funzione spenta per tutti</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Torna all&#x27;organizzazione»</td><td data-label="Cosa puoi fare" class="align-left">Togliere l&#x27;eccezione</td><td data-label="Cosa succede" class="align-left">L&#x27;appartamento segue di nuovo l&#x27;organizzazione</td></tr>
@@ -3357,7 +3388,8 @@ comfort; il climatizzatore, se nella stanza c&#x27;è un sensore, scalda o raffr
 <p><strong>Quando Italianway comunica l&#x27;arrivo effettivo</strong> («Check-in» nelle Decisioni) l&#x27;occupazione diventa «Occupato».</p>
 </li>
 <li>
-<p><strong>Da ora</strong> l&#x27;assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità.</p>
+<p><strong>Da ora</strong> l&#x27;assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità. Dal lotto 40 la
+chiede già dall&#x27;inizio della prenotazione, anche se l&#x27;arrivo effettivo non è stato comunicato.</p>
 </li>
 <li>
 <p><strong>Se vuoi scaldare prima</strong> o cambiare qualcosa, usa «Modalità» o i comandi in Panoramica, oppure l&#x27;assistente.</p>
@@ -3448,6 +3480,10 @@ l&#x27;assistenza.</p>
 <p><strong>Dopo la stessa soglia</strong> arriva una sola notifica «…: sistema domotico non raggiungibile». Dice «Il connettore
 domotico risulta fermo» se il sistema risponde ma ha perso i dispositivi; dal lotto 38 dice «Il sistema domotico
 non risponde da N minuti: …» se non risponde affatto (macchina spenta, rete interrotta).</p>
+</li>
+<li>
+<p><strong>La durata è il tempo da quando tace</strong> (D75): «N minuti» fino a due ore, poi «N ore», dopo due giorni «N giorni».
+Dopo una sospensione degli avvisi può dire, per esempio, «da 3 giorni».</p>
 </li>
 <li>
 <p><strong>Nelle Decisioni</strong>, nel primo caso: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi
@@ -3770,7 +3806,7 @@ massimo che hai scelto.</p>
 <tbody>
 <tr><td data-label="Regola" class="align-left">«Finestra aperta spegne il clima»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 5, da 1 a 30</td></tr>
 <tr><td data-label="Regola" class="align-left">«Limiti del setpoint»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c&#x27;è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.»</td><td data-label="Valori di partenza e limiti" class="align-left">Vedi la tabella sotto</td></tr>
-<tr><td data-label="Regola" class="align-left">«Antigelo a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota mantiene almeno questa temperatura.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Temperatura (°C)»: 8, da 5 a 12</td></tr>
+<tr><td data-label="Regola" class="align-left">«Antigelo a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare.» (D31)</td><td data-label="Valori di partenza e limiti" class="align-left">«Temperatura (°C)»: 8, da 5 a 12</td></tr>
 <tr><td data-label="Regola" class="align-left">«Antimuffa a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota, se l&#x27;umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Umidità (%)»: 65, da 50 a 80</td></tr>
 <tr><td data-label="Regola" class="align-left">«Pre-arrivo»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Porta la casa in comfort prima dell&#x27;arrivo degli ospiti.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Ore prima del check-in»: 2, da 0 a 6</td></tr>
 <tr><td data-label="Regola" class="align-left">«Risparmio al check-out»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180</td></tr>
@@ -3795,6 +3831,9 @@ massimo che hai scelto.</p>
 stanza. Sospesa durante una forzatura; alla fine riparte. L&#x27;antigelo è più forte. Dal lotto 38, se il sistema
 domotico si riavvia con una finestra aperta, la regola riparte da sola: il clima si spegne allo scadere dei minuti
 contati da quando la finestra si è aperta; se si è aperta mentre il sistema era fermo, dalla ripartenza.
+Dal lotto 40, finché il sensore non si è fatto risentire dopo il riavvio la finestra resta «aperta» e la caldaia
+resta spenta; la regola tiene spenti clima e caldaia per tutto il tempo in cui la finestra resta aperta, anche se
+un dispositivo era offline o lo spegnimento non era riuscito.
 Quando la modalità comfort accende un climatizzatore dopo la pausa del compressore, il climatizzatore resta regolato
 dal comfort (dal lotto 39).
 <strong>Alla chiusura della finestra riscaldamento e clima riprendono da soli</strong> (dal lotto 38): quando si chiude l&#x27;ultima
@@ -3807,6 +3846,14 @@ fra due accensioni. Nelle Decisioni compare «Finestra chiusa: … riacceso».</
 <p><strong>«Antigelo a casa vuota»</strong>: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
 0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve
 un sensore: senza, «Antigelo non attivo».</p>
+</li>
+<li>
+<p><strong>Antigelo con la regola spenta</strong> (D31, risposta 1089): al passaggio a casa vuota la caldaia va comunque alla
+temperatura dell&#x27;antigelo. Ma se qualcuno la spegne o abbassa la temperatura a mano, resta così: vince la scelta a
+mano, e senza sensore non arriva nessun avviso.</p>
+</li>
+<li>
+<p><strong>Con la regola accesa</strong> (come all&#x27;inizio) la caldaia torna alla soglia anche dopo uno spegnimento a mano.</p>
 </li>
 <li>
 <p><strong>«Antimuffa a casa vuota»</strong>: scrive «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa
@@ -3822,11 +3869,15 @@ prenotazioni che arrivano o cambiano dopo: le azioni già in programma non vengo
 </li>
 <li>
 <p><strong>«Pausa minima del compressore»</strong>: dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico
-viene rimandato, uno di una persona o dell&#x27;assistente può essere rifiutato se manca più di qualche secondo.</p>
+viene rimandato, uno di una persona o dell&#x27;assistente può essere rifiutato se manca più di qualche secondo.
+Dal lotto 40 vale anche se lo spegnimento è ancora in corso («riprova tra N secondi»), e un&#x27;accensione rimandata
+non parte se nel frattempo è cambiata la modalità, è iniziata una forzatura o qualcuno ha comandato il clima
+(«rimandata … e non eseguita»).</p>
 </li>
 <li>
 <p><strong>«Avviso dispositivo offline»</strong>: dopo la soglia scrive «Dispositivo offline» nelle Decisioni e manda la notifica;
-la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto.</p>
+la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto. Dal lotto 40
+vale anche per un dispositivo già scollegato quando il sistema riparte, e l&#x27;app mostra quando è stato visto l&#x27;ultima volta.</p>
 </li>
 </ul>
 <p><strong>«Limiti del setpoint»</strong> (con effetto dal lotto 31):</p>
@@ -3911,7 +3962,26 @@ prenotazione»).</p>
 manda la notifica «Prenotazioni», salvo un altro soggiorno in corso o un altro pre-arrivo già eseguito.</p>
 </li>
 <li>
+<p><strong>Due ospiti di fila</strong> (dal lotto 40): il check-out del primo non mette la casa a vuoto se il secondo è già
+dentro, se il suo pre-arrivo è già partito o se arriva entro le ore del pre-arrivo. Nelle Decisioni compare
+«Check-out: casa non svuotata».</p>
+</li>
+<li>
+<p><strong>Prenotazione modificata dopo il pre-arrivo</strong> (dal lotto 40): non rimette il comfort al posto della tua scelta.
+Se l&#x27;arrivo slitta più avanti, la casa torna subito a vuoto e si riscalda al nuovo pre-arrivo («Arrivo spostato:
+casa vuota»).</p>
+</li>
+<li>
+<p><strong>Un messaggio di prenotazione arrivato in ritardo</strong>, più vecchio dell&#x27;ultimo già applicato, viene ignorato
+(dal lotto 40, «Prenotazione: evento vecchio ignorato»).</p>
+</li>
+<li>
 <p><strong>Un cambio di modalità programmato durante una forzatura</strong> aspetta la sua fine («Azione rimandata»).</p>
+</li>
+<li>
+<p><strong>Un cambio di modalità con un dispositivo non raggiungibile</strong> (dal lotto 40): la caldaia prende subito la
+temperatura della nuova modalità; il climatizzatore riceve il comando quando torna raggiungibile, salvo un altro
+cambio o un comando di una persona nel frattempo («Modalità: comando in sospeso»).</p>
 </li>
 <li>
 <p><strong>Dopo un riavvio del sistema</strong>, un&#x27;azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).</p>

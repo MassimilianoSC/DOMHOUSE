@@ -19,6 +19,14 @@ order, also before the new BFF is published (which reads the per-environment one
   REPOSITORY=firestore GCP_PROJECT_ID=<project> python scripts/set_claims.py --platform-list
 --platform-add gives the platform manager role (P-36, D-62), matched with the verified email at sign-in; then the role
 is managed from the app. No claims, no session revoked.
+R4-1 (P-83): before 82759e9 a person removed by an administrator kept the claims, and came back at the next sign-in.
+--orphan-claims lists, READ ONLY, the accounts whose claims of this environment name an organisation where they have
+no record (nor an invitation waiting): the people removed before the fix, and also anyone enabled with --create who
+never signed in (legitimate: the committente chooses name by name). --apply --email removes this environment's claims
+of ONE of them (and revokes its sessions in production, so a token already issued cannot use them for its last hour):
+  REPOSITORY=firestore GCP_PROJECT_ID=<project> python scripts/set_claims.py --orphan-claims
+  REPOSITORY=firestore GCP_PROJECT_ID=<project> python scripts/set_claims.py --orphan-claims --apply --email <email>
+  ... FIRESTORE_DATABASE=staging ... --orphan-claims --env staging     # the staging database with --env staging
 """
 import argparse
 import asyncio
@@ -55,6 +63,70 @@ def migrated(current: dict | None) -> dict | None:
         return None
     claims["prod"] = {"tenant_id": claims["tenant_id"], "role": claims.get("role")}
     return claims
+
+
+def own_claims(claims: dict | None, env: str) -> dict:
+    """This environment's {tenant_id, role}, as the BFF reads them (bff.auth.env_claims): its own key, and outside
+    staging the flat ones of before P-67."""
+    claims = claims or {}
+    if isinstance(claims.get(env), dict):
+        return claims[env]
+    if env != "staging" and claims.get("tenant_id"):
+        return {"tenant_id": claims.get("tenant_id"), "role": claims.get("role")}
+    return {}
+
+
+async def orphans(repo, accounts_list, env: str) -> list[tuple]:
+    """(account, tenant_id, role, record or None) for every account whose claims of env name an organisation where it
+    has no record and no invitation waiting."""
+    found = []
+    for u in accounts_list:
+        own = own_claims(u.custom_claims, env)
+        tenant_id = own.get("tenant_id")
+        if not tenant_id:
+            continue
+        record = await repo.get_user(u.uid)
+        if record is not None and record.tenant_id == tenant_id:
+            continue
+        invited = await repo.get_user_by_email(u.email) if u.email else None
+        if invited is not None and invited.uid.startswith("inv-") and invited.tenant_id == tenant_id:
+            continue                                        # an invitation waiting there: the claims will be used
+        found.append((u, tenant_id, own.get("role"), record))
+    return found
+
+
+def orphan_command(env: str, apply: bool, email: str | None) -> int:
+    repo = _firestore_repository("--orphan-claims")
+    from bff.config import get_settings
+    database = get_settings().firestore_database
+    if (env == "staging") != (database == "staging"):
+        raise SystemExit(f"--env {env} con il database «{database}»: per lo staging FIRESTORE_DATABASE=staging e "
+                         "--env staging, per la produzione nessuno dei due")
+    if apply and not email:
+        raise SystemExit("--apply vuole --email: una persona alla volta, fra quelle dell'elenco")
+    init()
+    accounts_list = list(auth.list_users().iterate_all())
+
+    async def go():
+        return await orphans(repo, accounts_list, env)
+    found = asyncio.run(go())
+    if not apply:
+        for u, tenant_id, role, record in found:
+            where = "nessun record" if record is None else f"record in un'altra organizzazione ({record.tenant_id})"
+            print(f"{u.email or u.uid}: claim {env} -> {tenant_id} {role}; {where}")
+        print(f"{len(found)} account con claim senza record in quella organizzazione (niente scritto)")
+        return len(found)
+    target = next((f for f in found if (f[0].email or "").lower() == email.strip().lower()), None)
+    if target is None:
+        raise SystemExit(f"{email} non è nell'elenco di --orphan-claims: non tocco niente")
+    from bff.accounts import without_env_claims
+    u, tenant_id = target[0], target[1]
+    left = without_env_claims(u.custom_claims, env, tenant_id) or {}
+    auth.set_custom_user_claims(u.uid, left)
+    if env != "staging":
+        auth.revoke_refresh_tokens(u.uid)
+    print(f"{u.email}: claim {env} di {tenant_id} tolti" + ("" if env == "staging" else ", sessioni revocate"))
+    return 1
 
 
 def init() -> None:
@@ -190,10 +262,19 @@ def main() -> None:
     p.add_argument("--create", action="store_true", help="create the Firebase user if missing")
     p.add_argument("--send-reset-link", action="store_true", help="print a password setup link")
     p.add_argument("--from-repo", action="store_true", help="process every invited (inv-*) user in the repository")
-    p.add_argument("--env", choices=ENVS, default="prod", help="the environment of the claims (P-67), prod by default")
+    p.add_argument("--env", choices=ENVS, default=None,
+                   help="the environment of the claims (P-67), prod by default; required with --from-repo (D26)")
     p.add_argument("--migrate-claims", action="store_true", help="rewrite the flat claims per environment (P-67)")
-    p.add_argument("--apply", action="store_true", help="with --migrate-claims: write (without: only show)")
+    p.add_argument("--apply", action="store_true", help="with --migrate-claims or --orphan-claims: write (without: only show)")
+    p.add_argument("--orphan-claims", action="store_true", help="R4-1: claims naming an organisation without the record")
     a = p.parse_args()
+    explicit_env = a.env
+    a.env = a.env or "prod"
+    if a.orphan_claims:
+        if a.tenant or a.role or a.from_repo or a.migrate_claims or a.tenant_name is not None or a.platform_add:
+            p.error("--orphan-claims va usato solo con --env, --apply e --email")
+        orphan_command(a.env, a.apply, a.email)
+        return
     if a.migrate_claims:
         init()
         migrate_claims(a.apply)
@@ -210,6 +291,16 @@ def main() -> None:
         return
     init()
     if a.from_repo:
+        # D26 (P-83): the invitations are read from the database open now; their claims must be written for that same
+        # environment, said explicitly, or a staging invitation became production's (and production sessions revoked)
+        if explicit_env is None:
+            p.error("--from-repo vuole --env prod oppure --env staging, quello del database da cui legge gli inviti")
+        from bff.config import get_settings
+        database = get_settings().firestore_database
+        if get_settings().repository != "firestore" or (explicit_env == "staging") != (database == "staging"):
+            raise SystemExit(f"--from-repo --env {explicit_env} con il database «{database}»: per lo staging "
+                             "REPOSITORY=firestore FIRESTORE_DATABASE=staging e --env staging, per la produzione "
+                             "REPOSITORY=firestore e --env prod. Niente è stato scritto")
         asyncio.run(from_repo(a.create, a.send_reset_link, a.env))
     elif a.email and a.tenant and a.role:
         set_claims(a.email, a.tenant, a.role, a.create, a.send_reset_link, a.env)

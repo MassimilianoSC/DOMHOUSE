@@ -21,7 +21,7 @@ Git Bash:
 ```bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 git push origin main
-TARGET=staging GCP_PROJECT_ID=domotica-poc-511707 GCP_REGION=europe-west8 SMTP_USER=m.scardovellicrac@gmail.com VITE_FCM_ENABLED=true scripts/publish.sh 604ed2b
+TARGET=staging STAGING_SITE=domhouse-staging GCP_PROJECT_ID=domotica-poc-511707 GCP_REGION=europe-west8 SMTP_USER=m.scardovellicrac@gmail.com VITE_FCM_ENABLED=true scripts/publish.sh 604ed2b
 ```
 Ci si aspetta: passi in italiano (controlli, copia pulita, costruzione del server su Google con il nuovo account, 1-3
 minuti, pubblicazione del server, compilazione e pubblicazione del sito) e alla fine le righe di riepilogo da incollare.

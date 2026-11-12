@@ -13,6 +13,7 @@ import { Badge, Card, Dialog, DialogContent, DialogTitle, Input, Label, Switch }
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { fmtPrice, parsePrice, priceInput } from "@/lib/price";
+import { instanceAddress } from "@/lib/instanceAddress";
 
 /**
  * Editing an apartment of the organization. Creating, relinking and deleting apartments is the platform manager's, in
@@ -53,7 +54,7 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
           </div>
           <div className="space-y-1 rounded-xl border border-dashed px-3 py-2 sm:col-span-2" data-testid="apt-form-connection-locked">
             <div className="text-sm font-semibold">{t("admin.apartments.connection")}</div>
-            <div className="tabular text-xs text-muted-foreground">{apt.instance_url}{apt.port ? `:${apt.port}` : ""}</div>
+            <div className="tabular text-xs text-muted-foreground">{instanceAddress(apt.instance_url, apt.port)}</div>
             <p className="text-xs text-muted-foreground">{t("admin.apartments.connectionByPlatform")}</p>
           </div>
           <div className="space-y-1 rounded-xl border border-dashed px-3 py-2 sm:col-span-2" data-testid="apt-form-italianway-locked">
@@ -164,7 +165,7 @@ function ApartmentRow({ a, orgPrice, verify, onVerify, onToggle, onEdit }: { a: 
           <dt className="font-medium">{t("admin.apartments.timezone")}</dt>
           <dd>{a.timezone}</dd>
           <dt className="font-medium">{t("admin.apartments.connection")}</dt>
-          <dd className="tabular [overflow-wrap:anywhere]">{a.instance_url}{a.port ? `:${a.port}` : ""}</dd>
+          <dd className="tabular [overflow-wrap:anywhere]">{instanceAddress(a.instance_url, a.port)}</dd>
           <dt className="font-medium">{t("admin.apartments.italianway")}</dt>
           <dd className="tabular">{a.italianway_id || "—"}</dd>
           <dt className="font-medium">{t("admin.features.scope")}</dt>

@@ -38,8 +38,10 @@ case "$*" in
   *"services describe domotica-bff "*minScale*) cat "$STUB_DIR/values-prod" 2>/dev/null ;;
   *"compute scp"*) : ;;
   *"compute ssh"*)
+    [ -f "$STUB_DIR/ssh-fails" ] && { echo "ssh: connect to host: Connection timed out" >&2; exit 255; }
     cmd="${*#*--command }"
     case "$cmd" in
+      *"docker inspect"*) [ -f "$STUB_DIR/no-container" ] && exit 1; cat "$STUB_DIR/vm-running" 2>/dev/null ;;
       *ENGINE_IMAGE*) cat "$STUB_DIR/vm-image" ;;
       *engine-vm.sh*sha256sum*) cat "$STUB_DIR/vm-script-hash" ;;
       *compose.yaml*sha256sum*) cat "$STUB_DIR/vm-compose-hash" ;;
@@ -83,7 +85,7 @@ def pub(tmp_path):
     (r / "scripts" / "publish-settings.conf").write_text(
         "# di prova\nGCP_PROJECT_ID=progetto-prova\nGCP_REGION=europe-west8\nARTIFACT_REPO=domotica\n"
         "CLOUDSDK_CORE_ACCOUNT=prova@example.com\nSTAGING_SITE=sito-prova\nVPC_NETWORK=default\nVPC_SUBNET=default\n"
-        "SMTP_USER=mittente@example.com\nVITE_FCM_ENABLED=true\nENGINE_APARTMENT=dev\nVM_NAME=vm-prova\nVM_ZONE=europe-west8-a\n",
+        "SMTP_USER=mittente@example.com\nVITE_FCM_ENABLED=true\nENGINE_APARTMENT=dev\nVM_NAME=vm-prova\nVM_ZONE=europe-west8-a\nVM_INTERNAL_IP=10.0.0.9\n",
         encoding="utf-8", newline="\n")
     (r / "scripts" / "engine-vm.sh").write_text("echo motore v1\n", encoding="utf-8", newline="\n")
     (r / "engine" / "core.py").write_text("x = 1\n", encoding="utf-8", newline="\n")
@@ -197,6 +199,25 @@ def test_a_dry_run_with_only_a_new_compose_file_says_the_engine_is_to_be_recreat
     assert (f"motore dev: da ricreare con la stessa immagine ({pub.lot}) per il nuovo compose.yaml; "
             f"compose.yaml da aggiornare sulla VM") in summary
     assert "scp" not in steps(calls) and "update" not in steps(calls)
+
+
+def test_d73_a_vm_not_reached_stops_with_its_fermo(pub):
+    """D73 (P-83): with set -euo pipefail the failed ssh inside VM_IMAGE="$(...)" left the script at once, exit 255 and
+    no FERMO (ssh's own error thrown in 2>/dev/null)."""
+    (pub.stubs / "ssh-fails").write_text("", encoding="utf-8")
+    done, calls = pub()
+    out = done.stdout + done.stderr
+    assert done.returncode == 1 and "FERMO: Non riesco a leggere l'immagine del motore dev sulla VM" in out, out
+    assert steps(calls) == []
+
+
+def test_d73_an_engine_container_missing_is_not_a_silent_exit(pub):
+    """D73: docker inspect fails when the container is not there (removed, never started): the run goes on with the
+    image of the settings, it did not leave the script."""
+    (pub.stubs / "no-container").write_text("", encoding="utf-8")
+    done, calls = pub()
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "update" in steps(calls)
 
 
 def test_any_other_answer_changes_nothing(pub):

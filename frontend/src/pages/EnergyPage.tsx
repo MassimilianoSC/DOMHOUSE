@@ -126,14 +126,23 @@ export default function EnergyPage() {
   const stayAvailable = Boolean(stayFrom);
   const [period, setPeriod] = useState<Period>("today");
   const effectivePeriod = period === "stay" && !stayAvailable ? "today" : period;
-  const params = useMemo(() => range(effectivePeriod, tz, stayFrom), [effectivePeriod, tz, stayFrom]);
-  const q = useQuery({ queryKey: ["energy", aptId, effectivePeriod, effectivePeriod === "stay" ? stayFrom : null], queryFn: () => instanceApi(aptId).getEnergy(params), refetchInterval: 60_000 });
+  // P-83, D22: the window is computed at every request, not once at the opening: the minute's re-read and the return
+  // to the window move «to» forward, and after midnight «Oggi» is the new day. The data keep the bucket they were read with.
+  const q = useQuery({
+    queryKey: ["energy", aptId, effectivePeriod, effectivePeriod === "stay" ? stayFrom : null, tz],
+    queryFn: async () => {
+      const span = range(effectivePeriod, tz, stayFrom);
+      return { ...(await instanceApi(aptId).getEnergy(span)), bucket: span.bucket };
+    },
+    refetchInterval: 60_000,
+  });
+  const bucket = q.data?.bucket ?? range(effectivePeriod, tz, stayFrom).bucket;
   const prevQ = usePreviousStayEnergy(aptId, effectivePeriod === "stay" ? previous : undefined);
   // D-130: since when the server has measured consumption (the same summary the apartment layout already reads).
   const since = fmtDayMonth(useApartmentSummary(aptId).data?.energy_since, tz);
   const r = q.data;
   const fmtTick = (ts: string) =>
-    params.bucket === "hour"
+    bucket === "hour"
       ? new Intl.DateTimeFormat("it-IT", { hour: "2-digit", timeZone: tz }).format(new Date(ts))
       : new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "short", timeZone: tz }).format(new Date(ts));
   const maxDevice = Math.max(1, ...(r?.by_device.map((d) => d.kwh) ?? [1]));
@@ -166,10 +175,10 @@ export default function EnergyPage() {
             <div className={`grid gap-px overflow-hidden rounded-lg border bg-border ${r.avoided_hvac_hours === null ? "sm:grid-cols-2" : "sm:grid-cols-3"}`} data-testid="energy-stats">
               <Stat label={t("energy.total")} value={fmtNumber(r.total_kwh, 2)} unit={t("energy.kwh")} testId="energy-total" data />
               <Stat
-                label={params.bucket === "hour" ? t("energy.peakHour") : t("energy.peakDay")}
+                label={bucket === "hour" ? t("energy.peakHour") : t("energy.peakDay")}
                 value={peak ? fmtNumber(peak.kwh, 2) : "—"}
                 unit={peak ? t("energy.kwh") : undefined}
-                sub={peak ? (params.bucket === "hour" ? t("energy.atHour", { hour: fmtTick(peak.ts) }) : fmtTick(peak.ts)) : undefined}
+                sub={peak ? (bucket === "hour" ? t("energy.atHour", { hour: fmtTick(peak.ts) }) : fmtTick(peak.ts)) : undefined}
                 testId="energy-peak"
               />
               {r.avoided_hvac_hours !== null && <Stat label={t("energy.avoided")} value={fmtNumber(r.avoided_hvac_hours)} unit="h" sub={t("energy.avoidedHint")} testId="energy-avoided" />}
@@ -177,7 +186,7 @@ export default function EnergyPage() {
             {effectivePeriod === "stay" && previous && prevQ.data && <StayComparison current={r.total_kwh} previous={prevQ.data.total_kwh} prev={previous} tz={tz} aptId={aptId} />}
           </div>
           <Card className="p-5" data-testid="energy-chart">
-            <h2 className="mb-4 text-base font-semibold">{t("energy.chart", { bucket: t(`energy.${params.bucket}`) })} <span className="font-normal text-muted-foreground">({t("energy.kwh")})</span></h2>
+            <h2 className="mb-4 text-base font-semibold">{t("energy.chart", { bucket: t(`energy.${bucket}`) })} <span className="font-normal text-muted-foreground">({t("energy.kwh")})</span></h2>
             {r.series.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground" data-testid="energy-empty">{t("energy.empty")}</p>
             ) : (
@@ -191,7 +200,7 @@ export default function EnergyPage() {
                       cursor={{ fill: "hsl(var(--secondary))" }}
                       contentStyle={{ borderRadius: 6, border: "1px solid hsl(var(--border))", background: "hsl(var(--card))", fontSize: 13, boxShadow: "none" }}
                       separator=""
-                      labelFormatter={(v) => (params.bucket === "hour" ? t("energy.atHour", { hour: fmtTick(String(v)) }) : fmtTick(String(v)))}
+                      labelFormatter={(v) => (bucket === "hour" ? t("energy.atHour", { hour: fmtTick(String(v)) }) : fmtTick(String(v)))}
                       formatter={(v) => [`${fmtNumber(Number(v), 2)} ${t("energy.kwh")}`, ""]}
                     />
                     <Bar dataKey="kwh" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} maxBarSize={36} isAnimationActive={false} />

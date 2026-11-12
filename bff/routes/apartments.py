@@ -222,6 +222,17 @@ async def _shown(resp, tenant_id: str, path: str = "") -> bytes:
 
 async def _event(ev: SseEvent, tenant_id: str) -> str:
     """The same rewrite for the stream (decision.logged, approval.*, the apartment's hold)."""
+    if ev.event == "instance.health":
+        # D81 (P-83): what GET .../instance/health leaves out (D-90) never goes in the frame either
+        try:
+            payload = json.loads(ev.data)
+        except ValueError:
+            return ev.encode()
+        if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
+            payload["data"] = instances.health_out(payload["data"])
+            return SseEvent(id=ev.id, event=ev.event, data=json.dumps(payload, ensure_ascii=False),
+                            received=ev.received).encode()
+        return ev.encode()
     if not any(m in ev.data for m in actors.MARKERS):
         return ev.encode()
     try:
@@ -344,7 +355,7 @@ async def list_bookings(apartment_id: str, booking_id: str | None = None, user: 
     """Booking archive kept by the BFF (every event it forwarded); empty when the booking predates the BFF."""
     apt = await get_tenant_apartment(user, apartment_id)
     repo = get_repository()
-    unused = {"event_ids", "last_event_type", "updated_at", "source"}   # D-90: technical, never shown
+    unused = {"event_ids", "last_event_type", "last_event_ts", "updated_at", "source"}   # D-90, D07: never shown
     if booking_id:
         b = await repo.get_booking(apt.apartment_id, booking_id)
         return {"items": [b.model_dump(exclude=unused)] if b else []}

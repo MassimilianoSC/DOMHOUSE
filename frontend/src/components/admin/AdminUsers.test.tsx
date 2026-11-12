@@ -106,11 +106,17 @@ describe("Utenti: invito con gli appartamenti", () => {
 
 describe("Utenti: elenco e modifica degli appartamenti", () => {
   it("sintesi per operatori e lettori; niente per gli amministratori", async () => {
+    s.users = [...s.users, user("u-admin2", "admin", "all", "admin2@demo.it")]; // another admin: one with its «⋯» menu
     await renderUsers();
     expect(screen.getByTestId("admin-user-scope-u-op")).toHaveTextContent(t("admin.users.scopeAll"));
     expect(screen.getByTestId("admin-user-scope-u-owner")).toHaveTextContent("Rimini Mare");
     expect(screen.queryByTestId("admin-user-scope-u-admin")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("admin-user-scope-btn-u-admin")).not.toBeInTheDocument();
+    // P-83, T3b-8: the entry lives in the «⋯» menu: absent with the menu OPEN, not merely closed (the signed-in admin
+    // has no menu at all, so the check is on another admin)
+    expect(screen.queryByTestId("admin-user-scope-u-admin2")).not.toBeInTheDocument();
+    await openMenu("admin-user-menu-u-admin2");
+    expect(await screen.findByRole("menu")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-user-scope-btn-u-admin2")).not.toBeInTheDocument();
   });
 
   it("«Appartamenti» apre la scelta con la lista attuale; «Tutti» e Salva → PATCH con «all» e avviso", async () => {

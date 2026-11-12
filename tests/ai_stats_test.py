@@ -95,7 +95,8 @@ def test_the_route_sums_only_the_organisations_apartments(monkeypatch):
     async def main():
         week = ai_stats.week_of(datetime.now(UTC))
         await ai_stats.count_ask(APT, ask("r1", created_at=datetime.now(UTC).isoformat()))
-        await get_repository().add_ai_stats("apt-altra-org", week, ai_stats.bounds(week), asks=7)
+        # T3c-3 (P-83): an apartment that exists, of the other organisation (a name of no apartment proved nothing)
+        await get_repository().add_ai_stats("apt-altra-01", week, ai_stats.bounds(week), asks=7)
         return await call("GET", "/app/admin/assistant-stats?weeks=8", ADMIN)
     r = run(main())
     assert r.status_code == 200 and len(r.json()["weeks"]) == 8 and r.json()["weeks"][0]["asks"] == 1

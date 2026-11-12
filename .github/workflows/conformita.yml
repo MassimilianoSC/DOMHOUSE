@@ -83,6 +83,28 @@ jobs:
         if: failure()
         run: tail -50 engine.log engine-down.log || true
 
+  prove-del-server:
+    # D85 (P-83): the server's tests (tests/: routes, accesses, scripts, the Linux-only SIGTERM test of T3b-3), until
+    # then only in the full run on the PC: a broken one never stopped a push. scripts/run_tests.py --server starts its
+    # own BFF for each HTTP suite; the repository suite runs in the job «repository», the broker's container ones only
+    # on the PC (Docker)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Dipendenze
+        run: |
+          pip install -r bff/requirements.txt -r engine/requirements.txt -r contract/conformance/requirements.txt requests
+
+      - name: Prove del server (tests/)
+        run: |
+          python scripts/run_tests.py --server
+
   motore-in-container:
     # l'immagine che va sulla VM (engine/Dockerfile): senza chiave non parte, con la chiave rispetta il contratto
     runs-on: ubuntu-latest

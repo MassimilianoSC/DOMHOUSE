@@ -3,6 +3,7 @@
     python scripts/run_tests.py                     # every suite
     python scripts/run_tests.py --suite phase3      # only the suites whose name contains "phase3" ("sito" = the PWA)
     python scripts/run_tests.py -- -k webhook       # everything after -- goes to pytest (only the pytest suites run)
+    python scripts/run_tests.py --server            # D85: only the server's suites, as the CI job «prove-del-server»
 
 Uses app/.venv when it exists (create it with: python -m venv .venv, then .venv/Scripts/python -m pip install
 -r bff/requirements.txt -r engine/requirements.txt pytest requests; engine/requirements.txt brings the Shelly
@@ -53,6 +54,11 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "tests/actors_test.py", "tests/erasure_test.py", "tests/fields_by_role_test.py",
                 "tests/lot9_review_test.py", "tests/energy_export_test.py",
                 "tests/simulated_apartments_test.py", "tests/cloudrun_manifests_test.py", "tests/engine_vm_settings_test.py", "tests/deploy_engine_test.py", "tests/publish_all_test.py", "tests/ai_gateway_test.py", "tests/environments_test.py", "tests/deploy_targets_test.py", "tests/list_demos_test.py", "tests/engine_alerts_test.py", "tests/rodaggio_test.py", "tests/weekly_summary_test.py", "tests/summary_job_test.py", "tests/rule_proposals_test.py", "tests/demo_variant_test.py", "tests/measure_model_test.py", "tests/net_phase_test.py", "tests/vertex_native_test.py", "tests/manager_profile_test.py", "tests/timezone_test.py", "tests/ai_stats_test.py", "tests/auth_token_test.py", "tests/stream_queue_test.py", "tests/runtime_log_test.py",
+                "tests/load_tool_test.py", "tests/load_environment_test.py", "tests/load_vm_test.py",
+                "tests/staging_targets_test.py", "tests/booking_order_test.py", "tests/booking_fields_test.py",
+                "tests/rule_recognizer_off_test.py", "tests/publish_resume_test.py", "tests/summary_known_features_test.py",
+                "tests/rules_feature_gate_test.py", "tests/atomic_writes_test.py", "tests/offline_push_retry_test.py",
+                "tests/webhook_signature_test.py",
                 "engine/connector/tests/test_interface.py",
                 "engine/connector/shelly/tests/test_battery.py",
                 "engine/connector/shelly/tests/test_catalog.py",
@@ -79,7 +85,16 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "engine/tests/test_loop_errors.py", "engine/tests/test_restart_window.py",
                 "engine/tests/test_approved_not_done.py", "engine/tests/test_approvals_window.py",
                 "engine/tests/test_schedule_failed.py", "engine/tests/test_reachability.py",
-                "engine/tests/test_window_restore.py", "engine/tests/test_schedule_partial.py"]
+                "engine/tests/test_window_restore.py", "engine/tests/test_window_kept_off.py", "engine/tests/test_window_mode_change.py",
+                "engine/tests/test_back_to_back.py", "engine/tests/test_booking_changed.py", "engine/tests/test_booking_order.py",
+                "engine/tests/test_approval_during_hold.py", "engine/tests/test_compressor_in_flight.py", "engine/tests/test_offline_at_start.py", "engine/tests/test_deferred_start.py", "engine/tests/test_ir_climate_state.py",
+                "engine/tests/test_contact_unread_at_start.py", "engine/tests/test_relay_unknown.py",
+                "engine/tests/test_mode_device_offline.py", "engine/tests/test_quick_socket_words.py",
+                "engine/tests/test_guests_in_by_booking.py",
+                "engine/tests/test_approval_expired_long_ago.py", "engine/tests/test_window_rule_reenabled.py",
+                "engine/tests/test_command_queued_state.py", "engine/tests/test_approved_after_its_time.py",
+                "engine/tests/test_question_text_not_kept.py", "engine/tests/test_schedule_partial.py",
+                "engine/tests/test_approval_values.py", "engine/tests/test_manual_mode_during_hold.py"]
 SITE_SUITE = "sito"
 CONFORMANCE_SUITE = "conformita"
 CONFORMANCE_DIR = "contract/conformance"
@@ -547,6 +562,18 @@ def run_linux_suite(skip: bool) -> dict:
     return linux_counts(lines, code)
 
 
+# D85 (P-83): what --server leaves out: suites the CI runs in its other jobs (the repository suite with its emulator,
+# job «repository»; the engine, the conformance, the site, e2e) or that need Docker.
+SERVER_LEAVES_OUT = {"tests/repository_suite_test.py", "tests/broker_container_test.py"}
+
+
+def server_suites() -> list[str]:
+    """D85 (and T3b-3, the Linux-only SIGTERM test of runtime_log_test): the server's own suites (tests/, the HTTP
+    ones with their BFF) and the shell scripts' check, for the CI on Linux; until then they ran only on the PC."""
+    return [SCRIPT_SUITE] + [s for s in HTTP_SUITES + LOCAL_SUITES
+                             if s.startswith("tests/") and s not in SERVER_LEAVES_OUT]
+
+
 def selected_suites(chosen: list[str], extra: list[str]) -> list[str]:
     """--suite picks by name; otherwise a pytest filter (-- -k …) runs only the pytest suites: "sito", "dimensione" and
     "script_sh" never receive pytest's arguments and would only add a long, unrelated run (lot 11); the same for "linux"."""
@@ -570,13 +597,15 @@ def main() -> int:
     ap.add_argument("--suite", action="append", default=[], help="run only suites whose name contains this text")
     ap.add_argument("--no-linux", action="store_true",
                     help="skip the Linux run of the CI job (scripts/ci-linux.sh); shown as skipped in the totals")
+    ap.add_argument("--server", action="store_true",
+                    help="D85: only the server's suites (tests/ and the shell scripts' check), as the CI runs them")
     args = ap.parse_args(argv)
 
     vpy = venv_python()
     if vpy and Path(sys.executable).resolve() != vpy.resolve() and not os.environ.get("RUN_TESTS_NO_VENV"):
         return subprocess.call([str(vpy), str(Path(__file__).resolve()), *sys.argv[1:]], cwd=ROOT)
 
-    selected = selected_suites(args.suite, extra)
+    selected = server_suites() if args.server else selected_suites(args.suite, extra)
     if not selected:
         print("Nessuna suite corrisponde a", args.suite)
         return 2

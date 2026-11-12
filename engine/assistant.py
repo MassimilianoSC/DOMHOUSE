@@ -393,7 +393,7 @@ class Assistant:
             return "errore" not in self.tool("cambia_modalita", {"modalita": m}, proposals)
         kinds = [cap for cap, words in (("climate", r"\b(clima|climatizzatore|condizionatore|split)\b"),
                                         ("heating", r"\b(caldaia|riscaldamento|termosifoni?)\b"),
-                                        ("switch", r"\b(presa|prese|stufetta|luce)\b")) if re.search(words, t)]
+                                        ("switch", r"\b(presa|prese|stufetta)\b")) if re.search(words, t)]
         if len(kinds) > 1 or sum(bool(x) for x in (off, on, number)) != 1:
             return False
         rooms = {r["room_id"] for r in self.e.rooms if f" {r['name'].lower()} " in t}
@@ -404,6 +404,10 @@ class Assistant:
                 continue
             if rooms and d["room_id"] not in rooms:
                 continue
+            room_words = {w for r in self.e.rooms for w in r["name"].lower().split()}
+            if (kinds[0] if kinds else caps[0]) == "switch" and not any(
+                    f" {w} " in t for w in re.findall(r"[a-zàèéìòù]{4,}", d["label"].lower()) if w not in room_words):
+                continue          # D17 (P-83): a socket only by a word of its own name («stufetta» is not any socket)
             candidates.append((d, kinds[0] if kinds else caps[0]))
         if not kinds and number:                          # «porta il soggiorno a 21 gradi»: the room's climate
             candidates = [(d, c) for d, c in candidates if c == "climate"]
@@ -514,6 +518,8 @@ class Assistant:
             if name == "programma":
                 when = self._when(args.get("quando"))
                 if args.get("modalita"):
+                    if args["modalita"] not in ("comfort", "eco", "empty"):    # D60 (P-83): as cambia_modalita
+                        return {"errore": "modalità non valida: comfort, eco o empty"}
                     action = {"type": "apartment_mode", "mode": args["modalita"]}
                 else:
                     device = e.get_device(args.get("device_id", ""))
@@ -563,16 +569,21 @@ class Assistant:
             return f"{label} a {target['setpoint']:g} °C"
         return f"accendere {label}"
 
-    def schedule_question(self, what: str) -> str:
-        """D-170: a scheduled action that will find guests in."""
-        return (f"Programmo {what}, con ospiti presenti a quell'ora? Rispondi Sì o No qui sotto, oppure dalla pagina "
-                f"Approvazioni.")
+    def _guests_at(self, p: dict) -> bool:
+        """Guests in at a scheduled action's time (by the calendar)."""
+        from .core import parse_dt
+        return self.e.occupied_at(parse_dt(p["run_at"]))
+
+    def schedule_question(self, what: str, guests: bool = True) -> str:
+        """D-170: a scheduled action that will find guests in; D33: with «sempre» also one that will not."""
+        with_guests = ", con ospiti presenti a quell'ora" if guests else ""
+        return f"Programmo {what}{with_guests}? Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni."
 
     def question(self, what: str) -> str:
         """D-154 point 2: the approval asked as a question in the chat, answered with «Sì» / «No» under it (the same
         call as the Approvals page, so the same record) or from the Approvals page."""
         tail = " Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni."
-        if self.e.apartment().get("occupancy") == "occupied":
+        if self.e.guests_in():                       # D18: also a booking in course without its check-in
             if what.startswith("spegnere "):
                 return f"Spengo {what[len('spegnere '):]} con ospiti presenti?{tail}"
             if what.startswith("modalità "):
@@ -599,17 +610,17 @@ class Assistant:
         action together with others (one approval each, D-144). D-162: the setting ASSISTANT_CONFIRM, «ospiti» (this,
         the default), «sempre» (every action), «multiple» (only actions together)."""
         policy = self.e.setting("ASSISTANT_CONFIRM")
+        if policy == "sempre":
+            return True                              # D33 (P-83, answer 1087 = a): every action, scheduled ones too
         if p["type"] == "schedule":
             # D-170: a scheduled action, by the calendar at its time (the same rule as an immediate one on the guests'
-            # comfort); with «multiple» and «sempre» as before: scheduled actions do not ask
+            # comfort); with «multiple» as before: scheduled actions do not ask
             return policy == "ospiti" and self._touches_comfort_at(p)
-        if policy == "sempre":
-            return True
         if together:
             return True
         if policy == "multiple":
             return False
-        if self.e.apartment().get("occupancy") != "occupied":
+        if not self.e.guests_in():                   # D18
             return False
         if p["type"] == "mode":
             return True
@@ -622,7 +633,8 @@ class Assistant:
         command not final by then is announced as sent, its outcome arrives in the app)."""
         from .core import FINAL, MockError
         e = self.e
-        corr, why = ask["correlation_id"], f"Richiesta all'assistente: «{ask['text']}»"
+        # D56 (P-83): never the question's text: decisions and approvals are read by every member, viewers too
+        corr, why = ask["correlation_id"], "Richiesta all'assistente"
         together = len([p for p in proposals if p["type"] != "schedule"]) >= 2
         lines, waiting = [], []
         for p in proposals:
@@ -643,9 +655,10 @@ class Assistant:
                     if ask["approval_id"] is None:
                         ask["approval_id"] = approval["approval_id"]
                         ask["status"] = "needs_approval"
-                    lines.append(self.schedule_question(what) if p["type"] == "schedule" else self.question(what))
+                    lines.append(self.schedule_question(what, self._guests_at(p)) if p["type"] == "schedule"
+                                 else self.question(what))
                 elif p["type"] == "mode":
-                    for command_id in e.set_mode(p["mode"], actor, corr, why, "assistant"):
+                    for command_id in e.set_mode(p["mode"], actor, corr, why, "assistant", by_hand=True):
                         ask["actions"].append({"type": "command", "command_id": command_id})
                     lines.append(f"Modalità {MODE_NAMES.get(p['mode'], p['mode'])} impostata: i comandi ai dispositivi partono ora, l'esito arriva "
                                  f"nell'app.")

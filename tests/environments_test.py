@@ -182,6 +182,63 @@ def test_set_claims_writes_one_environment_and_keeps_the_flat_ones_for_the_old_b
     assert (migrated["tenant_id"], migrated["role"]) == (TENANT, "admin") and migrated["prod"]["role"] == "admin"
 
 
+def test_orphan_claims_lists_removed_people_and_not_members_nor_waiting_invitations():
+    """R4-1: the people removed before the fix kept their claims; the list names them, never a member nor a person
+    with an invitation waiting in that organisation, and reads each environment's own claims only."""
+    from bff.repository import User
+    from bff.repository.memory import InMemoryRepository
+    sc = _set_claims()
+    repo = InMemoryRepository()
+    repo.users["u-member"] = User(uid="u-member", email="m@x.it", tenant_id="t-a", role="admin")
+    repo.users["u-moved"] = User(uid="u-moved", email="mv@x.it", tenant_id="t-b", role="viewer")
+    repo.users["inv-w"] = User(uid="inv-w", email="w@x.it", tenant_id="t-a", role="operator")
+    acc = lambda uid, email, claims: SimpleNamespace(uid=uid, email=email, custom_claims=claims)
+    accounts_list = [
+        acc("u-member", "m@x.it", {"prod": {"tenant_id": "t-a", "role": "admin"}}),          # member: fine
+        acc("u-gone", "g@x.it", {"prod": {"tenant_id": "t-a", "role": "operator"}}),         # removed: listed
+        acc("u-flat", "f@x.it", {"tenant_id": "t-a", "role": "admin"}),                      # removed, flat: listed
+        acc("u-moved", "mv@x.it", {"prod": {"tenant_id": "t-a", "role": "admin"}}),          # record elsewhere: listed
+        acc("u-wait", "w@x.it", {"prod": {"tenant_id": "t-a", "role": "operator"}}),         # invitation waiting: fine
+        acc("u-stg", "s@x.it", {"staging": {"tenant_id": "t-s", "role": "viewer"}}),         # staging only
+        acc("u-none", "n@x.it", None),
+    ]
+    found = run(sc.orphans(repo, accounts_list, "prod"))
+    assert [(u.uid, t, r) for u, t, r, _ in found] == [("u-gone", "t-a", "operator"), ("u-flat", "t-a", "admin"),
+                                                         ("u-moved", "t-a", "admin")]
+    assert found[2][3].tenant_id == "t-b"
+    staging = run(sc.orphans(repo, accounts_list, "staging"))
+    assert [u.uid for u, *_ in staging] == ["u-stg"]                   # the flat ones never count in staging
+
+
+def test_orphan_claims_apply_removes_one_persons_claims_and_revokes_in_production(monkeypatch):
+    from bff.repository import User
+    from bff.repository.memory import InMemoryRepository
+    sc = _set_claims()
+    repo = InMemoryRepository()
+    repo.users["u-ok"] = User(uid="u-ok", email="ok@x.it", tenant_id="t-a", role="admin")
+    people = {"u-gone": SimpleNamespace(uid="u-gone", email="g@x.it", custom_claims={
+                  "prod": {"tenant_id": "t-a", "role": "admin"}, "tenant_id": "t-a", "role": "admin",
+                  "staging": {"tenant_id": "t-s", "role": "viewer"}}),
+              "u-ok": SimpleNamespace(uid="u-ok", email="ok@x.it", custom_claims={"prod": {"tenant_id": "t-a", "role": "admin"}})}
+    calls = []
+    fake = SimpleNamespace(
+        list_users=lambda: SimpleNamespace(iterate_all=lambda: iter(people.values())),
+        set_custom_user_claims=lambda uid, c: (calls.append(("claims", uid)), setattr(people[uid], "custom_claims", c)),
+        revoke_refresh_tokens=lambda uid: calls.append(("revoke", uid)))
+    monkeypatch.setattr(sc, "auth", fake)
+    monkeypatch.setattr(sc, "init", lambda: None)
+    monkeypatch.setattr(sc, "_firestore_repository", lambda option: repo)
+    assert sc.orphan_command("prod", False, None) == 1 and calls == []           # the list writes nothing
+    with pytest.raises(SystemExit):
+        sc.orphan_command("prod", True, "ok@x.it")                                # a member: refused
+    with pytest.raises(SystemExit):
+        sc.orphan_command("prod", True, None)                                     # never everybody at once
+    assert sc.orphan_command("prod", True, "G@x.it") == 1
+    assert people["u-gone"].custom_claims == {"staging": {"tenant_id": "t-s", "role": "viewer"}}
+    assert calls == [("claims", "u-gone"), ("revoke", "u-gone")]
+    assert people["u-ok"].custom_claims == {"prod": {"tenant_id": "t-a", "role": "admin"}}
+
+
 # -------- D-180: the model in the European Union, for every model and environment --------
 def test_the_model_location_must_be_european():
     import dataclasses
@@ -266,3 +323,43 @@ def test_both_manifests_start(monkeypatch):
         e = manifest_env(manifest)
         settings = dataclasses.replace(config.get_settings(), app_env=e["APP_ENV"], auth_mode=e["AUTH_MODE"])
         main.check_access_settings(settings, {"K_SERVICE": "domotica-bff"})
+
+
+@pytest.mark.parametrize("argv, database", [(["--from-repo"], "staging"),                      # no --env: refused
+                                            (["--from-repo", "--env", "prod"], "staging"),     # the wrong database
+                                            (["--from-repo", "--env", "staging"], "(default)")])
+def test_from_repo_needs_its_environment_and_the_matching_database(monkeypatch, argv, database):
+    """D26 (P-83): --from-repo wrote production claims (the default --env) for the invitations of whatever database was
+    open, and revoked sessions: with the staging database, a staging invitation became a production admin, or locked a
+    production account out. Now --env is required and must match the database; nothing is written otherwise."""
+    import sys
+
+    from bff import config as bff_config
+    sc = _set_claims()
+    s = dataclasses.replace(bff_config.get_settings(), repository="firestore", firestore_database=database)
+    monkeypatch.setattr(bff_config, "get_settings", lambda: s)
+    written = []
+    monkeypatch.setattr(sc, "set_claims", lambda *a, **k: written.append(a))
+    monkeypatch.setattr(sc, "init", lambda: None)
+    monkeypatch.setattr(sys, "argv", ["set_claims.py", *argv])
+    with pytest.raises(SystemExit):
+        sc.main()
+    assert written == []
+
+
+def test_from_repo_with_its_environment_goes_on(monkeypatch):
+    import sys
+
+    from bff import config as bff_config
+    sc = _set_claims()
+    s = dataclasses.replace(bff_config.get_settings(), repository="firestore", firestore_database="staging")
+    monkeypatch.setattr(bff_config, "get_settings", lambda: s)
+    seen = []
+
+    async def fake_from_repo(create, send_reset_link, env="prod"):
+        seen.append(env)
+    monkeypatch.setattr(sc, "from_repo", fake_from_repo)
+    monkeypatch.setattr(sc, "init", lambda: None)
+    monkeypatch.setattr(sys, "argv", ["set_claims.py", "--from-repo", "--env", "staging"])
+    sc.main()
+    assert seen == ["staging"]

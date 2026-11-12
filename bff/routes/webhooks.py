@@ -83,13 +83,15 @@ def verify_signature(raw: bytes, header_value: str | None, secret: str) -> bool:
     provided = header_value.strip()
     if provided.lower().startswith("sha256="):
         provided = provided[7:]
-    return hmac.compare_digest(expected.lower(), provided.lower())
+    if not provided.isascii():                     # D65 (P-83): compare_digest raised TypeError on it (500, no entry)
+        return False
+    return hmac.compare_digest(expected.lower().encode(), provided.lower().encode())
 
 
 async def report_demo_codes() -> None:
     """D-99 F1: in production, list in the log at startup every demonstration apartment that still has an Italianway
     code, so the platform removes it (the webhook refuses its bookings anyway)."""
-    if get_settings().instance_mode != "real":
+    if get_settings().app_env != "prod":             # D66 (P-83): staging is INSTANCE_MODE=real too
         return
     for apt in await get_repository().list_apartments():
         if apt.external_ids.italianway and instances.is_mock(apt.instance_url):
@@ -136,7 +138,7 @@ async def italianway(request: Request):
         return await done(409, "ambiguous_apartment", {"error": "ambiguous_apartment", "message": "Codice Italianway collegato a più appartamenti"})
     apt = matches[0]
     log.tenant_id, log.apartment_id = apt.tenant_id, apt.apartment_id
-    if s.instance_mode == "real" and instances.is_mock(apt.instance_url):
+    if s.app_env == "prod" and instances.is_mock(apt.instance_url):     # D66 (P-83): not INSTANCE_MODE
         # D-99 F1: in production a demonstration apartment (allowed a code in staging, or saved before D-98) must
         # never receive the real bookings: refused, logged for its organisation, nothing reaches the simulated engine
         warn("webhook refused: Italianway code on a demo apartment", apartment_id=apt.apartment_id)

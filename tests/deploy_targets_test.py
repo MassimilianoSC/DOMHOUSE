@@ -30,6 +30,8 @@ def _bash():
 GCLOUD = r'''#!/usr/bin/env bash
 echo "gcloud $*" >> "$STUB_DIR/calls.log"
 case "$*" in
+  *"artifacts docker images describe"*) [ -f "$STUB_DIR/no-image" ] && exit 1 ;;
+  *"builds submit"*) rm -rf "$STUB_DIR/received"; cp -r "$3" "$STUB_DIR/received" ;;   # T3c-2: what Cloud Build gets
   *"run services replace"*) cp "$4" "$STUB_DIR/rendered.yaml" ;;
   *"services describe"*status.traffic*) [ -f "$STUB_DIR/staging_image.txt" ] && cat "$STUB_DIR/staging_image.txt" ;;
   *"services describe"*minScale*) [ -f "$STUB_DIR/live.txt" ] && cat "$STUB_DIR/live.txt" ;;
@@ -65,7 +67,7 @@ def repo(tmp_path):
 
     def run(target, env="SKIP_BUILD=1"):
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(r)}" && '
-               f'TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default {env} '
+               f'TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default VM_INTERNAL_IP=10.0.0.9 STAGING_SITE=progetto-prova-staging {env} '
                f'bash scripts/deploy.sh')
         out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=60)
         calls = (stubs / "calls.log").read_text(encoding="utf-8") if (stubs / "calls.log").exists() else ""
@@ -90,6 +92,31 @@ def test_staging_publishes_its_service_database_and_site(repo):
     assert "PWA: https://progetto-prova-staging.web.app" in out.stdout
     assert (repo.root / "frontend" / ".firebaserc").read_text(encoding="utf-8") == \
         (ROOT / "frontend" / ".firebaserc").read_text(encoding="utf-8")    # put back as committed
+
+
+def test_staging_lists_only_the_engines_it_may_reach_and_needs_the_vms_address(repo):
+    """D04 (P-83): INSTANCE_ALLOWED of the staging manifest filled with the VM's internal address; without it, no deploy."""
+    out, calls, rendered = repo("staging")
+    assert out.returncode == 0, out.stderr
+    assert "value: 10.0.0.9:8100,10.0.0.9:8150-8169" in rendered
+    out, calls, _ = repo("staging", env="SKIP_BUILD=1 VM_INTERNAL_IP=")
+    assert out.returncode != 0 and "set VM_INTERNAL_IP" in out.stderr and "services replace" not in calls
+    out, _, rendered = repo("prod", env="SKIP_BUILD=1 VM_INTERNAL_IP=")
+    assert out.returncode == 0, out.stderr                                 # production has no list: not needed
+    assert "INSTANCE_ALLOWED" not in rendered
+
+
+def test_staging_without_its_site_stops_before_writing_anything(repo):
+    """D53 (P-83): STAGING_SITE missing used to become «<project>-staging», not the staging site: CORS, APP_PUBLIC_URL
+    and the Cloud Run service were written with it before Hosting failed. Now it stops first."""
+    out, calls, rendered = repo("staging", env="SKIP_BUILD=1 STAGING_SITE=")
+    assert out.returncode != 0 and "set STAGING_SITE" in out.stderr
+    assert "services replace" not in calls and not any(w in calls for w in ("add-iam-policy-binding", "deploy --only"))
+
+
+def test_publish_staging_without_its_site_stops_too(publish):
+    out, calls = publish("staging", env="DRY_RUN=1 STAGING_SITE=")
+    assert out.returncode != 0 and "Serve STAGING_SITE" in out.stderr
 
 
 def test_production_publishes_its_own(repo):
@@ -218,7 +245,7 @@ def publish(tmp_path):
     def run(target, env="DRY_RUN=1"):
         (stubs / "calls.log").unlink(missing_ok=True)
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(r)}" && '
-               f'{env} TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default '
+               f'STAGING_SITE=progetto-prova-staging {env} TARGET={target} GCP_PROJECT_ID=progetto-prova VPC_NETWORK=default VPC_SUBNET=default VM_INTERNAL_IP=10.0.0.9 '
                f'ENV_FILE="{posix(env_file)}" bash scripts/publish.sh')
         out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=120, stdin=subprocess.DEVNULL)
         return out, (stubs / "calls.log").read_text(encoding="utf-8") if (stubs / "calls.log").exists() else ""
@@ -226,7 +253,7 @@ def publish(tmp_path):
     def git(*args):
         return subprocess.run(["git", "-C", str(r), *args], check=True, capture_output=True, text=True).stdout.strip()
 
-    run.stubs, run.git = stubs, git
+    run.stubs, run.git, run.root = stubs, git, r
     return run
 
 
@@ -324,6 +351,22 @@ def test_d214_from_publish_all_production_is_not_asked_again(publish, tmp_path):
     assert out.returncode == 0, out.stdout + out.stderr
     assert "la conferma l'hai già data all'inizio di publish-all.sh" in out.stdout and "Per continuare" not in out.stdout
     assert "run services replace" in calls                                # it really published, with the stubs
+
+
+def test_t3c2_cloud_build_receives_the_commit_never_the_working_copy(publish, tmp_path):
+    """T3c-2 (P-83): the BFF's image is built from the commit's clean copy: work not committed in the working copy (a
+    changed manifest, a new file) never reaches Cloud Build. A stand-in gcloud keeps the folder builds submit gets."""
+    on_github(publish, tmp_path)
+    (publish.stubs / "no-image").write_text("", encoding="utf-8")
+    committed = (publish.root / "bff" / "cloudrun.staging.yaml").read_text(encoding="utf-8")
+    (publish.root / "bff" / "cloudrun.staging.yaml").write_text(committed + "# not committed\n", encoding="utf-8")
+    (publish.root / "bff" / "new.py").write_text("y = 1\n", encoding="utf-8")
+    out, calls = publish("staging", env="PUBLISH_ALL_CONFIRMED=pubblica X=1")
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "builds submit" in calls
+    received = publish.stubs / "received"
+    assert (received / "bff" / "cloudrun.staging.yaml").read_text(encoding="utf-8") == committed
+    assert not (received / "bff" / "new.py").exists()
 
 
 def test_d214_without_publish_all_production_still_asks(publish, tmp_path):

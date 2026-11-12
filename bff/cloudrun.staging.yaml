@@ -26,7 +26,8 @@ spec:
         run.googleapis.com/vpc-access-egress: private-ranges-only
         run.googleapis.com/startup-cpu-boost: "true"
     spec:
-      serviceAccountName: domotica-bff@your-gcp-project-id.iam.gserviceaccount.com
+      # D04 (P-83): its own identity: Firestore only on the staging database, only the staging's secrets
+      serviceAccountName: domotica-bff-staging@your-gcp-project-id.iam.gserviceaccount.com
       containerConcurrency: 250                        # as production (D-197, answer 295)
       # as production (D-197, E-27): the longest a request may last, a browser's stream included; the server's own end of
       # the stream, before this limit, comes with lot 35
@@ -90,6 +91,8 @@ spec:
               value: https://your-staging-site.web.app,https://your-staging-site.firebaseapp.com
             - name: SECRET_MANAGER_PREFIX
               value: langbrain-api-key-
+            - name: INSTANCE_ALLOWED       # D04 (P-83): only dev and the load test's engines (scripts/load), filled by deploy.sh
+              value: your-vm-internal-ip:8100,your-vm-internal-ip:8150-8169
             - name: INSTANCE_TIMEOUT_S
               value: "10"
             - name: ITALIANWAY_SIGNATURE_HEADER

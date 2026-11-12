@@ -123,14 +123,44 @@ export async function disablePush({ resume = false }: { resume?: boolean } = {})
   }
   // From now on the token belongs to nobody: "off" for every account, and syncPushToken retries the deletion (N2).
   localStorage.setItem(OWNER_KEY, DELETING);
+  // The browser's own subscription goes first, and it needs no network (P-83, D50): with the BFF and FCM out of
+  // reach the token would keep delivering here until the next start, and the service worker would show the previous
+  // person's notifications. Firebase deletes the token at FCM from its own records, subscription or not.
+  await dropBrowserSubscription();
   await pushApi.unsubscribe(token).catch(() => undefined);
   try {
     const { mod, messaging: m } = await messaging();
     await mod.deleteToken(m); // the token stops working at FCM too, not only on our side
     forgetToken(); // only once FCM confirmed: without network the local copy stays and the next start tries again
   } catch {
-    /* offline: kept with no owner, retried at the next start */
+    // offline: kept with no owner, retried as soon as the network is back (D50) and at the next start
+    retryWhenOnline();
   }
+}
+
+async function dropBrowserSubscription(): Promise<void> {
+  try {
+    const registration = await swRegistration();
+    await (await registration.pushManager?.getSubscription())?.unsubscribe();
+  } catch {
+    /* no service worker or no subscription: nothing delivers here anyway */
+  }
+}
+
+let retryArmed = false;
+
+/** One retry of a pending deletion when the browser says the network is back; a new failure arms the next one. */
+function retryWhenOnline() {
+  if (retryArmed || typeof window === "undefined") return;
+  retryArmed = true;
+  window.addEventListener(
+    "online",
+    () => {
+      retryArmed = false;
+      if (localStorage.getItem(OWNER_KEY) === DELETING) void disablePush();
+    },
+    { once: true },
+  );
 }
 
 /** What a start did that the person should hear about (P-44): push back on, or left off for lack of permission. */

@@ -173,7 +173,9 @@ def make_connector(config: ConnectorConfig) -> ShellyConnector:
 Le proprie variabili hanno il prefisso del nome del connector in maiuscolo più «_» (`SHELLY_` per `shelly`): una
 variabile senza prefisso non arriva in `config.env`. Se il catalogo manca o è sbagliato, `make_connector` solleva
 un'eccezione il cui messaggio dice quale campo e quale dispositivo sono sbagliati, mai il valore trovato: il motore
-scrive «connector setup failed» con quel messaggio ed esce con il codice 3.
+scrive «connector setup failed» con quel messaggio ed esce con il codice 3. Un errore che arriva dopo, all'avvio
+vero (la `start()` del connector che non si collega, un `engine.db` di uno schema più nuovo), scrive «engine start
+failed» ed esce con il codice 4; il 4 vale anche per la porta già occupata, con la riga «engine did not start» (D36).
 
 Poi lo si avvia come al punto 3, con `CONNECTOR=shelly`, le proprie `SHELLY_*` e il catalogo in `CATALOG_PATH` (o in
 `<DATA_DIR>/catalog.yaml`). Con un connector diverso dal simulato `POST /_test/state` risponde 404 e `/ask` 501, come
@@ -215,6 +217,7 @@ in `/data/<apartment_id>` (`engine.db`, SQLite) e la chiave in un file fuori dal
 | `GCP_PROJECT_ID`, `GCP_REGION`, `FIREBASE_PROJECT_ID` | | placeholder `your-gcp-project-id`, `europe-west8` |
 | `SECRET_MANAGER_PREFIX` | `langbrain-api-key-` | nome segreto = prefisso + `apartment_id` (o `instance_secret_name`) |
 | `ITALIANWAY_WEBHOOK_SECRET`, `ITALIANWAY_SIGNATURE_HEADER` | | HMAC-SHA256 esadecimale sul body grezzo (accetta anche `sha256=<hex>`) |
+| `INSTANCE_ALLOWED` | vuoto (produzione) | D04: nello staging i motori raggiungibili, `host:porta` o `host:prima-ultima` separati da virgole; senza, lo staging reale non parte |
 | `INSTANCE_TIMEOUT_S`, `PORT`, `BFF_ROOT_PATH` | | `BFF_ROOT_PATH` = prefisso unico quando il BFF è dietro un path (es. `/api`) |
 | `CORS_ORIGINS` | | origini della PWA ammesse fuori da dev, separate da virgola |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | default `smtp.gmail.com`, `465` | email di invito; senza `SMTP_USER`/`SMTP_PASSWORD` l'invito è solo registrato. Su Cloud Run la password arriva dal segreto `smtp-app-password` |
@@ -258,7 +261,7 @@ Primo amministratore e utenti invitati:
 
 ```bash
 python scripts/set_claims.py --email admin@azienda.it --tenant t-flatsharing-demo --role admin --create --send-reset-link
-python scripts/set_claims.py --from-repo     # claim per tutti gli utenti invitati dall'area Amministrazione
+REPOSITORY=firestore GCP_PROJECT_ID=your-gcp-project-id python scripts/set_claims.py --from-repo --env prod   # claim per tutti gli invitati del database di produzione (D26: --env obbligatorio e uguale al database)
 ```
 
 Un utente invitato dall'area Amministrazione riceve un'email (link all'app, «Accedi con Google» e un link Firebase per

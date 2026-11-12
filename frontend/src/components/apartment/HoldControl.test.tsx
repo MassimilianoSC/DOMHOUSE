@@ -72,3 +72,12 @@ describe("forzatura con una finestra aperta (D-127)", () => {
     expect(s.setHold).toHaveBeenCalledWith({ minutes: 0 }, expect.any(String));
   });
 });
+
+describe("forzatura con un sensore finestra senza segnale (P-83, D44)", () => {
+  it("sensore offline (ultimo stato «chiusa»): avviso con la stanza, perché la finestra potrebbe essere aperta", async () => {
+    setup([clima, { ...win("w1", "r-cam", false), online: false } as Device]);
+    await click("hold-btn-30");
+    expect(screen.getByTestId("hold-window-warning")).toHaveTextContent(t("hold.windowUnknown", { rooms: "Camera" }));
+    expect(s.setHold).not.toHaveBeenCalled();
+  });
+});

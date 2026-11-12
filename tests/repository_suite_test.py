@@ -160,7 +160,9 @@ def test_webhook_logs_per_tenant_newest_first(repo, monkeypatch):
     t1 = run(repo.list_webhook_logs("t1"))
     assert [x.log_id for x in t1] == ["wh-0011", "wh-0009", "wh-0007", "wh-0005"]      # newest first, 4 kept
     none = run(repo.list_webhook_logs(None))
-    assert [x.log_id for x in none] == ["wh-0010", "wh-0008", "wh-0006", "wh-0004"] and all(x.tenant_id is None for x in none)
+    # D54: the unsigned call wh-0000 stays in its own room, the signed ones keep their 4
+    assert [x.log_id for x in none] == ["wh-0010", "wh-0008", "wh-0006", "wh-0004", "wh-0000"]
+    assert all(x.tenant_id is None for x in none)
     assert [x.log_id for x in run(repo.list_webhook_logs("t2"))] == ["wh-0020"]        # not pushed out by t1
     assert run(repo.list_webhook_logs("t3")) == []
     assert len(run(repo.list_webhook_logs("t1", limit=2))) == 2
@@ -223,6 +225,63 @@ def test_last_admin_concurrent_deletions(repo):
     assert run(repo.delete_user_keeping_an_admin("nessuno")) == "not_found"
     run(repo.upsert_user(User(uid="tc2-viewer", email="v@tc2.it", tenant_id="tc2", role="viewer")))
     assert run(repo.delete_user_keeping_an_admin("tc2-viewer")) == "deleted"      # non-admins are never blocked
+
+
+def test_an_invitation_never_counts_as_an_admin(repo):
+    """D39 (P-83, = R4-3): the only real admin A with a pending admin invitation (inv-…) could delete or demote
+    themselves: the invitation counted as «another admin», and the organisation was left with nobody able to sign in
+    as admin. Now invitations never count; deleting or demoting an invitation itself is never blocked."""
+    run(repo.upsert_user(User(uid="tc3-a", email="a@tc3.it", tenant_id="tc3", role="admin")))
+    run(repo.upsert_user(User(uid="inv-tc3-x", email="x@tc3.it", tenant_id="tc3", role="admin")))
+    assert run(repo.delete_user_keeping_an_admin("tc3-a")) == "last_admin"
+    demoted = run(repo.get_user("tc3-a")).model_copy(update={"role": "viewer"})
+    assert run(repo.upsert_user_keeping_an_admin(demoted)) is False
+    assert run(repo.get_user("tc3-a")).role == "admin"
+    assert run(repo.delete_user_keeping_an_admin("inv-tc3-x")) == "deleted"
+
+
+def test_two_events_of_a_booking_folded_at_once_both_count(repo):
+    """D43 (P-83): fold_booking_event reads, folds and writes in one transaction (Firestore) or with no await between
+    (memory): two events of the same booking at the same moment are both in the record."""
+    def ev(eid, kind, checkout):
+        return {"event_id": eid, "type": kind, "booking_id": "bk-rs", "checkin_at": "2026-12-01T14:00:00.000Z",
+                "checkout_at": checkout, "source": "italianway", "ts": f"2026-11-11T10:00:0{eid[-1]}.000Z"}
+    run(repo.fold_booking_event("apt-rs", ev("e0", "booking_created", "2026-12-04T10:00:00.000Z")))
+
+    async def both():
+        return await asyncio.gather(repo.fold_booking_event("apt-rs", ev("e1", "booking_changed", "2026-12-05T10:00:00.000Z")),
+                                    repo.fold_booking_event("apt-rs", ev("e2", "checkin", "2026-12-05T10:00:00.000Z")))
+    run(both())
+    rec = run(repo.get_booking("apt-rs", "bk-rs"))
+    assert set(rec.event_ids) == {"e0", "e1", "e2"} and rec.checkout_at == "2026-12-05T10:00:00.000Z"
+
+
+def test_a_change_never_brings_a_deleted_user_back(repo):
+    """D57 (P-83): update_user_if_present and upsert_user_keeping_an_admin leave a deleted record deleted."""
+    run(repo.upsert_user(User(uid="tc4-u", email="u@tc4.it", tenant_id="tc4", role="operator", push_tokens=["a", "b"])))
+    out = run(repo.update_user_if_present("tc4-u", lambda u: u.model_copy(update={"push_tokens": ["b"]})))
+    assert out.push_tokens == ["b"] and run(repo.get_user("tc4-u")).push_tokens == ["b"]
+    run(repo.delete_user("tc4-u"))
+    assert run(repo.update_user_if_present("tc4-u", lambda u: u)) is None and run(repo.get_user("tc4-u")) is None
+    gone = User(uid="tc4-u", email="u@tc4.it", tenant_id="tc4", role="viewer")
+    assert run(repo.upsert_user_keeping_an_admin(gone)) is None and run(repo.get_user("tc4-u")) is None
+
+
+def test_calls_without_a_valid_signature_never_push_out_a_real_unattributed_call(repo):
+    """D54 (P-83): 120 POSTs without a signature filled the unattributed log and pushed out the one real call signed
+    with an unknown code (the very row the diagnosis needs). Now the unsigned ones have their own small room."""
+    from bff.repository import WebhookLog
+    from bff.repository.base import UNSIGNED_LOG_LIMIT
+    real = WebhookLog(log_id="wh-real", received_at="2026-11-11T09:00:00.000Z", signature_ok=True, status_code=404,
+                      outcome="unknown_apartment", correlation_id="c-real")
+    run(repo.add_webhook_log(real))
+    for i in range(UNSIGNED_LOG_LIMIT + 30):
+        run(repo.add_webhook_log(WebhookLog(log_id=f"wh-x{i:03d}", received_at=f"2026-11-11T10:{i // 60:02d}:{i % 60:02d}.000Z",
+                                            signature_ok=False, status_code=401, outcome="invalid_signature",
+                                            correlation_id=f"c-{i}")))
+    logs = run(repo.list_webhook_logs(None))
+    assert "wh-real" in [x.log_id for x in logs]
+    assert len([x for x in logs if not x.signature_ok]) == UNSIGNED_LOG_LIMIT
 
 
 def test_last_platform_manager_concurrent_removals(repo):
@@ -586,6 +645,25 @@ def test_expire_work(repo):
     assert run(repo.claim_work("vuota", "a", 3600)) == "mine"
     assert run(repo.expire_work("vuota")) is False                          # no message
     assert run(repo.expire_work("mai-vista")) is False
+
+
+def test_renew_work(repo):
+    """D42 (P-83): the notification group claimed at once gets its whole message at the end of the window, only while
+    the claim is still its own."""
+    import time
+    assert run(repo.claim_work("gruppo", "a", 120, {"m": "primo"})) == "mine"
+    assert run(repo.renew_work("gruppo", "b", 60, {"m": "altro"})) is False          # not b's
+    assert run(repo.renew_work("gruppo", "a", 60, {"m": "tutto"})) is True
+    assert run(repo.due_work(time.time() + 59)) == []                                   # the new lease, not the old one
+    [item] = run(repo.due_work(time.time() + 61))
+    assert item["payload"] == {"m": "tutto"}
+    assert run(repo.claim_work("gruppo", "b", 60)) == "taken"
+    run(repo.finish_work("gruppo"))
+    assert run(repo.renew_work("gruppo", "a", 60, {"m": "dopo"})) is False             # done
+    assert run(repo.renew_work("mai-visto", "a", 60, {"m": "x"})) is False
+    assert run(repo.claim_work("ripreso", "a", 0, {"m": "1"})) == "mine"
+    assert run(repo.claim_work("ripreso", "b", 60)) == "mine"                          # lease over, taken over by b
+    assert run(repo.renew_work("ripreso", "a", 60, {"m": "2"})) is False
 
 
 def test_two_instances_claiming_at_the_same_instant_on_firestore(repo):

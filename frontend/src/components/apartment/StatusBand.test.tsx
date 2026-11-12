@@ -65,3 +65,23 @@ describe("fascia di stato della Panoramica (design, lotto 2)", () => {
     expect(screen.getByTestId("band-energy-value")).toHaveTextContent("—");
   });
 });
+
+describe("fascia di stato: sensore finestra senza segnale (P-83, D44)", () => {
+  const off = (d: Device): Device => ({ ...d, online: false }) as Device;
+
+  it("unico sensore offline, ultimo stato «chiusa»: niente «Tutte chiuse» né verde, stato non noto", () => {
+    render(<StatusBand apartment={apt()} devices={[off(dev("w1", "r1", { contact: { open: false, since: null } }))]} rooms={rooms} kwhToday={null} energyOn={false} tz={TZ} />);
+    expect(screen.getByTestId("band-windows-value")).not.toHaveTextContent(t("overview.band.windowsClosed"));
+    expect(screen.getByTestId("band-windows-value")).toHaveTextContent(t("overview.band.windowsUnknown"));
+    expect(screen.getByTestId("band-windows")).toHaveAttribute("data-tint", "");
+    expect(screen.getByTestId("band-windows")).toHaveTextContent(t("overview.band.windowsNoSignal", { rooms: "Camera" }));
+  });
+
+  it("una chiusa in linea e una offline: «Nessuna aperta», con la stanza senza segnale, non verde", () => {
+    const devices = [dev("w1", "r1", { contact: { open: false, since: null } }), off(dev("w2", "r2", { contact: { open: false, since: null } }))];
+    render(<StatusBand apartment={apt()} devices={devices} rooms={rooms} kwhToday={null} energyOn={false} tz={TZ} />);
+    expect(screen.getByTestId("band-windows-value")).toHaveTextContent(t("overview.band.windowsNoneOpen"));
+    expect(screen.getByTestId("band-windows")).toHaveAttribute("data-tint", "");
+    expect(screen.getByTestId("band-windows")).toHaveTextContent(t("overview.band.windowsNoSignal", { rooms: "Soggiorno" }));
+  });
+});

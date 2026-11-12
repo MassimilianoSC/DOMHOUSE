@@ -14,13 +14,23 @@ export interface BookingRecord {
 
 const bookings = (aptId: string) => bffFetch<{ items: BookingRecord[] }>(`/app/apartments/${encodeURIComponent(aptId)}/bookings`);
 
-/** Current stay = booking archived by the BFF whose id is GET /apartment.current_booking_id; hidden when unknown. */
+/** A booking in course for the site: not cancelled, not checked out; with a check-in (occupied), or inside its window. */
+const inCourse = (b: BookingRecord, occupancy: string | undefined, now: number) =>
+  b.status !== "cancelled" && b.status !== "checked_out" &&
+  (occupancy === "occupied" || (new Date(b.checkin_at).getTime() <= now && now < new Date(b.checkout_at).getTime()));
+
+/**
+ * Current stay = booking archived by the BFF whose id is GET /apartment.current_booking_id; hidden when unknown.
+ * D18 (P-83): «occupied» comes only with a check-in event, which Italianway may never send; a booking in course without
+ * it is «reserved» with its current_booking_id, and it is a stay all the same (as the engine's approvals now count it).
+ */
 export function useCurrentStay(aptId: string) {
   const occupancy = useApartmentStore((s) => s.apartment?.occupancy);
   const currentId = useApartmentStore((s) => s.apartment?.current_booking_id);
   const q = useQuery({ queryKey: ["bookings", aptId], queryFn: () => bookings(aptId), enabled: Boolean(aptId), staleTime: 60_000 });
   const items = q.data?.items ?? [];
-  const current = occupancy === "occupied" && currentId ? items.find((b) => b.booking_id === currentId && b.status !== "cancelled") : undefined;
+  const now = Date.now();
+  const current = occupancy !== "vacant" && currentId ? items.find((b) => b.booking_id === currentId && inCourse(b, occupancy, now)) : undefined;
   const previous = current
     ? items.filter((b) => b.status !== "cancelled" && b.booking_id !== current.booking_id && b.checkout_at <= current.checkin_at).sort((a, b) => b.checkout_at.localeCompare(a.checkout_at))[0]
     : undefined;

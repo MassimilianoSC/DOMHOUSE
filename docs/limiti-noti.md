@@ -41,6 +41,8 @@
 | **A server spento** | Niente notifiche, e gli eventi di quel periodo non si recuperano | Voluto |
 | **Dimostrativi** | Ripartono dai valori iniziali a ogni avvio del server | Voluto |
 | **Nessun backup del database** | Il database dello staging non ha backup pianificati: contiene solo dati di prova | Voluto |
+| **Stessa identità della produzione (D04)** | Lo staging gira con lo stesso account della produzione: potrebbe scrivere anche nel database della produzione e leggerne i segreti | In lavorazione: comandi pronti (o1, 11 nov), da lanciare prima del primo appartamento vero |
+| **Accessi condivisi** | Anche dopo D04, staging e produzione usano lo stesso Firebase Authentication: lo staging può ancora gestire gli account di accesso della produzione. Si separa solo con un secondo progetto Firebase | Accettato |
 
 ## Aggiornamenti in diretta
 
@@ -90,7 +92,7 @@
 | **Testo delle notifiche** | Nella notifica il testo si taglia a 200 caratteri; nelle Decisioni resta intero | Accettato |
 | **Approvata ma non eseguita** | Dal lotto 38 il fallimento si vede nelle Decisioni («Azione approvata ma non eseguita»), ma l'approvazione resta «Approvata» e l'app riceve un OK: il contratto non ha uno stato «non eseguita» | Accettato |
 | **Riepilogo fatto in ritardo** | Se il motore è irraggiungibile per tutto il lunedì, il riepilogo fatto dopo può ancora perdere le approvazioni scadute nei primi giorni della settimana | Accettato |
-| **Caldaia e clima dopo la chiusura della finestra** | Dal lotto 38 tornano da soli, circa un minuto dopo la chiusura dell'ultima finestra; la caldaia può aspettare in più il minimo fra due accensioni. Se la modalità cambia a finestra aperta vale quella nuova; un dispositivo offline alla chiusura torna quando risponde | Corretto il 10 novembre (`cb50298`) |
+| **Caldaia e clima dopo la chiusura della finestra** | Dal lotto 38 tornano da soli, circa un minuto dopo la chiusura dell'ultima finestra; la caldaia può aspettare in più il minimo fra due accensioni. Se la modalità cambia a finestra aperta vale quella nuova, anche quando la finestra si chiude prima che la regola scatti (dal lotto 40, D08: prima restava la temperatura della modalità vecchia); un dispositivo offline alla chiusura torna quando risponde | Corretto il 10 novembre (`cb50298`); caso della finestra chiusa prima della regola corretto l'11 novembre (o1 `6cfa5f8`) |
 | **Riconoscimento di Cloud Run** | Il blocco dell'accesso di sviluppo riconosce Cloud Run dalla variabile `K_SERVICE`; su un altro servizio vale solo il controllo su `APP_ENV` | Accettato |
 | **Pausa del compressore dopo un riavvio** | Era tenuta in memoria e un riavvio la azzerava | Corretto il 10 novembre (`ce7d7a5`): si salva e continua dopo un riavvio; lotto 38 |
 | **Finestra chiusa e riaperta mentre la regola aspetta** | Partono due attese, e il clima si spegne allo scadere della prima (c'era già prima del lotto 38) | Accettato |

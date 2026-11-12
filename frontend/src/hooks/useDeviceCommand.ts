@@ -14,10 +14,16 @@ export function useDeviceCommand(aptId: string, deviceId: string) {
     return id ? s.commands[id] : undefined;
   });
   const error = useApartmentStore((s) => s.deviceErrors[deviceId]);
-  const busy = isInProgress(status?.status);
+  const sending = useApartmentStore((s) => Boolean(s.sending[deviceId]));
+  const busy = sending || isInProgress(status?.status);
 
   const send = useCallback(
     async (cmd: Command) => {
+      // P-83, D72: a second tap before the server answers would start from the same value (21 → 21,5 and 20,5): the
+      // store is read now, not at the last render, so even two taps in the same frame send one command.
+      const store = useApartmentStore.getState();
+      if (store.sending[deviceId]) return;
+      store.setSending(deviceId, true);
       const correlationId = newCorrelationId();
       try {
         const res = await instanceApi(aptId).sendCommand(deviceId, cmd, correlationId);
@@ -34,6 +40,8 @@ export function useDeviceCommand(aptId: string, deviceId: string) {
           useApartmentStore.getState().setDeviceError(deviceId, { message: err.message, code: err.code, correlationId });
         }
         showError(err, correlationId);
+      } finally {
+        useApartmentStore.getState().setSending(deviceId, false);
       }
     },
     [aptId, deviceId],

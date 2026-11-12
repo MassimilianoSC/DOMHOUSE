@@ -13,7 +13,7 @@ from google.cloud import firestore
 
 from .. import retention
 
-from .base import (EMPTY_AI_USAGE, ai_stats_added, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email, now_iso)
 
 
@@ -137,17 +137,51 @@ class FirestoreRepository:
     async def upsert_booking(self, booking):
         return await self._put("bookings", booking.key, booking, retention.booking(booking.model_dump()))
 
+    async def fold_booking_event(self, apartment_id, ev):
+        from .base import apply_booking_event
+        ref = self._col("bookings").document(f"{apartment_id}__{ev['booking_id']}")
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            new = apply_booking_event(BookingRecord(**snap.to_dict()) if snap.exists else None, apartment_id, ev)
+            data = new.model_dump()
+            data[retention.FIELD] = retention.booking(data)
+            tx.set(ref, data)
+            return new
+        async with self._lock(f"booking:{ref.id}"):    # two events at once in this process: one after the other
+            return await txn(self.db.transaction())
+
+    async def update_user_if_present(self, uid, change):
+        ref = self._col("users").document(uid)
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            if not snap.exists:
+                return None
+            new = change(User(**snap.to_dict()))
+            new.email = new.email.lower()
+            tx.set(ref, new.model_dump())
+            return new
+        async with self._lock(f"user:{uid}"):
+            return await txn(self.db.transaction())
+
     # webhook logs (last WEBHOOK_LOG_LIMIT overall; older documents are deleted on insert)
-    async def _tenant_logs(self, tenant_id):
-        # equality filter only (automatic single-field index, no composite index to deploy); at most
-        # WEBHOOK_LOG_LIMIT+1 documents per tenant, sorted here
+    async def _tenant_logs(self, tenant_id, signature_ok=None):
+        # equality filters only (automatic single-field indexes, no composite index to deploy); at most
+        # WEBHOOK_LOG_LIMIT+1 documents per tenant (D54: of the unattributed ones, per signature_ok), sorted here
         q = self._col("webhook_logs").where(filter=firestore.FieldFilter("tenant_id", "==", tenant_id))
+        if signature_ok is not None:
+            q = q.where(filter=firestore.FieldFilter("signature_ok", "==", signature_ok))
         docs = [d async for d in q.stream()]
         return sorted(docs, key=lambda d: d.get("received_at"), reverse=True)
 
     async def add_webhook_log(self, log):
         await self._put("webhook_logs", log.log_id, log, retention.webhook(log.model_dump()))
-        for stale in (await self._tenant_logs(log.tenant_id))[WEBHOOK_LOG_LIMIT:]:
+        unsigned = log.tenant_id is None and not log.signature_ok      # D54: their own room
+        part = None if log.tenant_id is not None else log.signature_ok
+        for stale in (await self._tenant_logs(log.tenant_id, part))[UNSIGNED_LOG_LIMIT if unsigned else WEBHOOK_LOG_LIMIT:]:
             await stale.reference.delete()
         return log
 
@@ -326,6 +360,24 @@ class FirestoreRepository:
     async def release_work(self, key):
         await self._work(key).delete()
 
+    async def renew_work(self, key, owner, lease_s, payload):
+        ref = self._work(key)
+
+        @firestore.async_transactional
+        async def renew(tx):
+            snap = await ref.get(transaction=tx)
+            d = snap.to_dict() or {}
+            if d.get("status") != "pending" or d.get("owner") != owner:
+                return False
+            until = time.time() + lease_s
+            tx.update(ref, {"lease_until": until, "payload": payload, "retry_at": until})
+            return True
+        try:
+            async with self._lock(f"work:{key}"):
+                return await renew(self.db.transaction())
+        except (Aborted, ValueError):                  # taken over at that very moment: no longer ours
+            return False
+
     async def expire_work(self, key):
         ref = self._work(key)
 
@@ -502,7 +554,10 @@ class FirestoreRepository:
 
         @firestore.async_transactional
         async def txn(tx):
-            admins = [d.id async for d in self._admins_query(user.tenant_id).stream(transaction=tx)]
+            if not (await ref.get(transaction=tx)).exists:
+                return None                              # D57 (P-83): deleted meanwhile: never written back
+            admins = [d.id async for d in self._admins_query(user.tenant_id).stream(transaction=tx)
+                      if not d.id.startswith("inv-")]                      # D39: invitations never count
             if user.role != "admin" and user.uid in admins and len(admins) == 1:
                 return False
             tx.set(ref, user.model_dump())
@@ -522,7 +577,8 @@ class FirestoreRepository:
             if not snap.exists:
                 return "not_found"
             if snap.get("role") == "admin":
-                admins = [d.id async for d in self._admins_query(snap.get("tenant_id")).stream(transaction=tx)]
+                admins = [d.id async for d in self._admins_query(snap.get("tenant_id")).stream(transaction=tx)
+                          if not d.id.startswith("inv-")]                  # D39: invitations never count
                 if admins == [uid]:
                     return "last_admin"
             tx.delete(ref)

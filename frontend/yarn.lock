@@ -1402,6 +1402,16 @@
   resolved "https://registry.yarnpkg.com/@floating-ui/utils/-/utils-0.2.12.tgz#afefe785949f16ac4cdd1e695935a321572dd56a"
   integrity sha512-HpCo8tmWzLVad5s2d19EhAz5zqrrQ6s69qd6moPMQvkOuSwDT1YgRfWSVuc4ennqrgv3OHppiOGMQ7oC13yIww==
 
+"@fontsource-variable/manrope@5.3.0":
+  version "5.3.0"
+  resolved "https://registry.yarnpkg.com/@fontsource-variable/manrope/-/manrope-5.3.0.tgz#da97b427a854b8169141364b8080a9e5f3922518"
+  integrity sha512-6D5dgokHsWDDMtmXHznKa0hK229NN+1a4BLPmUCLqcO1Pw5EEhWY5RFt0AcXnVRAljFFPfRtLkJePQj6LSsV6g==
+
+"@fontsource/jetbrains-mono@5.3.0":
+  version "5.3.0"
+  resolved "https://registry.yarnpkg.com/@fontsource/jetbrains-mono/-/jetbrains-mono-5.3.0.tgz#87bfd849f24b536ed72e89b56ae0d42223697f74"
+  integrity sha512-fqDfB5I9f1p1TV486aUgB9t8zP84P0O1FtQR5Ol9vjwPy+S+EIGlVYm1cvj2W5shcZMTg2nZFdVMoH5wFu8a1A==
+
 "@grpc/grpc-js@~1.9.0":
   version "1.9.16"
   resolved "https://registry.yarnpkg.com/@grpc/grpc-js/-/grpc-js-1.9.16.tgz#614f85036ac8e3c957374c1bd1ebb05934a79a1c"

@@ -9,8 +9,9 @@ Three shapes of data:
 - events: the stream, with an id that keeps growing across restarts (AUTOINCREMENT), kept one hour for Last-Event-ID.
 Plus the hourly telemetry of the power meters (Wh per device and hour).
 
-One writer: the engine's event loop. Every write is committed at once (WAL, synchronous=NORMAL): a crash loses at
-most the last instant, never leaves a half-written record.
+One writer: the engine's event loop. Every write is committed at once (WAL, synchronous=FULL, D34): a crash of the
+process or of the VM loses nothing committed and never leaves a half-written record (with NORMAL a crash of the VM
+could lose the last commits, and a scheduled action closed as done run again at the restart).
 """
 import json
 import sqlite3
@@ -117,7 +118,7 @@ class SqliteStore(MemoryStore):
         self.path = path
         self.db = sqlite3.connect(path, isolation_level=None, check_same_thread=False)
         self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.execute("PRAGMA synchronous=NORMAL")
+        self.db.execute("PRAGMA synchronous=FULL")         # D34 (P-83): every commit on disk, also if the VM crashes
         self.db.execute("PRAGMA busy_timeout=5000")
         version = self.db.execute("PRAGMA user_version").fetchone()[0]
         if version > SCHEMA_VERSION:

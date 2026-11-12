@@ -4,7 +4,7 @@ import uuid
 
 from .. import instances
 from ..logs import info, warn
-from ..repository import Apartment, apply_booking_event, get_repository
+from ..repository import Apartment, get_repository
 from .translator import BookingEvent
 
 RETRIES = 3
@@ -13,9 +13,8 @@ BACKOFF_S = (0.5, 1.5, 3.0)
 
 async def _archive(apartment_id: str, ev: BookingEvent) -> None:
     """Keeps the latest state of every forwarded booking: the contract only exposes current_booking_id."""
-    repo = get_repository()
-    existing = await repo.get_booking(apartment_id, ev.booking_id)
-    await repo.upsert_booking(apply_booking_event(existing, apartment_id, ev.model_dump()))
+    # D43 (P-83): read, fold and write in one transaction: two events of the same booking at once lost one
+    await get_repository().fold_booking_event(apartment_id, ev.model_dump())
 
 
 class ForwardError(Exception):

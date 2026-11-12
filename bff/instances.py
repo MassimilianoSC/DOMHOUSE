@@ -14,6 +14,8 @@ from .repository import Apartment, get_repository
 BFF_ACTOR = "system:bff"
 _http: httpx.AsyncClient | None = None
 _version_cache: dict[str, tuple[float, dict]] = {}
+# D27 (P-83): (apartment, engine address) -> the last /version that answered: the summary's features when it does not
+_version_known: dict[tuple[str, str], dict] = {}
 _secret_cache: dict[str, tuple[float, str]] = {}
 
 
@@ -91,6 +93,43 @@ def instance_url_problem(raw: str) -> str | None:
     if parts.scheme not in ("http", "https") or not parts.hostname:
         return MSG_BAD_URL
     return None
+
+
+MSG_NOT_ALLOWED = ("In questo ambiente di prova si collegano solo il motore di sviluppo e quelli della prova di carico: "
+                   "indirizzo e porta non ammessi")
+
+
+class TargetRefused(Exception):
+    """D04: an engine this environment may not reach (INSTANCE_ALLOWED): no key is read, no call is made."""
+
+
+def allowed_targets(spec: str) -> list[tuple[str, int, int]]:
+    """«10.0.0.2:8100,10.0.0.2:8150-8169» -> [(host, first port, last port)]; a malformed item is never allowed."""
+    out = []
+    for item in (x.strip() for x in spec.split(",")):
+        host, _, ports = item.rpartition(":")
+        first, _, last = ports.partition("-")
+        if host and first.isdigit() and (not last or last.isdigit()):
+            out.append((host.lower(), int(first), int(last or first)))
+    return out
+
+
+def target_problem(raw: str, port: int | None = None) -> str | None:
+    """D04 (P-83): with INSTANCE_ALLOWED set (staging) only those engines, host and port, the port of the link or the
+    apartment's or the scheme's; mock:// is in this process and always allowed. None when allowed."""
+    spec = get_settings().instance_allowed
+    v = normalize_instance_url(raw)
+    if not spec or v.startswith("mock://"):
+        return None
+    parts = urlsplit(v)
+    try:
+        number = parts.port or port or (443 if parts.scheme == "https" else 80)
+    except ValueError:
+        return MSG_NOT_ALLOWED
+    host = (parts.hostname or "").lower()
+    if any(host == h and lo <= number <= hi for h, lo, hi in allowed_targets(spec)):
+        return None
+    return MSG_NOT_ALLOWED
 
 
 def base_url(apt: Apartment) -> str:
@@ -183,6 +222,8 @@ def correlation_id(incoming: str | None) -> str:
 
 
 async def instance_headers(apt: Apartment, actor: str, correlation_id: str | None = None) -> dict[str, str]:
+    if target_problem(apt.instance_url, apt.port):        # D04: before the key is read, for every call and stream
+        raise TargetRefused(apt.apartment_id)
     headers = {
         "X-API-Key": await api_key(apt),
         "X-Actor": actor,
@@ -276,6 +317,8 @@ async def verify(apt: Apartment, actor: str) -> dict:
                  "contract_version": None, "features": [], "ok": False}
     if problem := instance_url_problem(apt.instance_url):
         out["error"] = problem  # saved before the check existed: no call would work, say what to write instead
+    elif problem := target_problem(apt.instance_url, apt.port):
+        out["error"] = problem  # D04: an engine this environment may not reach; no key is read
     elif problem := await _secret_problem(apt):
         out["error"], out["secret_problem"] = problem, True
     else:
@@ -308,7 +351,13 @@ async def get_version(apt: Apartment, *, timeout: float | None = None) -> dict:
     resp.raise_for_status()
     data = resp.json()
     _version_cache[apt.apartment_id] = (time.monotonic() + 60, data)
+    _version_known[(apt.apartment_id, base_url(apt))] = data
     return data
+
+
+def known_version(apt: Apartment) -> dict | None:
+    """D27: the last /version this engine (same apartment, same address) answered; None for a new link."""
+    return _version_known.get((apt.apartment_id, base_url(apt)))
 
 
 def invalidate_version(apartment_id: str) -> None:
@@ -396,7 +445,17 @@ async def summary(apt: Apartment, actor: str, tz_midnight_utc: str | None = None
     out["health"] = health_out(health) if reachable else None
     out["online"] = health_code == 200 and version is not None
     if not version:
-        return out
+        # D27 (P-83): an engine that does not answer keeps the features it had (never «non disponibile» everywhere);
+        # online stays False. Down altogether: no other call to wait for
+        known = known_version(apt)
+        if known is None:
+            return out
+        version = known
+        if not reachable:
+            out["contract_version"] = version.get("contract_version")
+            out["features"] = effective_features(version.get("features", []), tenant.enabled_features if tenant else None,
+                                                 apt.enabled_features)
+            return out
     out["contract_version"] = version.get("contract_version")
     feats = effective_features(version.get("features", []), tenant.enabled_features if tenant else None, apt.enabled_features)
     out["features"] = feats

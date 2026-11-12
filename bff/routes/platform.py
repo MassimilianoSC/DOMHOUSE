@@ -343,8 +343,9 @@ class ApartmentLink(BaseModel):
 
 def _demo_code_refused(url: str, code: str | None) -> JSONResponse | None:
     """D-98 (d3): in production a demonstration apartment (mock://) never gets an Italianway code, which would route
-    real bookings into a simulated engine. In staging it stays allowed."""
-    if code and instances.is_mock(url) and get_settings().instance_mode == "real":
+    real bookings into a simulated engine. In staging it stays allowed. D66 (P-83): production is APP_ENV=prod; staging
+    has real engines too (INSTANCE_MODE=real, D-203) and was refused with «In produzione…»."""
+    if code and instances.is_mock(url) and get_settings().app_env == "prod":
         return err(409, "italianway_on_demo", "In produzione un appartamento dimostrativo non può avere un codice Italianway")
     return None
 
@@ -394,7 +395,7 @@ async def create_tenant_apartment(tenant_id: str, body: ApartmentCreate, identit
         return t
     if not _check_tz(body.timezone):
         return err(422, "invalid_timezone", "Fuso orario non valido")
-    if problem := instances.instance_url_problem(body.instance_url):
+    if problem := instances.instance_url_problem(body.instance_url) or instances.target_problem(body.instance_url, body.port):
         return err(422, "invalid_instance_url", problem)
     if refused := _demo_code_refused(body.instance_url, _code(body.italianway_id)):
         return refused
@@ -438,6 +439,8 @@ async def relink_tenant_apartment(tenant_id: str, apartment_id: str, body: Apart
         apt.instance_url = instances.normalize_instance_url(body.instance_url)
     if "port" in body.model_fields_set:
         apt.port = body.port
+    if problem := instances.target_problem(apt.instance_url, apt.port):     # D04: the link as it would be saved
+        return err(422, "invalid_instance_url", problem)
     new_code = _code(body.italianway_id) if "italianway_id" in body.model_fields_set else old_code
     if refused := _demo_code_refused(apt.instance_url, new_code):
         return refused

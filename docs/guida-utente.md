@@ -370,7 +370,11 @@ Le notifiche arrivano anche ad app chiusa, se le attivi su quel dispositivo.
   le «Decisioni» (prenotazione annullata, antigelo non attivo) o il riepilogo della settimana.
 - **Se l'app è già aperta**, la notifica compare come avviso in alto con il pulsante «Apri» (su iPhone arriva
   comunque come notifica del telefono).
-- **Se stai già guardando quell'appartamento** non compare un secondo avviso.
+- **Se stai già guardando quell'appartamento**, approvazioni e dispositivi offline non compaiono una seconda volta,
+  perché la pagina li mostra già. Gli altri avvisi compaiono comunque (dal lotto 40): antigelo non attivo, azioni
+  programmate non eseguite, prenotazioni, riepiloghi, sistema domotico non raggiungibile.
+- **Se una notifica sostituisce una precedente** (per esempio lo stesso dispositivo di nuovo offline), il telefono
+  suona di nuovo (dal lotto 40).
 - **Se non sei collegato**, prima devi accedere e poi aprire la pagina da solo.
 
 **Uscita e rientro:**
@@ -395,7 +399,7 @@ Tutte hanno il nome dell'appartamento davanti.
 |---|---|---|---|
 | «Approvazioni richieste» | «…: approvazione richiesta», con la proposta oppure «Il motore chiede il tuo consenso» | Quando il motore apre una richiesta (non per quelle in coda dietro un'altra) | «Approvazioni» |
 | «Dispositivi e sistema domotico offline» | «…: dispositivo offline», «… non risponde da oltre … minuti» | Dopo i minuti della regola «Avviso dispositivo offline» (15 all'inizio); regola spenta, niente avviso | «Panoramica» |
-| «Dispositivi e sistema domotico offline» | «…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall'app non arrivano e le regole automatiche potrebbero essere ferme.» | Sistema domotico fermo o irraggiungibile oltre la stessa soglia; una volta per episodio | «Panoramica» |
+| «Dispositivi e sistema domotico offline» | «…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall'app non arrivano e le regole automatiche potrebbero essere ferme.» (dopo due ore «N ore», dopo due giorni «N giorni»: è il tempo da quando tace, D75) | Sistema domotico fermo o irraggiungibile oltre la stessa soglia; una volta per episodio | «Panoramica» |
 | «Dispositivi e sistema domotico offline» | «…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo» | A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio | «Decisioni» |
 | «Prenotazioni» | «…: prenotazione annullata, appartamento rimesso a vuoto» | Disdetta dopo che l'appartamento era già stato preparato per l'arrivo | «Decisioni» |
 | «Prenotazioni» (pre-arrivo, check-out, casa vuota) oppure «Dispositivi e sistema domotico offline» (le altre) | «…: azione programmata non eseguita» con il motivo, oppure «N azioni programmate non eseguite. La prima: …» se più d'una entro un minuto; dopo uno spegnimento programmato «Durante la manutenzione N azioni programmate non sono state eseguite» | Un'azione programmata rifiutata alla sua ora o saltata perché il sistema era fermo (dal lotto 38); dopo uno spegnimento programmato le azioni saltate non arrivano una per una | «Programmazione» |
@@ -485,6 +489,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | In alto | Il nome e «In tempo reale» | La pagina si aggiorna da sola |
 | In alto | «Riconnessione…» | Sta ricollegandosi: non prendere per buono un valore vecchio |
 | In alto, quando torni sulla pagina | «Riconnessione…» per un attimo | Con la pagina in sottofondo l'app non si aggiorna in tempo reale; quando torni si rimette in pari da sola |
+| In alto (dal lotto 40) | «Dati non aggiornati» al posto di «In tempo reale», con «Sistema domotico non raggiungibile» | Il collegamento col server c'è, ma il sistema domotico non risponde: i valori mostrati possono essere vecchi |
 | La striscia di salute | «In salute», «Degradata» o «Ferma», poi «… dispositivi connessi» | Lo stato del sistema domotico e il collegamento con i dispositivi |
 | La striscia di salute | «Dettagli tecnici» | Apre «Connettore» («attivo» o «fermo»), «Modello», «Versione» con il contratto e «Ultimo evento» |
 | La striscia di salute | «Sistema domotico non raggiungibile» | Il sistema domotico non risponde |
@@ -501,7 +506,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | «Modalità» | Comfort, Eco o Casa vuota; durante una forzatura, sotto, «forzata fino alle …» | Il colore della modalità: Comfort arancione chiaro, Eco verde salvia, Casa vuota azzurro ardesia |
 | «Occupazione» | «Vuoto», «Occupato» o «Prenotato» | «Occupato» verde, «Prenotato» ambra, «Vuoto» tortora |
 | «Prossimo check-in» o «Prossimo check-out» | Il primo fra arrivo e partenza; senza nessuno dei due, «Prossimo evento» con un trattino | Bianca |
-| «Finestre» | «Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore» | Verde se sono tutte chiuse, ambra se una è aperta; bianca senza sensori |
+| «Finestre» | «Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore». Dal lotto 40, se un sensore è senza segnale: «Stato non noto» (o «Nessuna aperta» se gli altri sono chiusi) con la riga «Senza segnale: …» e le stanze | Verde se sono tutte chiuse, ambra se una è aperta; bianca senza sensori; neutra se un sensore è senza segnale, perché di quella finestra non si sa nulla |
 | «Consumo di oggi» | I kWh di oggi; un trattino se la funzione Consumi è spenta | Bianca, con il numero in arancione |
 | «Dispositivi online» | Quanti rispondono, per esempio 5/6; sotto, «… offline» se qualcuno manca | Verde se rispondono tutti, ambra se qualcuno è offline |
 
@@ -573,7 +578,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | La descrizione, in grande | Che cosa chiede |
 | «Perché il motore lo propone», con il testo sotto | Il motivo, senza riquadro |
 | «Azione proposta» seguita dall'azione in grassetto | Che cosa partirà |
-| «… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta» | Quanto tempo resta per decidere |
+| «… rimasti» (in rosso sotto i 5 minuti) oppure «scaduta» | Quanto tempo resta per decidere; dal lotto 40, a «scaduta» i pulsanti si disattivano |
 | Accanto: «Alla scadenza verrà respinta», «Alla scadenza verrà eseguita» o «Alla scadenza resta in attesa» | Cosa succede se nessuno decide |
 | Sotto una riga: «Nota (facoltativa)» e i pulsanti | Solo nelle richieste in attesa, per chi può decidere |
 | In fondo: «Approvata da … …» o «Respinta da … …» con la nota, poi l'«ID richiesta» | Solo nelle richieste già decise o scadute |
@@ -602,7 +607,7 @@ per 24 mesi.
 |---|---|
 | Prima linea, in nero: il tipo di azione e i valori prima → dopo | Per esempio «Modalità» con «comfort → casa vuota» |
 | Il tipo di azione, in italiano | Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata» |
-| Altri esempi di tipo | «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo» |
+| Altri esempi di tipo | «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo»; dal lotto 40 «Modalità: comando in sospeso» (un dispositivo non raggiungibile durante il cambio di modalità: il comando parte quando torna raggiungibile) |
 | A destra della prima linea: l'esito, in un badge colorato | «Applicata» verde; «Respinta» e «Non riuscita» rosso mattone; «in attesa di approvazione» ambra; «Informativa» tortora |
 | Seconda linea, in grigio: la data · chi ha deciso · su cosa | «Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; «appartamento», «dispositivo», «regole», «programmazione» |
 | Chi ha deciso, se ha eliminato l'account | «utente rimosso» |
@@ -672,7 +677,7 @@ per 24 mesi.
 
 | Cosa vedi | Cosa puoi fare | Cosa succede |
 |---|---|---|
-| Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso» | Toccare una delle pillole: la scelta è scritta in scuro | «Soggiorno in corso» compare solo con ospiti dentro e una prenotazione conosciuta dall'app |
+| Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso» | Toccare una delle pillole: la scelta è scritta in scuro | «Soggiorno in corso» compare durante una prenotazione conosciuta dall'app; dal lotto 40 anche se il check-in non è stato registrato, e sparisce al check-out |
 | La casella «Totale periodo» in «kWh», con il numero in arancione | Leggere il totale | I numeri si aggiornano ogni minuto |
 | La casella «Ora con più consumo» (oggi) o «Giorno con più consumo» (periodi più lunghi) | Leggere il picco | Sotto il valore, «ore …» oppure la data |
 | La casella «Ore di clima evitate» | Leggere le ore | Compare solo quando il motore le calcola; oggi non compare |
@@ -850,6 +855,7 @@ lavora con un accesso di assistenza.
 1. **Sotto «Forza per…»** premi «30 min», «2 h» o «6 h».
 2. **Se c'è una finestra aperta**, prima di partire l'app avvisa con «Finestra aperta» e «Finestra aperta in …:
    durante la forzatura il clima resta acceso.» (o «Finestre aperte in …: …»): scegli «Forza comunque» o «Annulla».
+   Dal lotto 40 avvisa anche se un sensore è senza segnale: «Sensore della finestra senza segnale in …».
 3. **Compare** «Forzatura … attiva fino alle …» con «ancora …» e il pulsante «Annulla forzatura».
 
 **Che cosa fa la forzatura:**
@@ -859,8 +865,17 @@ lavora con un accesso di assistenza.
   cui riparte).
 - **La regolazione automatica del clima** si ferma.
 - **Un cambio di modalità programmato** (per esempio il check-out) aspetta la fine della forzatura (nelle Decisioni
-  «Azione rimandata», «rimandata per la forzatura»).
+  «Azione rimandata», «rimandata per la forzatura»). Dal lotto 40 aspetta anche una richiesta di approvazione che
+  scade durante la forzatura con «Alla scadenza verrà eseguita».
 - **L'antigelo** resta attivo.
+
+**Se durante la forzatura cambi modalità a mano** (D09, risposta 1085):
+
+- **Vale per:** i pulsanti della modalità, un'approvazione accolta a mano, una richiesta all'assistente.
+- **La forzatura continua** fino alla stessa ora, nella modalità nuova: il riquadro diventa «Forzatura eco attiva fino
+  alle …».
+- **Nelle Decisioni:** «Forzatura», con «comfort → eco fino alle …».
+- **Alla fine** resta la modalità scelta. Non compare «Forzatura annullata».
 
 **Quando finisce:**
 
@@ -879,7 +894,7 @@ I comandi funzionano solo sui dispositivi online e con la funzione «Comandi» a
 | Prese e interruttori | Tocca l'interruttore («Accendi …» / «Spegni …») | Lo stato diventa «Acceso» o «Spento» |
 | Caldaia | «Attiva …» / «Disattiva …» abilita o disabilita il riscaldamento | Leggi «Riscaldamento abilitato» / «Riscaldamento disabilitato» |
 | Caldaia e climatizzatore | «Diminuisci temperatura» e «Aumenta temperatura» accanto a «Temperatura», a passi di 0,5 °C, entro «da … a … °C» | Fuori dai limiti il comando è rifiutato («Il setpoint deve essere tra … e …») |
-| Climatizzatore | L'interruttore | Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all'inizio) |
+| Climatizzatore | L'interruttore | Dopo uno spegnimento la riaccensione aspetta la pausa del compressore (3 minuti all'inizio). Dal lotto 40 un climatizzatore a infrarossi con misuratore risulta acceso se assorbe corrente, anche quando il comando era «non confermato» |
 | Climatizzatore, «Modo» | Scegli dalla tendina: Caldo, Freddo, Deumidifica, Ventilazione | Il modo cambia |
 | Climatizzatore, «Ventola» | Scegli dalla tendina: Auto, Bassa, Media, Alta | La ventola cambia |
 
@@ -1038,7 +1053,8 @@ modifica, tu la controlli e la applichi. Niente cambia finché non premi «Appli
 
 1. **Scrivi in italiano** (esempio «la finestra aperta spegne dopo 10 minuti»; al massimo 500 caratteri, contatore
    «…/… caratteri») e premi «Proponi».
-2. **Leggi** «Preparo la proposta…», poi «Modifiche proposte».
+2. **Leggi** «Preparo la proposta…», poi «Modifiche proposte». Dal lotto 40 una frase con un numero cambia il valore
+   («dopo 10 minuti» cambia i minuti) e non spegne la regola; la spegne solo una frase senza numeri e senza «non».
 3. **Controlla** regola, campo, valore prima e dopo (per esempio «Finestra aperta spegne il clima, Minuti da 5 a
    10», «Stato» «attiva» o «spenta») e la spiegazione.
 4. **Premi «Applica»** («Regole aggiornate come proposto») o «Scarta».
@@ -1082,6 +1098,7 @@ riquadro: la conversazione e, in fondo, il campo per scrivere.
    tocca un suggerimento.
 2. **La tua domanda** compare a destra, in una bolla colorata.
 3. **Leggi** «Sto elaborando…», poi la risposta a sinistra sotto il nome «Assistente», senza bolla né icona.
+   Dal lotto 40 la risposta arriva anche se nel frattempo cambi pagina o ricarichi.
 4. **Un badge compare solo se serve**: «Richiede approvazione» (poi «Approvata», «Respinta» o «Scaduta») oppure
    «Non riuscita». Una risposta normale non ha badge.
 5. **Se dopo 30 secondi** non c'è risposta leggi «Nessuna risposta dall'assistente: riprova».
@@ -1185,6 +1202,8 @@ riquadro: la conversazione e, in fondo, il campo per scrivere.
 - **Esegue il comando** solo se la frase è inequivocabile: un verbo e un solo dispositivo (per tipo, stanza o nome)
   oppure una modalità, senza «non», condizioni od orari.
 - **Con ospiti dentro** chiede conferma come sempre.
+- **Una presa** si comanda solo nominandola con una parola del suo nome, per esempio «la stufetta» (dal lotto 40):
+  «accendi la luce» non accende più una presa qualsiasi.
 - **In fondo alla risposta** leggi «Risposta rapida: l'assistente completo non ha risposto in tempo.» (oppure «… non
   è raggiungibile ora.» o «… ha raggiunto il limite mensile.»).
 
@@ -1434,7 +1453,7 @@ appartamento può avere un'eccezione.».
 
 | Cosa vedi | Cosa puoi fare | Cosa succede |
 |---|---|---|
-| Nove interruttori in colonna, con i nomi del menu e una riga di spiegazione sotto ciascuno (tabella sotto) | Accendere o spegnere una funzione per tutta l'organizzazione | Ogni cambio si salva subito («Funzioni aggiornate») |
+| Nove interruttori in colonna, con i nomi del menu e una riga di spiegazione sotto ciascuno (tabella sotto) | Accendere o spegnere una funzione per tutta l'organizzazione | Ogni cambio si salva subito («Funzioni aggiornate»); dal lotto 40, mentre salva, gli interruttori sono grigi |
 | «Ripristina tutte» | Riaccendere tutto | Tutte le funzioni tornano accese |
 | Lo stesso elenco per ogni appartamento, compatto e senza spiegazioni, con «eredita dall'organizzazione» oppure «eccezione per questo appartamento» | Fare un'eccezione per un appartamento | L'eccezione sostituisce la scelta dell'organizzazione e può anche riaccendere una funzione spenta per tutti |
 | «Torna all'organizzazione» | Togliere l'eccezione | L'appartamento segue di nuovo l'organizzazione |
@@ -1999,7 +2018,8 @@ all'amministratore. Non serve un'approvazione preventiva.
    comfort; il climatizzatore, se nella stanza c'è un sensore, scalda o raffresca da solo.
 4. **Nella scheda** l'occupazione è «Prenotato».
 5. **Quando Italianway comunica l'arrivo effettivo** («Check-in» nelle Decisioni) l'occupazione diventa «Occupato».
-6. **Da ora** l'assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità.
+6. **Da ora** l'assistente chiede conferma prima di spegnere clima o caldaia o cambiare modalità. Dal lotto 40 la
+   chiede già dall'inizio della prenotazione, anche se l'arrivo effettivo non è stato comunicato.
 7. **Se vuoi scaldare prima** o cambiare qualcosa, usa «Modalità» o i comandi in Panoramica, oppure l'assistente.
 
 > **Da sapere**
@@ -2054,6 +2074,8 @@ all'amministratore. Non serve un'approvazione preventiva.
 - **Dopo la stessa soglia** arriva una sola notifica «…: sistema domotico non raggiungibile». Dice «Il connettore
   domotico risulta fermo» se il sistema risponde ma ha perso i dispositivi; dal lotto 38 dice «Il sistema domotico
   non risponde da N minuti: …» se non risponde affatto (macchina spenta, rete interrotta).
+- **La durata è il tempo da quando tace** (D75): «N minuti» fino a due ore, poi «N ore», dopo due giorni «N giorni».
+  Dopo una sospensione degli avvisi può dire, per esempio, «da 3 giorni».
 - **Nelle Decisioni**, nel primo caso: «Collegamento ai dispositivi perso» e poi «Collegamento ai dispositivi
   ripristinato». Nel secondo caso (dal lotto 38), dopo un fermo più lungo della soglia: «Sistema domotico di nuovo
   raggiungibile dopo …», con la durata.
@@ -2250,7 +2272,7 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 |---|---|---|
 | «Finestra aperta spegne il clima» | «Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.» | «Minuti»: 5, da 1 a 30 |
 | «Limiti del setpoint» | «Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c'è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.» | Vedi la tabella sotto |
-| «Antigelo a casa vuota» | «Con la casa vuota mantiene almeno questa temperatura.» | «Temperatura (°C)»: 8, da 5 a 12 |
+| «Antigelo a casa vuota» | «Con la casa vuota la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare.» (D31) | «Temperatura (°C)»: 8, da 5 a 12 |
 | «Antimuffa a casa vuota» | «Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.» | «Umidità (%)»: 65, da 50 a 80 |
 | «Pre-arrivo» | «Porta la casa in comfort prima dell'arrivo degli ospiti.» | «Ore prima del check-in»: 2, da 0 a 6 |
 | «Risparmio al check-out» | «Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.» | «Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180 |
@@ -2275,6 +2297,9 @@ Tutte partono attive. Sette si modificano dall'app, una no.
   stanza. Sospesa durante una forzatura; alla fine riparte. L'antigelo è più forte. Dal lotto 38, se il sistema
   domotico si riavvia con una finestra aperta, la regola riparte da sola: il clima si spegne allo scadere dei minuti
   contati da quando la finestra si è aperta; se si è aperta mentre il sistema era fermo, dalla ripartenza.
+  Dal lotto 40, finché il sensore non si è fatto risentire dopo il riavvio la finestra resta «aperta» e la caldaia
+  resta spenta; la regola tiene spenti clima e caldaia per tutto il tempo in cui la finestra resta aperta, anche se
+  un dispositivo era offline o lo spegnimento non era riuscito.
   Quando la modalità comfort accende un climatizzatore dopo la pausa del compressore, il climatizzatore resta regolato
   dal comfort (dal lotto 39).
   **Alla chiusura della finestra riscaldamento e clima riprendono da soli** (dal lotto 38): quando si chiude l'ultima
@@ -2285,6 +2310,10 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 - **«Antigelo a casa vuota»**: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
   0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve
   un sensore: senza, «Antigelo non attivo».
+- **Antigelo con la regola spenta** (D31, risposta 1089): al passaggio a casa vuota la caldaia va comunque alla
+  temperatura dell'antigelo. Ma se qualcuno la spegne o abbassa la temperatura a mano, resta così: vince la scelta a
+  mano, e senza sensore non arriva nessun avviso.
+- **Con la regola accesa** (come all'inizio) la caldaia torna alla soglia anche dopo uno spegnimento a mano.
 - **«Antimuffa a casa vuota»**: scrive «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa
   vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione.
 - **«Pre-arrivo»**: ogni prenotazione creata o modificata programma il comfort. Cambiare le ore vale per le
@@ -2293,8 +2322,12 @@ Tutte partono attive. Sette si modificano dall'app, una no.
   «Mettere l'appartamento a vuoto dopo il check-out»; senza risposta la approva.
 - **«Pausa minima del compressore»**: dopo uno spegnimento la riaccensione del clima aspetta; un comando automatico
   viene rimandato, uno di una persona o dell'assistente può essere rifiutato se manca più di qualche secondo.
+  Dal lotto 40 vale anche se lo spegnimento è ancora in corso («riprova tra N secondi»), e un'accensione rimandata
+  non parte se nel frattempo è cambiata la modalità, è iniziata una forzatura o qualcuno ha comandato il clima
+  («rimandata … e non eseguita»).
 - **«Avviso dispositivo offline»**: dopo la soglia scrive «Dispositivo offline» nelle Decisioni e manda la notifica;
-  la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto.
+  la stessa soglia vale per il sistema domotico fermo. Il ritorno online prima della soglia annulla tutto. Dal lotto 40
+  vale anche per un dispositivo già scollegato quando il sistema riparte, e l'app mostra quando è stato visto l'ultima volta.
 
 **«Limiti del setpoint»** (con effetto dal lotto 31):
 
@@ -2341,7 +2374,18 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 - **Una disdetta** annulla le azioni aperte.
 - **Se il pre-arrivo era già stato eseguito**, programma il ritorno a casa vuota («Disdetta dopo il pre-arrivo») e
   manda la notifica «Prenotazioni», salvo un altro soggiorno in corso o un altro pre-arrivo già eseguito.
+- **Due ospiti di fila** (dal lotto 40): il check-out del primo non mette la casa a vuoto se il secondo è già
+  dentro, se il suo pre-arrivo è già partito o se arriva entro le ore del pre-arrivo. Nelle Decisioni compare
+  «Check-out: casa non svuotata».
+- **Prenotazione modificata dopo il pre-arrivo** (dal lotto 40): non rimette il comfort al posto della tua scelta.
+  Se l'arrivo slitta più avanti, la casa torna subito a vuoto e si riscalda al nuovo pre-arrivo («Arrivo spostato:
+  casa vuota»).
+- **Un messaggio di prenotazione arrivato in ritardo**, più vecchio dell'ultimo già applicato, viene ignorato
+  (dal lotto 40, «Prenotazione: evento vecchio ignorato»).
 - **Un cambio di modalità programmato durante una forzatura** aspetta la sua fine («Azione rimandata»).
+- **Un cambio di modalità con un dispositivo non raggiungibile** (dal lotto 40): la caldaia prende subito la
+  temperatura della nuova modalità; il climatizzatore riceve il comando quando torna raggiungibile, salvo un altro
+  cambio o un comando di una persona nel frattempo («Modalità: comando in sospeso»).
 - **Dopo un riavvio del sistema**, un'azione in ritardo di oltre 30 minuti viene saltata («Programma: saltata»).
 - **L'occupazione «Occupato»** richiede il check-in effettivo comunicato da Italianway; la sola prenotazione dà
   «Prenotato».

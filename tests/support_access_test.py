@@ -63,6 +63,7 @@ def test_stream_closes_at_the_exact_expiry():
     elapsed = time.monotonic() - start
     assert r.status_code == 200 and ": connected" in r.text
     assert elapsed < 10, elapsed                                  # the deadline, not the 25 s ping or the 30 s recheck
+    assert elapsed >= 1.2, elapsed                                # T3b-7 (P-83): and not before it (1.5 s, margin 0.3)
     close(aid)
 
 

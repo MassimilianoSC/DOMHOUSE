@@ -113,7 +113,46 @@ export default function AssistantPage() {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages, aptId]);
 
-  const update = (m: AskStatus) => setMessages((list) => list.map((x) => (x.ask_id === m.ask_id ? m : x)));
+
+  /**
+   * P-83, D23: a question stays «pending» on the engine up to ~28 s; it is followed here until its answer, also when
+   * it was asked before the page was left or reloaded. One failed read (network, 502) is retried; a refusal (403, 404)
+   * or no answer after 30 reads makes it «non riuscita», never «Sto elaborando…» for ever. Leaving the page (or another
+   * apartment) stops the reads: generation changes, and the next opening takes them up from the stored chat.
+   */
+  const generation = useRef(0);
+  const follow = useCallback(async (askId: string) => {
+    const mine = generation.current;
+    const api = instanceApi(aptId);
+    const gone = () => mine !== generation.current;
+    for (let i = 0; i < 30; i++) {
+      await sleep(1000);
+      if (gone()) return;
+      let current: AskStatus;
+      try {
+        current = await api.getAsk(askId);
+      } catch (err) {
+        if (gone()) return;
+        if (err instanceof ApiError && err.status >= 400 && err.status < 500) break;
+        continue;
+      }
+      if (gone()) return;
+      if (current.status !== "pending") {
+        setMessages((list) => list.map((x) => (x.ask_id === current.ask_id ? current : x)));
+        return;
+      }
+    }
+    if (gone()) return;
+    setMessages((list) => list.map((x) => (x.ask_id === askId && x.status === "pending" ? { ...x, status: "failed", answer: t("assistant.timeout"), reason: "timeout" } : x)));
+  }, [aptId]);
+
+  useEffect(() => {
+    generation.current++;
+    for (const m of load(aptId)) if (m.status === "pending") void follow(m.ask_id);
+    return () => {
+      generation.current++;
+    };
+  }, [aptId, follow]);
   // P-75: the outcome of the question's approvals, kept with the message (and in the tab's storage) for the badge
   const onOutcome = useCallback((askId: string, o: ApprovalOutcome) =>
     setMessages((list) => (list.some((x) => x.ask_id === askId && x.approval_outcome !== o) ? list.map((x) => (x.ask_id === askId ? { ...x, approval_outcome: o } : x)) : list)), []);
@@ -126,17 +165,17 @@ export default function AssistantPage() {
     setText("");
     const correlationId = newCorrelationId();
     const api = instanceApi(aptId);
+    const asked = generation.current;
     try {
       const ask = await api.ask(q, correlationId);
+      if (asked !== generation.current) {
+        // the page was left before the server answered: kept in the stored chat, followed at the next opening (D23)
+        sessionStorage.setItem(`assistant.${aptId}`, JSON.stringify([...load(aptId), ask].slice(-50)));
+        return;
+      }
       setMessages((list) => [...list, ask]);
       setSending(false);
-      let current = ask;
-      for (let i = 0; i < 30 && current.status === "pending"; i++) {
-        await sleep(1000);
-        current = await api.getAsk(ask.ask_id);
-      }
-      if (current.status === "pending") current = { ...current, status: "failed", answer: t("assistant.timeout"), reason: "timeout" };
-      update(current);
+      if (ask.status === "pending") void follow(ask.ask_id);
     } catch (err) {
       setSending(false);
       showError(err, err instanceof ApiError ? err.correlationId : correlationId);

@@ -288,28 +288,77 @@ def test_c10_modalita_appartamento(client: Client):
     assert any(e.get("event") == "apartment.changed" for e in eventi)
 
 
+LIMITE_REGOLA_S = 60   # C11: entro quanto la regola finestra aperta deve spegnere il clima, senza forzatura
+
+
+def _clima_acceso(client: Client, device_id: str) -> bool:
+    stato = next(d for d in client.get("/devices").json()["devices"] if d["device_id"] == device_id)
+    return stato["capabilities"]["climate"]["on"] is True
+
+
+def _accendi_clima(client: Client, device_id: str) -> None:
+    r = client.post(f"/devices/{device_id}/commands",
+                    {"capability": "climate", "action": "set_climate", "params": {"on": True, "mode": "heat"}})
+    assert r.status_code == 202, r.text
+    assert client.attendi_comando(r.json()["command_id"])["status"] == "acked"
+
+
+def _finestra(client: Client, device_id: str, aperta: bool) -> None:
+    client.stato_simulato({"device_id": device_id, "capability": "contact", "state": {"open": aperta}})
+
+
+def _secondi_allo_spegnimento(client: Client, device_id: str, limite_s: float) -> float | None:
+    """Secondi finché il clima risulta spento, controllando ogni mezzo secondo; None se è ancora acceso dopo limite_s."""
+    inizio = time.monotonic()
+    while time.monotonic() - inizio < limite_s:
+        if not _clima_acceso(client, device_id):
+            return time.monotonic() - inizio
+        time.sleep(0.5)
+    return None
+
+
 def test_c11_forzatura(client: Client):
     """C11 · POST /apartment/hold 5 minuti → hold valorizzato; durante il hold una finestra aperta (via /_test/state)
-    non spegne il clima; alla scadenza hold = null e la regola torna attiva."""
+    non spegne il clima; tolto il hold (hold = null) la regola torna attiva.
+    L'attesa si misura sull'implementazione (D79): prima, senza forzatura, una finestra aperta deve spegnere il clima
+    entro LIMITE_REGOLA_S, in T secondi (la regola agisce davvero qui, quindi la prova può fallire); poi, con la
+    forzatura, il clima deve restare acceso per 2T + 3 s. Con un'attesa fissa più breve di T la prova passava anche
+    con una forzatura che non sospende la regola."""
     client.richiede("apartment", "devices", "commands", "rules")
     client.richiede_stato("forzatura")
     finestra = client.dispositivo_con("contact")
     clima = client.dispositivo_con("climate")
 
-    r = client.post("/apartment/hold", {"minutes": 1, "mode": "comfort"})
-    assert r.status_code == 202, r.text
-    assert client.get("/apartment").json()["hold"] is not None
+    # 1. senza forzatura: la regola spegne il clima, e si misura in quanto tempo
+    assert client.get("/apartment").json()["hold"] is None
+    _accendi_clima(client, clima["device_id"])
+    _finestra(client, finestra["device_id"], True)
     try:
-        r = client.post(f"/devices/{clima['device_id']}/commands",
-                        {"capability": "climate", "action": "set_climate", "params": {"on": True, "mode": "heat"}})
-        assert r.status_code == 202
-        assert client.attendi_comando(r.json()["command_id"])["status"] == "acked"
-        client.stato_simulato({"device_id": finestra["device_id"], "capability": "contact", "state": {"open": True}})
-        time.sleep(2)
-        stato = next(d for d in client.get("/devices").json()["devices"] if d["device_id"] == clima["device_id"])
-        assert stato["capabilities"]["climate"]["on"] is True, "il hold non ha sospeso la regola finestra aperta"
+        t = _secondi_allo_spegnimento(client, clima["device_id"], LIMITE_REGOLA_S)
     finally:
-        client.stato_simulato({"device_id": finestra["device_id"], "capability": "contact", "state": {"open": False}})
+        _finestra(client, finestra["device_id"], False)
+    assert t is not None, (f"senza forzatura la finestra aperta non ha spento il clima entro {LIMITE_REGOLA_S} s: "
+                           "C11 non può provare che la forzatura sospende la regola")
+
+    # 2. con la forzatura: per 2T + 3 s il clima resta acceso
+    r = client.post("/apartment/hold", {"minutes": 5, "mode": "comfort"})
+    assert r.status_code == 202, r.text
+    try:
+        assert client.get("/apartment").json()["hold"] is not None
+        _accendi_clima(client, clima["device_id"])
+        _finestra(client, finestra["device_id"], True)
+        spento = _secondi_allo_spegnimento(client, clima["device_id"], 2 * t + 3)
+        assert spento is None, (f"il hold non ha sospeso la regola finestra aperta: clima spento dopo {spento:.1f} s "
+                                f"(senza forzatura {t:.1f} s)")
+
+        # 3. tolta la forzatura con la finestra ancora aperta, la regola torna attiva
+        r = client.post("/apartment/hold", {"minutes": 0})
+        assert r.status_code == 202, r.text
+        assert client.get("/apartment").json()["hold"] is None
+        assert _secondi_allo_spegnimento(client, clima["device_id"], 2 * t + 3) is not None, \
+            "tolta la forzatura, la regola finestra aperta non è tornata attiva"
+    finally:
+        _finestra(client, finestra["device_id"], False)
         client.post("/apartment/hold", {"minutes": 0})
     assert client.get("/apartment").json()["hold"] is None
 

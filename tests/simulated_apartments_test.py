@@ -33,6 +33,16 @@ def real(monkeypatch):
     return settings
 
 
+def prod(monkeypatch, app_env="prod"):
+    """D66 (P-83): production is APP_ENV=prod; staging has real engines too (INSTANCE_MODE=real, D-203)."""
+    from bff.routes import webhooks
+    settings = dataclasses.replace(get_settings(), instance_mode="real", app_env=app_env,
+                                   italianway_webhook_secret="replace-me")
+    for module in (instances, platform, webhooks):
+        monkeypatch.setattr(module, "get_settings", lambda: settings)
+    return settings
+
+
 async def call(method, path, who="admin@demo.it", target=app, **kw):
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=target), base_url="http://t") as c:
         return await c.request(method, path, headers={"X-Dev-User": who, **kw.pop("headers", {})}, **kw)
@@ -108,12 +118,12 @@ def test_platform_sets_simulated_and_the_log_says_so(monkeypatch):
 def test_no_italianway_code_on_a_demo_apartment_in_production(monkeypatch):
     run(get_repository().upsert_tenant(Tenant(tenant_id="t-sim2", name="Sim2")))
     body = platform.ApartmentCreate(apartment_id="apt-sim-code", name="Demo", instance_url="mock://builtin", italianway_id="IW-DEMO-X")
-    real(monkeypatch)
+    prod(monkeypatch)
     r = run(platform.create_tenant_apartment("t-sim2", body, identity=PLAT))
-    assert r.status_code == 409 and b"italianway_on_demo" in r.body
+    assert r.status_code == 422 and "dimostrativi" in r.body.decode()             # D-202: no demo at all, code or not
     monkeypatch.undo()                                                              # staging: allowed
     assert run(platform.create_tenant_apartment("t-sim2", body, identity=PLAT))["italianway_id"] == "IW-DEMO-X"
-    real(monkeypatch)
+    prod(monkeypatch)
     r = run(platform.relink_tenant_apartment("t-sim2", "apt-sim-code", platform.ApartmentLink(italianway_id="IW-DEMO-Y"),
                                              identity=PLAT))
     assert r.status_code == 409
@@ -210,8 +220,7 @@ def test_webhook_never_feeds_a_demo_apartment_in_production(monkeypatch):
     repo = get_repository()
     run(repo.upsert_apartment(Apartment(apartment_id="apt-demo-code", tenant_id=TID, name="Demo", instance_url="mock://builtin",
                                         external_ids=ExternalIds(italianway="IW-DEMO-F1"))))
-    settings = dataclasses.replace(get_settings(), instance_mode="real", italianway_webhook_secret="replace-me")
-    monkeypatch.setattr(webhooks, "get_settings", lambda: settings)
+    prod(monkeypatch)
     forwarded = []
 
     async def no_forward(*a, **k):
@@ -235,13 +244,41 @@ def test_demo_apartments_with_a_code_are_reported_at_startup(monkeypatch):
                                                     instance_url="mock://builtin", external_ids=ExternalIds(italianway="IW-DEMO-W"))))
     seen = []
     monkeypatch.setattr(webhooks, "warn", lambda msg, **f: seen.append((msg, f)))
-    monkeypatch.setattr(webhooks, "get_settings", lambda: dataclasses.replace(get_settings(), instance_mode="real"))
+    prod(monkeypatch)
     run(webhooks.report_demo_codes())
     assert ("demo apartment with an Italianway code", {"apartment_id": "apt-demo-warn"}) in seen
     seen.clear()
-    monkeypatch.setattr(webhooks, "get_settings", lambda: dataclasses.replace(get_settings(), instance_mode="mock"))
+    prod(monkeypatch, app_env="staging")
     run(webhooks.report_demo_codes())
     assert seen == []                                                               # staging: allowed, nothing to say
+
+
+def test_d66_staging_with_real_engines_keeps_the_demo_codes(monkeypatch):
+    """D66 (P-83): staging runs INSTANCE_MODE=real (D-203) and refused, with «In produzione…», what it allows: a demo
+    apartment's Italianway code, its webhook. Staging is APP_ENV=staging."""
+    import hashlib
+    import hmac
+    import json
+
+    from bff.routes import webhooks
+
+    prod(monkeypatch, app_env="staging")
+    run(get_repository().upsert_tenant(Tenant(tenant_id="t-sim66", name="Sim66")))
+    body = platform.ApartmentCreate(apartment_id="apt-sim-66", name="Demo", instance_url="mock://builtin",
+                                    italianway_id="IW-DEMO-66")
+    assert run(platform.create_tenant_apartment("t-sim66", body, identity=PLAT))["italianway_id"] == "IW-DEMO-66"
+    forwarded = []
+
+    async def fake_forward(*a, **k):
+        forwarded.append(a)
+        return {"status": "accepted"}
+    monkeypatch.setattr(webhooks, "forward", fake_forward)
+    raw = json.dumps({"event": "reservation.created", "id": "iw-ev-66", "sent_at": "2026-11-01T10:00:00Z",
+                      "reservation": {"id": "RES-66", "apartment_id": "IW-DEMO-66", "checkin": "2026-12-01T15:00:00Z",
+                                      "checkout": "2026-12-03T10:00:00Z", "guests": 2}}).encode()
+    sig = hmac.new(b"replace-me", raw, hashlib.sha256).hexdigest()
+    r = run(call("POST", "/webhooks/italianway", content=raw, headers={"X-Signature": sig, "Content-Type": "application/json"}))
+    assert r.status_code != 409 and len(forwarded) == 1, r.text
 
 
 def test_reset_restarts_the_background_hub_when_pushes_are_on(monkeypatch):

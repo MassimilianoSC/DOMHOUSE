@@ -298,6 +298,29 @@ def test_settings_of_the_assistant():
         load_config({**base, "MODEL_BASE_URL": "domotica-bff"})
 
 
+@pytest.mark.parametrize("mode", ["casa vuota", "away", "", 3])
+def test_a_scheduled_mode_is_checked_before_it_is_proposed(mode):
+    """D60 (P-83): «programma» took any mode: a useless approval took the place and moved the queue on."""
+    e = engine(None)
+    a, proposals = assistant.Assistant(e, None), []
+    later = (datetime.now(UTC) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
+    out = a.tool("programma", {"quando": later, "modalita": mode}, proposals)
+    if mode == "":                                     # no mode: read as a device command, refused for its device
+        assert "errore" in out and proposals == []
+        return
+    assert "errore" in out and "modalità non valida" in out["errore"] and proposals == []
+    assert "errore" not in a.tool("programma", {"quando": later, "modalita": "eco"}, proposals) and len(proposals) == 1
+
+
+def test_the_model_address_must_be_https():
+    """D35 (P-83): the engine sends its key (X-API-Key) to MODEL_BASE_URL: http:// would send it in clear."""
+    base = {"APARTMENT_ID": "apt-prova-01", "API_KEY": "k" * 16, "CONNECTOR": "simulated"}
+    for url in ("http://domotica-bff.example", "HTTP://domotica-bff.example", "https://"):
+        with pytest.raises(ConfigError, match="MODEL_BASE_URL"):
+            load_config({**base, "MODEL_BASE_URL": url})
+    assert load_config({**base, "MODEL_BASE_URL": "HTTPS://domotica-bff.example"}).model_base_url
+
+
 def test_the_demonstrations_get_the_model_from_the_registry():
     """D-132 point 5: the BFF's demonstration apartments with the real assistant (AI_DEMOS), the keywords without."""
     script = Script(js("Ciao dal modello."))
@@ -361,6 +384,43 @@ def test_d170_without_guests_at_its_time_it_is_scheduled_at_once_and_a_no_schedu
         return e.decide(a["approval_id"], {"decision": "reject"}, ACTOR, "44444444-4444-4444-4444-444444444444")
     asyncio.run(no())
     assert not [s for s in e.schedule.values() if s["source"] == "assistant"] and e.approval_schedules == {}
+
+
+# -------- D33 (P-83, answer 1087 = a): with ASSISTANT_CONFIRM=sempre a scheduled action asks too, guests or not --------
+def test_d33_always_a_scheduled_action_without_guests_asks_then_schedules():
+    local, when = _at_18_tomorrow()
+    e = engine(Script(js("Programmo eco.", plan(when, "eco"))), ASSISTANT_CONFIRM="sempre")    # no booking then
+    a = ask(e, "domani alle 18 metti eco")
+    assert a["status"] == "needs_approval"
+    approval = e.pending_approval()
+    assert approval["description"].startswith("Programmare modalità eco alle 18:00")
+    assert approval["proposed_action"] == {"type": "apartment_mode", "mode": "eco"}
+    assert "Programmo modalità eco alle 18:00" in a["answer"] and "ospiti" not in a["answer"]
+    assert not [s for s in e.schedule.values() if s["source"] == "assistant"]   # nothing scheduled yet
+
+    async def yes():
+        return e.decide(approval["approval_id"], {"decision": "approve"}, ACTOR, "55555555-5555-5555-5555-555555555555")
+    asyncio.run(yes())
+    planned = [s for s in e.schedule.values() if s["source"] == "assistant"]
+    assert len(planned) == 1 and core.parse_dt(planned[0]["run_at"]) == local and e.mode != "eco"
+
+
+def test_d33_always_a_scheduled_action_with_guests_at_its_time_asks():
+    local, when = _at_18_tomorrow()
+    e = engine(Script(js("Programmo eco.", plan(when, "eco"))), ASSISTANT_CONFIRM="sempre")
+    _booked(e, local - timedelta(hours=3), local + timedelta(days=2))           # guests in at 18:00 tomorrow
+    a = ask(e, "domani alle 18 metti eco")
+    assert a["status"] == "needs_approval"
+    assert "con ospiti presenti a quell'ora?" in a["answer"]
+    assert not [s for s in e.schedule.values() if s["source"] == "assistant"]
+
+
+def test_d33_multiple_a_single_scheduled_action_still_does_not_ask():
+    local, when = _at_18_tomorrow()
+    e = engine(Script(js("Programmo eco.", plan(when, "eco"))), ASSISTANT_CONFIRM="multiple")
+    _booked(e, local - timedelta(hours=3), local + timedelta(days=2))
+    a = ask(e, "domani alle 18 metti eco")
+    assert a["status"] == "answered" and a["actions"][0]["type"] == "schedule"
 
 
 # -------- D-181: an answer from outside the EU (or without its location) is refused before anything runs --------

@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { deliverInApp, isOpenMessage, isPushMessage, isWebKitSafari, safeLink, toNotice, toastWanted } from "./pushPayload";
+import { deliverInApp, isOpenMessage, isPushMessage, isWebKitSafari, notificationOptions, safeLink, toNotice, toastWanted } from "./pushPayload";
 
 // Format S2 (D-31): FCM web push, data-only, delivered by the browser as { data: {...}, from, fcmMessageId }.
 const approval = {
@@ -25,6 +25,7 @@ describe("push: lettura del messaggio (formato S2)", () => {
       link: "/a/apt-001/approvazioni",
       tag: "approval:ap-7",
       apartmentId: "apt-001",
+      kind: "approval",
     });
   });
 
@@ -86,6 +87,7 @@ describe("push: prenotazioni (D-123)", () => {
       link: "/a/apt-001/decisioni",
       tag: "booking:d-42",
       apartmentId: "apt-001",
+      kind: "booking",
     });
   });
 });
@@ -99,6 +101,7 @@ describe("push: riepilogo settimanale (D-150)", () => {
       link: "/a/apt-001/riepiloghi/2026-W42",
       tag: "summary:apt-001:2026-W42",
       apartmentId: "apt-001",
+      kind: "summary",
     });
   });
 });
@@ -112,6 +115,35 @@ describe("push: antigelo non attivo (lotto 30)", () => {
       link: "/a/apt-001/decisioni",
       tag: "frost:apt-001:dev-caldaia",
       apartmentId: "apt-001",
+      kind: "frost_inactive",
     });
+  });
+});
+
+describe("push: revisione P-83", () => {
+  const on = (kind: string) => toNotice({ data: { ...approval.data, kind } }, "D");
+
+  it("D24: il tipo del messaggio arriva fino alla pagina", () => {
+    expect(toNotice(approval, "D").kind).toBe("approval");
+  });
+
+  it("D24: sulla pagina dell'appartamento si tace solo per ciò che lo stream annuncia (approvazione, dispositivo offline)", () => {
+    expect(toastWanted(on("approval"), "/a/apt-001")).toBe(false);
+    expect(toastWanted(on("device_offline"), "/a/apt-001/dispositivi")).toBe(false);
+    for (const kind of ["frost_inactive", "schedule_failed", "booking", "summary", "instance_down"]) {
+      expect(toastWanted(on(kind), "/a/apt-001")).toBe(true);
+    }
+    expect(toastWanted({ ...on("approval"), kind: undefined }, "/a/apt-001")).toBe(true); // tipo sconosciuto: meglio due che nessuno
+  });
+
+  it("D49: una notifica con lo stesso tag della precedente la sostituisce E suona di nuovo", () => {
+    const n = toNotice(approval, "D");
+    expect(notificationOptions(n)).toEqual({ body: n.body, icon: "/icons/icon-192.png", tag: "approval:ap-7", renotify: true, data: { link: n.link } });
+    expect(notificationOptions(toNotice(null, "D"))).not.toHaveProperty("renotify"); // senza tag il browser rifiuta renotify
+  });
+
+  it("D78: caratteri di controllo nel link (tab, a capo) non portano fuori dall'app", () => {
+    for (const bad of ["/\t/evil.example", "/\n/evil.example", "/\r/evil.example", "/\u0000x", "/a\u007f"]) expect(safeLink(bad)).toBe("/");
+    expect(safeLink("/a/apt-001/decisioni")).toBe("/a/apt-001/decisioni");
   });
 });

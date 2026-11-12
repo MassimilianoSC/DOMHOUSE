@@ -93,6 +93,9 @@ class ItalianwayTranslator:
         ext = res.get("apartment_id") or payload.get("apartment_id")
         if not ext:
             raise TranslationError("apartment_id mancante nel payload Italianway")
+        if res.get("id") is None or not str(res["id"]).strip():
+            # D68 (P-83): without it booking_id was '' or 'None' and two such bookings at the same moment one
+            raise TranslationError("id della prenotazione mancante nel payload Italianway")
         try:
             ev = BookingEvent(
                 event_id=str(payload.get("id") or f"iw-{res.get('id')}-{ev_type}-{payload.get('sent_at')}"),

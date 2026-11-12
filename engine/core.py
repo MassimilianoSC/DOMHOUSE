@@ -64,7 +64,10 @@ ENERGY_PROFILE_SHARES = (0.62, 0.28, 0.10)
 RETENTION_EVERY_S = 3600
 # the engine's own fields of a capability, kept across restarts (the device reports the others again)
 ENGINE_FIELDS = {"heating": ("on", "setpoint"), "contact": ("since",), "motion": ("last_seen",),
-                 "power_meter": ("kwh_today",)}
+                 "power_meter": ("kwh_today",), "climate": ("on", "mode", "setpoint", "fan")}
+# D14 (P-83): an infrared split reports nothing of its state (connector-v2 §2.3): the engine's copy is all there is, and
+# it is kept across restarts; a climate that reports these fields keeps its own report (REPORTED_WINS)
+REPORTED_WINS = {"climate"}
 # the boiler's thermostat (R1, R2, D-126, D-128): heating.on is the intention the app sees; the relay is the engine's
 # D-133: the rules' thresholds that the app does not change are settings of the engine per apartment, with defaults
 # and limits in engine/config.py (SETTINGS); the engine reads them with self.setting(name)
@@ -121,6 +124,7 @@ def utcnow() -> datetime:
 
 # D-219: what a scheduled action is, in the decisions schedule_failed and schedule_missed (new_value) and in their text.
 # An action the assistant planned is a manual one in the schedule (kind "manual", source "assistant"): here it has its own.
+CHECKOUT_APPROVAL = "Mettere l'appartamento a vuoto dopo il check-out"   # F1 (D-137); D05 recognises it at expiry
 SCHEDULE_LABELS = {"prearrival": "pre-arrivo", "checkout": "check-out", "empty": "casa vuota", "manual": "manuale",
                    "assistant": "dell'assistente"}
 
@@ -346,8 +350,14 @@ class ApartmentEngine:
         # device -> {"cap", "by_mode", "state"}; kept in the store. The wait of each open window, cancelled when it closes
         self.window_off: dict[str, dict] = {}
         self.window_reflexes: dict[str, asyncio.Task] = {}
+        # D03 (P-83): the open windows whose rule's minutes ran out; while one stays open the rule holds (window_in_force)
+        self.window_fired: set[str] = set()
         self.windows_closed_at = float("-inf")      # monotonic: when the last open window closed
         self._window_command = False                # the rule's own turn_off: not a person's (the mode is kept)
+        self.commanded_at: dict[str, float] = {}    # D13: device -> monotonic of its last non-automatic command
+        self._mode_in_progress: str | None = None   # D13: the mode set_mode is setting (its commands are made first)
+        # D16 (P-83): device -> {"body", "mode", "at"}: a mode's command for a device unreachable when it was set
+        self.mode_pending: dict[str, dict] = {}
         self.profile_until: datetime | None = None   # D-130: end of the demonstration's invented consumption
         self.connector_was_up = self.connector_up()  # D-131: a change is an event and a decision (tick)
         self.empty_power: dict[str, dict] = {}       # D-137 F2: meter -> {"since": monotonic, "asked": bool}, one episode
@@ -463,6 +473,15 @@ class ApartmentEngine:
             self.store.put_meta("approval_schedules", self.approval_schedules)
         return run_at
 
+    def guests_in(self) -> bool:
+        """D18 (P-83): guests in now, for the assistant's approvals: the occupancy says so (a check-in), or a booking in
+        course, not cancelled and not checked out, says so (Italianway may never send the check-in)."""
+        if self.apartment().get("occupancy") == "occupied":
+            return True
+        now = utcnow()
+        return any(not b["cancelled"] and not b["checked_out"] and b["checkin"] <= now < b["checkout"]
+                   for b in self.bookings.values())
+
     def occupied_at(self, when: datetime) -> bool:
         """D-170: the bookings' calendar says guests are in at that time (a booking not cancelled covering it)."""
         return any(not b["cancelled"] and b["checkin"] <= when < b["checkout"] for b in self.bookings.values())
@@ -486,6 +505,7 @@ class ApartmentEngine:
         self.heating_by_mode = set(st.get_meta("heating_by_mode", []) or [])
         self.climate_by_mode = set(st.get_meta("climate_by_mode", []) or [])
         self.window_off = dict(st.get_meta("window_off", {}) or {})
+        self.mode_pending = {k: {**v, "at": float("-inf")} for k, v in (st.get_meta("mode_pending", {}) or {}).items()}
         self.meters ={k: EnergyCounter(self.timezone, v) for k, v in st.all("meters")}
         profile = st.get_meta("energy_profile")
         self.profile_until = parse_dt(profile["until"]) if profile else None
@@ -501,12 +521,22 @@ class ApartmentEngine:
                     if cap in device["capabilities"] and cap in old["capabilities"]:
                         if cap == "power_meter" and info.device_id in self.meters:
                             continue                    # kwh_today comes from the restored counter
+                        reported = info.capabilities.get(cap) or {}
                         for f in fields:
+                            if cap in REPORTED_WINS and f in reported:
+                                continue                # D14: the device said it itself
                             if f in old["capabilities"][cap]:
                                 device["capabilities"][cap][f] = old["capabilities"][cap][f]
                 contact, was = device["capabilities"].get("contact"), old["capabilities"].get("contact")
-                if contact and was and contact.get("open") != was.get("open"):
+                if contact and was and "open" not in (info.capabilities.get("contact") or {}):
+                    # D15 / P7a-2 (P-83): not read yet (a BLU contact behind its bridge): the saved value stays until a
+                    # reading arrives; before, open False was invented and the window rule's return brought the
+                    # boiler back with the window open
+                    contact["open"], contact["since"] = was.get("open", False), was.get("since", contact.get("since"))
+                elif contact and was and contact.get("open") != was.get("open"):
                     contact["since"] = iso(utcnow())    # it changed while the engine was down
+                if device["last_seen"] is None and old.get("last_seen"):
+                    device["last_seen"] = old["last_seen"]     # D12: the connector does not know it yet
             self.devices[info.device_id] = device
             self._save_device(device)
         self._apply_limits()                               # D-174: the manager's inside the catalog's
@@ -616,6 +646,7 @@ class ApartmentEngine:
             if not self.windows_armed:
                 self.windows_armed = True
                 self._windows_at_start()
+                self._offline_at_start()
         if self.consumer_task is None or self.consumer_task.done():
             self.consumer_task = asyncio.get_running_loop().create_task(self._consume_changes())
 
@@ -838,6 +869,18 @@ class ApartmentEngine:
         note = f"setpoint {fmt_num(sp)} °C riportato a {fmt_num(fixed)} °C (limiti {fmt_num(lo)}–{fmt_num(hi)})"
         return {**body, "params": {**params, "setpoint": fixed}}, note
 
+    def _offline_at_start(self) -> None:
+        """D12 (P-83): a device already offline at the start (unplugged while the engine was down, or never connected)
+        is watched as if it had just gone offline (one offline_alert decision after the rule's minutes, the BFF's
+        push), and the apps hear it at once (device.online false, with the last_seen known)."""
+        corr = str(uuid.uuid4())
+        for device in self.devices.values():
+            if device["online"]:
+                continue
+            self._watch_offline(device["device_id"], False)
+            self.emit("device.online", {"device_id": device["device_id"], "online": False,
+                                        "last_seen": device["last_seen"]}, corr)
+
     def _watch_offline(self, device_id: str, online: bool) -> None:
         """R5: a device still offline after the minutes of offline_alert gets one decision for the episode (the push
         is the BFF's)."""
@@ -922,7 +965,10 @@ class ApartmentEngine:
                 logs.warn("split without confirmation meter", apartment_id=self.apartment_id, device_id=info.device_id,
                           treated_as="confirmation none")
             if "heating" in info.capabilities:
-                self.relay[info.device_id] = bool(info.capabilities["heating"].get("on"))
+                if "on" in info.capabilities["heating"]:
+                    self.relay[info.device_id] = bool(info.capabilities["heating"]["on"])
+                else:                                # P7a-1 (P-83): not read (a failed snapshot): unknown, not open
+                    self.relay.pop(info.device_id, None)
                 if "sensor_device_id" not in kept:
                     logs.warn("boiler without sensor", apartment_id=self.apartment_id, device_id=info.device_id,
                               treated_as="not regulated")
@@ -984,7 +1030,10 @@ class ApartmentEngine:
         connector down nothing can be switched: it waits for it (D-131)."""
         if not self.connector_was_up:
             return
+        self._mode_pending_send()                            # D16: what the mode could not send before
         self._restore_after_window()                         # D-218 point 1: first, so the boiler's relay follows now
+        self._keep_window_off()                              # D03: and what is still on with the window open goes off
+        in_force = self.window_in_force()
         for device in self.devices.values():
             if "heating" not in device["capabilities"] or not device["online"]:
                 continue
@@ -996,8 +1045,10 @@ class ApartmentEngine:
             if device_id in self.relay_busy or any(r[0] == device_id for r in self.inflight):
                 continue
             want, temperature, setpoint, frost = self.thermostat(device)
-            if want == self.relay.get(device_id, False):
-                continue
+            if want and in_force and not frost:
+                want = False                                 # D03: never closed by the thermostat with the window open
+            if device_id in self.relay and want == self.relay[device_id]:
+                continue                                     # P7a-1: an unknown relay is commanded either way
             since = time.monotonic() - self.relay_switched.get(device_id, -1e18)
             if since < self.setting("THERMOSTAT_MIN_SWITCH_MINUTES") * seconds_per_minute():
                 continue
@@ -1041,7 +1092,7 @@ class ApartmentEngine:
             if not device["online"] or any(r[0] == device_id for r in self.inflight):
                 continue                                     # later, when it can be reached
             state = device["capabilities"][cap]
-            if state.get("on"):
+            if state.get("on") and not entry.get("mode_blocked"):
                 self.window_off.pop(device_id, None)         # already back on (by itself, or the mode)
                 continue
             by_mode = device_id in (self.heating_by_mode if cap == "heating" else self.climate_by_mode)
@@ -1344,7 +1395,8 @@ class ApartmentEngine:
                 return float(t["celsius"])
         return None
 
-    def mode_commands(self, mode: str, correlation_id: str | None = None) -> list[tuple[str, dict]]:
+    def mode_commands(self, mode: str, correlation_id: str | None = None,
+                      include_offline: bool = False) -> list[tuple[str, dict]]:
         """The commands of a mode (D-161, D-162). Boiler: comfort_celsius, eco_celsius, or the frost protection's in
         «casa vuota». Climate: off in eco and «casa vuota»; in comfort by the room's sensor: heating to
         comfort_celsius under it, cooling to comfort_cool_celsius over that, nothing in between; without a sensor no
@@ -1357,7 +1409,7 @@ class ApartmentEngine:
             self.no_sensor_noted.clear()
         for d in self.devices.values():
             caps = d["capabilities"]
-            if not d["online"]:
+            if not d["online"] and not include_offline:
                 if self._schedule_run and self._mode_would_command(d, mode):
                     # D-219 (2): a device of a scheduled action that is offline at its time is a command not done
                     self._schedule_refused(self._schedule_run, d["device_id"], "dispositivo offline, non comandato")
@@ -1403,6 +1455,49 @@ class ApartmentEngine:
         sl = self.rule("setpoint_limits")["params"]
         return room is not None and (room < sl["comfort_celsius"] or room > sl["comfort_cool_celsius"])
 
+    def _mode_wait(self, device_id: str, body: dict, mode: str, correlation_id: str) -> None:
+        """D16 (P-83): a device the mode could not reach (offline, or the connector down). The boiler's intention is the
+        engine's: it takes the mode's now and the relay follows when the boiler is back (regulate). A climate's command
+        waits (mode_pending) and goes when the climate is reachable again (_mode_pending_send). A decision says it."""
+        device = self.devices[device_id]
+        if body["capability"] == "heating":
+            heating = device["capabilities"]["heating"]
+            heating.update(on=bool(body["params"].get("on")), setpoint=body["params"].get("setpoint", heating.get("setpoint")))
+            self._heating_set_by(device_id, mode=True)
+            self._save_device(device)
+            self.emit("device.state", {"device_id": device_id, "capability": "heating", "state": heating}, correlation_id)
+            what = "impostata ora, il relè la segue quando torna raggiungibile"
+        else:
+            self.mode_pending[device_id] = {"body": copy.deepcopy(body), "mode": mode, "at": time.monotonic()}
+            what = "il comando parte quando torna raggiungibile"
+        self.log("system", {"type": "device", "device_id": device_id}, "mode_device_pending", None, mode,
+                 f"{device['label']} non raggiungibile durante il passaggio a {mode}: {what}", "informational",
+                 correlation_id)
+
+    def _mode_pending_send(self) -> None:
+        """D16: the waiting commands of the mode, for the devices reachable again; dropped when the mode changed or
+        someone commanded the device meanwhile (D13's commanded_at)."""
+        if not self.mode_pending or not self.connector_up():
+            return
+        for device_id, wait in list(self.mode_pending.items()):
+            device = self.devices.get(device_id)
+            if device is None or wait["mode"] != self.mode or self.commanded_at.get(device_id, float("-inf")) > wait["at"]:
+                self.mode_pending.pop(device_id, None)
+                continue
+            if not device["online"]:
+                continue
+            self.mode_pending.pop(device_id, None)
+            self._auto_climate = True
+            try:
+                self.create_command(device_id, wait["body"], "system:engine", str(uuid.uuid4()), decision_actor="system",
+                                    reasoning=f"Modalità {self.mode}: {device['label']} di nuovo raggiungibile")
+            except MockError as exc:
+                logs.warn("waiting mode command not sent", apartment_id=self.apartment_id, device_id=device_id,
+                          error=exc.error)
+            finally:
+                self._auto_climate = False
+        self.store.put_meta("mode_pending", {k: {"body": v["body"], "mode": v["mode"]} for k, v in self.mode_pending.items()})
+
     def _heating_set_by(self, device_id: str, mode: bool) -> None:
         (self.heating_by_mode.add if mode else self.heating_by_mode.discard)(device_id)
         self.store.put_meta("heating_by_mode", sorted(self.heating_by_mode))
@@ -1416,37 +1511,60 @@ class ApartmentEngine:
                  f"{device['label']}: sensore di temperatura mancante, regolazione automatica disattivata",
                  "informational", correlation_id or str(uuid.uuid4()))
 
-    def set_mode(self, mode: str, actor: str, correlation_id: str, reasoning: str, decision_actor: str | None = None) -> list[str]:
+    def set_mode(self, mode: str, actor: str, correlation_id: str, reasoning: str, decision_actor: str | None = None,
+                 by_hand: bool = False) -> list[str]:
+        """by_hand: a person chose it now (the app, the assistant, an approval decided by hand); during a hold it
+        becomes the hold's mode (D09). The automatic paths leave it False."""
         if mode not in MODES:
             raise bad_request("Modalità non valida")
         command_ids = []
         self._auto_climate = True
         self._frost_command = mode == "empty"
+        self._mode_in_progress = mode
         try:
+            self.mode_pending = {}                       # D16: a new mode replaces what the previous one left waiting
+            sent: set[str] = set()
             for device_id, body in self.mode_commands(mode, correlation_id):
                 try:
                     cmd = self.create_command(device_id, body, actor, correlation_id, decision_actor=decision_actor,
                                               reasoning=f"Modalità {mode}")
                     if cmd:
                         command_ids.append(cmd["command_id"])
+                    sent.add(device_id)
                 except MockError as exc:
                     if self._schedule_run:                     # D-219 (2): a command of a scheduled action not sent
                         self._schedule_refused(self._schedule_run, device_id, exc.message)
                     continue
                 if body["capability"] == "heating":
                     self._heating_set_by(device_id, mode=True)        # D-164: a mode's intention, never unregulated
+            for device_id, body in self.mode_commands(mode, correlation_id, include_offline=True):
+                if device_id not in sent:
+                    self._mode_wait(device_id, body, mode, correlation_id)
         finally:
             self._auto_climate = False
             self._frost_command = False
+            self._mode_in_progress = None
         # D-169: in comfort every climate is the regulation's until a person changes it; in eco and «casa vuota» none
         self.climate_by_mode = ({d["device_id"] for d in self.devices.values() if "climate" in d["capabilities"]}
                                 if mode == "comfort" else set())
         self.store.put_meta("climate_by_mode", sorted(self.climate_by_mode))
+        self.store.put_meta("mode_pending", {k: {"body": v["body"], "mode": v["mode"]} for k, v in self.mode_pending.items()})
         old = self.mode
         self.mode = mode
         self._save_apartment()
         self.log(decision_actor or actor_of(actor), {"type": "apartment"}, "set_mode", old, mode, reasoning,
                  "applied", correlation_id)
+        if by_hand and self.hold and self.hold.get("mode") != mode:
+            # D09 (P-83, answer 1085 = a): a mode chosen by a person during a hold becomes the hold's mode; the hold
+            # goes on to its end with the rules suspended, and at its end the new mode stays
+            before = self.hold.get("mode")
+            self.hold["mode"] = mode
+            self._save_apartment()
+            until = parse_dt(self.hold["until"]).astimezone(ZoneInfo(self.timezone)).strftime("%H:%M")
+            name = {"empty": "casa vuota"}.get(mode, mode)
+            self.log(decision_actor or actor_of(actor), {"type": "apartment"}, "hold", before, f"{mode} fino alle {until}",
+                     f"Modalità {name} scelta a mano: la forzatura continua in {name} fino alle {until}", "applied",
+                     correlation_id)
         self.apartment_changed(correlation_id)
         return command_ids
 
@@ -1551,10 +1669,36 @@ class ApartmentEngine:
     def window_rule_active(self) -> bool:
         return self.rule("window_open_off")["enabled"] and self.hold is None
 
+    def window_in_force(self) -> dict | None:
+        """D03 (P-83): an open window whose rule's minutes ran out, with the rule active (no hold): what it turned off
+        must stay off, not only be turned off once."""
+        if not self.window_rule_active():
+            return None
+        for window_id in sorted(self.window_fired):
+            d = self.devices.get(window_id)
+            contact = d["capabilities"].get("contact") if d else None
+            if contact and contact.get("open"):
+                return d
+        return None
+
+    def _keep_window_off(self) -> None:
+        """D03 (P-83): once a regulation's minute, while a window is in force, every climate and boiler still on and
+        reachable is turned off again: one offline when the minutes ran out, one whose turn_off failed or was not
+        confirmed. Never twice at once (a command of its still running), at most once a minute (the regulation)."""
+        window = self.window_in_force()
+        if window is None:
+            return
+        minutes = self.rule("window_open_off")["params"]["minutes"]
+        busy = {c["device_id"] for c in self.commands.values() if c["status"] not in FINAL}
+        self._window_turn_off(window["device_id"], f"{window['label']} aperta da oltre {fmt_num(minutes)} minuti",
+                              skip=busy | {r[0] for r in self.inflight} | set(self.relay_busy))
+
     def create_command(self, device_id: str, body: dict, actor: str, correlation_id: str,
                        decision_actor: str | None = None, reasoning: str | None = None) -> dict | None:
         """A command, or None when an automatic one waits for the compressor's pause (R4) and starts after it."""
         device = self.get_device(device_id)
+        if not self._window_command and not self._auto_climate:
+            self.commanded_at[device_id] = time.monotonic()   # D13: a deferred automatic start must not undo it
         if not self._window_command and not self._auto_climate and self.window_off.pop(device_id, None) is not None:
             self.store.put_meta("window_off", self.window_off)  # D-218: commanded meanwhile, it stays as it is left
         if body.get("capability") == "heating" and device_id in self.heating_by_mode and not self._window_command:
@@ -1574,9 +1718,17 @@ class ApartmentEngine:
             if note:
                 reasoning = f"{reasoning or 'Comando automatico'}; {note}"
         cap, action, params = self.validate_command(device, body)
+        turning_off = cap == "climate" and any(
+            c["device_id"] == device_id and c["status"] not in FINAL and c["capability"] == cap
+            and not self.target_state(device, cap, c["action"], c["params"]).get("on", True)
+            for c in self.commands.values())
         if cap == "climate" and not manual and who != "assistant" \
-                and self.target_state(device, cap, action, params)["on"] and not device["capabilities"][cap]["on"]:
+                and self.target_state(device, cap, action, params)["on"] \
+                and (not device["capabilities"][cap]["on"] or turning_off):
             wait = self.compressor_wait(device_id)
+            if turning_off:                                  # D11: its pause starts when that turn_off is over
+                rule = self.rule("compressor_min_off")
+                wait = rule["params"]["minutes"] * seconds_per_minute() if rule["enabled"] else 0.0
             if wait > 0:                                     # R4: an automatic start waits for the pause
                 self.log("rule:compressor_min_off", {"type": "device", "device_id": device_id}, action, "off", "on",
                          f"{reasoning or 'Accensione automatica'}: rimandata di {int(wait) + 1} s per la pausa minima "
@@ -1589,9 +1741,16 @@ class ApartmentEngine:
                                                 self._schedule_run)
                 if sid:
                     self._schedule_wait(sid, device_id)
+                snap = self._start_snapshot(device_id)
 
                 async def later():
                     await asyncio.sleep(wait)
+                    if why := self._start_not_wanted(device_id, snap):   # D13: the situation it was made for is gone
+                        self._start_dropped(device_id, why, correlation_id)
+                        if sid:
+                            self._schedule_refused(sid, device_id, f"non eseguita: {why}")
+                            self._schedule_wait(sid, device_id, done=True)
+                        return
                     saved = (self._auto_climate, self._frost_command, self._window_command, self._schedule_run)
                     self._auto_climate, self._frost_command, self._window_command, self._schedule_run = \
                         auto, frost, window_cmd, sid
@@ -1657,6 +1816,69 @@ class ApartmentEngine:
             if (sid := self.command_schedule.get(cmd["command_id"])) and cmd["status"] in FINAL:
                 self._schedule_check(sid)
 
+    def _start_snapshot(self, device_id: str) -> dict:
+        """D13 (P-83): what an automatic start put off for the compressor's pause was made for."""
+        if self._mode_in_progress is not None:            # a mode's own command: made before the mode is recorded
+            return {"mode": self._mode_in_progress, "hold": (self.hold or {}).get("until"),
+                    "by_mode": self._mode_in_progress == "comfort", "at": time.monotonic()}
+        return {"mode": self.mode, "hold": (self.hold or {}).get("until"), "by_mode": device_id in self.climate_by_mode,
+                "at": time.monotonic()}
+
+    def _start_not_wanted(self, device_id: str, snap: dict) -> str | None:
+        """D13: why a start put off is no longer wanted when the pause ends, or None."""
+        if self.mode != snap["mode"]:
+            return f"la modalità è cambiata ({self.mode})"
+        if self.hold and self.hold.get("until") != snap["hold"] and self.hold.get("mode") != snap["mode"]:
+            return f"è iniziata una forzatura in {self.hold['mode']}"
+        if snap["by_mode"] and device_id not in self.climate_by_mode:
+            return "il climatizzatore non segue più la modalità"
+        if self.commanded_at.get(device_id, float("-inf")) > snap["at"]:
+            return "nel frattempo è stato comandato"
+        return None
+
+    def _start_dropped(self, device_id: str, why: str, correlation_id: str) -> None:
+        device = self.devices.get(device_id)
+        self.log("rule:compressor_min_off", {"type": "device", "device_id": device_id}, "set_climate", "off", "off",
+                 f"Accensione automatica di {device['label'].lower() if device else device_id} rimandata per la pausa "
+                 f"del compressore e non eseguita: {why}", "informational", correlation_id)
+
+    async def _refused_by_pause(self, cmd: dict, decision_actor: str, reasoning: str, target: dict, old, new_state: dict,
+                                pause: float) -> None:
+        """D11: a start that finds the compressor's pause inside the lock. A person's (or the assistant's) is refused
+        saying when to try again; an automatic one (the mode, the regulation, the rules) is created again when the
+        pause ends, as create_command does for an automatic start (R4)."""
+        cap = cmd["capability"]
+        automatic = decision_actor == "system" or decision_actor.startswith("rule:")
+        self._set_status(cmd, "sent")
+        await asyncio.sleep(0.2)
+        self._set_status(cmd, "failed", "blocked_by_rule")
+        if not automatic:
+            self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state),
+                     f"Comando bloccato dalla regola «Pausa minima del compressore»: riprova tra {int(pause) + 1} secondi",
+                     "rejected", cmd["correlation_id"], command_id=cmd["command_id"])
+            return
+        device_id = cmd["device_id"]
+        self.log("rule:compressor_min_off", target, cmd["action"], "off", "on",
+                 f"{reasoning or 'Accensione automatica'}: rimandata di {int(pause) + 1} s per la pausa minima "
+                 f"del compressore", "informational", cmd["correlation_id"])
+        body = {"capability": cap, "action": cmd["action"], **({"params": cmd["params"]} if cmd.get("params") else {})}
+        snap = self._start_snapshot(device_id)
+
+        async def later():
+            await asyncio.sleep(pause)
+            if why := self._start_not_wanted(device_id, snap):   # D13
+                self._start_dropped(device_id, why, cmd["correlation_id"])
+                return
+            self._auto_climate = True
+            try:
+                self.create_command(device_id, body, "system:engine", cmd["correlation_id"], decision_actor, reasoning)
+            except MockError as exc:
+                logs.warn("deferred command not created", apartment_id=self.apartment_id, device_id=device_id,
+                          error=exc.error)
+            finally:
+                self._auto_climate = False
+        self.spawn(later())
+
     async def _execute_command(self, cmd: dict, decision_actor: str, reasoning: str) -> None:
         device = self.devices[cmd["device_id"]]
         cap = cmd["capability"]
@@ -1664,8 +1886,17 @@ class ApartmentEngine:
         old = describe(cap, device["capabilities"][cap])
         new_state = self.target_state(device, cap, cmd["action"], cmd["params"])
         window = self.window_open()
-        if cap in ("climate", "heating") and new_state["on"] and window and self.window_rule_active():
+        current = device["capabilities"][cap]
+        lowering = (cap == "heating" and current.get("on") and isinstance(new_state.get("setpoint"), (int, float))
+                    and isinstance(current.get("setpoint"), (int, float)) and new_state["setpoint"] <= current["setpoint"])
+        if cap in ("climate", "heating") and new_state["on"] and window and self.window_rule_active() and not lowering:
             # the engine's rule: the device is never asked; the app sees the same steps as before P-60 (sent, failed)
+            if device["device_id"] in (self.heating_by_mode if cap == "heating" else self.climate_by_mode):
+                # D08 (P-83): a mode's command (the mode's own heating or climate): it applies when the windows are
+                # closed again, with the mode of that moment, also when the window closes before the rule's minutes
+                self.window_off[device["device_id"]] = {"cap": cap, "by_mode": True, "mode_blocked": True, "state": {
+                    k: new_state[k] for k in ("on", "mode", "setpoint", "fan") if k in new_state}}
+                self.store.put_meta("window_off", self.window_off)
             await asyncio.sleep(0.3)
             self._set_status(cmd, "sent")
             await asyncio.sleep(0.2)
@@ -1694,6 +1925,29 @@ class ApartmentEngine:
         waiter = self._watch_power(check) if check and check[0]["online"] else None
         no_confirmation = "Nessuna conferma dal dispositivo entro il tempo massimo"
         async with self._device_lock(device["device_id"]):       # at most one command per device (connector-v2.md §2.5)
+            # D32 (P-83): what it asks is computed from the state the command before it left (it was computed at its
+            # creation: «fan high» sent while the split was being turned on turned it off again), and its time starts
+            # here, where it gets the device
+            fresh = self.target_state(device, cap, cmd["action"], cmd["params"])
+            if fresh != new_state:
+                old, new_state = describe(cap, device["capabilities"][cap]), fresh
+                if waiter is not None:
+                    self._unwatch_power(check[0]["device_id"], waiter)
+                check = self._power_check(device, cap, new_state)
+                waiter = self._watch_power(check) if check and check[0]["online"] else None
+            deadline = max(deadline, utcnow() + timedelta(seconds=COMMAND_DEADLINE_S))
+            if cap == "climate" and new_state["on"] and not device["capabilities"][cap]["on"]:
+                # D11 (P-83): the pause checked again here, where a turn_off sent before this command is over (its
+                # pause starts when it is settled): before, a start queued behind a turn_off ran at once
+                pause = self.compressor_wait(device["device_id"])
+                if 0 < pause <= self.setting("COMPRESSOR_WAIT_SECONDS"):
+                    await asyncio.sleep(pause)
+                    pause = 0.0
+                if pause > 0:
+                    if waiter is not None:
+                        self._unwatch_power(check[0]["device_id"], waiter)
+                    await self._refused_by_pause(cmd, decision_actor, reasoning, target, old, new_state, pause)
+                    return
             running = (device["device_id"], cap, cmd["correlation_id"], new_state)
             self.inflight.append(running)
             try:
@@ -1777,12 +2031,28 @@ class ApartmentEngine:
             self.power_waiters.pop(meter_id, None)
 
     def _power_seen(self, meter_id: str, state: dict) -> None:
-        """A meter's new watts: the commands watching it that they confirm are confirmed."""
+        """A meter's new watts: the commands watching it that they confirm are confirmed; D14, a split confirmed by this
+        meter and with no command running follows it (drawing: on; nothing: off), so a start that came after its
+        command's window, or a split switched by its own remote, is seen as it is (the window rule turns it off)."""
         watts = float(state.get("watts") or 0)
         for direction, baseline, waiter in self.power_waiters.get(meter_id, []):
             if not waiter.done() and confirm.power_confirms(direction, baseline, watts, self.confirm_on_watts,
                                                             self.confirm_off_watts):
                 waiter.set_result(True)
+        busy = {c["device_id"] for c in self.commands.values() if c["status"] not in FINAL} | {r[0] for r in self.inflight}
+        for split in self.devices.values():
+            climate = split["capabilities"].get("climate")
+            if (not climate or climate.get("confirmation") != "power" or split["device_id"] in busy
+                    or (self.confirmation_meter(split["device_id"]) or {}).get("device_id") != meter_id):
+                continue
+            seen_on = (True if watts >= self.confirm_on_watts else False if watts < self.confirm_off_watts else None)
+            if seen_on is None or seen_on == bool(climate.get("on")):
+                continue
+            climate["on"] = seen_on
+            self._note_climate(split["device_id"], "climate", not seen_on, seen_on)
+            self._save_device(split)
+            self.emit("device.state", {"device_id": split["device_id"], "capability": "climate", "state": climate},
+                      str(uuid.uuid4()))
 
     async def _power_confirmed(self, waiter: asyncio.Future, cmd: dict) -> bool:
         """Wait for the meter until CONFIRM_UNTIL_S after the command's creation."""
@@ -1841,6 +2111,7 @@ class ApartmentEngine:
         comes back at the regulation's next round, after a minute with the windows closed (_restore_after_window)."""
         if (task := self.window_reflexes.pop(device_id, None)) and not task.done():
             task.cancel()
+        self.window_fired.discard(device_id)
         if not self.window_open():
             self.windows_closed_at = time.monotonic()
 
@@ -1874,20 +2145,27 @@ class ApartmentEngine:
             open_s = (utcnow() - parse_dt(contact["since"])).total_seconds() if contact.get("since") else 0.0
             self._arm_window(d["device_id"], delay=max(0.0, minutes * seconds_per_minute() - open_s))
 
-    def _window_turn_off(self, window_id: str, why: str) -> None:
+    def _window_turn_off(self, window_id: str, why: str, skip: set[str] | frozenset = frozenset()) -> None:
+        self.window_fired.add(window_id)                     # D03: the rule now holds while this window stays open
+        # D08 (P-83): a device with a command still running (the mode's turn_off or its new setpoint) is left to it: a
+        # turn_off made now would carry the state of before (a boiler back to 21 °C), and one being turned off would be
+        # remembered as «on» and come back on when the window closes, in «casa vuota» too. The next regulation's minute
+        # looks again (_keep_window_off, D03)
+        skip = set(skip) | {c["device_id"] for c in self.commands.values() if c["status"] not in FINAL}
         corr = str(uuid.uuid4())
         frost = self.mode == "empty" and self.rule("frost_protection")["enabled"]
         for d in list(self.devices.values()):
             for cap in ("climate", "heating"):
                 st = d["capabilities"].get(cap)
-                if st and st["on"] and d["online"]:
+                if st and st["on"] and d["online"] and d["device_id"] not in skip:
                     # R8: safety stays stronger than the window: in an empty apartment the frost protection goes on
                     extra = "; l'antigelo resta attivo" if cap == "heating" and frost else ""
                     device_id = d["device_id"]
-                    # D-218 point 1: remembered to bring back, and not a person's command (the mode keeps it)
+                    # D-218 point 1: remembered to bring back, and not a person's command (the mode keeps it); D03: a
+                    # second try keeps what was remembered the first time
                     by_mode = device_id in (self.heating_by_mode if cap == "heating" else self.climate_by_mode)
-                    self.window_off[device_id] = {"cap": cap, "by_mode": by_mode, "state": {
-                        k: st[k] for k in ("on", "mode", "setpoint", "fan") if k in st}}
+                    self.window_off.setdefault(device_id, {"cap": cap, "by_mode": by_mode, "state": {
+                        k: st[k] for k in ("on", "mode", "setpoint", "fan") if k in st}})
                     self._window_command = True
                     try:
                         self.create_command(device_id, {"capability": cap, "action": "turn_off"}, "system:engine", corr,
@@ -2008,6 +2286,14 @@ class ApartmentEngine:
         self.log(actor_of(actor), {"type": "rules"}, "update_rules", None, changed, "Regole modificate dall'app",
                  "applied", correlation_id)
         self._apply_limits(correlation_id, emit=True)       # D-174: the switch and the limits take effect now
+        if any(p.get("rule_id") == "window_open_off" for p in patches):
+            # D30 (P-83): turned on, or its minutes changed: every open window waits again from when it opened (past
+            # the minutes, at once); before, a wait that ended with the rule off was never planned again
+            try:
+                asyncio.get_running_loop()
+                self._windows_at_start()
+            except RuntimeError:
+                pass                                         # no loop (a call outside the engine's): the start arms them
         return self.ruleset()
 
     # ---- schedule & bookings -----------------------------------------------
@@ -2104,16 +2390,28 @@ class ApartmentEngine:
             raise bad_request("source non valido")
         try:
             checkin, checkout = parse_dt(ev["checkin_at"]), parse_dt(ev["checkout_at"])
-            parse_dt(ev["ts"])
+            ts = parse_dt(ev["ts"])
         except ValueError:
             raise bad_request("Date non valide")
         if checkout <= checkin:
             raise MockError(422, "invalid_dates", "Il check-out deve essere successivo al check-in")
         bid = ev["booking_id"]
+        known = self.bookings.get(bid)
+        if known is not None and known.get("last_ts") and ts < parse_dt(known["last_ts"]):
+            # D07 (P-83): older than the last event applied to this booking (a retry after a 502 arriving late):
+            # acknowledged, so it is not sent again, and changes nothing
+            result = {"event_id": ev["event_id"], "accepted": True, "duplicate": False, "schedule_ids": []}
+            self.processed_events[ev["event_id"]] = result
+            self._save_processed(ev["event_id"], result, known["checkout"])
+            self.log("system", {"type": "schedule"}, "booking_event_stale", None, bid,
+                     f"Evento «{ev['type']}» della prenotazione {bid} più vecchio dell'ultimo applicato: ignorato",
+                     "informational", correlation_id, emit=emit)
+            return 200, result
         booking = self.bookings.setdefault(bid, {"booking_id": bid, "checkin": checkin, "checkout": checkout,
                                                  "cancelled": False, "checked_in": False, "checked_out": False})
         items = [s for s in self.schedule.values() if s["booking_id"] == bid]
         ids: list[str] = []
+        moved_reset = False
         reset = False
         if ev["type"] == "booking_cancelled":
             booking["cancelled"] = True
@@ -2144,14 +2442,25 @@ class ApartmentEngine:
             co = self.rule("checkout_eco")
             if co["enabled"]:
                 plan.append(("checkout", checkout + timedelta(minutes=co["params"]["minutes_after"]), "empty"))
+            now = utcnow()
             for kind, run_at, mode in plan:
                 existing = next((s for s in items if s["kind"] == kind and s["status"] == "planned"), None)
+                done = any(s["kind"] == kind and s["status"] == "done" for s in items)
                 if existing:
                     existing["run_at"] = iso(run_at)
                     ids.append(existing["schedule_id"])
-                else:
-                    ids.append(self.add_schedule(run_at, {"type": "apartment_mode", "mode": mode}, kind, "booking", bid)["schedule_id"])
+                    continue
+                if done and (run_at <= now or booking["checked_in"] or booking["checked_out"]):
+                    continue        # D06 (P-83): already done for this booking, its time past or the guests in or gone
+                if done and kind == "prearrival" and not moved_reset and not self._booking_needs_comfort(bid):
+                    # D06: the arrival moved to the future after the prearrival: back to empty now, as a cancellation
+                    # does (D-121), through the scheduler; warmed again at the new time
+                    ids.append(self.add_schedule(now, {"type": "apartment_mode", "mode": "empty"}, "empty", "booking",
+                                                 bid)["schedule_id"])
+                    moved_reset = True
+                ids.append(self.add_schedule(run_at, {"type": "apartment_mode", "mode": mode}, kind, "booking", bid)["schedule_id"])
             reasoning = f"Prenotazione {bid} {'ricevuta' if ev['type'] == 'booking_created' else 'modificata'}: pre-arrivo e check-out programmati"
+        booking["last_ts"] = iso(ts)                     # D07: the time of the last event applied
         result = {"event_id": ev["event_id"], "accepted": True, "duplicate": False, "schedule_ids": ids}
         self.processed_events[ev["event_id"]] = result
         self._save_booking(booking)
@@ -2160,6 +2469,11 @@ class ApartmentEngine:
                 self._save_schedule(item)
         self._save_processed(ev["event_id"], result, booking["checkout"])
         self.log("system", {"type": "schedule"}, ev["type"], None, bid, reasoning, "informational", correlation_id, emit=emit)
+        if moved_reset:
+            arrival = booking["checkin"].astimezone(ZoneInfo(self.timezone)).strftime("%d/%m %H:%M")
+            self.log("system", {"type": "apartment"}, "booking_moved_reset", self.mode, "empty",
+                     f"Arrivo della prenotazione {bid} spostato al {arrival}, dopo il pre-arrivo: appartamento rimesso a "
+                     f"vuoto, si riscalda al nuovo pre-arrivo", "informational", correlation_id, emit=emit)
         if reset:   # its own decision, which the BFF turns into a push to the managers (D-121)
             self.log("system", {"type": "apartment"}, "booking_cancel_reset", self.mode, "empty",
                      f"Prenotazione {bid} annullata dopo il pre-arrivo: appartamento rimesso a vuoto", "informational",
@@ -2168,17 +2482,35 @@ class ApartmentEngine:
             self.apartment_changed(correlation_id)
         return 202, result
 
-    def _booking_needs_comfort(self, cancelled_id: str) -> bool:
-        """Another booking, not cancelled nor checked out, that is in course now or whose prearrival already ran."""
+    def _booking_needs_comfort(self, other_than: str | None) -> bool:
+        return self._booking_needing_comfort(other_than) is not None
+
+    def _booking_needing_comfort(self, other_than: str | None) -> dict | None:
+        """Another booking, not cancelled nor checked out, that is in course now, whose prearrival already ran, or
+        (D05, P-83) whose arrival is within the prearrival's hours: its warmth must not be taken away."""
         now = utcnow()
-        for b in self.bookings.values():
-            if b["booking_id"] == cancelled_id or b["cancelled"] or b["checked_out"]:
-                continue
-            if b["checkin"] <= now < b["checkout"] or any(
+        pre = self.rule("prearrival")
+        soon = timedelta(hours=pre["params"]["hours_before"]) if pre["enabled"] else None
+        for b in sorted(self.bookings.values(), key=lambda b: b["checkin"]):
+            if b["booking_id"] == other_than or b["cancelled"] or b["checked_out"] or b["checkout"] <= now:
+                continue                                     # D05: a stay already over needs nothing
+            if b["checkin"] <= now < b["checkout"] or (soon is not None and now < b["checkin"] <= now + soon) or any(
                     s["booking_id"] == b["booking_id"] and s["kind"] == "prearrival" and s["status"] == "done"
                     for s in self.schedule.values()):
-                return True
-        return False
+                return b
+        return None
+
+    def _checkout_keeps_comfort(self, booking_id: str | None, correlation_id: str) -> bool:
+        """D05 (P-83): a check-out about to empty the apartment while another booking needs it (back to back): the mode
+        stays, and a decision says why. True when it stays."""
+        other = self._booking_needing_comfort(booking_id)
+        if other is None:
+            return False
+        arrival = other["checkin"].astimezone(ZoneInfo(self.timezone)).strftime("%d/%m %H:%M")
+        self.log("system", {"type": "apartment"}, "checkout_kept_comfort", self.mode, self.mode,
+                 f"Check-out della prenotazione {booking_id or '?'}: l'appartamento non va a vuoto, c'è la prenotazione "
+                 f"{other['booking_id']} (arrivo {arrival})", "informational", correlation_id)
+        return True
 
     # ---- approvals ---------------------------------------------------------
     def pending_approval(self) -> dict | None:
@@ -2232,8 +2564,15 @@ class ApartmentEngine:
         if pa["type"] == "apartment_mode":
             action, old, new = "set_mode", self.mode, pa["mode"]
         else:
-            state = self.devices.get(pa["device_id"], {}).get("capabilities", {}).get(pa["capability"], {})
-            action, old, new = pa["action"], ("on" if state.get("on") else "off"), "off"
+            # D76 (P-83): described like the commands' own decisions, the new value from the state the command gives
+            # (the new value was always "off": «from off to off» for a socket turned on)
+            device, cap = self.devices.get(pa["device_id"]), pa["capability"]
+            if device and cap in device["capabilities"]:
+                state = device["capabilities"][cap]
+                action, old = pa["action"], describe(cap, state)
+                new = describe(cap, self.target_state(device, cap, pa["action"], pa.get("params") or {}))
+            else:
+                action, old, new = pa["action"], "off", "on" if pa["action"] == "turn_on" else "off"
         self.log(self._approval_actor(approval), self._approval_target(approval), action, old, new, approval["reason"],
                  "pending_approval", approval["correlation_id"], approval_id=approval["approval_id"])
 
@@ -2320,7 +2659,7 @@ class ApartmentEngine:
         booking = self.bookings[item["booking_id"]]
         departure = booking["checkout"].astimezone(ZoneInfo(self.timezone)).strftime("%H:%M")
         minutes = max(int((utcnow() - last).total_seconds() // 60), 0)
-        self._new_approval("rule", "Mettere l'appartamento a vuoto dopo il check-out",
+        self._new_approval("rule", CHECKOUT_APPROVAL,
                            f"Movimento rilevato {minutes} minuti fa da «{sensor['label']}», dopo l'orario di partenza "
                            f"delle {departure}: gli ospiti potrebbero essere ancora in casa",
                            dict(item["action"]), "approve", correlation_id)
@@ -2336,9 +2675,16 @@ class ApartmentEngine:
         items = [a for a in self.approvals if a["status"] == "pending" or (status == "all" and parse_dt(a["created_at"]) >= cutoff)]
         return {"items": copy.deepcopy(sorted(items, key=lambda a: a["created_at"], reverse=True))}
 
-    def _execute_proposed(self, approval: dict, actor: str, correlation_id: str, decision_actor: str) -> None:
+    def _execute_proposed(self, approval: dict, actor: str, correlation_id: str, decision_actor: str,
+                          by_hand: bool = False) -> None:
         pa = approval["proposed_action"]
         run_at = self._take_schedule(approval["approval_id"])
+        if run_at is not None and parse_dt(run_at) < utcnow() - timedelta(seconds=30):
+            # D37 (P-83): approved after its time: nothing runs at a time nobody chose
+            at = parse_dt(run_at).astimezone(ZoneInfo(self.timezone)).strftime("%d/%m %H:%M")
+            self._approved_not_done(approval, decision_actor, correlation_id, "non eseguita",
+                                    MockError(422, "run_at_in_past", f"l'orario ({at}) è già passato"))
+            return
         if run_at is not None and parse_dt(run_at) > utcnow() + timedelta(seconds=30):
             try:                                          # D-170: approved, the action is scheduled at its time
                 self.create_schedule({"run_at": run_at, "action": pa}, actor, correlation_id, source="assistant")
@@ -2347,7 +2693,7 @@ class ApartmentEngine:
             return
         try:
             if pa["type"] == "apartment_mode":
-                self.set_mode(pa["mode"], actor, correlation_id, "Azione approvata", decision_actor)
+                self.set_mode(pa["mode"], actor, correlation_id, "Azione approvata", decision_actor, by_hand=by_hand)
             else:
                 self.create_command(pa["device_id"], pa, actor, correlation_id, decision_actor=decision_actor,
                                     reasoning=f"Azione approvata: {approval['description']}")
@@ -2385,7 +2731,7 @@ class ApartmentEngine:
                  None, approval["status"], reasoning, "applied" if approve else "rejected", correlation_id,
                  approval_id=approval_id)
         if approve:
-            self._execute_proposed(approval, actor, correlation_id, who)
+            self._execute_proposed(approval, actor, correlation_id, who, by_hand=True)
         else:
             self._take_schedule(approval_id)
         self._dequeue_approval()
@@ -2599,14 +2945,14 @@ class ApartmentEngine:
         off = re.search(r"\b(spegni|disattiva)\b", text)
         try:
             # D-189: with guests in only switching the boiler off asks first; switching it on or a temperature does not
-            if "caldaia" in text and off and self.apartment()["occupancy"] == "occupied":
+            if "caldaia" in text and off and self.guests_in():      # D18
                 pending = self.pending_approval()
                 if pending:
                     ask.update(status="answered", approval_id=pending["approval_id"],
                                answer="C'è già un'approvazione in attesa: decidi prima quella.")
                 else:
                     approval = self.trigger_approval(corr, source="assistant",
-                                                     reason=f"Richiesta all'assistente: «{ask['text']}». Ospiti presenti nell'appartamento.")
+                                                     reason="Richiesta all'assistente. Ospiti presenti nell'appartamento.")   # D56: not its text
                     ask.update(status="needs_approval", approval_id=approval["approval_id"],
                                answer="Spegnere la caldaia con ospiti presenti richiede la tua approvazione.")
             elif at and int(at.group(1)) < 24:
@@ -2637,7 +2983,7 @@ class ApartmentEngine:
                 d = self._match_device(text)
                 cap = next(c for c in ACTIONS if c in d["capabilities"])
                 cmd = self.create_command(d["device_id"], {"capability": cap, "action": "turn_off"}, actor, corr,
-                                          decision_actor="assistant", reasoning=f"Richiesta all'assistente: «{ask['text']}»")
+                                          decision_actor="assistant", reasoning="Richiesta all'assistente")
                 ask.update(status="answered", actions=[{"type": "command", "command_id": cmd["command_id"]}],
                            answer=f"Ho spento {d['label'].lower()}.")
             elif "caldaia" in text:                       # D-189: the boiler on, at a temperature if given
@@ -2647,7 +2993,7 @@ class ApartmentEngine:
                 params = {"on": True, **({"setpoint": setpoint} if setpoint is not None else {})}
                 cmd = self.create_command(d["device_id"], {"capability": "heating", "action": "set_heating",
                                                            "params": params}, actor, corr, decision_actor="assistant",
-                                          reasoning=f"Richiesta all'assistente: «{ask['text']}»")
+                                          reasoning="Richiesta all'assistente")
                 done = cmd["params"].get("setpoint")
                 ask.update(status="answered", actions=[{"type": "command", "command_id": cmd["command_id"]}],
                            answer=(f"Ho acceso {d['label'].lower()} a {fmt_num(done)} °C." if done is not None
@@ -2659,7 +3005,7 @@ class ApartmentEngine:
                 else:
                     cmd = self.create_command(d["device_id"], {"capability": "climate", "action": "set_climate",
                                                                "params": {"on": True, "setpoint": setpoint}}, actor, corr,
-                                              decision_actor="assistant", reasoning=f"Richiesta all'assistente: «{ask['text']}»")
+                                              decision_actor="assistant", reasoning="Richiesta all'assistente")
                     done = cmd["params"]["setpoint"]          # R6: maybe brought within the limits
                     extra = "" if done == setpoint else f", nei limiti consentiti (avevi chiesto {fmt_num(setpoint)} °C)"
                     ask.update(status="answered", actions=[{"type": "command", "command_id": cmd["command_id"]}],
@@ -2786,8 +3132,26 @@ class ApartmentEngine:
         self.log("system", self._approval_target(a), "expire",
                  "pending", "expired", f"Approvazione scaduta senza risposta: {outcome}", "informational", corr,
                  approval_id=a["approval_id"])
+        late = utcnow() - parse_dt(a["expires_at"]) if a.get("expires_at") else timedelta(0)
         try:
-            if a["expires_action"] == "approve":
+            if a["expires_action"] == "approve" and late > timedelta(minutes=self.setting("MISSED_AFTER_MINUTES")):
+                # D10 (P-83): it expired while the engine was down, longer ago than a scheduled action may run late:
+                # closed without running, as schedule_missed does
+                at = parse_dt(a["expires_at"]).astimezone(ZoneInfo(self.timezone)).strftime("%d/%m %H:%M")
+                self._take_schedule(a["approval_id"])
+                self.log("system", self._approval_target(a), "expire", "pending", "expired",
+                         f"Approvazione scaduta alle {at}, mentre il sistema era fermo: azione non eseguita "
+                         f"({a['description']})", "failed", corr, approval_id=a["approval_id"])
+            elif a["expires_action"] == "approve" and a["description"] == CHECKOUT_APPROVAL and \
+                    self._checkout_keeps_comfort(None, corr):
+                pass                                     # D05: approved at expiry, but the next guest arrived meanwhile
+            elif a["expires_action"] == "approve" and self.hold and a["proposed_action"].get("type") == "apartment_mode":
+                # D09 (P-83): like a scheduled mode change (D-122), it waits for the end of the hold: an action due now,
+                # which the scheduler defers with the decision «rimandata per la forzatura»
+                pa = dict(a["proposed_action"])           # kind and source within the contract's values
+                self.add_schedule(utcnow(), pa, "empty" if pa.get("mode") == "empty" else "manual",
+                                  "booking" if a["description"] == CHECKOUT_APPROVAL else "manual")
+            elif a["expires_action"] == "approve":
                 self._execute_proposed(a, "system:engine", corr, "system")
             else:
                 self._take_schedule(a["approval_id"])
@@ -2814,6 +3178,12 @@ class ApartmentEngine:
         if self.deferred.pop(item["schedule_id"], None) is not None:
             self.store.put_meta("deferred", self.deferred)
             reasoning += " (rimandata per la forzatura)"
+        if (item["kind"] == "checkout" and act["type"] == "apartment_mode" and act.get("mode") == "empty"
+                and self._checkout_keeps_comfort(item["booking_id"], corr)):
+            item.update(status="done", command_ids=[], executed_at=iso(now))   # D05: the next guest keeps the warmth
+            self._save_schedule(item)
+            self.apartment_changed(corr)
+            return
         if item["kind"] == "checkout" and act["type"] == "apartment_mode" and (seen := self._presence_after_checkout(item)):
             self._propose_checkout(item, seen, corr)      # F1 (D-137): the manager decides; approved at expiry
             item.update(status="done", command_ids=[], executed_at=iso(now))

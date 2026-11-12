@@ -766,7 +766,9 @@ def test_an_engine_silent_for_the_rules_minutes_is_told_once(unreachable, fcm):
         await push.on_link_change(APT, False)                 # the hub tells only changes; twice changes nothing
         await drain()
     run(scenario())
-    assert [m.data["body"] for m in fcm.sent] == [UNREACHABLE_BODY]
+    # D75: the time since it went silent; here a minute is 0.01 s and the last check can add one
+    [body] = [m.data["body"] for m in fcm.sent]
+    assert body in (UNREACHABLE_BODY, UNREACHABLE_BODY.replace("15 minuti", "16 minuti"))
 
 
 def test_back_before_the_minutes_nothing_and_the_next_outage_is_told(unreachable, fcm):
@@ -844,7 +846,26 @@ def test_a_suspension_holds_it_until_its_end_then_an_engine_still_down_is_told(u
         assert fcm.sent == []
         await drain()
     run(scenario())
-    assert [m.data["body"] for m in fcm.sent] == [UNREACHABLE_BODY]
+    # D75 (P-83): told at the end of the suspension, it says how long the engine has been silent (about 40 minutes
+    # here), not the rule's 15
+    [body] = [m.data["body"] for m in fcm.sent]
+    minutes = int(body.split("non risponde da ")[1].split(" minuti")[0])
+    assert 39 <= minutes <= 60 and body == UNREACHABLE_BODY.replace("15 minuti", f"{minutes} minuti")
+
+
+@pytest.mark.parametrize("minutes, said", [(15, "15 minuti"), (119.9, "119 minuti"), (150, "2 ore"), (47 * 60 + 59, "47 ore"),
+                                           (3 * 1440 + 5, "3 giorni"), (30 * 1440, "30 giorni")])
+def test_d75_the_message_says_how_long(minutes, said):
+    data, _ = push.instance_unreachable_push(APT, minutes, TS)
+    assert data["body"].startswith(f"Il sistema domotico non risponde da {said}: ")
+
+
+def test_d75_an_engine_silent_for_three_days_says_three_days(unreachable, fcm):
+    """D75 (P-83): told after a long suspension (up to 30 days), the text still said the rule's minutes."""
+    since = time.time() - 3 * 1440 * push._minute_s() - 1
+    push._unreachable[APT.apartment_id] = since
+    run(push._unreachable_watch(APT, since))
+    assert [m.data["body"].split(":")[0] for m in fcm.sent] == ["Il sistema domotico non risponde da 3 giorni"]
 
 
 def test_a_suspension_holds_the_connector_down_too(unreachable, fcm, monkeypatch):
@@ -1210,3 +1231,79 @@ def test_the_next_shutdown_has_its_own_summary(maintenance, grouped):
     run(one_shutdown())
     run(one_shutdown())
     assert len(grouped.sent) == 2
+
+
+# -------- D42 (P-83): a process that dies within the grouping window ----------------------------------------------------
+async def dies():
+    """The process stops: its tasks cancelled, its open groups gone (they lived only in its memory)."""
+    for task in list(push._tasks):
+        task.cancel()
+    await asyncio.gather(*list(push._tasks), return_exceptions=True)
+    push._schedule_groups.clear()
+
+
+def leases_run_out():
+    for d in get_repository().work.values():
+        d["lease_until"] = min(d["lease_until"], time.time())
+
+
+def test_a_group_survives_a_process_that_dies_in_the_window(grouped, monkeypatch):
+    """Before D42 the group was only in memory for 60 s (and the stream's cursor already beyond its event): lost."""
+    monkeypatch.setattr(push, "SCHEDULE_GROUP_S", 30.0)
+
+    async def scenario():
+        await push.on_stream_event(APT, not_done("checkout", "Azione programmata (check-out) non eseguita: z",
+                                                 decision_id="dec-42"))
+        await asyncio.sleep(0.05)
+        await dies()
+        assert await push.recover_once() == 0              # its lease covers the window and a margin
+        leases_run_out()
+        recovered = await push.recover_once()
+        await drain()
+        return recovered
+    assert run(scenario()) == 1
+    [msg] = grouped.sent
+    assert msg.data["body"] == "Azione programmata (check-out) non eseguita: z"
+    assert msg.data["tag"] == "schedule:apt-push:dec-42"
+
+
+def test_the_group_claimed_at_once_is_sent_whole_at_the_end_of_the_window(grouped):
+    async def scenario():
+        for n in range(3):
+            await push.on_stream_event(APT, not_done("checkout", f"Azione {n}", decision_id=f"dec-42{n}"))
+        await drain()
+        leases_run_out()
+        return await push.recover_once()
+    assert run(scenario()) == 0                            # sent and done: nothing left to recover
+    [msg] = grouped.sent
+    assert msg.data["body"] == "3 azioni programmate non eseguite. La prima: Azione 0"
+
+
+def test_a_reset_within_the_window_leaves_nothing_to_recover(grouped, monkeypatch):
+    monkeypatch.setattr(push, "SCHEDULE_GROUP_S", 0.2)
+
+    async def scenario():
+        await push.on_stream_event(APT, not_done("manual", "Azione programmata (manuale) non eseguita: r"))
+        await asyncio.sleep(0.05)
+        push.forget_apartment(APT.apartment_id)
+        await drain()
+        leases_run_out()
+        return await push.recover_once()
+    assert run(scenario()) == 0 and grouped.sent == []
+
+
+def test_the_maintenance_summary_survives_a_process_that_dies_in_the_window(maintenance, grouped, monkeypatch):
+    monkeypatch.setattr(push, "SCHEDULE_GROUP_S", 30.0)
+    maintenance.suspend(soon(0.2))
+
+    async def scenario():
+        await push.on_stream_event(APT, missed("checkout"))
+        await asyncio.sleep(0.05)
+        await dies()
+        await asyncio.sleep(0.3)                           # the suspension is over
+        recovered = await push.recover_once()
+        await drain()
+        return recovered
+    assert run(scenario()) == 1
+    [msg] = grouped.sent
+    assert msg.data["body"] == "Durante la manutenzione 1 azione programmata non è stata eseguita"

@@ -88,6 +88,19 @@ def can_connect(where, user, password):
     return pub(where, user, password, "nessuno/qui").returncode == 0
 
 
+def taken_over(client_id: str, since: str) -> list[str]:
+    """D38: the broker's lines «Client <id> [<address>] disconnected: session taken over.» since a time (docker logs
+    --since): a connection that took the Client ID of another and dropped it. mosquitto_sub reconnects by itself (two
+    clients with one Client ID drop each other in turn, every second), so "still running" alone says nothing."""
+    out = docker("logs", "--since", since, CONTAINER, check=False)
+    return [line for line in (out.stdout + out.stderr).splitlines()
+            if f"Client {client_id} [" in line and "session taken over" in line]
+
+
+def docker_now() -> str:
+    return rig("date -u +%Y-%m-%dT%H:%M:%SZ").stdout.strip()
+
+
 class Sub:
     """A mosquitto_sub left running; its lines come from docker logs."""
 
@@ -314,19 +327,58 @@ def test_a_connector_cannot_see_or_write_another_apartment(bench, sub):
     assert not any("comando-estraneo" in line for line in listener_b.lines())
 
 
-def test_a_device_cannot_leave_its_own_topics(bench, sub):
-    connector_a = sub("internal", f"{A}.connector", PW["connA"], f"{A}/#")
+def test_a_device_cannot_read_outside_its_own_topics(bench, sub):
+    """D38: one login of a1 at a time (on the devices' door the login is the Client ID: a second one would take the
+    first one's place, and a silent spy would prove nothing); it subscribes to everything and stays connected."""
+    since = docker_now()
     other_device = sub("tls", f"{A}.a2", PW["a2"], f"{A}/a2/#")
-    spy_sibling = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a2/#")
-    spy_b = sub("tls", f"{A}.a1", PW["a1"], f"{B}/#")
+    spy = sub("tls", f"{A}.a1", PW["a1"], "#")
+    assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a2/rpc", "comando-vero").returncode == 0
+    assert pub("internal", f"{B}.connector", PW["connB"], f"{B}/b1/rpc", "comando-di-b").returncode == 0
+    assert other_device.wait_for("comando-vero")
+    time.sleep(1)
+    assert spy.running() and not taken_over(f"{A}.a1", since), "la spia è stata scollegata: la prova non dice nulla"
+    assert not any("comando-vero" in line or "comando-di-b" in line for line in spy.lines())
+
+
+def test_a_device_cannot_write_outside_its_own_topics(bench, sub):
+    connector_a = sub("internal", f"{A}.connector", PW["connA"], f"{A}/#")
+    connector_b = sub("internal", f"{B}.connector", PW["connB"], f"{B}/#")
+    other_device = sub("tls", f"{A}.a2", PW["a2"], f"{A}/a2/#")
     pub("tls", f"{A}.a1", PW["a1"], f"{A}/a2/rpc", "finto-comando")
     pub("tls", f"{A}.a1", PW["a1"], f"{B}/b1/rpc", "fuori-appartamento")
-    pub("internal", f"{A}.connector", PW["connA"], f"{A}/a2/rpc", "comando-vero")
+    assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a2/rpc", "comando-vero").returncode == 0
     assert other_device.wait_for("comando-vero")
     time.sleep(1)
     assert not any("finto-comando" in line for line in other_device.lines() + connector_a.lines())
-    assert not any("comando-vero" in line for line in spy_sibling.lines())
-    assert not any("fuori-appartamento" in line for line in spy_b.lines())
+    assert not any("fuori-appartamento" in line for line in connector_b.lines())
+
+
+def test_d38_a_device_cannot_take_the_place_of_another(bench, sub):
+    """D38 (P-83): on the devices' door the Client ID is the login (use_username_as_clientid): a1, with its own right
+    password and the Client ID of b1 (another apartment's device), used to drop b1 (MQTT gives a Client ID to one
+    connection only). Now b1 stays connected and keeps receiving its requests."""
+    since = docker_now()
+    b1 = sub("tls", f"{B}.b1", PW["b1"], f"{B}/b1/rpc", client_id=f"{B}.b1")
+    intruder = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/rpc", client_id=f"{B}.b1")
+    time.sleep(1)
+    assert not taken_over(f"{B}.b1", since), "a1 con il Client ID di b1 ha scollegato b1"
+    assert b1.running()
+    assert intruder.running()
+    assert pub("internal", f"{B}.connector", PW["connB"], f"{B}/b1/rpc", "per-b1").returncode == 0
+    assert b1.wait_for("per-b1")
+
+
+def test_d38_two_connectors_of_an_apartment_stay_connected_together(bench, sub):
+    """D38: on the connectors' door nothing changes: during an update the old and the new connector of an apartment
+    are connected together, with the same login and their own Client IDs; both stay connected."""
+    since = docker_now()
+    old = sub("internal", f"{A}.connector", PW["connA"], f"{A}/#", client_id="connettore-vecchio")
+    new = sub("internal", f"{A}.connector", PW["connA"], f"{A}/#", client_id="connettore-nuovo")
+    assert pub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/events/rpc", "evento-a1").returncode == 0
+    assert old.wait_for("evento-a1") and new.wait_for("evento-a1")
+    assert old.running() and new.running() and not taken_over(f"{A}.connector", since)
+    assert not taken_over("connettore-vecchio", since) and not taken_over("connettore-nuovo", since)
 
 
 def test_request_and_answer_between_the_connector_and_its_device(bench, sub):
@@ -336,6 +388,7 @@ def test_request_and_answer_between_the_connector_and_its_device(bench, sub):
     connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/+/connector/rpc")
     assert pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "richiesta-1").returncode == 0
     assert device.wait_for("richiesta-1")
+    device.close()                     # D38: the answer comes from a new login of a1, which would take this one's place
     assert pub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/connector/rpc", "risposta-1").returncode == 0
     assert connector.wait_for(f"{A}/a1/connector/rpc risposta-1")
 

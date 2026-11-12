@@ -1,6 +1,6 @@
 import time
 
-from .base import (EMPTY_AI_USAGE, ai_stats_added, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
 
 
@@ -109,10 +109,28 @@ class InMemoryRepository:
         self.bookings[booking.key] = booking.model_copy(deep=True)
         return booking
 
+    async def fold_booking_event(self, apartment_id, ev):
+        from .base import apply_booking_event
+        key = f"{apartment_id}__{ev['booking_id']}"
+        current = self.bookings.get(key)
+        new = apply_booking_event(current.model_copy(deep=True) if current else None, apartment_id, ev)
+        self.bookings[key] = new.model_copy(deep=True)
+        return new
+
+    async def update_user_if_present(self, uid, change):
+        current = self.users.get(uid)
+        if current is None:
+            return None
+        new = change(current.model_copy(deep=True))
+        self.users[uid] = new.model_copy(deep=True)
+        return new
+
     async def add_webhook_log(self, log):
         self.webhook_logs.append(log.model_copy(deep=True))
-        same = [i for i, l in enumerate(self.webhook_logs) if l.tenant_id == log.tenant_id]
-        for i in reversed(same[:-WEBHOOK_LOG_LIMIT]):
+        unsigned = log.tenant_id is None and not log.signature_ok      # D54: their own room
+        same = [i for i, l in enumerate(self.webhook_logs) if l.tenant_id == log.tenant_id
+                and (log.tenant_id is not None or (not l.signature_ok) == unsigned)]
+        for i in reversed(same[:-(UNSIGNED_LOG_LIMIT if unsigned else WEBHOOK_LOG_LIMIT)]):
             del self.webhook_logs[i]
         return log
 
@@ -193,6 +211,13 @@ class InMemoryRepository:
 
     async def release_work(self, key):
         self.work.pop(key, None)
+
+    async def renew_work(self, key, owner, lease_s, payload):
+        d = self.work.get(key)
+        if not d or d["status"] != "pending" or d["owner"] != owner:
+            return False
+        d.update(lease_until=time.time() + lease_s, payload=payload)
+        return True
 
     async def expire_work(self, key):
         d = self.work.get(key)
@@ -310,10 +335,14 @@ class InMemoryRepository:
 
     # P-36 point 14: no await between the check and the write, so atomic within the (single) process
     def _other_admins(self, tenant_id, uid):
-        return [u for u in self.users.values() if u.tenant_id == tenant_id and u.role == "admin" and u.uid != uid]
+        # D39 (P-83): an invitation (inv-…) is nobody who can sign in: it never counts as an admin
+        return [u for u in self.users.values() if u.tenant_id == tenant_id and u.role == "admin" and u.uid != uid
+                and not u.uid.startswith("inv-")]
 
     async def upsert_user_keeping_an_admin(self, user):
         current = self.users.get(user.uid)
+        if current is None:
+            return None                                  # D57 (P-83): deleted meanwhile: never written back
         if current and current.role == "admin" and user.role != "admin" and not self._other_admins(user.tenant_id, user.uid):
             return False
         self.users[user.uid] = user.model_copy(deep=True)

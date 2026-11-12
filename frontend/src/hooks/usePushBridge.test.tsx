@@ -31,7 +31,7 @@ const fromWorker = (data: unknown) =>
     sw.dispatchEvent(new MessageEvent("message", { data }));
   });
 
-const push = { type: "domotica-push", notice: { title: "Milano Centro: approvazione richiesta", body: "Accendere il clima", link: "/a/apt-001/approvazioni", apartmentId: "apt-001" } };
+const push = { type: "domotica-push", notice: { title: "Milano Centro: approvazione richiesta", body: "Accendere il clima", link: "/a/apt-001/approvazioni", apartmentId: "apt-001", kind: "approval" } };
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -83,6 +83,12 @@ describe("notifiche push: lato pagina", () => {
     mount("/a/apt-001/consumi");
     fromWorker(push);
     expect(toast.info).not.toHaveBeenCalled();
+  });
+
+  it("P-83, D24: push che lo stream NON annuncia (antigelo, azione non eseguita) sulla pagina di quell'appartamento: avviso", () => {
+    mount("/a/apt-001");
+    fromWorker({ type: "domotica-push", notice: { ...push.notice, title: "Milano Centro: antigelo non attivo", kind: "frost_inactive" } });
+    expect(toast.info).toHaveBeenCalledWith("Milano Centro: antigelo non attivo", expect.anything());
   });
 
   it("tocco sulla notifica con l'app aperta: la pagina va al link senza ricaricare", () => {

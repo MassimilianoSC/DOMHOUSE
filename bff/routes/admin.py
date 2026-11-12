@@ -127,7 +127,10 @@ async def patch_user(uid: str, body: UserPatch, user: CurrentUser = Depends(requ
         target.display_name = body.display_name
     target.apartment_ids = apartment_ids
     # P-36 point 14b: "at least one admin" checked and written atomically (two admins demoting each other at once)
-    if not await repo.upsert_user_keeping_an_admin(target):
+    saved = await repo.upsert_user_keeping_an_admin(target)
+    if saved is None:                                    # D57 (P-83): removed meanwhile by someone else
+        return err(404, "not_found", "Utente inesistente")
+    if not saved:
         return err(409, "last_admin", "Deve restare almeno un amministratore nell'organizzazione")
     if body.role and body.role != before.role and not target.uid.startswith("inv-"):
         try:  # claims prevail over the app record: a role change must reach them, or it would be undone at login
@@ -138,8 +141,13 @@ async def patch_user(uid: str, body: UserPatch, user: CurrentUser = Depends(requ
             return err(502, "auth_unavailable", "Ruolo non aggiornato, riprova tra poco")
         # F3 (D-70): a user without claims (recognised by the record) keeps a valid token with the old role; revoke the
         # sessions so the new role takes effect and any open stream ends. set_role_claim already revokes when it has claims.
+        # D40 (P-83): never in staging: one Firebase Auth for both environments (P-67), a revocation from staging
+        # would sign the person out of production too. The new role applies anyway: the record wins over a token's
+        # copy of the claims that Firebase no longer confirms (R4-1, bff/auth.py)
         try:
-            await asyncio.to_thread(accounts.revoke_sessions, target.uid)
+            from .. import config
+            if config.get_settings().app_env != "staging":
+                await asyncio.to_thread(accounts.revoke_sessions, target.uid)
         except Exception as exc:  # N5 (D-71): the change stays (the record rules the next request and the stream
             warn("admin: sessions not revoked after a role change", uid=target.uid, error=str(exc))  # re-check)
     who = audit.by_user(user)
@@ -169,10 +177,11 @@ async def delete_user(uid: str, user: CurrentUser = Depends(require_admin)):
     # F5 (D-70): never hard-delete the Firebase account of a platform manager (its email is visible to every user)
     protect = await repo.get_platform_member(target.email) is not None
     try:  # removing only the app record would leave a Firebase account (with claims, still able to sign in)
+        # R4-1: with the organisation of the record, so that claims naming it go too
         if target.uid.startswith("inv-"):
-            await asyncio.to_thread(accounts.delete_account, None, target.email, protect)
+            await asyncio.to_thread(accounts.delete_account, None, target.email, protect, False, target.tenant_id)
         else:
-            await asyncio.to_thread(accounts.delete_account, target.uid, None, protect)
+            await asyncio.to_thread(accounts.delete_account, target.uid, None, protect, False, target.tenant_id)
     except Exception as exc:
         warn("admin: firebase account not detached", uid=target.uid, error=str(exc))
         await repo.upsert_user(target)  # put the record back: the person is not half removed

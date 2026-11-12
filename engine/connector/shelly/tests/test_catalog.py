@@ -152,6 +152,37 @@ def test_device_without_id():
     refused(catalog_with(lambda d: d["devices"].__setitem__(0, SENTINEL)), "catalog device #1", "must be a mapping")
 
 
+@pytest.mark.parametrize("shelly_id", [
+    "shellyplugmg3-3c8a1f0e9b2d", "shelly1g4-7e41c09a5f36", "shellyemminig4-d20b6a8c4e17",   # the real form
+    "a", "A_b-9", "x" * 64, "0shelly",
+])
+def test_shelly_id_with_the_broker_rule_is_accepted(shelly_id):
+    """connector-v2.md §7.1: ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$, as scripts/broker_accounts.py (ID_RE)."""
+    cat = parse_catalog(catalog_with(lambda d: dev(d)["shelly"].update(id=shelly_id)), THRESHOLDS)
+    assert cat.devices[0].shelly_id == shelly_id
+
+
+@pytest.mark.parametrize("shelly_id", [
+    f"{SENTINEL}.x", f"{SENTINEL} x", f"{SENTINEL}/x", "x" * 65, f"-{SENTINEL}", f"_{SENTINEL}", f"{SENTINEL}\n",
+    f"{SENTINEL}è", f"{SENTINEL}:x",
+], ids=["dot", "space", "slash", "65-characters", "leading-dash", "leading-underscore", "trailing-newline",
+        "accent", "colon"])
+def test_shelly_id_against_the_broker_rule_is_refused_with_the_rule(shelly_id):
+    message = refused(catalog_with(lambda d: dev(d)["shelly"].update(id=shelly_id)),
+                      "catalog device dev-presa-camera", "shelly.id must be one MQTT topic level and a broker id")
+    assert "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$" in message and "at most 64 characters" in message
+
+
+def test_empty_shelly_id_is_refused():
+    refused(catalog_with(lambda d: dev(d)["shelly"].update(id="")), "catalog device dev-presa-camera",
+            "shelly.id is missing or not a text")
+
+
+def test_shelly_id_connector_is_reserved():
+    refused(catalog_with(lambda d: dev(d)["shelly"].update(id="connector")), "catalog device dev-presa-camera",
+            "shelly.id must not be connector, the broker's name for the connector itself")
+
+
 def test_shelly_id_repeated_names_the_other_device_not_the_id():
     data = catalog_with(lambda d: dev(d, 1)["shelly"].update(id=dev(d)["shelly"]["id"]))
     message = refused(data, "catalog device dev-presa-soggiorno", "shelly.id is the same as device dev-presa-camera")

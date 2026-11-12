@@ -74,12 +74,17 @@ const HOLDS = [
   { minutes: 360, key: "h6" },
 ];
 
-/** Rooms with a window open (contact open), each once, in the order of the devices; a device without room by its name. */
+const roomNames = (devices: Device[], rooms: Room[]) =>
+  [...new Set(devices.map((d) => rooms.find((r) => r.room_id === d.room_id)?.name ?? d.label))];
+
+/** Rooms with a window open (contact open, sensor online), each once, in the order of the devices; a device without room by its name. */
 export function openWindowRooms(devices: Device[], rooms: Room[]): string[] {
-  const names = devices
-    .filter((d) => d.capabilities.contact?.open === true)
-    .map((d) => rooms.find((r) => r.room_id === d.room_id)?.name ?? d.label);
-  return [...new Set(names)];
+  return roomNames(devices.filter((d) => d.online && d.capabilities.contact?.open === true), rooms);
+}
+
+/** Rooms whose window sensor is offline (P-83, D44): its last state is not the window's state now, open or closed. */
+export function unknownWindowRooms(devices: Device[], rooms: Room[]): string[] {
+  return roomNames(devices.filter((d) => !d.online && d.capabilities.contact), rooms);
 }
 
 const listIt = (items: string[]) => new Intl.ListFormat("it", { style: "long", type: "conjunction" }).format(items);
@@ -93,6 +98,7 @@ export function HoldControl({ aptId, apartment, canWrite }: { aptId: string; apa
   const rooms = useApartmentStore((s) => s.rooms);
   const [asking, setAsking] = useState<number | null>(null);
   const openRooms = openWindowRooms(devices, rooms);
+  const unknownRooms = unknownWindowRooms(devices, rooms);
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(id);
@@ -108,7 +114,7 @@ export function HoldControl({ aptId, apartment, canWrite }: { aptId: string; apa
   };
 
   const choose = (minutes: number) => {
-    if (openRooms.length) setAsking(minutes);
+    if (openRooms.length || unknownRooms.length) setAsking(minutes);
     else void hold(minutes);
   };
 
@@ -145,7 +151,9 @@ export function HoldControl({ aptId, apartment, canWrite }: { aptId: string; apa
           <DialogContent data-testid="hold-window-warning">
             <DialogTitle>{t("hold.windowTitle")}</DialogTitle>
             <DialogDescription>
-              {openRooms.length > 1 ? t("hold.windowsOpen", { rooms: listIt(openRooms) }) : t("hold.windowOpen", { rooms: openRooms[0] ?? "" })}
+              {openRooms.length > 1 ? t("hold.windowsOpen", { rooms: listIt(openRooms) }) : openRooms.length === 1 ? t("hold.windowOpen", { rooms: openRooms[0] }) : null}
+              {openRooms.length > 0 && unknownRooms.length > 0 && " "}
+              {unknownRooms.length > 0 && t("hold.windowUnknown", { rooms: listIt(unknownRooms) })}
             </DialogDescription>
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="ghost" onClick={() => setAsking(null)} data-testid="hold-window-cancel">{t("common.cancel")}</Button>

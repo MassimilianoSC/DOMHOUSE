@@ -71,14 +71,28 @@ def create_engine_app(config: EngineConfig, connector=None):
 
     @asynccontextmanager
     async def lifespan(app):
-        store = SqliteStore(config.data_dir / DB_NAME)
-        model = (ModelClient(config.model_base_url, config.apartment_id, config.api_key) if config.model_base_url
-                 else None)                           # P-60 step 9: the BFF's way to the model
-        await connector.start()
-        engine = ApartmentEngine(config.apartment_id, connector, simulated=config.simulated, seed=config.simulated,
-                                 implementation=IMPLEMENTATION, store=store,
-                                 settings=config.settings, model=model)
-        engine.ensure_started()
+        store = None
+        started = False
+        try:
+            store = SqliteStore(config.data_dir / DB_NAME)
+            model = (ModelClient(config.model_base_url, config.apartment_id, config.api_key) if config.model_base_url
+                     else None)                       # P-60 step 9: the BFF's way to the model
+            await connector.start()
+            started = True
+            engine = ApartmentEngine(config.apartment_id, connector, simulated=config.simulated, seed=config.simulated,
+                                     implementation=IMPLEMENTATION, store=store,
+                                     settings=config.settings, model=model)
+            engine.ensure_started()
+        except Exception as exc:
+            # D36 (P-83): a JSON line (the «righe di errore» alarm reads them) and python -m engine exits 4. The
+            # message only: a library's text, never the configuration (the key is not in it)
+            log.error("engine start failed", connector=config.connector, error_type=type(exc).__name__,
+                      error=str(exc)[:300])            # the same fields as «connector setup failed»
+            if started:
+                await asyncio.gather(connector.stop(), return_exceptions=True)
+            if store is not None:
+                store.close()
+            raise
         running["engine"] = engine
         log.info("engine started", connector=config.connector, devices=len(engine.devices), port=config.port,
                  restored=engine.restored)

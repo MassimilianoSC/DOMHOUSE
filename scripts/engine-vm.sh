@@ -3,7 +3,7 @@
 # as root (sudo), with the VM's own identity: no gcloud needed there, only curl, python3 and docker (procedure and the
 # commands to launch it from the PC: docs/motore-vm.md).
 #
-#   sudo bash engine-vm.sh install <apartment_id> <port> <image> [connector]   # first time; connector: simulated
+#   sudo bash engine-vm.sh install <apartment_id> <port> <image> <connector>   # first time; connector: simulated
 #   sudo bash /opt/domhouse/engine-vm.sh update <apartment_id> <image>          # new image, same data
 #   sudo bash /opt/domhouse/engine-vm.sh key <apartment_id>                     # rewrite the key file, restart
 #   sudo bash /opt/domhouse/engine-vm.sh status <apartment_id>
@@ -153,7 +153,8 @@ lock_engines() {
   # 5-minute watch never waits, it skips its restart while someone holds the lock (a restore stops an engine on purpose)
   install -d -m 755 "${OPT}"
   exec 9> "${OPT}/.engines.lock"
-  flock 9
+  # D51 (P-83): never waits for ever behind a command that hangs
+  flock -w 600 9 || die "un altro comando sui motori tiene il blocco da oltre 10 minuti (${OPT}/.engines.lock): riprova più tardi"
 }
 
 container_state() { docker inspect -f '{{.State.Status}}' "engine-$1" 2>/dev/null || true; }
@@ -210,6 +211,12 @@ compose() {
   # the simulated engines never depend on the broker
   local apt="$1"; shift
   local files=(-f "${OPT}/compose.yaml")
+  # D62 (P-83): compose.yaml has no default for CONNECTOR any more; a settings file written before the line existed
+  # (only simulated engines then) gets it once, said on stderr (this function's stdout can be read by the caller)
+  if ! grep -q '^CONNECTOR=' "$(settings_file "${apt}")"; then
+    echo "CONNECTOR=simulated" >> "$(settings_file "${apt}")"
+    echo "${apt}: CONNECTOR=simulated aggiunto a $(settings_file "${apt}") (scritto prima che la riga esistesse)" >&2
+  fi
   if [ "$(sed -n 's/^CONNECTOR=//p' "$(settings_file "${apt}")")" != "simulated" ] && [ -f "${OPT}/compose.broker.yaml" ]; then
     files+=(-f "${OPT}/compose.broker.yaml")
   fi
@@ -221,9 +228,9 @@ wait_healthy() {
   port="$(sed -n 's/^PORT=//p' "$(settings_file "${apt}")")"
   step "Attesa di http://${BIND_IP}:${port}/api/v1/health"
   for _ in $(seq 1 "${DOMHOUSE_HEALTH_TRIES:-30}"); do      # 30 tries, 2 s apart (fewer only in the tests)
-    code="$(curl -s -o /dev/null -w '%{http_code}' "http://${BIND_IP}:${port}/api/v1/health" || true)"
+    code="$(curl -s -m 5 -o /dev/null -w '%{http_code}' "http://${BIND_IP}:${port}/api/v1/health" || true)"   # D51: -m
     if [ "${code}" = "200" ]; then
-      curl -s "http://${BIND_IP}:${port}/api/v1/health" | python3 -c \
+      curl -s -m 5 "http://${BIND_IP}:${port}/api/v1/health" | python3 -c \
         'import json, sys; h = json.load(sys.stdin); print("health 200:", h["status"], h["implementation"], "connector", h["connector"]["status"])'
       return 0
     fi
@@ -314,6 +321,8 @@ Wants=network-online.target docker.service
 [Service]
 Type=oneshot
 ExecStart=/bin/bash ${OPT}/engine-vm.sh start-all
+# D51: a boot never waits for ever on it (the address up to ADDRESS_WAIT_S, then one compose up per engine)
+TimeoutStartSec=15min
 
 [Install]
 WantedBy=multi-user.target
@@ -331,7 +340,7 @@ watch_line() {
 }
 
 check_all() {
-  local total=0 silent=0 settings apt port code newest age_h
+  local total=0 silent=0 settings apt port code newest age_h installed
   shopt -s nullglob
   for settings in "${OPT}"/*.settings; do
     apt="$(basename "${settings}" .settings)"
@@ -344,10 +353,16 @@ check_all() {
       *)   watch_line "engine silent ${apt} (nessuna risposta, codice ${code:-nessuno})"; silent=$((silent + 1))
            restart_stopped "${apt}" ;;
     esac
-    newest="$(ls -1t "${DATA}/${apt}/backup"/engine-*.db 2>/dev/null | head -1 || true)"
+    # D52: find, not ls with a glob: with nullglob on and no backup the glob vanished and «ls -1t» listed the current
+    # folder (/ for the service): the «newest backup» was any file there
+    newest="$(find "${DATA}/${apt}/backup" -maxdepth 1 -name 'engine-*.db' -printf '%T@ %p\n' 2>/dev/null \
+      | sort -rn | head -1 | cut -d' ' -f2- || true)"
+    installed="$(sed -n 's/^INSTALLED_AT=//p' "${settings}" | head -1)"
     if [ -n "${newest}" ]; then
       age_h=$(( ( $(date +%s) - $(stat -c %Y "${newest}") ) / 3600 ))
-    elif [ -f "$(db_of "${apt}")" ]; then           # never backed up: count from the database's age
+    elif [[ "${installed}" =~ ^[0-9]+$ ]]; then     # D52: never backed up: count from the installation (engine.db's
+      age_h=$(( ( $(date +%s) - installed ) / 3600 ))  # time is renewed by every checkpoint and restart)
+    elif [ -f "$(db_of "${apt}")" ]; then           # installed before INSTALLED_AT: count from the database's age
       age_h=$(( ( $(date +%s) - $(stat -c %Y "$(db_of "${apt}")") ) / 3600 ))
     else
       age_h=0
@@ -480,9 +495,11 @@ cmd="${1:-}"; shift || true
 case "${cmd}" in backup|backup-all|timers|logs-agent|"") ;; *) resolve_bind_ip ;; esac
 case "${cmd}" in
   install)
-    [ $# -ge 3 ] || die "uso: install <apartment_id> <port> <image> [connector]"
-    apt="$1"; port="$2"; image="$3"; connector="${4:-simulated}"
+    # D62 (P-83): the connector is always said (simulated or shelly): it was simulated when forgotten
+    [ $# -eq 4 ] || die "uso: install <apartment_id> <port> <image> <connector> (simulated per le prove, shelly per un appartamento vero)"
+    apt="$1"; port="$2"; image="$3"; connector="$4"
     valid_id "${apt}"; valid_port "${port}"
+    [[ "${connector}" =~ ^[a-z][a-z0-9_]*$ ]] || die "connector non valido: ${connector}"
     lock_engines
     here="$(cd "$(dirname "$0")" && pwd)"
     [ -f "${here}/compose.yaml" ] || die "compose.yaml deve stare accanto a questo script"
@@ -490,8 +507,9 @@ case "${cmd}" in
     install -d -m 755 "${OPT}"
     [ "${here}" = "${OPT}" ] || install -m 755 "$0" "${OPT}/engine-vm.sh"
     [ "${here}" = "${OPT}" ] || install -m 644 "${here}/compose.yaml" "${OPT}/compose.yaml"
-    printf 'APARTMENT_ID=%s\nPORT=%s\nCONNECTOR=%s\nENGINE_IMAGE=%s\n' "${apt}" "${port}" "${connector}" "${image}" \
-      > "$(settings_file "${apt}")"
+    # D52 (P-83): INSTALLED_AT, the time the watch counts from while the engine has no backup yet
+    printf 'APARTMENT_ID=%s\nPORT=%s\nCONNECTOR=%s\nENGINE_IMAGE=%s\nINSTALLED_AT=%s\n' "${apt}" "${port}" "${connector}" \
+      "${image}" "$(date +%s)" > "$(settings_file "${apt}")"
     cat "$(settings_file "${apt}")"
     step "Dati in ${DATA}/${apt} (proprietario ${ENGINE_UID})"
     install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${DATA}/${apt}" "${DATA}/${apt}/backup"

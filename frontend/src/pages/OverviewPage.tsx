@@ -29,18 +29,22 @@ function Header({ aptId }: { aptId: string }) {
   const apartment = useApartmentStore((s) => s.apartment);
   const health = useApartmentStore((s) => s.health);
   const connected = useApartmentStore((s) => s.connected);
+  // P-83, D27: the server says it does not reach the engine (summary online false, or 502 on the re-read). Then neither
+  // the health kept from before nor «In tempo reale» (the stream to the server is alive, the engine's data are not).
+  const unreachable = useApartmentStore((s) => s.unreachable) || summary.data?.online === false;
+  const live = connected && !unreachable;
   return (
     <PageHeader
       title={summary.data?.name ?? apartment?.name ?? ""}
       titleTestId="apartment-title"
       testId="overview-header"
       badges={
-        <span data-testid="stream-status" data-connected={connected} className={cn("flex items-center gap-1.5 text-xs font-semibold", connected ? "text-positive" : "text-muted-foreground")}>
-          <Radio className="h-3.5 w-3.5" /> {connected ? t("overview.liveOn") : t("overview.liveOff")}
+        <span data-testid="stream-status" data-connected={live} className={cn("flex items-center gap-1.5 text-xs font-semibold", live ? "text-positive" : "text-muted-foreground")}>
+          <Radio className="h-3.5 w-3.5" /> {live ? t("overview.liveOn") : connected ? t("overview.liveStale") : t("overview.liveOff")}
         </span>
       }
     >
-      <InstanceStatus health={health ?? summary.data?.health ?? null} contractVersion={contractVersion} />
+      <InstanceStatus health={unreachable ? null : (health ?? summary.data?.health ?? null)} contractVersion={contractVersion} />
     </PageHeader>
   );
 }

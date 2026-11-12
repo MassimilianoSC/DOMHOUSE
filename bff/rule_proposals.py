@@ -199,10 +199,14 @@ def from_answer(answer: dict) -> tuple[list | None, str]:
         for row in args.get("modifiche") or []:
             if not isinstance(row, dict) or not isinstance(row.get("rule_id"), str):
                 continue
-            patch = by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"]})
             if row.get("parametro") == ENABLED_FIELD:
-                patch["enabled"] = bool(row.get("valore"))
+                # D69 (P-83): only 0 or 1 (or a JSON boolean); bool() read "0" and "false" as on, a missing value as off
+                value = row.get("valore")
+                if not (isinstance(value, bool) or (isinstance(value, (int, float)) and value in (0, 1))):
+                    continue
+                by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"]})["enabled"] = bool(value)
             elif isinstance(row.get("parametro"), str):
+                patch = by_rule.setdefault(row["rule_id"], {"rule_id": row["rule_id"]})
                 patch.setdefault("params", {})[row["parametro"]] = row.get("valore")
         said = str(args.get("spiegazione") or "").strip()
         if not by_rule:                          # nothing proposed: the model's sentence says why
@@ -256,7 +260,9 @@ def recognize(text: str, ruleset: dict) -> tuple[list | None, str]:
     if rule is None:
         return None, ("Posso cambiare le regole della pagina: finestra aperta, limiti del setpoint, antigelo, "
                       "antimuffa, pre-arrivo, risparmio al check-out, avviso offline.")
-    if re.search(r"\b(spegn|disattiv|togli)", t):
+    # D20 (P-83): off only by a command («spegni», «spegnere», «disattiva», «togli»), never «spegne» (the window rule's
+    # own name and the site's example «la finestra aperta spegne dopo 10 minuti»), never with a number or a negation
+    if re.search(r"\b(spegni\w*|spegnere|disattiv\w*|togli\w*)\b", t) and not n and not re.search(r"\bnon\b", t):
         return [{"rule_id": rule, "enabled": False}], "Spengo la regola."
     if re.search(r"\b(attiv|accend|riattiv)", t) and not n:
         return [{"rule_id": rule, "enabled": True}], "Attivo la regola."

@@ -110,9 +110,9 @@ def test_assistant_confirm(policy, alone_off_with_guests, alone_on_empty, togeth
     e.apartment = lambda: {**real(), "occupancy": "empty"}
     assert a.needs_approval(on, False) is alone_on_empty
     assert a.needs_approval(on, True) is together
-    later = core.iso(core.utcnow() + core.timedelta(days=3))              # no booking then: a scheduled action does not ask
+    later = core.iso(core.utcnow() + core.timedelta(days=3))   # no booking then: a scheduled action asks only with «sempre» (D33)
     assert a.needs_approval({"type": "schedule", "run_at": later, "action": {"type": "apartment_mode", "mode": "eco"}},
-                            True) is False
+                            True) is (policy == "sempre")
 
 
 # -------- D-169: the climate in comfort is regulated every minute --------

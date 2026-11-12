@@ -36,6 +36,10 @@ export interface LiveState {
   deviceErrors: Record<string, DeviceError>;
   lastEventId: string | null;
   pendingApprovalEvents: number;
+  /** Devices whose command request is on its way to the server: no second one before the answer (P-83, D72). */
+  sending: Record<string, true>;
+  /** The server answered that it does not reach the engine (502 on the re-read, P-83 D27): the kept health is void. */
+  unreachable: boolean;
 }
 
 export const emptyLive = (): LiveState => ({
@@ -48,7 +52,16 @@ export const emptyLive = (): LiveState => ({
   deviceErrors: {},
   lastEventId: null,
   pendingApprovalEvents: 0,
+  sending: {},
+  unreachable: false,
 });
+
+function withoutKey<T>(rec: Record<string, T>, key: string): Record<string, T> {
+  if (!(key in rec)) return rec;
+  const copy = { ...rec };
+  delete copy[key];
+  return copy;
+}
 
 function mapDevice(state: LiveState, deviceId: string, fn: (d: Device) => Device): Device[] {
   return state.devices.map((d) => (d.device_id === deviceId ? fn(d) : d));
@@ -91,8 +104,11 @@ export function applyEvent(state: LiveState, env: StreamEnvelope): LiveState {
       const data = env.data as unknown as EventCommandUpdated;
       const prev = state.commands[data.command_id];
       const current = state.lastCommandByDevice[data.device_id];
+      // A command this page did not know (sent elsewhere) is newer than the error of a request made here (P-83, D47).
+      const deviceErrors = prev ? state.deviceErrors : withoutKey(state.deviceErrors, data.device_id);
       return {
         ...next,
+        deviceErrors,
         commands: {
           ...state.commands,
           [data.command_id]: { ...prev, command_id: data.command_id, device_id: data.device_id, status: data.status, reason: data.reason },
@@ -103,7 +119,7 @@ export function applyEvent(state: LiveState, env: StreamEnvelope): LiveState {
     case "apartment.changed":
       return { ...next, apartment: env.data as unknown as Apartment };
     case "instance.health":
-      return { ...next, health: env.data as unknown as Health };
+      return { ...next, health: env.data as unknown as Health, unreachable: false };
     case "approval.pending":
       return { ...next, pendingApprovalEvents: state.pendingApprovalEvents + 1 };
     default:

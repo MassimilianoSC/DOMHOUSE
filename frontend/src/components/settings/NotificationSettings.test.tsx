@@ -268,3 +268,23 @@ describe("Impostazioni > Notifiche: niente più «Decisioni del motore» (D-170)
     expect(state.setPrefs).toHaveBeenCalledWith({ approvals: true, offline: false, bookings: true, summary: true });
   });
 });
+
+describe("Impostazioni > Notifiche: preferenze spente sul server (P-83, T3d-1)", () => {
+  const saved = { ...state.prefs };
+  afterEach(() => {
+    state.prefs = { ...saved };
+  });
+
+  it("«Prenotazioni» e «Riepilogo» spenti dal server: interruttori spenti, e cambiare un'altra voce li rimanda spenti", async () => {
+    state.prefs = { approvals: true, offline: true, bookings: false, summary: false };
+    renderCard();
+    await waitFor(() => expect(screen.getByTestId("settings-pref-approvals")).not.toBeDisabled());
+    expect(screen.getByTestId("settings-pref-bookings")).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByTestId("settings-pref-summary")).toHaveAttribute("aria-checked", "false");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("settings-pref-offline"));
+    });
+    await waitFor(() => expect(state.setPrefs).toHaveBeenCalled());
+    expect(state.setPrefs.mock.calls.at(-1)![0]).toMatchObject({ approvals: true, offline: false, bookings: false, summary: false });
+  });
+});

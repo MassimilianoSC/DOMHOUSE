@@ -129,6 +129,31 @@ def test_main_exits_3_with_a_log_line(monkeypatch, capsys, tmp_path):
 
 
 # ---- the contract at /api/v1 ---------------------------------------------------------------------------------------
+def test_main_exits_4_with_a_log_line_when_the_start_fails(monkeypatch, capsys, tmp_path):
+    """D36 (P-83): a failure inside the start (here an engine.db of a newer schema) gave uvicorn's exit 3 (the code of
+    the connector), a traceback on stderr and no JSON line: the «righe di errore» alarm saw nothing."""
+    import socket
+    import sqlite3
+    from engine.__main__ import main
+    from engine.service import DB_NAME
+    db = sqlite3.connect(tmp_path / DB_NAME)
+    db.execute("PRAGMA user_version=99")
+    db.close()
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    for name, value in {**ENV, "MOCK_TIME_SCALE": "1", "DATA_DIR": str(tmp_path), "PORT": str(port),
+                        "HOST": "127.0.0.1"}.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setattr(log, "_apartment_id", None)
+    monkeypatch.setattr(log.logger, "handlers", [])
+    assert main() == 4
+    lines = [json.loads(x) for x in capsys.readouterr().out.strip().splitlines() if x.startswith("{")]
+    failed = [x for x in lines if x["msg"] == "engine start failed"]
+    assert failed and failed[0]["level"] == "error" and "schema 99" in failed[0]["error"]
+    assert KEY not in json.dumps(lines)
+
+
 def test_simulated_service(tmp_path):
     with TestClient(create_engine_app(config(DATA_DIR=str(tmp_path)))) as client:
         version = client.get("/api/v1/version").json()
@@ -154,6 +179,33 @@ def test_real_mode_has_no_test_hooks_and_no_ask(tmp_path):
         assert client.get("/api/v1/health").json()["model_provider"] == {"status": "unknown", "provider": "none"}
         assert client.get("/api/v1/approvals", headers=HEADERS).json() == {"items": []}
         assert client.get("/api/v1/apartment", headers=HEADERS).json()["current_booking_id"] is None   # no demo history
+
+
+def test_the_key_is_compared_in_constant_time(tmp_path, monkeypatch):
+    """D74 (P-83): the engine compared X-API-Key with != (the server already used compare_digest)."""
+    import hmac
+    seen = []
+    real = hmac.compare_digest
+
+    def spy(a, b):
+        seen.append((type(a), type(b)))
+        return real(a, b)
+    monkeypatch.setattr(hmac, "compare_digest", spy)
+    with TestClient(create_engine_app(config(DATA_DIR=str(tmp_path)))) as client:
+        other = {k: v for k, v in HEADERS.items() if k != "X-API-Key"}
+        for key in (None, "", KEY[:-1], KEY[:-1] + "x", KEY + "x"):
+            sent = other if key is None else {**other, "X-API-Key": key}
+            assert client.get("/api/v1/devices", headers=sent).status_code == 401, key
+        assert client.get("/api/v1/devices", headers=HEADERS).status_code == 200
+    assert seen and all(t == (bytes, bytes) for t in seen)
+
+
+def test_no_schema_pages_without_the_key(tmp_path):
+    """D61 (P-83): /docs, /redoc and /openapi.json answered 200 without a key, listing every path of the engine."""
+    with TestClient(create_engine_app(config(DATA_DIR=str(tmp_path)))) as client:
+        for path in ("/docs", "/redoc", "/openapi.json", "/docs/oauth2-redirect"):
+            assert client.get(path).status_code == 404, path
+            assert client.get(path, headers=HEADERS).status_code == 404, path
 
 
 # ---- what reaches the app ------------------------------------------------------------------------------------------

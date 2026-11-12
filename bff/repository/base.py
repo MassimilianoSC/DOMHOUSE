@@ -112,6 +112,7 @@ class BookingRecord(BaseModel):
     status: BookingStatus = "booked"
     event_ids: list[str] = Field(default_factory=list)
     last_event_type: str = ""
+    last_event_ts: str = ""                 # D07 (P-83): the ts of the last event applied; an older one changes nothing
     updated_at: str = Field(default_factory=now_iso)
 
     @property
@@ -159,6 +160,9 @@ class WebhookLog(BaseModel):
 
 
 WEBHOOK_LOG_LIMIT = 100
+# D54 (P-83): calls without a valid signature (nobody's organisation) keep their own few rows: a flood of them never
+# pushes out the unattributed calls signed with an unknown code, the ones the diagnosis needs
+UNSIGNED_LOG_LIMIT = 20
 EMPTY_AI_USAGE = {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0, "alerted": False}
 
 
@@ -298,6 +302,10 @@ class Repository(Protocol):
     async def get_booking(self, apartment_id: str, booking_id: str) -> BookingRecord | None: ...
     async def list_bookings(self, apartment_id: str) -> list[BookingRecord]: ...
     async def upsert_booking(self, booking: BookingRecord) -> BookingRecord: ...
+    # D43 (P-83): read, fold one forwarded event and write, atomically (two events of the same booking at once)
+    async def fold_booking_event(self, apartment_id: str, ev: dict) -> BookingRecord: ...
+    # D57 (P-83): change a user only if the record still exists (a delete meanwhile is never undone); None if absent
+    async def update_user_if_present(self, uid: str, change) -> User | None: ...
     async def delete_bookings(self, apartment_id: str) -> int: ...   # D-97: reset of a demonstration apartment
 
     async def add_webhook_log(self, log: WebhookLog) -> WebhookLog: ...
@@ -345,6 +353,9 @@ class Repository(Protocol):
     async def claim_work(self, key: str, owner: str, lease_s: float, payload: dict | None = None) -> str: ...
     async def finish_work(self, key: str) -> None: ...
     async def release_work(self, key: str) -> None: ...
+    # D42 (P-83): a pending claim still held by owner gets a new lease and message; False when it is no longer its own
+    # (taken over after its lease, or done)
+    async def renew_work(self, key: str, owner: str, lease_s: float, payload: dict) -> bool: ...
     # D-219: a pending claim with its message becomes due now (due_work lists it, recover_once sends it); True if it was
     async def expire_work(self, key: str) -> bool: ...
     async def due_work(self, now: float, limit: int = 50) -> list[dict]: ...      # [{key, payload, attempts}]
@@ -379,6 +390,15 @@ class Repository(Protocol):
     async def remove_platform_member(self, email: str) -> bool: ...
 
 
+def _when(ts: str | None) -> datetime:
+    """An event's ts as an instant (ISO 8601, Z or offset); a missing or unreadable one counts as the oldest."""
+    try:
+        moment = datetime.fromisoformat((ts or "").replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.min.replace(tzinfo=UTC)
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)
+
+
 def apply_booking_event(existing: BookingRecord | None, apartment_id: str, ev: dict) -> BookingRecord:
     """Folds a forwarded BookingEvent into the archived record (idempotent on event_id)."""
     rec = existing or BookingRecord(apartment_id=apartment_id, booking_id=ev["booking_id"], checkin_at=ev["checkin_at"],
@@ -386,8 +406,12 @@ def apply_booking_event(existing: BookingRecord | None, apartment_id: str, ev: d
     if ev["event_id"] in rec.event_ids:
         return rec
     rec.event_ids = rec.event_ids + [ev["event_id"]]
+    if rec.last_event_ts and _when(ev.get("ts")) < _when(rec.last_event_ts):
+        return rec                          # D07: sent again after newer ones (a retry after a 502): seen, not applied
+    rec.last_event_ts = ev.get("ts") or rec.last_event_ts
     rec.last_event_type = ev["type"]
-    rec.guests = ev.get("guests", rec.guests)
+    if ev.get("guests") is not None:        # D67 (P-83): an event without the number leaves the one known
+        rec.guests = ev["guests"]
     rec.source = ev["source"]
     if ev["type"] == "booking_cancelled":
         rec.status = "cancelled"

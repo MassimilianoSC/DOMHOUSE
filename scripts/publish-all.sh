@@ -33,7 +33,7 @@ DEPLOY_ENGINE_SH="${DEPLOY_ENGINE_SH:-${HERE}/deploy-engine.sh}"
 HEALTH_TRIES="${PUBLISH_HEALTH_TRIES:-12}"                      # every 10 s: two minutes
 HEALTH_WAIT_S="${PUBLISH_HEALTH_WAIT_S:-10}"
 DRY_RUN="${DRY_RUN:-}"
-KNOWN="GCP_PROJECT_ID GCP_REGION ARTIFACT_REPO CLOUDSDK_CORE_ACCOUNT STAGING_SITE VPC_NETWORK VPC_SUBNET SMTP_USER VITE_FCM_ENABLED ENGINE_APARTMENT VM_NAME VM_ZONE"
+KNOWN="GCP_PROJECT_ID GCP_REGION ARTIFACT_REPO CLOUDSDK_CORE_ACCOUNT STAGING_SITE VPC_NETWORK VPC_SUBNET SMTP_USER VITE_FCM_ENABLED ENGINE_APARTMENT VM_NAME VM_ZONE VM_INTERNAL_IP"
 
 say()  { printf '\n\033[1;34m== %s\033[0m\n' "$*"; }
 stop() { printf '\n\033[1;31mFERMO: %s\033[0m\n' "$*" >&2; exit 1; }
@@ -69,6 +69,11 @@ trap 'rmdir "${LOCK}" 2>/dev/null || true' EXIT
 done_step() { [ -n "${DRY_RUN}" ] || echo "$1" >> "${STATE}"; }
 has_step() { [ -f "${STATE}" ] && grep -qx "$1" "${STATE}"; }
 remember() { [ -n "${DRY_RUN}" ] || grep -q "^$1=" "${STATE}" 2>/dev/null || echo "$1=$2" >> "${STATE}"; }   # the first value stays
+# D25 (P-83): a step on the VM is written before it starts (da-fare=<step>) and marked when it succeeded (fatto=<step>):
+# a step started and not finished is done again by the next run, whatever the VM's files say (motore, timer, compose)
+todo() { [ -n "${DRY_RUN}" ] || grep -qx "da-fare=$1" "${STATE}" 2>/dev/null || echo "da-fare=$1" >> "${STATE}"; }
+finished() { [ -n "${DRY_RUN}" ] || echo "fatto=$1" >> "${STATE}"; }
+pending() { [ -f "${STATE}" ] && grep -qx "da-fare=$1" "${STATE}" && ! grep -qx "fatto=$1" "${STATE}"; }
 recall() { [ -f "${STATE}" ] || return 0; sed -n "s/^$1=//p" "${STATE}" | head -1; }
 
 gc() { gcloud "$@" --project "${GCP_PROJECT_ID}"; }
@@ -119,10 +124,20 @@ for service in domotica-bff-staging domotica-bff; do
   else note "${service}: stato non letto (il servizio non esiste ancora, oppure gcloud non risponde)"; fi
 done
 ENGINE_IMAGE="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPO}/engine:${SHORT}"
-VM_IMAGE="$(on_vm "sudo sed -n 's/^ENGINE_IMAGE=//p' /opt/domhouse/${ENGINE_APARTMENT}.settings" | tail -1)"
+# D73 (P-83): a failed ssh inside the assignment left the script at once (set -euo pipefail), without the FERMO: every
+# reading from the VM catches its failure
+VM_IMAGE="$(on_vm "sudo sed -n 's/^ENGINE_IMAGE=//p' /opt/domhouse/${ENGINE_APARTMENT}.settings" | tail -1)" || VM_IMAGE=""
 [ -n "${VM_IMAGE}" ] || stop "Non riesco a leggere l'immagine del motore ${ENGINE_APARTMENT} sulla VM ${VM_NAME} (gcloud compute ssh via IAP).
 Controlla che la VM sia accesa e che «gcloud compute ssh» funzioni, poi rilancia."
 note "motore ${ENGINE_APARTMENT} sulla VM: ${VM_IMAGE##*:}"
+# D25: the image the engine really runs; engine-vm.sh update writes the settings before the start, so after a failed
+# update the file says the new image and the old one runs (or none healthy): the running one decides
+# (no container: removed or never started; the settings' image counts)
+VM_RUNNING="$(on_vm "sudo docker inspect -f '{{.Config.Image}}' engine-${ENGINE_APARTMENT}" | tail -1)" || VM_RUNNING=""
+if [ -n "${VM_RUNNING}" ] && [ "${VM_RUNNING}" != "${VM_IMAGE}" ]; then
+  note "ma il motore ${ENGINE_APARTMENT} gira con ${VM_RUNNING##*:}: un aggiornamento non concluso, lo rifaccio"
+  VM_IMAGE="${VM_RUNNING}"
+fi
 VM_TAG="${VM_IMAGE##*:}"
 VM_SHA="$(git -C "${ROOT}" rev-parse --verify --quiet "${VM_TAG}^{commit}" 2>/dev/null || true)"
 if [ "${VM_TAG}" = "${SHORT}" ]; then
@@ -135,19 +150,31 @@ else
     | grep -v '/tests/' | grep -v '\.md$' || true)"
 fi
 WANTED_SCRIPT="$(git -C "${ROOT}" show "${SHA}:scripts/engine-vm.sh" | tr -d '\r' | sha256sum | cut -d' ' -f1)"
-VM_SCRIPT="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/engine-vm.sh | sha256sum" | cut -d' ' -f1)"
+VM_SCRIPT="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/engine-vm.sh | sha256sum" | cut -d' ' -f1)" \
+  || stop "La VM ${VM_NAME} non risponde più (gcloud compute ssh via IAP) mentre leggo engine-vm.sh: rilancia lo stesso comando."
 WANTED_COMPOSE="$(git -C "${ROOT}" show "${SHA}:engine/compose.yaml" | tr -d '\r' | sha256sum | cut -d' ' -f1)"
-VM_COMPOSE="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/compose.yaml | sha256sum" | cut -d' ' -f1)"
+VM_COMPOSE="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/compose.yaml | sha256sum" | cut -d' ' -f1)" \
+  || stop "La VM ${VM_NAME} non risponde più (gcloud compute ssh via IAP) mentre leggo compose.yaml: rilancia lo stesso comando."
+if pending motore; then ENGINE_CHANGES="aggiornamento del motore non concluso al giro precedente: lo rifaccio"; fi
+SCRIPT_NEW=""; COMPOSE_NEW=""
+[ "${WANTED_SCRIPT}" = "${VM_SCRIPT}" ] || SCRIPT_NEW=1
+[ "${WANTED_COMPOSE}" = "${VM_COMPOSE}" ] || COMPOSE_NEW=1
+if pending timer; then SCRIPT_NEW=1; fi           # D25: installed but its timers not, at the previous run
+if pending compose; then COMPOSE_NEW=1; fi        # D25: installed but the engine not recreated with it
 case "${ENGINE_CHANGES}" in
   "") note "codice del motore invariato fra ${VM_TAG} e ${SHORT}: il motore non si aggiorna" ;;
   "già a questo commit") note "il motore è già all'immagine ${SHORT}" ;;
   *) note "codice del motore cambiato: il motore passa a ${SHORT}"; printf '%s\n' "${ENGINE_CHANGES}" | head -10 | sed 's/^/    /' ;;
 esac
-if [ "${WANTED_SCRIPT}" = "${VM_SCRIPT}" ]; then note "engine-vm.sh sulla VM è quello del commit"; else note "engine-vm.sh sulla VM è diverso da quello del commit: lo copio e reinstallo i timer"; fi
-if [ "${WANTED_COMPOSE}" = "${VM_COMPOSE}" ]; then note "compose.yaml del motore sulla VM è quello del commit"; else note "compose.yaml del motore sulla VM è diverso da quello del commit: lo copio e ricreo il motore"; fi
+if [ -z "${SCRIPT_NEW}" ]; then note "engine-vm.sh sulla VM è quello del commit"
+elif [ "${WANTED_SCRIPT}" = "${VM_SCRIPT}" ]; then note "engine-vm.sh: i timer non sono stati reinstallati al giro precedente, lo rifaccio"
+else note "engine-vm.sh sulla VM è diverso da quello del commit: lo copio e reinstallo i timer"; fi
+if [ -z "${COMPOSE_NEW}" ]; then note "compose.yaml del motore sulla VM è quello del commit"
+elif [ "${WANTED_COMPOSE}" = "${VM_COMPOSE}" ]; then note "compose.yaml: il motore non è stato ricreato con lui al giro precedente, lo rifaccio"
+else note "compose.yaml del motore sulla VM è diverso da quello del commit: lo copio e ricreo il motore"; fi
 
 # ---- the one question --------------------------------------------------------------------------------------------
-say "Cosa farò: staging, controlli, produzione, controlli$([ -n "${ENGINE_CHANGES}" ] && [ "${ENGINE_CHANGES}" != "già a questo commit" ] && echo ', motore sulla VM')$([ "${WANTED_SCRIPT}" != "${VM_SCRIPT}" ] && echo ', engine-vm.sh sulla VM')$([ "${WANTED_COMPOSE}" != "${VM_COMPOSE}" ] && echo ', compose.yaml sulla VM'), riepilogo"
+say "Cosa farò: staging, controlli, produzione, controlli$([ -n "${ENGINE_CHANGES}" ] && [ "${ENGINE_CHANGES}" != "già a questo commit" ] && echo ', motore sulla VM')$([ -n "${SCRIPT_NEW}" ] && echo ', engine-vm.sh sulla VM')$([ -n "${COMPOSE_NEW}" ] && echo ', compose.yaml sulla VM'), riepilogo"
 if [ -n "${DRY_RUN}" ]; then
   note "prova a secco: non chiedo conferma"
 else
@@ -222,15 +249,15 @@ ENGINE_NEEDED=""
 # the image first: it is the long step and the one that can fail; then the VM's changes together
 if [ -n "${ENGINE_NEEDED}" ]; then
   remember "prima-motore" "${VM_IMAGE}"
+  todo motore
   if [ -n "${DRY_RUN}" ]; then
     DRY_RUN=1 bash "${DEPLOY_ENGINE_SH}" "${SHA}" || stop "La prova a secco di deploy-engine.sh non è riuscita."
   else
     bash "${DEPLOY_ENGINE_SH}" "${SHA}" || stop "La costruzione dell'immagine del motore non è riuscita: leggi i messaggi sopra, poi rilancia."
   fi
 fi
-SCRIPT_NEW=""; COMPOSE_NEW=""
-[ "${WANTED_SCRIPT}" = "${VM_SCRIPT}" ] || SCRIPT_NEW=1
-[ "${WANTED_COMPOSE}" = "${VM_COMPOSE}" ] || COMPOSE_NEW=1
+if [ -n "${SCRIPT_NEW}" ]; then todo timer; fi
+if [ -n "${COMPOSE_NEW}" ]; then todo compose; fi
 if [ -n "${SCRIPT_NEW}${COMPOSE_NEW}" ]; then
   if [ -n "${DRY_RUN}" ]; then
     note "prova a secco: copierei$([ -n "${SCRIPT_NEW}" ] && echo ' engine-vm.sh (poi engine-vm.sh timers)')$([ -n "${COMPOSE_NEW}" ] && echo ' compose.yaml (poi il motore ricreato)') del commit"
@@ -249,6 +276,7 @@ if [ -n "${SCRIPT_NEW}${COMPOSE_NEW}" ]; then
     if [ -n "${SCRIPT_NEW}" ]; then
       on_vm "sudo install -m 755 ~/engine-vm.sh /opt/domhouse/engine-vm.sh && sudo bash /opt/domhouse/engine-vm.sh timers > /dev/null && echo timer-ok" \
         | grep -q timer-ok || stop "engine-vm.sh timers sulla VM non è riuscito: rilancia lo stesso comando."
+      finished timer
       note "engine-vm.sh copiato e timer reinstallati"
     fi
   fi
@@ -258,9 +286,10 @@ if [ -n "${COMPOSE_NEW}" ] && [ -z "${ENGINE_NEEDED}" ]; then
   if [ -n "${DRY_RUN}" ]; then
     note "prova a secco: poi engine-vm.sh update ${ENGINE_APARTMENT} ${VM_IMAGE} (stessa immagine, per compose.yaml)"
   else
-    on_vm "sudo bash /opt/domhouse/engine-vm.sh update ${ENGINE_APARTMENT} ${VM_IMAGE} > /dev/null 2>&1 && echo update-ok" \
+    on_vm "sudo timeout 900 bash /opt/domhouse/engine-vm.sh update ${ENGINE_APARTMENT} ${VM_IMAGE} > /dev/null 2>&1 && echo update-ok" \
       | grep -q update-ok || stop "Il motore ${ENGINE_APARTMENT} non è tornato sano dopo il nuovo compose.yaml.
 Guarda engine-vm.sh status ${ENGINE_APARTMENT} sulla VM; il compose.yaml di prima è nel commit del motore sulla VM (${VM_TAG})."
+    finished compose
     note "motore ${ENGINE_APARTMENT} ricreato con la stessa immagine, /health 200"
   fi
   if [ -n "${DRY_RUN}" ]; then ENGINE_DONE="da ricreare"; else ENGINE_DONE="ricreato"; fi
@@ -270,7 +299,7 @@ if [ -n "${ENGINE_NEEDED}" ]; then
   if [ -n "${DRY_RUN}" ]; then
     note "prova a secco: poi engine-vm.sh update ${ENGINE_APARTMENT} ${ENGINE_IMAGE}"
   else
-    on_vm "sudo bash /opt/domhouse/engine-vm.sh update ${ENGINE_APARTMENT} ${ENGINE_IMAGE} > /dev/null 2>&1 && echo update-ok" \
+    on_vm "sudo timeout 900 bash /opt/domhouse/engine-vm.sh update ${ENGINE_APARTMENT} ${ENGINE_IMAGE} > /dev/null 2>&1 && echo update-ok" \
       | grep -q update-ok || stop "Il motore ${ENGINE_APARTMENT} non è tornato sano con ${ENGINE_IMAGE}.
 Per tornare all'immagine di prima (lo decidi tu):
   gcloud compute ssh ${VM_NAME} --zone ${VM_ZONE} --tunnel-through-iap --project ${GCP_PROJECT_ID} --command='sudo bash /opt/domhouse/engine-vm.sh update ${ENGINE_APARTMENT} $(recall prima-motore)'"
@@ -278,6 +307,8 @@ Per tornare all'immagine di prima (lo decidi tu):
       || stop "Dopo l'aggiornamento la VM non dice l'immagine ${ENGINE_IMAGE}: guarda engine-vm.sh status ${ENGINE_APARTMENT}."
     note "motore ${ENGINE_APARTMENT} a ${SHORT}, /health 200"
     done_step engine
+    finished motore
+    if [ -n "${COMPOSE_NEW}" ]; then finished compose; fi    # the recreation with the new image applied it too
   fi
   if [ -n "${DRY_RUN}" ]; then ENGINE_DONE="da aggiornare, da ${VM_TAG} a ${SHORT}"; else ENGINE_DONE="da ${VM_TAG} a ${SHORT}"; fi
 fi
