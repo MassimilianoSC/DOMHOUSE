@@ -51,7 +51,16 @@ Ogni blocco in **Git Bash** comincia da questa cartella:
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 ```
 
-**2. Prepara l'ambiente nello staging, prima a secco.**
+**Prima del passo 2: lo staging deve girare con il suo account (D04).** Dal 12 novembre i segreti di prova li legge solo `domotica-bff-staging@`. Controllo in sola lettura:
+
+```bash
+gcloud run services describe domotica-bff-staging --region=europe-west8 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="value(spec.template.spec.serviceAccountName)"
+```
+
+- **Atteso:** `domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com`.
+- **Se esce `domotica-bff@…`:** fermati. Prima va completata `docs/procedura-d04-permessi-staging.md` e pubblicato lo staging.
+
+**2. Prepara l'ambiente nello staging, prima a secco.** Il testo dice che ogni segreto sarà «leggibile da domotica-bff-staging@ e langbrain-vm@».
 
 ```bash
 GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python scripts/load/ambiente.py prepara --prova

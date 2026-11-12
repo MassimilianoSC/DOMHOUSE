@@ -869,6 +869,14 @@ lavora con un accesso di assistenza.
   scade durante la forzatura con «Alla scadenza verrà eseguita».
 - **L'antigelo** resta attivo.
 
+**Se durante la forzatura cambi modalità a mano** (D09, risposta 1085):
+
+- **Vale per:** i pulsanti della modalità, un'approvazione accolta a mano, una richiesta all'assistente.
+- **La forzatura continua** fino alla stessa ora, nella modalità nuova: il riquadro diventa «Forzatura eco attiva fino
+  alle …».
+- **Nelle Decisioni:** «Forzatura», con «comfort → eco fino alle …».
+- **Alla fine** resta la modalità scelta. Non compare «Forzatura annullata».
+
 **Quando finisce:**
 
 - **Alla scadenza** («Forzatura scaduta» nelle Decisioni) o con «Annulla forzatura» («Forzatura annullata») le

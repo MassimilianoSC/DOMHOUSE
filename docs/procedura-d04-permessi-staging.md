@@ -2,7 +2,7 @@
 
 | Stato | Comandi | Preparata | Chi lancia | Quando |
 |---|---|---|---|---|
-| **Pronta, non lanciata** | o1, 11 novembre 2026 | memoria storica | il committente | prima del primo appartamento vero, dopo la prova di carico |
+| **Pronta, non lanciata** | o1, 11 novembre 2026 | memoria storica | il committente | 12 novembre, prima della pubblicazione delle riparazioni P-83 e prima della prova di carico |
 
 ## Perché
 
@@ -17,7 +17,7 @@
 
 ## Prima di lanciare
 
-- La prova di carico deve essere **già fatta**. Lo strumento della prova dà i suoi segreti a `domotica-bff@`. Dopo questi comandi lo staging non li leggerebbe più.
+- **Ordine (cambiato il 12 novembre, commit `75fd34e`):** prima D04 completo, poi la prova di carico. Lo strumento della prova ora dà i suoi segreti a `domotica-bff-staging@`, non più a `domotica-bff@`.
 - Dopo i comandi, o1 fa il suo commit. Il commit cambia l'account nel manifesto dello staging.
 
 ## 1. Comandi (Git Bash, un blocco solo, nell'ordine)
@@ -53,7 +53,7 @@ gcloud projects get-iam-policy domotica-poc-511707 --account=m.scardovellicrac@g
 | Commit del manifesto dello staging con il nuovo account, più una prova che fallisce se staging e produzione hanno lo stesso account | o1 |
 | Pubblicazione con `scripts/publish-all.sh` | il committente |
 | **Da verificare:** lo staging funziona (accesso, appartamenti, notifiche) e nei log non compaiono 403 «PERMISSION_DENIED» su Firestore | il committente con la memoria storica |
-| Cambiare il nome dell'account in `scripts/load/ambiente.py` | o1, a congelamento finito |
+| Nome dell'account in `scripts/load/ambiente.py` | fatto da o1 (`75fd34e`) |
 
 ## Note
 
