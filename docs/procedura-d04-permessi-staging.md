@@ -2,7 +2,7 @@
 
 | Stato | Comandi | Preparata | Chi lancia | Quando |
 |---|---|---|---|---|
-| **Pronta, non lanciata** | o1, 11 novembre 2026 | memoria storica | il committente | 12 novembre, prima della pubblicazione delle riparazioni P-83 e prima della prova di carico |
+| **Comandi e verifica fatti il 12 novembre alle 10:07; resta la pubblicazione** | o1, 11 novembre 2026 | memoria storica | il committente | 12 novembre, prima della pubblicazione delle riparazioni P-83 e prima della prova di carico |
 
 ## Perché
 
