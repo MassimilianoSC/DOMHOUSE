@@ -386,6 +386,43 @@ def test_d170_without_guests_at_its_time_it_is_scheduled_at_once_and_a_no_schedu
     assert not [s for s in e.schedule.values() if s["source"] == "assistant"] and e.approval_schedules == {}
 
 
+# -------- D33 (P-83, answer 1087 = a): with ASSISTANT_CONFIRM=sempre a scheduled action asks too, guests or not --------
+def test_d33_always_a_scheduled_action_without_guests_asks_then_schedules():
+    local, when = _at_18_tomorrow()
+    e = engine(Script(js("Programmo eco.", plan(when, "eco"))), ASSISTANT_CONFIRM="sempre")    # no booking then
+    a = ask(e, "domani alle 18 metti eco")
+    assert a["status"] == "needs_approval"
+    approval = e.pending_approval()
+    assert approval["description"].startswith("Programmare modalità eco alle 18:00")
+    assert approval["proposed_action"] == {"type": "apartment_mode", "mode": "eco"}
+    assert "Programmo modalità eco alle 18:00" in a["answer"] and "ospiti" not in a["answer"]
+    assert not [s for s in e.schedule.values() if s["source"] == "assistant"]   # nothing scheduled yet
+
+    async def yes():
+        return e.decide(approval["approval_id"], {"decision": "approve"}, ACTOR, "55555555-5555-5555-5555-555555555555")
+    asyncio.run(yes())
+    planned = [s for s in e.schedule.values() if s["source"] == "assistant"]
+    assert len(planned) == 1 and core.parse_dt(planned[0]["run_at"]) == local and e.mode != "eco"
+
+
+def test_d33_always_a_scheduled_action_with_guests_at_its_time_asks():
+    local, when = _at_18_tomorrow()
+    e = engine(Script(js("Programmo eco.", plan(when, "eco"))), ASSISTANT_CONFIRM="sempre")
+    _booked(e, local - timedelta(hours=3), local + timedelta(days=2))           # guests in at 18:00 tomorrow
+    a = ask(e, "domani alle 18 metti eco")
+    assert a["status"] == "needs_approval"
+    assert "con ospiti presenti a quell'ora?" in a["answer"]
+    assert not [s for s in e.schedule.values() if s["source"] == "assistant"]
+
+
+def test_d33_multiple_a_single_scheduled_action_still_does_not_ask():
+    local, when = _at_18_tomorrow()
+    e = engine(Script(js("Programmo eco.", plan(when, "eco"))), ASSISTANT_CONFIRM="multiple")
+    _booked(e, local - timedelta(hours=3), local + timedelta(days=2))
+    a = ask(e, "domani alle 18 metti eco")
+    assert a["status"] == "answered" and a["actions"][0]["type"] == "schedule"
+
+
 # -------- D-181: an answer from outside the EU (or without its location) is refused before anything runs --------
 @pytest.mark.parametrize("location", [None, "global", "us"])
 def test_d181_an_answer_without_a_european_location_runs_nothing(monkeypatch, location):

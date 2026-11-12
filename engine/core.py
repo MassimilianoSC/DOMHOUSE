@@ -1511,7 +1511,10 @@ class ApartmentEngine:
                  f"{device['label']}: sensore di temperatura mancante, regolazione automatica disattivata",
                  "informational", correlation_id or str(uuid.uuid4()))
 
-    def set_mode(self, mode: str, actor: str, correlation_id: str, reasoning: str, decision_actor: str | None = None) -> list[str]:
+    def set_mode(self, mode: str, actor: str, correlation_id: str, reasoning: str, decision_actor: str | None = None,
+                 by_hand: bool = False) -> list[str]:
+        """by_hand: a person chose it now (the app, the assistant, an approval decided by hand); during a hold it
+        becomes the hold's mode (D09). The automatic paths leave it False."""
         if mode not in MODES:
             raise bad_request("Modalità non valida")
         command_ids = []
@@ -1551,6 +1554,17 @@ class ApartmentEngine:
         self._save_apartment()
         self.log(decision_actor or actor_of(actor), {"type": "apartment"}, "set_mode", old, mode, reasoning,
                  "applied", correlation_id)
+        if by_hand and self.hold and self.hold.get("mode") != mode:
+            # D09 (P-83, answer 1085 = a): a mode chosen by a person during a hold becomes the hold's mode; the hold
+            # goes on to its end with the rules suspended, and at its end the new mode stays
+            before = self.hold.get("mode")
+            self.hold["mode"] = mode
+            self._save_apartment()
+            until = parse_dt(self.hold["until"]).astimezone(ZoneInfo(self.timezone)).strftime("%H:%M")
+            name = {"empty": "casa vuota"}.get(mode, mode)
+            self.log(decision_actor or actor_of(actor), {"type": "apartment"}, "hold", before, f"{mode} fino alle {until}",
+                     f"Modalità {name} scelta a mano: la forzatura continua in {name} fino alle {until}", "applied",
+                     correlation_id)
         self.apartment_changed(correlation_id)
         return command_ids
 
@@ -2661,7 +2675,8 @@ class ApartmentEngine:
         items = [a for a in self.approvals if a["status"] == "pending" or (status == "all" and parse_dt(a["created_at"]) >= cutoff)]
         return {"items": copy.deepcopy(sorted(items, key=lambda a: a["created_at"], reverse=True))}
 
-    def _execute_proposed(self, approval: dict, actor: str, correlation_id: str, decision_actor: str) -> None:
+    def _execute_proposed(self, approval: dict, actor: str, correlation_id: str, decision_actor: str,
+                          by_hand: bool = False) -> None:
         pa = approval["proposed_action"]
         run_at = self._take_schedule(approval["approval_id"])
         if run_at is not None and parse_dt(run_at) < utcnow() - timedelta(seconds=30):
@@ -2678,7 +2693,7 @@ class ApartmentEngine:
             return
         try:
             if pa["type"] == "apartment_mode":
-                self.set_mode(pa["mode"], actor, correlation_id, "Azione approvata", decision_actor)
+                self.set_mode(pa["mode"], actor, correlation_id, "Azione approvata", decision_actor, by_hand=by_hand)
             else:
                 self.create_command(pa["device_id"], pa, actor, correlation_id, decision_actor=decision_actor,
                                     reasoning=f"Azione approvata: {approval['description']}")
@@ -2716,7 +2731,7 @@ class ApartmentEngine:
                  None, approval["status"], reasoning, "applied" if approve else "rejected", correlation_id,
                  approval_id=approval_id)
         if approve:
-            self._execute_proposed(approval, actor, correlation_id, who)
+            self._execute_proposed(approval, actor, correlation_id, who, by_hand=True)
         else:
             self._take_schedule(approval_id)
         self._dequeue_approval()

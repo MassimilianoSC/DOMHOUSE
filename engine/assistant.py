@@ -569,10 +569,15 @@ class Assistant:
             return f"{label} a {target['setpoint']:g} °C"
         return f"accendere {label}"
 
-    def schedule_question(self, what: str) -> str:
-        """D-170: a scheduled action that will find guests in."""
-        return (f"Programmo {what}, con ospiti presenti a quell'ora? Rispondi Sì o No qui sotto, oppure dalla pagina "
-                f"Approvazioni.")
+    def _guests_at(self, p: dict) -> bool:
+        """Guests in at a scheduled action's time (by the calendar)."""
+        from .core import parse_dt
+        return self.e.occupied_at(parse_dt(p["run_at"]))
+
+    def schedule_question(self, what: str, guests: bool = True) -> str:
+        """D-170: a scheduled action that will find guests in; D33: with «sempre» also one that will not."""
+        with_guests = ", con ospiti presenti a quell'ora" if guests else ""
+        return f"Programmo {what}{with_guests}? Rispondi Sì o No qui sotto, oppure dalla pagina Approvazioni."
 
     def question(self, what: str) -> str:
         """D-154 point 2: the approval asked as a question in the chat, answered with «Sì» / «No» under it (the same
@@ -605,12 +610,12 @@ class Assistant:
         action together with others (one approval each, D-144). D-162: the setting ASSISTANT_CONFIRM, «ospiti» (this,
         the default), «sempre» (every action), «multiple» (only actions together)."""
         policy = self.e.setting("ASSISTANT_CONFIRM")
+        if policy == "sempre":
+            return True                              # D33 (P-83, answer 1087 = a): every action, scheduled ones too
         if p["type"] == "schedule":
             # D-170: a scheduled action, by the calendar at its time (the same rule as an immediate one on the guests'
-            # comfort); with «multiple» and «sempre» as before: scheduled actions do not ask
+            # comfort); with «multiple» as before: scheduled actions do not ask
             return policy == "ospiti" and self._touches_comfort_at(p)
-        if policy == "sempre":
-            return True
         if together:
             return True
         if policy == "multiple":
@@ -650,9 +655,10 @@ class Assistant:
                     if ask["approval_id"] is None:
                         ask["approval_id"] = approval["approval_id"]
                         ask["status"] = "needs_approval"
-                    lines.append(self.schedule_question(what) if p["type"] == "schedule" else self.question(what))
+                    lines.append(self.schedule_question(what, self._guests_at(p)) if p["type"] == "schedule"
+                                 else self.question(what))
                 elif p["type"] == "mode":
-                    for command_id in e.set_mode(p["mode"], actor, corr, why, "assistant"):
+                    for command_id in e.set_mode(p["mode"], actor, corr, why, "assistant", by_hand=True):
                         ask["actions"].append({"type": "command", "command_id": command_id})
                     lines.append(f"Modalità {MODE_NAMES.get(p['mode'], p['mode'])} impostata: i comandi ai dispositivi partono ora, l'esito arriva "
                                  f"nell'app.")

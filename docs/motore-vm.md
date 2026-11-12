@@ -316,7 +316,7 @@ Risultato atteso: le impostazioni in vigore, oppure «tutte ai valori predefinit
   `auto` = la regola di prima, «bologna» nell'identificativo); conta solo al primo avvio, poi i dati restano (P-72);
 - `ASSISTANT_CONFIRM` (`ospiti`, `sempre`, `multiple`; predefinito `ospiti`): quando l'assistente chiede conferma prima
   di agire: `ospiti` = con ospiti presenti per spegnere clima o caldaia o cambiare modalità, e per due o più azioni
-  insieme (D-154, D-162); `sempre` = per ogni azione, programmazioni escluse; `multiple` = solo per due o più azioni
+  insieme (D-154, D-162); `sempre` = per ogni azione, anche le programmazioni (D33); `multiple` = solo per due o più azioni
   insieme, anche con ospiti. Non esiste «mai».
 - `STREAM_QUEUE_MAX` (predefinito 1000, da 10 a 100000; lotto 35): eventi in attesa per ogni lettore dello stream del
   motore; oltre, quello stream si chiude e il server si ricollega dal suo ultimo evento, senza perdere nulla.

@@ -67,7 +67,7 @@ CHOICES: dict[str, tuple[str, tuple[str, ...]]] = {
     # start of an apartment (its data are kept afterwards)
     "DEMO_VARIANT": ("auto", ("auto", "vuoto", "occupato")),
     # D-162: when the assistant asks the manager before acting: «ospiti» (with guests in, for switching off a climate
-    # or a boiler and for a mode; and two or more actions together), «sempre» (every action, scheduled ones excepted),
+    # or a boiler and for a mode; and two or more actions together), «sempre» (every action, scheduled ones too: D33),
     # «multiple» (only two or more actions together, guests or not). No «never», on purpose
     "ASSISTANT_CONFIRM": ("ospiti", ("ospiti", "sempre", "multiple")),
 }

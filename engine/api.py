@@ -127,7 +127,8 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
             return JSONResponse(status_code=exc.status, content=exc.body())
         mode = (body or {}).get("mode") if isinstance(body, dict) else None
         return await run_idempotent(request, sim, lambda: {
-            "mode": mode, "command_ids": sim.set_mode(mode, actor, corr, "Modalità impostata dall'app")}, 202)
+            "mode": mode, "command_ids": sim.set_mode(mode, actor, corr, "Modalità impostata dall'app", by_hand=True)},
+            202)
 
     @router.post("/apartment/hold")
     async def hold(request: Request, apartment_id: str = Depends(apartment_of)):
