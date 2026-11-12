@@ -296,8 +296,9 @@ def notification_ts(params: Mapping, received_at: datetime, max_skew_s: float = 
 # BthomeComponent.errors reads it on any bthome component.
 
 BTHOME_DEVICE, BTHOME_SENSOR = "bthomedevice", "bthomesensor"
-# BTHome objects that are not a field of the contract: battery (it comes from bthomedevice.battery, battery.py),
-# rotation in degrees (Door/Window), illuminance level 0-2 (Motion, Door/Window). Never a StateChange, never a warning.
+# BTHome objects that are not a field of the contract: battery (a level, never a StateChange: ShellyConnector takes it
+# from both bthomedevice.battery and this obj_id 1 bthomesensor, the last that arrived counts, battery.py), rotation
+# in degrees (Door/Window), illuminance level 0-2 (Motion, Door/Window). Never a StateChange, never a warning.
 BTHOME_IGNORED = frozenset({1, 63, 100})
 
 

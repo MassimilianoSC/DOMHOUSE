@@ -32,10 +32,16 @@ is there for the battery sensors to come.
 
 The order of ts. StateChange.ts is translate.notification_ts (the device's clock when it is within the trusted skew,
 else our reception time; for a BLU sensor translate.bthome_ts, the packet's time at its bridge brought to our clock,
-see below), but in the stream of changes() it NEVER goes back, not even between different devices: a ts earlier
-than the last one emitted is replaced by the last one emitted. So a device whose clock is a little behind (within
-translate.MAX_CLOCK_SKEW_S) gets its changes dated a little later than its own clock says; the engine needs an
-ordered stream more than that precision (its consumption per hour, kwh_today).
+see below), with two rules on the way out (_emit):
+  - it is NEVER later than our reception of the event that made the change: a device whose clock is ahead (within
+    translate.MAX_CLOCK_SKEW_S) gets its changes dated at their reception, so it cannot push the ts of the other
+    devices forward (at midnight a consumption would fall in the wrong day);
+  - in the stream of changes() it NEVER goes back, not even between different devices: a ts earlier than the last
+    one emitted is replaced by the last one emitted. So a device whose clock is a little behind gets its changes
+    dated a little later than its own clock says; the engine needs an ordered stream more than that precision (its
+    consumption per hour, kwh_today).
+When the two collide (a reception earlier than the last ts emitted: only with times our clock never gives, as in
+the tests) the stream not going back wins.
 
 BLU sensors (translate.py, «Shelly BLU sensors»; catalog: shelly {addr, bridge, type}). They have no worker: their
 events are the bridge's notifications, handled in the bridge's worker, so the order bridge offline -> sensors offline
@@ -85,7 +91,10 @@ holds. Read only: execute() refuses them (no command). In detail:
 Commands: command.run_command (set, then read back, every RPC within cmd.deadline). A device the connector has
 offline fails at once with failed/device_offline, nothing queued (§2.5, §6); a device_offline outcome of a device the
 connector had online puts it offline through its queue, so online=False goes out in its order (§2.6). Cancelling
-execute() (the engine past the deadline) leaves nothing half done: no state of the connector is changed by a command.
+execute() (the engine past the deadline) calls nothing back: a request already handed to the transport may have
+reached the device (the MQTT transport publishes it at once and then waits for the answer), which acts on it. The
+connector keeps no state of a command, so after a cancellation the state is, as always, what the device reports in
+its notifications.
 
 No global state: everything lives in the instance, so two connectors live together in one process (§6). The logs
 (engine.log) carry short stable messages and ids, never payloads nor credentials.
@@ -369,12 +378,12 @@ class ShellyConnector:
             device.status, changed = apply_notify_status(profile, device.status, item.params, channel)
             for cap in device.entry.capabilities:
                 if cap in changed:
-                    self._emit_state(device, cap, changed[cap], ts)
+                    self._emit_state(device, cap, changed[cap], ts, item.received_at)
             if device.sensors:
                 self._blu_notify(device, item)
         elif item.method == "NotifyFullStatus":
             device.snapshot_failed = False      # the device sent its full status: no GetStatus to try again
-            self._snapshot(device, {k: v for k, v in item.params.items() if k != "ts"}, ts)
+            self._snapshot(device, {k: v for k, v in item.params.items() if k != "ts"}, ts, item.received_at)
         elif device.sensors and component_event_targets(item.params):
             # a BLU sensor paired or removed on this bridge: the numbers changed, the old map is no longer valid
             # (a number may now name another measure) and is read again; until a read succeeds (the silence check
@@ -425,17 +434,17 @@ class ShellyConnector:
         device.last_seen = self._clock()
         if device.sensors and isinstance(status, dict) and isinstance(status.get("sys"), dict):
             self._bridge_clock(device, status["sys"].get("unixtime"), device.last_seen)
-        self._snapshot(device, status if isinstance(status, dict) else {}, device.last_seen)
+        self._snapshot(device, status if isinstance(status, dict) else {}, device.last_seen, device.last_seen)
 
-    def _snapshot(self, device: _Device, status: dict, ts: datetime) -> None:
-        """A full status: one "state" change for every capability of the device (§2.6)."""
+    def _snapshot(self, device: _Device, status: dict, ts: datetime, received_at: datetime) -> None:
+        """A full status, received at received_at: one "state" change for every capability of the device (§2.6)."""
         device.status = copy.deepcopy(status)
         found = capabilities_from_status(device.entry.profile, device.status, device.entry.channel)
         for cap in device.entry.capabilities:
             if cap in found:
-                self._emit_state(device, cap, found[cap], ts)
+                self._emit_state(device, cap, found[cap], ts, received_at)
             elif cap in device.reported:              # not in this status: what was last known, so none is missing
-                self._emit_state(device, cap, device.reported[cap], ts)
+                self._emit_state(device, cap, device.reported[cap], ts, received_at)
             else:
                 log.warn("capability missing from device status", device_id=device.entry.device_id, capability=cap)
 
@@ -575,7 +584,7 @@ class ShellyConnector:
                 if self._blu_fresh(sensor, self._clock()):
                     # back after a silence: online, then the snapshot (it carries this change too)
                     at = self._packet_at(bridge, component.last_updated_ts, item.received_at) or item.received_at
-                    self._blu_online(sensor, at)
+                    self._blu_online(sensor, at, received_at=item.received_at)
                     self._blu_snapshot(sensor, [c for c in mine if not c.errors], item.received_at)
                 continue
             if component.obj_id is None or "value" not in change:
@@ -583,7 +592,7 @@ class ShellyConnector:
             reading = blu_reading(sensor.entry.blu.model, component.obj_id, component.status.get("value"))
             if reading is not None and reading[0] in sensor.entry.capabilities:
                 at = self._packet_at(bridge, component.last_updated_ts, item.received_at) or item.received_at
-                self._emit_state(sensor, reading[0], reading[1], at)
+                self._emit_state(sensor, reading[0], reading[1], at, item.received_at)
 
     def _blu_packet(self, sensor: _Device, component: BthomeComponent, received_at: datetime,
                     arrived: dict | None = None) -> None:
@@ -631,7 +640,7 @@ class ShellyConnector:
             reading = None if component is None else blu_reading(model, obj_id, component.status.get("value"))
             if reading is not None:
                 at = self._packet_at(self._bridge_of(sensor), component.last_updated_ts, received_at) or received_at
-                self._emit_state(sensor, cap, reading[1], at)
+                self._emit_state(sensor, cap, reading[1], at, received_at)
 
     def _check_blu_silence(self, bridge: _Device, now: datetime) -> None:
         for sensor in bridge.sensors.values():
@@ -647,13 +656,14 @@ class ShellyConnector:
                      threshold_s=sensor.entry.offline_after_s)
         self._blu_offline(sensor, now)
 
-    def _blu_online(self, sensor: _Device, at: datetime, *, force: bool = False) -> None:
+    def _blu_online(self, sensor: _Device, at: datetime, *, force: bool = False,
+                    received_at: datetime | None = None) -> None:
         if not sensor.online:
             sensor.online = True
             log.info("device online", device_id=sensor.entry.device_id)
         elif not force:
             return
-        self._emit(StateChange(sensor.entry.device_id, "online", at, online=True))
+        self._emit(StateChange(sensor.entry.device_id, "online", at, online=True), received_at)
 
     def _blu_offline(self, sensor: _Device, at: datetime) -> None:
         """Only when it changes: a sensor that was not online has nothing to say (its bridge said it already)."""
@@ -664,14 +674,20 @@ class ShellyConnector:
         self._emit(StateChange(sensor.entry.device_id, "online", at, online=False))
 
     # ---- emission ------------------------------------------------------------------------------------------------
-    def _emit_state(self, device: _Device, cap: str, state: dict, ts: datetime) -> None:
+    def _emit_state(self, device: _Device, cap: str, state: dict, ts: datetime, received_at: datetime) -> None:
         device.reported[cap] = copy.deepcopy(state)
-        self._emit(StateChange(device.entry.device_id, "state", ts, capability=cap, state=copy.deepcopy(state)))
+        self._emit(StateChange(device.entry.device_id, "state", ts, capability=cap, state=copy.deepcopy(state)),
+                   received_at)
 
-    def _emit(self, change: StateChange) -> None:
-        """The one way out: the ts of the stream never goes back (see the module's docstring)."""
-        if self._last_ts is not None and change.ts < self._last_ts:
-            change = StateChange(change.device_id, change.kind, self._last_ts, capability=change.capability,
+    def _emit(self, change: StateChange, received_at: datetime | None = None) -> None:
+        """The one way out (see the module's docstring): the ts is never later than received_at, the reception of
+        the event that made the change (None: change.ts is that reception already), and the ts of the stream never
+        goes back."""
+        ts = change.ts if received_at is None else min(change.ts, received_at)
+        if self._last_ts is not None and ts < self._last_ts:
+            ts = self._last_ts
+        if ts != change.ts:
+            change = StateChange(change.device_id, change.kind, ts, capability=change.capability,
                                  state=change.state, online=change.online)
         self._last_ts = change.ts
         for q in list(self._readers):

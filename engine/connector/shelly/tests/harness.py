@@ -15,8 +15,9 @@ every capability: the boiler's catalog values alone do not count). The connector
 is unchanged; with the fakes the wait is two RPCs, about 0.3 s. If the devices do not come, the wait ends quietly and
 the tests that need them fail on their own assertions.
 
-FakeTransport answers every RPC after LATENCY_S, so a command lasts about 0.3 s, like the simulated one, and
-test_cancelled_command_leaves_the_connector_usable can cancel it half way (after 0.1 s).
+FakeTransport answers every RPC after LATENCY_S (the device acts at once, as over MQTT), so a command lasts about
+0.3 s, like the simulated one, and test_cancelled_command_leaves_the_connector_usable can cancel it half way (after
+0.1 s), when the plug has already switched.
 
 connector_env(data_dir) writes CATALOG_YAML to data_dir/catalog.yaml (the engine's default CATALOG_PATH) and gives the
 SHELLY_MQTT_* variables make_connector needs, with fake values: make_connector never connects. CATALOG_YAML has the

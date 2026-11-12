@@ -171,18 +171,25 @@ def test_model_check_failing_keeps_the_catalog_profile(warnings):
 
 
 def test_snapshot_failing_keeps_the_device_online(warnings):
-    """GetStatus fails at the connection: online without a snapshot, warned once; a NotifyFullStatus that comes before
-    the next silence check (30 s here) fills the state, and nothing is tried again after it."""
+    """GetStatus fails at the connection and at every retry: online without a snapshot, warned once. A
+    NotifyFullStatus fills the state, and after it GetStatus is not tried again, however many silence checks come
+    (0.05 s apart here)."""
     async def scenario(w):
-        w.plugs[SID_A].fail_next("Shelly.GetStatus")
+        for _ in range(1000):
+            w.plugs[SID_A].fail_next("Shelly.GetStatus")
         w.transport.set_online(SID_A, True)
         await w.wait_for(lambda xs: any(m == "device snapshot failed" for m, _ in warnings))
         assert w.info().online and kinds(w.mine()) == [("online", True)]
+        await w.settle(0.2)
+        assert [m for _, m, _ in w.transport.calls].count("Shelly.GetStatus") >= 3     # tried again, failing
         w.plugs[SID_A].reboot()                     # the next full status fills the state
         await w.wait_for(lambda xs: {c.capability for c in xs if c.kind == "state"} == {"switch", "power_meter"})
-        assert [m for m, _ in warnings].count("device snapshot failed") == 1
-        assert [m for _, m, _ in w.transport.calls].count("Shelly.GetStatus") == 1
-    run(scenario)
+        await w.settle(0.1)                         # a check queued before the full status may still have tried
+        tried = [m for _, m, _ in w.transport.calls].count("Shelly.GetStatus")
+        await w.settle(0.4)                         # several silence checks: no more GetStatus
+        assert [m for _, m, _ in w.transport.calls].count("Shelly.GetStatus") == tried
+        assert [m for m, _ in warnings].count("device snapshot failed") == 1 and w.info().online
+    run(scenario, silence_check_s=0.05)
 
 
 def test_snapshot_failing_is_tried_again_at_the_silence_checks_until_it_succeeds(warnings):
@@ -295,7 +302,10 @@ def test_command_within_the_deadline():
     run(scenario)
 
 
-def test_cancelled_command_leaves_nothing_half_done():
+def test_cancelled_command_the_state_is_what_the_device_reports():
+    """The engine cancels a command half way (past its deadline), while the answer of Switch.Set is on its way. As over
+    MQTT, the request had already reached the plug and the relay switched: nothing is called back and nothing made
+    up, the state is what the plug reports (its NotifyStatus). The plug stays online and takes the next command."""
     async def scenario(w):
         await w.connect()
         w.transport.latency_s = 0.2
@@ -304,10 +314,14 @@ def test_cancelled_command_leaves_nothing_half_done():
         task.cancel()
         with pytest.raises(asyncio.CancelledError):
             await task
+        await w.wait_for(lambda xs: any(c.capability == "switch" and c.state == {"on": True} for c in xs))
         await w.settle(0.3)
-        assert not w.plugs[SID_A].on and w.info().online
-        result = await w.conn.execute(cmd(True, n=2), lambda s: None)
-        assert result.outcome == "confirmed"
+        assert w.plugs[SID_A].on and w.info().online
+        assert w.info().capabilities["switch"] == {"on": True}
+        assert [c.state for c in w.mine() if c.capability == "switch"] == [{"on": False}, {"on": True}]
+        result = await w.conn.execute(cmd(False, n=2), lambda s: None)
+        assert (result.outcome, result.state) == ("confirmed", {"on": False})
+        await w.wait_for(lambda xs: w.info().capabilities["switch"] == {"on": False})
     run(scenario)
 
 
@@ -416,6 +430,29 @@ def test_ts_never_goes_back_with_a_device_clock_off():
         assert [(c.device_id, c.capability) for c in b_changes] == [(DEV_B, "switch"), (DEV_B, "power_meter")]
         assert b_changes[0].state == {"on": False} and b_changes[1].state == {"watts": 0.0, "energy_total_wh": 17.0}
         assert all(c.ts == max(a_time, *(x.ts for x in w.changes[:start])) for c in b_changes), "the last emitted"
+        assert [c.ts for c in w.changes] == sorted(c.ts for c in w.changes)
+    run(scenario, n_plugs=2)
+
+
+def test_a_device_clock_ahead_never_dates_the_others_later():
+    """Plug A's clock is 240 s ahead, within MAX_CLOCK_SKEW_S: its change is dated at its reception, not 240 s later,
+    so plug B's change right after, with the right clock, keeps its own time (at midnight a consumption would
+    otherwise fall in the wrong day). The stream still never goes back."""
+    async def scenario(w):
+        await w.connect(SID_A)
+        await w.connect(SID_B)
+        w.plugs[SID_A].clock_skew = timedelta(seconds=240)
+        start = len(w.changes)
+        before_a = datetime.now(UTC)
+        w.plugs[SID_A].press_button()
+        await w.wait_for(lambda xs: any(c.device_id == DEV_A and c.capability == "switch" for c in xs[start:]))
+        a = next(c for c in w.changes[start:] if c.device_id == DEV_A and c.capability == "switch")
+        assert before_a <= a.ts <= datetime.now(UTC), a.ts                  # its reception, not now + 240 s
+        before_b = datetime.now(UTC)
+        w.plugs[SID_B].press_button()
+        await w.wait_for(lambda xs: any(c.device_id == DEV_B and c.capability == "switch" for c in xs[start:]))
+        b = next(c for c in w.changes[start:] if c.device_id == DEV_B and c.capability == "switch")
+        assert before_b - timedelta(seconds=0.05) <= b.ts <= datetime.now(UTC), b.ts   # its own time (ts in 1/100 s)
         assert [c.ts for c in w.changes] == sorted(c.ts for c in w.changes)
     run(scenario, n_plugs=2)
 
