@@ -117,3 +117,15 @@ def test_d197_a_stream_ends_before_cloud_run_cuts_it():
     for manifest in (STAGING, PROD):
         assert get_settings().stream_max_s + 30 <= int(annotation(manifest, "timeoutSeconds"))
 
+
+
+def test_d04_staging_and_production_run_as_different_accounts():
+    """D04 (P-83): both ran as domotica-bff@ (datastore.user on the whole project: staging could write production's
+    database, and read every secret production reads)."""
+    import re
+    from pathlib import Path
+    root = Path(__file__).resolve().parent.parent
+    accounts = {name: re.findall(r"serviceAccountName: (\S+)", (root / "bff" / name).read_text(encoding="utf-8"))
+                for name in ("cloudrun.yaml", "cloudrun.staging.yaml")}
+    assert accounts == {"cloudrun.yaml": ["domotica-bff@your-gcp-project-id.iam.gserviceaccount.com"],
+                        "cloudrun.staging.yaml": ["domotica-bff-staging@your-gcp-project-id.iam.gserviceaccount.com"]}
