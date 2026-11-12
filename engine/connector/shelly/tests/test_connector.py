@@ -17,7 +17,7 @@ from engine.connector.shelly import make_connector
 from engine.connector.shelly.catalog import CatalogError, parse_catalog
 from engine.connector.shelly.connector import ShellyConnector
 from engine.connector.shelly.offline import load_thresholds
-from engine.connector.shelly.transport.base import Notification
+from engine.connector.shelly.transport.base import Notification, RpcError
 from engine.connector.shelly.transport.mqtt import MqttConfigError, MqttTransport
 from engine.connector.shelly.translate import notification_ts
 
@@ -1322,3 +1322,160 @@ def test_blu_sensor_entering_error_goes_offline_at_its_threshold_and_comes_back_
         await w.wait_for(lambda xs: len(errors_warnings(warnings)) == 2)
         assert w.blu(start)[3:] == []                       # no state from the packet in error
     run_blu(scenario, sensors=(DEV_MOTION,))
+
+
+# --- the bridge's clock: last_updated_ts is read with it ------------------------------------------------------------
+
+def clock_warnings(warnings):
+    return [f for m, f in warnings if m == "bridge clock off"]
+
+
+async def ht_every_minute(w, minutes, skews=None):
+    """The H&T sends a packet a minute (a new temperature each time, so its bthomesensor is notified); skews, when
+    given, sets the bridge's clock before each packet. After each one: the H&T is still online and its temperature
+    comes out dated on OUR clock."""
+    for n in range(1, minutes + 1):
+        if skews is not None:
+            w.bridge.clock_skew = timedelta(seconds=skews[n - 1])
+        w.shift = timedelta(seconds=60 * n)
+        received = datetime.now(UTC) + w.shift
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0 + n})
+        await w.wait_for(lambda xs: (DEV_HT, "state", "temperature", {"celsius": 20.0 + n}) in w.blu())
+        await w.settle(0.15)                                 # silence checks
+        assert w.info(DEV_HT).online, n
+        ts = [c.ts for c in w.changes if c.device_id == DEV_HT and c.kind == "state"][-1]
+        assert abs((ts - received).total_seconds()) < 2, (n, ts, received)
+
+
+@pytest.mark.parametrize("skew_s", [-400, 400])
+def test_blu_bridge_clock_off_the_age_is_counted_on_the_bridge_clock(warnings, skew_s):
+    """The bridge's clock is 400 s behind (or ahead of) ours, beyond MAX_CLOCK_SKEW_S; the H&T sends every minute.
+    last_updated_ts is the bridge's clock: the H&T is online, its values come out dated on our clock, and the bridge
+    is warned once."""
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=skew_s)
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        assert w.blu() == [(DEV_HT, "online", True, None), (DEV_HT, "state", "temperature", {"celsius": 20.0}),
+                           (DEV_HT, "state", "humidity", {"percent": 40.0})]
+        await ht_every_minute(w, 5)
+        assert [c for c in w.blu() if c[1] == "online"] == [(DEV_HT, "online", True, None)]
+        warned = clock_warnings(warnings)
+        assert len(warned) == 1 and warned[0]["device_id"] == DEV_BRIDGE
+        assert abs(warned[0]["offset_s"] - skew_s) <= 1             # sys.unixtime is in whole seconds
+        assert_ts_never_go_back(w.changes)
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_bridge_clock_corrected_midway_keeps_the_sensor_online(warnings):
+    """The bridge's clock is 400 s behind, then corrected, then off again: the offset follows it at every message,
+    the H&T never falls, and the bridge is warned again only after its clock was back within the skew."""
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=-400)
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        await ht_every_minute(w, 6, skews=[-400, 0, 0, -400, -400, 0])
+        assert [c for c in w.blu() if c[1] == "online"] == [(DEV_HT, "online", True, None)]
+        assert len(clock_warnings(warnings)) == 2
+        assert_ts_never_go_back(w.changes)
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+# --- a sensor whose error goes away without "errors": [] -----------------------------------------------------------
+
+def test_blu_error_gone_without_an_empty_errors_is_read_at_the_silence_checks(warnings):
+    """How the bridge says that an error is gone was never seen: here it never notifies "errors": [], the error only
+    disappears from GetComponents. The Motion is in error and offline (its last good packet beyond 2720 s), the H&T on
+    the same bridge healthy. While the error lasts GetComponents is read once per silence check (a failed read
+    included), the error is warned once, and the H&T sends nothing again. The error gone, a packet at rest (no
+    bthomesensor notified) and the bthomedevice report without "errors": at the next check the Motion is online with
+    its snapshot, and the reads stop."""
+    async def scenario(w):
+        w.bridge.announce_errors_gone = False
+        w.pair(ADDR_HT, ADDR_MOTION)
+        w.bridge.blu_packet(ADDR_MOTION, {33: False}, battery=100)          # the last good packet, at 0 s
+        w.bridge.blu_set_errors(ADDR_MOTION, ["parse_failed"])
+        w.shift = timedelta(seconds=2000)
+        w.bridge.blu_packet(ADDR_MOTION, {33: False})                       # in error: only its bthomedevice moves
+        w.shift = timedelta(seconds=2800)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0, 46: 40}, battery=90)
+        reads_at_check = []
+        check = w.conn._check_blu_silence
+
+        def counted(bridge, now):
+            reads_at_check.append(len(w.get_components_offsets()))
+            check(bridge, now)
+        w.conn._check_blu_silence = counted
+        await w.connect_bridge()
+        assert w.blu() == [(DEV_HT, "online", True, None), (DEV_HT, "state", "temperature", {"celsius": 21.0}),
+                           (DEV_HT, "state", "humidity", {"percent": 40.0})]
+        assert not w.info(DEV_MOTION).online
+        await w.settle(0.2)
+        assert len(w.blu()) == 3                    # the reads in error send nothing again for the H&T
+        w.bridge.fail_next("Shelly.GetComponents")  # (the retry after a failed read is a snapshot: the H&T's again)
+        await w.settle(0.2)
+        during = reads_at_check[:]
+        assert len(during) >= 6
+        assert all(b - a == 1 for a, b in zip(during, during[1:])), during      # one read per check, no more
+        assert len(errors_warnings(warnings)) == 1
+        assert [m for m, _ in warnings].count("blu components read failed") == 1
+        w.bridge.blu_set_errors(ADDR_MOTION, [])
+        w.shift = timedelta(seconds=2810)
+        w.bridge.blu_packet(ADDR_MOTION, {33: False})                       # at rest: no bthomesensor notified
+        w.bridge.blu_device_report(ADDR_MOTION)                             # without "errors"
+        start = len(w.changes)
+        await w.wait_for(lambda xs: len(w.blu(start)) == 2)
+        assert w.blu(start) == [(DEV_MOTION, "online", True, None),
+                                (DEV_MOTION, "state", "motion", {"detected": False})]
+        await w.settle(0.2)
+        after = len(w.get_components_offsets())
+        await w.settle(0.2)
+        assert len(w.get_components_offsets()) == after                     # healed: no more reads
+        assert w.info(DEV_MOTION).online and len(errors_warnings(warnings)) == 1
+    run_blu(scenario, sensors=(DEV_HT, DEV_MOTION))
+
+
+# --- a pairing while the bridge is online: the old map is not used --------------------------------------------------
+
+def test_blu_map_is_dropped_at_a_pairing_with_the_bridge_online():
+    """The sensors are paired again while the bridge is online, with the numbers reused: the old H&T temperature
+    (bthomesensor:202) is now the Door/Window's rotation. Every read of the map fails meanwhile: a notification with the
+    old number gives nothing (no old map); once a read at the silence check succeeds, the new numbers work."""
+    async def scenario(w):
+        w.pair(ADDR_HT, ADDR_DOOR)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0, 46: 40})
+        w.bridge.blu_packet(ADDR_DOOR, {45: True})
+        await w.connect_bridge()
+        old_temperature = w.bridge.blu_keys(ADDR_HT)[3]
+        assert old_temperature == "bthomesensor:202"
+        failing = [True]
+        real_get_components = w.bridge._get_components
+
+        def get_components(params):
+            if failing[0]:
+                raise RpcError(-103, "fake bridge: busy")
+            return real_get_components(params)
+        w.bridge._get_components = get_components
+        start = len(w.changes)
+        w.bridge.unpair(ADDR_HT)
+        w.bridge.unpair(ADDR_DOOR)
+        w.bridge.restart_numbering()
+        w.pair(ADDR_DOOR, ADDR_HT)
+        assert w.bridge.blu_keys(ADDR_DOOR)[3] == old_temperature
+        await w.wait_for(lambda xs: len(w.get_components_offsets()) >= 1 + 18)   # every event read, and failed
+        now = datetime.now(UTC) + w.shift
+        w.transport.inject(Notification("NotifyStatus", SID_BRIDGE, {
+            "ts": now.timestamp(), old_temperature: {"last_updated_ts": int(now.timestamp()), "value": 85.0}}, now))
+        await w.settle()
+        assert not any(c[1] == "state" for c in w.blu(start)), w.blu(start)
+        failing[0] = False                                  # the next silence check reads the new map
+        await w.settle()
+        w.bridge.blu_packet(ADDR_HT, {69: 22.0})
+        w.bridge.blu_packet(ADDR_DOOR, {45: False, 63: 25.0})
+        await w.wait_for(lambda xs: (DEV_DOOR, "state", "contact", {"open": False}) in w.blu(start))
+        await w.wait_for(lambda xs: (DEV_HT, "state", "temperature", {"celsius": 22.0}) in w.blu(start))
+        assert not any(c[3] in ({"celsius": 85.0}, {"celsius": 25.0}) for c in w.blu(start)), w.blu(start)
+        assert w.info(DEV_HT).capabilities["temperature"] == {"celsius": 22.0}
+    run_blu(scenario, sensors=(DEV_HT, DEV_DOOR))

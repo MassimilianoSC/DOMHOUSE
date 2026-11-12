@@ -31,9 +31,10 @@ sends online=False when the silence goes beyond it. For the Plug the broker's "f
 is there for the battery sensors to come.
 
 The order of ts. StateChange.ts is translate.notification_ts (the device's clock when it is within the trusted skew,
-else our reception time; for a BLU sensor translate.bthome_ts, the packet's time at its bridge), but in the stream of changes() it NEVER goes back, not even between different devices: a
-ts earlier than the last one emitted is replaced by the last one emitted. So a device whose clock is a little behind
-(within translate.MAX_CLOCK_SKEW_S) gets its changes dated a little later than its own clock says; the engine needs an
+else our reception time; for a BLU sensor translate.bthome_ts, the packet's time at its bridge brought to our clock,
+see below), but in the stream of changes() it NEVER goes back, not even between different devices: a ts earlier
+than the last one emitted is replaced by the last one emitted. So a device whose clock is a little behind (within
+translate.MAX_CLOCK_SKEW_S) gets its changes dated a little later than its own clock says; the engine needs an
 ordered stream more than that precision (its consumption per hour, kwh_today).
 
 BLU sensors (translate.py, «Shelly BLU sensors»; catalog: shelly {addr, bridge, type}). They have no worker: their
@@ -42,15 +43,26 @@ holds. Read only: execute() refuses them (no command). In detail:
   - when a bridge with sensors in the catalog connects, after Shelly.GetStatus, Shelly.GetComponents (every page)
     gives the map number -> (addr, obj_id) and each sensor's last values: a sensor whose last packet (the newest
     last_updated_ts of all its components, bthomedevice included) is within its threshold goes online=True with a
-    snapshot of the values it has (a null value sends nothing); an older one stays offline and sends nothing. The
-    age is counted on last_updated_ts as the bridge gives it (translate.bthome_ts): a packet hours old is hours old,
-    never «now»; only a last_updated_ts in the future beyond MAX_CLOCK_SKEW_S becomes our reception time. A bridge
-    without sensors in the catalog is never asked. A failed GetComponents is warned once and tried again at the
-    silence checks;
+    snapshot of the values it has (a null value sends nothing); an older one stays offline and sends nothing. A
+    bridge without sensors in the catalog is never asked. A failed GetComponents is warned once and tried again at
+    the silence checks;
+  - the age of a packet is counted on the BRIDGE's clock, which wrote its last_updated_ts: for every bridge the
+    connector keeps the offset of its clock from ours (bridge minus ours), renewed by every message carrying the
+    bridge's time (the "ts" of its notifications, the sys.unixtime of each Shelly.GetStatus). The packet's time on our
+    clock is last_updated_ts - offset, never later than its reception (translate.bthome_ts), and it is both the
+    sensor's last packet and the ts of its changes; so a bridge 400 s behind does not keep offline a sensor that
+    sends every minute, and a packet hours old is still hours old, never «now». The same for the notifications and
+    for every read of GetComponents. An offset under CLOCK_OFFSET_IGNORED_S is the transport's delay and the whole
+    seconds of sys.unixtime, and counts as none; before any time of the bridge is known our clock is used, and only a
+    last_updated_ts in the future beyond MAX_CLOCK_SKEW_S becomes our reception time. An offset beyond
+    MAX_CLOCK_SKEW_S is warned once per bridge ("bridge clock off"), again only after it was back within and went out
+    again;
   - the map lives while the bridge is online: when the bridge goes offline it is forgotten (the sensors may be paired
     again meanwhile, with other numbers), and until it is read again the bridge's bthome notifications give nothing;
-  - a sys component_added/component_removed of a bthomedevice or bthomesensor reads the map again (the numbers
-    change at every pairing); a sensor that becomes reachable is online with its snapshot, one removed is offline;
+  - a sys component_added/component_removed of a bthomedevice or bthomesensor drops the map and reads it again (the
+    numbers change at every pairing, and are reused: an old number may now name another measure). If that read
+    fails, the bridge's bthome notifications give nothing until the retry at a silence check succeeds. A sensor that
+    becomes reachable is online with its snapshot, one removed is offline;
   - a bthomesensor:<n> NotifyStatus of a mapped measure is a "state" change dated last_updated_ts (with the rule of
     bthome_ts and of the stream below); obj_id 63, 100 and unknown ones are ignored silently. bthomedevice only
     refreshes the last packet. The battery comes from both the bthomedevice's battery and the obj_id 1 bthomesensor,
@@ -59,9 +71,13 @@ holds. Read only: execute() refuses them (no command). In detail:
     November 2026) is no packet: it does not renew the last packet, gives no state and no battery. A sensor whose
     components are all in error is therefore offline at its threshold, as if silent. Warned once per sensor with the
     bridge's errors, again only after they were gone and came back. The errors stay on a component until a
-    notification carries "errors" again (empty: gone) or GetComponents reads it without them;
+    notification carries "errors" again (empty: gone) or GetComponents reads it without them. How the bridge tells
+    that they are gone was never seen, so while a catalog sensor of the bridge has errors GetComponents is read again
+    at every silence check (one read per check, no warning repeated): the read without them brings the sensor back,
+    online with its snapshot when its last packet is within its threshold;
   - offline: at once when the bridge goes offline (or is rejected); with the bridge online, when the last packet is
-    older than the threshold of the sensor's type (checked with the bridge's silence tick). A packet that arrives
+    older than the threshold of the sensor's type (checked with the bridge's silence tick, or found by a read of the
+    map: warned "device silent beyond threshold" either way). A packet that arrives
     afterwards brings it back online, with a snapshot;
   - a catalog sensor missing from its bridge's components is offline, warned once; a sensor paired with the bridge but
     not in the catalog is ignored, warned once.
@@ -89,12 +105,13 @@ from .battery import BTHOME_BATTERY_OBJ_ID, BatteryTracker, battery_from_bthome_
 from .catalog import Catalog, CatalogDevice
 from .command import RPC_TIMEOUT_S, run_command
 from .offline import is_offline
-from .translate import (BTHOME_DEVICE, BTHOME_SENSOR, BthomeComponent, UnknownModel, apply_notify_status,
-                        blu_reading, bthome_components, bthome_ts, capabilities_from_status, component_event_targets,
-                        notification_ts, profile_for)
+from .translate import (BTHOME_DEVICE, BTHOME_SENSOR, MAX_CLOCK_SKEW_S, BthomeComponent, UnknownModel,
+                        apply_notify_status, blu_reading, bthome_components, bthome_ts, capabilities_from_status,
+                        component_event_targets, notification_ts, profile_for)
 from .transport.base import ConnectionEvent, Notification, Transport, TransportError
 
 SILENCE_CHECK_MIN_S, SILENCE_CHECK_MAX_S = 1.0, 30.0
+CLOCK_OFFSET_IGNORED_S = 2.0       # a bridge's clock offset below this is the transport's delay and rounding
 GET_COMPONENTS_MAX_PAGES = 20      # 10 components a page: far more than a bridge carries; stops a bridge that loops
 _STOP = object()
 
@@ -140,6 +157,9 @@ class _Device:
         self.components: dict[str, BthomeComponent] | None = None
         self.components_failed = False   # the last GetComponents failed: tried again at the next silence check
         self.unknown_addrs: set[str] = set()   # sensors on the bridge but not in the catalog, already warned
+        # a bridge: its clock minus ours (s), from the last message carrying its time; None until one came
+        self.clock_offset_s: float | None = None
+        self.clock_warned = False        # the offset is beyond MAX_CLOCK_SKEW_S, warned until it is back within
         # a BLU sensor: last_seen is its last packet (last_updated_ts); missing_warned: not on its bridge, warned;
         # errors_warned: its bridge reports errors for it (parse_failed), warned until they are gone
         self.missing_warned = False
@@ -312,6 +332,10 @@ class ShellyConnector:
             if device.sensors and device.online:
                 if device.components_failed:
                     await self._read_components(device, snapshot=True)
+                elif self._blu_errors_pending(device):
+                    # a sensor in error: its return may never be notified ("errors": [] was never seen), so the map
+                    # is read again, once per check; only a sensor that comes back sends online and its snapshot
+                    await self._read_components(device, snapshot=False)
                 self._check_blu_silence(device, item.now)
             return
         if isinstance(item, _Lost):
@@ -331,6 +355,8 @@ class ShellyConnector:
         if device.rejected:
             return                                  # not the catalog's model: ignored until it connects again
         device.last_seen = item.received_at
+        if device.sensors:
+            self._bridge_clock(device, item.params.get("ts"), item.received_at)
         if not device.online:
             if item.shelly_id not in self._transport.connected():
                 return                              # it came before its "offline": the stream says the rest
@@ -350,7 +376,10 @@ class ShellyConnector:
             device.snapshot_failed = False      # the device sent its full status: no GetStatus to try again
             self._snapshot(device, {k: v for k, v in item.params.items() if k != "ts"}, ts)
         elif device.sensors and component_event_targets(item.params):
-            # a BLU sensor paired or removed on this bridge: the numbers changed, the map is read again
+            # a BLU sensor paired or removed on this bridge: the numbers changed, the old map is no longer valid
+            # (a number may now name another measure) and is read again; until a read succeeds (the silence check
+            # tries again), the bthome notifications give nothing
+            device.components = None
             await self._read_components(device, snapshot=False)
         # any other NotifyEvent: nothing (its last_seen is already counted)
 
@@ -394,6 +423,8 @@ class ShellyConnector:
             return
         device.snapshot_failed = False
         device.last_seen = self._clock()
+        if device.sensors and isinstance(status, dict) and isinstance(status.get("sys"), dict):
+            self._bridge_clock(device, status["sys"].get("unixtime"), device.last_seen)
         self._snapshot(device, status if isinstance(status, dict) else {}, device.last_seen)
 
     def _snapshot(self, device: _Device, status: dict, ts: datetime) -> None:
@@ -429,6 +460,37 @@ class ShellyConnector:
             self._blu_offline(sensor, at)
 
     # ---- BLU sensors, in the worker of their bridge (translate.py, «Shelly BLU sensors») ------------------------
+    def _bridge_clock(self, bridge: _Device, bridge_time, at: datetime) -> None:
+        """A message carrying the bridge's time (a notification's ts, GetStatus's sys.unixtime) at our time `at`: the
+        offset of its clock, with which its last_updated_ts are read. Warned once when beyond MAX_CLOCK_SKEW_S, again
+        only after it was back within and went out again."""
+        if isinstance(bridge_time, bool) or not isinstance(bridge_time, (int, float)) or bridge_time <= 0:
+            return
+        offset = bridge_time - at.timestamp()
+        bridge.clock_offset_s = offset
+        if abs(offset) <= MAX_CLOCK_SKEW_S:
+            bridge.clock_warned = False
+        elif not bridge.clock_warned:
+            bridge.clock_warned = True
+            log.warn("bridge clock off", device_id=bridge.entry.device_id, offset_s=round(offset))
+
+    def _packet_at(self, bridge: _Device, last_updated_ts, received_at: datetime) -> datetime | None:
+        """translate.bthome_ts with the bridge's offset: a few seconds are the transport's delay and the whole
+        seconds of sys.unixtime, not a clock off, and count as none."""
+        offset = bridge.clock_offset_s
+        if offset is not None and abs(offset) < CLOCK_OFFSET_IGNORED_S:
+            offset = 0.0
+        return bthome_ts(last_updated_ts, received_at, bridge_offset_s=offset)
+
+    def _bridge_of(self, sensor: _Device) -> _Device:
+        return self._by_shelly[sensor.entry.blu.bridge]
+
+    def _blu_errors_pending(self, bridge: _Device) -> bool:
+        """A catalog sensor of the bridge is in error in the map: its return is read with GetComponents at every
+        silence check, as the bridge may never notify "errors": []."""
+        return bridge.components is not None and any(
+            c.errors for c in bridge.components.values() if c.addr in bridge.sensors)
+
     async def _get_components(self, shelly_id: str) -> dict[str, BthomeComponent]:
         """Shelly.GetComponents {"dynamic_only": true}, every page (10 components a page), -> the bthome ones."""
         found: list = []
@@ -488,7 +550,7 @@ class ShellyConnector:
                     self._blu_online(sensor, at, force=True)
                     self._blu_snapshot(sensor, healthy, at)
             else:
-                self._blu_offline(sensor, at)
+                self._blu_silent(sensor, at)
 
     def _blu_notify(self, bridge: _Device, item: Notification) -> None:
         """The bthome part of a NotifyStatus of the bridge: numbers -> (addr, obj_id) through the map."""
@@ -512,7 +574,7 @@ class ShellyConnector:
             if not sensor.online:
                 if self._blu_fresh(sensor, self._clock()):
                     # back after a silence: online, then the snapshot (it carries this change too)
-                    at = bthome_ts(component.last_updated_ts, item.received_at) or item.received_at
+                    at = self._packet_at(bridge, component.last_updated_ts, item.received_at) or item.received_at
                     self._blu_online(sensor, at)
                     self._blu_snapshot(sensor, [c for c in mine if not c.errors], item.received_at)
                 continue
@@ -520,7 +582,7 @@ class ShellyConnector:
                 continue
             reading = blu_reading(sensor.entry.blu.model, component.obj_id, component.status.get("value"))
             if reading is not None and reading[0] in sensor.entry.capabilities:
-                at = bthome_ts(component.last_updated_ts, item.received_at) or item.received_at
+                at = self._packet_at(bridge, component.last_updated_ts, item.received_at) or item.received_at
                 self._emit_state(sensor, reading[0], reading[1], at)
 
     def _blu_packet(self, sensor: _Device, component: BthomeComponent, received_at: datetime,
@@ -530,7 +592,7 @@ class ShellyConnector:
         bthomedevice's battery and the obj_id 1 bthomesensor's value, into one BatteryTracker: the last value that
         arrived counts. arrived is what a notification carried (None: the whole status, read with GetComponents), so
         a bthomedevice report without battery never brings back an older level."""
-        packet_at = bthome_ts(component.last_updated_ts, received_at)
+        packet_at = self._packet_at(self._bridge_of(sensor), component.last_updated_ts, received_at)
         if packet_at is not None and (sensor.last_seen is None or packet_at > sensor.last_seen):
             sensor.last_seen = packet_at
         fields = dict(component.status) if arrived is None else arrived
@@ -568,16 +630,22 @@ class ShellyConnector:
             component = next((c for c in components if c.obj_id == obj_id), None)
             reading = None if component is None else blu_reading(model, obj_id, component.status.get("value"))
             if reading is not None:
-                at = bthome_ts(component.last_updated_ts, received_at) or received_at
+                at = self._packet_at(self._bridge_of(sensor), component.last_updated_ts, received_at) or received_at
                 self._emit_state(sensor, cap, reading[1], at)
 
     def _check_blu_silence(self, bridge: _Device, now: datetime) -> None:
         for sensor in bridge.sensors.values():
             if sensor.online and not self._blu_fresh(sensor, now):
-                silence = (now - sensor.last_seen).total_seconds()
-                log.warn("device silent beyond threshold", device_id=sensor.entry.device_id,
-                         silence_s=round(silence, 1), threshold_s=sensor.entry.offline_after_s)
-                self._blu_offline(sensor, now)
+                self._blu_silent(sensor, now)
+
+    def _blu_silent(self, sensor: _Device, now: datetime) -> None:
+        """Its last packet is beyond its threshold: offline, warned when it was online (by the silence check or by a
+        read of the map, which a sensor in error gets at every check)."""
+        if sensor.online and sensor.last_seen is not None:
+            log.warn("device silent beyond threshold", device_id=sensor.entry.device_id,
+                     silence_s=round((now - sensor.last_seen).total_seconds(), 1),
+                     threshold_s=sensor.entry.offline_after_s)
+        self._blu_offline(sensor, now)
 
     def _blu_online(self, sensor: _Device, at: datetime, *, force: bool = False) -> None:
         if not sensor.online:

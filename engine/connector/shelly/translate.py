@@ -232,20 +232,27 @@ def apply_notify_status(profile: ModelProfile, last_status: Mapping, partial: Ma
     return status, changed
 
 
-def bthome_ts(last_updated_ts, received_at: datetime, max_skew_s: float = MAX_CLOCK_SKEW_S) -> datetime | None:
-    """When a BLU packet arrived at its bridge: last_updated_ts (Unix seconds), or None when the component has
-    received no packet yet (null or 0).
+def bthome_ts(last_updated_ts, received_at: datetime, max_skew_s: float = MAX_CLOCK_SKEW_S,
+              bridge_offset_s: float | None = None) -> datetime | None:
+    """When a BLU packet arrived at its bridge, on OUR clock: last_updated_ts (Unix seconds), or None when the
+    component has received no packet yet (null or 0).
 
-    NOT the rule of notification_ts. last_updated_ts is the time the bridge received the packet, kept by the bridge:
-    a value in the PAST is kept as it is, however far (a sensor silent for hours really was silent for hours, and its
-    age against the threshold is counted from there). Only a value in the FUTURE beyond max_skew_s is not trusted and
-    becomes our reception time."""
+    NOT the rule of notification_ts. last_updated_ts is the time the bridge received the packet, written by the
+    bridge's clock: a value in the PAST is kept as it is, however far (a sensor silent for hours really was silent for
+    hours, and its age against the threshold is counted from there).
+      - bridge_offset_s known (the bridge's clock minus ours, ShellyConnector keeps it per bridge): the packet's time
+        is last_updated_ts - bridge_offset_s, never later than received_at. So a bridge 400 s behind does not make
+        a sensor that sends every minute look 400 s old.
+      - unknown (None): our clock is the bridge's; only a value in the FUTURE beyond max_skew_s is not trusted and
+        becomes our reception time."""
     if isinstance(last_updated_ts, bool) or not isinstance(last_updated_ts, (int, float)) or last_updated_ts <= 0:
         return None
     try:
-        packet_at = datetime.fromtimestamp(last_updated_ts, UTC)
+        packet_at = datetime.fromtimestamp(last_updated_ts - (bridge_offset_s or 0.0), UTC)
     except (OverflowError, OSError, ValueError):
         return received_at
+    if bridge_offset_s is not None:
+        return min(packet_at, received_at)
     if (packet_at - received_at).total_seconds() > max_skew_s:
         return received_at
     return packet_at

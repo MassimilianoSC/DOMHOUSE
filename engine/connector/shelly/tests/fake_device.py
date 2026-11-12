@@ -38,6 +38,12 @@ three models changes. blu_set_errors() makes the bridge unable to decode a senso
 bthomedevice, as the EM Mini Gen4 did with the Motion and the Door/Window on 11 November 2026), or able again.
 restart_numbering() makes the next pairings take the numbers from 200 again, as the real bridge reuses the numbers
 freed by an unpairing (capture of 11 November 2026: bthomedevice:201 removed and added again as 201).
+Back from error the bridge notifies "errors": [] by default, an ASSUMPTION never seen on the bench;
+announce_errors_gone = False makes it silent about it (the errors only disappear from GetComponents).
+
+Every device has a clock of its own: clock_skew (0 by default) is added to ours for the "ts" of its notifications, the
+last_updated_ts of its BLU packets and the sys.unixtime of its full status (whole seconds, as the real one); the
+received_at of its notifications is always our clock.
 """
 import copy
 from collections import defaultdict, deque
@@ -100,6 +106,7 @@ class _FakeShelly:
         self.shelly_id = shelly_id
         self.online = True
         self._clock = clock
+        self.clock_skew = timedelta(0)   # the device's clock minus ours: its ts, last_updated_ts and sys.unixtime
         self._uptime = 0
         self._faults: dict[str, deque] = defaultdict(deque)
         self._sinks: list[Callable[[Notification], None]] = []
@@ -109,6 +116,7 @@ class _FakeShelly:
         self._numbers = {BTHOME_DEVICE: 199, BTHOME_SENSOR: 199}
         self._reported_battery: dict[str, float] = {}
         self._errors: dict[str, list[str]] = {}            # blu_set_errors: the sensors this bridge cannot decode
+        self.announce_errors_gone = True   # False: back from error, the bridge does not notify "errors": []
         self._notified_errors: dict[str, list[str]] = {}
         self._cfg_rev = 10
 
@@ -168,7 +176,7 @@ class _FakeShelly:
         theirs). Every object in the packet gets last_updated_ts = now; a bthomesensor is notified ONLY when its value
         changes. The bthomedevice is updated silently: its notification is blu_device_report()."""
         sensor, keys = self._paired[addr]
-        now = int(self._clock().timestamp())
+        now = int(self.device_now().timestamp())
         if self._blu_errored_packet(addr, keys[0], now, rssi):
             return
         sensor.values.update(values)
@@ -187,7 +195,10 @@ class _FakeShelly:
             status.update(value=sensor.values[obj_id], last_updated_ts=now)
             if old != status["value"] or type(old) is not type(status["value"]):
                 self._notify("NotifyStatus", {key: {"last_updated_ts": now, "value": status["value"]}})
-        if self._notified_errors.get(addr):
+        if self._notified_errors.get(addr) and not self.announce_errors_gone:
+            device.pop("errors", None)                     # gone from GetComponents, never notified
+            self._notified_errors[addr] = []
+        elif self._notified_errors.get(addr):
             # back from error, an ASSUMPTION (never seen on the bench): the packet decoded as usual, then a
             # bthomedevice NotifyStatus with "errors": [] (after the values, the order of a normal packet in the
             # capture), and the key gone from its status
@@ -241,7 +252,7 @@ class _FakeShelly:
 
     def _component_event(self, event: str, key: str) -> None:
         self._cfg_rev += 1
-        now = round(self._clock().timestamp(), 2)
+        now = round(self.device_now().timestamp(), 2)
         self._notify("NotifyEvent", {"events": [{"component": "sys", "event": event, "target": key,
                                                  "restart_required": False, "ts": now, "cfg_rev": self._cfg_rev}]})
 
@@ -279,6 +290,13 @@ class _FakeShelly:
     def _handle_own(self, method: str, params: dict) -> dict:
         raise RpcError(-32601, f"Method {method} not found")
 
+    def device_now(self) -> datetime:
+        """The device's clock: ours plus clock_skew."""
+        return self._clock() + self.clock_skew
+
+    def _unixtime(self) -> int:
+        return int(self.device_now().timestamp())
+
     def _mac(self) -> str:
         return self.shelly_id.rsplit("-", 1)[-1].upper()
 
@@ -287,9 +305,9 @@ class _FakeShelly:
             raise RpcError(-105, f"Argument 'id', value {params.get('id')} not found!")
 
     def _notify(self, method: str, status: dict, *, ts: datetime | None = None) -> None:
-        """ts: the device's clock for the "ts" field, now by default; received_at is always now."""
+        """ts: the device's clock for the "ts" field, its now (device_now) by default; received_at is always our now."""
         now = self._clock()
-        params = {"ts": round((ts or now).timestamp(), 2)} | copy.deepcopy(status)
+        params = {"ts": round((ts or self.device_now()).timestamp(), 2)} | copy.deepcopy(status)
         for sink in self._sinks:
             sink(Notification(method=method, shelly_id=self.shelly_id, params=params, received_at=now))
 
@@ -352,7 +370,8 @@ class FakePlugMG3(_FakeShelly):
 
     def full_status(self) -> dict:
         return {"switch:0": self._switch_status(),
-                "sys": {"mac": self._mac(), "uptime": self._uptime, "restart_required": False}}
+                "sys": {"mac": self._mac(), "uptime": self._uptime, "restart_required": False,
+                        "unixtime": self._unixtime()}}
 
     def _apower(self) -> float:
         return self._load if self._on else 0.0
@@ -439,7 +458,8 @@ class FakeS1G4(_FakeShelly):
                 "cloud": {"connected": False}, "input:0": {"id": 0, "state": False}, "knx": {},
                 "matter": {"num_fabrics": 0, "commissionable": True}, "modbus": {}, "mqtt": {"connected": True},
                 "switch:0": self._switch_status(),
-                "sys": {"mac": self._mac(), "restart_required": False, "uptime": self._uptime, "utc_offset": 3600},
+                "sys": {"mac": self._mac(), "restart_required": False, "uptime": self._uptime, "utc_offset": 3600,
+                        "unixtime": self._unixtime()},
                 "wifi": {"status": "got ip", "rssi": -38}, "ws": {"connected": False}}
 
     def _counts(self) -> dict:
@@ -493,7 +513,7 @@ class FakeMiniEMG4(_FakeShelly):
     def report_power(self) -> None:
         """The em1:0 NotifyStatus, with its ts em1_delay_s before now (the reception)."""
         em1 = {k: v for k, v in self._em1().items() if k in ("act_power", "current", "freq", "voltage")}
-        self._notify("NotifyStatus", {"em1:0": em1}, ts=self._clock() - timedelta(seconds=self.em1_delay_s))
+        self._notify("NotifyStatus", {"em1:0": em1}, ts=self.device_now() - timedelta(seconds=self.em1_delay_s))
 
     def report_energy(self) -> None:
         """The em1data:0 NotifyStatus, then its NotifyEvent "data" (the last minute's record), as in the capture."""
@@ -509,7 +529,8 @@ class FakeMiniEMG4(_FakeShelly):
         return {"ble": {}, "bthome": {}, "cloud": {"connected": False}, "em1:0": self._em1(),
                 "em1data:0": self._em1data(), "matter": {"num_fabrics": 0, "commissionable": True}, "modbus": {},
                 "mqtt": {"connected": True},
-                "sys": {"mac": self._mac(), "restart_required": False, "uptime": self._uptime, "utc_offset": 3600},
+                "sys": {"mac": self._mac(), "restart_required": False, "uptime": self._uptime, "utc_offset": 3600,
+                        "unixtime": self._unixtime()},
                 "wifi": {"status": "got ip", "rssi": -47}, "ws": {"connected": False}}
 
     def _em1(self) -> dict:
