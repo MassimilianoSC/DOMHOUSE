@@ -9,6 +9,7 @@ Every test runs on asyncio.Runner(loop_factory=asyncio.SelectorEventLoop), as ai
 pytest-asyncio. Run: python -m pytest engine/connector/shelly/tests -q
 """
 import asyncio
+import importlib
 import json
 import logging
 from datetime import datetime
@@ -442,10 +443,22 @@ def test_the_start_of_a_run_is_random(monkeypatch):
 
 
 def test_the_module_counter_of_a_real_run_starts_after_the_random_value_and_grows_by_one(monkeypatch):
-    """The counter as a real run makes it (_request_id_counter() without arguments, the module's _request_ids), not a
-    start passed by hand: randbelow forced to 41, the requests that leave carry 42, 43, 44."""
+    """The module's own line, as a real run executes it at import (_request_ids = ...): secrets.randbelow forced to
+    41, the module reloaded, its _request_ids as the import left it gives 42, then 43.
+
+    importlib.reload makes new classes and functions in the module's namespace, while this file and the connector
+    hold those of the first import (and their functions read the namespace: a second reload would not undo it). So
+    the namespace is saved before and put back after, the very same objects, whatever happens in between."""
+    saved = dict(mqtt_module.__dict__)
     monkeypatch.setattr(mqtt_module.secrets, "randbelow", lambda n: 41)
-    assert request_ids_from(monkeypatch, None) == [42, 43, 44]
+    try:
+        assert importlib.reload(mqtt_module) is mqtt_module
+        assert next(mqtt_module._request_ids) == 42                    # randbelow(2**30) + 1
+        assert next(mqtt_module._request_ids) == 43
+    finally:
+        mqtt_module.__dict__.clear()
+        mqtt_module.__dict__.update(saved)
+    assert mqtt_module.MqttTransport is MqttTransport and mqtt_module._request_ids is saved["_request_ids"]
 
 
 # --- broker drop -------------------------------------------------------------------------------------------------
