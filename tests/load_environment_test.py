@@ -142,7 +142,7 @@ def test_prepare_makes_secrets_organisation_apartments_people_and_the_file(env):
     for apt in ids:
         s = env.secrets.store[f"langbrain-api-key-{apt}"]
         assert s["location"] == "europe-west8" and s["labels"] == {"domhouse": "carico"} and len(s["versions"]) == 1
-        assert s["readers"] == ["serviceAccount:domotica-bff@progetto.iam.gserviceaccount.com",
+        assert s["readers"] == ["serviceAccount:domotica-bff-staging@progetto.iam.gserviceaccount.com",
                                 "serviceAccount:langbrain-vm@progetto.iam.gserviceaccount.com"]
     assert len({env.secrets.store[f"langbrain-api-key-{a}"]["versions"][0] for a in ids}) == 5   # five different keys
     assert env.repo.tenants["t-carico-prova"].name == "Carico (prova)"
@@ -233,7 +233,7 @@ def test_the_real_secret_store_adds_only_the_missing_readers_with_the_librarys_o
             self.policy = policy_pb2.Policy()
             b = self.policy.bindings.add()
             b.role = "roles/secretmanager.secretAccessor"
-            b.members.append("serviceAccount:domotica-bff@progetto.iam.gserviceaccount.com")
+            b.members.append("serviceAccount:domotica-bff-staging@progetto.iam.gserviceaccount.com")
             self.set_calls = 0
 
         def get_iam_policy(self, request):
@@ -245,7 +245,7 @@ def test_the_real_secret_store_adds_only_the_missing_readers_with_the_librarys_o
             return self.policy
     store = amb.Secrets.__new__(amb.Secrets)
     store.client, store.project = Client(), "progetto"
-    readers = ["serviceAccount:domotica-bff@progetto.iam.gserviceaccount.com",
+    readers = ["serviceAccount:domotica-bff-staging@progetto.iam.gserviceaccount.com",
                "serviceAccount:langbrain-vm@progetto.iam.gserviceaccount.com"]
     store.grant("langbrain-api-key-carico-01", readers)
     store.grant("langbrain-api-key-carico-01", readers)               # again: nothing to add, no write

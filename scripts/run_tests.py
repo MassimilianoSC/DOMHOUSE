@@ -563,11 +563,8 @@ def run_linux_suite(skip: bool) -> dict:
 
 
 # D85 (P-83): what --server leaves out: suites the CI runs in its other jobs (the repository suite with its emulator,
-# job «repository»; the engine, the conformance, the site, e2e) or that need Docker. load_vm_test too, for now: its
-# prepara gives the data folder to the container's user (os.chown), refused on Linux to a user that is not root (the CI);
-# Windows has no os.chown. The fix belongs to the test (os.chown replaced in its fixture), frozen with the load test
-# (C-13): it comes back here when the freeze ends. On the PC the full run keeps running it.
-SERVER_LEAVES_OUT = {"tests/repository_suite_test.py", "tests/broker_container_test.py", "tests/load_vm_test.py"}
+# job «repository»; the engine, the conformance, the site, e2e) or that need Docker.
+SERVER_LEAVES_OUT = {"tests/repository_suite_test.py", "tests/broker_container_test.py"}
 
 
 def server_suites() -> list[str]:

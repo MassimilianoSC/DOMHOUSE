@@ -9,7 +9,9 @@ the PC, in Git Bash, with the credentials already used for scripts/set_claims.py
 
 prepara, in this order (it can be run again: what exists is kept or brought back to the same state):
   1. the engines' keys: one secret langbrain-api-key-carico-NN per test apartment, value random and never shown, only
-     in europe-west8, label domhouse=carico, readable by the server's account (domotica-bff@) and the VM's (langbrain-vm@);
+     in europe-west8, label domhouse=carico, readable by the staging server's account (domotica-bff-staging@, D04: the
+     account must exist and the staging service must already run as it) and the VM's (langbrain-vm@); production's
+     account (domotica-bff@) is never given them;
   2. the organisation «Carico (prova)» (t-carico-prova) in the staging database only (FIRESTORE_DATABASE=staging, forced
      here: production's database is never opened);
   3. the apartments carico-01 ... carico-NN, each linked to its engine on the VM, http://<VM>:8150, 8151, ...
@@ -148,7 +150,7 @@ class Env:
 
     @property
     def readers(self) -> list[str]:
-        return [f"serviceAccount:domotica-bff@{self.project}.iam.gserviceaccount.com",
+        return [f"serviceAccount:domotica-bff-staging@{self.project}.iam.gserviceaccount.com",
                 f"serviceAccount:langbrain-vm@{self.project}.iam.gserviceaccount.com"]
 
 
@@ -163,7 +165,7 @@ async def prepare(env: Env, apartments: int, people: int, dry: bool) -> None:
         name = SECRET_PREFIX + apt
         if dry:
             say(f"{tag}{name}: {'esiste già' if env.secrets.exists(name) else 'lo creerei'}, con una chiave casuale se "
-                "non ne ha una, leggibile da domotica-bff@ e langbrain-vm@")
+                "non ne ha una, leggibile da domotica-bff-staging@ e langbrain-vm@")
             continue
         if not env.secrets.exists(name):
             env.secrets.create(name)
@@ -174,7 +176,7 @@ async def prepare(env: Env, apartments: int, people: int, dry: bool) -> None:
             env.secrets.add_version(name, secrets.token_urlsafe(32))
             say(f"{name}: chiave casuale scritta (mai mostrata)")
         env.secrets.grant(name, env.readers)
-        say(f"{name} leggibile da domotica-bff@ e langbrain-vm@")
+        say(f"{name} leggibile da domotica-bff-staging@ e langbrain-vm@")
 
     say(f"\n== 2. Organizzazione «{TENANT_NAME}» ({TENANT_ID}) nel database dello staging")
     existing = await env.repo.get_tenant(TENANT_ID)

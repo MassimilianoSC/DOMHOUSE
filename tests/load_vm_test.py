@@ -56,7 +56,12 @@ def vm(tmp_path, monkeypatch):
             return 202, {"status": "pending"}
     Commands.EVERY_S = 0.05
     monkeypatch.setattr(mod, "Commands", Commands)
-    mod.test = {"opt": opt, "etc": etc, "data": data, "containers": containers, "calls": calls, "memory": memory}
+    # The data folder goes to the container's user: os.chown is refused on Linux to a user that is not root (the CI),
+    # and Windows has none. Recorded here, on both, and checked by the first test.
+    owners: dict[str, tuple[int, int]] = {}
+    monkeypatch.setattr(mod.os, "chown", lambda path, uid, gid: owners.__setitem__(str(path), (uid, gid)), raising=False)
+    mod.test = {"opt": opt, "etc": etc, "data": data, "containers": containers, "calls": calls, "memory": memory,
+                "owners": owners}
     monkeypatch.chdir(tmp_path)
     return mod
 
@@ -71,6 +76,7 @@ def test_prepare_starts_the_apartments_engines_protected_and_out_of_the_watchs_s
         assert run[run.index(flag) + 1] == value, flag
     assert run[-1] == "registro/engine:abc123" and "PORT=8151" in run and "CONNECTOR=simulated" in run
     assert f"{vm.test['data'] / 'carico-02'}:/data/carico-02" in run
+    assert vm.test["owners"] == {str(vm.test["data"] / f"carico-0{i}"): (vm.ENGINE_UID, vm.ENGINE_UID) for i in (1, 2)}
     env_file = vm.test["etc"] / "carico-02.env"
     assert env_file.read_text(encoding="utf-8") == "API_KEY=segreto-di-langbrain-api-key-carico-02\n"
     assert sorted(p.name for p in vm.test["opt"].iterdir()) == ["dev.settings"]     # nothing the watch would read
@@ -152,6 +158,7 @@ def test_the_dry_run_starts_and_removes_nothing(vm, monkeypatch, capsys):
     assert vm.main(["prepara", "2"]) == 0
     assert vm.main(["pulisci"]) == 0
     assert not any(a[0] in ("run", "rm") for a in vm.test["calls"]) and not vm.test["etc"].exists()
+    assert vm.test["owners"] == {}
     assert "(prova a secco) avvierei engine-carico-02 sulla porta 8151" in capsys.readouterr().out
 
 
