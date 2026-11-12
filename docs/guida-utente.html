@@ -3790,7 +3790,7 @@ massimo che hai scelto.</p>
 <tbody>
 <tr><td data-label="Regola" class="align-left">«Finestra aperta spegne il clima»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti»: 5, da 1 a 30</td></tr>
 <tr><td data-label="Regola" class="align-left">«Limiti del setpoint»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c&#x27;è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.»</td><td data-label="Valori di partenza e limiti" class="align-left">Vedi la tabella sotto</td></tr>
-<tr><td data-label="Regola" class="align-left">«Antigelo a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota mantiene almeno questa temperatura.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Temperatura (°C)»: 8, da 5 a 12</td></tr>
+<tr><td data-label="Regola" class="align-left">«Antigelo a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare.» (D31)</td><td data-label="Valori di partenza e limiti" class="align-left">«Temperatura (°C)»: 8, da 5 a 12</td></tr>
 <tr><td data-label="Regola" class="align-left">«Antimuffa a casa vuota»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Con la casa vuota, se l&#x27;umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Umidità (%)»: 65, da 50 a 80</td></tr>
 <tr><td data-label="Regola" class="align-left">«Pre-arrivo»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Porta la casa in comfort prima dell&#x27;arrivo degli ospiti.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Ore prima del check-in»: 2, da 0 a 6</td></tr>
 <tr><td data-label="Regola" class="align-left">«Risparmio al check-out»</td><td data-label="Descrizione nell&#x27;app" class="align-left">«Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.»</td><td data-label="Valori di partenza e limiti" class="align-left">«Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180</td></tr>
@@ -3830,6 +3830,14 @@ fra due accensioni. Nelle Decisioni compare «Finestra chiusa: … riacceso».</
 <p><strong>«Antigelo a casa vuota»</strong>: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
 0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve
 un sensore: senza, «Antigelo non attivo».</p>
+</li>
+<li>
+<p><strong>Antigelo con la regola spenta</strong> (D31, risposta 1089): al passaggio a casa vuota la caldaia va comunque alla
+temperatura dell&#x27;antigelo. Ma se qualcuno la spegne o abbassa la temperatura a mano, resta così: vince la scelta a
+mano, e senza sensore non arriva nessun avviso.</p>
+</li>
+<li>
+<p><strong>Con la regola accesa</strong> (come all&#x27;inizio) la caldaia torna alla soglia anche dopo uno spegnimento a mano.</p>
 </li>
 <li>
 <p><strong>«Antimuffa a casa vuota»</strong>: scrive «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa

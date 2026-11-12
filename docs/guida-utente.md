@@ -2264,7 +2264,7 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 |---|---|---|
 | «Finestra aperta spegne il clima» | «Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.» | «Minuti»: 5, da 1 a 30 |
 | «Limiti del setpoint» | «Limita la temperatura impostabile da ospiti e app. In comfort la caldaia e il clima scaldano fino alla temperatura comfort; il clima raffresca sopra quella di raffrescamento, se nella stanza c'è un sensore di temperatura. In eco la caldaia sta alla temperatura eco.» | Vedi la tabella sotto |
-| «Antigelo a casa vuota» | «Con la casa vuota mantiene almeno questa temperatura.» | «Temperatura (°C)»: 8, da 5 a 12 |
+| «Antigelo a casa vuota» | «Con la casa vuota la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare.» (D31) | «Temperatura (°C)»: 8, da 5 a 12 |
 | «Antimuffa a casa vuota» | «Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.» | «Umidità (%)»: 65, da 50 a 80 |
 | «Pre-arrivo» | «Porta la casa in comfort prima dell'arrivo degli ospiti.» | «Ore prima del check-in»: 2, da 0 a 6 |
 | «Risparmio al check-out» | «Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.» | «Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180 |
@@ -2302,6 +2302,10 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 - **«Antigelo a casa vuota»**: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
   0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve
   un sensore: senza, «Antigelo non attivo».
+- **Antigelo con la regola spenta** (D31, risposta 1089): al passaggio a casa vuota la caldaia va comunque alla
+  temperatura dell'antigelo. Ma se qualcuno la spegne o abbassa la temperatura a mano, resta così: vince la scelta a
+  mano, e senza sensore non arriva nessun avviso.
+- **Con la regola accesa** (come all'inizio) la caldaia torna alla soglia anche dopo uno spegnimento a mano.
 - **«Antimuffa a casa vuota»**: scrive «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa
   vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione.
 - **«Pre-arrivo»**: ogni prenotazione creata o modificata programma il comfort. Cambiare le ore vale per le
