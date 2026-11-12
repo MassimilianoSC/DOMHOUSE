@@ -80,9 +80,11 @@ RECONNECT_FIRST_S = 1.0
 RECONNECT_MAX_S = 30.0
 
 # one counter for the whole process: two transports of the same apartment in one process must not mix their answers.
-# It starts from a random number chosen at start: answers are QoS 1 and the broker keeps a session up to an hour
-# (§7.2), so a late answer to a request of the previous run must not carry the id of a new request, as it would if
-# every run counted from 1. Below 2**30, the counter stays a small positive integer for a billion requests.
+# It starts from a random number chosen at start. The connector keeps no session on the broker (clean_session=True,
+# aiomqtt_client), but a device does not forget: it publishes its answers at QoS 1 and sends again one whose delivery
+# was not acknowledged, so an answer to a request of the previous run may still arrive after a restart. It must not
+# carry the id of a new request, as it would if every run counted from 1. Below 2**30, the counter stays a small
+# positive integer for a billion requests.
 REQUEST_ID_FIRST_MAX = 2**30
 
 

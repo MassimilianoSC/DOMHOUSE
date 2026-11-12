@@ -424,7 +424,8 @@ def test_request_ids_start_from_the_chosen_value_and_grow_by_one(monkeypatch):
 
 
 def test_two_starts_give_different_ids(monkeypatch):
-    """A late answer of the previous run (QoS 1, sessions kept up to an hour) must not match a new request."""
+    """A late answer of the previous run (the device sends again a QoS 1 answer not acknowledged) must not match a new
+    request."""
     before = request_ids_from(monkeypatch, 1_000)
     after = request_ids_from(monkeypatch, 52_000_000)
     assert not set(before) & set(after)
@@ -438,6 +439,13 @@ def test_the_start_of_a_run_is_random(monkeypatch):
     monkeypatch.undo()
     firsts = {next(mqtt_module._request_id_counter()) for _ in range(5)}
     assert len(firsts) > 1 and all(1 <= f <= 2**30 for f in firsts)    # not 1 every time
+
+
+def test_the_module_counter_of_a_real_run_starts_after_the_random_value_and_grows_by_one(monkeypatch):
+    """The counter as a real run makes it (_request_id_counter() without arguments, the module's _request_ids), not a
+    start passed by hand: randbelow forced to 41, the requests that leave carry 42, 43, 44."""
+    monkeypatch.setattr(mqtt_module.secrets, "randbelow", lambda n: 41)
+    assert request_ids_from(monkeypatch, None) == [42, 43, 44]
 
 
 # --- broker drop -------------------------------------------------------------------------------------------------
