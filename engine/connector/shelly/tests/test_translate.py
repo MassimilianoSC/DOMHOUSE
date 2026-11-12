@@ -475,7 +475,27 @@ def test_mac_and_last_updated_ts():
     received = datetime.fromtimestamp(1794394038, UTC)
     assert bthome_ts(1794394038, received) == received
     assert bthome_ts(None, received) is None and bthome_ts(0, received) is None
-    assert bthome_ts(1794394038 - 3600, received) == received     # beyond the trusted skew: our reception
+    # the past is kept, however far: the bridge received that packet then (a sensor silent for hours is not «now»)
+    assert bthome_ts(1794394038 - 3600, received) == received - timedelta(hours=1)
+    assert bthome_ts(1794394038 - 30 * 86400, received) == received - timedelta(days=30)
+    # the future: within the trusted skew kept, beyond it our reception time
+    assert bthome_ts(1794394038 + 299, received) == received + timedelta(seconds=299)
+    assert bthome_ts(1794394038 + 3600, received) == received
+    assert bthome_ts(1e20, received) == received                    # not a date at all: our reception
+
+
+def test_errors_of_the_real_parse_failed_answer():
+    """The EM Mini's answer with the Motion and the Door/Window in parse_failed (tests/fixtures/blu_parse_failed.json):
+    errors only on their bthomedevice; a notification without "errors" keeps them, one with [] clears them."""
+    real = json.loads((BLU_PAGES.parent / "blu_parse_failed.json").read_text(encoding="utf-8"))
+    components = bthome_components(real["page"]["components"])
+    assert {k: c.errors for k, c in components.items() if c.errors} == {
+        "bthomedevice:200": ("parse_failed",), "bthomedevice:202": ("parse_failed",)}
+    assert all(c.errors == () for k, c in components.items() if k.startswith("bthomesensor"))
+    door = components["bthomedevice:202"]
+    report = real["notifications"][2]["params"]["bthomedevice:202"]     # the report a minute later: no "errors"
+    assert "errors" not in report and door.updated(report).errors == ("parse_failed",)
+    assert door.updated({"errors": []}).errors == () and door.updated({"errors": None}).errors == ()
 
 
 def test_never_heard_components_of_the_real_answer_give_nothing():

@@ -34,7 +34,10 @@ Shelly.GetComponents answers with the dynamic components, 10 a page, from "offse
 when the test says so: blu_packet() updates the components and notifies a bthomesensor only when its value changes;
 blu_device_report() sends the bthomedevice notification (the real one sends it at most once a minute, with the last
 packet already received). A device with nothing paired answers GetComponents with an empty list; nothing else of the
-three models changes.
+three models changes. blu_set_errors() makes the bridge unable to decode a sensor (errors ["parse_failed"] on its
+bthomedevice, as the EM Mini Gen4 did with the Motion and the Door/Window on 11 November 2026), or able again.
+restart_numbering() makes the next pairings take the numbers from 200 again, as the real bridge reuses the numbers
+freed by an unpairing (capture of 11 November 2026: bthomedevice:201 removed and added again as 201).
 """
 import copy
 from collections import defaultdict, deque
@@ -105,6 +108,8 @@ class _FakeShelly:
         self._paired: dict[str, tuple["FakeBlu", list[str]]] = {}
         self._numbers = {BTHOME_DEVICE: 199, BTHOME_SENSOR: 199}
         self._reported_battery: dict[str, float] = {}
+        self._errors: dict[str, list[str]] = {}            # blu_set_errors: the sensors this bridge cannot decode
+        self._notified_errors: dict[str, list[str]] = {}
         self._cfg_rev = 10
 
     # --- what the transport needs -------------------------------------------------------------------------------
@@ -164,6 +169,8 @@ class _FakeShelly:
         changes. The bthomedevice is updated silently: its notification is blu_device_report()."""
         sensor, keys = self._paired[addr]
         now = int(self._clock().timestamp())
+        if self._blu_errored_packet(addr, keys[0], now, rssi):
+            return
         sensor.values.update(values)
         if battery is not None and 1 in sensor.values:
             sensor.values[1] = battery                     # the obj_id 1 sensor carries the same level
@@ -180,6 +187,33 @@ class _FakeShelly:
             status.update(value=sensor.values[obj_id], last_updated_ts=now)
             if old != status["value"] or type(old) is not type(status["value"]):
                 self._notify("NotifyStatus", {key: {"last_updated_ts": now, "value": status["value"]}})
+        if self._notified_errors.get(addr):
+            # back from error, an ASSUMPTION (never seen on the bench): the packet decoded as usual, then a
+            # bthomedevice NotifyStatus with "errors": [] (after the values, the order of a normal packet in the
+            # capture), and the key gone from its status
+            device.pop("errors", None)
+            self._notified_errors[addr] = []
+            self._notify("NotifyStatus", {keys[0]: {"errors": [], "last_updated_ts": now, "rssi": rssi}})
+
+    def blu_set_errors(self, addr: str, errors: list[str]) -> None:
+        """From the next packet of this sensor on, the bridge cannot decode it (["parse_failed"], bench of 11
+        November 2026, tests/fixtures/blu_parse_failed.json), or can again ([]). Silent until that packet."""
+        self._errors[addr] = list(errors)
+
+    def _blu_errored_packet(self, addr: str, device_key: str, now: int, rssi: int) -> bool:
+        """A packet of a sensor in error (True; nothing decoded) or not (False). In error, as the real one: only the
+        bthomedevice moves (last_updated_ts, rssi; the values, packet_id and battery stay), and its NotifyStatus
+        carries "errors" only when they changed since the last notified, so the report a minute later
+        (blu_device_report) comes without them."""
+        errors, notified = self._errors.get(addr, []), self._notified_errors.get(addr, [])
+        if not errors:
+            return False
+        device = self._components[device_key]["status"]
+        device.update(last_updated_ts=now, rssi=rssi, errors=list(errors))
+        if errors != notified:
+            self._notified_errors[addr] = list(errors)
+            self._notify("NotifyStatus", {device_key: {"errors": list(errors), "last_updated_ts": now, "rssi": rssi}})
+        return True
 
     def blu_device_report(self, addr: str) -> None:
         """The bthomedevice NotifyStatus (at most one a minute on the real one): the last packet already received,
@@ -194,6 +228,12 @@ class _FakeShelly:
     def blu_keys(self, addr: str) -> list[str]:
         """The component keys of a paired sensor: the bthomedevice first, then a bthomesensor per object."""
         return list(self._paired[addr][1])
+
+    def restart_numbering(self) -> None:
+        """The next pairings are numbered from 200 again (the real bridge reuses freed numbers); only with nothing
+        paired, so no two components share a number."""
+        assert not self._paired, "restart_numbering with sensors still paired"
+        self._numbers = {BTHOME_DEVICE: 199, BTHOME_SENSOR: 199}
 
     def _next_number(self, kind: str) -> int:
         self._numbers[kind] += 1

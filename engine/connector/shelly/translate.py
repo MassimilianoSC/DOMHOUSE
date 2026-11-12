@@ -233,11 +233,22 @@ def apply_notify_status(profile: ModelProfile, last_status: Mapping, partial: Ma
 
 
 def bthome_ts(last_updated_ts, received_at: datetime, max_skew_s: float = MAX_CLOCK_SKEW_S) -> datetime | None:
-    """When a BLU packet arrived at its bridge: last_updated_ts (Unix seconds) with the rule of notification_ts, or
-    None when the component has received no packet yet (null or 0)."""
+    """When a BLU packet arrived at its bridge: last_updated_ts (Unix seconds), or None when the component has
+    received no packet yet (null or 0).
+
+    NOT the rule of notification_ts. last_updated_ts is the time the bridge received the packet, kept by the bridge:
+    a value in the PAST is kept as it is, however far (a sensor silent for hours really was silent for hours, and its
+    age against the threshold is counted from there). Only a value in the FUTURE beyond max_skew_s is not trusted and
+    becomes our reception time."""
     if isinstance(last_updated_ts, bool) or not isinstance(last_updated_ts, (int, float)) or last_updated_ts <= 0:
         return None
-    return notification_ts({"ts": last_updated_ts}, received_at, max_skew_s)
+    try:
+        packet_at = datetime.fromtimestamp(last_updated_ts, UTC)
+    except (OverflowError, OSError, ValueError):
+        return received_at
+    if (packet_at - received_at).total_seconds() > max_skew_s:
+        return received_at
+    return packet_at
 
 
 def notification_ts(params: Mapping, received_at: datetime, max_skew_s: float = MAX_CLOCK_SKEW_S) -> datetime:
@@ -270,6 +281,12 @@ def notification_ts(params: Mapping, received_at: datetime, max_skew_s: float = 
 # Before the first packet (real answer, tests/fixtures/blu_get_components_pages.json, never_heard): the bthomedevice
 # has rssi, battery, packet_id and last_updated_ts null; a bthomesensor has value null and last_updated_ts 0, not
 # null. bthome_ts reads both null and 0 as «never heard»: 0 is no packet of 1 January 1970.
+# A sensor the bridge cannot decode (bench of 11 November 2026, afternoon: Motion and Door/Window on the EM Mini Gen4 firmware
+# 1.7.0, tests/fixtures/blu_parse_failed.json): its bthomedevice carries "errors": ["parse_failed"] and still moves
+# last_updated_ts, while it has no bthomesensor at all. "errors" is in a NotifyStatus only when it changes (the
+# bthomedevice report a minute later repeats last_updated_ts and rssi without it, while GetComponents still shows it):
+# BthomeComponent.updated keeps it until a notification says otherwise. Only the bthomedevice was seen with errors;
+# BthomeComponent.errors reads it on any bthome component.
 
 BTHOME_DEVICE, BTHOME_SENSOR = "bthomedevice", "bthomesensor"
 # BTHome objects that are not a field of the contract: battery (it comes from bthomedevice.battery, battery.py),
@@ -340,6 +357,15 @@ class BthomeComponent:
     @property
     def last_updated_ts(self):
         return self.status.get("last_updated_ts")
+
+    @property
+    def errors(self) -> tuple[str, ...]:
+        """The bridge's errors for this component ("parse_failed": it cannot decode the sensor's packets), () when
+        none. A component with errors carries no packet and no value the connector may use."""
+        errors = self.status.get("errors")
+        if not isinstance(errors, list):
+            return ()
+        return tuple(e if isinstance(e, str) else "unknown" for e in errors)
 
     def updated(self, change: Mapping) -> "BthomeComponent":
         return BthomeComponent(self.key, self.addr, self.obj_id, {**self.status, **copy.deepcopy(dict(change))})

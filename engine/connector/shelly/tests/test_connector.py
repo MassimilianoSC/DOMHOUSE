@@ -171,6 +171,8 @@ def test_model_check_failing_keeps_the_catalog_profile(warnings):
 
 
 def test_snapshot_failing_keeps_the_device_online(warnings):
+    """GetStatus fails at the connection: online without a snapshot, warned once; a NotifyFullStatus that comes before
+    the next silence check (30 s here) fills the state, and nothing is tried again after it."""
     async def scenario(w):
         w.plugs[SID_A].fail_next("Shelly.GetStatus")
         w.transport.set_online(SID_A, True)
@@ -178,7 +180,26 @@ def test_snapshot_failing_keeps_the_device_online(warnings):
         assert w.info().online and kinds(w.mine()) == [("online", True)]
         w.plugs[SID_A].reboot()                     # the next full status fills the state
         await w.wait_for(lambda xs: {c.capability for c in xs if c.kind == "state"} == {"switch", "power_meter"})
+        assert [m for m, _ in warnings].count("device snapshot failed") == 1
+        assert [m for _, m, _ in w.transport.calls].count("Shelly.GetStatus") == 1
     run(scenario)
+
+
+def test_snapshot_failing_is_tried_again_at_the_silence_checks_until_it_succeeds(warnings):
+    """GetStatus fails at the connection and at the next two silence checks: warned once; the third retry gives the
+    full snapshot, and then GetStatus is not asked again."""
+    async def scenario(w):
+        for _ in range(3):
+            w.plugs[SID_A].fail_next("Shelly.GetStatus")
+        w.transport.set_online(SID_A, True)
+        await w.wait_for(lambda xs: {c.capability for c in xs if c.kind == "state"} == {"switch", "power_meter"})
+        assert kinds(w.mine()) == [("online", True), ("state", "switch"), ("state", "power_meter")]
+        assert w.mine()[2].state == {"watts": 0.0, "energy_total_wh": 1000.0}
+        assert [m for m, _ in warnings].count("device snapshot failed") == 1
+        assert [m for _, m, _ in w.transport.calls].count("Shelly.GetStatus") == 4
+        await w.settle(0.3)                         # several silence checks later: no more GetStatus
+        assert [m for _, m, _ in w.transport.calls].count("Shelly.GetStatus") == 4 and w.info().online
+    run(scenario, silence_check_s=0.05)
 
 
 # --- notifications -----------------------------------------------------------------------------------------------
@@ -1025,8 +1046,8 @@ GET_COMPONENTS_DELAY = timedelta(seconds=2)             # a page of the bench's 
 
 def slow_get_components(w, untrusted_ts_addr=None):
     """Every GetComponents page takes 2 s on the shared clock; returns the clock at the end of each page. With
-    untrusted_ts_addr, that sensor's bthomesensors answer with a value and a last_updated_ts 1000 s off (beyond
-    MAX_CLOCK_SKEW_S): the connector must fall back on its own time."""
+    untrusted_ts_addr, that sensor's bthomesensors answer with a value and a last_updated_ts 1000 s in the FUTURE
+    (beyond MAX_CLOCK_SKEW_S; one in the past is kept, however far): the connector must fall back on its own time."""
     ends = []
     real_call = w.transport.call
 
@@ -1039,7 +1060,7 @@ def slow_get_components(w, untrusted_ts_addr=None):
         for c in page["components"]:
             if c["config"]["addr"] == untrusted_ts_addr and c["key"].startswith("bthomesensor"):
                 c["status"].update(value=c["status"]["value"] if c["status"]["value"] is not None else False,
-                                   last_updated_ts=int((datetime.now(UTC) + w.shift).timestamp()) - 1000)
+                                   last_updated_ts=int((datetime.now(UTC) + w.shift).timestamp()) + 1000)
         ends.append(datetime.now(UTC) + w.shift)
         return page
     w.transport.call = call
@@ -1094,4 +1115,210 @@ def test_blu_component_added_fallback_time_is_after_the_slow_get_components():
         for c in motion:
             assert ends[0] <= c.ts < ends[0] + timedelta(seconds=1), (c, ends)
         assert_ts_never_go_back(w.changes)
+    run_blu(scenario, sensors=(DEV_MOTION,))
+
+
+# --- the age of a BLU sensor is its last packet, as the bridge dates it (translate.bthome_ts) ------------------------
+
+def last_packet(w, addr):
+    """The sensor's last packet as the fake bridge dates it (its bthomedevice's last_updated_ts)."""
+    page = w.bridge.handle("Shelly.GetComponents", {"dynamic_only": True})["components"]
+    key = w.bridge.blu_keys(addr)[0]
+    return datetime.fromtimestamp(next(c for c in page if c["key"] == key)["status"]["last_updated_ts"], UTC)
+
+
+def test_blu_bridge_back_with_a_sensor_silent_beyond_its_threshold_keeps_it_offline():
+    """The bridge comes back and the H&T's last packet is 400 s old: beyond its 300 s, and beyond MAX_CLOCK_SKEW_S.
+    That packet is not «now»: the H&T stays offline and sends nothing, not its old values."""
+    async def scenario(w):
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0, 46: 40}, battery=90)
+        packet = last_packet(w, ADDR_HT)
+        w.shift = timedelta(seconds=400)
+        await w.connect_bridge()
+        await w.settle(0.2)                                  # silence checks too
+        assert w.blu() == []
+        ht = w.info(DEV_HT)
+        assert not ht.online and ht.last_seen == packet and ht.capabilities == {"temperature": {}, "humidity": {}}
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_bridge_back_with_a_packet_within_the_threshold_but_older_than_the_skew():
+    """The contact's last packet is 600 s old: older than MAX_CLOCK_SKEW_S (300 s), within its 920 s. Online with
+    its snapshot, its age counted from the real packet; the ts of the stream still never goes back."""
+    async def scenario(w):
+        w.pair(ADDR_DOOR)
+        w.bridge.blu_packet(ADDR_DOOR, {45: True}, battery=90)
+        packet = last_packet(w, ADDR_DOOR)
+        w.shift = timedelta(seconds=600)
+        await w.connect_bridge()
+        assert w.blu() == [(DEV_DOOR, "online", True, None), (DEV_DOOR, "state", "contact", {"open": True})]
+        assert w.info(DEV_DOOR).online and w.info(DEV_DOOR).last_seen == packet
+        assert_ts_never_go_back(w.changes)
+        w.shift = timedelta(seconds=600 + 310)               # 910 s after its packet: within 920
+        await w.settle(0.2)
+        assert w.info(DEV_DOOR).online
+        w.shift = timedelta(seconds=600 + 330)               # 930 s after it: offline, counted from the real packet
+        await w.wait_for(lambda xs: w.blu()[-1] == (DEV_DOOR, "online", False, None))
+    run_blu(scenario, sensors=(DEV_DOOR,))
+
+
+# --- the map of a bridge does not outlive its connection -------------------------------------------------------------
+
+def test_blu_map_is_forgotten_while_the_bridge_is_offline():
+    """While the bridge is offline its sensors are paired again, and the numbers now name other measures: the old
+    H&T temperature (bthomesensor:202) is now the Door/Window's rotation. Back online, GetComponents fails once: a
+    notification with the old numbers gives nothing (no old map); after the retry the new numbers work."""
+    async def scenario(w):
+        w.pair(ADDR_HT, ADDR_DOOR)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0, 46: 40})
+        w.bridge.blu_packet(ADDR_DOOR, {45: True})
+        await w.connect_bridge()
+        old_temperature = w.bridge.blu_keys(ADDR_HT)[3]                  # objects 1, 46, 69: the temperature
+        assert old_temperature == "bthomesensor:202"
+        w.transport.set_online(SID_BRIDGE, False)
+        await w.wait_for(lambda xs: (DEV_DOOR, "online", False, None) in w.blu())
+        w.bridge.unpair(ADDR_HT)
+        w.bridge.unpair(ADDR_DOOR)
+        w.bridge.restart_numbering()
+        w.pair(ADDR_DOOR, ADDR_HT)
+        assert w.bridge.blu_keys(ADDR_DOOR)[3] == old_temperature        # objects 1, 45, 63, 100: the rotation
+        w.bridge.fail_next("Shelly.GetComponents")
+        start = len(w.changes)
+        w.transport.set_online(SID_BRIDGE, True)
+        now = datetime.now(UTC) + w.shift                   # right after the connection, before any silence check
+        w.transport.inject(Notification("NotifyStatus", SID_BRIDGE, {
+            "ts": now.timestamp(), old_temperature: {"last_updated_ts": int(now.timestamp()), "value": 25.0}}, now))
+        await w.wait_for(lambda xs: len(w.get_components_offsets()) >= 3)   # connection, failure, retry
+        await w.settle()
+        w.bridge.blu_packet(ADDR_HT, {69: 22.0})
+        w.bridge.blu_packet(ADDR_DOOR, {45: False, 63: 25.0})
+        await w.wait_for(lambda xs: (DEV_DOOR, "state", "contact", {"open": False}) in w.blu(start))
+        await w.wait_for(lambda xs: (DEV_HT, "state", "temperature", {"celsius": 22.0}) in w.blu(start))
+        assert not any(c[3] == {"celsius": 25.0} for c in w.blu(start)), w.blu(start)
+        assert w.info(DEV_HT).capabilities["temperature"] == {"celsius": 22.0}
+    run_blu(scenario, sensors=(DEV_HT, DEV_DOOR))
+
+
+# --- the battery, from both sources --------------------------------------------------------------------------------
+
+def test_blu_battery_from_both_sources_the_last_one_counts(warnings):
+    """bthomedevice.battery and the obj_id 1 bthomesensor arrive in turn: the last that arrived counts. A bthomedevice
+    report without battery leaves the level as it is. «battery low» once, again only after a new battery."""
+    async def scenario(w):
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0, 46: 40}, battery=80)
+        await w.connect_bridge()
+        assert w.info(DEV_HT).battery_percent == 80.0
+        device_key, battery_key = w.bridge.blu_keys(ADDR_HT)[:2]          # bthomedevice, obj_id 1
+
+        async def arrives(key, change, expected):
+            now = datetime.now(UTC) + w.shift
+            change = {"last_updated_ts": int(now.timestamp()), **change}
+            w.transport.inject(Notification("NotifyStatus", SID_BRIDGE, {"ts": now.timestamp(), key: change}, now))
+            await w.settle(0.05)
+            assert w.info(DEV_HT).battery_percent == expected, (key, change)
+
+        await arrives(battery_key, {"value": 70}, 70.0)
+        await arrives(device_key, {"battery": 60, "rssi": -60}, 60.0)
+        await arrives(battery_key, {"value": 50}, 50.0)
+        await arrives(device_key, {"packet_id": 9, "rssi": -61}, 50.0)   # no battery: not the older 60
+        await arrives(device_key, {"battery": 14, "rssi": -60}, 14.0)    # low: warned
+        await arrives(battery_key, {"value": 12}, 12.0)                  # still low: not again
+        await arrives(battery_key, {"value": 100}, 100.0)                # a new battery
+        await arrives(device_key, {"battery": 10, "rssi": -60}, 10.0)    # low again: warned again
+        assert [f for m, f in warnings if m == "battery low"] == [{"device_id": DEV_HT, "percent": 14.0},
+                                                                  {"device_id": DEV_HT, "percent": 10.0}]
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_battery_of_the_snapshot_is_the_newest_packets():
+    """At the snapshot both sources are read at once: the component with the newest packet gives the level."""
+    async def scenario(w):
+        page = copy.deepcopy(REAL_PAGES["pages"])
+        for component in (c for p in page for c in p["components"]):
+            if component["config"]["addr"] != ADDR_HT:
+                continue
+            if component["key"].startswith("bthomedevice"):
+                component["status"].update(battery=40, last_updated_ts=1794397000)    # older
+            elif component["config"]["obj_id"] == 1:
+                component["status"].update(value=35, last_updated_ts=1794397064)      # newer
+        real_pages_world(w, page)
+        await w.connect_bridge()
+        assert w.info(DEV_HT).battery_percent == 35.0
+    run_blu(scenario)
+
+
+# --- a sensor its bridge cannot decode (errors: ["parse_failed"]) -------------------------------------------------
+
+PARSE_FAILED = json.loads((Path(__file__).with_name("fixtures") / "blu_parse_failed.json").read_text(encoding="utf-8"))
+PARSE_FAILED_AT = datetime.fromtimestamp(1794414510, UTC)  # 10 s after the H&T's packet of the real page
+
+
+def errors_warnings(warnings):
+    return [f for m, f in warnings if m == "blu sensor errors on its bridge"]
+
+
+def test_blu_sensors_in_error_in_the_snapshot_stay_offline_with_one_warning(warnings):
+    """The real answer of the EM Mini: the Motion and the Door/Window in parse_failed, packets 526 and 813 s old
+    (within their thresholds), no bthomesensor; the H&T healthy. The H&T is online with its snapshot; the other two
+    stay offline, warned once each with the bridge's error. The notifications of the capture change nothing."""
+    async def scenario(w):
+        w.shift = PARSE_FAILED_AT - datetime.now(UTC)
+        w.bridge._get_components = lambda params: copy.deepcopy(PARSE_FAILED["page"])
+        await w.connect_bridge()
+        assert w.blu() == [(DEV_HT, "online", True, None), (DEV_HT, "state", "temperature", {"celsius": 20.4}),
+                           (DEV_HT, "state", "humidity", {"percent": 57.0})]
+        for device_id in (DEV_MOTION, DEV_DOOR):
+            info = w.info(device_id)
+            assert (info.online, info.last_seen, info.battery_percent) == (False, None, None), device_id
+        assert errors_warnings(warnings) == [
+            {"device_id": DEV_MOTION, "bridge_device_id": DEV_BRIDGE, "errors": "parse_failed"},
+            {"device_id": DEV_DOOR, "bridge_device_id": DEV_BRIDGE, "errors": "parse_failed"}]
+        count = len(w.changes)
+        for n in PARSE_FAILED["notifications"]:
+            w.transport.inject(Notification(n["method"], SID_BRIDGE, n["params"], datetime.now(UTC) + w.shift))
+        await w.settle(0.2)
+        assert len(w.changes) == count and len(errors_warnings(warnings)) == 2
+        assert not w.info(DEV_MOTION).online and not w.info(DEV_DOOR).online
+    run_blu(scenario)
+
+
+def test_blu_sensor_entering_error_goes_offline_at_its_threshold_and_comes_back_when_it_is_gone(warnings):
+    """A healthy Motion enters parse_failed: its packets go on reaching the bridge, none counts. Offline at its
+    threshold from the last good packet, warned once; the error gone, the next packet brings it online with its
+    snapshot; the error back, warned again."""
+    async def scenario(w):
+        w.pair(ADDR_MOTION)
+        w.bridge.blu_packet(ADDR_MOTION, {33: False}, battery=100)
+        good = last_packet(w, ADDR_MOTION)
+        await w.connect_bridge()
+        start = len(w.changes)
+        w.bridge.blu_set_errors(ADDR_MOTION, ["parse_failed"])
+        for n in range(1, 4):                               # a packet every 900 s, the bridge reporting each
+            w.shift = timedelta(seconds=900 * n)
+            w.bridge.blu_packet(ADDR_MOTION, {33: True})
+            w.bridge.blu_device_report(ADDR_MOTION)
+            await w.settle(0.1)
+        assert last_packet(w, ADDR_MOTION) > good           # the bridge's last_updated_ts moved...
+        assert w.info(DEV_MOTION).last_seen == good         # ...the connector's last packet did not
+        assert w.info(DEV_MOTION).online and w.blu(start) == []      # 2700 s: within its 2720 s
+        assert errors_warnings(warnings) == [
+            {"device_id": DEV_MOTION, "bridge_device_id": DEV_BRIDGE, "errors": "parse_failed"}]
+        w.shift = timedelta(seconds=2725)
+        await w.wait_for(lambda xs: w.blu(start) == [(DEV_MOTION, "online", False, None)])
+        assert ("device silent beyond threshold", DEV_MOTION) in [(m, f.get("device_id")) for m, f in warnings]
+        w.bridge.blu_set_errors(ADDR_MOTION, [])            # decoded again
+        w.shift = timedelta(seconds=2800)
+        w.bridge.blu_packet(ADDR_MOTION, {33: True})
+        await w.wait_for(lambda xs: len(w.blu(start)) == 3)
+        assert w.blu(start)[1:] == [(DEV_MOTION, "online", True, None),
+                                    (DEV_MOTION, "state", "motion", {"detected": True})]
+        await w.settle()
+        assert w.info(DEV_MOTION).online and len(errors_warnings(warnings)) == 1
+        w.bridge.blu_set_errors(ADDR_MOTION, ["parse_failed"])       # and back again: a new warning
+        w.shift = timedelta(seconds=2900)
+        w.bridge.blu_packet(ADDR_MOTION, {33: False})
+        await w.wait_for(lambda xs: len(errors_warnings(warnings)) == 2)
+        assert w.blu(start)[3:] == []                       # no state from the packet in error
     run_blu(scenario, sensors=(DEV_MOTION,))

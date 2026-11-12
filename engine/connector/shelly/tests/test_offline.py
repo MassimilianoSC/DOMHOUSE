@@ -12,6 +12,8 @@ from engine.connector.shelly.offline import (CONTRACT_DEFAULT_S, DEFAULT_PATH, D
 BEACON_S = {"blu_ht": 60, "blu_door_window": 300, "blu_motion": 900}
 # the rule of offline_thresholds.toml: three beacon periods plus 20 s of radio delay for the third beacon
 MARGIN_S = 20
+# the exceptions to the rule, decided in the review of PR #7: the H&T regulates the heating, a false offline stops it
+RULE_EXCEPTIONS_S = {"blu_ht": 300}
 
 
 def types_toml(**override) -> str:
@@ -50,7 +52,7 @@ def test_silence_equal_to_the_threshold_is_still_online():
     assert not is_offline(0.0, 120.0)
 
 
-@pytest.mark.parametrize("kind", sorted(BEACON_S))
+@pytest.mark.parametrize("kind", sorted(set(BEACON_S) - set(RULE_EXCEPTIONS_S)))
 def test_battery_sensors_survive_two_missed_beacons_and_go_offline_at_the_third(kind):
     """Silence counts from the last beacon received. A healthy BLU sensor misses a beacon now and then (radio): with
     two missed and the third arriving up to MARGIN_S late it stays online; when the third is missed too it goes
@@ -64,6 +66,17 @@ def test_battery_sensors_survive_two_missed_beacons_and_go_offline_at_the_third(
     assert not is_offline(3 * beacon + MARGIN_S, threshold)       # the third late by the whole margin: the boundary
     assert is_offline(3 * beacon + MARGIN_S + 0.001, threshold)   # just past the boundary
     assert is_offline(4 * beacon - 1, threshold)                  # three missed: offline before the fourth is due
+
+
+def test_ht_threshold_is_the_exception_300_s():
+    """The H&T (a beacon every 60 s) is the sensor of the heating: 300 s, not the rule's 3 × 60 + 20 = 200. Four
+    beacons missed and the fifth on time still online; offline only past 300 s."""
+    beacon, threshold = BEACON_S["blu_ht"], load_thresholds().for_device(device("blu_ht"))
+    assert threshold == RULE_EXCEPTIONS_S["blu_ht"] == 300.0
+    assert threshold > 3 * beacon + MARGIN_S
+    assert not is_offline(5 * beacon, threshold)                  # four missed, the fifth on time
+    assert not is_offline(300.0, threshold)                       # the boundary
+    assert is_offline(300.001, threshold)
 
 
 def test_motion_is_not_declared_offline_between_beacons():

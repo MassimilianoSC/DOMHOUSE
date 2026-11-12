@@ -21,8 +21,10 @@ plug = 120
 energy_meter = 120
 # emettitore a infrarossi (Broadlink RM4 Mini o Athom): alimentato, keep-alive del trasporto
 ir_blaster = 120
-# BLU H&T ZB: beacon ogni 60 s (3 × 60 + 20)
-blu_ht = 200
+# BLU H&T ZB: beacon ogni 60 s. ECCEZIONE alla regola «tre beacon persi + 20 s» (che darebbe 3 × 60 + 20 = 200):
+# 300 s, deciso da Massimiliano nella revisione della PR #7. È il sensore che regola il riscaldamento (links.sensor_device_id
+# della caldaia): un falso offline ferma la regolazione, e qualche beacon perso in più non deve bastare a causarlo.
+blu_ht = 300
 # BLU Door/Window ZB: la documentazione dava un beacon ogni 60 s, ma il contatto misurato a riposo trasmette ogni
 # ~300 s (302 s, due volte, laboratorio dell'11 novembre 2026), più invio immediato su apertura/chiusura (3 × 300 + 20)
 blu_door_window = 920

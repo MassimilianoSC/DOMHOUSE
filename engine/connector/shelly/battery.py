@@ -17,25 +17,28 @@ BTHOME_BATTERY_OBJ_ID = 1      # BTHome object 0x01: battery level in percent
 LOW_PERCENT = 15.0             # the sensors' own «battery low» flag (Zigbee IAS Zone bit 3) is at <= 15 %
 
 
+def battery_level(value) -> float | None:
+    """A battery percent as reported (an integer 0-100) -> float, clamped to 0-100; None for null or another type."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(min(100, max(0, value)))
+
+
 def battery_from_bthome_sensor(status: dict) -> float | None:
     """The battery level in a BTHomeSensor status (`{"id": 200, "obj_id": 1, "value": 93, ...}`), or None when the
     component is another sensor (temperature, humidity, window...) or carries no usable value."""
     if status.get("obj_id") != BTHOME_BATTERY_OBJ_ID:
         return None
-    value = status.get("value")
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return float(min(100, max(0, value)))
+    return battery_level(status.get("value"))
 
 
 def battery_from_bthome_device(status: dict) -> float | None:
-    """The battery level in a BTHomeDevice status (`{"id": 200, "battery": 100, "packet_id": 16, ...}`), the source
-    the ShellyConnector uses for the BLU sensors (the same level as the obj_id 1 sensor, one component per sensor), or
-    None when the status carries none (the notifications carry it only now and then)."""
+    """The battery level in a BTHomeDevice status (`{"id": 200, "battery": 100, "packet_id": 16, ...}`), or None when
+    the status carries none (the notifications carry it only now and then). The ShellyConnector reads both sources,
+    this one and the obj_id 1 BTHomeSensor (the bthomesensor's value, with battery_level), into one BatteryTracker:
+    the last value that arrived counts."""
     value = status.get("battery") if isinstance(status, dict) else None
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
-        return None
-    return float(min(100, max(0, value)))
+    return battery_level(value)
 
 
 @dataclass

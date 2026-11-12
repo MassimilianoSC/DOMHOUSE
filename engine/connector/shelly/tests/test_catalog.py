@@ -370,7 +370,7 @@ def test_catalog_with_a_bridge_and_three_blu_sensors(tmp_path: Path):
     assert {d.blu.bridge for d in (ht, motion, door)} == {"shelly1g4-000000000002"}
     assert (ht.shelly_id, ht.profile, ht.blu.model.device_type) == (None, None, "blu_ht")
     assert ht.capabilities == {"temperature": {}, "humidity": {}} and motion.capabilities == {"motion": {}}
-    assert ht.offline_after_s == THRESHOLDS.by_type["blu_ht"] == 200.0
+    assert ht.offline_after_s == THRESHOLDS.by_type["blu_ht"] == 300.0
     assert motion.offline_after_s == THRESHOLDS.by_type["blu_motion"] == 2720.0
     assert THRESHOLDS.by_type["blu_door_window"] == 920.0 and door.offline_after_s == 1000.0    # the override
     assert set(cat.by_shelly_id()) == {"shellyplugmg3-000000000001", "shelly1g4-000000000002",
