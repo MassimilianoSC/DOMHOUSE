@@ -53,8 +53,15 @@ holds. Read only: execute() refuses them (no command). In detail:
     bridge without sensors in the catalog is never asked. A failed GetComponents is warned once and tried again at
     the silence checks;
   - the age of a packet is counted on the BRIDGE's clock, which wrote its last_updated_ts: for every bridge the
-    connector keeps the offset of its clock from ours (bridge minus ours), renewed by every message carrying the
-    bridge's time (the "ts" of its notifications, the sys.unixtime of each Shelly.GetStatus). The packet's time on our
+    connector keeps the offset of its clock from ours (bridge minus ours), renewed only by the sources of the bridge's
+    time found reliable: the sys.unixtime of each Shelly.GetStatus and the "ts" of a NotifyStatus carrying at least a
+    bthomedevice or bthomesensor component. The other notifications never touch it: on the bench an EM Mini Gen4 sends
+    its em1:0 with a ts about 13.5 s behind, and a Shelly 1 Gen4 its first NotifyFullStatus after a restart about
+    1750 s off (an H&T silent for 29 minutes would look alive). A missing or null time (a device without its time yet)
+    changes nothing; an offset beyond CLOCK_OFFSET_IMPLAUSIBLE_S (a day) is not adopted, the offset of before stays
+    (or none), warned once per bridge ("bridge clock implausible"), again only after a plausible one came. The
+    offset is forgotten when the bridge goes offline (it may come back restarted, with another clock), with its
+    "bridge clock off" warning. The packet's time on our
     clock is last_updated_ts - offset, never later than its reception (translate.bthome_ts), and it is both the
     sensor's last packet and the ts of its changes; so a bridge 400 s behind does not keep offline a sensor that
     sends every minute, and a packet hours old is still hours old, never «now». The same for the notifications and
@@ -79,8 +86,13 @@ holds. Read only: execute() refuses them (no command). In detail:
     bridge's errors, again only after they were gone and came back. The errors stay on a component until a
     notification carries "errors" again (empty: gone) or GetComponents reads it without them. How the bridge tells
     that they are gone was never seen, so while a catalog sensor of the bridge has errors GetComponents is read again
-    at every silence check (one read per check, no warning repeated): the read without them brings the sensor back,
-    online with its snapshot when its last packet is within its threshold;
+    at a silence check, at most every ERRORS_REREAD_INTERVAL_S (5 minutes) per bridge, counted from the last attempt
+    to read the map of any kind (the connection's, a pairing's, a read for errors; no warning repeated): a sensor in
+    error that then goes silent for good (a flat battery) costs one read every 5 minutes, and the bridge's worker,
+    held up during a read, keeps the notifications of its own relay or meter waiting at most once in that time. The
+    read without the errors brings the sensor back, online with its snapshot when its last packet is within its
+    threshold. The retry after a failed read at the connection or at a pairing (the map is missing) stays at every
+    check;
   - offline: at once when the bridge goes offline (or is rejected); with the bridge online, when the last packet is
     older than the threshold of the sensor's type (checked with the bridge's silence tick, or found by a read of the
     map: warned "device silent beyond threshold" either way). A packet that arrives
@@ -121,12 +133,19 @@ from .transport.base import ConnectionEvent, Notification, Transport, TransportE
 
 SILENCE_CHECK_MIN_S, SILENCE_CHECK_MAX_S = 1.0, 30.0
 CLOCK_OFFSET_IGNORED_S = 2.0       # a bridge's clock offset below this is the transport's delay and rounding
+CLOCK_OFFSET_IMPLAUSIBLE_S = 86_400.0   # a bridge's clock offset beyond a day is no clock: never adopted, warned
+ERRORS_REREAD_INTERVAL_S = 300.0   # a catalog sensor in error: its bridge's GetComponents read again at most this often
 GET_COMPONENTS_MAX_PAGES = 20      # 10 components a page: far more than a bridge carries; stops a bridge that loops
 _STOP = object()
 
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _carries_bthome(params: dict) -> bool:
+    """A notification with at least one bthomedevice or bthomesensor component."""
+    return any(key.split(":", 1)[0] in (BTHOME_DEVICE, BTHOME_SENSOR) for key in params)
 
 
 def _packet_order(component: BthomeComponent) -> float:
@@ -165,10 +184,12 @@ class _Device:
         self.sensors: dict[str, "_Device"] = {}
         self.components: dict[str, BthomeComponent] | None = None
         self.components_failed = False   # the last GetComponents failed: tried again at the next silence check
+        self.components_read_at: datetime | None = None   # the last attempt to read the map, of any kind
         self.unknown_addrs: set[str] = set()   # sensors on the bridge but not in the catalog, already warned
         # a bridge: its clock minus ours (s), from the last message carrying its time; None until one came
         self.clock_offset_s: float | None = None
         self.clock_warned = False        # the offset is beyond MAX_CLOCK_SKEW_S, warned until it is back within
+        self.clock_implausible_warned = False   # an offset beyond CLOCK_OFFSET_IMPLAUSIBLE_S came: warned
         # a BLU sensor: last_seen is its last packet (last_updated_ts); missing_warned: not on its bridge, warned;
         # errors_warned: its bridge reports errors for it (parse_failed), warned until they are gone
         self.missing_warned = False
@@ -179,11 +200,13 @@ class ShellyConnector:
     api_version = CONNECTOR_API_VERSION
 
     def __init__(self, catalog: Catalog, transport: Transport, *, clock: Callable[[], datetime] = utcnow,
-                 silence_check_s: float | None = None, rpc_timeout_s: float = RPC_TIMEOUT_S):
+                 silence_check_s: float | None = None, rpc_timeout_s: float = RPC_TIMEOUT_S,
+                 errors_reread_s: float = ERRORS_REREAD_INTERVAL_S):
         self._catalog = catalog
         self._transport = transport
         self._clock = clock
         self._rpc_timeout_s = rpc_timeout_s
+        self._errors_reread_s = errors_reread_s
         self._devices = {d.device_id: _Device(d) for d in catalog.devices}
         self._by_shelly = {d.entry.shelly_id: d for d in self._devices.values() if d.entry.blu is None}
         for device in self._devices.values():
@@ -341,9 +364,10 @@ class ShellyConnector:
             if device.sensors and device.online:
                 if device.components_failed:
                     await self._read_components(device, snapshot=True)
-                elif self._blu_errors_pending(device):
+                elif self._blu_errors_pending(device) and self._errors_reread_due(device, item.now):
                     # a sensor in error: its return may never be notified ("errors": [] was never seen), so the map
-                    # is read again, once per check; only a sensor that comes back sends online and its snapshot
+                    # is read again, at most every errors_reread_s; only a sensor that comes back sends online and
+                    # its snapshot
                     await self._read_components(device, snapshot=False)
                 self._check_blu_silence(device, item.now)
             return
@@ -364,7 +388,9 @@ class ShellyConnector:
         if device.rejected:
             return                                  # not the catalog's model: ignored until it connects again
         device.last_seen = item.received_at
-        if device.sensors:
+        if device.sensors and item.method == "NotifyStatus" and _carries_bthome(item.params):
+            # only these carry the bridge's time well: an EM Mini's em1:0 comes ~13.5 s behind, the first
+            # NotifyFullStatus after a restart ~1750 s off (bench), and the sensors' age is counted with this offset
             self._bridge_clock(device, item.params.get("ts"), item.received_at)
         if not device.online:
             if item.shelly_id not in self._transport.connected():
@@ -465,17 +491,30 @@ class ShellyConnector:
         # a bridge: its map is forgotten (sensors may be paired again meanwhile, with other numbers; it is read again
         # when it comes back), and its BLU sensors cannot be reached any more (§2.6)
         device.components = None
+        # and its clock: it may come back restarted, with another clock; until a time of its own comes (GetStatus,
+        # a bthome notification) our clock is used, not the offset of before
+        device.clock_offset_s = None
+        device.clock_warned = False
         for sensor in device.sensors.values():
             self._blu_offline(sensor, at)
 
     # ---- BLU sensors, in the worker of their bridge (translate.py, «Shelly BLU sensors») ------------------------
     def _bridge_clock(self, bridge: _Device, bridge_time, at: datetime) -> None:
-        """A message carrying the bridge's time (a notification's ts, GetStatus's sys.unixtime) at our time `at`: the
-        offset of its clock, with which its last_updated_ts are read. Warned once when beyond MAX_CLOCK_SKEW_S, again
+        """A message carrying the bridge's time (the ts of a NotifyStatus with bthome components, GetStatus's
+        sys.unixtime) at our time `at`: the offset of its clock, with which its last_updated_ts are read. A missing or
+        null time (a device without its time yet) changes nothing. An offset beyond CLOCK_OFFSET_IMPLAUSIBLE_S is no
+        clock: not adopted (the one of before stays, or none), warned once ("bridge clock implausible"), again only
+        after a plausible one came. Beyond MAX_CLOCK_SKEW_S it is adopted and warned once ("bridge clock off"), again
         only after it was back within and went out again."""
         if isinstance(bridge_time, bool) or not isinstance(bridge_time, (int, float)) or bridge_time <= 0:
             return
         offset = bridge_time - at.timestamp()
+        if abs(offset) > CLOCK_OFFSET_IMPLAUSIBLE_S:
+            if not bridge.clock_implausible_warned:
+                bridge.clock_implausible_warned = True
+                log.warn("bridge clock implausible", device_id=bridge.entry.device_id, offset_s=round(offset))
+            return
+        bridge.clock_implausible_warned = False
         bridge.clock_offset_s = offset
         if abs(offset) <= MAX_CLOCK_SKEW_S:
             bridge.clock_warned = False
@@ -495,10 +534,17 @@ class ShellyConnector:
         return self._by_shelly[sensor.entry.blu.bridge]
 
     def _blu_errors_pending(self, bridge: _Device) -> bool:
-        """A catalog sensor of the bridge is in error in the map: its return is read with GetComponents at every
-        silence check, as the bridge may never notify "errors": []."""
+        """A catalog sensor of the bridge is in error in the map: its return is read with GetComponents at the
+        silence checks, at most every errors_reread_s, as the bridge may never notify "errors": []."""
         return bridge.components is not None and any(
             c.errors for c in bridge.components.values() if c.addr in bridge.sensors)
+
+    def _errors_reread_due(self, bridge: _Device, now: datetime) -> bool:
+        """errors_reread_s have passed since the last attempt to read the map, of any kind (the connection's, a
+        pairing's, a read for errors): a sensor in error that went silent for good costs one read every
+        errors_reread_s, not one at every check, and the bridge's worker is not held up at every check."""
+        last = bridge.components_read_at
+        return last is None or (now - last).total_seconds() >= self._errors_reread_s
 
     async def _get_components(self, shelly_id: str) -> dict[str, BthomeComponent]:
         """Shelly.GetComponents {"dynamic_only": true}, every page (10 components a page), -> the bthome ones."""
@@ -523,6 +569,7 @@ class ShellyConnector:
         The time of the data is taken AFTER the last page: the pages take up to a few seconds (the bench's Shelly 1
         answered in up to 2.3 s), and a time taken before would date the data before they arrived. It is only the
         fallback: a component's own valid last_updated_ts dates its packet."""
+        bridge.components_read_at = self._clock()
         try:
             components = await self._get_components(bridge.entry.shelly_id)
         except TransportError as exc:
