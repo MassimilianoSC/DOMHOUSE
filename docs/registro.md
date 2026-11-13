@@ -79,6 +79,15 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
   - `2a93426`: lab-01 si può installare prima della tappa A, perché basta il filtro per id in R2 e R4; le cautele sono nel rischio 9.
   - Domande per il committente: 1117 (porta 8169 o 8101), poi il cambio della password (VM o a mano) e la password dei prossimi apparecchi.
 - **Tappa B, passo 1.1 (committente, 15:42): VM come attesa.** Sono attivi solo `engine-dev` (8100) e `domhouse-broker` (8883); `dev` è a `engine:247fda0`; `compose.broker.yaml` c'è; `SHELLY_MQTT_HOST` è presente 1 volta. Memoria: available 1293 MB. Broker: appartamenti 1, devices 1, connectors 1, `cert_days=86`. **Risposta 1117 = a (15:44):** il motore `lab-01` va sulla porta **8169**. Prima di una prova di carico va spento.
+- **Tappa B, passi 1.1 bis–3.2 (committente, 15:44–15:50): il motore `lab-01` vede la presa di Youssouf. È il primo contatto vero fra il motore e il dispositivo.**
+  - 1.1 bis: `INSTANCE_ALLOWED` = `10.198.0.2:8100,10.198.0.2:8150-8169`.
+  - 1.2: `langbrain-shelly-lab-01` alla versione 1 e `-devices` alla 2, entrambi abilitati; `langbrain-api-key-lab-01` dava NOT_FOUND.
+  - 2.1: chiave creata, versione 1.
+  - 2.2: lettori `langbrain-vm@` e `domotica-bff-staging@`, e nessun altro. Il 2.3 non è servito, perché l'elenco era già nell'uscita.
+  - 3.0.1: catalogo valido; il connector sul PC è uguale a quello di `247fda0`.
+  - 3.0.2 e 3.0.3: `/data/lab-01/catalog.yaml` a `10001:10001` con permessi 640.
+  - 3.1: `install lab-01 8169 engine:247fda0 shelly`, timer attivi, «health 200: ok … connector up».
+  - 3.2: `/health` dà `connected_devices` 1. `/devices` mostra `dev-presa-lab` online, `switch.on` true, `power_meter` 12,6 W e `kwh_today` 0,0. Il broker dice «New client connected … u'lab-01.connector'» (14:49:16 UTC). Nessun avviso nel motore. Memoria available da 1293 a 1205 MB (−88 MB, misurato).
 - **Proposta al cliente, frase da precisare (07:03, domanda del committente):** il passo 10 della giornata dice «Se l'ospite proverà ad accendere il clima, sarà bloccato». Nel motore: un clima acceso col telecomando con la finestra aperta viene visto solo dal suo misuratore di consumo (`_power_seen`, D14) e rispento dalla regola finestra entro circa un minuto (`_keep_window_off`, D03); senza misuratore collegato non viene visto; durante una forzatura la regola è sospesa. Non è un difetto: in una prossima versione della proposta scrivere «il motore lo rispegnerà entro un minuto». La differenza con i limiti di temperatura: accensione e spegnimento si vedono dal consumo, la temperatura scelta col telecomando no.
 - **Raccomandazione di o1:** V1 + 1-bis + testo nello stesso lotto, o1 circa 8–11 h, o2 circa 1,5–2 h, più la guida.
 - **Risposta 1097 = a (07:00):** valori iniziali di «Limiti del setpoint»: massimo da 24 a 26, raffrescamento resta 25 (D-162). Avviati V1 + 1-bis + testo (D-198): o1 motore e BFF, o2 sito; testo della regola sulla base della proposta di o2 (antigelo escluso, telecomando escluso).
