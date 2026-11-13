@@ -98,6 +98,8 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     expect(actionLabel("booking_event_stale")).toBe("Prenotazione: evento vecchio ignorato");
     // P-83, D16 (o1): dispositivo non raggiungibile durante il passaggio di modalità, il comando parte al suo ritorno
     expect(actionLabel("mode_device_pending")).toBe("Modalità: comando in sospeso");
+    // 1097 = a, o1 V1: regole salvate con le temperature delle modalità fuori da minimo e massimo (una per episodio)
+    expect(actionLabel("limits_modes_outside")).toBe("Modalità: temperature fuori dai limiti");
   });
 
   it("ogni azione che il motore scrive nelle decisioni è nell'elenco del sito (controllo automatico, lotto 39)", () => {

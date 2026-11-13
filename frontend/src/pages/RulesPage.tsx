@@ -127,17 +127,30 @@ export default function RulesPage() {
   const hasErrors = rules.some((r) => Object.keys(paramErrors(r, draft[r.rule_id])).length > 0);
   const sl = rules.find((r) => r.rule_id === "setpoint_limits");
   const slEff = sl ? effective(sl, draft[sl.rule_id]).params : null;
-  // The same checks as the engine, before saving, with its sentences (lotto 30): min ≤ max, and for an engine that has
-  // the temperatures of the modes, eco ≤ comfort < cooling.
+  // The same checks as the engine, before saving, with its sentences, in its order (lotto 30; 1096/1097 = a, o1 V1):
+  // min ≤ eco ≤ comfort < cooling ≤ max. The three of lotto 30 always; the two of the chain's ends (eco under the
+  // minimum, cooling over the maximum) only when the change touches «Limiti del setpoint», as the engine does: rules
+  // saved before that break them (the old max 24 under cooling 25) are said as a warning, and another rule still saves.
   const has = (k: string) => slEff !== null && typeof slEff[k] === "number";
-  const rangeErrors = slEff
+  const slTouched = Boolean(sl && patches.some((p) => p.rule_id === sl.rule_id));
+  const always = slEff
     ? [
         slEff.min > slEff.max ? t("rules.invalidRange") : null,
         has("eco_celsius") && has("comfort_celsius") && slEff.eco_celsius > slEff.comfort_celsius ? t("rules.ecoAboveComfort") : null,
         has("comfort_cool_celsius") && has("comfort_celsius") && slEff.comfort_cool_celsius <= slEff.comfort_celsius ? t("rules.coolNotAboveComfort") : null,
-      ].filter((e): e is string => e !== null)
+      ]
     : [];
-  const rangeError = rangeErrors.length ? rangeErrors.join(" · ") : null;
+  const ends = slEff
+    ? [
+        has("eco_celsius") && slEff.eco_celsius < slEff.min ? t("rules.ecoBelowMin") : null,
+        has("comfort_cool_celsius") && slEff.comfort_cool_celsius > slEff.max ? t("rules.coolAboveMax") : null,
+      ]
+    : [];
+  const join = (list: (string | null)[]) => (list.some(Boolean) ? list.filter(Boolean).join(" · ") : null);
+  const [a, c, d] = always;
+  const [b, e] = ends;
+  const rangeError = join(slTouched ? [a, b, c, d, e] : [a, c, d]);
+  const rangeWarning = slTouched ? null : join([b, e]);
 
   const save = async () => {
     setSaving(true);
@@ -192,6 +205,7 @@ export default function RulesPage() {
         </div>
       )}
       {rangeError && <p className="text-sm font-medium text-destructive" data-testid="rules-range-error">{rangeError}</p>}
+      {rangeWarning && <p className="rounded-xl border border-warning-border bg-warning-bg px-3 py-2 text-sm font-semibold text-warning-fg" data-testid="rules-range-warning">{t("rules.rangeWarning", { problem: rangeWarning })}</p>}
       {saveError ? <ErrorNotice error={saveError} testId="rules-save-error" /> : null}
       {/* D-151: the assistant proposes (after the rules, design lot 2), the manager applies; whoever only reads does not see it */}
       {canWrite && q.data && (
