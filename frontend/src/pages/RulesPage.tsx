@@ -88,31 +88,33 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
           {group.title && <h4 className="text-sm font-semibold">{group.title()}</h4>}
           <div className="grid gap-3 sm:grid-cols-2">
           {group.keys.map((key) => [key, rule.limits[key]] as const).map(([key, lim]) => (
-            <div key={key} className="space-y-1">
+            <div key={key} className="field-cell">
               <label htmlFor={`rule-${rule.rule_id}-${key}`} className="text-[13px] font-medium text-muted-foreground">
                 {tOr(`rules.params.${key}`, key)} <span className="font-normal normal-case">({t("rules.range", { min: fmtNumber(lim.min), max: fmtNumber(lim.max) })})</span>
               </label>
-              <Input
-                id={`rule-${rule.rule_id}-${key}`}
-                type="number"
-                inputMode="decimal"
-                min={lim.min}
-                max={lim.max}
-                step={Number.isInteger(lim.min) && Number.isInteger(lim.max) ? 1 : 0.5}
-                value={draft?.params[key] ?? String(rule.params[key] ?? "")}
-                disabled={!editable}
-                aria-disabled={!editable}
-                aria-invalid={Boolean(errs[key])}
-                onChange={(e) => {
-                  const params = { ...(draft?.params ?? {}) };
-                  if (e.target.value === String(rule.params[key])) delete params[key];
-                  else params[key] = e.target.value;
-                  onChange({ enabled: draft?.enabled, params });
-                }}
-                className={cn("tabular", errs[key] && "border-destructive focus-visible:ring-destructive")}
-                data-testid={`rule-param-${rule.rule_id}-${key}`}
-              />
-              {errs[key] && <p className="text-xs font-medium text-destructive" data-testid={`rule-param-error-${rule.rule_id}-${key}`}>{errs[key]}</p>}
+              <div className="space-y-1">
+                <Input
+                  id={`rule-${rule.rule_id}-${key}`}
+                  type="number"
+                  inputMode="decimal"
+                  min={lim.min}
+                  max={lim.max}
+                  step={Number.isInteger(lim.min) && Number.isInteger(lim.max) ? 1 : 0.5}
+                  value={draft?.params[key] ?? String(rule.params[key] ?? "")}
+                  disabled={!editable}
+                  aria-disabled={!editable}
+                  aria-invalid={Boolean(errs[key])}
+                  onChange={(e) => {
+                    const params = { ...(draft?.params ?? {}) };
+                    if (e.target.value === String(rule.params[key])) delete params[key];
+                    else params[key] = e.target.value;
+                    onChange({ enabled: draft?.enabled, params });
+                  }}
+                  className={cn("tabular", errs[key] && "border-destructive focus-visible:ring-destructive")}
+                  data-testid={`rule-param-${rule.rule_id}-${key}`}
+                />
+                {errs[key] && <p className="text-xs font-medium text-destructive" data-testid={`rule-param-error-${rule.rule_id}-${key}`}>{errs[key]}</p>}
+              </div>
             </div>
           ))}
           </div>

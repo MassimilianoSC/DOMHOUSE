@@ -199,25 +199,25 @@ export default function SimulatorPage() {
         </Section>
         <Section icon={<CalendarPlus className="h-5 w-5" />} title={t("simulator.booking")} hint={t("simulator.bookingHint")} testId="simulator-booking">
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
+            <div className="field-cell">
               <Label htmlFor="sim-type">{t("simulator.eventType")}</Label>
               <NativeSelect id="sim-type" value={booking.type} onChange={(e) => change({ type: e.target.value as SimBookingInput["type"] })} data-testid="sim-booking-type">
                 {(["booking_created", "booking_changed", "booking_cancelled", "checkin", "checkout"] as const).map((v) => <option key={v} value={v}>{t(`simulator.types.${v}`)}</option>)}
               </NativeSelect>
             </div>
-            <div className="space-y-1">
+            <div className="field-cell">
               <Label htmlFor="sim-bid">{t("simulator.bookingId")}</Label>
               <Input id="sim-bid" value={booking.booking_id} onChange={(e) => change({ booking_id: e.target.value })} data-testid="sim-booking-id" />
             </div>
-            <div className="space-y-1">
+            <div className="field-cell">
               <Label htmlFor="sim-ci">{t("simulator.checkin")}</Label>
               <Input id="sim-ci" type="datetime-local" value={booking.checkin} onChange={(e) => change({ checkin: e.target.value })} data-testid="sim-booking-checkin" />
             </div>
-            <div className="space-y-1">
+            <div className="field-cell">
               <Label htmlFor="sim-co">{t("simulator.checkout")}</Label>
               <Input id="sim-co" type="datetime-local" value={booking.checkout} onChange={(e) => change({ checkout: e.target.value })} data-testid="sim-booking-checkout" />
             </div>
-            <div className="space-y-1">
+            <div className="field-cell">
               <Label htmlFor="sim-guests">{t("simulator.guests")}</Label>
               <Input id="sim-guests" type="number" min={0} value={booking.guests} onChange={(e) => change({ guests: e.target.value })} data-testid="sim-booking-guests" />
             </div>

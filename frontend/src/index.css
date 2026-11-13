@@ -76,6 +76,20 @@
   }
 }
 
+@layer components {
+  /* A field in a grid of side-by-side fields (D-198, 13 Nov 2026): exactly two children, the label and the box (with
+     its note under it, in one wrapper). From sm up it takes two rows of its grid (subgrid), so the labels of one row
+     share a height and the boxes stay level even when a label wraps; below sm the fields are one under the other and
+     nothing changes (the same stack as before). In the grid the label keeps the 24 px lines it had as an inline element
+     in a block. */
+  .field-cell {
+    @apply space-y-1 sm:row-span-2 sm:grid sm:grid-rows-subgrid sm:gap-y-1 sm:space-y-0;
+  }
+  .field-cell > label {
+    @apply sm:leading-6;
+  }
+}
+
 @layer utilities {
   .focus-ring {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;

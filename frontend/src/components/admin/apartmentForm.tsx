@@ -58,10 +58,12 @@ export const defaultInstanceUrl = (mock: boolean) => (mock ? "mock://builtin" : 
 
 export function Field({ id, label, value, onChange, type = "text", placeholder, hint }: { id: string; label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; hint?: string }) {
   return (
-    <div className="space-y-1">
+    <div className="field-cell">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} data-testid={`apt-form-${id}`} />
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      <div className="space-y-1">
+        <Input id={id} type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} data-testid={`apt-form-${id}`} />
+        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+      </div>
     </div>
   );
 }

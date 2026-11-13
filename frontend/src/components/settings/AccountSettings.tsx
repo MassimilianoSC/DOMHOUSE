@@ -71,11 +71,11 @@ function ChangePassword() {
         <Input id="pw-current" type="password" autoComplete="current-password" required value={form.current} onChange={(e) => setForm({ ...form, current: e.target.value })} data-testid="account-pw-current" />
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
+        <div className="field-cell space-y-1.5 sm:gap-y-1.5 sm:space-y-0">
           <Label htmlFor="pw-new">{t("account.newPassword")}</Label>
           <Input id="pw-new" type="password" autoComplete="new-password" required value={form.next} onChange={(e) => setForm({ ...form, next: e.target.value })} aria-invalid={tooShort} data-testid="account-pw-new" />
         </div>
-        <div className="space-y-1.5">
+        <div className="field-cell space-y-1.5 sm:gap-y-1.5 sm:space-y-0">
           <Label htmlFor="pw-confirm">{t("account.confirmPassword")}</Label>
           <Input id="pw-confirm" type="password" autoComplete="new-password" required value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} aria-invalid={mismatch} data-testid="account-pw-confirm" />
         </div>
@@ -99,11 +99,11 @@ function ChangeEmail() {
     <form onSubmit={submit} className="space-y-3" data-testid="account-email-form">
       <p className="text-sm text-muted-foreground">{t("account.emailHint", { email: me?.user.email ?? "" })}</p>
       <div className="grid gap-3 sm:grid-cols-2">
-        <div className="space-y-1.5">
+        <div className="field-cell space-y-1.5 sm:gap-y-1.5 sm:space-y-0">
           <Label htmlFor="em-new">{t("account.newEmail")}</Label>
           <Input id="em-new" type="email" autoComplete="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="account-email-new" />
         </div>
-        <div className="space-y-1.5">
+        <div className="field-cell space-y-1.5 sm:gap-y-1.5 sm:space-y-0">
           <Label htmlFor="em-current">{t("account.currentPassword")}</Label>
           <Input id="em-current" type="password" autoComplete="current-password" required value={form.current} onChange={(e) => setForm({ ...form, current: e.target.value })} data-testid="account-email-pw" />
         </div>
