@@ -64,6 +64,21 @@ async def minutes(n: float) -> None:
     await asyncio.sleep(n * MINUTE)
 
 
+async def just_after_a_tick(e) -> None:
+    """The engine's loop ticks once a REAL second (_tick_loop), the regulation's checks with it: right after a tick is
+    the worst phase for a wait counted from now (giro of 13 Nov on 654375a: a fixed wait lost that race)."""
+    seen = e.last_tick
+    while e.last_tick == seen:
+        await asyncio.sleep(0.005)
+
+
+async def until(condition, timeout: float = 5.0) -> None:
+    end = asyncio.get_running_loop().time() + timeout
+    while not condition():
+        assert asyncio.get_running_loop().time() < end, "condition not reached"
+        await asyncio.sleep(0.02)
+
+
 def stop(e) -> None:
     for t in [e.loop_task, e.consumer_task, *e.tasks]:
         if t is not None:
@@ -429,13 +444,16 @@ def test_s1_a_split_switched_off_by_its_remote_stays_off_until_the_next_mode(fas
         e = await started("comfort")
         assert climate(e)["on"] and CLIMA in e.climate_by_mode
         before = len([c for c in e.commands.values() if c["device_id"] == CLIMA])
+        await just_after_a_tick(e)                                          # the worst phase, every time
         e.connector._devices[CLIMA].capabilities["climate"]["on"] = False       # its own remote
         e.connector.set_state("dev-misura-clima", "power_meter", {"watts": 0})
         await asyncio.sleep(0.1)
         assert climate(e)["on"]                                             # a few low watts: not yet off
-        await minutes(e.setting("REMOTE_OFF_MINUTES") + 1)
+        began = asyncio.get_running_loop().time()
+        await until(lambda: not climate(e)["on"])                           # off at a tick after the minutes
+        assert asyncio.get_running_loop().time() - began >= e.setting("REMOTE_OFF_MINUTES") * MINUTE - 0.15
         await settle(e)
-        assert not climate(e)["on"] and CLIMA not in e.climate_by_mode
+        assert CLIMA not in e.climate_by_mode
         await minutes(2 * e.setting("THERMOSTAT_MIN_SWITCH_MINUTES") + 2)
         await settle(e)
         after = len([c for c in e.commands.values() if c["device_id"] == CLIMA])
