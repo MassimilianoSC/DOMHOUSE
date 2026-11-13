@@ -250,6 +250,8 @@
       "limits_modes_outside": "Modalità: temperature fuori dai limiti",
       "booking_extended_comfort": "Partenza spostata: casa in comfort",
       "heating_unregulated": "Caldaia: senza regolazione",
+      "climate_remote_off": "Clima: spento col telecomando",
+      "window_contact_offline": "Finestra: senza segnale, considerata chiusa",
       "offline_alert": "Dispositivo offline",
       "mold_warning": "Avviso antimuffa",
       "frost_heating_on": "Antigelo: caldaia accesa",
@@ -534,7 +536,7 @@
     "windowTitle": "Finestra aperta",
     "windowOpen": "Finestra aperta in {rooms}: durante la forzatura la finestra non spegne clima e caldaia; se li aveva già spenti, ripartono quando la forzatura finisce e la finestra è chiusa.",
     "windowsOpen": "Finestre aperte in {rooms}: durante la forzatura le finestre non spengono clima e caldaia; se li avevano già spenti, ripartono quando la forzatura finisce e le finestre sono chiuse.",
-    "windowUnknown": "Sensore della finestra senza segnale in {rooms}: se è aperta, durante la forzatura non spegne clima e caldaia; se li aveva già spenti, ripartono quando la forzatura finisce e la finestra è chiusa.",
+    "windowUnknown": "Sensore della finestra senza segnale in {rooms}: finché non torna raggiungibile conta come chiusa, quindi anche se è aperta non spegne clima e caldaia, con o senza forzatura.",
     "windowConfirm": "Forza comunque"
   },
   "apartments": {

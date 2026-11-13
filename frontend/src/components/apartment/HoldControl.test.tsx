@@ -80,7 +80,8 @@ describe("forzatura con un sensore finestra senza segnale (P-83, D44)", () => {
     setup([clima, { ...win("w1", "r-cam", false), online: false } as Device]);
     await click("hold-btn-30");
     expect(screen.getByTestId("hold-window-warning")).toHaveTextContent(t("hold.windowUnknown", { rooms: "Camera" }));
-    expect(screen.getByTestId("hold-window-warning")).toHaveTextContent("Sensore della finestra senza segnale in Camera: se è aperta, durante la forzatura non spegne clima e caldaia; se li aveva già spenti, ripartono quando la forzatura finisce e la finestra è chiusa.");
+    // P-90 S6 (o1, 1102): the engine counts an offline contact as closed, with or without a hold: the sentence says so
+    expect(screen.getByTestId("hold-window-warning")).toHaveTextContent("Sensore della finestra senza segnale in Camera: finché non torna raggiungibile conta come chiusa, quindi anche se è aperta non spegne clima e caldaia, con o senza forzatura.");
     expect(screen.getByTestId("hold-window-warning")).not.toHaveTextContent("resta acceso");
     expect(s.setHold).not.toHaveBeenCalled();
   });

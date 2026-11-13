@@ -82,7 +82,8 @@ export function openWindowRooms(devices: Device[], rooms: Room[]): string[] {
   return roomNames(devices.filter((d) => d.online && d.capabilities.contact?.open === true), rooms);
 }
 
-/** Rooms whose window sensor is offline (P-83, D44): its last state is not the window's state now, open or closed. */
+/** Rooms whose window sensor is offline (P-83, D44): its last state is not the window's state now, open or closed. The
+ *  engine counts it as closed for the window rule (P-90 S6), so it is never among the open ones. */
 export function unknownWindowRooms(devices: Device[], rooms: Room[]): string[] {
   return roomNames(devices.filter((d) => !d.online && d.capabilities.contact), rooms);
 }

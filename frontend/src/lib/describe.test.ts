@@ -103,6 +103,9 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     // P-90 (o1): partenza spostata dopo il check-out, comfort rimesso (S5); caldaia che segue il comando senza regolazione (S18)
     expect(actionLabel("booking_extended_comfort")).toBe("Partenza spostata: casa in comfort");
     expect(actionLabel("heating_unregulated")).toBe("Caldaia: senza regolazione");
+    // P-90 (o1, 1101 e 1102): split spento col telecomando (S1); contatto finestra senza segnale contato come chiuso (S6)
+    expect(actionLabel("climate_remote_off")).toBe("Clima: spento col telecomando");
+    expect(actionLabel("window_contact_offline")).toBe("Finestra: senza segnale, considerata chiusa");
   });
 
   it("ogni azione che il motore scrive nelle decisioni è nell'elenco del sito (controllo automatico, lotto 39)", () => {
