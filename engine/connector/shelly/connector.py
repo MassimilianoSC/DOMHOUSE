@@ -62,8 +62,8 @@ holds. Read only: execute() refuses them (no command). In detail:
     its em1:0 with a ts about 13.5 s behind, and a Shelly 1 Gen4 its first NotifyFullStatus after a restart about
     1750 s off (an H&T silent for 29 minutes would look alive). A missing or null time (a device without its time yet)
     changes nothing; an offset beyond CLOCK_OFFSET_IMPLAUSIBLE_S (a day) is not adopted, the offset of before stays
-    (or none), warned once per bridge ("bridge clock implausible"), again only after a plausible one came. An offset
-    within MAX_CLOCK_SKEW_S is adopted at once. One beyond it is only a CANDIDATE: after a restart the bridge runs on
+    (or none), warned once per bridge ("bridge clock implausible"), again only after a plausible one came or the
+    bridge was offline. An offset within MAX_CLOCK_SKEW_S is adopted at once. One beyond it is only a CANDIDATE: after a restart the bridge runs on
     a wrong clock until it synchronises (bench: about 1750 s behind) and its sources read that clock too (the
     GetStatus at the connection a few ms after the wrong NotifyFullStatus, a packet of any sensor, also one outside
     the catalog), so adopting it at once would bring an H&T silent for 29 minutes back online with its old reading
@@ -75,7 +75,14 @@ holds. Read only: execute() refuses them (no command). In detail:
     candidate that waited CLOCK_CONFIRM_S gets Shelly.GetStatus read again at the next silence check, for its
     sys.unixtime only, once per wait. The candidate is logged once (info); "bridge clock off" is warned when such an
     offset is adopted. The offset and the candidate are forgotten when the bridge goes offline (it may come back
-    restarted, with another clock), with its "bridge clock off" warning. The packet's time on our clock is
+    restarted, with another clock), with its warnings; a bthome notification that comes after the offline, before the
+    bridge is connected again, does not set them again. Since only GetStatus and the bthome NotifyStatus renew the
+    offset (no longer the Shelly 1's switch counts of every minute), after an NTP correction of the bridge the offset
+    stays the old one until the next BLU packet: with only a Motion at rest or a contact, for many minutes. Accepted:
+    every notification brings its own ts, read before its values, so the old offset only dates a read of the map in
+    between (a pairing, a read for errors). With the candidate's rule: a correction that brings the bridge within
+    MAX_CLOCK_SKEW_S is adopted at that first packet; one that leaves it beyond (or takes it there) is a candidate,
+    adopted only when confirmed, the old offset used meanwhile. The packet's time on our clock is
     last_updated_ts - offset, never later than its reception (translate.bthome_ts), and it is both the sensor's last
     packet and the ts of its changes; so a bridge steadily 400 s behind does not keep offline a sensor that sends
     every minute once its offset is confirmed (before that it may be offline: the price wanted), and a packet hours
@@ -418,16 +425,18 @@ class ShellyConnector:
         if device.rejected:
             return                                  # not the catalog's model: ignored until it connects again
         device.last_seen = item.received_at
-        if device.sensors and item.method == "NotifyStatus" and _carries_bthome(item.params):
-            # only these carry the bridge's time well: an EM Mini's em1:0 comes ~13.5 s behind, the first
-            # NotifyFullStatus after a restart ~1750 s off (bench), and the sensors' age is counted with this offset
-            self._bridge_clock(device, item.params.get("ts"), item.received_at)
         if not device.online:
             if item.shelly_id not in self._transport.connected():
                 return                              # it came before its "offline": the stream says the rest
             await self._connected(device, item.received_at)    # back after a silence: online and a snapshot first
             if not device.online:
                 return
+        if device.sensors and item.method == "NotifyStatus" and _carries_bthome(item.params):
+            # only these carry the bridge's time well: an EM Mini's em1:0 comes ~13.5 s behind, the first
+            # NotifyFullStatus after a restart ~1750 s off (bench), and the sensors' age is counted with this offset.
+            # Only with the bridge online: a notification that came after its offline does not set again the offset
+            # forgotten with it
+            self._bridge_clock(device, item.params.get("ts"), item.received_at)
         profile, channel = device.entry.profile, device.entry.channel
         ts = notification_ts(item.params, item.received_at)
         if item.method == "NotifyStatus":
@@ -525,6 +534,7 @@ class ShellyConnector:
         # a bthome notification) our clock is used, not the offset of before
         device.clock_offset_s = None
         device.clock_warned = False
+        device.clock_implausible_warned = False
         self._drop_clock_candidate(device)
         for sensor in device.sensors.values():
             self._blu_offline(sensor, at)
@@ -535,7 +545,8 @@ class ShellyConnector:
         sys.unixtime) at our time `at`: the offset of its clock, with which its last_updated_ts are read.
           - a missing or null time (a device without its time yet) changes nothing;
           - beyond CLOCK_OFFSET_IMPLAUSIBLE_S it is no clock: not adopted, no candidate, the offset of before stays (or
-            none), warned once ("bridge clock implausible"), again only after a plausible one came;
+            none), warned once ("bridge clock implausible"), again only after a plausible one came or the bridge was
+            offline;
           - within MAX_CLOCK_SKEW_S it is adopted at once, and a candidate waiting is dropped (the bridge synchronised);
           - beyond it, the offset adopted already (within CLOCK_CONFIRM_TOLERANCE_S) is renewed; any other is a
             CANDIDATE, not adopted: after a restart the bridge runs on a wrong clock until it synchronises (bench:
