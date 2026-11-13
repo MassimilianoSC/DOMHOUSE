@@ -36,14 +36,18 @@
 
 ## 1. Controlli prima di cominciare (sola lettura)
 
-**Si comincia dopo la pubblicazione di `247fda0`** (committente, 13 novembre): il motore di `lab-01` usa la stessa immagine di `dev`.
+**Quando si comincia:**
+
+1. dopo la pubblicazione di `247fda0` (committente, 13 novembre): il motore di `lab-01` usa la stessa immagine di `dev`;
+2. dopo la risposta del committente sulla porta (decisione aperta, sezione 0);
+3. **dopo la tappa A completa**, compresa la sua sezione 4 (cambio della password, R4 riuscito). Così la tappa A non si incrocia con il motore acceso e con le `sync` del passo 6.2.
 
 ### 1.1 La VM oggi
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo docker ps --format "{{.Names}}  {{.Ports}}"; ls /opt/domhouse/*.settings; sudo sed -n "s/^ENGINE_IMAGE=//p" /opt/domhouse/dev.settings; free -m | head -2; sudo bash /opt/domhouse/broker-vm.sh status | grep -E "^appartamenti|^utenti|^broker ok"'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo docker ps --format "{{.Names}}  {{.Ports}}"; ls /opt/domhouse/*.settings; sudo sed -n "s/^ENGINE_IMAGE=//p" /opt/domhouse/dev.settings; ls -l /opt/domhouse/compose.broker.yaml; grep -c SHELLY_MQTT_HOST /opt/domhouse/engine-vm.sh; free -m | head -2; sudo bash /opt/domhouse/broker-vm.sh status | grep -E "^appartamenti|^utenti|^broker ok"'
 ```
 
 | Riga | Atteso |
@@ -51,11 +55,24 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 | container | `engine-dev` sulla porta 8100 e `domhouse-broker` sulla 8883; **nessun** altro motore, e niente sulla 8169 |
 | file delle impostazioni | solo `/opt/domhouse/dev.settings` |
 | immagine di `dev` | `europe-west8-docker.pkg.dev/domotica-poc-511707/domotica/engine:247fda0` |
+| `compose.broker.yaml` | il file c'è. Senza, il motore non entrerebbe nella rete del broker e `install` fallirebbe con un errore poco chiaro |
+| numero dopo il file | maggiore di 0: lo script sulla VM sa passare al motore il conto del connector |
 | memoria | annota la colonna `available`: serve per il confronto al passo 3.2 |
 | broker | `appartamenti: 1`, `utenti devices: 1`, `utenti connectors: 1`, `broker ok cert_days=…` |
 
+- `broker-vm.sh status` non è del tutto in sola lettura: il suo controllo scrive una riga nel registro della VM e rimette il limite sui collegamenti, se mancasse. È innocuo.
 - **Se l'immagine di `dev` è un'altra:** si usa quella nei comandi del passo 3.1. Avvisa la memoria storica, che la sostituisce prima.
 - **Se c'è già qualcosa sulla 8169:** fermati.
+
+### 1.1 bis Le porte ammesse dal server di staging (sola lettura)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud run services describe domotica-bff-staging --region=europe-west8 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format='yaml(spec.template.spec.containers[0].env)' | grep -A1 INSTANCE_ALLOWED
+```
+
+- **Atteso:** `value: 10.198.0.2:8100,10.198.0.2:8150-8169`. Se la 8169 non c'è, fermati.
 
 ### 1.2 I segreti di `lab-01` (solo l'elenco delle versioni, mai il valore)
 
@@ -68,7 +85,7 @@ for s in langbrain-shelly-lab-01 langbrain-shelly-lab-01-devices langbrain-api-k
 | Segreto | Atteso |
 |---|---|
 | `langbrain-shelly-lab-01` | una versione `enabled` (password del connector) |
-| `langbrain-shelly-lab-01-devices` | in cima la versione 2, oppure la 3 se il cambio di password della tappa A è fatto |
+| `langbrain-shelly-lab-01-devices` | in cima la versione 3, **solo se** la sezione 4 della tappa A è conclusa con R4 riuscito. Con la versione 2 la tappa A non è finita: falla prima. Con la 3 ma R4 non riuscito: fermati |
 | `langbrain-api-key-lab-01` | **errore `NOT_FOUND`**: non esiste ancora, si crea al passo 2 |
 
 ## 2. La chiave del motore `lab-01` (scrive su Secret Manager)
@@ -132,10 +149,15 @@ devices:
     shelly: {id: shellyplugmg3-9070695cb0d0, type: plug}
 EOF
 .venv/Scripts/python.exe -c "from pathlib import Path; from engine.connector.shelly.catalog import load_catalog; from engine.connector.shelly.offline import load_thresholds; c = load_catalog(Path.home() / 'domhouse-lab-01' / 'catalog.yaml', load_thresholds()); print('catalogo valido:', [(d.device_id, d.shelly_id, d.device_type) for d in c.devices])"
+cp ~/domhouse-lab-01/catalog.yaml ~/domhouse-lab-01/catalog-solo-plug.yaml
+git diff --stat 247fda0 HEAD -- engine/connector/shelly/ | tail -1
 ```
 
-- **Atteso:** `catalogo valido: [('dev-presa-lab', 'shellyplugmg3-9070695cb0d0', 'plug')]`.
-- o1 l'ha già controllato con il codice di `247fda0`, quello dell'immagine del motore: valido, profilo «Shelly Plug M Gen3», soglia offline 120 s.
+- **Atteso:**
+  1. `catalogo valido: [('dev-presa-lab', 'shellyplugmg3-9070695cb0d0', 'plug')]`;
+  2. nessuna riga dopo: il codice del connector sul PC è uguale a quello dell'immagine `247fda0`. Se compare una riga, il controllo è fatto su codice diverso: avvisa la memoria storica.
+- La copia `catalog-solo-plug.yaml` serve per tornare indietro dopo il catalogo di Y (6.5).
+- o1 l'ha già controllato con il codice di `247fda0`: valido, profilo «Shelly Plug M Gen3», soglia offline 120 s.
 
 **3.0.2 Copiarlo sulla VM** (scrive sulla VM, nella cartella di chi si collega).
 
@@ -187,7 +209,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 | «segreto langbrain-api-key-lab-01 non leggibile dalla VM» | manca il passo 2.2 |
 | «segreto langbrain-shelly-lab-01 non leggibile dalla VM» | permesso della VM sul segreto del connector mancante |
 | «health non risponde 200» e nel log «connector setup failed» (codice d'uscita 3) | catalogo mancante o sbagliato: passi 3.0.x |
-| «health non risponde 200» e nel log «mqtt broker not connected» | il motore non raggiunge il broker: incolla il log, o1 guarda |
+| «health non risponde 200» e nel log «mqtt connect failed» o «mqtt first connection still pending» | il motore non raggiunge il broker, oppure il broker rifiuta il conto del connector: incolla il log, o1 guarda |
 
 ### 3.2 Controlli dopo l'installazione (sola lettura)
 
@@ -202,7 +224,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 | `/health` | `"apartment_id":"lab-01"`, `"connector":{"status":"up","connected_devices":1,…}` e `HTTP 200` |
 | `/devices` | il dispositivo `dev-presa-lab` con `"online":true`, lo stato di `switch` e i watt |
 | broker | «New client connected … u'lab-01.connector'» |
-| avvisi del motore | nessuna riga, oppure avvisi da incollare alla memoria storica |
+| avvisi del motore | nessuna riga, oppure avvisi da incollare alla memoria storica. «mqtt rpc answer dropped» è atteso solo se la sezione 4 della tappa A è stata fatta con il motore già acceso: sono le risposte 901 e 902 dei nostri comandi |
 | memoria | `available` più bassa di quella del passo 1.1 di circa 100 MB (**da verificare**: è il primo motore con il connector Shelly sulla VM) |
 
 - Dal prossimo giro di 5 minuti il controllo della VM scrive anche «engine ok lab-01» e il backup notturno copia `lab-01`. Si vede con:
@@ -223,29 +245,34 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 - la chiave la legge da `langbrain-api-key-lab-01` (passo 2);
 - i dati vanno nel database Firestore `staging`, non in quello della produzione.
 
-### 4.1 Crearlo (nell'app di staging, come gestore della piattaforma)
+### 4.1 Crearlo (nell'app di staging, con il tuo account di **gestore della piattaforma**)
 
-Sito: `https://domhouse-staging.web.app`. **Organizzazioni** → l'organizzazione di prova che usi per lo staging → **Appartamenti** → **Nuovo appartamento**:
+Sito: `https://domhouse-staging.web.app`. **Organizzazioni** → **«Flatsharing (prova)»**, l'organizzazione di prova dove stanno già `demo-vuoto`, `demo-occupato` e `dev` → **Appartamenti** → **Nuovo appartamento**:
 
-| Campo | Valore |
+| Campo nell'app | Valore |
 |---|---|
 | ID | `lab-01` (proprio questo: dà il nome alla chiave) |
 | Nome | `Laboratorio di Youssouf (lab-01)` |
-| URL istanza | `http://10.198.0.2:8169/api/v1` |
-| Porta | vuota (è già nell'URL) |
+| Indirizzo del sistema domotico | `http://10.198.0.2:8169/api/v1` |
+| Porta | vuota (è già nell'indirizzo) |
 | Fuso orario | `Europe/Rome` |
 | ID Italianway | vuoto: nessuna prenotazione vera deve arrivarci |
-| Istanza simulata (appartamento dimostrativo) | **spenta**: i dispositivi sono veri |
+| Appartamento dimostrativo | **spento**: i dispositivi sono veri |
+| Attivo | **acceso** (è già così) |
+
+- **«Collegamento già usato da un altro appartamento»:** un appartamento della prova di carico usa già `10.198.0.2:8169`. Fermati e avvisa la memoria storica.
 
 ### 4.2 Verifica connessione
 
 Sulla riga dell'appartamento: **Verifica connessione**.
 
 - **Atteso:** «Connessione OK».
-- **«In questo ambiente di prova si collegano solo il motore di sviluppo e quelli della prova di carico: indirizzo e porta non ammessi»:** URL o porta scritti male; deve essere esattamente `http://10.198.0.2:8169/api/v1`.
+- **«In questo ambiente di prova si collegano solo il motore di sviluppo e quelli della prova di carico: indirizzo e porta non ammessi»:** indirizzo o porta scritti male; deve essere esattamente `http://10.198.0.2:8169/api/v1`.
 - **Altro errore:** incolla il testo alla memoria storica.
 
 ### 4.3 La Plug nell'app (sola lettura)
+
+**Con quale account:** il tuo account di lavoro, **amministratore di «Flatsharing (prova)»**. Il gestore della piattaforma non vede i dispositivi degli appartamenti. Vale anche per tutte le prove della sezione 5.
 
 Apri l'appartamento «Laboratorio di Youssouf (lab-01)».
 
@@ -261,47 +288,64 @@ Il percorso di un comando:
 
 | Tratto | Di chi | Come si vede |
 |---|---|---|
-| 1. sito → server di staging | nostro | l'app mostra un errore; log del server (S) |
+| 1. sito → server di staging | nostro | l'app mostra un errore; avvisi del server (S) |
 | 2. server → motore `lab-01` | nostro | «Verifica connessione» nell'app; `/health` dalla VM (passo 3.2) |
-| 3. motore → connector (dentro lo stesso container) | confine: il motore è nostro, il connector di Y | decisioni e log del motore (M) |
+| 3. motore → connector (dentro lo stesso container) | confine: il motore è nostro, il connector di Y | decisioni e log del motore (M): «command sent», «command result» |
 | 4. connector → broker | confine: il broker è nostro, il collegamento lo fa il connector di Y | `/health` dice `connector up`; log del broker con `lab-01.connector` (passo 3.2) |
-| 5. broker → dispositivo e ritorno | di Y (dispositivo e sue impostazioni), salvo certificato e utenti del broker, che sono nostri | ascolto (A): richiesta del connector e risposta del dispositivo |
+| 5. broker → dispositivo e ritorno | il dispositivo e le sue impostazioni sono di Y; certificato, utenti e permessi del broker sono nostri | ascolto (A): richieste del connector, risposte e notifiche del dispositivo |
 
-**Regola per decidere:** si guarda l'ascolto (A).
+**Regola per decidere, nell'ordine:**
 
-- **La richiesta non c'è:** il guasto è prima del broker, cioè nel motore, nel server o nel sito.
-- **La richiesta c'è ma la risposta no:** il guasto è nel dispositivo o nella sua rete.
-- **Richiesta e risposta ci sono, ma l'app non cambia:** il guasto è nel connector, che non legge bene la risposta, oppure nel motore, nel server o nel sito. Lo dicono il log del motore (M) e il log del server (S).
+1. **(M): c'è la decisione e c'è «command sent»?**
+   - No: il comando non è arrivato al connector. Il guasto è nostro: sito, server o motore. Guarda (S).
+2. **(M): «command result» con `outcome` `failed` e `reason` `device_offline` o `internal_error`, e in (A) nessuna richiesta?**
+   - Il connector ha chiuso il comando senza mandarlo: crede la presa scollegata, oppure non sa tradurre il comando.
+   - Il guasto è del connector (Y), oppure dello stato «online» della presa: verifiche 1 e 2 della tappa A.
+3. **(A): la richiesta c'è, la risposta no?**
+   - In (A) arrivano comunque le `NotifyStatus` della presa, o la lampada scatta: la presa risponde ma non può scrivere sul suo topic di risposta. Permessi o topic del broker: nostro.
+   - Dalla presa non arriva niente: la presa o la rete di Y.
+4. **(A): richieste e risposte ci sono tutte, ma l'app non cambia o dice fallito?**
+   - (M) «command result» con esito riuscito, ma l'app non lo mostra: server o sito, nostro. Guarda (S).
+   - (M) «command result» fallito (per esempio `read back failed`) nonostante le risposte in (A): il connector non legge bene le risposte (Y).
 
-**(A) Ascolto dei messaggi della presa per 40 secondi** (sola lettura). Lancialo e, entro 5 secondi, fai l'azione della prova nell'app. Per un altro apparecchio si cambia l'id nativo nel topic (sezione 6).
+**(A) Ascolto dei messaggi della presa per 40 secondi** (sola lettura).
+
+- Lancialo e aspetta la riga «IN ASCOLTO»: il collegamento alla VM impiega qualche secondo. Poi fai l'azione della prova nell'app.
+- Ogni riga ha l'ora (UTC, dal broker), il topic e il contenuto.
+- Per un altro apparecchio si cambia l'id nativo nel topic (sezione 6).
+- **Mai durante R2 della tappa A:** mostrerebbe a video il messaggio con la password nuova.
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='set +x; T=$(curl -sf -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | python3 -c "import json,sys; print(json.load(sys.stdin)[\"access_token\"])"); PW=$(curl -sf -H "Authorization: Bearer $T" https://secretmanager.googleapis.com/v1/projects/domotica-poc-511707/secrets/langbrain-shelly-lab-01/versions/latest:access | python3 -c "import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)[\"payload\"][\"data\"]).decode().strip())"); [ -n "$PW" ] || { echo "password del connector non letta da Secret Manager"; exit 1; }; export PW; sudo --preserve-env=PW docker exec -e PW domhouse-broker sh -c "mosquitto_sub -h 172.30.83.2 -p 1883 -i lab-01.connector-ascolto-prove -u lab-01.connector -P \"\$PW\" -t \"lab-01/shellyplugmg3-9070695cb0d0/#\" -v -W 40"; unset PW T'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='set +x; T=$(curl -sf -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | python3 -c "import json,sys; print(json.load(sys.stdin)[\"access_token\"])"); PW=$(curl -sf -H "Authorization: Bearer $T" https://secretmanager.googleapis.com/v1/projects/domotica-poc-511707/secrets/langbrain-shelly-lab-01/versions/latest:access | python3 -c "import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)[\"payload\"][\"data\"]).decode().strip())"); [ -n "$PW" ] || { echo "password del connector non letta da Secret Manager"; exit 1; }; export PW; echo "IN ASCOLTO per 40 secondi: fai adesso la prova"; sudo --preserve-env=PW docker exec -e PW domhouse-broker sh -c "mosquitto_sub -h 172.30.83.2 -p 1883 -i lab-01.connector-ascolto-prove -u lab-01.connector -P \"\$PW\" -t \"lab-01/shellyplugmg3-9070695cb0d0/#\" -F \"%I %t %p\" -W 40"; unset PW T'
 ```
 
 | Riga | Che cos'è |
 |---|---|
-| `…/rpc {"id":…,"src":"lab-01/shellyplugmg3-9070695cb0d0/connector","method":"Switch.Set",…}` | la richiesta del connector: il comando è arrivato fino al broker |
-| `…/connector/rpc {"id":…,"result":…}` | la risposta della presa |
-| `…/events/rpc {"method":"NotifyStatus",…"output":…}` | la presa annuncia il cambio di stato |
-| `…/online true` | lo stato conservato (normale) |
+| `… lab-01/shellyplugmg3-9070695cb0d0/rpc {"id":…,"src":"lab-01/shellyplugmg3-9070695cb0d0/connector","method":"Switch.Set",…}` | la richiesta del connector: il comando è arrivato fino al broker |
+| `… …/connector/rpc {"id":…,"result":…}` | la risposta della presa al comando |
+| `… …/rpc {…"method":"Switch.GetStatus",…}` e poi un'altra `…/connector/rpc` con `"output"` | la rilettura: il connector controlla che la presa sia davvero nello stato chiesto. Senza questa coppia l'app resta «in corso» e poi segna fallito |
+| `… …/events/rpc {"method":"NotifyStatus",…"output":…}` | la presa annuncia il cambio di stato |
+| `… …/events/rpc {"method":"NotifyStatus",…"apower":…}` | i consumi, circa una volta al minuto |
+| `… …/online true` | lo stato conservato (normale) |
 
-**(M) Decisioni, dispositivi e log del motore** (sola lettura):
+**(M) Decisioni e log del motore** (sola lettura):
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/engine-vm.sh api lab-01 GET "/decisions?limit=3" | head -1; sudo bash /opt/domhouse/engine-vm.sh api lab-01 GET /devices | head -1; sudo docker logs --since 10m engine-lab-01 2>&1 | tail -15'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/engine-vm.sh api lab-01 GET "/decisions?limit=3&device_id=dev-presa-lab" | head -1; sudo bash /opt/domhouse/engine-vm.sh api lab-01 GET /devices | head -1; sudo docker logs --since 10m engine-lab-01 2>&1 | grep -E "command|device|mqtt" | tail -20'
 ```
 
-**(S) Avvisi ed errori del server di staging negli ultimi 10 minuti** (sola lettura):
+- Nel log: «command sent» (il motore ha passato il comando al connector), poi «command result» con `outcome`, `reason` e `detail`.
+
+**(S) Avvisi ed errori del server di staging negli ultimi 10 minuti** (sola lettura). Il server scrive `level` e `msg`, non la gravità di Cloud Logging: il filtro è quello del rapporto di rodaggio.
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="domotica-bff-staging" AND severity>=WARNING' --freshness=10m --limit=10 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format='value(timestamp,severity,jsonPayload.message,textPayload)'
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="domotica-bff-staging" AND (jsonPayload.level="warning" OR jsonPayload.level="error" OR severity>=WARNING)' --freshness=10m --limit=20 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format='value(timestamp,jsonPayload.level,jsonPayload.apartment_id,jsonPayload.msg,jsonPayload.error,httpRequest.status,httpRequest.requestUrl,textPayload)'
 ```
 
 ### 5.1 Prova 1: la presa si vede nell'app (lettura)
@@ -309,32 +353,35 @@ gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.serv
 | | |
 |---|---|
 | **Tu, nell'app** | apri «Laboratorio di Youssouf (lab-01)» |
-| **Y, al banco** | attacca alla presa una lampada e la accende, poi la spegne |
-| **Deve comparire** | «Presa del laboratorio» in linea; i watt salgono con la lampada accesa e tornano vicino a 0 da spenta, entro circa un minuto |
+| **Y, al banco** | attacca alla presa una lampada e la accende, poi la spegne. Con la lampada accesa legge i watt (`apower`) sulla pagina web della presa e te li dice |
+| **Deve comparire** | «Presa del laboratorio» in linea; i watt salgono con la lampada accesa e tornano vicino a 0 da spenta, entro circa un minuto; **gli stessi watt** della pagina web, a meno di qualche watt per i tempi diversi |
 | **Se la presa è «non in linea»** | verifica 1 della tappa A. Se la presa non è nel broker, il guasto è dalla parte di Y (presa o sua rete). Se è nel broker ma l'app la dà fuori linea: (M), poi o1 guarda catalogo e connector |
-| **Se i watt non cambiano** | (A) per un minuto. Se le `NotifyStatus` con `apower` cambiano ma l'app no, il guasto è da noi o nel connector: (M). Se la presa non manda niente, è dalla parte di Y |
+| **Se i watt non cambiano** | (A) per un minuto. Se le `NotifyStatus` con `apower` cambiano ma l'app no: connector o motore, (M). Se la presa non manda niente: dalla parte di Y |
+| **Se i watt sono diversi da quelli della pagina web** | la traduzione dei valori del connector (Y): annota i due numeri |
 
 ### 5.2 Prova 2: accendere e spegnere la presa dall'app (comando)
 
 | | |
 |---|---|
 | **Prima** | Y conferma che alla presa è attaccata solo la lampada |
-| **Tu, nell'app** | lanci (A), poi entro 5 secondi premi **Accendi** sulla presa; dopo, lo stesso con **Spegni** |
+| **Tu, nell'app** | lanci (A); alla riga «IN ASCOLTO» premi **Accendi** sulla presa. Poi di nuovo (A) e **Spegni** |
 | **Y, al banco** | guarda la lampada e dice quando scatta |
 | **Deve comparire nell'app** | lo stato passa da «in corso» al nuovo valore in pochi secondi; in **Decisioni** l'azione con esito applicato |
-| **Deve comparire in (A)** | la richiesta `Switch.Set`, la risposta, poi la `NotifyStatus` con `output` nuovo |
-| **Deve comparire in (M)** | `"action":"turn_on"` (o `turn_off`), `"outcome":"applied"`, `"device_id":"dev-presa-lab"` |
-| **Diagnosi** | Nessuna richiesta in (A): guasto da noi (sito, server o motore), guarda (S) e (M). Richiesta senza risposta: dalla parte di Y (la presa). Risposta arrivata e lampada scattata, ma l'app resta «in corso» o dice fallito: connector o motore, (M) |
-| **Da verificare la prima volta** | il tempo da «Accendi» allo stato confermato. Al banco Y ha misurato 75 ms di mediana per la Plug da sola; qui si aggiunge il percorso sito → server → motore → broker → presa e ritorno |
+| **Deve comparire in (A), in quest'ordine** | la richiesta `Switch.Set` e la sua risposta; la rilettura `Switch.GetStatus` e la sua risposta con `output` nuovo; la `NotifyStatus` con `output` nuovo |
+| **Deve comparire in (M)** | `"action":"turn_on"` (o `turn_off`), `"outcome":"applied"`, `"device_id":"dev-presa-lab"`; nel log «command sent» e «command result» |
+| **Diagnosi** | la regola del 5.0, nell'ordine |
+| **Tempo, da verificare la prima volta** | dall'ora della richiesta `Switch.Set` a quella della risposta alla rilettura, in (A). Al banco Y ha misurato 75 ms di mediana per la Plug da sola; da «Accendi» allo stato confermato nell'app si aggiunge il percorso sito → server → motore |
 
-### 5.3 Prova 3: la presa staccata dalla corrente (fuori linea e ritorno)
+### 5.3 Prova 3: la presa staccata dalla corrente (fuori linea, comando a vuoto, ritorno)
 
 | | |
 |---|---|
-| **Tu, nell'app** | guardi la presa |
-| **Y, al banco** | stacca la presa dalla corrente; dopo 3 minuti la riattacca |
-| **Deve comparire** | dopo circa 2 minuti la presa è «non in linea» (soglia 120 s più il controllo del silenzio); riattaccata, torna in linea in meno di un minuto, con il suo stato |
-| **Diagnosi** | Non va mai fuori linea: (M), connector. Non torna in linea: verifica 1 della tappa A. Se non è nel broker, il guasto è dalla parte di Y; se è nel broker, connector o motore: (M) |
+| **Tu, nell'app** | guardi la presa. Quando è «non in linea», lanci (A) e premi **Accendi** |
+| **Y, al banco** | stacca la presa dalla corrente; la riattacca solo quando glielo dici, dopo il comando a vuoto |
+| **Deve comparire** | dopo circa 2 minuti la presa è «non in linea» (soglia 120 s più il controllo del silenzio) |
+| **Comando a vuoto** | il comando fallisce subito, con il motivo «dispositivo offline» (testo da verificare a schermo); in (A) **nessuna** richiesta; in (M) «command result» con `reason` `device_offline`. Così si prova il percorso d'errore di connector e motore |
+| **Ritorno** | riattaccata, la presa torna in linea in meno di un minuto, con il suo stato |
+| **Diagnosi** | Non va mai fuori linea: connector, (M). Il comando a vuoto parte lo stesso verso la presa (richiesta in (A)): connector (Y). Non torna in linea: verifica 1 della tappa A. Se non è nel broker, il guasto è dalla parte di Y; se è nel broker, connector o motore: (M) |
 
 ### 5.4 Prova 4: temperatura del sensore H&T (da completare con il catalogo di Y, sezione 6)
 
@@ -390,6 +437,8 @@ E il catalogo completo nel formato di `catalog.py`, con la Plug già scritta com
 
 Per **ogni** id nativo dato da Y. Il comando sotto è la forma: o1 lo riscrive completo, con gli id veri, quando arrivano.
 
+**Mai durante la sezione 4 della tappa A** (fra R1 e R4): la `sync` qui sotto darebbe al broker la password nuova della Plug prima che la presa la conosca, e la lascerebbe fuori.
+
 ```bash
 # Git Bash — FORMA, da completare con l'id nativo di Y
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
@@ -435,16 +484,39 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 ### 6.5 Catalogo nuovo sul motore
 
-- Passi 3.0.1–3.0.3 con il file di Y, poi un riavvio del motore. Va fatto con `key`, che riscrive il file della chiave e ricrea il container, e così fa rileggere il catalogo:
+Il catalogo di Y arriva come pull request, in `engine/connector/shelly/cataloghi/lab-01.yaml` (messaggio a Y). Si usa dopo l'unione, dal repository. Se Y sceglie un altro percorso, o1 riscrive i comandi.
+
+**6.5.1 Controllarlo sul PC** (sola lettura).
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/engine-vm.sh key lab-01'
+.venv/Scripts/python.exe -c "from pathlib import Path; from engine.connector.shelly.catalog import load_catalog; from engine.connector.shelly.offline import load_thresholds; c = load_catalog(Path('engine/connector/shelly/cataloghi/lab-01.yaml'), load_thresholds()); print('catalogo valido:', [(d.device_id, d.shelly_id or d.blu.addr, d.device_type) for d in c.devices])"
 ```
 
-- **Atteso:** `health 200: ok … connector up`, poi il passo 3.2 con tutti i dispositivi.
-- Un catalogo sbagliato ferma il motore (codice 3). Si rimette quello di prima, che è ancora in `~/domhouse-lab-01/catalog.yaml` sul PC, con i passi 3.0.2–3.0.3 e lo stesso comando `key`.
+- **Atteso:** `catalogo valido: […]`, con dentro `('dev-presa-lab', 'shellyplugmg3-9070695cb0d0', 'plug')`. Se la Plug ha un altro `device_id`, fermati: l'app perderebbe lo storico.
+
+**6.5.2 Copia di sicurezza sulla VM, copia del file nuovo, riavvio del motore** (scrive sulla VM). La copia `catalog-solo-plug.yaml` sul PC è stata fatta al passo 3.0.1.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute scp engine/connector/shelly/cataloghi/lab-01.yaml langbrain-dev:catalog-lab-01.yaml --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo cp -p /data/lab-01/catalog.yaml /data/lab-01/catalog.yaml.prima && sudo install -m 640 -o 10001 -g 10001 ~/catalog-lab-01.yaml /data/lab-01/catalog.yaml && sudo ls -ln /data/lab-01 && sudo bash /opt/domhouse/engine-vm.sh key lab-01'
+```
+
+- `key` riscrive il file della chiave e ricrea il container: così il motore rilegge il catalogo.
+- **Atteso:** `catalog.yaml` e `catalog.yaml.prima` nella cartella, poi `health 200: ok … connector up`. Dopo, il passo 3.2 con tutti i dispositivi.
+
+**6.5.3 Tornare al catalogo di prima** (scrive sulla VM), se il motore non riparte (codice 3) o qualcosa non va:
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo cp -p /data/lab-01/catalog.yaml.prima /data/lab-01/catalog.yaml && sudo bash /opt/domhouse/engine-vm.sh key lab-01'
+```
+
+- **Atteso:** `health 200: ok … connector up` con la sola Plug. Se anche la copia sulla VM mancasse, quella del PC è `~/domhouse-lab-01/catalog-solo-plug.yaml`: passi 3.0.2–3.0.3 con quel file.
 
 ## 7. Tornare indietro
 
@@ -452,8 +524,10 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 |---|---|---|
 | L'appartamento nell'app | nell'app di staging, come gestore: elimina l'appartamento `lab-01` | lo staging non lo chiama più; il motore resta |
 | Il motore | comando 7.1 | il motore si ferma; il controllo ogni 5 minuti e il backup non lo contano più; i dati restano in `/data/lab-01` |
-| La chiave | resta (non costa nulla); per toglierla: comando della memoria storica | — |
-| Gli utenti del broker | `broker-secrets.sh remove-device lab-01 <id nativo>`, poi `broker-vm.sh sync` | l'apparecchio non entra più |
+| La chiave | resta (non costa nulla); per toglierla: 7.2, facoltativo | — |
+| L'utente del broker della Plug | 7.3 | la Plug non entra più nel broker |
+
+Per gli apparecchi di Y aggiunti al 6.2: lo stesso comando del 7.3 con il loro id nativo.
 
 ### 7.1 Fermare e togliere il motore `lab-01` (scrive sulla VM)
 
@@ -466,6 +540,33 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 - **Atteso:** «Container engine-lab-01 Removed»; nell'elenco finale restano `engine-dev` e `domhouse-broker`.
 - Spostare `lab-01.settings` fa sì che il controllo ogni 5 minuti non lo cerchi più: altrimenti scatterebbe l'allarme «motore muto». Il file `.env` conteneva la chiave e la password del connector: si toglie, e un `install` lo riscrive.
 - **Per rimetterlo:** il passo 3.1. I dati in `/data/lab-01` sono ancora lì.
+- Fra il `down` e lo spostamento del file passano pochi secondi. Se il controllo ogni 5 minuti cade proprio lì, scrive «engine silent lab-01» e può arrivare un'email: è innocua. Per evitarla, lancia il comando subito dopo un giro del controllo (al minuto :x1, cioè :01, :06, :11…).
+
+### 7.2 Togliere la chiave (facoltativo; scrive su Secret Manager)
+
+Solo **dopo** aver eliminato l'appartamento nell'app e fermato il motore (7.1).
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud secrets delete langbrain-api-key-lab-01 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud secrets versions list langbrain-api-key-lab-01 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+```
+
+- gcloud chiede conferma: rispondi `y`.
+- **Atteso:** l'eliminazione, poi `NOT_FOUND` alla seconda riga.
+
+### 7.3 Togliere l'utente del broker della Plug (scrive su Secret Manager, poi sulla VM)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 bash scripts/broker-secrets.sh remove-device lab-01 shellyplugmg3-9070695cb0d0
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/broker-vm.sh sync'
+```
+
+- **Atteso:** «nuova versione di langbrain-shelly-lab-01-devices scritta», poi «lab-01: connector e 0 dispositivi», «changed», «utenti e permessi ricaricati».
+- La Plug resta collegata finché non si ricollega: al primo ricollegamento il broker la rifiuta.
 
 ## 8. Rischi e cose da verificare
 
@@ -487,3 +588,12 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
    - prima volta che l'app comanda uno Shelly vero.
    - Nessuna versione nuova di immagini o programmi: il motore è quello della pubblicazione di `247fda0`, il broker non cambia.
 8. **Sensori BLU:** non prima della correzione di B1 e dell'immagine nuova (6.4). Con l'immagine di oggi un sensore morto potrebbe risultare vivo dopo un riavvio del ponte.
+9. **Tappa A prima del motore acceso.** La sezione 4 della tappa A (cambio della password) va fatta **prima** di installare `lab-01`.
+   - Il connector usa lo stesso topic di risposta dei comandi R2 e R4. Con il motore acceso, l'ascolto di R2 e R4 potrebbe prendere una risposta del connector invece della nostra.
+   - Il connector, a sua volta, scarta le nostre risposte e scrive «mqtt rpc answer dropped».
+   - Se si dovesse rifare la sezione 4 con il motore acceso: prima si ferma il motore (7.1), poi lo si rimette (3.1).
+10. **Regola dei consumi a casa vuota.** `lab-01` non ha prenotazioni, quindi per il motore è «casa vuota».
+    - Con un carico oltre 300 W per 15 minuti (valori predefiniti), il motore chiede nell'app «Spegnere Presa del laboratorio».
+    - Se nessuno risponde, la richiesta scade ed è respinta: la presa resta accesa. Se qualcuno la approva, la presa si spegne.
+    - Quindi: Y non attacca carichi oltre 300 W, oppure nessuno approva quella richiesta.
+11. **Assistente spento.** Senza `MODEL_BASE_URL` l'assistente di `lab-01` risponde «non disponibile» (codice 501). Non è un guasto: non fa parte della tappa B.
