@@ -457,6 +457,21 @@ def test_a_device_clock_ahead_never_dates_the_others_later():
     run(scenario, n_plugs=2)
 
 
+def test_a_full_status_with_its_clock_ahead_is_dated_at_its_reception():
+    """A NotifyFullStatus whose ts is 200 s ahead of its reception, within MAX_CLOCK_SKEW_S: trusted, but the states
+    of the snapshot come out at the reception, never later, as for NotifyStatus."""
+    async def scenario(w):
+        await w.connect(SID_A)
+        received = max(datetime.now(UTC), w.changes[-1].ts) + timedelta(seconds=1)
+        params = {"ts": round((received + timedelta(seconds=200)).timestamp(), 2), **w.plugs[SID_A].full_status()}
+        assert notification_ts(params, received) > received                # the device's clock is trusted...
+        start = len(w.changes)
+        w.transport.inject(Notification("NotifyFullStatus", SID_A, params, received))
+        await w.wait_for(lambda xs: len(xs) >= start + 2)
+        assert [(c.capability, c.ts) for c in w.changes[start:]] == [("switch", received), ("power_meter", received)]
+    run(scenario)
+
+
 # --- status, stop, two connectors --------------------------------------------------------------------------------
 
 def test_status():
@@ -1508,6 +1523,45 @@ def test_blu_sensor_in_error_then_silent_reads_the_map_at_most_every_5_minutes()
     run_blu(scenario, sensors=(DEV_MOTION,))
 
 
+def test_blu_failed_read_for_errors_keeps_the_map_and_sends_no_snapshot_again(warnings):
+    """The Motion in error, the H&T healthy on the same bridge; the interval of the reads for errors is 60 s here.
+    Two reads for errors fail in a row, the third succeeds: the map of before is kept (a new H&T value in between comes
+    out), each read is tried again only when the next interval is due, never at every check, and never with the
+    snapshot: the H&T does not send online or its states again. "blu components read failed" is warned once."""
+    async def scenario(w):
+        w.pair(ADDR_HT, ADDR_MOTION)
+        w.bridge.blu_packet(ADDR_MOTION, {33: False}, battery=100)
+        w.bridge.blu_set_errors(ADDR_MOTION, ["parse_failed"])
+        w.bridge.blu_packet(ADDR_MOTION, {33: True})                        # in error: only its bthomedevice moves
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        start = len(w.changes)
+        assert len(w.get_components_offsets()) == 1
+        w.bridge.fail_next("Shelly.GetComponents")
+        w.bridge.fail_next("Shelly.GetComponents")
+        w.shift = timedelta(seconds=70)                                     # due: the read fails
+        await w.settle(0.2)
+        assert len(w.get_components_offsets()) == 2                         # not tried again at every check
+        w.shift = timedelta(seconds=100)
+        w.bridge.blu_packet(ADDR_HT, {69: 22.0})                            # the map of before still works
+        await w.wait_for(lambda xs: (DEV_HT, "state", "temperature", {"celsius": 22.0}) in w.blu(start))
+        await w.settle(0.2)
+        assert len(w.get_components_offsets()) == 2
+        w.shift = timedelta(seconds=140)                                    # due again: fails again
+        await w.settle(0.2)
+        assert len(w.get_components_offsets()) == 3
+        w.shift = timedelta(seconds=210)                                    # due again: succeeds
+        await w.settle(0.2)
+        assert len(w.get_components_offsets()) == 4
+        w.shift = timedelta(seconds=240)
+        await w.settle(0.2)
+        assert len(w.get_components_offsets()) == 4
+        assert w.blu(start) == [(DEV_HT, "state", "temperature", {"celsius": 22.0})]
+        assert [m for m, _ in warnings].count("blu components read failed") == 1
+        assert len(errors_warnings(warnings)) == 1
+    run_blu(scenario, sensors=(DEV_HT, DEV_MOTION), errors_reread_s=60)
+
+
 # --- the bridge's offset: forgotten with the connection, taken only from reliable sources -------------------------
 
 def bridge_offset(w):
@@ -1625,6 +1679,37 @@ def test_blu_bridge_offset_beyond_a_day_is_ignored_with_one_warning(warnings):
         assert len(implausible) == 1 and implausible[0]["device_id"] == DEV_BRIDGE
         assert abs(implausible[0]["offset_s"] - 2 * 86_400) <= 1
         assert clock_warnings(warnings) == []
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+@pytest.mark.parametrize("bridge_time", ["known", "unknown"])
+def test_blu_packet_after_its_reception_is_dated_at_its_reception(bridge_time):
+    """A BLU packet whose last_updated_ts, brought to our clock, would fall 100 s after its reception (within
+    MAX_CLOCK_SKEW_S): its state comes out at the reception, never later. "known": the bridge's offset is known (its
+    clock right; translate.bthome_ts keeps the packet at the reception). "unknown": the bridge has no time yet
+    (sys.unixtime null) and the notification no ts, so no offset (the way out, _emit, keeps it at the reception)."""
+    async def scenario(w):
+        if bridge_time == "unknown":
+            full_status = w.bridge.full_status
+
+            def without_time():
+                status = full_status()
+                status["sys"]["unixtime"] = None
+                return status
+            w.bridge.full_status = without_time
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        assert (bridge_offset(w) is None) == (bridge_time == "unknown")
+        received = max(datetime.now(UTC) + w.shift, w.changes[-1].ts) + timedelta(seconds=1)
+        params = {w.bridge.blu_keys(ADDR_HT)[3]: {"last_updated_ts": int(received.timestamp()) + 100, "value": 23.0}}
+        if bridge_time == "known":
+            params["ts"] = round(received.timestamp(), 2)
+        start = len(w.changes)
+        w.transport.inject(Notification("NotifyStatus", SID_BRIDGE, params, received))
+        await w.wait_for(lambda xs: len(xs) > start)
+        assert [(c.device_id, c.capability, c.state, c.ts) for c in w.changes[start:]] == [
+            (DEV_HT, "temperature", {"celsius": 23.0}, received)]
     run_blu(scenario, sensors=(DEV_HT,))
 
 

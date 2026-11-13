@@ -16,8 +16,9 @@ The sequence:
      "read back failed: ...", so the logs tell a failed read back from a failed command;
   4. confirmed_result on what was read back: reached -> confirmed, not reached -> failed/device_rejected.
 Every RPC gets the smaller of rpc_timeout_s and the time left before the deadline; nothing is tried after it.
-asyncio.CancelledError is never caught: the engine cancels a command past its deadline and nothing is left half done,
-because no state is kept here.
+asyncio.CancelledError is never caught: the engine cancels a command past its deadline, and no state of the command
+is kept here. The device may have acted already (the set request may have reached it before the cancellation): after
+a cancellation the state is the one the device reports.
 """
 from collections.abc import Callable
 from datetime import UTC, datetime
