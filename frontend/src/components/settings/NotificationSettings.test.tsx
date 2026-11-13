@@ -12,7 +12,7 @@ const state = vi.hoisted(() => {
     }
   }
   return {
-    appEnv: "staging", env: {} as Record<string, unknown>, pushState: "off", PushError, enablePush: vi.fn(), disablePush: vi.fn(),
+    appEnv: "staging", canWrite: true, env: {} as Record<string, unknown>, pushState: "off", PushError, enablePush: vi.fn(), disablePush: vi.fn(),
     prefs: { approvals: true, offline: true, decisions: false, bookings: true } as Record<string, boolean>,
     setPrefs: vi.fn(async (p: Record<string, boolean>) => p),
   };
@@ -23,6 +23,7 @@ vi.mock("@/lib/utils", async (importOriginal) => {
   return { ...mod, env: Object.assign(state.env, mod.env) };
 });
 vi.mock("@/auth/AuthProvider", () => ({
+  useRole: () => ({ canWrite: state.canWrite }),
   useAuth: () => ({ me: { user: { uid: "u1" }, env: { app_env: state.appEnv, auth_mode: "firebase", fcm_enabled: false, simulator: true, instance_mode: "mock" } } }),
 }));
 vi.mock("@/api/admin", () => ({
@@ -50,6 +51,7 @@ beforeEach(() => {
   state.env.fcmEnabled = false;
   state.appEnv = "staging";
   state.pushState = "off";
+  state.canWrite = true;
 });
 
 describe("Impostazioni > Notifiche: intestazione", () => {
@@ -286,5 +288,35 @@ describe("Impostazioni > Notifiche: preferenze spente sul server (P-83, T3d-1)",
     });
     await waitFor(() => expect(state.setPrefs).toHaveBeenCalled());
     expect(state.setPrefs.mock.calls.at(-1)![0]).toMatchObject({ approvals: true, offline: false, bookings: false, summary: false });
+  });
+});
+
+describe("Impostazioni > Notifiche: sola lettura e avviso di sistema (P-90 S16, T1)", () => {
+  it("sola lettura: niente «Approvazioni» (non può approvare, e il server non gliele manda più)", async () => {
+    state.canWrite = false;
+    renderCard();
+    expect(await screen.findByTestId("settings-pref-offline")).toBeInTheDocument();
+    expect(screen.queryByTestId("settings-pref-approvals")).toBeNull();
+    expect(screen.getByTestId("settings-notifications")).not.toHaveTextContent(t("settings.notifications.approvals"));
+  });
+
+  it("sola lettura: cambiando un'altra voce, le preferenze salvate tengono «Approvazioni» com'era", async () => {
+    state.canWrite = false;
+    renderCard();
+    const offline = await screen.findByTestId("settings-pref-offline");
+    await waitFor(() => expect(offline).not.toBeDisabled());
+    await act(async () => { fireEvent.click(offline); });
+    expect(state.setPrefs).toHaveBeenCalledWith(expect.objectContaining({ approvals: true, offline: false }));
+  });
+
+  it("operatore: «Approvazioni» c'è", async () => {
+    renderCard();
+    expect(await screen.findByTestId("settings-pref-approvals")).toBeInTheDocument();
+  });
+
+  it("la categoria «offline» dice che l'avviso del sistema domotico arriva dopo 15 minuti", async () => {
+    renderCard();
+    await screen.findByTestId("settings-pref-offline");
+    expect(screen.getByTestId("settings-notifications")).toHaveTextContent("sistema domotico non raggiungibile da 15 minuti");
   });
 });

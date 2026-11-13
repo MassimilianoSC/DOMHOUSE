@@ -20,6 +20,10 @@ import { instanceAddress } from "@/lib/instanceAddress";
  * every mode (D-77): the connection to the engine and the Italianway code are shown read-only and never sent (D-64, D-72).
  */
 /** Price of energy shown to the admin: "0,25 €/kWh", or "non impostato". */
+/** P-90 T2 (1107 = a): switching an apartment off stops notifications, summaries, bookings and the Excel export, while
+ *  the engine's automations go on; it is asked once. Switching it back on is one tap. */
+const confirmDisable = (name: string) => window.confirm(t("admin.apartments.disableConfirm", { name }));
+
 const priceText = (n: number | null | undefined) => (n === null || n === undefined ? t("admin.price.notSet") : t("admin.price.value", { price: fmtPrice(n) }));
 
 function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartment; orgPrice: number | null; onClose: () => void; onSaved: () => void }) {
@@ -30,6 +34,7 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
   const set = (k: "name" | "address") => (v: string) => setF((s) => ({ ...s, [k]: v }));
   const parsed = parsePrice(price);
   const save = async () => {
+    if (apt.enabled && !f.enabled && !confirmDisable(f.name || apt.name)) return;
     setSaving(true);
     // The exception is sent only when it changed (empty = back to the organization's price).
     const body = parsed !== undefined && parsed !== (apt.energy_price_eur_kwh ?? null) ? { ...f, energy_price_eur_kwh: parsed } : f;
@@ -203,6 +208,7 @@ export function AdminApartments() {
   };
 
   const toggle = async (a: AdminApartment, enabled: boolean) => {
+    if (!enabled && !confirmDisable(a.name)) return;
     const res = await runAction((c) => adminApi.patchApartment(a.apartment_id, { enabled }, c), { success: t("admin.apartments.saved") });
     if (res) refresh();
   };

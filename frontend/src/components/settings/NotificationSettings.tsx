@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
 import { pushApi, type NotificationPrefs } from "@/api/admin";
-import { useAuth } from "@/auth/AuthProvider";
+import { useAuth, useRole } from "@/auth/AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/primitives";
 import { SettingsSection } from "@/components/settings/SettingsSection";
@@ -44,6 +44,10 @@ function pushErrorText(reason: PushError["reason"]): string {
 
 export function NotificationSettings() {
   const { me } = useAuth();
+  // P-90 S16 (1106 = a): whoever only reads cannot approve and the server sends them no approval: no switch for it. The
+  // saved preferences still carry «approvals» as it was.
+  const { canWrite } = useRole();
+  const keys = canWrite ? KEYS : KEYS.filter((k) => k !== "approvals");
   // Without FCM the alerts are in-app toasts; only a dev environment may call itself "sviluppo" (staging is tested by
   // people who would read it as a fault).
   const dev = me?.env.app_env === "dev";
@@ -105,7 +109,7 @@ export function NotificationSettings() {
           </Button>
         )}
       </div>
-      {KEYS.map((k) => (
+      {keys.map((k) => (
         <div key={k} className="flex items-center justify-between gap-3 border-b py-2 last:border-0">
           <div>
             <div className="text-sm font-semibold">{t(`settings.notifications.${k}`)}</div>

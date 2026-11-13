@@ -132,7 +132,7 @@
       "prearrival": "Porta la casa in comfort prima dell'arrivo degli ospiti.",
       "checkout_eco": "Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.",
       "compressor_min_off": "Pausa minima tra spegnimento e riaccensione del compressore.",
-      "offline_alert": "Avvisa quando un dispositivo resta offline oltre i minuti indicati."
+      "offline_alert": "Avvisa quando un dispositivo resta offline oltre i minuti indicati. L'avviso «sistema domotico non raggiungibile» non dipende da questa regola: arriva sempre dopo 15 minuti."
     },
     "proposal": {
       "title": "Chiedi all'assistente",
@@ -728,7 +728,7 @@
       "approvals": "Approvazioni richieste",
       "approvalsHint": "Quando il motore chiede il tuo consenso",
       "offline": "Dispositivi e sistema domotico offline",
-      "offlineHint": "Dispositivo offline oltre la soglia della regola, sistema domotico non raggiungibile, antigelo non attivo, caldaia senza regolazione",
+      "offlineHint": "Dispositivo offline oltre la soglia della regola, sistema domotico non raggiungibile da 15 minuti, antigelo non attivo, caldaia senza regolazione",
       "bookings": "Prenotazioni",
       "bookingsHint": "Avvisi sulle prenotazioni che cambiano il programma dell'appartamento",
       "summary": "Riepilogo",
@@ -864,6 +864,7 @@
       "italianway": "ID Italianway",
       "code": "Codice",
       "enabled": "Attivo",
+      "disableConfirm": "Disattivare «{name}»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi.",
       "disabled": "disattivato",
       "verify": "Verifica connessione",
       "verifyOk": "Connessione OK",

@@ -6,7 +6,10 @@ import SettingsPage from "./SettingsPage";
 // only answer 403 and leave two lines in the server's log at every opening; with an organization nothing changes.
 const s = vi.hoisted(() => ({ me: null as unknown, calls: [] as string[] }));
 
-vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ me: s.me, logout: vi.fn() }) }));
+vi.mock("@/auth/AuthProvider", () => ({
+  useAuth: () => ({ me: s.me, logout: vi.fn() }),
+  useRole: () => ({ canWrite: s.me?.role === "admin" || s.me?.role === "operator" }),
+}));
 // the account sections are tested on their own; the profile rows the page passes in still show
 vi.mock("@/components/settings/AccountSettings", () => ({ AccountSettings: ({ profile }: { profile?: React.ReactNode }) => <>{profile}</> }));
 

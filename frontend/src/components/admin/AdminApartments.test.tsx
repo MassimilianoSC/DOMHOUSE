@@ -302,3 +302,53 @@ describe("appartamenti dimostrativi (D-97, D-98)", () => {
     expect(screen.queryByTestId("apartment-demo-apt-002")).not.toBeInTheDocument();
   });
 });
+
+describe("disattivare un appartamento chiede conferma, riattivarlo no (P-90 T2, 1107 = a)", () => {
+  const CONFIRM = "Disattivare «Milano Centro»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi.";
+  afterEach(() => vi.restoreAllMocks());
+
+  it("interruttore della riga, confermato: si salva disattivato", async () => {
+    const ask = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderAdmin();
+    const toggle = await screen.findByTestId("admin-apartment-enabled-apt-001");
+    await act(async () => { fireEvent.click(toggle); });
+    expect(ask).toHaveBeenCalledWith(CONFIRM);
+    expect(state.patchApartment).toHaveBeenCalledWith("apt-001", { enabled: false }, expect.any(String));
+  });
+
+  it("interruttore della riga, annullato: niente salvataggio", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+    renderAdmin();
+    const toggle = await screen.findByTestId("admin-apartment-enabled-apt-001");
+    await act(async () => { fireEvent.click(toggle); });
+    expect(state.patchApartment).not.toHaveBeenCalled();
+  });
+
+  it("riattivare: un tocco, senza domande", async () => {
+    const ask = vi.spyOn(window, "confirm").mockReturnValue(true);
+    state.apartments = [{ ...APT, enabled: false }];
+    renderAdmin();
+    const toggle = await screen.findByTestId("admin-apartment-enabled-apt-001");
+    await act(async () => { fireEvent.click(toggle); });
+    expect(ask).not.toHaveBeenCalled();
+    expect(state.patchApartment).toHaveBeenCalledWith("apt-001", { enabled: true }, expect.any(String));
+  });
+
+  it("«Modifica» con «Attivo» spento: la stessa conferma; annullata, niente salvataggio", async () => {
+    const ask = vi.spyOn(window, "confirm").mockReturnValue(false);
+    await openEdit();
+    fireEvent.click(screen.getByTestId("apt-form-enabled"));
+    await save();
+    expect(ask).toHaveBeenCalledWith(CONFIRM);
+    expect(state.patchApartment).not.toHaveBeenCalled();
+  });
+
+  it("«Modifica» senza toccare «Attivo»: nessuna domanda", async () => {
+    const ask = vi.spyOn(window, "confirm").mockReturnValue(true);
+    await openEdit();
+    fireEvent.change(field("name"), { target: { value: "Milano Duomo" } });
+    await save();
+    expect(ask).not.toHaveBeenCalled();
+    expect(state.patchApartment).toHaveBeenCalled();
+  });
+});
