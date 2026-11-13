@@ -1,17 +1,23 @@
-# Tappa A: le tre verifiche di laboratorio sulla Plug di Y
+# Tappa A: le verifiche di laboratorio sulla Plug di Y e il cambio della sua password
 
 | Stato | Comandi | Preparata | Chi lancia |
 |---|---|---|---|
-| **Pronta** | o1, 11 novembre 2026 (motore-vm.md, G2, passo B5) | memoria storica | il committente, dopo che Y ha configurato e riavviato la presa |
+| Verifiche 1 e 2 **superate** (12 novembre 2026). Restano la verifica 3 e il cambio della password | o1, 11 e 13 novembre 2026 (motore-vm.md, G2, passo B5) | memoria storica | il committente, con Y vicino alla presa |
 
-- **Dispositivo:** `lab-01.shellyplugmg3-9070695cb0d0`.
+- **Dispositivo:** `lab-01.shellyplugmg3-9070695cb0d0` (utente del broker); id nativo `shellyplugmg3-9070695cb0d0`.
 - **Tutti i comandi si lanciano in Git Bash.** Ognuno apre la VM attraverso il tunnel di Google.
-- **Nessuna password compare a video.** La password del connector la legge la VM da sola. Nelle verifiche 2 e 3, per i 5–10 secondi del comando, è visibile solo dentro la VM a chi vi è collegato in quel momento, cioè solo tu.
-- **Incolla alla memoria storica l'uscita di ogni verifica:** l'esito va nel registro.
+- **Nessuna password compare a video.**
+  - La VM legge da sola le password che servono.
+  - Mentre il comando gira, cioè per 5–15 secondi, la password del connector è visibile solo dentro la VM, a chi vi è collegato in quel momento: cioè solo tu.
+- **Incolla alla memoria storica l'uscita di ogni passo:** l'esito va nel registro.
+- **Ordine:** verifica 3, poi il cambio della password (sezione 4). Si possono fare anche con il motore `lab-01` già acceso: il connector non legge i topic della verifica 3.
 
-## 1. La presa si è collegata? (sola lettura)
+## 1. La presa si è collegata? (sola lettura) — superata il 12 novembre
+
+Si ripete solo se serve, per esempio dopo il cambio della password.
 
 ```bash
+# Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo docker logs --since 30m domhouse-broker 2>&1 | grep "New client connected" | grep "lab-01.shellyplugmg3-9070695cb0d0"'
 ```
@@ -19,9 +25,10 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 - **Atteso:** una riga «New client connected from … as lab-01.shellyplugmg3-9070695cb0d0 (p4, c?, k…)». Vuol dire che **il certificato funziona**.
 - **Se non esce niente:** la presa non si è collegata negli ultimi 30 minuti. Riprova con `--since 2h` al posto di `--since 30m`.
 
-## 2. Lo stato «online» è conservato? (sola lettura)
+## 2. Lo stato «online» è conservato? (sola lettura) — superata il 12 novembre
 
 ```bash
+# Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='set +x; T=$(curl -sf -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | python3 -c "import json,sys; print(json.load(sys.stdin)[\"access_token\"])"); PW=$(curl -sf -H "Authorization: Bearer $T" https://secretmanager.googleapis.com/v1/projects/domotica-poc-511707/secrets/langbrain-shelly-lab-01/versions/latest:access | python3 -c "import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)[\"payload\"][\"data\"]).decode().strip())"); [ -n "$PW" ] || { echo "password del connector non letta da Secret Manager"; exit 1; }; export PW; sudo --preserve-env=PW docker exec -e PW domhouse-broker sh -c "mosquitto_sub -h 172.30.83.2 -p 1883 -i lab-01.connector-verifica -u lab-01.connector -P \"\$PW\" -t lab-01/shellyplugmg3-9070695cb0d0/online -C 1 -W 5 -v"; echo "uscita $?"; unset PW T'
 ```
@@ -32,16 +39,118 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 ## 3. La presa ignora i comandi «di controllo»? (manda un messaggio di prova)
 
-**Prima di lanciarla:** se il controllo fosse attivo, la presa **cambierebbe stato** (da accesa a spenta o il contrario). Y non deve avere attaccato niente che non possa spegnersi.
+**Che cosa fa Y prima:** stacca dalla presa ciò che non può spegnersi. Se il controllo fosse attivo, la presa **cambierebbe stato** (da accesa a spenta o il contrario).
+
+**Che cosa fa Y durante:** guarda la luce della presa per i 10 secondi del comando e dice se è cambiata.
 
 ```bash
+# Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='set +x; T=$(curl -sf -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | python3 -c "import json,sys; print(json.load(sys.stdin)[\"access_token\"])"); PW=$(curl -sf -H "Authorization: Bearer $T" https://secretmanager.googleapis.com/v1/projects/domotica-poc-511707/secrets/langbrain-shelly-lab-01/versions/latest:access | python3 -c "import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)[\"payload\"][\"data\"]).decode().strip())"); [ -n "$PW" ] || { echo "password del connector non letta da Secret Manager"; exit 1; }; export PW; sudo --preserve-env=PW docker exec -e PW domhouse-broker sh -c "mosquitto_sub -h 172.30.83.2 -p 1883 -i lab-01.connector-ascolto -u lab-01.connector -P \"\$PW\" -t \"lab-01/shellyplugmg3-9070695cb0d0/#\" -v -W 10 & sleep 2; mosquitto_pub -h 172.30.83.2 -p 1883 -i lab-01.connector-prova -u lab-01.connector -P \"\$PW\" -t lab-01/shellyplugmg3-9070695cb0d0/command/switch:0 -m toggle; mosquitto_pub -h 172.30.83.2 -p 1883 -i lab-01.connector-prova -u lab-01.connector -P \"\$PW\" -t lab-01/shellyplugmg3-9070695cb0d0/command -m status_update; sleep 9"; unset PW T'
 ```
 
-- **Atteso:**
-  - compaiono solo i due comandi mandati da noi, «…/command/switch:0 toggle» e «…/command status_update», e forse «online true»;
-  - nessuna risposta della presa;
-  - la presa non cambia stato (Y lo vede dalla luce).
-- **Se invece compaiono messaggi su «…/status/…»**, oppure una NotifyStatus con «output» cambiato, oppure la presa cambia stato: la presa non rispetta l'impostazione. È un esito da registrare. Se la presa ha cambiato stato, Y la rimette com'era.
+| Che cosa compare | Che cosa vuol dire |
+|---|---|
+| i due comandi mandati da noi: «…/command/switch:0 toggle» e «…/command status_update» | normale: sono i nostri |
+| «…/online true» | normale: è lo stato conservato (verifica 2) |
+| «…/events/rpc» con una `NotifyStatus` che contiene solo `aenergy` o `apower` | normale: la presa manda i consumi circa una volta al minuto |
+| **«…/status/…»**, oppure una `NotifyStatus` con **`output`** cambiato | la presa **non** rispetta `enable_control: false`: esito da registrare |
+| Y vede la luce cambiare | come sopra; Y rimette la presa com'era |
+
+- **Atteso:** solo righe delle prime tre file della tabella, e la presa che non cambia stato.
 - **Da verificare:** i nomi dei topic di controllo vengono dalla documentazione Shelly Gen2+. Se Y ne conosce altri per la Plug M Gen3, o1 aggiunge un comando.
+
+## 4. Cambio della password della presa (rotate-device)
+
+**Perché:** la password di oggi è passata nella chat aziendale (risposta 1080). Quella nuova la scrive **la VM** nella presa con un comando MQTT (`MQTT.SetConfig`), mentre la presa è collegata. Nessuna persona la vede, nessuno la copia.
+
+**Che cosa fa Y:** sta vicino alla presa. Al passo R4 la vede riavviarsi e dice se torna accesa entro 1–2 minuti. Non deve scrivere niente.
+
+**Regola fino alla fine del passo R4:** nessun `broker-vm.sh sync` e nessun `broker-secrets.sh add-device` per `lab-01`, oltre a quelli scritti qui. Una `sync` prima di R2 lascerebbe fuori la presa.
+
+| Passo | Dove | Scrive? | Che cosa fa |
+|---|---|---|---|
+| R0 | PC | no | controlla la versione attuale del segreto dei dispositivi |
+| R1 | PC | Secret Manager | password nuova nel segreto (versione nuova) |
+| R2 | VM | la presa | la VM manda la password nuova alla presa |
+| R3 | VM | broker | il broker accetta la password nuova |
+| R4 | VM | la presa | la VM fa riavviare la presa, che si ricollega con la password nuova |
+
+### R0. Versione attuale (sola lettura)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud secrets versions list langbrain-shelly-lab-01-devices --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+```
+
+- **Atteso:** in cima la versione `2`, `enabled`. È quella con la Plug (registro, 11 novembre).
+- **Se la versione in cima non è la 2:** fermati e avvisa la memoria storica.
+
+### R1. Password nuova nel segreto (scrive su Secret Manager)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+CLOUDSDK_CORE_ACCOUNT=m.scardovellicrac@gmail.com GCP_PROJECT_ID=domotica-poc-511707 bash scripts/broker-secrets.sh rotate-device lab-01 shellyplugmg3-9070695cb0d0
+```
+
+- **Atteso:** «nuova versione di langbrain-shelly-lab-01-devices scritta», nessuna password a video.
+- Lo script poi suggerisce «Ora, sulla VM: … sync»: **non** farlo adesso. Si fa al passo R3.
+- **Controllo:** R0 di nuovo; in cima la versione `3`, `enabled`.
+
+### R2. La VM manda la password nuova alla presa (scrive nella presa)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='set +x; T=$(curl -sf -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | python3 -c "import json,sys; print(json.load(sys.stdin)[\"access_token\"])"); S=https://secretmanager.googleapis.com/v1/projects/domotica-poc-511707/secrets; PW=$(curl -sf -H "Authorization: Bearer $T" $S/langbrain-shelly-lab-01/versions/latest:access | python3 -c "import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)[\"payload\"][\"data\"]).decode().strip())"); MSG=$(curl -sf -H "Authorization: Bearer $T" $S/langbrain-shelly-lab-01-devices/versions/latest:access | python3 -c "import base64,json,sys; d=json.loads(base64.b64decode(json.load(sys.stdin)[\"payload\"][\"data\"])); print(json.dumps(dict(id=901,src=\"lab-01/shellyplugmg3-9070695cb0d0/connector\",method=\"MQTT.SetConfig\",params=dict(config={\"pass\":d[\"shellyplugmg3-9070695cb0d0\"]}))))"); [ -n "$PW" ] && [ -n "$MSG" ] || { echo "segreti non letti da Secret Manager"; exit 1; }; export PW MSG; sudo --preserve-env=PW,MSG docker exec -e PW -e MSG domhouse-broker sh -c "mosquitto_sub -h 172.30.83.2 -p 1883 -i lab-01.connector-rotazione-ascolto -u lab-01.connector -P \"\$PW\" -t lab-01/shellyplugmg3-9070695cb0d0/connector/rpc -C 1 -W 10 & L=\$!; sleep 2; printf %s \"\$MSG\" | mosquitto_pub -h 172.30.83.2 -p 1883 -i lab-01.connector-rotazione -u lab-01.connector -P \"\$PW\" -t lab-01/shellyplugmg3-9070695cb0d0/rpc -s; wait \$L"; echo "uscita $?"; unset PW MSG T'
+```
+
+- **Come passa la password:** la VM la legge dal segreto e la mette nel messaggio, che `mosquitto_pub` legge da stdin (`-s`), non dalla riga di comando. Il messaggio va alla presa attraverso il broker, poi in TLS. La risposta della presa non contiene la password.
+- **Atteso:** una riga `{"id":901,"src":"shellyplugmg3-9070695cb0d0","dst":"lab-01/shellyplugmg3-9070695cb0d0/connector","result":{"restart_required":true}}`, poi «uscita 0».
+- La presa tiene la password nuova, ma la usa solo dal prossimo riavvio. Fino ad allora resta collegata con quella vecchia.
+- **«uscita 27» senza righe:** la presa non ha risposto in 10 secondi, probabilmente è scollegata. Non fare R3. Controlla con la verifica 1 se è collegata, poi ripeti R2.
+- **Una riga con `"error"`:** la presa ha rifiutato. Non fare R3; incolla il testo alla memoria storica.
+- **Da verificare la prima volta:** che la Plug M Gen3 accetti `MQTT.SetConfig` arrivato proprio via MQTT. La documentazione Shelly Gen2+ lo prevede, ma noi non l'abbiamo ancora provato.
+
+### R3. Il broker accetta la password nuova (scrive sulla VM)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/broker-vm.sh sync'
+```
+
+- **Atteso:** «lab-01: connector e 1 dispositivi», «changed», «utenti e permessi ricaricati».
+- La ricarica non fa cadere chi è collegato: la presa resta collegata.
+
+### R4. Riavvio della presa e controllo (scrive nella presa)
+
+**Y guarda la presa:** si spegne la luce per qualche secondo e torna.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='set +x; T=$(curl -sf -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | python3 -c "import json,sys; print(json.load(sys.stdin)[\"access_token\"])"); PW=$(curl -sf -H "Authorization: Bearer $T" https://secretmanager.googleapis.com/v1/projects/domotica-poc-511707/secrets/langbrain-shelly-lab-01/versions/latest:access | python3 -c "import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)[\"payload\"][\"data\"]).decode().strip())"); MSG=$(python3 -c "import json; print(json.dumps(dict(id=902,src=\"lab-01/shellyplugmg3-9070695cb0d0/connector\",method=\"Shelly.Reboot\")))"); [ -n "$PW" ] || { echo "password del connector non letta da Secret Manager"; exit 1; }; export PW MSG; sudo --preserve-env=PW,MSG docker exec -e PW -e MSG domhouse-broker sh -c "mosquitto_sub -h 172.30.83.2 -p 1883 -i lab-01.connector-riavvio-ascolto -u lab-01.connector -P \"\$PW\" -t lab-01/shellyplugmg3-9070695cb0d0/connector/rpc -C 1 -W 10 & L=\$!; sleep 2; printf %s \"\$MSG\" | mosquitto_pub -h 172.30.83.2 -p 1883 -i lab-01.connector-riavvio -u lab-01.connector -P \"\$PW\" -t lab-01/shellyplugmg3-9070695cb0d0/rpc -s; wait \$L"; echo "uscita $?"; unset PW MSG T; echo "attesa di 60 secondi per il riavvio della presa"; sleep 60; sudo docker logs --since 2m domhouse-broker 2>&1 | grep "shellyplugmg3-9070695cb0d0"'
+```
+
+- **Atteso:**
+  1. la risposta `{"id":902,…,"result":null}` o simile, poi «uscita 0»;
+  2. dopo 60 secondi, nelle righe del broker, la presa che si scollega e poi «New client connected from … as lab-01.shellyplugmg3-9070695cb0d0 (p4, c1, k…)».
+- **Riuscito:** la presa si è ricollegata **con la password nuova**, perché il broker ormai conosce solo quella. La password passata in chat non vale più.
+- **«disconnected: not authorised»** con il nome della presa: la presa non ha la password nuova. Fermati e incolla il testo alla memoria storica. La soluzione di riserva è sotto.
+- **Nessuna riga «New client connected» dopo 60 secondi:** ripeti solo la verifica 1 dopo un minuto. Se ancora niente, Y guarda se la presa è accesa.
+
+### Soluzione di riserva (solo se R2 o R4 non riescono, e solo se il committente la sceglie)
+
+Come l'11 novembre: il committente legge sul suo schermo la password della sola presa e Y la scrive nella pagina web della presa (MQTT → Password). Poi riavvio della presa e verifica 1.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud secrets versions access latest --secret=langbrain-shelly-lab-01-devices --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com | .venv/Scripts/python.exe -c "import json,sys; print(json.load(sys.stdin)['shellyplugmg3-9070695cb0d0'])"
+```
+
+- Mostra **solo** la password della presa, non il resto del segreto.
+- Se R3 non è ancora stato fatto, va fatto prima del riavvio della presa.
