@@ -10,7 +10,8 @@
 //   kind              "approval" | "device_offline" | "instance_down" | "booking" (D-123) | "summary" (D-150) |
 //                     "frost_inactive" (lotto 30, tag "frost:<apartment_id>:<device_id>") |
 //                     "schedule_failed" (D-219, also an action done in part; tag "schedule:<apartment_id>:<decision_id>",
-//                     "maintenance:<apartment_id>" for the summary after a planned shutdown);
+//                     "maintenance:<apartment_id>" for the summary after a planned shutdown) |
+//                     "heating_unregulated" (P-90 S18, category offline, with device_id);
 //                     the page uses it to skip the toast only for what the apartment's live stream announces (P-83, D24)
 //   apartment_id      always; approval_id / device_id / ts when relevant
 // Extra keys are ignored. A push is never silent: a missing title/body/link gives a generic notification opening "/".

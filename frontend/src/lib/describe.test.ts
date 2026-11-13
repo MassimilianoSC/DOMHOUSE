@@ -100,6 +100,9 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     expect(actionLabel("mode_device_pending")).toBe("Modalità: comando in sospeso");
     // 1097 = a, o1 V1: regole salvate con le temperature delle modalità fuori da minimo e massimo (una per episodio)
     expect(actionLabel("limits_modes_outside")).toBe("Modalità: temperature fuori dai limiti");
+    // P-90 (o1): partenza spostata dopo il check-out, comfort rimesso (S5); caldaia che segue il comando senza regolazione (S18)
+    expect(actionLabel("booking_extended_comfort")).toBe("Partenza spostata: casa in comfort");
+    expect(actionLabel("heating_unregulated")).toBe("Caldaia: senza regolazione");
   });
 
   it("ogni azione che il motore scrive nelle decisioni è nell'elenco del sito (controllo automatico, lotto 39)", () => {

@@ -66,6 +66,7 @@ export const DECISION_ACTIONS = [
   "offline_alert", "mold_warning", "frost_heating_on", "frost_heating_off", "thermostat_sensor",
   "window_rule_suspended", "command_unverified", "connector_down", "connector_up", "auto_regulation_off", "frost_inactive",
   "setpoint_limits_ignored", "instance_reachable", "window_restore", "mode_device_pending", "limits_modes_outside",
+  "booking_extended_comfort", "heating_unregulated",
 ] as const;
 
 /** The kind of action of a decision, in Italian («Forzatura scaduta»); its code for one not translated yet. */
