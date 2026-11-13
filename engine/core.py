@@ -88,9 +88,10 @@ DEFAULT_RULES = [
     {"rule_id": "setpoint_limits", "label": "Limiti del setpoint", "enabled": True, "editable": True,
      # 1098 = b: two ranges. min/max the WINTER one (the boiler, a climate heating: eco and comfort inside it),
      # summer_min/summer_max the SUMMER one (a climate cooling or dehumidifying: the cooling inside it); no tie between
-     # them but comfort < cooling (D-162). A rule saved before gets the summer one with its first values (_rule_defaults)
+     # them but comfort < cooling (D-162). A rule saved before gets the summer one with its first values (_rule_defaults);
+     # first values 16–24 and 18–28 (answer 1099)
      "params": {"min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18, "comfort_cool_celsius": 25,
-                "summer_min": 22, "summer_max": 28},
+                "summer_min": 18, "summer_max": 28},
      "limits": {"min": {"min": 7, "max": 20}, "max": {"min": 20, "max": 28}, "comfort_celsius": {"min": 16, "max": 26},
                 "eco_celsius": {"min": 10, "max": 22}, "comfort_cool_celsius": {"min": 22, "max": 28},
                 "summer_min": {"min": 16, "max": 28}, "summer_max": {"min": 22, "max": 30}}},

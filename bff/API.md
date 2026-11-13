@@ -726,7 +726,7 @@ Esempio di risposta di #38 a «la finestra aperta spegne dopo 10 minuti e la pre
   caldaia può stare a 8 °C anche con `setpoint_min` 16.
 - Dal 13 novembre 2026 (1096 = a, 1098 = b) «Limiti del setpoint» ha DUE intervalli. `min` e `max` sono l'intervallo
   INVERNO (caldaia e clima che scalda; iniziali 16 e 24, limiti invariati): una regola salvata prima li tiene così.
-  `summer_min` e `summer_max` sono l'intervallo ESTATE (clima che raffresca o deumidifica; iniziali 22 e 28, limiti
+  `summer_min` e `summer_max` sono l'intervallo ESTATE (clima che raffresca o deumidifica; iniziali 18 e 28 (1099), limiti
   16–28 e 22–30): una regola salvata prima li riceve con i valori iniziali. Deve valere `min` ≤ `eco_celsius` ≤
   `comfort_celsius` ≤ `max`, `summer_min` ≤ `comfort_cool_celsius` ≤ `summer_max` e `comfort_celsius` <
   `comfort_cool_celsius`; nessun altro legame fra i due intervalli. 422 `invalid_range`, nell'ordine (frasi di o2):

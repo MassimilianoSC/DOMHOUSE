@@ -35,7 +35,7 @@ ENABLED_FIELD = "attiva"      # the tool's name for on/off: valore 1 = attiva, 0
 DEFAULTS = {
     "window_open_off": {"enabled": True, "minutes": 5},
     "setpoint_limits": {"enabled": True, "min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18,
-                        "comfort_cool_celsius": 25, "summer_min": 22, "summer_max": 28},
+                        "comfort_cool_celsius": 25, "summer_min": 18, "summer_max": 28},
     "frost_protection": {"enabled": True, "celsius": 8},
     "mold_protection": {"enabled": True, "humidity_percent": 65},
     "prearrival": {"enabled": True, "hours_before": 2},

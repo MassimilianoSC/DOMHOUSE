@@ -1,7 +1,7 @@
 """«Limiti del setpoint» with two ranges (1096 = a, 1098 = b, 13 Nov):
 - WINTER min/max (the boiler, a climate heating: eco and comfort inside it), SUMMER summer_min/summer_max (a climate
   cooling or dehumidifying: the cooling inside it); no tie between them but comfort < cooling (D-162); first values
-  16–24 and 22–28; a rule saved before keeps min/max as the winter range and gets the summer one;
+  16–24 and 18–28 (1099); a rule saved before keeps min/max as the winter range and gets the summer one;
 - a PUT /rules that touches the rule refuses a range broken (o2's sentences, in their order), also with the rule off;
   one that touches only other rules is not refused for a rule saved before;
 - a rule saved incoherent, while on: one decision «limits_modes_outside» per episode, also across restarts;
@@ -93,7 +93,7 @@ def applied(e, cmd):
 def test_the_first_values_two_ranges():
     rule = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False).rule("setpoint_limits")
     assert rule["params"] == {"min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18,
-                              "comfort_cool_celsius": 25, "summer_min": 22, "summer_max": 28}
+                              "comfort_cool_celsius": 25, "summer_min": 18, "summer_max": 28}
     assert rule["limits"]["summer_min"] == {"min": 16, "max": 28} and rule["limits"]["summer_max"] == {"min": 22, "max": 30}
 
 
@@ -108,7 +108,7 @@ def test_a_rule_saved_before_keeps_its_range_as_winter_and_gets_the_summer_one(t
     e.store.close()
     rule = engine(store=SqliteStore(db)).rule("setpoint_limits")
     assert (rule["params"]["min"], rule["params"]["max"]) == (17, 23)
-    assert (rule["params"]["summer_min"], rule["params"]["summer_max"]) == (22, 28)
+    assert (rule["params"]["summer_min"], rule["params"]["summer_max"]) == (18, 28)
     assert rule["limits"]["summer_max"] == {"min": 22, "max": 30}
 
 
@@ -174,7 +174,7 @@ def test_a_rule_saved_incoherent_one_decision_per_episode(tmp_path):
     e.store.close()
     e = run(start(SqliteStore(db)))
     assert len(outside(e)) == 2 and outside(e)[-1]["reasoning"].startswith(
-        "Temperature delle modalità fuori dai limiti del setpoint: raffrescamento 25 °C (estate 22–24 °C).")
+        "Temperature delle modalità fuori dai limiti del setpoint: raffrescamento 25 °C (estate 18–24 °C).")
 
 
 def test_a_rule_saved_incoherent_but_off_no_decision():
@@ -198,7 +198,7 @@ async def climate_on_at(e, setpoint, mode="heat"):
 
 
 def test_the_pair_follows_the_mode_of_the_climate():
-    """The simulated split is 16–24: heat 16–21 (winter after the change), cool and dry 22–24, fan 16–24."""
+    """The simulated split is 16–24: heat 16–21 (winter after the change), cool and dry 18–24, fan 16–24."""
     async def main():
         e = engine()
         put(e, max=21)
@@ -211,7 +211,7 @@ def test_the_pair_follows_the_mode_of_the_climate():
             seen.append(pair(e))
         return e, seen
     e, seen = run(main())
-    assert seen == [(16, 21), (22, 24), (22, 24), (16, 24), (16, 21)]
+    assert seen == [(16, 21), (18, 24), (18, 24), (16, 24), (16, 21)]
     last = [ev["data"]["state"] for ev in e.events if ev["event"] == "device.state" and ev["data"]["device_id"] == CLIMA]
     assert (last[-1]["setpoint_min"], last[-1]["setpoint_max"]) == (16, 21)          # the app hears it
 
@@ -219,17 +219,17 @@ def test_the_pair_follows_the_mode_of_the_climate():
 def test_a_mode_change_brings_the_setpoint_inside_the_new_range():
     async def main():
         e = engine()
-        before = await climate_on_at(e, 20)                               # heat at 20
+        before = await climate_on_at(e, 17)                               # heat at 17
         e.create_command(CLIMA, {"capability": "climate", "action": "set_climate", "params": {"mode": "cool"}},
                          ACTOR, CORR)
         await settle(e)
         return e, before
     e, before = run(main())
     [cmd] = climate_commands(e)[before:]
-    assert cmd["params"] == {"mode": "cool", "setpoint": 22} and cmd["status"] == "acked"
-    assert e.devices[CLIMA]["capabilities"]["climate"]["setpoint"] == 22
-    assert e.connector._devices[CLIMA].capabilities["climate"]["setpoint"] == 22
-    assert applied(e, cmd)["reasoning"] == "Comando manuale dall'app; setpoint 20 °C riportato a 22 °C (limiti 22–24)"
+    assert cmd["params"] == {"mode": "cool", "setpoint": 18} and cmd["status"] == "acked"
+    assert e.devices[CLIMA]["capabilities"]["climate"]["setpoint"] == 18
+    assert e.connector._devices[CLIMA].capabilities["climate"]["setpoint"] == 18
+    assert applied(e, cmd)["reasoning"] == "Comando manuale dall'app; setpoint 17 °C riportato a 18 °C (limiti 18–24)"
 
 
 def test_a_manual_command_is_checked_with_its_new_modes_range():
@@ -238,32 +238,32 @@ def test_a_manual_command_is_checked_with_its_new_modes_range():
     assert state["mode"] == "heat"
     with pytest.raises(core.MockError) as exc:
         e.validate_command(e.devices[CLIMA], {"capability": "climate", "action": "set_climate",
-                                              "params": {"mode": "cool", "setpoint": 21}})
-    assert (exc.value.status, exc.value.error, exc.value.details) == (422, "setpoint_out_of_range", {"min": 22, "max": 24})
+                                              "params": {"mode": "cool", "setpoint": 17}})
+    assert (exc.value.status, exc.value.error, exc.value.details) == (422, "setpoint_out_of_range", {"min": 18, "max": 24})
     body, note = e._within_limits(e.devices[CLIMA], {"capability": "climate", "action": "set_climate",
-                                                     "params": {"mode": "cool", "setpoint": 21}})
-    assert body["params"]["setpoint"] == 22 and note == "setpoint 21 °C riportato a 22 °C (limiti 22–24)"
+                                                     "params": {"mode": "cool", "setpoint": 17}})
+    assert body["params"]["setpoint"] == 18 and note == "setpoint 17 °C riportato a 18 °C (limiti 18–24)"
 
 
 def test_the_remote_control_is_not_limited():
-    """A split that reports its state, switched to cool at 19 with its own remote: the pair of cool, the 19 as it is,
+    """A split that reports its state, switched to cool at 17 with its own remote: the pair of cool, the 17 as it is,
     no command."""
     async def main():
         e = engine()
         before = await climate_on_at(e, 20)
-        e.connector.set_state(CLIMA, "climate", {"mode": "cool", "setpoint": 19})
+        e.connector.set_state(CLIMA, "climate", {"mode": "cool", "setpoint": 17})
         await asyncio.sleep(0.2)
         await settle(e)
         return e, before
     e, before = run(main())
     state = e.devices[CLIMA]["capabilities"]["climate"]
-    assert (state["mode"], state["setpoint"], pair(e)) == ("cool", 19, (22, 24))
+    assert (state["mode"], state["setpoint"], pair(e)) == ("cool", 17, (18, 24))
     assert len(climate_commands(e)) == before and e.limits_push == {}
 
 
 # -------- the device's limits say so --------
 def test_the_devices_limit_cuts_the_cooling_and_the_decision_says_it():
-    """Summer range 22–28, the simulated split 16–24: comfort with the room at 29 °C cools to 24, not 25."""
+    """Summer range 18–28, the simulated split 16–24: comfort with the room at 29 °C cools to 24, not 25."""
     async def main():
         e = engine()
         e.ensure_started()

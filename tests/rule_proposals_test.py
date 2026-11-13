@@ -367,7 +367,7 @@ def fresh_rules():
 
 
 def test_a_proposal_never_breaks_the_ranges():
-    ruleset = fresh_rules()                                    # winter 16–24, summer 22–28, eco 18, comfort 21, cooling 25
+    ruleset = fresh_rules()                                    # winter 16–24, summer 18–28, eco 18, comfort 21, cooling 25
     for patch, message in (({"min": 19}, "La temperatura eco non può essere sotto il minimo invernale"),
                            ({"comfort_celsius": 24.5}, "La temperatura comfort non può superare il massimo invernale"),
                            ({"summer_min": 27, "summer_max": 24}, "Il minimo estivo non può superare il massimo estivo"),
