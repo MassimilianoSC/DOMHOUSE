@@ -42,7 +42,9 @@ describe("forzatura con una finestra aperta (D-127)", () => {
     await click("hold-btn-120");
     const dialog = screen.getByTestId("hold-window-warning");
     expect(dialog).toHaveTextContent(t("hold.windowOpen", { rooms: "Soggiorno" }));
-    expect(dialog).toHaveTextContent("Finestra aperta in Soggiorno: durante la forzatura il clima resta acceso.");
+    // P-90 S2 (o1 529a77b): «il clima resta acceso» era falso se la finestra l'aveva già spento; ora il ripristino aspetta
+    // la fine della forzatura, con la finestra chiusa
+    expect(dialog).toHaveTextContent("Finestra aperta in Soggiorno: durante la forzatura la finestra non spegne clima e caldaia; se li aveva già spenti, ripartono quando la forzatura finisce e la finestra è chiusa.");
     expect(s.setHold).not.toHaveBeenCalled();
     await click("hold-window-confirm");
     expect(s.setHold).toHaveBeenCalledWith({ minutes: 120 }, expect.any(String));
@@ -52,7 +54,7 @@ describe("forzatura con una finestra aperta (D-127)", () => {
   it("più finestre aperte: elenca le stanze, una volta sola ciascuna", async () => {
     setup([win("w1", "r-sog", true), win("w2", "r-cam", true), win("w3", "r-sog", true), win("w4", "r-cuc", false)]);
     await click("hold-btn-360");
-    expect(screen.getByTestId("hold-window-warning")).toHaveTextContent("Finestre aperte in Soggiorno e Camera: durante la forzatura il clima resta acceso.");
+    expect(screen.getByTestId("hold-window-warning")).toHaveTextContent("Finestre aperte in Soggiorno e Camera: durante la forzatura le finestre non spengono clima e caldaia; se li avevano già spenti, ripartono quando la forzatura finisce e le finestre sono chiuse.");
   });
 
   it("annullando, nessuna forzatura", async () => {
@@ -78,6 +80,8 @@ describe("forzatura con un sensore finestra senza segnale (P-83, D44)", () => {
     setup([clima, { ...win("w1", "r-cam", false), online: false } as Device]);
     await click("hold-btn-30");
     expect(screen.getByTestId("hold-window-warning")).toHaveTextContent(t("hold.windowUnknown", { rooms: "Camera" }));
+    expect(screen.getByTestId("hold-window-warning")).toHaveTextContent("Sensore della finestra senza segnale in Camera: se è aperta, durante la forzatura non spegne clima e caldaia; se li aveva già spenti, ripartono quando la forzatura finisce e la finestra è chiusa.");
+    expect(screen.getByTestId("hold-window-warning")).not.toHaveTextContent("resta acceso");
     expect(s.setHold).not.toHaveBeenCalled();
   });
 });

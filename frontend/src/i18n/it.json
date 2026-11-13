@@ -532,9 +532,9 @@
     "h2": "2 h",
     "h6": "6 h",
     "windowTitle": "Finestra aperta",
-    "windowOpen": "Finestra aperta in {rooms}: durante la forzatura il clima resta acceso.",
-    "windowsOpen": "Finestre aperte in {rooms}: durante la forzatura il clima resta acceso.",
-    "windowUnknown": "Sensore della finestra senza segnale in {rooms}: se è aperta, durante la forzatura il clima resta acceso.",
+    "windowOpen": "Finestra aperta in {rooms}: durante la forzatura la finestra non spegne clima e caldaia; se li aveva già spenti, ripartono quando la forzatura finisce e la finestra è chiusa.",
+    "windowsOpen": "Finestre aperte in {rooms}: durante la forzatura le finestre non spengono clima e caldaia; se li avevano già spenti, ripartono quando la forzatura finisce e le finestre sono chiuse.",
+    "windowUnknown": "Sensore della finestra senza segnale in {rooms}: se è aperta, durante la forzatura non spegne clima e caldaia; se li aveva già spenti, ripartono quando la forzatura finisce e la finestra è chiusa.",
     "windowConfirm": "Forza comunque"
   },
   "apartments": {
