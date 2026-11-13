@@ -1,6 +1,6 @@
 # Limiti noti di DOMHOUSE
 
-*Aggiornato il 9 novembre 2026 (lotto 36). Regola del committente (D-204): ogni limite che conosciamo sta scritto qui.*
+*Aggiornato il 13 novembre 2026 (revisione per scenari P-90). Regola del committente (D-204): ogni limite che conosciamo sta scritto qui.*
 
 **Come leggerlo:** «Stato» dice se il limite è accettato, se è in lavorazione o se va ancora verificato.
 
@@ -14,7 +14,7 @@
 | **Eventi molto vecchi** | Se nessun server resta collegato a un motore per più di un'ora, gli eventi più vecchi di un'ora non generano notifiche; resta una riga nei log | Accettato |
 | **Primo avvio del lotto 36** | Un dispositivo già offline da meno di 6 giorni manda una notifica, anche se era già stata mandata | Una tantum |
 
-## Notifica «sistema domotico non raggiungibile» (dal lotto 38, D-217)
+## Notifica «sistema domotico non raggiungibile» (dal lotto 38, D-217; soglia fissa di 15 minuti dal 13 novembre, risposta 1104)
 
 | Limite | Cosa succede | Stato |
 |---|---|---|
@@ -23,6 +23,8 @@
 | **Riassunto a fine manutenzione** | Se il motore riparte due volte nella stessa sospensione conta solo il primo gruppo di azioni saltate; con una sospensione più lunga di 6 giorni il riassunto parte al sesto giorno; se la sospensione viene prolungata dopo che il riassunto è già in attesa, parte alla data vecchia | Accettato |
 | **Pubblicazione durante una sospensione** | Una pubblicazione toglie la sospensione degli avvisi | Accettato (M19) |
 | **Chiave rifiutata** | Un motore che risponde ma rifiuta la chiave conta come irraggiungibile | Accettato |
+| **Categoria spenta dall'utente** | Chi spegne «Dispositivi e sistema domotico offline» nelle sue Impostazioni non riceve nemmeno l'avviso del sistema fermo (la regola offline invece non lo spegne più) | Accettato |
+| **Appartamento disattivato** | Gli automatismi continuano, ma notifiche (anche le gravi), riepiloghi, prenotazioni ed Excel si fermano; le prenotazioni non si recuperano alla riattivazione | Accettato, detto nella conferma (risposta 1107) |
 
 ## Disponibilità del server
 
@@ -81,6 +83,8 @@
 | Limite | Cosa succede | Stato |
 |---|---|---|
 | **Formato di Italianway non ancora noto** | Il traduttore delle prenotazioni è provvisorio: con prenotazioni reali di Italianway il pre-arrivo automatico e il risparmio al check-out **non sono disponibili** finché Italianway non manda il formato vero | Da chiedere a Leonardo (committente) |
+| **Check-in e check-out effettivi** | Non sappiamo se Italianway li manderà. Se li manda: il check-in effettivo non porta il comfort a un ospite arrivato prima del pre-arrivo (S22); il check-out effettivo non anticipa il risparmio (S23); un check-in ritentato dopo una modifica viene scartato (S24) | Da chiedere a Leonardo; riparazioni dopo la risposta (P-90) |
+| **Occupazione prima del check-in** | Fino all'orario di check-in della prenotazione l'occupazione è «Vuoto», anche durante il pre-arrivo | Accettato (guida corretta il 13 novembre) |
 
 ## Motore
 
@@ -97,6 +101,13 @@
 | **Pausa del compressore dopo un riavvio** | Era tenuta in memoria e un riavvio la azzerava | Corretto il 10 novembre (`ce7d7a5`): si salva e continua dopo un riavvio; lotto 38 |
 | **Finestra chiusa e riaperta mentre la regola aspetta** | Partono due attese, e il clima si spegne allo scadere della prima (c'era già prima del lotto 38) | Accettato |
 | **Azione programmata rifiutata dal motore** | Diventava «non riuscita» senza una riga nelle Decisioni con il motivo | Corretto il 10 novembre (`0e1d04a`), nel lotto 38 |
+| **Caldaia comandata a mano senza sensore** | Un comando a mano sulla caldaia vale anche se poi il sensore smette di rispondere (D-164): il relè resta acceso senza sosta, anche a casa vuota | Accettato (risposta 1105), con la notifica «caldaia senza regolazione» dal 13 novembre |
+| **Telecomando del climatizzatore** | I limiti di temperatura non valgono per il telecomando, e il sistema non vede la temperatura scelta: vede solo acceso o spento, dal consumo, e solo se c'è il misuratore | Accettato |
+| **Climatizzatore spento col telecomando** | Viene creduto spento solo dopo 5 minuti di consumo sotto 15 W: nei primi 5 minuti l'app lo mostra acceso | Accettato (risposta 1101) |
+| **Sensore della finestra senza segnale** | Una finestra il cui sensore va offline conta come chiusa: se è davvero aperta, si scalda finché qualcuno non interviene | Accettato (risposta 1102) |
+| **Il motore non sa la stagione** | In comfort la caldaia è abilitata alla temperatura di comfort tutto l'anno: una notte fresca d'estate può accenderla | Da decidere (P-90, osservazione E1) |
+| **Caldaia rotta con il comando che funziona** | Nessun avviso se la temperatura resta sotto l'antigelo e non risale | Da decidere (P-90, osservazione E2) |
+| **Prezzo dell'Excel** | L'importo usa il prezzo in vigore il giorno in cui si scarica il file, anche per i mesi passati | Accettato (scritto in guida) |
 
 ## Orari e cambio d'ora
 
@@ -150,3 +161,7 @@
 | **Gen4 in modalità Zigbee** | I sensori Bluetooth spariscono: i Gen4 restano in Wi-Fi | Vincolo di installazione |
 | **Infrarossi** | Il climatizzatore non dà conferma di ritorno: l'esito si deduce dal consumo | Accettato |
 | **Portata dell'Athom** | Non dichiarata dal produttore; sotto 4–5 metri serve un trasmettitore più potente | Da misurare |
+| **Relè della caldaia senza sicurezza propria** | Se la catena si interrompe (server, broker, motore, Wi-Fi della caldaia), il relè resta com'era: o scalda per tutto il fermo, o a casa vuota l'antigelo non agisce | Da fare con Youssouf prima del pilota: spegnimento automatico sul relè e rinnovo dal motore (P-90 S4) |
+| **Due split sullo stesso misuratore** | Lo stato dei due split si confonde (uno spento risulta acceso) | Da chiedere al cliente se ci sono dual split (P-90 S8) |
+| **Split fermo a temperatura raggiunta** | Sotto 15 W viene creduto spento; con alcuni modelli in riscaldamento il consumo a riposo è basso | Da misurare al collaudo per ogni modello e regolare la soglia per appartamento (P-90 S9) |
+| **Orologio del ponte Bluetooth** | Lo scarto d'orologio del ponte si prende anche da notifiche non affidabili (EM Mini 13,5 s, Shelly 1 Gen4 dopo un riavvio circa 1750 s) | Seguito chiesto a Youssouf il 13 novembre |
