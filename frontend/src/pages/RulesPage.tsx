@@ -36,6 +36,23 @@ function effective(rule: Rule, d?: Draft[string]) {
   return { enabled: d?.enabled ?? rule.enabled, params };
 }
 
+/** 1098 = b: «Limiti del setpoint» in two groups, winter (heating) and summer (cooling), in the order of their checks;
+ *  any other parameter (and every other rule) in one group without a title, as before. */
+type Group = { id: string; title?: () => string; keys: string[] };
+const GROUPS: Record<string, Group[]> = {
+  setpoint_limits: [
+    { id: "winter", title: () => t("rules.groups.winter"), keys: ["min", "max", "eco_celsius", "comfort_celsius"] },
+    { id: "summer", title: () => t("rules.groups.summer"), keys: ["summer_min", "summer_max", "comfort_cool_celsius"] },
+  ],
+};
+
+function groupsOf(rule: Rule): Group[] {
+  const known = (GROUPS[rule.rule_id] ?? []).map((g) => ({ ...g, keys: g.keys.filter((k) => k in rule.limits) })).filter((g) => g.keys.length);
+  const grouped = new Set(known.flatMap((g) => g.keys));
+  const rest = Object.keys(rule.limits).filter((k) => !grouped.has(k));
+  return rest.length ? [...known, { id: "", keys: rest }] : known;
+}
+
 function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Draft[string]; onChange: (d: Draft[string]) => void; canWrite: boolean }) {
   const editable = canWrite && rule.editable;
   const eff = effective(rule, draft);
@@ -66,9 +83,11 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
           />
         </div>
       </div>
-      {Object.keys(rule.limits).length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {Object.entries(rule.limits).map(([key, lim]) => (
+      {groupsOf(rule).map((group) => (
+        <div key={group.id} className="space-y-2" data-testid={group.id ? `rule-group-${rule.rule_id}-${group.id}` : undefined}>
+          {group.title && <h4 className="text-sm font-semibold">{group.title()}</h4>}
+          <div className="grid gap-3 sm:grid-cols-2">
+          {group.keys.map((key) => [key, rule.limits[key]] as const).map(([key, lim]) => (
             <div key={key} className="space-y-1">
               <label htmlFor={`rule-${rule.rule_id}-${key}`} className="text-[13px] font-medium text-muted-foreground">
                 {tOr(`rules.params.${key}`, key)} <span className="font-normal normal-case">({t("rules.range", { min: fmtNumber(lim.min), max: fmtNumber(lim.max) })})</span>
@@ -96,8 +115,9 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
               {errs[key] && <p className="text-xs font-medium text-destructive" data-testid={`rule-param-error-${rule.rule_id}-${key}`}>{errs[key]}</p>}
             </div>
           ))}
+          </div>
         </div>
-      )}
+      ))}
     </Card>
   );
 }
@@ -127,30 +147,27 @@ export default function RulesPage() {
   const hasErrors = rules.some((r) => Object.keys(paramErrors(r, draft[r.rule_id])).length > 0);
   const sl = rules.find((r) => r.rule_id === "setpoint_limits");
   const slEff = sl ? effective(sl, draft[sl.rule_id]).params : null;
-  // The same checks as the engine, before saving, with its sentences, in its order (lotto 30; 1096/1097 = a, o1 V1):
-  // min ≤ eco ≤ comfort < cooling ≤ max. The three of lotto 30 always; the two of the chain's ends (eco under the
-  // minimum, cooling over the maximum) only when the change touches «Limiti del setpoint», as the engine does: rules
-  // saved before that break them (the old max 24 under cooling 25) are said as a warning, and another rule still saves.
-  const has = (k: string) => slEff !== null && typeof slEff[k] === "number";
+  // The same checks as the engine, before saving, with its sentences, in its order a–g (lotto 30; 1096/1097 = a;
+  // 1098 = b, two ranges): winter min ≤ eco ≤ comfort ≤ winter max; summer min ≤ cooling ≤ summer max; comfort <
+  // cooling. a, c, g always; b, d, e, f only when the change touches «Limiti del setpoint», as the engine does: rules
+  // saved before that break them are said as a warning, and another rule still saves.
+  const v = (k: string) => (slEff !== null && typeof slEff[k] === "number" ? slEff[k] : null);
+  const lt = (x: number | null, y: number | null) => x !== null && y !== null && x < y;
   const slTouched = Boolean(sl && patches.some((p) => p.rule_id === sl.rule_id));
-  const always = slEff
-    ? [
-        slEff.min > slEff.max ? t("rules.invalidRange") : null,
-        has("eco_celsius") && has("comfort_celsius") && slEff.eco_celsius > slEff.comfort_celsius ? t("rules.ecoAboveComfort") : null,
-        has("comfort_cool_celsius") && has("comfort_celsius") && slEff.comfort_cool_celsius <= slEff.comfort_celsius ? t("rules.coolNotAboveComfort") : null,
-      ]
-    : [];
-  const ends = slEff
-    ? [
-        has("eco_celsius") && slEff.eco_celsius < slEff.min ? t("rules.ecoBelowMin") : null,
-        has("comfort_cool_celsius") && slEff.comfort_cool_celsius > slEff.max ? t("rules.coolAboveMax") : null,
-      ]
-    : [];
-  const join = (list: (string | null)[]) => (list.some(Boolean) ? list.filter(Boolean).join(" · ") : null);
-  const [a, c, d] = always;
-  const [b, e] = ends;
-  const rangeError = join(slTouched ? [a, b, c, d, e] : [a, c, d]);
-  const rangeWarning = slTouched ? null : join([b, e]);
+  const [min, max, eco, comfort, cool, sMin, sMax] = ["min", "max", "eco_celsius", "comfort_celsius", "comfort_cool_celsius", "summer_min", "summer_max"].map(v);
+  const checks: [boolean, string, boolean][] = [   // [fails, message, always]
+    [lt(max, min), t("rules.invalidRange"), true],
+    [lt(eco, min), t("rules.ecoBelowMin"), false],
+    [lt(comfort, eco), t("rules.ecoAboveComfort"), true],
+    [lt(max, comfort), t("rules.comfortAboveMax"), false],
+    [lt(sMax, sMin), t("rules.summerInvalidRange"), false],
+    [lt(cool, sMin) || lt(sMax, cool), t("rules.coolOutsideSummer"), false],
+    [cool !== null && comfort !== null && cool <= comfort, t("rules.coolNotAboveComfort"), true],
+  ];
+  const join = (messages: string[]) => (messages.length ? messages.join(" · ") : null);
+  const failing = checks.filter(([fails]) => fails);
+  const rangeError = join(failing.filter(([, , always]) => always || slTouched).map(([, k]) => k));
+  const rangeWarning = slTouched ? null : join(failing.filter(([, , always]) => !always).map(([, k]) => k));
 
   const save = async () => {
     setSaving(true);
