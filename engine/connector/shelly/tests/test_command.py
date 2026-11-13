@@ -4,6 +4,7 @@ connector.md §2.5). Each test runs its own event loop, as test_interface.py doe
 Run: python -m pytest engine/connector/shelly/tests -q
 """
 import asyncio
+import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -184,10 +185,14 @@ def test_rpc_error_on_read_back_is_not_retried():
 def test_no_retry_after_the_deadline():
     device = FakePlugMG3(SID, on=False)
     device.hang_next("Switch.GetStatus")
-    # the first read back eats the time left: the retry would start after the deadline, so it never does
+    # the first read back gets the time left (about 0.15 s), not rpc_timeout_s (1 s): the command ends near the
+    # deadline, and the retry would start after it, so it never does
+    began = time.monotonic()
     result, _, calls = go(device, {"on": True}, deadline_s=0.15, rpc_timeout_s=1.0)
+    took = time.monotonic() - began
     assert result.detail == "read back failed: transport timeout"
     assert calls == ["Switch.Set", "Switch.GetStatus"]
+    assert 0.1 <= took < 0.5, took
 
 
 def test_deadline_already_passed_sends_nothing():

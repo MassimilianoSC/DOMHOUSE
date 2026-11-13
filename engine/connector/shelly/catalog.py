@@ -17,6 +17,19 @@ The format (YAML, one file per apartment, /data/<apartment_id>/catalog.yaml by d
           channel: 0                         # optional, 0 by default
           offline_after_s: 120               # optional, overrides the threshold of the type
 
+A Shelly BLU sensor (battery, Bluetooth) has no shelly_id of its own: a powered Shelly of the catalog receives its
+packets and is its bridge (translate.py, «Shelly BLU sensors»). Its shelly section names the sensor and the bridge:
+
+        shelly:
+          addr: 02:00:00:00:00:01            # the sensor's Bluetooth MAC, any case (compared in lower case)
+          bridge: shelly1g4-000000000002     # the shelly.id of the bridge, a device of this catalog
+          type: blu_ht                       # blu_ht, blu_motion or blu_door_window (translate.BLU_MODELS)
+          offline_after_s: 200               # optional, as above
+
+No id and no channel: the sensor is not a topic of the broker and has one channel. One bridge per sensor; a MAC
+appears once in the catalog. The capabilities are what the sensor measures: blu_ht temperature and/or humidity,
+blu_motion motion, blu_door_window contact. A section with addr or bridge is a BLU sensor, one without is a Shelly.
+
 What is checked, all at start: the structure; room and device ids unique; every room_id exists; capabilities among the
 eight of interface.CAPABILITIES; links only with the keys of interface.LINKS, to devices of the catalog that have the
 right capability; shelly ids unique and one MQTT topic level each; the offline threshold of every device
@@ -38,15 +51,24 @@ from pathlib import Path
 from engine.connector.interface import CAPABILITIES, LINKS, Room
 
 from .offline import OfflineThresholds, OfflineThresholdsError
-from .translate import ModelProfile, profile_for_catalog, supported_models
+from .translate import (BluModel, ModelProfile, blu_model_for, normalize_mac, profile_for_catalog, supported_blu,
+                        supported_models)
 
 ROOM_KEYS = {"room_id", "name"}
 DEVICE_KEYS = {"device_id", "label", "room_id", "capabilities", "links", "shelly"}
 SHELLY_KEYS = {"id", "type", "channel", "offline_after_s"}
+BLU_SHELLY_KEYS = {"addr", "bridge", "type", "offline_after_s"}
 
 
 class CatalogError(ValueError):
     """The catalog is missing or wrong. The message names the place (device, field), never the value."""
+
+
+@dataclass(frozen=True)
+class BluSensor:
+    addr: str                               # the sensor's MAC, lower case
+    bridge: str                             # the shelly_id of the bridge, a device of the catalog
+    model: BluModel = field(repr=False)
 
 
 @dataclass(frozen=True)
@@ -56,11 +78,12 @@ class CatalogDevice:
     room_id: str
     capabilities: Mapping[str, Mapping]     # capability -> the catalog's values ({} when it has none)
     links: Mapping[str, str]
-    shelly_id: str
+    shelly_id: str | None                   # None for a BLU sensor (blu)
     device_type: str
     channel: int
     offline_after_s: float
-    profile: ModelProfile = field(repr=False)
+    profile: ModelProfile | None = field(repr=False)    # None for a BLU sensor (blu)
+    blu: BluSensor | None = None            # a BLU sensor: its MAC and its bridge
 
 
 @dataclass(frozen=True)
@@ -69,7 +92,8 @@ class Catalog:
     devices: tuple[CatalogDevice, ...]
 
     def by_shelly_id(self) -> dict[str, CatalogDevice]:
-        return {d.shelly_id: d for d in self.devices}
+        """The Shelly devices (the BLU sensors have no shelly_id)."""
+        return {d.shelly_id: d for d in self.devices if d.shelly_id is not None}
 
     def by_device_id(self) -> dict[str, CatalogDevice]:
         return {d.device_id: d for d in self.devices}
@@ -210,6 +234,8 @@ def _device(entry, n: int, rooms: set[str], thresholds: OfflineThresholds) -> Ca
     shelly = entry.get("shelly")
     if not isinstance(shelly, Mapping):
         raise CatalogError(f"{where}: shelly section is missing or not a mapping")
+    if "addr" in shelly or "bridge" in shelly:
+        return _blu_device(entry, where, room_id, caps, links, shelly, thresholds)
     _unknown_keys(shelly, SHELLY_KEYS, f"{where}: shelly")
     shelly_id = _shelly_id(shelly, where)
     channel = _channel(shelly, where)
@@ -226,6 +252,32 @@ def _device(entry, n: int, rooms: set[str], thresholds: OfflineThresholds) -> Ca
                          offline_after_s=threshold, profile=profile)
 
 
+def _blu_device(entry: Mapping, where: str, room_id: str, caps: dict, links: Mapping, shelly: Mapping,
+                thresholds: OfflineThresholds) -> CatalogDevice:
+    """A BLU sensor's entry (see the module's docstring); its bridge is checked against the whole catalog later."""
+    _unknown_keys(shelly, BLU_SHELLY_KEYS, f"{where}: shelly")
+    raw_addr = shelly.get("addr")
+    addr = normalize_mac(raw_addr)
+    if addr is None or "," in raw_addr:
+        raise CatalogError(f"{where}: shelly.addr is missing or not a Bluetooth MAC (aa:bb:cc:dd:ee:ff)")
+    if not _text(shelly.get("bridge")):
+        raise CatalogError(f"{where}: shelly.bridge is missing or not a text")
+    try:
+        threshold = thresholds.for_device(shelly, entry["device_id"])
+    except OfflineThresholdsError as exc:
+        raise CatalogError(str(exc)) from None
+    model = blu_model_for(shelly["type"])
+    if model is None:
+        raise CatalogError(f"{where}: shelly.type is not a BLU sensor type (supported today: {supported_blu()})")
+    if not model.covers(caps):
+        raise CatalogError(f"{where}: capabilities are not measured by this BLU sensor "
+                           f"(supported today: {supported_blu()})")
+    return CatalogDevice(device_id=entry["device_id"], label=entry["label"], room_id=room_id, capabilities=caps,
+                         links=dict(links), shelly_id=None, device_type=shelly["type"], channel=0,
+                         offline_after_s=threshold, profile=None,
+                         blu=BluSensor(addr=addr, bridge=shelly["bridge"], model=model))
+
+
 def parse_catalog(data, thresholds: OfflineThresholds) -> Catalog:
     """The checks of the module's docstring on an already-read catalog (a mapping)."""
     if not isinstance(data, Mapping):
@@ -239,16 +291,29 @@ def parse_catalog(data, thresholds: OfflineThresholds) -> Catalog:
     devices: list[CatalogDevice] = []
     device_ids: set[str] = set()
     shelly_ids: dict[str, str] = {}
+    addrs: dict[str, str] = {}
     for n, entry in enumerate(raw_devices, 1):
         if isinstance(entry, Mapping) and _text(entry.get("device_id")) and entry["device_id"] in device_ids:
             raise CatalogError(f"catalog device {entry['device_id']}: device_id is repeated")
         device = _device(entry, n, room_ids, thresholds)
+        if device.blu is not None:
+            if device.blu.addr in addrs:
+                raise CatalogError(f"catalog device {device.device_id}: shelly.addr is the same as device "
+                                   f"{addrs[device.blu.addr]}")
+            addrs[device.blu.addr] = device.device_id
+            device_ids.add(device.device_id)
+            devices.append(device)
+            continue
         if device.shelly_id in shelly_ids:
             raise CatalogError(f"catalog device {device.device_id}: shelly.id is the same as device "
                                f"{shelly_ids[device.shelly_id]}")
         device_ids.add(device.device_id)
         shelly_ids[device.shelly_id] = device.device_id
         devices.append(device)
+    for device in devices:
+        if device.blu is not None and device.blu.bridge not in shelly_ids:
+            raise CatalogError(f"catalog device {device.device_id}: shelly.bridge is not the shelly.id of a device "
+                               f"of the catalog")
     by_id = {d.device_id: d for d in devices}
     for device in devices:
         for key, target in device.links.items():

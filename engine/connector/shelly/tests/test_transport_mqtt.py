@@ -345,7 +345,6 @@ def test_only_the_asked_device_can_answer():
         forged = {"forged": True}
         broker.device_publish(answer_topic(SID2), json.dumps({"id": rid, "src": SID2, "result": forged}))
         broker.device_publish(answer_topic(SID2), json.dumps({"id": rid, "src": SID, "result": forged}))
-        broker.device_publish(answer_topic(SID), json.dumps({"id": rid, "src": SID2, "result": forged}))
         broker.device_publish(answer_topic(SID), json.dumps({"id": rid + 1000, "src": SID, "result": forged}))
         await settle()
         assert not call.done()
@@ -488,17 +487,41 @@ def test_broker_drop_fails_pending_rpcs_marks_all_offline_and_reconnects():
 MARKER = "content-marker-41"
 
 
-def test_topic_and_src_that_differ_are_dropped(logs):
-    async def scenario():
-        broker = FakeBroker()
-        t = await started(broker)
+def test_src_other_than_the_topic_is_handled_with_one_warning_per_device(logs):
+    """The Shelly puts its native id in src; with another id in the catalog (the topic's) its answers and
+    notifications still count: the topic, which the broker grants to that device only, says who it is. One warning
+    per device while the difference lasts, again only after it was gone; never the value of src nor the payload."""
+    native = "shellyplugmg3-" + MARKER                  # the device's own id, not the catalog's
+
+    def answer(shelly_id, request):
+        return {"id": request["id"], "src": native, "dst": request["src"], "result": {"was_on": False}}
+
+    def notify(src, n):
         broker.device_publish(f"{APT}/{SID}/events/rpc", json.dumps(
-            {"src": SID2, "method": "NotifyStatus", "params": {"switch:0": {"output": True, "tag": MARKER}}}))
+            {"src": src, "method": "NotifyStatus", "params": {"ts": 1.0 + n, "switch:0": {"output": True}}}))
+
+    broker = FakeBroker(responder=answer)
+
+    async def scenario():
+        t = await started(broker)
+        broker.set_online(APT, SID, True)
         await settle()
-        assert await drain(t) == []
+        assert await t.call(SID, "Switch.Set", {"id": 0, "on": True}, 1) == {"was_on": False}
+        notify(native, 1)
+        notify(native, 2)
+        assert await t.call(SID, "Switch.Set", {"id": 0, "on": True}, 1) == {"was_on": False}
+        await settle()
+        notes = [i for i in await drain(t) if isinstance(i, Notification)]
+        assert [(i.shelly_id, i.method, i.params["ts"]) for i in notes] == [(SID, "NotifyStatus", 2.0),
+                                                                           (SID, "NotifyStatus", 3.0)]
+        assert rendered(logs).count("mqtt src does not match topic") == 1
+        notify(SID, 3)                                  # the same again: the difference is gone...
+        notify(native, 4)                               # ...and back: warned again
+        await settle()
+        assert len([i for i in await drain(t) if isinstance(i, Notification)]) == 2
         await t.stop()
     run(scenario)
-    assert "mqtt src does not match topic" in rendered(logs)
+    assert rendered(logs).count("mqtt src does not match topic") == 2
     assert MARKER not in rendered(logs)
 
 

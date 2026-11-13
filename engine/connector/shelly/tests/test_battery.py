@@ -73,3 +73,13 @@ def test_devices_are_independent():
 
 def test_threshold_matches_the_sensors_flag():
     assert LOW_PERCENT == 15.0
+
+
+def test_battery_of_the_bthome_device():
+    """The source the connector uses for the BLU sensors: bthomedevice.status.battery."""
+    from engine.connector.shelly.battery import battery_from_bthome_device
+    assert battery_from_bthome_device({"id": 200, "battery": 100, "packet_id": 16}) == 100.0
+    assert battery_from_bthome_device({"id": 200, "packet_id": 17, "rssi": -66}) is None    # not in every report
+    assert battery_from_bthome_device({"battery": None}) is None
+    assert battery_from_bthome_device({"battery": True}) is None
+    assert battery_from_bthome_device({"battery": 130}) == 100.0

@@ -1,0 +1,208 @@
+{
+ "_note": "REAL answers of a Shelly EM Mini Gen4 bridge (firmware 1.7.0, bench of 11 November 2026, afternoon) with a BLU H&T, a BLU Motion and a BLU Door/Window paired: the bridge cannot decode the Motion (bthomedevice:200) and the Door/Window (bthomedevice:202), errors [\"parse_failed\"], no bthomesensor for them; the H&T is healthy. MACs and shelly id replaced with the invented ones of the other fixtures (H&T a1:01, Motion a1:02, Door/Window a1:03); nothing else changed. page: Shelly.GetComponents {\"dynamic_only\": true} (one page, total 6), answered at about 1794414500. notifications: in order, the bthomedevice NotifyStatus of the two sensors in error: the first carries errors, the report 60 s later repeats last_updated_ts and rssi WITHOUT errors (while GetComponents still shows them).",
+ "page": {
+  "components": [
+   {
+    "key": "bthomedevice:200",
+    "status": {
+     "id": 200,
+     "rssi": -43,
+     "battery": null,
+     "packet_id": null,
+     "last_updated_ts": 1794413984,
+     "paired": true,
+     "rpc": false,
+     "rsv": -1,
+     "fw_ver": "v1.2.20",
+     "errors": [
+      "parse_failed"
+     ]
+    },
+    "config": {
+     "id": 200,
+     "addr": "02:00:00:00:a1:02",
+     "name": null,
+     "key": null,
+     "meta": {
+      "ui": {
+       "view": "regular"
+      }
+     }
+    },
+    "attrs": {
+     "flags": 0,
+     "model_id": 19
+    }
+   },
+   {
+    "key": "bthomedevice:201",
+    "status": {
+     "id": 201,
+     "rssi": -72,
+     "battery": 100,
+     "packet_id": 102,
+     "last_updated_ts": 1794414500,
+     "paired": true,
+     "rpc": false,
+     "rsv": -1,
+     "fw_ver": "v1.1.4"
+    },
+    "config": {
+     "id": 201,
+     "addr": "02:00:00:00:a1:01",
+     "name": null,
+     "key": null,
+     "meta": {
+      "ui": {
+       "view": "regular"
+      }
+     }
+    },
+    "attrs": {
+     "flags": 0,
+     "model_id": 17
+    }
+   },
+   {
+    "key": "bthomedevice:202",
+    "status": {
+     "id": 202,
+     "rssi": -66,
+     "battery": null,
+     "packet_id": null,
+     "last_updated_ts": 1794413697,
+     "paired": true,
+     "rpc": false,
+     "rsv": -1,
+     "fw_ver": "v1.2.14",
+     "errors": [
+      "parse_failed"
+     ]
+    },
+    "config": {
+     "id": 202,
+     "addr": "02:00:00:00:a1:03",
+     "name": null,
+     "key": null,
+     "meta": {
+      "ui": {
+       "view": "regular"
+      }
+     }
+    },
+    "attrs": {
+     "flags": 0,
+     "model_id": 20
+    }
+   },
+   {
+    "key": "bthomesensor:200",
+    "status": {
+     "id": 200,
+     "value": 100,
+     "last_updated_ts": 1794414500
+    },
+    "config": {
+     "id": 200,
+     "addr": "02:00:00:00:a1:01",
+     "name": null,
+     "obj_id": 1,
+     "idx": 0,
+     "meta": null
+    }
+   },
+   {
+    "key": "bthomesensor:201",
+    "status": {
+     "id": 201,
+     "value": 57,
+     "last_updated_ts": 1794414500
+    },
+    "config": {
+     "id": 201,
+     "addr": "02:00:00:00:a1:01",
+     "name": null,
+     "obj_id": 46,
+     "idx": 0,
+     "meta": null
+    }
+   },
+   {
+    "key": "bthomesensor:202",
+    "status": {
+     "id": 202,
+     "value": 20.4,
+     "last_updated_ts": 1794414500
+    },
+    "config": {
+     "id": 202,
+     "addr": "02:00:00:00:a1:01",
+     "name": null,
+     "obj_id": 69,
+     "idx": 0,
+     "meta": null
+    }
+   }
+  ],
+  "cfg_rev": 24,
+  "offset": 0,
+  "total": 6
+ },
+ "notifications": [
+  {
+   "method": "NotifyStatus",
+   "params": {
+    "ts": 1794413697.93,
+    "bthomedevice:202": {
+     "errors": [
+      "parse_failed"
+     ],
+     "last_updated_ts": 1794413697,
+     "rssi": -66
+    }
+   }
+  },
+  {
+   "method": "NotifyStatus",
+   "params": {
+    "ts": 1794413698.07,
+    "bthomedevice:202": {
+     "fw_ver": "v1.2.14"
+    }
+   }
+  },
+  {
+   "method": "NotifyStatus",
+   "params": {
+    "ts": 1794413757.93,
+    "bthomedevice:202": {
+     "last_updated_ts": 1794413697,
+     "rssi": -66
+    }
+   }
+  },
+  {
+   "method": "NotifyStatus",
+   "params": {
+    "ts": 1794413984.99,
+    "bthomedevice:200": {
+     "errors": [
+      "parse_failed"
+     ],
+     "last_updated_ts": 1794413984,
+     "rssi": -43
+    }
+   }
+  },
+  {
+   "method": "NotifyStatus",
+   "params": {
+    "ts": 1794414044.99,
+    "bthomedevice:200": {
+     "last_updated_ts": 1794413984,
+     "rssi": -43
+    }
+   }
+  }
+ ]
+}

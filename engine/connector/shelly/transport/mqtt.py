@@ -14,13 +14,15 @@ A request is {"id", "src", "method", "params"} with src = "<apartment_id>/<shell
 Why the answer topic is per device. The broker grants each device its own prefix only (<apartment_id>/<shelly_id>/#).
 With src inside that prefix a device never needs to write outside it, and no device can publish an answer, true or
 false, on the topic of another one. On top of that an answer counts only if it arrives on the topic of the device we
-asked, its id is among the RPCs pending for that device, and the "src" of its payload is that device.
+asked and its id is among the RPCs pending for that device.
 If the broker still refuses the device the write on its answer topic (a wrong ACL), the answer never arrives and the
 device stays connected: on this side that is only a TransportTimeout, and nothing tells the two cases apart.
 
-The device is identified by the TOPIC, the part the broker's permissions control; "src" in a payload is only the
-shelly_id. When the two differ the message is dropped with a warning. Invalid JSON, an unknown method or a malformed
-answer are dropped too; the logs name the device and the reason, never the payload.
+The device is identified by the TOPIC, the part the broker's permissions control (connector-v2.md §7.1); "src" in a
+payload is the Shelly's own id, which a catalog id other than the native one makes different from the topic's. Such a
+message is handled as any other (the identity is the topic's), with one warning per device while the difference lasts,
+never the value of src. Invalid JSON, an unknown method or a malformed answer are dropped; the logs name the device
+and the reason, never the payload.
 
 Connection state. ConnectionEvent travels in the notifications() stream (base.py), and connected() reflects the last
 "online" value of each device, the retained ones received at subscription included. The last will "false" reaches us
@@ -226,6 +228,7 @@ class MqttTransport:
         self._task: asyncio.Task | None = None
         self._first_attempt: asyncio.Event | None = None
         self._waiting_since: datetime | None = None    # since start() or the loss of the broker: for the log
+        self._src_warned: set[str] = set()            # devices whose "src" differs from their topic, already warned
 
     @classmethod
     def from_config(cls, config: ConnectorConfig, **kwargs) -> "MqttTransport":
@@ -401,9 +404,12 @@ class MqttTransport:
         if not isinstance(message, dict):
             log.warn("mqtt payload not valid json", shelly_id=shelly_id, topic_kind=kind)
             return
-        if message.get("src") != shelly_id:
-            log.warn("mqtt src does not match topic", shelly_id=shelly_id, topic_kind=kind)
-            return
+        if message.get("src") != shelly_id:          # the topic says who it is: handled, warned once
+            if shelly_id not in self._src_warned:
+                self._src_warned.add(shelly_id)
+                log.warn("mqtt src does not match topic", shelly_id=shelly_id, topic_kind=kind)
+        else:
+            self._src_warned.discard(shelly_id)
         if kind == "event":
             self._notification(shelly_id, message, received_at)
         else:
