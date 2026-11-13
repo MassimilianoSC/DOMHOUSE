@@ -9,6 +9,7 @@ Every test runs on asyncio.Runner(loop_factory=asyncio.SelectorEventLoop), as ai
 pytest-asyncio. Run: python -m pytest engine/connector/shelly/tests -q
 """
 import asyncio
+import importlib
 import json
 import logging
 from datetime import datetime
@@ -423,7 +424,8 @@ def test_request_ids_start_from_the_chosen_value_and_grow_by_one(monkeypatch):
 
 
 def test_two_starts_give_different_ids(monkeypatch):
-    """A late answer of the previous run (QoS 1, sessions kept up to an hour) must not match a new request."""
+    """A late answer of the previous run (the device sends again a QoS 1 answer not acknowledged) must not match a new
+    request."""
     before = request_ids_from(monkeypatch, 1_000)
     after = request_ids_from(monkeypatch, 52_000_000)
     assert not set(before) & set(after)
@@ -437,6 +439,25 @@ def test_the_start_of_a_run_is_random(monkeypatch):
     monkeypatch.undo()
     firsts = {next(mqtt_module._request_id_counter()) for _ in range(5)}
     assert len(firsts) > 1 and all(1 <= f <= 2**30 for f in firsts)    # not 1 every time
+
+
+def test_the_module_counter_of_a_real_run_starts_after_the_random_value_and_grows_by_one(monkeypatch):
+    """The module's own line, as a real run executes it at import (_request_ids = ...): secrets.randbelow forced to
+    41, the module reloaded, its _request_ids as the import left it gives 42, then 43.
+
+    importlib.reload makes new classes and functions in the module's namespace, while this file and the connector
+    hold those of the first import (and their functions read the namespace: a second reload would not undo it). So
+    the namespace is saved before and put back after, the very same objects, whatever happens in between."""
+    saved = dict(mqtt_module.__dict__)
+    monkeypatch.setattr(mqtt_module.secrets, "randbelow", lambda n: 41)
+    try:
+        assert importlib.reload(mqtt_module) is mqtt_module
+        assert next(mqtt_module._request_ids) == 42                    # randbelow(2**30) + 1
+        assert next(mqtt_module._request_ids) == 43
+    finally:
+        mqtt_module.__dict__.clear()
+        mqtt_module.__dict__.update(saved)
+    assert mqtt_module.MqttTransport is MqttTransport and mqtt_module._request_ids is saved["_request_ids"]
 
 
 # --- broker drop -------------------------------------------------------------------------------------------------

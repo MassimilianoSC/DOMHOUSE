@@ -3,6 +3,7 @@
 Every wrong value below contains SENTINEL: the message must name the device and the field, never repeat it.
 """
 import copy
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -181,6 +182,23 @@ def test_empty_shelly_id_is_refused():
 def test_shelly_id_connector_is_reserved():
     refused(catalog_with(lambda d: dev(d)["shelly"].update(id="connector")), "catalog device dev-presa-camera",
             "shelly.id must not be connector, the broker's name for the connector itself")
+
+
+BROKER_ACCOUNTS = Path(__file__).resolve().parents[4] / "scripts" / "broker_accounts.py"
+
+
+def test_the_catalog_and_the_broker_keep_the_same_id_rule():
+    """catalog.py copies the broker's rule (the engine never imports from scripts/): the copy and the original must
+    stay equal, or an id the catalog accepts would be refused by the broker only when the device is put into service.
+    The test may import the script: it loads it by its path (stdlib only, nothing runs outside __main__)."""
+    if not BROKER_ACCOUNTS.is_file():
+        pytest.skip(f"scripts/broker_accounts.py not found at {BROKER_ACCOUNTS}: the rule cannot be compared")
+    spec = importlib.util.spec_from_file_location("broker_accounts_for_the_catalog_test", BROKER_ACCOUNTS)
+    broker = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(broker)
+    assert catalog_module.BROKER_ID_RE.pattern == broker.ID_RE.pattern
+    assert catalog_module.BROKER_ID_RE.flags == broker.ID_RE.flags
+    assert catalog_module.BROKER_RESERVED_ID == broker.RESERVED_DEVICE
 
 
 def test_shelly_id_repeated_names_the_other_device_not_the_id():
