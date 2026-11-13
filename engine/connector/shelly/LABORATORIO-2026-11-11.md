@@ -4,6 +4,10 @@ Note di Youssouf dalla mattina dell'11 novembre, per Massimiliano. Tre parti: co
 dispositivi veri, cosa ho **deciso per andare avanti** (da confermare), cosa **propongo o chiedo**. Qui non ci sono
 id né MAC reali: i dispositivi sono indicati con il modello. I rimandi «§» sono a `engine/connector/connector-v2.md`.
 
+**Aggiornato il 12 novembre**: due affermazioni di queste note erano sbagliate e sono corrette nel testo (il tempo
+della prima variazione di potenza, §2.2; «fanno da ponte tutti e tre», §3). Le misure sul ritardo dello Shelly 1 e
+l'esito delle scelte sono nel §8.
+
 Banco: Plug M Gen3 (firmware 1.8.99), Shelly 1 Gen4 (2.0.3), EM Mini Gen4 (1.7.0), tre sensori BLU ZB (H&T
 `SBHT-203C`, Motion `SBMO-103Z`, contatto porta/finestra), broker Mosquitto di laboratorio sul PC, motore in Docker
 sul PC con `CONNECTOR=shelly`.
@@ -16,8 +20,8 @@ sul PC con `CONNECTOR=shelly`.
 2. **I sensori BLU non compaiono in `Shelly.GetStatus`**: per la fotografia del §2.6 serve una seconda chiamata,
    `Shelly.GetComponents`, che è paginata (§3.1).
 3. **L'EM Mini Gen4 rispetta i 2 secondi del §2.5** (aggiornato alle 15:45). A riposo manda la potenza ogni
-   ~14 s, ed era il mio dubbio di stamattina; sotto carico notifica la variazione in 50 ms e poi circa ogni secondo
-   (§2.2).
+   ~14 s, ed era il mio dubbio di stamattina; sotto carico la prima variazione arriva fra 0,4 e 1,2 s dopo la
+   commutazione del relè, poi circa ogni secondo (§2.2).
 4. **Per il catalogo dei BLU propongo il kit preparato in ufficio**: l'elettricista non configura niente e nessuno
    detta un MAC (§4.1). Risponde anche al §7.3 punto 4.
 5. I profili di **Shelly 1 Gen4 ed EM Mini Gen4** e i sensori BLU sono nella pull request #7; nel pomeriggio sono
@@ -45,7 +49,7 @@ un portatile, ~40 W). Orari di arrivo al motore, comando dato dall'API del motor
 | Evento | Ora | Dopo il cambio del relè |
 |---|---|---|
 | Relè acceso | 15:38:23,73 | |
-| Prima variazione di `watts` (3,4 W) | 15:38:23,79 | 0,05 s |
+| Prima variazione di `watts` (3,4 W) | 15:38:23,79 | 0,05 s (vedi la correzione sotto) |
 | `watts` sopra i 20 W (30,0 W) | 15:38:26,78 | 3,1 s |
 | Relè spento | 15:40:02,65 | |
 | `watts` sotto i 15 W (1,4 W) | 15:40:04,44 | 1,8 s |
@@ -53,6 +57,10 @@ un portatile, ~40 W). Orari di arrivo al motore, comando dato dall'API del motor
 
 - **Il misuratore notifica subito quando la potenza cambia**, poi circa una volta al secondo finché varia. I ~14 s
   sono solo il ritmo a riposo. «Ogni variazione di `watts` entro 2 secondi» del §2.5 è rispettato.
+- **Correzione del 12 novembre: gli 0,05 s della tabella non sono il tempo vero.** Sono contati dall'evento del
+  relè nel motore, che arriva fino a 0,6 s dopo la commutazione. Rimisurato dalla commutazione: la prima variazione
+  di `watts` arriva dopo **0,4–1,2 s**, 7 volte su 7 entro i 2 secondi, anche con l'EM Mini che fa da ponte per i
+  sensori (§8.1). La conclusione sul §2.5 non cambia.
 - I ~3 s per superare i 20 W sono del carico: il caricabatterie sale per gradi (3, 7, 19, 30, 48 W). Stanno dentro
   i 10 s della conferma. Con uno split vero la salita sarà diversa e va misurata su quello.
 - Nel leggere queste misure: il flusso del connector non manda mai un `ts` all'indietro, quindi il `ts` di uno
@@ -70,6 +78,8 @@ un portatile, ~40 W). Orari di arrivo al motore, comando dato dall'API del motor
 - Per lo Shelly 1 Gen4 è disponibile la 2.2.0 (del 9 novembre); il banco è sulla 2.0.3. Non ho aggiornato a metà
   delle prove.
 - Domanda aperta: su quali versioni ci fermiamo per gli appartamenti (oggi 1.8.99, 2.0.3, 1.7.0)?
+  **Deciso da Massimiliano l'11 novembre**: per il pilota restano queste tre; una versione nuova si usa solo dopo
+  una prova al banco. Lo Shelly 1 del banco era già stato portato alla 2.2.0 prima della decisione (§8.1).
 - Idea: `Shelly.Update` si può chiamare via RPC, quindi dallo stesso canale MQTT si può lanciare da remoto una
   versione già provata in laboratorio, un appartamento alla volta. Strumento a parte, fuori dal connector.
 
@@ -81,8 +91,11 @@ un portatile, ~40 W). Orari di arrivo al motore, comando dato dall'API del motor
 
 ## 3. Sensori BLU
 
-Ponte usato: Shelly 1 Gen4. Per errore i sensori sono passati anche da Plug M Gen3 ed EM Mini Gen4: **fanno da
-ponte tutti e tre**.
+Ponte usato: Shelly 1 Gen4. Per errore i sensori sono passati anche da Plug M Gen3 ed EM Mini Gen4.
+
+**Correzione del 12 novembre**: avevo scritto «fanno da ponte tutti e tre», ma era provato solo con l'H&T. L'EM Mini
+con il firmware 1.7.0 riceve i pacchetti di Motion e contatto ma non li decodifica (`parse_failed`, §8.2). Lo
+Shelly 1 Gen4 decodifica tutti e tre i sensori; sulla Plug è stato visto solo l'H&T.
 
 ### 3.1 Come li espone il ponte
 - Ogni sensore associato è un componente `bthomedevice:<n>` (MAC in `config.addr`; in `status`: `battery`,
@@ -139,8 +152,9 @@ banco e segnale buono: con 920 s resta online.
 Due cose collegate:
 - Il «visto l'ultima volta» di un sensore va preso dal `last_updated_ts` più recente fra tutti i suoi componenti,
   `bthomedevice` compreso: per Motion e contatto a riposo arriva solo quello.
-- **Proposta, non applicata:** `blu_ht` a 300 s invece di 200. È il sensore che regola la caldaia
-  (`links.sensor_device_id`): se va offline per tre pacchetti Bluetooth persi, il motore smette di regolare.
+- **Proposta, accettata da Massimiliano e applicata nella #7:** `blu_ht` a 300 s invece di 200. È il sensore che
+  regola la caldaia (`links.sensor_device_id`): se va offline per tre pacchetti Bluetooth persi, il motore smette di
+  regolare.
 
 ### 3.5 Cifratura (§7.3 punto 7)
 I tre sensori sono stati associati **non cifrati** (`encrypted: false` nella scoperta). Per gli appartamenti la
@@ -215,8 +229,9 @@ luci accese solo se è buio. Richiede capacità nuove: da valutare dopo il pilot
 
 | Ramo | Contenuto | Stato |
 |---|---|---|
-| `shelly-qos0` | Richieste RPC a QoS 0 e ritocchi della revisione della #4 | Pull request #6 |
-| `shelly-blu` | Profili Shelly 1 Gen4 ed EM Mini Gen4, i tre sensori BLU, `GetComponents`, soglia del contatto | Pull request #7 (contiene anche il lavoro di `shelly-gen4`, riallineato a `main`) |
+| `shelly-qos0` | Richieste RPC a QoS 0 e ritocchi della revisione della #4 | Pull request #6, unita l'11 novembre |
+| `shelly-qos0-prove` | Due prove e un commento chiesti dalla revisione della #6 | Pull request #8 |
+| `shelly-blu` | Profili Shelly 1 Gen4 ed EM Mini Gen4, i tre sensori BLU, `GetComponents`, soglie, correzioni della revisione, `parse_failed` | Pull request #7, riallineata a `main` il 12 novembre |
 | `developYouss` | `DESIGN.md` (pull request #1) | Aperta; da aggiornare con queste note e con `connector-v2.md` |
 
 Le catture di laboratorio di oggi sono anonimizzate in `tests/fixtures/` del ramo `shelly-blu`.
@@ -237,6 +252,8 @@ Motore in Docker sul PC, costruito dal ramo `shelly-blu`, catalogo con Plug, She
   sensori arriva quindi fino alle decisioni.
 
 ### Due punti aperti, emersi qui
+Tutti e due chiusi: il primo con le misure del §8.1, il secondo corretto nella #7.
+
 1. **Lo Shelly 1 che fa da ponte risponde lentamente alle RPC**: fra 69 ms e 2,8 s misurati sul broker, contro i
    78–144 ms della Plug; i due comandi hanno impiegato 4,9 s e 2,5 s in tutto. Causa probabile, non dimostrata: la
    scansione Bluetooth. A 2,8 s siamo vicini ai 3 s di attesa del connector. Da rimisurare con i sensori dissociati
@@ -245,3 +262,64 @@ Motore in Docker sul PC, costruito dal ramo `shelly-blu`, catalogo con Plug, She
    riordina nulla; la correggo nel ramo `shelly-blu`.
 
 Per o1, fuori dal mio perimetro: un `turn_on` ha aspettato 1,6 s nel motore prima di arrivare al connector.
+
+## 8. Aggiornamento del 12 novembre
+
+### 8.1 Il ritardo delle RPC segue il ruolo di ponte
+Misure dell'11 novembre, tardo pomeriggio: 60 richieste `Shelly.GetDeviceInfo` per dispositivo sul broker di
+laboratorio, una ogni 2 s, alternate fra i dispositivi nello stesso intervallo.
+
+Tempi in millisecondi; le ultime tre colonne sono quante risposte su 60 superano 1, 2 e 3 secondi.
+
+| Serie | Dispositivo | min | mediana | p90 | max | >1 s | >2 s | >3 s |
+|---|---|---|---|---|---|---|---|---|
+| 15:57, sensori sullo Shelly 1 (2.0.3) | Plug | 70 | 84 | 132 | 217 | 0 | 0 | 0 |
+| | EM Mini | 65 | 79 | 112 | 192 | 0 | 0 | 0 |
+| | **Shelly 1** | 70 | 215 | 1784 | 2334 | **19** | **6** | 0 |
+| 16:39, sensori sullo Shelly 1 (2.2.0) | Plug | 71 | 89 | 121 | 171 | 0 | 0 | 0 |
+| | EM Mini | 68 | 74 | 93 | 204 | 0 | 0 | 0 |
+| | **Shelly 1** | 43 | 148 | 2328 | 2687 | **16** | **8** | 0 |
+| 17:28, sensori sull'EM Mini (1.7.0) | Plug | 69 | 78 | 96 | 511 | 0 | 0 | 0 |
+| | **EM Mini** | 66 | 148 | 1717 | 2387 | **14** | **3** | 0 |
+| | Shelly 1 | 71 | 75 | 95 | 528 | 0 | 0 | 0 |
+
+Nessuna risposta persa; segnale Wi-Fi fra −39 e −45 dBm per tutti, stesso access point.
+
+- **Comandi dal motore al relè con i sensori sullo Shelly 1**: `acked`, ma una `Switch.GetStatus` ha risposto in
+  3029 ms, 29 ms oltre l'attesa del connector, ed è stata ritentata (comando in 3,2 s). **Senza sensori**: `acked`
+  in 0,4–0,8 s.
+- **Non è il modello, non è il firmware, non è il Wi-Fi**: lo Shelly 1 è lento allo stesso modo con 2.0.3 e 2.2.0,
+  torna veloce appena gli si tolgono i sensori, e la lentezza passa all'EM Mini insieme ai sensori.
+- **La potenza dell'EM Mini regge anche mentre fa da ponte**: prima variazione di `watts` fra 0,4 e 1,2 s dalla
+  commutazione, 7 su 7 entro 2 s, poi circa un aggiornamento al secondo. Il §2.5 resta rispettato.
+- L'orologio del PC del banco è 8–11 s indietro rispetto ai dispositivi: per i tempi valgono le differenze fra
+  orari presi dalla stessa parte.
+
+### 8.2 L'EM Mini con il firmware 1.7.0 non decodifica Motion e contatto
+Con i tre sensori associati all'EM Mini, l'H&T arriva regolarmente. Motion e contatto no: il loro `bthomedevice`
+riporta `errors: ["parse_failed"]`, non ha nessun `bthomesensor`, e continua ad aggiornare `last_updated_ts` a ogni
+pacchetto. `errors` compare nella notifica solo quando cambia; `Shelly.GetComponents` lo mostra sempre.
+
+Il connector li teneva online con uno stato fermo. Corretto nella #7: un `bthomedevice` in errore non conta come
+pacchetto ricevuto e il sensore va offline alla soglia, con un warn. **Non visto al banco**: come sparisce l'errore
+quando il ponte impara a decodificare il sensore.
+
+Per l'EM Mini è disponibile la 2.1.1 stabile, non installata: le versioni sono fissate (§2.4).
+
+### 8.3 Dove mettere il ponte: da decidere
+- **Ponte sullo Shelly 1** (com'è oggi): decodifica i tre sensori, ma i comandi al relè arrivano vicino ai 3 s di
+  attesa del connector. Servirebbe più margine, per esempio accettare come conferma la notifica di stato del relè e
+  tenere la rilettura come ripiego.
+- **Ponte sull'EM Mini**: il relè torna veloce e la potenza resta nei tempi, ma serve un firmware che decodifichi
+  Motion e contatto, quindi una prova al banco della 2.1.1.
+- **Non verificabile al banco**: la portata del Bluetooth da un quadro elettrico, dove di solito sta l'EM Mini.
+
+### 8.4 Esito delle scelte del §4 e delle domande del §5
+Massimiliano, 11 novembre: confermate tutte le scelte del §4. Soglie modificabili dal cliente (§5.1) e capacità
+nuove (§5.2) dopo il pilota. Cifratura dei BLU (§3.5): sì se è automatica, cioè se lo script del kit genera la
+chiave, la scrive su sensore e ponte e la conserva; la fattibilità la verifico io. Chi prepara i kit e chi fa
+l'assistenza (§4.1) resta aperto.
+
+### 8.5 Rimozione di un sensore dal ponte, dal vivo
+Togliendo i sensori dal ponte a motore acceso, il connector segnala «blu sensor not paired with its bridge» e li
+mette offline, senza bloccarsi. Fino a ieri era un caso solo simulato.
