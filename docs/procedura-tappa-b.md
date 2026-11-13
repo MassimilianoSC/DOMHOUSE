@@ -21,7 +21,7 @@
 | Cosa | Valore | Perché |
 |---|---|---|
 | Porta del motore | **8169** | Lo staging raggiunge solo `10.198.0.2:8100` e `10.198.0.2:8150-8169` (`INSTANCE_ALLOWED`, D04): con 8169 non serve cambiare il server né pubblicare. **Decisione del committente aperta** (domanda della memoria storica): l'alternativa è 8101, con una modifica di o1 al manifesto dello staging e una pubblicazione |
-| Immagine del motore | `europe-west8-docker.pkg.dev/domotica-poc-511707/domotica/engine:d274386` | quella del lotto pubblicato alle 14:32 di oggi, la stessa di `dev`; contiene il connector Shelly e basta per la Plug. Per i sensori BLU serve un'immagine nuova (sezione 6.4) |
+| Immagine del motore | `europe-west8-docker.pkg.dev/domotica-poc-511707/domotica/engine:247fda0` | quella della pubblicazione di `247fda0` del 13 novembre, la stessa di `dev`; contiene il connector Shelly con #10 e #11 e basta per la Plug. Per i sensori BLU serve un'immagine con la correzione di B1 (sezione 6.4) |
 | Catalogo | solo la Plug, `device_id` **`dev-presa-lab`** | Y lo tiene uguale nel suo catalogo: cambiarlo dopo farebbe perdere lo storico nell'app |
 | Ambiente dell'app | **staging** | D-134: niente appartamenti veri; la produzione non si tocca |
 
@@ -36,6 +36,8 @@
 
 ## 1. Controlli prima di cominciare (sola lettura)
 
+**Si comincia dopo la pubblicazione di `247fda0`** (committente, 13 novembre): il motore di `lab-01` usa la stessa immagine di `dev`.
+
 ### 1.1 La VM oggi
 
 ```bash
@@ -48,7 +50,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 |---|---|
 | container | `engine-dev` sulla porta 8100 e `domhouse-broker` sulla 8883; **nessun** altro motore, e niente sulla 8169 |
 | file delle impostazioni | solo `/opt/domhouse/dev.settings` |
-| immagine di `dev` | `europe-west8-docker.pkg.dev/domotica-poc-511707/domotica/engine:d274386` |
+| immagine di `dev` | `europe-west8-docker.pkg.dev/domotica-poc-511707/domotica/engine:247fda0` |
 | memoria | annota la colonna `available`: serve per il confronto al passo 3.2 |
 | broker | `appartamenti: 1`, `utenti devices: 1`, `utenti connectors: 1`, `broker ok cert_days=…` |
 
@@ -133,7 +135,7 @@ EOF
 ```
 
 - **Atteso:** `catalogo valido: [('dev-presa-lab', 'shellyplugmg3-9070695cb0d0', 'plug')]`.
-- o1 l'ha già controllato con il codice di `d274386`, l'immagine del motore: valido, profilo «Shelly Plug M Gen3», soglia offline 120 s.
+- o1 l'ha già controllato con il codice di `247fda0`, quello dell'immagine del motore: valido, profilo «Shelly Plug M Gen3», soglia offline 120 s.
 
 **3.0.2 Copiarlo sulla VM** (scrive sulla VM, nella cartella di chi si collega).
 
@@ -169,7 +171,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/engine-vm.sh install lab-01 8169 europe-west8-docker.pkg.dev/domotica-poc-511707/domotica/engine:d274386 shelly'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/engine-vm.sh install lab-01 8169 europe-west8-docker.pkg.dev/domotica-poc-511707/domotica/engine:247fda0 shelly'
 ```
 
 - **Atteso, nell'ordine:**
@@ -249,30 +251,126 @@ Apri l'appartamento «Laboratorio di Youssouf (lab-01)».
 
 - **Atteso:** la stanza «Laboratorio» con «Presa del laboratorio», in linea, con lo stato (accesa o spenta) e i watt.
 
-## 5. Le prove app ↔ dispositivi
+## 5. Le prove app ↔ dispositivi (il centro della tappa B)
 
-**Regola per ogni prova che comanda un dispositivo:** prima Y conferma che a quel dispositivo non è attaccato niente che non possa spegnersi; durante, Y guarda il dispositivo.
+Ogni prova dimostra un pezzo del punto di contatto fra la nostra parte (sito, server, motore, broker) e quella di Y (connector e dispositivi). Per ogni prova: che cosa fai tu nell'app, che cosa fa o guarda Y al banco, che cosa deve comparire, e da che parte sta il guasto se qualcosa non torna.
 
-| N. | Prova | Serve | Atteso nell'app | Atteso al banco |
-|---|---|---|---|---|
-| 1 | Plug: consumi | solo la Plug | i watt cambiano quando Y attacca o stacca un carico (una lampada) | — |
-| 2 | Plug accesa e spenta dall'app (**Accendi**, **Spegni**) | la Plug e **Y presente** | lo stato passa da «in corso» al nuovo valore in pochi secondi; nelle **Decisioni** l'accensione con esito applicato | Y vede la presa scattare |
-| 3 | Plug staccata dalla corrente da Y | la Plug e Y | dopo circa 2 minuti la presa risulta «non in linea» (soglia del tipo `plug`, 120 s, più il controllo del silenzio); riattaccata, torna in linea | — |
-| 4 | Temperatura del sensore H&T che sale quando Y lo scalda con la mano | **catalogo di Y** (sezione 6) | la temperatura sale entro qualche secondo dal pacchetto | — |
-| 5 | Contatto della finestra aperto | **catalogo di Y**, con un clima o una caldaia nel catalogo | «Aperta»; dopo i minuti della regola, il motore spegne clima e caldaia | Y vede il relè della caldaia scattare |
-| 6 | Sensore di movimento e misuratore EM Mini | **catalogo di Y** | movimento rilevato; watt del misuratore | — |
-| 7 | Verifiche al banco: orologio del ponte dopo un riavvio (B1), `errors` dei BLU, consumo di uno split fermo | **catalogo di Y** e **immagine nuova** (6.4) | — | esiti da registrare |
+### 5.0 Gli strumenti per capire di chi è il guasto
 
-Verifica di ogni comando sul motore (sola lettura):
+Il percorso di un comando:
+
+| Tratto | Di chi | Come si vede |
+|---|---|---|
+| 1. sito → server di staging | nostro | l'app mostra un errore; log del server (S) |
+| 2. server → motore `lab-01` | nostro | «Verifica connessione» nell'app; `/health` dalla VM (passo 3.2) |
+| 3. motore → connector (dentro lo stesso container) | confine: il motore è nostro, il connector di Y | decisioni e log del motore (M) |
+| 4. connector → broker | confine: il broker è nostro, il collegamento lo fa il connector di Y | `/health` dice `connector up`; log del broker con `lab-01.connector` (passo 3.2) |
+| 5. broker → dispositivo e ritorno | di Y (dispositivo e sue impostazioni), salvo certificato e utenti del broker, che sono nostri | ascolto (A): richiesta del connector e risposta del dispositivo |
+
+**Regola per decidere:** si guarda l'ascolto (A).
+
+- **La richiesta non c'è:** il guasto è prima del broker, cioè nel motore, nel server o nel sito.
+- **La richiesta c'è ma la risposta no:** il guasto è nel dispositivo o nella sua rete.
+- **Richiesta e risposta ci sono, ma l'app non cambia:** il guasto è nel connector, che non legge bene la risposta, oppure nel motore, nel server o nel sito. Lo dicono il log del motore (M) e il log del server (S).
+
+**(A) Ascolto dei messaggi della presa per 40 secondi** (sola lettura). Lancialo e, entro 5 secondi, fai l'azione della prova nell'app. Per un altro apparecchio si cambia l'id nativo nel topic (sezione 6).
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/engine-vm.sh api lab-01 GET "/decisions?limit=3" | head -1; sudo bash /opt/domhouse/engine-vm.sh api lab-01 GET /devices | head -1'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='set +x; T=$(curl -sf -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | python3 -c "import json,sys; print(json.load(sys.stdin)[\"access_token\"])"); PW=$(curl -sf -H "Authorization: Bearer $T" https://secretmanager.googleapis.com/v1/projects/domotica-poc-511707/secrets/langbrain-shelly-lab-01/versions/latest:access | python3 -c "import base64,json,sys; print(base64.b64decode(json.load(sys.stdin)[\"payload\"][\"data\"]).decode().strip())"); [ -n "$PW" ] || { echo "password del connector non letta da Secret Manager"; exit 1; }; export PW; sudo --preserve-env=PW docker exec -e PW domhouse-broker sh -c "mosquitto_sub -h 172.30.83.2 -p 1883 -i lab-01.connector-ascolto-prove -u lab-01.connector -P \"\$PW\" -t \"lab-01/shellyplugmg3-9070695cb0d0/#\" -v -W 40"; unset PW T'
 ```
 
-- **Atteso dopo la prova 2:** fra le ultime decisioni `"action":"turn_on"` (o `turn_off`), `"outcome":"applied"`, `"device_id":"dev-presa-lab"`; nel dispositivo `"switch":{"on":…}` uguale a quello che Y vede.
-- **Da verificare la prima volta:** il tempo da «Accendi» allo stato confermato. Y ha misurato al banco 75 ms di mediana per la Plug da sola. Nell'app ci aggiungiamo il percorso server → motore → broker → presa e ritorno.
+| Riga | Che cos'è |
+|---|---|
+| `…/rpc {"id":…,"src":"lab-01/shellyplugmg3-9070695cb0d0/connector","method":"Switch.Set",…}` | la richiesta del connector: il comando è arrivato fino al broker |
+| `…/connector/rpc {"id":…,"result":…}` | la risposta della presa |
+| `…/events/rpc {"method":"NotifyStatus",…"output":…}` | la presa annuncia il cambio di stato |
+| `…/online true` | lo stato conservato (normale) |
+
+**(M) Decisioni, dispositivi e log del motore** (sola lettura):
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/engine-vm.sh api lab-01 GET "/decisions?limit=3" | head -1; sudo bash /opt/domhouse/engine-vm.sh api lab-01 GET /devices | head -1; sudo docker logs --since 10m engine-lab-01 2>&1 | tail -15'
+```
+
+**(S) Avvisi ed errori del server di staging negli ultimi 10 minuti** (sola lettura):
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud logging read 'resource.type="cloud_run_revision" AND resource.labels.service_name="domotica-bff-staging" AND severity>=WARNING' --freshness=10m --limit=10 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format='value(timestamp,severity,jsonPayload.message,textPayload)'
+```
+
+### 5.1 Prova 1: la presa si vede nell'app (lettura)
+
+| | |
+|---|---|
+| **Tu, nell'app** | apri «Laboratorio di Youssouf (lab-01)» |
+| **Y, al banco** | attacca alla presa una lampada e la accende, poi la spegne |
+| **Deve comparire** | «Presa del laboratorio» in linea; i watt salgono con la lampada accesa e tornano vicino a 0 da spenta, entro circa un minuto |
+| **Se la presa è «non in linea»** | verifica 1 della tappa A. Se la presa non è nel broker, il guasto è dalla parte di Y (presa o sua rete). Se è nel broker ma l'app la dà fuori linea: (M), poi o1 guarda catalogo e connector |
+| **Se i watt non cambiano** | (A) per un minuto. Se le `NotifyStatus` con `apower` cambiano ma l'app no, il guasto è da noi o nel connector: (M). Se la presa non manda niente, è dalla parte di Y |
+
+### 5.2 Prova 2: accendere e spegnere la presa dall'app (comando)
+
+| | |
+|---|---|
+| **Prima** | Y conferma che alla presa è attaccata solo la lampada |
+| **Tu, nell'app** | lanci (A), poi entro 5 secondi premi **Accendi** sulla presa; dopo, lo stesso con **Spegni** |
+| **Y, al banco** | guarda la lampada e dice quando scatta |
+| **Deve comparire nell'app** | lo stato passa da «in corso» al nuovo valore in pochi secondi; in **Decisioni** l'azione con esito applicato |
+| **Deve comparire in (A)** | la richiesta `Switch.Set`, la risposta, poi la `NotifyStatus` con `output` nuovo |
+| **Deve comparire in (M)** | `"action":"turn_on"` (o `turn_off`), `"outcome":"applied"`, `"device_id":"dev-presa-lab"` |
+| **Diagnosi** | Nessuna richiesta in (A): guasto da noi (sito, server o motore), guarda (S) e (M). Richiesta senza risposta: dalla parte di Y (la presa). Risposta arrivata e lampada scattata, ma l'app resta «in corso» o dice fallito: connector o motore, (M) |
+| **Da verificare la prima volta** | il tempo da «Accendi» allo stato confermato. Al banco Y ha misurato 75 ms di mediana per la Plug da sola; qui si aggiunge il percorso sito → server → motore → broker → presa e ritorno |
+
+### 5.3 Prova 3: la presa staccata dalla corrente (fuori linea e ritorno)
+
+| | |
+|---|---|
+| **Tu, nell'app** | guardi la presa |
+| **Y, al banco** | stacca la presa dalla corrente; dopo 3 minuti la riattacca |
+| **Deve comparire** | dopo circa 2 minuti la presa è «non in linea» (soglia 120 s più il controllo del silenzio); riattaccata, torna in linea in meno di un minuto, con il suo stato |
+| **Diagnosi** | Non va mai fuori linea: (M), connector. Non torna in linea: verifica 1 della tappa A. Se non è nel broker, il guasto è dalla parte di Y; se è nel broker, connector o motore: (M) |
+
+### 5.4 Prova 4: temperatura del sensore H&T (da completare con il catalogo di Y, sezione 6)
+
+| | |
+|---|---|
+| **Tu, nell'app** | guardi la temperatura della stanza del sensore |
+| **Y, al banco** | scalda il sensore con la mano per un minuto |
+| **Deve comparire** | la temperatura sale di qualche grado, entro qualche secondo da ogni pacchetto del sensore |
+| **Diagnosi** | (A) sul **ponte** BLU. Se le `NotifyStatus` con `bthomesensor` cambiano ma l'app no: connector o motore, (M). Se dal ponte non arriva niente: sensore o ponte, dalla parte di Y |
+
+### 5.5 Prova 5: contatto della finestra aperto e regola (da completare con il catalogo di Y)
+
+| | |
+|---|---|
+| **Serve** | nel catalogo un contatto BLU e un relè «caldaia» (o un clima) nella stessa stanza; la regola della finestra accesa nell'app |
+| **Tu, nell'app** | accendi la caldaia; poi guardi la stanza |
+| **Y, al banco** | apre il contatto e lo tiene aperto oltre i minuti della regola |
+| **Deve comparire** | «Aperta» entro qualche secondo; dopo i minuti della regola, la caldaia spenta dal motore, con la decisione e il suo motivo in **Decisioni** |
+| **Diagnosi** | «Aperta» non compare: come la prova 4. Compare ma la caldaia resta accesa: motore (nostro), (M). Il motore decide ma il relè non scatta: come la prova 2 |
+
+### 5.6 Prova 6: movimento e misuratore EM Mini (da completare con il catalogo di Y)
+
+| | |
+|---|---|
+| **Tu, nell'app** | guardi il sensore di movimento e il misuratore |
+| **Y, al banco** | passa davanti al sensore; accende un carico sul misuratore |
+| **Deve comparire** | movimento rilevato; watt del misuratore |
+| **Diagnosi** | come le prove 4 e 1 |
+
+### 5.7 Prova 7: le verifiche al banco (da completare; serve l'immagine nuova, 6.4)
+
+| Verifica | Y fa | Si guarda |
+|---|---|---|
+| Orologio del ponte dopo un riavvio (B1) | riavvia il ponte con un H&T spento da oltre 5 minuti | l'H&T deve restare «non in linea» nell'app; (A) sul ponte per l'orologio di `sys` |
+| `errors` dei sensori BLU | toglie e rimette la batteria di un sensore | il sensore va fuori linea, poi torna entro 5 minuti dal primo pacchetto |
+| Consumo di uno split fermo | se ne ha uno sul misuratore | i watt a riposo, per la soglia di conferma dei comandi |
 
 ## 6. Da completare con il catalogo di Youssouf
 
@@ -387,5 +485,5 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
    - è la **prima volta** che il connector Shelly gira sulla VM e si collega al broker vero, con il conto di `lab-01.connector`;
    - prima volta che il catalogo viene letto da `/data/lab-01/catalog.yaml`;
    - prima volta che l'app comanda uno Shelly vero.
-   - Nessuna versione nuova di immagini o programmi: il motore è quello già pubblicato (`d274386`), il broker non cambia.
+   - Nessuna versione nuova di immagini o programmi: il motore è quello della pubblicazione di `247fda0`, il broker non cambia.
 8. **Sensori BLU:** non prima della correzione di B1 e dell'immagine nuova (6.4). Con l'immagine di oggi un sensore morto potrebbe risultare vivo dopo un riavvio del ponte.
