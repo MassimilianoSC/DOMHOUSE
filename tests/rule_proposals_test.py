@@ -295,8 +295,8 @@ def test_a_proposal_never_breaks_eco_comfort_cooling(engines, monkeypatch):
     model(monkeypatch, tool_call([{"rule_id": "setpoint_limits", "params": {"eco_celsius": 22}}]))
     p = propose("alza la temperatura di risparmio a 22").json()                 # ambiguous for the recognizer: the model
     assert p["changes"] == [] and p["explanation"] == "La temperatura eco non può superare quella comfort"
-    p = propose("comfort 25").json()                                           # the recognizer: comfort = cooling (25)
-    assert p["changes"] == [] and p["explanation"] == "La temperatura di raffrescamento deve essere più alta di quella comfort"
+    p = propose("comfort 25").json()            # the recognizer: comfort 25 over the winter maximum 24, checked first (1098 = b)
+    assert p["changes"] == [] and p["explanation"] == "La temperatura comfort non può superare il massimo invernale"
     with pytest.raises(rp.ProposalError):                                      # the copy's preview uses the same check
         rp.changes(engines.engines[BOLOGNA].ruleset(), [{"rule_id": "setpoint_limits", "params": {"comfort_celsius": 26}}])
 
@@ -359,3 +359,48 @@ def test_the_model_is_told_that_the_mold_rule_only_warns():
     assert "registra un avviso nelle Decisioni" in line and "non deumidifica da sola" in line
     assert "deumidifica sopra" not in line
     assert mold_action("empty", 90, 65) is None              # if the engine starts to dry the air, this text changes
+
+
+# -------- 1098 = b: two ranges, the engine's checks and sentences (engine.core.range_errors) --------
+def fresh_rules():
+    return core.ApartmentEngine(BOLOGNA, SimulatedConnector(), seed=False).ruleset()
+
+
+def test_a_proposal_never_breaks_the_ranges():
+    ruleset = fresh_rules()                                    # winter 16–24, summer 22–28, eco 18, comfort 21, cooling 25
+    for patch, message in (({"min": 19}, "La temperatura eco non può essere sotto il minimo invernale"),
+                           ({"comfort_celsius": 24.5}, "La temperatura comfort non può superare il massimo invernale"),
+                           ({"summer_min": 27, "summer_max": 24}, "Il minimo estivo non può superare il massimo estivo"),
+                           ({"summer_max": 24}, "La temperatura di raffrescamento deve stare fra il minimo e il massimo "
+                                                "estivi")):
+        with pytest.raises(rp.ProposalError) as exc:                           # also the copy's preview (rp.changes)
+            rp.changes(ruleset, [{"rule_id": "setpoint_limits", "params": patch}])
+        assert (exc.value.status, exc.value.error, exc.value.message) == (422, "invalid_range", message)
+    with pytest.raises(rp.ProposalError):                                      # also with the rule off
+        rp.changes(ruleset, [{"rule_id": "setpoint_limits", "enabled": False, "params": {"summer_max": 24}}])
+    assert rp.changes(ruleset, [{"rule_id": "setpoint_limits", "params": {"max": 21}}])[1][0]["new"] == 21   # no tie
+
+
+def test_a_rule_saved_before_is_not_refused_for_another_rule_in_a_proposal():
+    ruleset = fresh_rules()
+    [sl] = [r for r in ruleset["rules"] if r["rule_id"] == "setpoint_limits"]
+    sl["params"]["max"] = 20                                                   # comfort 21 over it
+    assert rp.changes(ruleset, [{"rule_id": "window_open_off", "params": {"minutes": 6}}])[1][0]["new"] == 6
+    with pytest.raises(rp.ProposalError):
+        rp.changes(ruleset, [{"rule_id": "setpoint_limits", "params": {"eco_celsius": 17}}])
+
+
+def test_the_recognizer_knows_the_summer_range(engines):
+    assert propose("massimo estivo 27").json()["changes"] == [
+        {"rule_id": "setpoint_limits", "label": "Limiti del setpoint", "field": "summer_max", "old": 28, "new": 27}]
+    assert [c["field"] for c in propose("setpoint estate da 23 a 27").json()["changes"]] == ["summer_min", "summer_max"]
+    assert propose("raffrescamento 24").json()["changes"][0]["field"] == "comfort_cool_celsius"
+
+
+def test_the_first_values_and_the_meaning_follow_the_engine():
+    engine_params = next(r for r in core.DEFAULT_RULES if r["rule_id"] == "setpoint_limits")["params"]
+    assert {k: v for k, v in rp.DEFAULTS["setpoint_limits"].items() if k != "enabled"} == engine_params
+    meaning = rp.MEANING["setpoint_limits"]
+    assert "ospiti" not in meaning and "telecomando" in meaning and "antigelo" in meaning
+    assert "summer_min" in meaning and "summer_max" in meaning and "comfort_celsius < comfort_cool_celsius" in meaning
+    assert "almeno" not in rp.MEANING["frost_protection"] and "anche con la regola spenta" in rp.MEANING["frost_protection"]

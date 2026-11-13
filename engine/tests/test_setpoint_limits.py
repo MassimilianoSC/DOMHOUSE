@@ -98,7 +98,9 @@ def test_manual_out_of_limits_refused_automatic_brought_inside_with_a_note():
 
 def test_the_modes_temperatures_inside_the_effective_limits():
     e = engine()
-    rules(e, min=20, max=24)                                      # eco 18 and comfort 21: eco is brought to 20
+    # a rule saved before the checks of 1098 = b (eco 18 under the minimum 20): eco is brought to 20
+    e.rule("setpoint_limits")["params"].update(min=20)
+    e._apply_limits()
     by_device = {device_id: body for device_id, body in e.mode_commands("eco", CORR)}
     assert by_device[CALDAIA]["params"]["setpoint"] == 20
     by_device = {device_id: body for device_id, body in e.mode_commands("comfort", CORR)}
@@ -160,7 +162,7 @@ def test_a_new_empty_apartment_shows_the_frost_setpoint_and_keeps_it(tmp_path):
     e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(1), seed=True, store=SqliteStore(db))
     assert e.restored and e.devices[CALDAIA]["capabilities"]["heating"]["setpoint"] == 8
     e.devices[CALDAIA]["capabilities"]["heating"].update(on=True, setpoint=18)       # a person's: on at 18 °C
-    rules(e, min=20)
+    rules(e, min=20, eco_celsius=20)
     assert e.devices[CALDAIA]["capabilities"]["heating"]["setpoint"] == 20
 
 

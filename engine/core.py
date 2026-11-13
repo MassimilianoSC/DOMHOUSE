@@ -86,9 +86,14 @@ DEFAULT_RULES = [
     # comfort_celsius (boiler and climate heating in comfort), eco_celsius (boiler in eco), comfort_cool_celsius (climate
     # cooling in comfort); eco <= comfort < cool. «Casa vuota» keeps frost_protection.celsius
     {"rule_id": "setpoint_limits", "label": "Limiti del setpoint", "enabled": True, "editable": True,
-     "params": {"min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18, "comfort_cool_celsius": 25},
+     # 1098 = b: two ranges. min/max the WINTER one (the boiler, a climate heating: eco and comfort inside it),
+     # summer_min/summer_max the SUMMER one (a climate cooling or dehumidifying: the cooling inside it); no tie between
+     # them but comfort < cooling (D-162). A rule saved before gets the summer one with its first values (_rule_defaults)
+     "params": {"min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18, "comfort_cool_celsius": 25,
+                "summer_min": 22, "summer_max": 28},
      "limits": {"min": {"min": 7, "max": 20}, "max": {"min": 20, "max": 28}, "comfort_celsius": {"min": 16, "max": 26},
-                "eco_celsius": {"min": 10, "max": 22}, "comfort_cool_celsius": {"min": 22, "max": 28}}},
+                "eco_celsius": {"min": 10, "max": 22}, "comfort_cool_celsius": {"min": 22, "max": 28},
+                "summer_min": {"min": 16, "max": 28}, "summer_max": {"min": 22, "max": 30}}},
     {"rule_id": "frost_protection", "label": "Antigelo a casa vuota", "enabled": True, "editable": True,
      "params": {"celsius": 8}, "limits": {"celsius": {"min": 5, "max": 12}}},
     {"rule_id": "mold_protection", "label": "Antimuffa a casa vuota", "enabled": True, "editable": True,
@@ -124,6 +129,29 @@ def utcnow() -> datetime:
 
 # D-219: what a scheduled action is, in the decisions schedule_failed and schedule_missed (new_value) and in their text.
 # An action the assistant planned is a manual one in the schedule (kind "manual", source "assistant"): here it has its own.
+def range_errors(sl: dict, touched: bool) -> list[tuple[int, str, str]]:
+    """«Limiti del setpoint» (1098 = b): the 422s of a rule's parameters, in the order the app shows them (o2's
+    sentences). min ≤ eco ≤ comfort ≤ max (winter), summer_min ≤ cooling ≤ summer_max (summer), comfort < cooling
+    (D-162). The checks against the ranges only when the patch touches the rule, also off (its temperatures hold
+    anyway): a rule saved before them is not refused for another rule; the three of before always. The first only."""
+    eco, comfort, cool = sl.get("eco_celsius"), sl.get("comfort_celsius"), sl.get("comfort_cool_celsius")
+    smin, smax = sl.get("summer_min"), sl.get("summer_max")
+    checks = [
+        (sl["min"] > sl["max"], "Il minimo invernale non può superare il massimo invernale"),
+        (touched and eco is not None and eco < sl["min"], "La temperatura eco non può essere sotto il minimo invernale"),
+        (eco is not None and comfort is not None and eco > comfort, "La temperatura eco non può superare quella comfort"),
+        (touched and comfort is not None and comfort > sl["max"],
+         "La temperatura comfort non può superare il massimo invernale"),
+        (touched and smin is not None and smax is not None and smin > smax,
+         "Il minimo estivo non può superare il massimo estivo"),
+        (touched and cool is not None and smin is not None and smax is not None and not smin <= cool <= smax,
+         "La temperatura di raffrescamento deve stare fra il minimo e il massimo estivi"),
+        (comfort is not None and cool is not None and comfort >= cool,
+         "La temperatura di raffrescamento deve essere più alta di quella comfort"),
+    ]
+    return [(422, "invalid_range", message) for broken, message in checks if broken][:1]
+
+
 CHECKOUT_APPROVAL = "Mettere l'appartamento a vuoto dopo il check-out"   # F1 (D-137); D05 recognises it at expiry
 SCHEDULE_LABELS = {"prearrival": "pre-arrivo", "checkout": "check-out", "empty": "casa vuota", "manual": "manuale",
                    "assistant": "dell'assistente"}
@@ -330,6 +358,11 @@ class ApartmentEngine:
         self._frost_command = False                  # D-183 point 125: the boiler's commands of «casa vuota»
         self.catalog_limits: dict[tuple[str, str], tuple] = {}   # D-174: (device, cap) -> the catalog's (min, max)
         self.limits_conflicts: set[str] = set(self.store.get_meta("limits_conflicts", []) or [])
+        # 1097 = a: climates on whose setpoint narrower limits cut, waiting for their command (offline, window open,
+        # busy): device -> {"from", "to"}; the episode of a rule saved with the modes' temperatures outside its limits
+        self.limits_push: dict[str, dict] = dict(self.store.get_meta("limits_push", {}) or {})
+        self.modes_outside: bool = bool(self.store.get_meta("modes_outside", False))
+        self.mode_notes: dict[str, str] = {}         # device -> the note of its last mode command cut by the limits
         self.last_regulation = 0.0
         self.decisions: list[dict] = []
         self.asks: dict[str, dict] = {}
@@ -647,6 +680,7 @@ class ApartmentEngine:
                 self.windows_armed = True
                 self._windows_at_start()
                 self._offline_at_start()
+                self._modes_outside_check()               # 1097 = a: a rule saved before the check
         if self.consumer_task is None or self.consumer_task.done():
             self.consumer_task = asyncio.get_running_loop().create_task(self._consume_changes())
 
@@ -680,7 +714,7 @@ class ApartmentEngine:
         def clamp(value, lo, hi):
             return min(max(value, lo), hi)
         if cap == "climate":
-            lo, hi, _ = self.effective_limits(device_id, cap)
+            lo, hi, _ = self.effective_limits(device_id, cap, "heat")
             return {"on": False, "mode": "heat", "setpoint": clamp(21, lo, hi), "fan": "auto", "setpoint_min": lo,
                     "setpoint_max": hi, "confirmation": "none"}
         if cap == "heating":
@@ -698,7 +732,8 @@ class ApartmentEngine:
         if cap in DEVICE_LIMITS_FALLBACK and ("setpoint_min" in raw or "setpoint_max" in raw):
             lo, hi = self.device_limits(device_id, cap)       # D-174: the catalog's, kept; the app sees the effective
             self.catalog_limits[(device_id, cap)] = (raw.get("setpoint_min", lo), raw.get("setpoint_max", hi))
-            out["setpoint_min"], out["setpoint_max"], _ = self.effective_limits(device_id, cap)
+            out["setpoint_min"], out["setpoint_max"], _ = self.effective_limits(device_id, cap,
+                                                                                raw.get("mode", current.get("mode")))
         if cap == "power_meter" and isinstance(raw.get("energy_total_wh"), (int, float)):
             meter = self.meters.setdefault(device_id, EnergyCounter(self.timezone))
             out["kwh_today"], pieces = meter.update(float(raw["energy_total_wh"]), ts)
@@ -754,6 +789,8 @@ class ApartmentEngine:
             state.update({k: copy.deepcopy(v) for k, v in running[3].items() if k in CONTRACT_FIELDS[cap]})
         was_open = state.get("open")
         state.update(part)
+        if cap == "climate":
+            self._climate_pair(change.device_id, state)      # 1098 = b: its mode may have changed
         if cap == "power_meter":
             self._power_seen(change.device_id, state)
         self._note_climate(change.device_id, cap, was_on, state.get("on"))
@@ -793,25 +830,52 @@ class ApartmentEngine:
         «casa vuota», a change of the rules)."""
         return self.device_limits(device_id, "heating")
 
-    def effective_limits(self, device_id: str, cap: str) -> tuple:
+    def rule_range(self, cap: str, mode: str | None) -> tuple | None:
+        """1098 = b: the manager's range for a device working in this mode: the boiler and a climate heating the winter
+        one (min/max); a climate cooling or dehumidifying (dry: the cold cycle, the warm season) the summer one
+        (summer_min/summer_max); a climate only ventilating (fan: its setpoint drives nothing) none, the device's
+        limits only."""
+        params = self.rule("setpoint_limits")["params"]
+        if cap == "heating" or mode == "heat":
+            return params["min"], params["max"]
+        if mode in ("cool", "dry"):
+            return params.get("summer_min", params["min"]), params.get("summer_max", params["max"])
+        return None
+
+    def effective_limits(self, device_id: str, cap: str, mode: str | None = None) -> tuple:
         """D-174 (D-183 point 124): (min, max, conflict). «Limiti del setpoint» on = the manager's limits inside the
-        device's, for climate and boiler; off = the device's; an empty intersection = the device's, conflict True."""
+        device's, for climate and boiler; off = the device's; an empty intersection = the device's, conflict True.
+        1098 = b: a climate's of the mode it works in (`mode`, by default its current one; a new climate heats)."""
         lo, hi = self.device_limits(device_id, cap)
         rule = self.rule("setpoint_limits")
         if not rule["enabled"]:
             return lo, hi, False
-        mlo, mhi = max(lo, rule["params"]["min"]), min(hi, rule["params"]["max"])
+        if cap == "climate" and mode is None:
+            device = getattr(self, "devices", {}).get(device_id)
+            mode = (device["capabilities"].get("climate") or {}).get("mode", "heat") if device else "heat"
+        rng = self.rule_range(cap, mode)
+        if rng is None:
+            return lo, hi, False
+        mlo, mhi = max(lo, rng[0]), min(hi, rng[1])
         if mlo > mhi:
             return lo, hi, True
         return mlo, mhi, False
 
-    def command_limits(self, device: dict, cap: str) -> tuple:
+    def command_limits(self, device: dict, cap: str, mode: str | None = None) -> tuple:
         """The limits a command is checked against: the state's (the effective ones); the boiler's commands of «casa
-        vuota» only the device's (D-183 point 125: the frost protection never follows the manager's limits)."""
+        vuota» only the device's (D-183 point 125: the frost protection never follows the manager's limits). 1098 = b:
+        a climate command that changes the mode, the new mode's."""
         if cap == "heating" and self._frost_command:
             return self.frost_limits(device["device_id"])
         state = device["capabilities"][cap]
+        if cap == "climate" and mode is not None and mode != state.get("mode"):
+            return self.effective_limits(device["device_id"], cap, mode)[:2]
         return state["setpoint_min"], state["setpoint_max"]
+
+    def _climate_pair(self, device_id: str, state: dict) -> None:
+        """1098 = b: a climate's setpoint_min/setpoint_max follow the mode it works in (a command, the device's own
+        report). Only the pair: a setpoint chosen with the remote control is shown as it is, never brought inside."""
+        state["setpoint_min"], state["setpoint_max"], _ = self.effective_limits(device_id, "climate", state.get("mode"))
 
     def _apply_limits(self, correlation_id: str | None = None, emit: bool = False) -> None:
         """D-174: every climate and boiler gets its effective limits and its setpoint inside them; in «casa vuota» a
@@ -836,6 +900,11 @@ class ApartmentEngine:
                 sp = c.get("setpoint")
                 fixed = min(max(sp, bound[0]), bound[1]) if isinstance(sp, (int, float)) else sp
                 if (c.get("setpoint_min"), c.get("setpoint_max"), sp) != (lo, hi, fixed):
+                    if cap == "climate" and c.get("on") and fixed != sp:
+                        # 1097 = a: the split keeps its own setpoint, the copy alone is not enough: a command (_push_limits)
+                        was = self.limits_push.get(d["device_id"], {}).get("from", sp)
+                        self.limits_push[d["device_id"]] = {"from": was, "to": fixed}
+                        self.store.put_meta("limits_push", self.limits_push)
                     c["setpoint_min"], c["setpoint_max"], c["setpoint"] = lo, hi, fixed
                     self._save_device(d)
                     if emit:
@@ -846,11 +915,11 @@ class ApartmentEngine:
             self.store.put_meta("limits_conflicts", sorted(conflicts))
 
     def _note_limits_conflict(self, device: dict, cap: str, correlation_id: str | None) -> None:
-        sl = self.rule("setpoint_limits")["params"]
+        rmin, rmax = self.rule_range(cap, (device["capabilities"].get(cap) or {}).get("mode"))   # 1098 = b: its mode's
         lo, hi = self.device_limits(device["device_id"], cap)
         self.log("rule:setpoint_limits", {"type": "device", "device_id": device["device_id"]}, "setpoint_limits_ignored",
-                 f"{fmt_num(sl['min'])}–{fmt_num(sl['max'])}", f"{fmt_num(lo)}–{fmt_num(hi)}",
-                 f"{device['label']}: i limiti del setpoint ({fmt_num(sl['min'])}–{fmt_num(sl['max'])} °C) sono fuori "
+                 f"{fmt_num(rmin)}–{fmt_num(rmax)}", f"{fmt_num(lo)}–{fmt_num(hi)}",
+                 f"{device['label']}: i limiti del setpoint ({fmt_num(rmin)}–{fmt_num(rmax)} °C) sono fuori "
                  f"da quelli del dispositivo ({fmt_num(lo)}–{fmt_num(hi)} °C): valgono quelli del dispositivo",
                  "informational", correlation_id or str(uuid.uuid4()))
 
@@ -862,12 +931,98 @@ class ApartmentEngine:
         state = device["capabilities"].get(cap) if isinstance(cap, str) else None
         if not isinstance(params, dict) or not state or "setpoint" not in params or "setpoint_min" not in state:
             return body, None
-        sp, (lo, hi) = params["setpoint"], self.command_limits(device, cap)
+        sp, (lo, hi) = params["setpoint"], self.command_limits(device, cap, params.get("mode"))
         if not isinstance(sp, (int, float)) or isinstance(sp, bool) or lo <= sp <= hi:
             return body, None
-        fixed = min(max(sp, lo), hi)
-        note = f"setpoint {fmt_num(sp)} °C riportato a {fmt_num(fixed)} °C (limiti {fmt_num(lo)}–{fmt_num(hi)})"
+        fixed, note = self._clamped(device, cap, sp, lo, hi)
         return {**body, "params": {**params, "setpoint": fixed}}, note
+
+    def _mode_change_setpoint(self, device: dict, body: dict) -> tuple[dict, str | None]:
+        """1098 = b: a climate command that changes the mode without a setpoint, while the current setpoint is outside
+        the new mode's range (heat at 21 to cool with the summer range 22–28): the setpoint brought inside goes with
+        it, in the command and in the state, with the note for the decision. Not a 422: nobody chose that setpoint."""
+        params = body.get("params") if isinstance(body, dict) else None
+        state = device["capabilities"].get("climate")
+        if (body.get("capability") != "climate" or not isinstance(params, dict) or not state
+                or params.get("mode") not in CLIMATE_MODES or "setpoint" in params):
+            return body, None
+        sp = state.get("setpoint")
+        if not isinstance(sp, (int, float)) or isinstance(sp, bool):
+            return body, None
+        lo, hi = self.command_limits(device, "climate", params["mode"])
+        fixed, note = self._clamped(device, "climate", sp, lo, hi)
+        if note is None:
+            return body, None
+        return {**body, "params": {**params, "setpoint": fixed}}, note
+
+    def _clamped(self, device: dict, cap: str, target, lo, hi) -> tuple:
+        """(the setpoint inside lo–hi, the note for the decision or None): R6's note; when the device's own limits cut
+        it, it says so with them (1097 = a: «Limiti del setpoint» 16–26, a split 16–24 cools to 24, not 25)."""
+        fixed = min(max(target, lo), hi)
+        if fixed == target:
+            return target, None
+        dlo, dhi = self.device_limits(device["device_id"], cap)
+        if (target > hi and hi == dhi) or (target < lo and lo == dlo):
+            where = f"limiti del dispositivo {fmt_num(dlo)}–{fmt_num(dhi)}"
+        else:
+            where = f"limiti {fmt_num(lo)}–{fmt_num(hi)}"
+        return fixed, f"setpoint {fmt_num(target)} °C riportato a {fmt_num(fixed)} °C ({where})"
+
+    def _push_limits(self, correlation_id: str | None = None) -> None:
+        """1097 = a: a climate on whose setpoint narrower limits cut gets a command to the new setpoint, as the system's
+        (it does not take the climate away from comfort). It waits, and tries again at every regulation's minute and
+        after a restart, while the devices cannot be reached, the climate is offline, a command of its own is running
+        (a turn_off in flight: the compressor's pause comes after it) or a window is open with its rule active (the
+        rule turns it off). Off, or commanded by anyone meanwhile (create_command): nothing more to send."""
+        if not self.limits_push:
+            return
+        for device_id, push in list(self.limits_push.items()):
+            device = self.devices.get(device_id)
+            c = device["capabilities"].get("climate") if device else None
+            if not c or not c.get("on") or c.get("setpoint") != push["to"]:
+                self.limits_push.pop(device_id, None)
+                continue
+            busy = any(x["device_id"] == device_id and x["status"] not in FINAL for x in self.commands.values())
+            if (not self.connector_up() or not device["online"] or busy or device_id in self.window_off
+                    or any(r[0] == device_id for r in self.inflight)
+                    or (self.window_open() and self.window_rule_active())):
+                continue
+            self.limits_push.pop(device_id, None)
+            self._auto_climate = True
+            try:
+                self.create_command(device_id, {"capability": "climate", "action": "set_climate",
+                                                "params": {"setpoint": push["to"]}},
+                                    "system:engine", correlation_id or str(uuid.uuid4()), decision_actor="system",
+                                    reasoning=f"Limiti del setpoint cambiati: {device['label']} portato da "
+                                              f"{fmt_num(push['from'])} °C a {fmt_num(push['to'])} °C")
+            except MockError as exc:
+                logs.warn("limits command not created", apartment_id=self.apartment_id, device_id=device_id,
+                          error=exc.error)
+            finally:
+                self._auto_climate = False
+        self.store.put_meta("limits_push", self.limits_push)
+
+    def _modes_outside_check(self, correlation_id: str | None = None) -> None:
+        """1097 = a: a rule saved before the check (first values 24 and 25) with the modes' temperatures outside its
+        limits, while on: one decision per episode, also across restarts; not refused nor corrected on its own. The
+        episode ends when the rule is corrected or switched off."""
+        rule = self.rule("setpoint_limits")
+        sl = rule["params"]
+        winter, summer = (sl["min"], sl["max"]), (sl.get("summer_min", sl["min"]), sl.get("summer_max", sl["max"]))
+        parts = [f"{name} {fmt_num(sl[key])} °C ({season} {fmt_num(rng[0])}–{fmt_num(rng[1])} °C)"
+                 for key, name, season, rng in (("eco_celsius", "eco", "inverno", winter),
+                                                ("comfort_celsius", "comfort", "inverno", winter),
+                                                ("comfort_cool_celsius", "raffrescamento", "estate", summer))
+                 if key in sl and not rng[0] <= sl[key] <= rng[1]]
+        now = bool(rule["enabled"] and parts)
+        if now and not self.modes_outside:
+            self.log("rule:setpoint_limits", {"type": "rules"}, "limits_modes_outside", None, ", ".join(parts),
+                     f"Temperature delle modalità fuori dai limiti del setpoint: {', '.join(parts)}. Clima e caldaia "
+                     f"restano dentro i limiti: correggi la regola «Limiti del setpoint»", "informational",
+                     correlation_id or str(uuid.uuid4()))
+        if now != self.modes_outside:
+            self.modes_outside = now
+            self.store.put_meta("modes_outside", now)
 
     def _offline_at_start(self) -> None:
         """D12 (P-83): a device already offline at the start (unplugged while the engine was down, or never connected)
@@ -1031,6 +1186,7 @@ class ApartmentEngine:
         if not self.connector_was_up:
             return
         self._mode_pending_send()                            # D16: what the mode could not send before
+        self._push_limits()                                  # 1097 = a: and what narrower limits could not send
         self._restore_after_window()                         # D-218 point 1: first, so the boiler's relay follows now
         self._keep_window_off()                              # D03: and what is still on with the window open goes off
         in_force = self.window_in_force()
@@ -1145,7 +1301,8 @@ class ApartmentEngine:
             climate_mode, target = "cool", cool
         else:
             return None
-        return {"mode": climate_mode, "setpoint": min(max(target, c["setpoint_min"]), c["setpoint_max"])}
+        # the mode's temperature as it is: create_command brings it inside the limits with the note (R6, 1097 = a)
+        return {"mode": climate_mode, "setpoint": target}
 
     def _regulate_climates(self) -> None:
         """D-169: in comfort, every "minute", each climate the mode set and no person changed since follows its room's
@@ -1183,7 +1340,10 @@ class ApartmentEngine:
                 climate_mode, target, words = "cool", cool, f"sopra {fmt_num(cool)} °C: raffresca"
             else:
                 continue
-            setpoint = min(max(target, c["setpoint_min"]), c["setpoint_max"])
+            lo, hi, _ = self.effective_limits(device_id, "climate", climate_mode)   # 1098 = b: the new mode's
+            setpoint, note = self._clamped(device, "climate", target, lo, hi)
+            if note:
+                words += f"; {note}"                        # 1097 = a: the device's limits cut it
             self.climate_switched[device_id] = time.monotonic()
             self._auto_climate = True
             try:
@@ -1427,7 +1587,9 @@ class ApartmentEngine:
                         heat, cool = sl["comfort_celsius"], sl["comfort_cool_celsius"]
                         if room < heat or room > cool:
                             climate_mode, target = ("heat", heat) if room < heat else ("cool", cool)
-                            sp = min(max(target, c["setpoint_min"]), c["setpoint_max"])
+                            lo, hi, _ = self.effective_limits(d["device_id"], "climate", climate_mode)   # 1098 = b
+                            sp, note = self._clamped(d, "climate", target, lo, hi)
+                            self._mode_note(d["device_id"], note)
                             out.append((d["device_id"], {"capability": "climate", "action": "set_climate",
                                                          "params": {"on": True, "mode": climate_mode, "setpoint": sp}}))
             if "heating" in caps:
@@ -1435,10 +1597,18 @@ class ApartmentEngine:
                 target = {"comfort": sl["comfort_celsius"], "eco": sl["eco_celsius"], "empty": frost}[mode]
                 lo, hi = (self.frost_limits(d["device_id"]) if mode == "empty"     # D-183 point 125
                           else (h["setpoint_min"], h["setpoint_max"]))
-                sp = min(max(target, lo), hi)
+                sp, note = self._clamped(d, "heating", target, lo, hi)
+                self._mode_note(d["device_id"], note)
                 out.append((d["device_id"], {"capability": "heating", "action": "set_heating",
                                              "params": {"on": True, "setpoint": sp}}))
         return out
+
+    def _mode_note(self, device_id: str, note: str | None) -> None:
+        """The note of a mode's setpoint cut by the limits (1097 = a), for set_mode's decision of that command."""
+        if note:
+            self.mode_notes[device_id] = note
+        else:
+            self.mode_notes.pop(device_id, None)
 
     def _mode_would_command(self, device: dict, mode: str) -> bool:
         """Whether the mode would send this device a command if it were online (the same choice as mode_commands,
@@ -1526,8 +1696,9 @@ class ApartmentEngine:
             sent: set[str] = set()
             for device_id, body in self.mode_commands(mode, correlation_id):
                 try:
+                    note = self.mode_notes.get(device_id)
                     cmd = self.create_command(device_id, body, actor, correlation_id, decision_actor=decision_actor,
-                                              reasoning=f"Modalità {mode}")
+                                              reasoning=f"Modalità {mode}" + (f"; {note}" if note else ""))
                     if cmd:
                         command_ids.append(cmd["command_id"])
                     sent.add(device_id)
@@ -1643,7 +1814,7 @@ class ApartmentEngine:
             sp = params["setpoint"]
             if not isinstance(sp, (int, float)) or isinstance(sp, bool):
                 raise bad_request("setpoint deve essere numerico")
-            lo, hi = self.command_limits(device, cap)
+            lo, hi = self.command_limits(device, cap, params.get("mode"))      # 1098 = b: the new mode's range
             if not lo <= sp <= hi:
                 raise MockError(422, "setpoint_out_of_range", f"Il setpoint deve essere tra {fmt_num(lo)} e {fmt_num(hi)}",
                                 {"min": lo, "max": hi})
@@ -1697,6 +1868,8 @@ class ApartmentEngine:
                        decision_actor: str | None = None, reasoning: str | None = None) -> dict | None:
         """A command, or None when an automatic one waits for the compressor's pause (R4) and starts after it."""
         device = self.get_device(device_id)
+        if self.limits_push.pop(device_id, None) is not None:   # 1097 = a: any command replaces the one of the limits
+            self.store.put_meta("limits_push", self.limits_push)
         if not self._window_command and not self._auto_climate:
             self.commanded_at[device_id] = time.monotonic()   # D13: a deferred automatic start must not undo it
         if not self._window_command and not self._auto_climate and self.window_off.pop(device_id, None) is not None:
@@ -1717,6 +1890,10 @@ class ApartmentEngine:
             body, note = self._within_limits(device, body)
             if note:
                 reasoning = f"{reasoning or 'Comando automatico'}; {note}"
+        body, note = self._mode_change_setpoint(device, body)
+        if note:                                             # 1098 = b: also a person's, nobody chose that setpoint
+            default = "Comando manuale dall'app" if manual else "Comando automatico"
+            reasoning = f"{reasoning or default}; {note}"
         cap, action, params = self.validate_command(device, body)
         turning_off = cap == "climate" and any(
             c["device_id"] == device_id and c["status"] not in FINAL and c["capability"] == cap
@@ -1798,6 +1975,8 @@ class ApartmentEngine:
         merged.update({k: copy.deepcopy(v) for k, v in requested.items() if k in CONTRACT_FIELDS[cap]})
         merged.update(self._contract_part(device["device_id"], cap, self._take_relay(device["device_id"], cap, reported),
                                           utcnow(), state))
+        if cap == "climate":
+            self._climate_pair(device["device_id"], merged)  # 1098 = b: the pair of the new mode
         if merged == state:
             return
         was_on = state.get("on")
@@ -2228,6 +2407,8 @@ class ApartmentEngine:
             state = device["capabilities"][cap]
             was_open = state.get("open")
             state.update(body["state"])
+            if cap == "climate":
+                self._climate_pair(device_id, state)         # 1098 = b
             if cap == "contact" and state.get("open") != was_open:
                 state["since"] = iso(seen)
             if cap == "motion" and state.get("detected") and "last_seen" not in body["state"]:
@@ -2272,13 +2453,8 @@ class ApartmentEngine:
                                     {"rule_id": rule["rule_id"], "param": key, "min": lim["min"], "max": lim["max"]})
                 rule["params"][key] = value
         sl = by_id["setpoint_limits"]["params"]
-        if sl["min"] > sl["max"]:
-            raise MockError(422, "invalid_range", "Il minimo del setpoint non può superare il massimo")
-        if sl.get("eco_celsius", 0) > sl.get("comfort_celsius", 99):        # D-161
-            raise MockError(422, "invalid_range", "La temperatura eco non può superare quella comfort")
-        if sl.get("comfort_celsius", 0) >= sl.get("comfort_cool_celsius", 99):   # D-162
-            raise MockError(422, "invalid_range",
-                            "La temperatura di raffrescamento deve essere più alta di quella comfort")
+        for status, error, message in range_errors(sl, any(p.get("rule_id") == "setpoint_limits" for p in patches)):
+            raise MockError(status, error, message)
         self.rules = staged
         self.rules_updated_at = iso(utcnow())
         self._save_apartment()
@@ -2286,6 +2462,12 @@ class ApartmentEngine:
         self.log(actor_of(actor), {"type": "rules"}, "update_rules", None, changed, "Regole modificate dall'app",
                  "applied", correlation_id)
         self._apply_limits(correlation_id, emit=True)       # D-174: the switch and the limits take effect now
+        self._modes_outside_check(correlation_id)           # 1097 = a: the episode of a rule saved before ends here
+        try:
+            asyncio.get_running_loop()
+            self._push_limits(correlation_id)                # 1097 = a: the climates the new limits cut, now
+        except RuntimeError:
+            pass                                             # no loop: the next regulation's minute sends them
         if any(p.get("rule_id") == "window_open_off" for p in patches):
             # D30 (P-83): turned on, or its minutes changed: every open window waits again from when it opened (past
             # the minutes, at once); before, a wait that ended with the rule off was never planned again

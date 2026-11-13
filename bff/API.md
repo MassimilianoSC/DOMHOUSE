@@ -718,6 +718,37 @@ Esempio di risposta di #38 a «la finestra aperta spegne dopo 10 minuti e la pre
   sovrappongono a quelli del dispositivo valgono quelli del dispositivo, con una decisione `setpoint_limits_ignored`
   (attore `rule:setpoint_limits`) per episodio. L'antigelo di «casa vuota» usa solo i limiti del dispositivo: la
   caldaia può stare a 8 °C anche con `setpoint_min` 16.
+- Dal 13 novembre 2026 (1096 = a, 1098 = b) «Limiti del setpoint» ha DUE intervalli. `min` e `max` sono l'intervallo
+  INVERNO (caldaia e clima che scalda; iniziali 16 e 24, limiti invariati): una regola salvata prima li tiene così.
+  `summer_min` e `summer_max` sono l'intervallo ESTATE (clima che raffresca o deumidifica; iniziali 22 e 28, limiti
+  16–28 e 22–30): una regola salvata prima li riceve con i valori iniziali. Deve valere `min` ≤ `eco_celsius` ≤
+  `comfort_celsius` ≤ `max`, `summer_min` ≤ `comfort_cool_celsius` ≤ `summer_max` e `comfort_celsius` <
+  `comfort_cool_celsius`; nessun altro legame fra i due intervalli. 422 `invalid_range`, nell'ordine (frasi di o2):
+  «Il minimo invernale non può superare il massimo invernale», «La temperatura eco non può essere sotto il minimo
+  invernale», «La temperatura eco non può superare quella comfort», «La temperatura comfort non può superare il massimo
+  invernale», «Il minimo estivo non può superare il massimo estivo», «La temperatura di raffrescamento deve stare fra
+  il minimo e il massimo estivi», «La temperatura di raffrescamento deve essere più alta di quella comfort». La prima,
+  la terza e l'ultima valgono sempre; le altre solo quando la modifica tocca `setpoint_limits` (anche a regola
+  spenta), così una regola salvata prima, incoerente, non fa rifiutare la modifica di un'altra regola. Gli stessi
+  controlli (la stessa funzione del motore, `engine.core.range_errors`) valgono nella proposta (#38, #39) e
+  nell'anteprima di copia; il riconoscitore capisce «massimo estivo 27» e «setpoint estate da 23 a 27».
+  `setpoint_min` e `setpoint_max` di un clima sono l'intervallo del modo in cui lavora, dentro i limiti del
+  dispositivo: `heat` inverno, `cool` e `dry` estate, `fan` solo i limiti del dispositivo (in ventilazione il setpoint
+  non comanda niente). Cambiano con il modo, dopo un comando o dopo uno stato riportato dal dispositivo, con un
+  `device.state`; un setpoint scelto col telecomando resta com'è. Un comando che cambia il modo si controlla con
+  l'intervallo del modo NUOVO (manuale fuori: 422 `setpoint_out_of_range` con `min` e `max` del nuovo modo). Un cambio
+  di modo senza setpoint, con il setpoint attuale fuori dal nuovo intervallo, porta con sé il setpoint riportato dentro
+  («Comando manuale dall'app; setpoint 20 °C riportato a 22 °C (limiti 22–24)»). Una regola salvata prima con le
+  temperature delle modalità fuori dai loro intervalli, mentre è accesa: una decisione `limits_modes_outside` (attore
+  `rule:setpoint_limits`, target `rules`, informativa) per episodio, anche dopo un riavvio («Temperature delle modalità
+  fuori dai limiti del setpoint: comfort 21 °C (inverno 16–20 °C). Clima e caldaia restano dentro i limiti: correggi
+  la regola «Limiti del setpoint»»); il motore non la corregge da solo. Quando sono i limiti del dispositivo a ridurre
+  la temperatura di una modalità o della regolazione, la decisione del comando finisce con «; setpoint 25 °C riportato
+  a 24 °C (limiti del dispositivo 16–24)». Limiti più stretti che lasciano fuori il setpoint di un clima acceso: un
+  comando `set_climate` di sistema con il solo setpoint («Limiti del setpoint cambiati: Climatizzatore soggiorno
+  portato da 17 °C a 18 °C»). Aspetta, e riprova a ogni minuto e dopo un riavvio, se il dispositivo è offline, ha un
+  comando in corso o c'è una finestra aperta con la sua regola attiva; non parte se nel frattempo il clima è stato
+  spento o comandato. Prima cambiava solo la copia del motore, e lo split restava al setpoint vecchio.
 
 ## Copia delle regole (P-60 passo 12, D-151 punto 22)
 

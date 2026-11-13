@@ -22,6 +22,8 @@ import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from engine.core import range_errors
+
 DAILY_LIMIT = 20
 TEXT_MAX = 500
 PROPOSAL_TIMEOUT_S = 15.0     # lot 29: the model's call for a proposal; then «L'assistente non ha risposto in tempo…»
@@ -29,11 +31,11 @@ TIMEOUT_MESSAGE = ("L'assistente non ha risposto in tempo: riprova con una frase
                    "mano qui sotto.")
 ENABLED_FIELD = "attiva"      # the tool's name for on/off: valore 1 = attiva, 0 = spenta
 
-# the predefined values (the contract's example of GET /rules, the engine's DEFAULT_RULES), for «regole personalizzate»
+# the predefined values (the engine's DEFAULT_RULES), for «regole personalizzate»; 1098 = b: the summer range too
 DEFAULTS = {
     "window_open_off": {"enabled": True, "minutes": 5},
     "setpoint_limits": {"enabled": True, "min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18,
-                        "comfort_cool_celsius": 25},
+                        "comfort_cool_celsius": 25, "summer_min": 22, "summer_max": 28},
     "frost_protection": {"enabled": True, "celsius": 8},
     "mold_protection": {"enabled": True, "humidity_percent": 65},
     "prearrival": {"enabled": True, "hours_before": 2},
@@ -44,10 +46,18 @@ DEFAULTS = {
 # what each rule and parameter means, for the model (the same words as the site's Rules page)
 MEANING = {
     "window_open_off": "spegne clima e caldaia se una finestra resta aperta più di minutes minuti",
-    "setpoint_limits": ("limita la temperatura impostabile da ospiti e app: da min a max gradi; in comfort la caldaia "
-                        "e il clima scaldano a comfort_celsius, il clima raffresca a comfort_cool_celsius; in eco la "
-                        "caldaia sta a eco_celsius"),
-    "frost_protection": "con la casa vuota mantiene almeno celsius gradi",
+    # 1096 = a, 1098 = b, with o2's it.json: neither guests nor the split's remote control are limited, nor the frost
+    # protection; two ranges, winter and summer, tied only by comfort < cooling
+    "setpoint_limits": ("limita la temperatura impostabile dall'app e dall'assistente e quella di modalità e programmi, "
+                        "non il telecomando del climatizzatore né l'antigelo; due intervalli: inverno da min a max gradi "
+                        "per la caldaia e il clima che scalda, estate da summer_min a summer_max gradi per il clima che "
+                        "raffresca o deumidifica; in comfort la caldaia e il clima scaldano a comfort_celsius, il clima "
+                        "raffresca a comfort_cool_celsius; in eco la caldaia sta a eco_celsius; deve valere "
+                        "min ≤ eco_celsius ≤ comfort_celsius ≤ max, summer_min ≤ comfort_cool_celsius ≤ summer_max e "
+                        "comfort_celsius < comfort_cool_celsius"),
+    # D31 (o2 6e84f1d): the frost protection is the boiler's setpoint in «casa vuota», not «at least»
+    "frost_protection": ("con la casa vuota la caldaia va a celsius gradi anche con la regola spenta; con la regola "
+                         "accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura"),
     # verification of 10 November 2026: it said «deumidifica», but the engine only warns (engine/mold.py)
     "mold_protection": ("con la casa vuota, se l'umidità supera humidity_percent, registra un avviso nelle Decisioni, al "
                         "massimo uno al giorno; non deumidifica da sola"),
@@ -114,13 +124,11 @@ def changes(ruleset: dict, patches: list) -> tuple[list[dict], list[dict]]:
         if patch:
             clean.append({"rule_id": rule["rule_id"], **patch})
     sl = after.get("setpoint_limits")
-    if sl and sl["min"] > sl["max"]:
-        raise ProposalError(422, "invalid_range", "Il minimo del setpoint non può superare il massimo")
-    # D-161/D-162, the engine's own checks (lot 30): a proposal never shows a change that «Applica» would refuse
-    if sl and "eco_celsius" in sl and "comfort_celsius" in sl and sl["eco_celsius"] > sl["comfort_celsius"]:
-        raise ProposalError(422, "invalid_range", "La temperatura eco non può superare quella comfort")
-    if sl and "comfort_celsius" in sl and "comfort_cool_celsius" in sl and sl["comfort_celsius"] >= sl["comfort_cool_celsius"]:
-        raise ProposalError(422, "invalid_range", "La temperatura di raffrescamento deve essere più alta di quella comfort")
+    # the engine's own checks (D-161, D-162, 1098 = b), the same function: a proposal or a copy never shows a change
+    # that «Applica» would refuse; those against the ranges only when the patches touch the rule
+    touched = any(isinstance(p, dict) and p.get("rule_id") == "setpoint_limits" for p in patches)
+    for status, error, message in (range_errors(sl, touched) if sl else []):
+        raise ProposalError(status, error, message)
     return clean, out
 
 
@@ -217,12 +225,13 @@ def from_answer(answer: dict) -> tuple[list | None, str]:
 
 # ---- the recognizer for the demonstrations without the model -------------------------------------------------------
 _NUM = r"(\d+(?:[.,]\d+)?)"
-AMBIGUOUS_TEMPERATURE = ("È la temperatura comfort, eco, di raffrescamento o un limite (minimo o massimo)? Scrivilo, per "
-                         "esempio «comfort 22» o «massimo 24».")
+AMBIGUOUS_TEMPERATURE = ("È la temperatura comfort, eco, di raffrescamento o un limite (minimo o massimo, d'inverno o "
+                         "d'estate)? Scrivilo, per esempio «comfort 22», «massimo 24» o «massimo estivo 27».")
 _RULE_WORDS = (("window_open_off", ("finestr",)), ("frost_protection", ("antigelo", "gelo")),
                ("mold_protection", ("muffa", "umidit")), ("prearrival", ("arrivo",)),
                ("checkout_eco", ("check-out", "checkout", "partenza")), ("offline_alert", ("offline",)),
-               ("setpoint_limits", ("setpoint", "temperatura", "comfort", " eco", "raffresc")))
+               ("setpoint_limits", ("setpoint", "temperatura", "comfort", " eco", "raffresc", "estat", "estiv",
+                                    "invern")))
 
 
 def simple(text: str) -> bool:
@@ -255,7 +264,8 @@ def recognize(text: str, ruleset: dict) -> tuple[list | None, str]:
             ("checkout_eco", "minutes_after")
     elif "offline" in t:
         rule, key = "offline_alert", "minutes"
-    elif "setpoint" in t or "temperatura" in t or "comfort" in t or "raffresc" in t or re.search(r"\beco\b", t):
+    elif ("setpoint" in t or "temperatura" in t or "comfort" in t or "raffresc" in t or "estat" in t or "estiv" in t
+          or "invern" in t or re.search(r"\beco\b", t)):
         rule = "setpoint_limits"
     if rule is None:
         return None, ("Posso cambiare le regole della pagina: finestra aperta, limiti del setpoint, antigelo, "
@@ -266,7 +276,10 @@ def recognize(text: str, ruleset: dict) -> tuple[list | None, str]:
         return [{"rule_id": rule, "enabled": False}], "Spengo la regola."
     if re.search(r"\b(attiv|accend|riattiv)", t) and not n:
         return [{"rule_id": rule, "enabled": True}], "Attivo la regola."
-    if rule == "setpoint_limits" and n and len(n) == 1:              # D-161: the modes' temperatures
+    # 1098 = b: the summer range («estate», «estivo»; «raffrescamento» with «minimo» or «massimo»), the winter one by default
+    summer = "estat" in t or "estiv" in t or ("raffresc" in t and ("min" in t or "mass" in t))
+    low, high, season = ("summer_min", "summer_max", " estivo") if summer else ("min", "max", "")
+    if rule == "setpoint_limits" and n and len(n) == 1 and not summer:   # D-161: the modes' temperatures
         if "raffresc" in t:
             return [{"rule_id": rule, "params": {"comfort_cool_celsius": _num(n[0])}}], "Cambio il raffrescamento in comfort."
         if "comfort" in t:
@@ -275,12 +288,12 @@ def recognize(text: str, ruleset: dict) -> tuple[list | None, str]:
             return [{"rule_id": rule, "params": {"eco_celsius": _num(n[0])}}], "Cambio la temperatura eco."
     if rule == "setpoint_limits":
         if len(n) >= 2:
-            return [{"rule_id": rule, "params": {"min": _num(min(n[:2])), "max": _num(max(n[:2]))}}], \
-                "Cambio i limiti del setpoint."
+            return [{"rule_id": rule, "params": {low: _num(min(n[:2])), high: _num(max(n[:2]))}}], \
+                f"Cambio i limiti{' estivi' if summer else ''} del setpoint."
         if n and "min" in t:
-            return [{"rule_id": rule, "params": {"min": _num(n[0])}}], "Cambio il minimo del setpoint."
+            return [{"rule_id": rule, "params": {low: _num(n[0])}}], f"Cambio il minimo{season} del setpoint."
         if n and "mass" in t:
-            return [{"rule_id": rule, "params": {"max": _num(n[0])}}], "Cambio il massimo del setpoint."
+            return [{"rule_id": rule, "params": {high: _num(n[0])}}], f"Cambio il massimo{season} del setpoint."
         if n:                                     # lot 30: «temperatura 22» alone is not a limit, ask which one
             return None, AMBIGUOUS_TEMPERATURE
     elif n:
