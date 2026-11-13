@@ -418,3 +418,80 @@ def test_t6_the_chat_says_why_in_words_not_codes(fast):
         return lines
     lines = asyncio.run(main())
     assert lines == ["Non riuscito: accendere presa stufetta camera (Il dispositivo ha rifiutato il comando)."], lines
+
+
+# -------- S1 (answer 1101 = a) --------
+def test_s1_a_split_switched_off_by_its_remote_stays_off_until_the_next_mode(fast):
+    """Comfort at 15 °C: the guest switches the split off with its remote (the meter at 0 W, no command running).
+    After REMOTE_OFF_MINUTES of low watts the engine believes it off, takes it out of the regulation with a decision,
+    and never switches it on again until the mode changes. Before: on again every THERMOSTAT_MIN_SWITCH_MINUTES."""
+    async def main():
+        e = await started("comfort")
+        assert climate(e)["on"] and CLIMA in e.climate_by_mode
+        before = len([c for c in e.commands.values() if c["device_id"] == CLIMA])
+        e.connector._devices[CLIMA].capabilities["climate"]["on"] = False       # its own remote
+        e.connector.set_state("dev-misura-clima", "power_meter", {"watts": 0})
+        await asyncio.sleep(0.1)
+        assert climate(e)["on"]                                             # a few low watts: not yet off
+        await minutes(e.setting("REMOTE_OFF_MINUTES") + 1)
+        await settle(e)
+        assert not climate(e)["on"] and CLIMA not in e.climate_by_mode
+        await minutes(2 * e.setting("THERMOSTAT_MIN_SWITCH_MINUTES") + 2)
+        await settle(e)
+        after = len([c for c in e.commands.values() if c["device_id"] == CLIMA])
+        e.set_mode("eco", ACTOR, CORR, "prova")
+        e.set_mode("comfort", ACTOR, CORR, "prova")                        # the next mode: regulated again
+        await settle(e)
+        stop(e)
+        return e, before, after
+    e, before, after = asyncio.run(main())
+    assert after == before                                                  # never switched on again
+    assert CLIMA in e.climate_by_mode
+    [d] = decisions(e, "climate_remote_off")
+    assert (d["actor"], d["target"], d["outcome"]) == ("system", {"type": "device", "device_id": CLIMA}, "informational")
+    assert d["reasoning"] == ("Climatizzatore soggiorno: spento col telecomando (consumo sotto 15 W da 5 minuti); resta "
+                              "fuori dalla regolazione fino al prossimo cambio di modalità")
+
+
+def test_s1_low_watts_for_less_than_the_minutes_change_nothing(fast):
+    """A split at its temperature that stops its fan for a while (S9): watts back up before the minutes, still on."""
+    async def main():
+        e = await started("comfort")
+        e.connector.set_state("dev-misura-clima", "power_meter", {"watts": 3})
+        await minutes(2)
+        e.connector.set_state("dev-misura-clima", "power_meter", {"watts": 600})
+        await minutes(e.setting("REMOTE_OFF_MINUTES") + 1)
+        await settle(e)
+        stop(e)
+        return e
+    e = asyncio.run(main())
+    assert climate(e)["on"] and CLIMA in e.climate_by_mode and decisions(e, "climate_remote_off") == []
+
+
+# -------- S6 (answer 1102 = a) --------
+def test_s6_a_window_contact_offline_while_open_counts_as_closed(fast):
+    """The window rule turned boiler and climate off; the contact goes silent while open (battery, bridge unplugged):
+    before, everything stayed off until it came back, for days. Now an offline contact counts as closed, with a
+    decision, and what the rule turned off comes back; back online and still open, the rule starts again."""
+    async def main():
+        e = await started("comfort")
+        window(e, True)
+        await minutes(e.rule("window_open_off")["params"]["minutes"] + 1)
+        await settle(e)
+        assert not boiler(e)["on"] and not climate(e)["on"]
+        e.test_state({"device_id": WINDOW, "online": False}, ACTOR, CORR)
+        await minutes(8)
+        await settle(e)
+        back = boiler(e)["on"] and climate(e)["on"]
+        e.test_state({"device_id": WINDOW, "online": True}, ACTOR, CORR)
+        await minutes(e.rule("window_open_off")["params"]["minutes"] + 2)
+        await settle(e)
+        stop(e)
+        return e, back
+    e, back = asyncio.run(main())
+    assert back                                                         # it came back with the contact silent
+    assert not boiler(e)["on"]                                          # the contact back, still open: off again
+    [d] = decisions(e, "window_contact_offline")
+    assert (d["actor"], d["target"]) == ("rule:window_open_off", {"type": "device", "device_id": WINDOW})
+    assert d["reasoning"] == ("Finestra camera senza segnale mentre era aperta: considerata chiusa per la regola "
+                              "«Finestra aperta spegne il clima» finché non torna raggiungibile")

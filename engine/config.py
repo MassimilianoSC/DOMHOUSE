@@ -34,6 +34,9 @@ SETTINGS: dict[str, tuple[float, float, float]] = {
     # what they were before the command, its switch-off when they drop under the second; within 10 s
     "CONFIRM_ON_WATTS": (20.0, 1.0, 5000.0),
     "CONFIRM_OFF_WATTS": (15.0, 1.0, 5000.0),
+    # P-90 S1 (answer 1101 = a): a split with no command running is believed switched off by its remote only after
+    # its meter stays under CONFIRM_OFF_WATTS for these minutes (a split at its temperature may stop for a while, S9)
+    "REMOTE_OFF_MINUTES": (5.0, 1.0, 60.0),
     # D-133: the boiler's thermostat and the frost protection: on below the setpoint, off above setpoint + this (°C)
     "THERMOSTAT_HYSTERESIS_C": (0.5, 0.1, 3.0),
     # at least these minutes between two switches of the relay made by the thermostat

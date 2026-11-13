@@ -68,17 +68,21 @@ def test_a_late_start_is_seen_through_the_meter_and_the_window_rule_turns_it_off
     asyncio.run(main())
 
 
-def test_the_meter_at_zero_turns_the_engines_copy_off():
+def test_the_meter_at_zero_turns_the_engines_copy_off(monkeypatch):
+    monkeypatch.setenv("MOCK_TIME_SCALE", "0.05")
     async def main():
         conn = SimulatedConnector(variant=1)
-        e = core.ApartmentEngine("apt-prova-01", conn, seed=False)
+        e = core.ApartmentEngine("apt-prova-01", conn, seed=False, settings={"REMOTE_OFF_MINUTES": 1})
         e.ensure_started()
         await wait_final(e, e.create_command(SPLIT, {"capability": "climate", "action": "set_climate",
                                                      "params": {"on": True}}, ACTOR, CORR))
         assert e.devices[SPLIT]["capabilities"]["climate"]["on"] is True
         conn._devices[SPLIT].capabilities["climate"]["on"] = False      # switched off by its own remote
         conn.set_state(METER, "power_meter", {"watts": 0})
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.02)
+        assert e.devices[SPLIT]["capabilities"]["climate"]["on"] is True        # P-90 S1: after REMOTE_OFF_MINUTES
+        await asyncio.sleep(0.1)
+        e._remote_off_check()
         assert e.devices[SPLIT]["capabilities"]["climate"]["on"] is False
         stop(e)
     asyncio.run(main())

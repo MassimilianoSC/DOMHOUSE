@@ -367,6 +367,7 @@ class ApartmentEngine:
         self.mode_notes: dict[str, str] = {}         # device -> the note of its last mode command cut by the limits
         # P-90 S3: command -> {"mode", "body", "at", "retried"} of the commands of a mode, until their outcome
         self.mode_cmds: dict[str, dict] = {}
+        self.remote_low: dict[str, float] = {}       # P-90 S1: split -> monotonic since its meter is low, no command
         self.last_regulation = 0.0
         self.decisions: list[dict] = []
         self.asks: dict[str, dict] = {}
@@ -771,6 +772,7 @@ class ApartmentEngine:
                 device["last_seen"] = iso(change.ts)
             self._save_device(device)
             self._watch_offline(device["device_id"], change.online)
+            self._contact_online(device)
             self.emit("device.online", {"device_id": device["device_id"], "online": device["online"],
                                         "last_seen": device["last_seen"]}, corr)
             self.emit("instance.health", self.health()[1], corr)
@@ -1240,6 +1242,7 @@ class ApartmentEngine:
             return
         self._mode_pending_send()                            # D16: what the mode could not send before
         self._push_limits()                                  # 1097 = a: and what narrower limits could not send
+        self._remote_off_check()                             # P-90 S1: a split switched off by its remote
         self._restore_after_window()                         # D-218 point 1: first, so the boiler's relay follows now
         self._keep_window_off()                              # D03: and what is still on with the window open goes off
         in_force = self.window_in_force()
@@ -1906,9 +1909,11 @@ class ApartmentEngine:
         return state
 
     def window_open(self) -> dict | None:
+        """An open window; P-90 S6 (answer 1102 = a): a contact offline counts as closed (its last «open» may be days
+        old, a battery or a bridge unplugged), with a decision when it goes silent while open (_contact_online)."""
         for d in self.devices.values():
             c = d["capabilities"].get("contact")
-            if c and c["open"]:
+            if c and c["open"] and d["online"]:
                 return d
         return None
 
@@ -1923,7 +1928,7 @@ class ApartmentEngine:
         for window_id in sorted(self.window_fired):
             d = self.devices.get(window_id)
             contact = d["capabilities"].get("contact") if d else None
-            if contact and contact.get("open"):
+            if contact and contact.get("open") and d["online"]:         # P-90 S6: offline = closed
                 return d
         return None
 
@@ -1945,6 +1950,7 @@ class ApartmentEngine:
         device = self.get_device(device_id)
         if self.limits_push.pop(device_id, None) is not None:   # 1097 = a: any command replaces the one of the limits
             self.store.put_meta("limits_push", self.limits_push)
+        self.remote_low.pop(device_id, None)                    # P-90 S1: a command, a new situation
         if not self._window_command and not self._auto_climate:
             self.commanded_at[device_id] = time.monotonic()   # D13: a deferred automatic start must not undo it
         if not self._window_command and not self._auto_climate and self.window_off.pop(device_id, None) is not None:
@@ -2303,13 +2309,51 @@ class ApartmentEngine:
                     or (self.confirmation_meter(split["device_id"]) or {}).get("device_id") != meter_id):
                 continue
             seen_on = (True if watts >= self.confirm_on_watts else False if watts < self.confirm_off_watts else None)
+            if seen_on is not False:
+                self.remote_low.pop(split["device_id"], None)
             if seen_on is None or seen_on == bool(climate.get("on")):
+                continue
+            if seen_on is False:
+                # P-90 S1: off only after REMOTE_OFF_MINUTES of low watts (_remote_off_check), then out of the regulation
+                self.remote_low.setdefault(split["device_id"], time.monotonic())
                 continue
             climate["on"] = seen_on
             self._note_climate(split["device_id"], "climate", not seen_on, seen_on)
             self._save_device(split)
             self.emit("device.state", {"device_id": split["device_id"], "capability": "climate", "state": climate},
                       str(uuid.uuid4()))
+
+    def _remote_off_check(self) -> None:
+        """P-90 S1 (answer 1101 = a): a split whose meter has stayed low for REMOTE_OFF_MINUTES, with no command of its
+        running, was switched off by its remote: the engine's copy goes off and, if the mode regulated it, it leaves the
+        regulation until the next mode (D-169: never against a person), with a decision. Before, the regulation switched
+        it on again every THERMOSTAT_MIN_SWITCH_MINUTES (and a beep each time, at night)."""
+        if not self.remote_low:
+            return
+        wait = self.setting("REMOTE_OFF_MINUTES") * seconds_per_minute()
+        busy = {c["device_id"] for c in self.commands.values() if c["status"] not in FINAL} | {r[0] for r in self.inflight}
+        for device_id, since in list(self.remote_low.items()):
+            split = self.devices.get(device_id)
+            climate = split["capabilities"].get("climate") if split else None
+            if not climate or not climate.get("on") or device_id in busy:
+                self.remote_low.pop(device_id, None)
+                continue
+            if time.monotonic() - since < wait:
+                continue
+            self.remote_low.pop(device_id, None)
+            climate["on"] = False
+            self._note_climate(device_id, "climate", True, False)
+            self._save_device(split)
+            corr = str(uuid.uuid4())
+            self.emit("device.state", {"device_id": device_id, "capability": "climate", "state": climate}, corr)
+            reasoning = (f"{split['label']}: spento col telecomando (consumo sotto {fmt_num(self.confirm_off_watts)} W "
+                         f"da {fmt_num(self.setting('REMOTE_OFF_MINUTES'))} minuti)")
+            if device_id in self.climate_by_mode:
+                self.climate_by_mode.discard(device_id)
+                self.store.put_meta("climate_by_mode", sorted(self.climate_by_mode))
+                reasoning += "; resta fuori dalla regolazione fino al prossimo cambio di modalità"
+            self.log("system", {"type": "device", "device_id": device_id}, "climate_remote_off", "on", "off", reasoning,
+                     "informational", corr)
 
     async def _power_confirmed(self, waiter: asyncio.Future, cmd: dict) -> bool:
         """Wait for the meter until CONFIRM_UNTIL_S after the command's creation."""
@@ -2355,6 +2399,27 @@ class ApartmentEngine:
                      f"«Finestra aperta spegne il clima» riparte alla sua fine (alle {until})", "informational",
                      str(uuid.uuid4()))
         self._arm_window(device_id)
+
+    def _contact_online(self, device: dict) -> None:
+        """P-90 S6 (answer 1102 = a): a window's contact that goes offline while open counts as closed (window_open):
+        its wait stops, and what the rule turned off comes back like after a closing, with a decision that says why;
+        the device's offline notification stays. Back online and still open, the rule's wait starts again."""
+        contact = device["capabilities"].get("contact")
+        if not contact or not contact.get("open"):
+            return
+        device_id = device["device_id"]
+        if not device["online"]:
+            self.log("rule:window_open_off", {"type": "device", "device_id": device_id}, "window_contact_offline",
+                     "aperta", "chiusa", f"{device['label']} senza segnale mentre era aperta: considerata chiusa per la "
+                     f"regola «Finestra aperta spegne il clima» finché non torna raggiungibile", "informational",
+                     str(uuid.uuid4()))
+            self._window_closed(device_id)
+            return
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return                                               # no loop: the start arms it (_windows_at_start)
+        self._window_opened(device_id)
 
     def _arm_window(self, device_id: str, delay: float | None = None) -> None:
         """The wait of one window, one at a time: a new one replaces the old (D-218: a window that bangs in the wind
@@ -2473,6 +2538,7 @@ class ApartmentEngine:
             device["last_seen"] = iso(seen) if body["online"] else device["last_seen"]
             self._save_device(device)
             self._watch_offline(device_id, body["online"])
+            self._contact_online(device)
             self.emit("device.online", {"device_id": device_id, "online": device["online"], "last_seen": device["last_seen"]},
                       correlation_id)
             self.emit("instance.health", self.health()[1], correlation_id)
