@@ -13,7 +13,7 @@
 - **Incolla alla memoria storica l'uscita di ogni passo:** l'esito va nel registro. **Unica eccezione: l'uscita della soluzione di riserva non va mai incollata.**
 - **Ordine:**
   1. verifica 3, poi il cambio della password (sezione 4);
-  2. tutto **prima** di installare il motore `lab-01` (tappa B). Con il motore acceso, l'ascolto di R2 e R4 potrebbe prendere una risposta del connector: per questo i due comandi tengono solo la risposta con il loro numero (901, 902).
+  2. si può fare prima o dopo l'installazione del motore `lab-01` (tappa B). Con il motore acceso, R2 e R4 tengono solo la risposta con il loro numero (901, 902). Valgono le cautele della tappa B, rischio 9: fra R2 e R4 nessuno preme comandi sulla presa nell'app; due righe «mqtt rpc answer dropped» nel log del motore sono attese.
   3. La verifica 3 si può fare anche con il motore acceso: il connector non legge i topic di controllo.
 
 ## 1. La presa si è collegata? (sola lettura) — superata il 12 novembre

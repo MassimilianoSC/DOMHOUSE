@@ -40,7 +40,7 @@
 
 1. dopo la pubblicazione di `247fda0` (committente, 13 novembre): il motore di `lab-01` usa la stessa immagine di `dev`;
 2. dopo la risposta del committente sulla porta (decisione aperta, sezione 0);
-3. **dopo la tappa A completa**, compresa la sua sezione 4 (cambio della password, R4 riuscito). Così la tappa A non si incrocia con il motore acceso e con le `sync` del passo 6.2.
+3. **La tappa A può venire prima o dopo.** I passi 1–4 e la prova 1 si fanno anche senza Youssouf, prima della sezione 4 della tappa A (cambio della password). Se la sezione 4 si fa con il motore acceso, valgono le cautele del rischio 9. La `sync` del passo 6.2 resta vietata fra R1 e R4.
 
 ### 1.1 La VM oggi
 
@@ -85,7 +85,7 @@ for s in langbrain-shelly-lab-01 langbrain-shelly-lab-01-devices langbrain-api-k
 | Segreto | Atteso |
 |---|---|
 | `langbrain-shelly-lab-01` | una versione `enabled` (password del connector) |
-| `langbrain-shelly-lab-01-devices` | in cima la versione 3, **solo se** la sezione 4 della tappa A è conclusa con R4 riuscito. Con la versione 2 la tappa A non è finita: falla prima. Con la 3 ma R4 non riuscito: fermati |
+| `langbrain-shelly-lab-01-devices` | in cima la versione 2 (la sezione 4 della tappa A non è ancora fatta: va bene, si prosegue), oppure la 3 **solo se** R4 è riuscito. Con la 3 ma R4 non riuscito: fermati, la sezione 4 è a metà |
 | `langbrain-api-key-lab-01` | **errore `NOT_FOUND`**: non esiste ancora, si crea al passo 2 |
 
 ## 2. La chiave del motore `lab-01` (scrive su Secret Manager)
@@ -588,10 +588,15 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
    - prima volta che l'app comanda uno Shelly vero.
    - Nessuna versione nuova di immagini o programmi: il motore è quello della pubblicazione di `247fda0`, il broker non cambia.
 8. **Sensori BLU:** non prima della correzione di B1 e dell'immagine nuova (6.4). Con l'immagine di oggi un sensore morto potrebbe risultare vivo dopo un riavvio del ponte.
-9. **Tappa A prima del motore acceso.** La sezione 4 della tappa A (cambio della password) va fatta **prima** di installare `lab-01`.
-   - Il connector usa lo stesso topic di risposta dei comandi R2 e R4. Con il motore acceso, l'ascolto di R2 e R4 potrebbe prendere una risposta del connector invece della nostra.
-   - Il connector, a sua volta, scarta le nostre risposte e scrive «mqtt rpc answer dropped».
-   - Se si dovesse rifare la sezione 4 con il motore acceso: prima si ferma il motore (7.1), poi lo si rimette (3.1).
+9. **Sezione 4 della tappa A (cambio della password) con il motore `lab-01` acceso: si può, con queste cautele.**
+   - Il connector usa lo stesso topic di risposta dei comandi R2 e R4: per questo R2 e R4 tengono solo la risposta con il loro numero (901, 902).
+   - Il connector scarta le nostre risposte e scrive due volte «mqtt rpc answer dropped»: è atteso, non è un guasto.
+   - Fra R2 e la fine di R4 **nessuno preme comandi sulla presa nell'app**: in R4 la presa si riavvia, e un comando in quei secondi fallirebbe.
+   - In R4 la presa risulta «non in linea» per qualche secondo, poi torna in linea: è il riavvio. Il connector rilegge lo stato da solo.
+   - Se la presa restasse fuori (R4 non riuscito) per più di 15 minuti, chi usa lo staging riceve l'avviso «dispositivo offline» (regola «Avviso dispositivo offline»): innocuo.
+   - Il connector non risente della `sync` di R3: la sua password non cambia, e la ricarica del broker non fa cadere nessuno.
+   - Il motore da solo non manda comandi alla presa: nessuna regola la comanda, salvo la richiesta di approvazione del rischio 10.
+   - **Mai l'ascolto (A) durante R2**: mostrerebbe la password nuova.
 10. **Regola dei consumi a casa vuota.** `lab-01` non ha prenotazioni, quindi per il motore è «casa vuota».
     - Con un carico oltre 300 W per 15 minuti (valori predefiniti), il motore chiede nell'app «Spegnere Presa del laboratorio».
     - Se nessuno risponde, la richiesta scade ed è respinta: la presa resta accesa. Se qualcuno la approva, la presa si spegne.
