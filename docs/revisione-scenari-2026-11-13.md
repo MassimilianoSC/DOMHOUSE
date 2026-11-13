@@ -83,3 +83,35 @@ Circa 80 in tutto, elencati in fondo a ciascun rapporto. Tra questi: prenotazion
 doppi o fuori ordine, cambio dell'ora, forzatura su check-in e check-out, riavvio notturno, due operatori che
 approvano insieme, privacy verso il gestore della piattaforma, accesso di assistenza che scade, consumi alla
 mezzanotte e col cambio d'ora.
+
+## Piano delle riparazioni (stime di o1 e o2, 07:53; ore NON misurate e probabilmente pessimiste)
+
+o1 e o2 confermano tutti i rilievi sul main `1f79ba9`.
+
+**Gruppo (a), senza decisioni: avviato subito (D-198).**
+
+- **o1, circa 26 h:** S2, S3, S5, S7, S11, S12, S13, S14, S15, S17, S18 (solo la notifica «caldaia comandata a mano
+  senza sensore»), S19, S21, T6, T1 (solo il testo, tenendo D-217).
+- **o2:** S20 (1 h), T6 (0,5 h), S2 (testo, 0,5 h dopo o1). S7, S11 e S13 non toccano il sito.
+
+**Gruppo (b), aspetta il committente.**
+
+| Punto | Domanda | Consiglio | Ore |
+|---|---|---|---|
+| S1 | L'ospite spegne il clima col telecomando: resta spento fino al prossimo cambio di modalità, o il sistema lo riaccende dopo un certo tempo? | Resta spento; lo si considera spento solo dopo circa 5 minuti di consumo basso (S9) | o1 3,5 |
+| S6 | Il contatto di una finestra aperta perde il segnale: la finestra va considerata chiusa (il riscaldamento riparte) o aperta finché il contatto non torna? | Chiusa, con una decisione; la notifica offline esiste già | o1 2,5 |
+| S10 | Azione eco o casa vuota programmata a mano, che alla sua ora trova ospiti: chiedere al gestore o eseguirla? Senza risposta? | Chiedere; senza risposta, respinta | o1 2,5 |
+| T1 | Spegnere «Avviso dispositivo offline» deve spegnere anche l'avviso «sistema domotico non raggiungibile» (D-217)? | No: l'avviso di sistema con una soglia fissa sempre attiva (pesa con S4) | o1 2, o2 0,25 |
+| S18 | Comando a mano sulla caldaia, poi il sensore si spegne: la caldaia resta accesa (D-164) o si spegne? | Tenere D-164, con la notifica nuova | 0 |
+| S16 | La sola lettura deve ricevere le notifiche di approvazione? | No: escluderla e nascondere l'interruttore | o1 1, o2 0,75 |
+| T2 | Una conferma prima di disattivare un appartamento (oggi si disattiva al tocco)? | Sì | o2 1 |
+
+**Gruppo (c), dipende da Youssouf, dal cliente o dall'hardware.**
+
+- **S4:** spegnimento automatico sul relè dello Shelly 1 della caldaia, con il motore che rinnova l'«acceso». Serve
+  che il connettore gestisca lo Shelly 1 (Youssouf), poi una prova in laboratorio; lato motore circa 2 h. Subito: una
+  riga in limiti-noti.
+- **S8:** chiedere al cliente se ha climatizzatori dual split. Lato motore 1,5–2 h, quando si vuole; la frase «un
+  misuratore per split» in connector-v2 §2.2 (Youssouf).
+- **S9:** soglia di consumo per modello, misurata al collaudo e scritta nella procedura del tecnico (P-91).
+- **S22–S24:** dopo la risposta di Italianway (messaggio per Leonardo).
