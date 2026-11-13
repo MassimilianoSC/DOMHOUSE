@@ -228,10 +228,13 @@ def test_hook_failure_is_logged_not_raised(users, fcm, monkeypatch):
 
 
 def alert_minutes(monkeypatch, minutes):
-    """The offline_alert rule's minutes as the engine would answer them (None: the rule is off)."""
+    """The offline_alert rule's minutes as the engine would answer them (None: the rule is off). P-90 T1 (1104 = a): the
+    system's alerts wait SYSTEM_ALERT_MINUTES, fixed: a number here sets that wait too, None leaves it as it is."""
     async def fake(apt):
         return minutes
     monkeypatch.setattr(push, "_offline_alert_minutes", fake)
+    if minutes is not None:
+        monkeypatch.setattr(push, "SYSTEM_ALERT_MINUTES", float(minutes), raising=False)
 
 
 def test_instance_down_once_until_back_up(users, fcm, monkeypatch):
@@ -245,7 +248,8 @@ def test_instance_down_once_until_back_up(users, fcm, monkeypatch):
 
 
 def test_instance_down_waits_for_the_offline_alert_minutes(users, fcm, monkeypatch):
-    """D-131: a connector that drops and comes back before the rule's minutes sends nothing; with the rule off, never."""
+    """D-131: a connector that drops and comes back before the minutes sends nothing. P-90 T1 (1104 = a): with the rule
+    off it is told anyway, after the fixed SYSTEM_ALERT_MINUTES (before, D-217: never)."""
     alert_minutes(monkeypatch, 1000)                     # still waiting when it comes back
 
     async def back_up_in_time():
@@ -256,12 +260,13 @@ def test_instance_down_waits_for_the_offline_alert_minutes(users, fcm, monkeypat
     run(back_up_in_time())
     assert fcm.sent == [] and APT.apartment_id not in push._down_timers
     alert_minutes(monkeypatch, None)
+    monkeypatch.setattr(push, "SYSTEM_ALERT_MINUTES", 0.0, raising=False)
 
     async def rule_off():
         await push.on_stream_event(APT, event("instance.health", {"status": "down"}))
         await drain()
     run(rule_off())
-    assert fcm.sent == []
+    assert [m.data["kind"] for m in fcm.sent] == ["instance_down"]
 
 
 def test_unsubscribe_removes_the_token_from_every_holder(users):
@@ -786,14 +791,15 @@ def test_back_before_the_minutes_nothing_and_the_next_outage_is_told(unreachable
     assert len(fcm.sent) == 1
 
 
-def test_with_the_rule_off_never(unreachable, fcm):
+def test_with_the_rule_off_still_told(unreachable, fcm):
+    """P-90 T1 (1104 = a): the rule commands only the devices' alerts; before (D-217), never with the rule off."""
     push._alert_minutes[APT.apartment_id] = None             # the last time the engine answered, the rule was off
 
     async def scenario():
         await push.on_link_change(APT, False)
         await drain()
     run(scenario())
-    assert fcm.sent == []
+    assert [m.data["kind"] for m in fcm.sent] == ["instance_down"]
 
 
 def test_an_engine_that_answers_at_the_last_check_is_not_told(unreachable, fcm):

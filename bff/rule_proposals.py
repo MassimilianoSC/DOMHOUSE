@@ -65,9 +65,9 @@ MEANING = {
     "checkout_eco": ("passa a casa vuota minutes_after minuti dopo il check-out; se il sensore di movimento ha visto "
                      "qualcuno negli ultimi presence_minutes minuti dopo l'orario di partenza, chiede prima al gestore"),
     "compressor_min_off": "pausa minima del compressore (non modificabile)",
-    # P-90 T1: D-217, off it silences the system's alert too
-    "offline_alert": ("avvisa quando un dispositivo resta offline più di minutes minuti; spenta, non arriva nemmeno "
-                      "l'avviso «sistema domotico non raggiungibile»"),
+    # P-90 T1 (answer 1104 = a): the system's alert does not depend on the rule
+    "offline_alert": ("avvisa quando un dispositivo resta offline più di minutes minuti; l'avviso «sistema domotico non "
+                      "raggiungibile» non dipende da questa regola: arriva sempre dopo 15 minuti"),
 }
 
 

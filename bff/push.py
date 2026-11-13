@@ -36,6 +36,9 @@ _unreachable: dict[str, float] = {}
 _unreachable_timers: dict[str, asyncio.Task] = {}
 _alert_minutes: dict[str, float | None] = {}
 ALERT_MINUTES_DEFAULT = 15.0
+# P-90 T1 (answer 1104 = a, over D-217): «sistema domotico non raggiungibile» and the connector down always come after
+# these minutes, fixed, also with the rule «Avviso dispositivo offline» off; the rule commands only the devices' alerts
+SYSTEM_ALERT_MINUTES = 15.0
 # D-219: scheduled actions not done, grouped per apartment and category for SCHEDULE_GROUP_S from the first one
 SCHEDULE_GROUP_S = 60.0
 SCHEDULE_FAILURES = ("schedule_failed", "schedule_missed")
@@ -378,13 +381,11 @@ async def _engine_answers(apt: Apartment) -> bool:
 
 
 async def _unreachable_watch(apt: Apartment, since: float) -> None:
-    """D-217: the engine has not answered this process since `since`. After the offline_alert rule's minutes (the last
-    ones read; 15 if never; nothing with the rule off), and after a suspension if there is one, it is asked once more;
-    still silent, one notification for the outage (the instance_down claim: one for every instance and every cause)."""
+    """D-217: the engine has not answered this process since `since`. After SYSTEM_ALERT_MINUTES (P-90 T1: fixed, also
+    with the offline_alert rule off), and after a suspension if there is one, it is asked once more; still silent, one
+    notification for the outage (the instance_down claim: one for every instance and every cause)."""
     apartment_id = apt.apartment_id
-    minutes = _alert_minutes.get(apartment_id, ALERT_MINUTES_DEFAULT)
-    if minutes is None:
-        return
+    minutes = SYSTEM_ALERT_MINUTES
     await asyncio.sleep(max(0.0, minutes * _minute_s() - (time.time() - since)))
     await _after_suspension(apt)
     if apartment_id not in _unreachable or await _engine_answers(apt):
@@ -438,7 +439,7 @@ async def on_link_change(apt: Apartment, up: bool) -> None:
                                                        "instance_unreachable", apartment_id)
             _spawn(get_repository().release_work(reachable_note_key(apt)), "reachability note", apartment_id)
         return
-    threshold = (_alert_minutes.get(apartment_id) or ALERT_MINUTES_DEFAULT) * _minute_s()   # the rule off: 15
+    threshold = SYSTEM_ALERT_MINUTES * _minute_s()                             # P-90 T1: fixed, as the alert
     _spawn(_offline_alert_minutes(apt), "alert minutes", apartment_id)      # kept for the next outage
     since = _unreachable.pop(apartment_id, None)
     if (task := _unreachable_timers.pop(apartment_id, None)) and not task.done():
@@ -503,14 +504,9 @@ async def _offline_watch(apt: Apartment, device_id: str, ts: str | None, key: st
 
 
 async def _instance_down_watch(apt: Apartment, ts: str | None) -> None:
-    """D-131: the "instance down" push only when it stays down as long as the offline_alert rule's minutes (the same
-    wait as a device's); never with the rule off. A connector that drops and reconnects at once sends nothing."""
-    minutes = await _offline_alert_minutes(apt)
-    if minutes is None:
-        return
-    from engine.core import seconds_per_minute
-
-    await asyncio.sleep(minutes * (seconds_per_minute() if get_settings().instance_mode == "mock" else 60.0))
+    """D-131: the "instance down" push only when it stays down for SYSTEM_ALERT_MINUTES (P-90 T1: fixed, also with the
+    offline_alert rule off). A connector that drops and reconnects at once sends nothing."""
+    await asyncio.sleep(SYSTEM_ALERT_MINUTES * _minute_s())
     await _after_suspension(apt)                   # D-217: a planned shutdown is not told
     if apt.apartment_id in _health_down:
         await notify_once(instance_down_key(apt), apt.tenant_id, "offline", *instance_down_push(apt, ts))

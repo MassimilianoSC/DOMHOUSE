@@ -143,8 +143,12 @@ def test_s18_a_boiler_without_regulation_is_a_push(monkeypatch):
 
 
 # -------- T1 and T6: texts --------
-def test_t1_the_offline_rule_says_it_silences_the_system_alert_too():
-    assert "sistema domotico non raggiungibile" in rp.MEANING["offline_alert"]
+def test_t1_the_offline_rule_says_the_system_alert_does_not_depend_on_it():
+    """1104 = a: the system's alert always comes, after a fixed 15 minutes (before, D-217: silenced with the rule)."""
+    assert rp.MEANING["offline_alert"] == ("avvisa quando un dispositivo resta offline più di minutes minuti; l'avviso "
+                                           "«sistema domotico non raggiungibile» non dipende da questa regola: arriva "
+                                           "sempre dopo 15 minuti")
+    assert push.SYSTEM_ALERT_MINUTES == 15.0
 
 
 def test_t6_the_cap_mail_says_the_quick_assistant_answers(monkeypatch):
