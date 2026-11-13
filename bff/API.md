@@ -541,7 +541,8 @@ rifà quelli cambiati e, con FCM acceso, apre quelli mancanti. L'ultimo id di og
 stato notificato. Se l'id salvato è più vecchio di un'ora, la finestra garantita dal contratto, gli eventi mancanti possono essere
 persi: nel log compare «stream resumes past the engine's window».
 
-Dal 13 novembre 2026 (P-90): «Esci da tutti i dispositivi» (`POST /app/me/revoke-sessions`) svuota anche i
+Dal 13 novembre 2026 (P-90 S16, risposta 1106 = a) le notifiche `approval` non vanno a chi ha sola lettura (`viewer`),
+che non può approvare; le altre categorie restano come prima. Sempre da P-90: «Esci da tutti i dispositivi» (`POST /app/me/revoke-sessions`) svuota anche i
 `push_tokens` della persona, così un telefono perso smette di ricevere notifiche (S7). L'attesa di `device_offline`
 non manda niente se l'appartamento risulta già fermo (`instance_down`, S14) o se nel frattempo la regola «Avviso
 dispositivo offline» è stata spenta; quando la regola cambia (decisione `update_rules` con `offline_alert`) i dispositivi

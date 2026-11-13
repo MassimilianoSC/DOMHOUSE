@@ -156,3 +156,23 @@ def test_t6_the_cap_mail_says_the_quick_assistant_answers(monkeypatch):
     monkeypatch.setattr(ai_gateway, "get_settings", lambda: settings)
     text = ai_gateway._alert_email(["admin@example.com"], "2026-11", 9.5).get_content()
     assert "si ferma" not in text and "risposta rapida" in text
+
+
+# -------- S16 (answer 1106 = a) --------
+def test_s16_read_only_receives_no_approval_notifications():
+    """The read-only member (the owner, in the guide's example) got «approvazione richiesta», also at night, and cannot
+    approve. Now the approvals' notifications skip «viewer»; the other categories are as before."""
+    from bff.repository import User
+
+    async def scenario():
+        repo = get_repository()
+        await repo.upsert_tenant(Tenant(tenant_id="t-p90-s16", name="S16"))
+        await repo.upsert_user(User(uid="u-s16-viewer", email="viewer@p90.it", tenant_id="t-p90-s16", role="viewer",
+                                    push_tokens=["tok-viewer"]))
+        await repo.upsert_user(User(uid="u-s16-op", email="op@p90.it", tenant_id="t-p90-s16", role="operator",
+                                    push_tokens=["tok-op"]))
+        data = {"apartment_id": "apt-s16", "kind": "approval", "tag": "x"}
+        return (await push.send_to_tenant("t-p90-s16", "approvals", data, {}),
+                await push.send_to_tenant("t-p90-s16", "offline", {**data, "kind": "device_offline"}, {}))
+    approvals, offline = run(scenario())
+    assert (approvals, offline) == (1, 2)                  # the operator only; the offline category reaches both

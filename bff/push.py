@@ -159,8 +159,8 @@ def frost_inactive_push(apt: Apartment, device_id: str, reasoning: str | None, t
 
 
 async def send_to_tenant(tenant_id: str, pref: str, data: dict[str, str], headers: dict[str, str]) -> int:
-    """Sends to every user of the tenant who opted in for `pref` and may see the message's apartment (P-18);
-    returns number of tokens targeted."""
+    """Sends to every user of the tenant who opted in for `pref` and may see the message's apartment (P-18), but the
+    approvals never to read-only members (P-90 S16, answer 1106 = a); returns number of tokens targeted."""
     repo = get_repository()
     if await tenant_status(repo, tenant_id) != "active":   # P-50: a suspended organisation receives nothing
         info("push skipped (organisation not active)", kind=data.get("kind"), tag=data.get("tag"))
@@ -168,6 +168,7 @@ async def send_to_tenant(tenant_id: str, pref: str, data: dict[str, str], header
     apartment_id = data["apartment_id"]
     tokens = [tok for u in await repo.list_users(tenant_id)
               if getattr(u.notification_prefs, pref, False) and sees(u.role, u.apartment_ids, apartment_id)
+              and not (pref == "approvals" and u.role == "viewer")   # P-90 S16 (1106 = a): read-only cannot approve
               for tok in u.push_tokens]
     if not tokens:
         return 0
