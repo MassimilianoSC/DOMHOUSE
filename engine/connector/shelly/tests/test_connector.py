@@ -1391,16 +1391,22 @@ def clock_warnings(warnings):
     return [f for m, f in warnings if m == "bridge clock off"]
 
 
-async def ht_every_minute(w, minutes, skews=None):
+async def ht_every_minute(w, minutes, skews=None, offline_until=0, first=1):
     """The H&T sends a packet a minute (a new temperature each time, so its bthomesensor is notified); skews, when
     given, sets the bridge's clock before each packet. After each one: the H&T is still online and its temperature
-    comes out dated on OUR clock."""
-    for n in range(1, minutes + 1):
+    comes out dated on OUR clock; up to the minute offline_until, instead, it is offline and its temperature does not
+    come out. first: the minute of the first packet."""
+    for n in range(first, first + minutes):
         if skews is not None:
-            w.bridge.clock_skew = timedelta(seconds=skews[n - 1])
+            w.bridge.clock_skew = timedelta(seconds=skews[n - first])
         w.shift = timedelta(seconds=60 * n)
         received = datetime.now(UTC) + w.shift
         w.bridge.blu_packet(ADDR_HT, {69: 20.0 + n})
+        if n <= offline_until:
+            await w.settle(0.15)
+            assert not w.info(DEV_HT).online, n
+            assert (DEV_HT, "state", "temperature", {"celsius": 20.0 + n}) not in w.blu(), n
+            continue
         await w.wait_for(lambda xs: (DEV_HT, "state", "temperature", {"celsius": 20.0 + n}) in w.blu())
         await w.settle(0.15)                                 # silence checks
         assert w.info(DEV_HT).online, n
@@ -1410,17 +1416,29 @@ async def ht_every_minute(w, minutes, skews=None):
 
 @pytest.mark.parametrize("skew_s", [-400, 400])
 def test_blu_bridge_clock_off_the_age_is_counted_on_the_bridge_clock(warnings, skew_s):
-    """The bridge's clock is 400 s behind (or ahead of) ours, beyond MAX_CLOCK_SKEW_S; the H&T sends every minute.
-    last_updated_ts is the bridge's clock: the H&T is online, its values come out dated on our clock, and the bridge
-    is warned once."""
+    """The bridge's clock is steadily 400 s behind (or ahead of) ours, beyond MAX_CLOCK_SKEW_S; the H&T sends every
+    minute. The offset of the connection's GetStatus is a candidate, confirmed by the H&T's packet CLOCK_CONFIRM_S
+    (5 minutes) later: from then on last_updated_ts is read on the bridge's clock, the H&T is online, its values come
+    out dated on our clock, and the bridge is warned once, at the confirmation. Before it our clock is used: 400 s
+    behind, the H&T's packets look 400 s old and it is offline (the price wanted); 400 s ahead, they are in the
+    future beyond the skew and dated at their reception, so it is online from the start."""
+    assert connector_module.CLOCK_CONFIRM_S == 300
+
     async def scenario(w):
         w.bridge.clock_skew = timedelta(seconds=skew_s)
         w.pair(ADDR_HT)
         w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
         await w.connect_bridge()
-        assert w.blu() == [(DEV_HT, "online", True, None), (DEV_HT, "state", "temperature", {"celsius": 20.0}),
-                           (DEV_HT, "state", "humidity", {"percent": 40.0})]
-        await ht_every_minute(w, 5)
+        if skew_s < 0:
+            assert w.blu() == [] and not w.info(DEV_HT).online
+        else:
+            assert w.blu() == [(DEV_HT, "online", True, None), (DEV_HT, "state", "temperature", {"celsius": 20.0}),
+                               (DEV_HT, "state", "humidity", {"percent": 40.0})]
+        assert bridge_offset(w) is None and clock_warnings(warnings) == []
+        await ht_every_minute(w, 4, offline_until=4 if skew_s < 0 else 0)      # 60 ... 240 s: not confirmed
+        assert bridge_offset(w) is None and clock_warnings(warnings) == []
+        await ht_every_minute(w, 3, first=5)                # 300 s: confirmed; 360, 420 s
+        assert abs(bridge_offset(w) - skew_s) <= 1
         assert [c for c in w.blu() if c[1] == "online"] == [(DEV_HT, "online", True, None)]
         warned = clock_warnings(warnings)
         assert len(warned) == 1 and warned[0]["device_id"] == DEV_BRIDGE
@@ -1429,17 +1447,51 @@ def test_blu_bridge_clock_off_the_age_is_counted_on_the_bridge_clock(warnings, s
     run_blu(scenario, sensors=(DEV_HT,))
 
 
-def test_blu_bridge_clock_corrected_midway_keeps_the_sensor_online(warnings):
-    """The bridge's clock is 400 s behind, then corrected, then off again: the offset follows it at every message,
-    the H&T never falls, and the bridge is warned again only after its clock was back within the skew."""
+def test_blu_bridge_clock_corrected_midway_never_adopts_the_offset_off(warnings):
+    """The bridge's clock is 400 s behind at the connection, then right, then 400 s behind again, then right: never
+    off for CLOCK_CONFIRM_S, so the -400 s offset is never adopted and "bridge clock off" never warned. Step by step:
+      - connection (-400 s, a candidate; our clock): the H&T's packet looks 400 s old, offline;
+      - minute 1 (-400 s, 60 s after the first: not confirmed): still offline, nothing;
+      - minute 2 (0 s: adopted at once, the candidate dropped): online with its snapshot, dated at its reception;
+      - minute 3 (0 s): its temperature, dated at its reception;
+      - minutes 4 and 5 (-400 s: a candidate again, the 0 s offset still used): the packets look 400 s old, so they do
+        not renew its last packet; it stays online on the packet of minute 3 (silent 120 s at minute 5, within its
+        300 s), and their temperatures come out dated 400 s before their reception, brought to the last ts emitted
+        (the stream never goes back);
+      - minute 6 (0 s: the candidate dropped): its temperature, dated at its reception."""
     async def scenario(w):
         w.bridge.clock_skew = timedelta(seconds=-400)
         w.pair(ADDR_HT)
         w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
         await w.connect_bridge()
-        await ht_every_minute(w, 6, skews=[-400, 0, 0, -400, -400, 0])
+        assert w.blu() == [] and not w.info(DEV_HT).online
+        for n, skew in enumerate([-400, 0, 0, -400, -400, 0], start=1):
+            w.bridge.clock_skew = timedelta(seconds=skew)
+            w.shift = timedelta(seconds=60 * n)
+            received = datetime.now(UTC) + w.shift
+            start = len(w.changes)
+            w.bridge.blu_packet(ADDR_HT, {69: 20.0 + n})
+            temperature = (DEV_HT, "state", "temperature", {"celsius": 20.0 + n})
+            if n == 1:
+                await w.settle(0.15)
+                assert w.blu(start) == [] and not w.info(DEV_HT).online
+                continue
+            await w.wait_for(lambda xs: temperature in w.blu(start))
+            await w.settle(0.15)                             # silence checks
+            assert w.info(DEV_HT).online, n
+            if n == 2:
+                assert w.blu(start) == [(DEV_HT, "online", True, None), temperature,
+                                        (DEV_HT, "state", "humidity", {"percent": 40.0})]
+            else:
+                assert w.blu(start) == [temperature], n
+            ts = [c.ts for c in w.changes[start:] if c.device_id == DEV_HT and c.capability == "temperature"][0]
+            late = (received - ts).total_seconds()
+            if skew:
+                assert ts == w.changes[start - 1].ts and late > 50, (n, late)    # the last ts emitted
+            else:
+                assert abs(late) < 2, (n, late)
         assert [c for c in w.blu() if c[1] == "online"] == [(DEV_HT, "online", True, None)]
-        assert len(clock_warnings(warnings)) == 2
+        assert clock_warnings(warnings) == []
         assert_ts_never_go_back(w.changes)
     run_blu(scenario, sensors=(DEV_HT,))
 
@@ -1518,7 +1570,7 @@ def test_blu_sensor_in_error_then_silent_reads_the_map_at_most_every_5_minutes()
         for n in range(1, 10):                                              # 130 ... 1170 s
             w.shift = timedelta(seconds=130 * n)
             await w.settle(0.15)
-        assert len(checks) >= 18, len(checks)
+        assert len(checks) >= 9, len(checks)                # at least one a step, whatever the load of the PC
         assert len(w.get_components_offsets()) == 1 + 3
     run_blu(scenario, sensors=(DEV_MOTION,))
 
@@ -1569,21 +1621,25 @@ def bridge_offset(w):
 
 
 def test_blu_bridge_offset_is_forgotten_when_the_bridge_goes_offline(warnings):
-    """The bridge's clock is 400 s behind; it goes offline and comes back restarted with its clock right, and its
-    Shelly.GetStatus fails. The H&T's last packet is 400 s old on the right clock: beyond its 300 s. The offset of
-    before (-400 s) would make that packet «now»: it was forgotten with the connection, our clock is used, and the
-    H&T stays offline, also once a time of the bridge comes (the GetStatus tried again at the silence check)."""
+    """The bridge's clock is 400 s behind, its offset confirmed by the H&T's packet 5 minutes after the connection; it
+    goes offline and comes back restarted with its clock right, and its Shelly.GetStatus fails. The H&T's last packet
+    is 400 s old on the right clock: beyond its 300 s. The offset of before (-400 s) would make that packet «now»: it
+    was forgotten with the connection, our clock is used, and the H&T stays offline, also once a time of the bridge
+    comes (the GetStatus tried again at the silence check)."""
     async def scenario(w):
         w.bridge.clock_skew = timedelta(seconds=-400)
         w.pair(ADDR_HT)
         w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
         await w.connect_bridge()
-        assert w.info(DEV_HT).online and abs(bridge_offset(w) + 400) <= 1
+        w.shift = timedelta(seconds=300)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.5})            # confirms the -400 s of the connection
+        await w.wait_for(lambda xs: w.info(DEV_HT).online)
+        assert abs(bridge_offset(w) + 400) <= 1
         w.transport.set_online(SID_BRIDGE, False)
         await w.wait_for(lambda xs: w.blu()[-1] == (DEV_HT, "online", False, None))
         w.bridge.clock_skew = timedelta(0)                  # restarted, its clock right
         w.bridge.blu_packet(ADDR_HT, {69: 21.0})            # offline for us: only in its components
-        w.shift = timedelta(seconds=400)
+        w.shift = timedelta(seconds=700)
         w.bridge.fail_next("Shelly.GetStatus")
         start, reads = len(w.changes), len(w.get_components_offsets())
         w.transport.set_online(SID_BRIDGE, True)
@@ -1601,18 +1657,27 @@ def test_blu_bridge_offset_is_forgotten_when_the_bridge_goes_offline(warnings):
 
 def test_blu_bridge_clock_off_is_warned_again_after_the_bridge_was_offline(warnings):
     """The "bridge clock off" warning goes with the offset when the bridge goes offline: back with its clock still
-    400 s behind, it is warned again."""
+    400 s behind, it is warned again when that offset is confirmed again (5 minutes after the new connection; at the
+    connection it is only a candidate, no warning)."""
     async def scenario(w):
         w.bridge.clock_skew = timedelta(seconds=-400)
         w.pair(ADDR_HT)
         w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
         await w.connect_bridge()
+        assert clock_warnings(warnings) == []
+        w.shift = timedelta(seconds=300)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.5})            # confirmed
+        await w.wait_for(lambda xs: w.info(DEV_HT).online)
         assert len(clock_warnings(warnings)) == 1
         w.transport.set_online(SID_BRIDGE, False)
         await w.wait_for(lambda xs: w.blu()[-1] == (DEV_HT, "online", False, None))
         assert bridge_offset(w) is None
         await w.connect_bridge()
-        assert len(clock_warnings(warnings)) == 2 and w.info(DEV_HT).online
+        assert len(clock_warnings(warnings)) == 1 and bridge_offset(w) is None      # a candidate again
+        w.shift = timedelta(seconds=600)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0})            # confirmed again
+        await w.wait_for(lambda xs: len(clock_warnings(warnings)) == 2)
+        assert abs(bridge_offset(w) + 400) <= 1
     run_blu(scenario, sensors=(DEV_HT,))
 
 
@@ -1638,31 +1703,6 @@ def test_blu_em_mini_power_reports_do_not_move_the_bridge_offset():
     run_blu(scenario, sensors=(DEV_HT,), bridge="em_mini")
 
 
-def test_blu_full_status_after_a_restart_does_not_move_the_bridge_offset(warnings):
-    """The bench's Shelly 1 Gen4 sends its first NotifyFullStatus after a restart with its clock about 1750 s off
-    (behind). Here the fake's clock is that far off for every message of those minutes (the sys events too), and its
-    H&T is silent since 1740 s, offline. That offset would bring the H&T's last packet to «now»: it is not taken, and
-    when the map is read again (a sensor paired meanwhile) the H&T stays offline."""
-    async def scenario(w):
-        w.pair(ADDR_HT)
-        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
-        await w.connect_bridge()
-        w.shift = timedelta(seconds=1740)
-        await w.wait_for(lambda xs: w.blu()[-1] == (DEV_HT, "online", False, None))
-        start = len(w.changes)
-        w.bridge.clock_skew = timedelta(seconds=-1750)      # the first minutes after the restart
-        w.bridge.reboot()                                   # NotifyFullStatus
-        await w.wait_for(lambda xs: any(c.device_id == DEV_BRIDGE for c in xs[start:]))
-        reads = len(w.get_components_offsets())
-        w.bridge.pair(w.fakes[ADDR_STRANGER])               # component_added: the map is read again
-        await w.wait_for(lambda xs: len(w.get_components_offsets()) > reads)
-        await w.settle(0.2)
-        assert w.blu(start) == [] and not w.info(DEV_HT).online
-        assert abs(bridge_offset(w)) < connector_module.CLOCK_OFFSET_IGNORED_S
-        assert clock_warnings(warnings) == []
-    run_blu(scenario, sensors=(DEV_HT,))
-
-
 def test_blu_bridge_offset_beyond_a_day_is_ignored_with_one_warning(warnings):
     """The bridge's clock is two days ahead: no clock. The offset is not adopted (none, our clock), warned once as
     implausible, never as "bridge clock off"; a last_updated_ts that far in the future is our reception time, so the
@@ -1679,6 +1719,44 @@ def test_blu_bridge_offset_beyond_a_day_is_ignored_with_one_warning(warnings):
         assert len(implausible) == 1 and implausible[0]["device_id"] == DEV_BRIDGE
         assert abs(implausible[0]["offset_s"] - 2 * 86_400) <= 1
         assert clock_warnings(warnings) == []
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_bridge_clock_implausible_is_warned_again_after_the_bridge_was_offline(warnings):
+    """The bridge's clock two days ahead: "bridge clock implausible" at the connection; the bridge goes offline and
+    comes back with the same clock: warned again."""
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(days=2)
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        assert [m for m, _ in warnings].count("bridge clock implausible") == 1
+        w.transport.set_online(SID_BRIDGE, False)
+        await w.wait_for(lambda xs: not w.info(DEV_BRIDGE).online)
+        await w.connect_bridge()
+        assert [m for m, _ in warnings].count("bridge clock implausible") == 2
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_bthome_notification_after_the_bridge_offline_sets_no_offset():
+    """The bridge goes offline (its offset forgotten); before the broker gives it connected again, two bthome
+    NotifyStatus arrive, their ts 100 s and 400 s behind. Neither sets the offset nor a candidate: the bridge's time is
+    read only with the bridge online."""
+    async def scenario(w):
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        assert bridge_offset(w) is not None
+        w.transport.set_online(SID_BRIDGE, False)
+        await w.wait_for(lambda xs: not w.info(DEV_BRIDGE).online)
+        key = w.bridge.blu_keys(ADDR_HT)[3]
+        for behind_s in (100, 400):
+            now = datetime.now(UTC) + w.shift
+            w.transport.inject(Notification("NotifyStatus", SID_BRIDGE, {
+                "ts": now.timestamp() - behind_s, key: {"last_updated_ts": int(now.timestamp()), "value": 21.0}}, now))
+        await w.settle(0.2)
+        bridge = w.conn._devices[DEV_BRIDGE]
+        assert bridge.clock_offset_s is None and bridge.clock_candidate_s is None
     run_blu(scenario, sensors=(DEV_HT,))
 
 
@@ -1710,6 +1788,10 @@ def test_blu_packet_after_its_reception_is_dated_at_its_reception(bridge_time):
         await w.wait_for(lambda xs: len(xs) > start)
         assert [(c.device_id, c.capability, c.state, c.ts) for c in w.changes[start:]] == [
             (DEV_HT, "temperature", {"celsius": 23.0}, received)]
+        if bridge_time == "known":
+            # the sensor's last packet does not go through _emit: only translate.bthome_ts keeps it at the reception
+            # (100 s later it would keep the H&T online 100 s too long, and show a last_seen in the future)
+            assert w.info(DEV_HT).last_seen == received
     run_blu(scenario, sensors=(DEV_HT,))
 
 
@@ -1737,6 +1819,157 @@ def test_blu_bridge_without_its_time_yet_gives_no_offset(warnings, monkeypatch, 
         await w.settle(0.1)
         assert bridge_offset(w) is None and w.info(DEV_HT).online
         assert not [m for m, _ in warnings if m.startswith("bridge clock")] and errors == []
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+# --- an offset beyond the skew is a candidate until a later source confirms it --------------------------------------
+
+def get_status_calls(w):
+    return sum(1 for _, m, _ in w.transport.calls if m == "Shelly.GetStatus")
+
+
+def clock_infos(monkeypatch):
+    seen = []
+    monkeypatch.setattr(connector_module.log, "info",
+                        lambda msg, **fields: seen.append(fields) if msg == "bridge clock offset to be confirmed"
+                        else None)
+    return seen
+
+
+def test_blu_clock_candidate_confirmed_by_a_bthome_notification(warnings, monkeypatch):
+    """The bridge 400 s behind: the GetStatus of the connection gives a candidate (logged once, no warning, not used:
+    the H&T looks 400 s old, offline). A bthome NotifyStatus giving the same offset CLOCK_CONFIRM_S later confirms it:
+    adopted, "bridge clock off" warned once, and the H&T of that packet is online."""
+    infos = clock_infos(monkeypatch)
+
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=-400)
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        assert bridge_offset(w) is None and not w.info(DEV_HT).online
+        assert clock_warnings(warnings) == [] and len(infos) == 1 and abs(infos[0]["offset_s"] + 400) <= 1
+        w.shift = timedelta(seconds=300)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0})
+        await w.wait_for(lambda xs: w.info(DEV_HT).online)
+        assert abs(bridge_offset(w) + 400) <= 1 and len(infos) == 1
+        assert len(clock_warnings(warnings)) == 1
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_clock_candidate_confirmed_by_get_status_at_the_silence_check():
+    """A Motion at rest: no BLU packet for minutes. The bridge 400 s behind gives a candidate at the connection; when
+    it has waited CLOCK_CONFIRM_S, the next silence check reads Shelly.GetStatus again, once, and its sys.unixtime
+    confirms it."""
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=-400)
+        w.pair(ADDR_MOTION)
+        w.bridge.blu_packet(ADDR_MOTION, {33: False}, battery=100)
+        await w.connect_bridge()
+        calls = get_status_calls(w)
+        assert bridge_offset(w) is None and calls == 1
+        w.shift = timedelta(seconds=290)
+        await w.settle(0.2)
+        assert bridge_offset(w) is None and get_status_calls(w) == calls
+        w.shift = timedelta(seconds=310)
+        await w.wait_for(lambda xs: bridge_offset(w) is not None)
+        assert abs(bridge_offset(w) + 400) <= 1
+        await w.settle(0.2)
+        assert get_status_calls(w) == calls + 1
+    run_blu(scenario, sensors=(DEV_MOTION,))
+
+
+def test_blu_clock_candidate_dropped_when_the_bridge_synchronises(warnings):
+    """The bridge 400 s behind at the connection (a candidate), then synchronised: the H&T's next packet gives an
+    offset within the skew, adopted at once, and the candidate is dropped. The -400 s is never adopted, never warned,
+    and no GetStatus is read again for it."""
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=-400)
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        calls = get_status_calls(w)
+        w.bridge.clock_skew = timedelta(0)
+        w.shift = timedelta(seconds=60)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0})
+        await w.wait_for(lambda xs: w.info(DEV_HT).online)
+        assert abs(bridge_offset(w)) < connector_module.CLOCK_OFFSET_IGNORED_S
+        w.shift = timedelta(seconds=400)
+        await w.settle(0.2)
+        assert get_status_calls(w) == calls and abs(bridge_offset(w)) < connector_module.CLOCK_OFFSET_IGNORED_S
+        assert clock_warnings(warnings) == []
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_clock_candidate_not_confirmed_before_clock_confirm_s(warnings):
+    """The same -400 s again 290 s after the candidate: too early, not adopted (the H&T stays offline, no warning);
+    the wait counts from the first source, so at 300 s the H&T's packet confirms it."""
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=-400)
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        w.shift = timedelta(seconds=290)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0})
+        await w.settle(0.2)
+        assert bridge_offset(w) is None and not w.info(DEV_HT).online and clock_warnings(warnings) == []
+        w.shift = timedelta(seconds=300)
+        w.bridge.blu_packet(ADDR_HT, {69: 22.0})
+        await w.wait_for(lambda xs: w.info(DEV_HT).online)
+        assert abs(bridge_offset(w) + 400) <= 1 and len(clock_warnings(warnings)) == 1
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_clock_get_status_read_again_once_per_wait(warnings):
+    """clock_confirm_s is 120 s here; a Motion at rest, no BLU packet. The candidate of the connection (-400 s) has
+    waited: one GetStatus read again at the first check after 120 s, which fails, and not again at the next checks:
+    120 s later. Its clock moved meanwhile (-500 s): a new candidate, the wait starts again, and the read 120 s later
+    confirms the -500 s."""
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=-400)
+        w.pair(ADDR_MOTION)
+        w.bridge.blu_packet(ADDR_MOTION, {33: False}, battery=100)
+        await w.connect_bridge()
+        calls = get_status_calls(w)
+        w.bridge.fail_next("Shelly.GetStatus")
+        w.shift = timedelta(seconds=130)                     # due: read again, fails
+        await w.wait_for(lambda xs: get_status_calls(w) == calls + 1)
+        await w.settle(0.3)                                  # several checks
+        assert get_status_calls(w) == calls + 1 and bridge_offset(w) is None
+        w.shift = timedelta(seconds=200)
+        await w.settle(0.2)
+        assert get_status_calls(w) == calls + 1
+        w.bridge.clock_skew = timedelta(seconds=-500)
+        w.shift = timedelta(seconds=260)                     # 120 s after the failed read: -500 s, a new candidate
+        await w.wait_for(lambda xs: get_status_calls(w) == calls + 2)
+        await w.settle(0.3)
+        assert get_status_calls(w) == calls + 2 and bridge_offset(w) is None
+        w.shift = timedelta(seconds=390)                     # 130 s after the new candidate: confirmed
+        await w.wait_for(lambda xs: bridge_offset(w) is not None)
+        await w.settle(0.2)
+        assert get_status_calls(w) == calls + 3 and abs(bridge_offset(w) + 500) <= 1
+        warned = clock_warnings(warnings)
+        assert len(warned) == 1 and abs(warned[0]["offset_s"] + 500) <= 1
+    run_blu(scenario, sensors=(DEV_MOTION,), clock_confirm_s=120)
+
+
+def test_blu_clock_candidate_is_forgotten_when_the_bridge_goes_offline():
+    """A candidate (-400 s) at the connection; the bridge goes offline and back, its clock still 400 s behind: the
+    candidate of the new connection waits from there, not from the first. 350 s after the first connection, 100 s
+    after the second, the H&T's packet does not confirm it: the H&T stays offline."""
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=-400)
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        w.shift = timedelta(seconds=250)
+        w.transport.set_online(SID_BRIDGE, False)
+        await w.wait_for(lambda xs: not w.info(DEV_BRIDGE).online)
+        await w.connect_bridge()
+        w.shift = timedelta(seconds=350)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0})
+        await w.settle(0.2)
+        assert bridge_offset(w) is None and not w.info(DEV_HT).online
     run_blu(scenario, sensors=(DEV_HT,))
 
 
@@ -1782,3 +2015,48 @@ def test_blu_map_is_dropped_at_a_pairing_with_the_bridge_online():
         assert not any(c[3] in ({"celsius": 85.0}, {"celsius": 25.0}) for c in w.blu(start)), w.blu(start)
         assert w.info(DEV_HT).capabilities["temperature"] == {"celsius": 22.0}
     run_blu(scenario, sensors=(DEV_HT, DEV_DOOR))
+
+
+def test_blu_restart_with_reconnection_and_its_clock_behind_keeps_a_dead_ht_offline(warnings):
+    """The bridge restarts through a reconnection with its clock 1750 s behind (the bench's Shelly 1 Gen4 after a
+    restart); its GetStatus at the connection reads that clock. The H&T, silent since 1740 s, is offline: its last
+    packet, dated by the wrong offset, would look «now». It must stay offline."""
+    async def scenario(w):
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        w.shift = timedelta(seconds=1740)
+        await w.wait_for(lambda xs: w.blu()[-1] == (DEV_HT, "online", False, None))
+        w.transport.set_online(SID_BRIDGE, False)
+        await w.wait_for(lambda xs: not w.info(DEV_BRIDGE).online)
+        w.bridge.clock_skew = timedelta(seconds=-1750)      # restarted, its clock not yet synchronised
+        start, reads = len(w.changes), len(w.get_components_offsets())
+        w.transport.set_online(SID_BRIDGE, True)            # GetStatus (sys.unixtime), then the map
+        w.bridge.reboot()                                   # NotifyFullStatus
+        await w.wait_for(lambda xs: len(w.get_components_offsets()) > reads)
+        await w.settle(0.2)
+        assert w.blu(start) == [] and not w.info(DEV_HT).online, (w.blu(start), bridge_offset(w))
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_restart_without_reconnection_a_stranger_packet_keeps_a_dead_ht_offline(warnings):
+    """The bridge restarts before the broker notices, so no reconnection and no GetStatus; a packet of a sensor
+    outside the catalog arrives with the wrong clock (1750 s behind), then the map is read again (a pairing). The H&T,
+    silent since 1740 s, must stay offline."""
+    async def scenario(w):
+        w.pair(ADDR_HT, ADDR_STRANGER)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        w.shift = timedelta(seconds=1740)
+        await w.wait_for(lambda xs: w.blu()[-1] == (DEV_HT, "online", False, None))
+        start = len(w.changes)
+        w.bridge.clock_skew = timedelta(seconds=-1750)      # restarted, its clock not yet synchronised
+        w.bridge.reboot()                                   # NotifyFullStatus
+        w.bridge.blu_packet(ADDR_STRANGER, {69: 19.0, 46: 50}, battery=80)
+        await w.settle(0.2)
+        reads = len(w.get_components_offsets())
+        w.pair(ADDR_MOTION)                                 # component_added: the map is read again
+        await w.wait_for(lambda xs: len(w.get_components_offsets()) > reads)
+        await w.settle(0.2)
+        assert w.blu(start) == [] and not w.info(DEV_HT).online, (w.blu(start), bridge_offset(w))
+    run_blu(scenario, sensors=(DEV_HT,))
