@@ -9,10 +9,10 @@ import RulesPage from "./RulesPage";
 // Lotto 30 (o1 91bc015): «Limiti del setpoint» gets the temperatures of the modes; the page draws the fields from the
 // limits, with their Italian labels, and shows the server's message when the values do not fit together.
 // 1098 = b: two ranges, winter (min, max: boiler and climate heating) and summer (summer_min, summer_max: climate cooling
-// and drying), the engine's initial values (o1).
+// and drying), the engine's initial values (o1; 1099: summer from 18 to 28, winter from 16 to 24).
 const SETPOINT = {
   rule_id: "setpoint_limits", label: "Limiti del setpoint", enabled: true, editable: true,
-  params: { min: 16, max: 24, comfort_celsius: 21, eco_celsius: 18, comfort_cool_celsius: 25, summer_min: 22, summer_max: 28 },
+  params: { min: 16, max: 24, comfort_celsius: 21, eco_celsius: 18, comfort_cool_celsius: 25, summer_min: 18, summer_max: 28 },
   limits: {
     min: { min: 7, max: 20 }, max: { min: 20, max: 28 }, comfort_celsius: { min: 16, max: 26 }, eco_celsius: { min: 10, max: 22 },
     comfort_cool_celsius: { min: 22, max: 28 }, summer_min: { min: 16, max: 28 }, summer_max: { min: 22, max: 30 },
