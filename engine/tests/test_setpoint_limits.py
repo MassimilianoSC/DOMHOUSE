@@ -63,8 +63,8 @@ def ignored(e):
 
 
 def test_switch_on_the_managers_limits_inside_the_devices_for_climate_and_boiler():
-    e = engine()                                                  # catalog: climate 16-24, boiler 7-23
-    assert e.device_limits(CALDAIA, "heating") == (7, 23) and e.device_limits(CLIMA, "climate") == (16, 24)
+    e = engine()                                                  # catalog: climate 16-30 (1100), boiler 7-23
+    assert e.device_limits(CALDAIA, "heating") == (7, 23) and e.device_limits(CLIMA, "climate") == (16, 30)
     assert limits(e, CLIMA, "climate") == (16, 24) and limits(e, CALDAIA, "heating") == (16, 23)
     rules(e, min=18, max=22)
     assert limits(e, CLIMA, "climate") == (18, 22) and limits(e, CALDAIA, "heating") == (18, 22)
@@ -72,14 +72,14 @@ def test_switch_on_the_managers_limits_inside_the_devices_for_climate_and_boiler
             and ev["data"]["device_id"] in (CLIMA, CALDAIA)}
     assert sent == {"climate", "heating"}                         # the app sees the new limits at once
     rules(e, min=10, max=28)                                      # wider than the device: the catalog is the boundary
-    assert limits(e, CLIMA, "climate") == (16, 24) and limits(e, CALDAIA, "heating") == (10, 23)
+    assert limits(e, CLIMA, "climate") == (16, 28) and limits(e, CALDAIA, "heating") == (10, 23)
 
 
 def test_switch_off_the_devices_limits():
     e = engine()
     rules(e, min=18, max=22)
     rules(e, enabled=False)
-    assert limits(e, CLIMA, "climate") == (16, 24) and limits(e, CALDAIA, "heating") == (7, 23)
+    assert limits(e, CLIMA, "climate") == (16, 30) and limits(e, CALDAIA, "heating") == (7, 23)
     assert set_point(e, CALDAIA, "heating", 10)[2] == {"setpoint": 10}       # accepted: inside the device's
     rules(e, enabled=True)
     assert limits(e, CALDAIA, "heating") == (18, 22)

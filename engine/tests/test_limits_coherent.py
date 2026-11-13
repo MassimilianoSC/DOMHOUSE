@@ -17,6 +17,8 @@ Run: python -m pytest engine/tests -q
 """
 import asyncio
 
+import dataclasses
+
 import pytest
 
 from engine import core
@@ -30,6 +32,19 @@ CLIMA, SENSORE, FINESTRA = "dev-clima-soggiorno", "dev-ambiente-soggiorno", "dev
 @pytest.fixture(autouse=True)
 def fast_minutes(monkeypatch):
     monkeypatch.setenv("MOCK_TIME_SCALE", "0.02")
+
+
+class Split24(SimulatedConnector):
+    """A split whose catalog goes only from 16 to 24 °C (the simulated one is 16–30 since answer 1100)."""
+
+    def devices(self):
+        out = []
+        for d in super().devices():
+            if d.device_id == CLIMA:
+                d = dataclasses.replace(d, capabilities={**d.capabilities, "climate": {
+                    **d.capabilities["climate"], "setpoint_min": 16, "setpoint_max": 24}})
+            out.append(d)
+        return out
 
 
 def engine(connector=None, store=None):
@@ -198,7 +213,7 @@ async def climate_on_at(e, setpoint, mode="heat"):
 
 
 def test_the_pair_follows_the_mode_of_the_climate():
-    """The simulated split is 16–24: heat 16–21 (winter after the change), cool and dry 18–24, fan 16–24."""
+    """The simulated split is 16–30 (1100): heat 16–21 (winter after the change), cool and dry 18–28, fan 16–30."""
     async def main():
         e = engine()
         put(e, max=21)
@@ -211,7 +226,7 @@ def test_the_pair_follows_the_mode_of_the_climate():
             seen.append(pair(e))
         return e, seen
     e, seen = run(main())
-    assert seen == [(16, 21), (18, 24), (18, 24), (16, 24), (16, 21)]
+    assert seen == [(16, 21), (18, 28), (18, 28), (16, 30), (16, 21)]
     last = [ev["data"]["state"] for ev in e.events if ev["event"] == "device.state" and ev["data"]["device_id"] == CLIMA]
     assert (last[-1]["setpoint_min"], last[-1]["setpoint_max"]) == (16, 21)          # the app hears it
 
@@ -229,7 +244,7 @@ def test_a_mode_change_brings_the_setpoint_inside_the_new_range():
     assert cmd["params"] == {"mode": "cool", "setpoint": 18} and cmd["status"] == "acked"
     assert e.devices[CLIMA]["capabilities"]["climate"]["setpoint"] == 18
     assert e.connector._devices[CLIMA].capabilities["climate"]["setpoint"] == 18
-    assert applied(e, cmd)["reasoning"] == "Comando manuale dall'app; setpoint 17 °C riportato a 18 °C (limiti 18–24)"
+    assert applied(e, cmd)["reasoning"] == "Comando manuale dall'app; setpoint 17 °C riportato a 18 °C (limiti 18–28)"
 
 
 def test_a_manual_command_is_checked_with_its_new_modes_range():
@@ -239,10 +254,10 @@ def test_a_manual_command_is_checked_with_its_new_modes_range():
     with pytest.raises(core.MockError) as exc:
         e.validate_command(e.devices[CLIMA], {"capability": "climate", "action": "set_climate",
                                               "params": {"mode": "cool", "setpoint": 17}})
-    assert (exc.value.status, exc.value.error, exc.value.details) == (422, "setpoint_out_of_range", {"min": 18, "max": 24})
+    assert (exc.value.status, exc.value.error, exc.value.details) == (422, "setpoint_out_of_range", {"min": 18, "max": 28})
     body, note = e._within_limits(e.devices[CLIMA], {"capability": "climate", "action": "set_climate",
                                                      "params": {"mode": "cool", "setpoint": 17}})
-    assert body["params"]["setpoint"] == 18 and note == "setpoint 17 °C riportato a 18 °C (limiti 18–24)"
+    assert body["params"]["setpoint"] == 18 and note == "setpoint 17 °C riportato a 18 °C (limiti 18–28)"
 
 
 def test_the_remote_control_is_not_limited():
@@ -257,15 +272,15 @@ def test_the_remote_control_is_not_limited():
         return e, before
     e, before = run(main())
     state = e.devices[CLIMA]["capabilities"]["climate"]
-    assert (state["mode"], state["setpoint"], pair(e)) == ("cool", 17, (18, 24))
+    assert (state["mode"], state["setpoint"], pair(e)) == ("cool", 17, (18, 28))
     assert len(climate_commands(e)) == before and e.limits_push == {}
 
 
 # -------- the device's limits say so --------
 def test_the_devices_limit_cuts_the_cooling_and_the_decision_says_it():
-    """Summer range 18–28, the simulated split 16–24: comfort with the room at 29 °C cools to 24, not 25."""
+    """Summer range 18–28, a split 16–24: comfort with the room at 29 °C cools to 24, not 25."""
     async def main():
-        e = engine()
+        e = engine(Split24())
         e.ensure_started()
         e.devices[SENSORE]["capabilities"]["temperature"]["celsius"] = 29.0
         e.set_mode("comfort", "system:engine", CORR, "Prova", decision_actor="system")
@@ -279,7 +294,7 @@ def test_the_devices_limit_cuts_the_cooling_and_the_decision_says_it():
 
 def test_the_regulation_says_it_too():
     async def main():
-        e = engine()
+        e = engine(Split24())
         e.ensure_started()
         e.devices[SENSORE]["capabilities"]["temperature"]["celsius"] = 22.0
         e.set_mode("comfort", "system:engine", CORR, "Prova", decision_actor="system")

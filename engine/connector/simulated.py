@@ -57,7 +57,7 @@ def seed_devices(variant: int) -> tuple[list[dict], dict[str, dict]]:
         {"device_id": "dev-clima-soggiorno", "label": "Climatizzatore soggiorno", "room_id": "soggiorno", "online": True,
          "last_seen": now, "capabilities": {
              "climate": {"on": warm, "mode": "heat", "setpoint": 21, "fan": "auto", "setpoint_min": 16,
-                         "setpoint_max": 24, "confirmation": "power"}}},
+                         "setpoint_max": 30, "confirmation": "power"}}},
         {"device_id": "dev-misura-clima", "label": "Misuratore clima", "room_id": "soggiorno", "online": True,
          "last_seen": now, "capabilities": {"power_meter": {"watts": 870 if warm else 0, "energy_total_wh": 812_400.0}}},
         {"device_id": "dev-caldaia", "label": "Caldaia", "room_id": "tecnico", "online": True, "last_seen": now,

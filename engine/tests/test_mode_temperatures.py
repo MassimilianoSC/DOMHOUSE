@@ -56,7 +56,8 @@ def test_the_climate_in_comfort_follows_the_room():
     room(e, 27.5)                                                       # hot: cools, within the device's range
     c = commands(e, "comfort")[CLIMA]
     climate = e.devices[CLIMA]["capabilities"]["climate"]
-    assert c["params"]["mode"] == "cool" and c["params"]["setpoint"] == min(25, climate["setpoint_max"])
+    # 1098 = b: cooling within the SUMMER range (18–28), not the heating pair the state shows now (16–24)
+    assert c["params"]["mode"] == "cool" and c["params"]["setpoint"] == 25
     room(e, 23.0)                                                       # in between: nothing to do
     assert CLIMA not in commands(e, "comfort")
     assert commands(e, "eco")[CLIMA] == {"capability": "climate", "action": "turn_off"}
