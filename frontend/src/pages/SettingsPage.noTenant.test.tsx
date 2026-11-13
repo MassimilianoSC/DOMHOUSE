@@ -8,7 +8,10 @@ const s = vi.hoisted(() => ({ me: null as unknown, calls: [] as string[] }));
 
 vi.mock("@/auth/AuthProvider", () => ({
   useAuth: () => ({ me: s.me, logout: vi.fn() }),
-  useRole: () => ({ canWrite: s.me?.role === "admin" || s.me?.role === "operator" }),
+  useRole: () => {
+    const role = (s.me as { role?: string | null } | null)?.role;
+    return { canWrite: role === "admin" || role === "operator" };
+  },
 }));
 // the account sections are tested on their own; the profile rows the page passes in still show
 vi.mock("@/components/settings/AccountSettings", () => ({ AccountSettings: ({ profile }: { profile?: React.ReactNode }) => <>{profile}</> }));
