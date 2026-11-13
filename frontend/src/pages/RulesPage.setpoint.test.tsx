@@ -60,29 +60,64 @@ describe("Regole: le temperature delle modalità (lotto 30)", () => {
     expect(card).toHaveTextContent("non vale per il telecomando del climatizzatore né per l'antigelo");
   });
 
+  // D-198 (13 Nov, prove a mano in staging): the message was only at the foot of the page, under every card, and the
+  // save button went grey with no reason in sight. Now it is in the card, under the group concerned (winter, summer, or
+  // between the two for «cooling above comfort»), the boxes concerned have the red border, and the save bar says why.
+  const ALL = ["min", "max", "eco_celsius", "comfort_celsius", "summer_min", "summer_max", "comfort_cool_celsius"];
   it.each([
-    ["eco_celsius=22", "La temperatura eco non può superare quella comfort"],
+    ["eco_celsius=22", "La temperatura eco non può superare quella comfort", "winter", ["eco_celsius", "comfort_celsius"]],
     // comfort uguale al raffrescamento (25): non più alta, quindi rifiutata
-    ["comfort_celsius=25 max=26", "La temperatura di raffrescamento deve essere più alta di quella comfort"],
-    ["comfort_celsius=26 max=26", "La temperatura di raffrescamento deve essere più alta di quella comfort"],
+    ["comfort_celsius=25 max=26", "La temperatura di raffrescamento deve essere più alta di quella comfort", "between", ["comfort_celsius", "comfort_cool_celsius"]],
+    ["comfort_celsius=26 max=26", "La temperatura di raffrescamento deve essere più alta di quella comfort", "between", ["comfort_celsius", "comfort_cool_celsius"]],
     // 1098 = b: inverno minimo ≤ eco ≤ comfort ≤ massimo; estate minimo ≤ raffrescamento ≤ massimo; comfort < raffrescamento
-    ["eco_celsius=15", "La temperatura eco non può essere sotto il minimo invernale"],
-    ["min=19", "La temperatura eco non può essere sotto il minimo invernale"],
-    ["max=20", "La temperatura comfort non può superare il massimo invernale"],
-    ["comfort_celsius=24.5", "La temperatura comfort non può superare il massimo invernale"],
-    ["summer_min=24 summer_max=23", "Il minimo estivo non può superare il massimo estivo"],
-    ["summer_min=26", "La temperatura di raffrescamento deve stare fra il minimo e il massimo estivi"],
-    ["summer_max=24", "La temperatura di raffrescamento deve stare fra il minimo e il massimo estivi"],
-  ])("prima del salvataggio, %s: «%s», e niente salvataggio", async (changes, message) => {
+    ["eco_celsius=15", "La temperatura eco non può essere sotto il minimo invernale", "winter", ["min", "eco_celsius"]],
+    ["min=19", "La temperatura eco non può essere sotto il minimo invernale", "winter", ["min", "eco_celsius"]],
+    ["max=20", "La temperatura comfort non può superare il massimo invernale", "winter", ["max", "comfort_celsius"]],
+    ["comfort_celsius=24.5", "La temperatura comfort non può superare il massimo invernale", "winter", ["max", "comfort_celsius"]],
+    ["summer_min=24 summer_max=23", "Il minimo estivo non può superare il massimo estivo", "summer", ["summer_min", "summer_max", "comfort_cool_celsius"]],
+    ["summer_min=26", "La temperatura di raffrescamento deve stare fra il minimo e il massimo estivi", "summer", ["summer_min", "comfort_cool_celsius"]],
+    ["summer_max=24", "La temperatura di raffrescamento deve stare fra il minimo e il massimo estivi", "summer", ["summer_max", "comfort_cool_celsius"]],
+  ])("prima del salvataggio, %s: «%s» nella scheda (gruppo %s), caselle in rosso, niente salvataggio e il perché nella barra", async (changes, message, group, red) => {
     s.canWrite = true;
     await open();
     for (const change of changes.split(" ")) {
       const [param, value] = change.split("=");
       fireEvent.change(screen.getByTestId(`rule-param-setpoint_limits-${param}`), { target: { value } });
     }
-    expect(screen.getByTestId("rules-range-error")).toHaveTextContent(message);
+    const error = screen.getByTestId(`rules-range-error-${group}`);
+    expect(error).toHaveTextContent(message);
+    expect(screen.getByTestId("rule-card-setpoint_limits")).toContainElement(error);
+    if (group === "between") {
+      // after the winter group, before the summer one
+      expect(screen.getByTestId("rule-group-setpoint_limits-winter").compareDocumentPosition(error) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(error.compareDocumentPosition(screen.getByTestId("rule-group-setpoint_limits-summer")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    } else {
+      expect(screen.getByTestId(`rule-group-setpoint_limits-${group}`)).toContainElement(error);
+    }
+    for (const k of ALL) {
+      const box = screen.getByTestId(`rule-param-setpoint_limits-${k}`);
+      expect([k, box.getAttribute("aria-invalid")]).toEqual([k, String(red.includes(k))]);
+      expect([k, box.className.includes("border-destructive")]).toEqual([k, red.includes(k)]);
+    }
+    expect(screen.queryByTestId("rules-range-error")).toBeNull();   // nothing left at the foot of the page
     expect(screen.getByTestId("rules-save-btn")).toBeDisabled();
+    expect(screen.getByTestId("rules-save-blocked")).toHaveTextContent("Correggi gli errori evidenziati");
     expect(s.update).not.toHaveBeenCalled();
+  });
+
+  it("un valore fuori dai limiti del campo: errore sotto la casella e lo stesso perché nella barra; valori validi: nessun perché", async () => {
+    s.canWrite = true;
+    await open();
+    fireEvent.change(screen.getByTestId("rule-param-setpoint_limits-max"), { target: { value: "19" } });
+    expect(screen.getByTestId("rule-param-error-setpoint_limits-max")).toHaveTextContent("Valore fuori dai limiti (20–28)");
+    expect(screen.getByTestId("rules-save-btn")).toBeDisabled();
+    expect(screen.getByTestId("rules-save-blocked")).toHaveTextContent("Correggi gli errori evidenziati");
+    // the line in the bar takes you to the box to correct
+    fireEvent.click(screen.getByTestId("rules-save-blocked"));
+    expect(screen.getByTestId("rule-param-setpoint_limits-max")).toHaveFocus();
+    fireEvent.change(screen.getByTestId("rule-param-setpoint_limits-max"), { target: { value: "25" } });
+    expect(screen.getByTestId("rules-save-btn")).not.toBeDisabled();
+    expect(screen.queryByTestId("rules-save-blocked")).toBeNull();
   });
 
   it("valori coerenti per il sito ma rifiutati dal server (422): il messaggio del server", async () => {
@@ -90,7 +125,7 @@ describe("Regole: le temperature delle modalità (lotto 30)", () => {
     s.update.mockRejectedValueOnce(new ApiError(422, "invalid_range", "La temperatura eco non può superare quella comfort", "c-1"));
     await open();
     fireEvent.change(screen.getByTestId("rule-param-setpoint_limits-comfort_celsius"), { target: { value: "22" } });
-    expect(screen.queryByTestId("rules-range-error")).toBeNull();
+    expect(screen.queryByTestId(/^rules-range-error/)).toBeNull();
     await act(async () => {
       fireEvent.click(screen.getByTestId("rules-save-btn"));
     });
@@ -122,10 +157,15 @@ describe("Regole: inverno ed estate, due intervalli (1096/1097 = a, 1098 = b)", 
     s.rules = [WINDOW, OLD];
     s.update.mockResolvedValue({ updated_at: "2026-11-13T08:00:00.000Z", rules: [WINDOW, OLD] });
     await open();
-    expect(screen.getByTestId("rules-range-warning")).toHaveTextContent("La temperatura comfort non può superare il massimo invernale");
-    expect(screen.queryByTestId("rules-range-error")).toBeNull();
+    const warning = screen.getByTestId("rules-range-warning-winter");
+    expect(warning).toHaveTextContent("«Limiti del setpoint» da correggere: La temperatura comfort non può superare il massimo invernale.");
+    expect(screen.getByTestId("rule-group-setpoint_limits-winter")).toContainElement(warning);
+    expect(screen.queryByTestId(/^rules-range-error/)).toBeNull();
+    // a warning does not block: no red border, no reason in the bar
+    expect(screen.getByTestId("rule-param-setpoint_limits-max")).toHaveAttribute("aria-invalid", "false");
     fireEvent.click(screen.getByTestId("rule-toggle-window_open_off"));
     expect(screen.getByTestId("rules-save-btn")).not.toBeDisabled();
+    expect(screen.queryByTestId("rules-save-blocked")).toBeNull();
     await act(async () => { fireEvent.click(screen.getByTestId("rules-save-btn")); });
     expect(s.update).toHaveBeenCalled();
   });
@@ -138,12 +178,15 @@ describe("Regole: inverno ed estate, due intervalli (1096/1097 = a, 1098 = b)", 
     s.rules = [WINDOW, OLD];
     await open();
     touch();
-    expect(screen.getByTestId("rules-range-error")).toHaveTextContent("La temperatura comfort non può superare il massimo invernale");
-    expect(screen.queryByTestId("rules-range-warning")).toBeNull();
+    expect(screen.getByTestId("rules-range-error-winter")).toHaveTextContent("La temperatura comfort non può superare il massimo invernale");
+    expect(screen.getByTestId("rule-param-setpoint_limits-max")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.queryByTestId(/^rules-range-warning/)).toBeNull();
     expect(screen.getByTestId("rules-save-btn")).toBeDisabled();
+    expect(screen.getByTestId("rules-save-blocked")).toBeInTheDocument();
     fireEvent.change(screen.getByTestId("rule-param-setpoint_limits-max"), { target: { value: "24" } });
-    expect(screen.queryByTestId("rules-range-error")).toBeNull();
+    expect(screen.queryByTestId(/^rules-range-error/)).toBeNull();
     expect(screen.getByTestId("rules-save-btn")).not.toBeDisabled();
+    expect(screen.queryByTestId("rules-save-blocked")).toBeNull();
   });
 });
 

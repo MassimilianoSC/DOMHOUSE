@@ -107,6 +107,7 @@
     "dirty": "{count} regole modificate",
     "dirtyOne": "1 regola modificata",
     "save": "Salva le modifiche",
+    "saveBlocked": "Correggi gli errori evidenziati",
     "discard": "Annulla le modifiche",
     "saved": "Regole aggiornate",
     "params": {

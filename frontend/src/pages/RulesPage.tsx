@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Lock } from "lucide-react";
@@ -46,6 +46,48 @@ const GROUPS: Record<string, Group[]> = {
   ],
 };
 
+/** A problem of the chain of «Limiti del setpoint»: where it shows (under the winter group, between the two groups,
+ *  under the summer group), the boxes it concerns, and whether it blocks the save (otherwise a warning). */
+type Place = "winter" | "between" | "summer";
+type LimitProblem = { place: Place; message: string; keys: string[]; blocking: boolean };
+
+// The same checks as the engine, before saving, with its sentences, in its order a–g (lotto 30; 1096/1097 = a;
+// 1098 = b, two ranges): winter min ≤ eco ≤ comfort ≤ winter max; summer min ≤ cooling ≤ summer max; comfort <
+// cooling. a, c, g always; b, d, e, f only when the change touches «Limiti del setpoint», as the engine does: rules
+// saved before that break them are said as a warning, and another rule still saves.
+function limitProblems(sl: Rule | undefined, d: Draft[string] | undefined, touched: boolean): LimitProblem[] {
+  if (!sl) return [];
+  const p = effective(sl, d).params;
+  const v = (k: string) => (typeof p[k] === "number" ? p[k] : null);
+  const lt = (x: number | null, y: number | null) => x !== null && y !== null && x < y;
+  const [min, max, eco, comfort, cool, sMin, sMax] = ["min", "max", "eco_celsius", "comfort_celsius", "comfort_cool_celsius", "summer_min", "summer_max"].map(v);
+  const checks: [boolean, string, boolean, Place, string[]][] = [   // [fails, message, always, place, boxes]
+    [lt(max, min), t("rules.invalidRange"), true, "winter", ["min", "max"]],
+    [lt(eco, min), t("rules.ecoBelowMin"), false, "winter", ["min", "eco_celsius"]],
+    [lt(comfort, eco), t("rules.ecoAboveComfort"), true, "winter", ["eco_celsius", "comfort_celsius"]],
+    [lt(max, comfort), t("rules.comfortAboveMax"), false, "winter", ["max", "comfort_celsius"]],
+    [lt(sMax, sMin), t("rules.summerInvalidRange"), false, "summer", ["summer_min", "summer_max"]],
+    [lt(cool, sMin), t("rules.coolOutsideSummer"), false, "summer", ["summer_min", "comfort_cool_celsius"]],
+    [lt(sMax, cool), t("rules.coolOutsideSummer"), false, "summer", ["summer_max", "comfort_cool_celsius"]],
+    [cool !== null && comfort !== null && cool <= comfort, t("rules.coolNotAboveComfort"), true, "between", ["comfort_celsius", "comfort_cool_celsius"]],
+  ];
+  return checks.filter(([fails]) => fails).map(([, message, always, place, keys]) => ({ place, message, keys, blocking: always || touched }));
+}
+
+/** The messages of one place: the blocking ones in red, the others as the yellow warning (texts as before). */
+function LimitMessages({ ruleId, place, problems }: { ruleId: string; place: Place; problems: LimitProblem[] }) {
+  const here = problems.filter((p) => p.place === place);
+  const join = (ps: LimitProblem[]) => [...new Set(ps.map((p) => p.message))].join(" · ");
+  const errors = here.filter((p) => p.blocking);
+  const warnings = here.filter((p) => !p.blocking);
+  return (
+    <>
+      {errors.length > 0 && <p id={`rule-${ruleId}-problem-${place}`} className="text-sm font-medium text-destructive" data-testid={`rules-range-error-${place}`}>{join(errors)}</p>}
+      {warnings.length > 0 && <p className="rounded-xl border border-warning-border bg-warning-bg px-3 py-2 text-sm font-semibold text-warning-fg" data-testid={`rules-range-warning-${place}`}>{t("rules.rangeWarning", { problem: join(warnings) })}</p>}
+    </>
+  );
+}
+
 function groupsOf(rule: Rule): Group[] {
   const known = (GROUPS[rule.rule_id] ?? []).map((g) => ({ ...g, keys: g.keys.filter((k) => k in rule.limits) })).filter((g) => g.keys.length);
   const grouped = new Set(known.flatMap((g) => g.keys));
@@ -53,11 +95,17 @@ function groupsOf(rule: Rule): Group[] {
   return rest.length ? [...known, { id: "", keys: rest }] : known;
 }
 
-function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Draft[string]; onChange: (d: Draft[string]) => void; canWrite: boolean }) {
+function RuleCard({ rule, draft, onChange, canWrite, problems = [] }: { rule: Rule; draft?: Draft[string]; onChange: (d: Draft[string]) => void; canWrite: boolean; problems?: LimitProblem[] }) {
   const editable = canWrite && rule.editable;
   const eff = effective(rule, draft);
   const errs = paramErrors(rule, draft);
   const dirty = draft && (draft.enabled !== undefined || Object.keys(draft.params).length > 0);
+  // D-198: the problems of the chain show under their group (winter, summer; «between» after winter), the boxes they
+  // concern get the red border; a place without its group shows at the end of the card, never nowhere.
+  const groups = groupsOf(rule);
+  const shown = new Set<string>(groups.flatMap((g) => (g.id === "winter" ? ["winter", "between"] : [g.id])));
+  const leftover = (["winter", "between", "summer"] as const).filter((p) => !shown.has(p));
+  const describedBy = (key: string) => [...new Set(problems.filter((p) => p.blocking && p.keys.includes(key)).map((p) => `rule-${rule.rule_id}-problem-${p.place}`))].join(" ") || undefined;
   return (
     <Card className={cn("space-y-4 p-5", dirty && "border-primary/50 ring-1 ring-primary/20")} data-testid={`rule-card-${rule.rule_id}`} data-enabled={eff.enabled}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -83,8 +131,9 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
           />
         </div>
       </div>
-      {groupsOf(rule).map((group) => (
-        <div key={group.id} className="space-y-2" data-testid={group.id ? `rule-group-${rule.rule_id}-${group.id}` : undefined}>
+      {groups.map((group) => (
+        <Fragment key={group.id}>
+        <div className="space-y-2" data-testid={group.id ? `rule-group-${rule.rule_id}-${group.id}` : undefined}>
           {group.title && <h4 className="text-sm font-semibold">{group.title()}</h4>}
           <div className="grid gap-3 sm:grid-cols-2">
           {group.keys.map((key) => [key, rule.limits[key]] as const).map(([key, lim]) => (
@@ -103,14 +152,15 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
                   value={draft?.params[key] ?? String(rule.params[key] ?? "")}
                   disabled={!editable}
                   aria-disabled={!editable}
-                  aria-invalid={Boolean(errs[key])}
+                  aria-invalid={Boolean(errs[key] || describedBy(key))}
+                  aria-describedby={describedBy(key)}
                   onChange={(e) => {
                     const params = { ...(draft?.params ?? {}) };
                     if (e.target.value === String(rule.params[key])) delete params[key];
                     else params[key] = e.target.value;
                     onChange({ enabled: draft?.enabled, params });
                   }}
-                  className={cn("tabular", errs[key] && "border-destructive focus-visible:ring-destructive")}
+                  className={cn("tabular", (errs[key] || describedBy(key)) && "border-destructive focus-visible:ring-destructive")}
                   data-testid={`rule-param-${rule.rule_id}-${key}`}
                 />
                 {errs[key] && <p className="text-xs font-medium text-destructive" data-testid={`rule-param-error-${rule.rule_id}-${key}`}>{errs[key]}</p>}
@@ -118,8 +168,12 @@ function RuleCard({ rule, draft, onChange, canWrite }: { rule: Rule; draft?: Dra
             </div>
           ))}
           </div>
+          {(group.id === "winter" || group.id === "summer") && <LimitMessages ruleId={rule.rule_id} place={group.id} problems={problems} />}
         </div>
+        {group.id === "winter" && <LimitMessages ruleId={rule.rule_id} place="between" problems={problems} />}
+        </Fragment>
       ))}
+      {leftover.map((place) => <LimitMessages key={place} ruleId={rule.rule_id} place={place} problems={problems} />)}
     </Card>
   );
 }
@@ -148,28 +202,15 @@ export default function RulesPage() {
   });
   const hasErrors = rules.some((r) => Object.keys(paramErrors(r, draft[r.rule_id])).length > 0);
   const sl = rules.find((r) => r.rule_id === "setpoint_limits");
-  const slEff = sl ? effective(sl, draft[sl.rule_id]).params : null;
-  // The same checks as the engine, before saving, with its sentences, in its order a–g (lotto 30; 1096/1097 = a;
-  // 1098 = b, two ranges): winter min ≤ eco ≤ comfort ≤ winter max; summer min ≤ cooling ≤ summer max; comfort <
-  // cooling. a, c, g always; b, d, e, f only when the change touches «Limiti del setpoint», as the engine does: rules
-  // saved before that break them are said as a warning, and another rule still saves.
-  const v = (k: string) => (slEff !== null && typeof slEff[k] === "number" ? slEff[k] : null);
-  const lt = (x: number | null, y: number | null) => x !== null && y !== null && x < y;
   const slTouched = Boolean(sl && patches.some((p) => p.rule_id === sl.rule_id));
-  const [min, max, eco, comfort, cool, sMin, sMax] = ["min", "max", "eco_celsius", "comfort_celsius", "comfort_cool_celsius", "summer_min", "summer_max"].map(v);
-  const checks: [boolean, string, boolean][] = [   // [fails, message, always]
-    [lt(max, min), t("rules.invalidRange"), true],
-    [lt(eco, min), t("rules.ecoBelowMin"), false],
-    [lt(comfort, eco), t("rules.ecoAboveComfort"), true],
-    [lt(max, comfort), t("rules.comfortAboveMax"), false],
-    [lt(sMax, sMin), t("rules.summerInvalidRange"), false],
-    [lt(cool, sMin) || lt(sMax, cool), t("rules.coolOutsideSummer"), false],
-    [cool !== null && comfort !== null && cool <= comfort, t("rules.coolNotAboveComfort"), true],
-  ];
-  const join = (messages: string[]) => (messages.length ? messages.join(" · ") : null);
-  const failing = checks.filter(([fails]) => fails);
-  const rangeError = join(failing.filter(([, , always]) => always || slTouched).map(([, k]) => k));
-  const rangeWarning = slTouched ? null : join(failing.filter(([, , always]) => !always).map(([, k]) => k));
+  const problems = limitProblems(sl, sl && draft[sl.rule_id], slTouched);
+  // D-198: a grey save button always says why, in the bar; the reason itself is next to its boxes
+  const blocked = hasErrors || problems.some((p) => p.blocking);
+  const goToError = () => {
+    const box = document.querySelector<HTMLInputElement>('[data-testid^="rule-param-"][aria-invalid="true"]');
+    box?.scrollIntoView?.({ block: "center" });
+    box?.focus({ preventScroll: true });
+  };
 
   const save = async () => {
     setSaving(true);
@@ -219,12 +260,10 @@ export default function RulesPage() {
         // ragged rows (design lot 2)
         <div className="flex flex-col gap-4 lg:block lg:columns-2 lg:gap-4 [&>*]:break-inside-avoid lg:[&>*]:mb-4">
           {rules.map((r) => (
-            <RuleCard key={r.rule_id} rule={r} draft={draft[r.rule_id]} canWrite={canWrite} onChange={(d) => setDraft((s) => ({ ...s, [r.rule_id]: d }))} />
+            <RuleCard key={r.rule_id} rule={r} draft={draft[r.rule_id]} canWrite={canWrite} problems={r === sl ? problems : undefined} onChange={(d) => setDraft((s) => ({ ...s, [r.rule_id]: d }))} />
           ))}
         </div>
       )}
-      {rangeError && <p className="text-sm font-medium text-destructive" data-testid="rules-range-error">{rangeError}</p>}
-      {rangeWarning && <p className="rounded-xl border border-warning-border bg-warning-bg px-3 py-2 text-sm font-semibold text-warning-fg" data-testid="rules-range-warning">{t("rules.rangeWarning", { problem: rangeWarning })}</p>}
       {saveError ? <ErrorNotice error={saveError} testId="rules-save-error" /> : null}
       {/* D-151: the assistant proposes (after the rules, design lot 2), the manager applies; whoever only reads does not see it */}
       {canWrite && q.data && (
@@ -241,10 +280,17 @@ export default function RulesPage() {
         // a full bar along the bottom edge, solid with a 1 px top border and a light shadow (design lot 2)
         <div ref={barRef} className="fixed inset-x-0 bottom-0 z-30 border-t bg-card px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 lg:px-10 shadow-[0_-4px_12px_hsl(var(--foreground)/0.06)] md:left-64" data-testid="rules-save-bar">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3">
-            <span className="text-sm font-semibold">{patches.length === 1 ? t("rules.dirtyOne") : t("rules.dirty", { count: patches.length })}</span>
+            <div className="flex flex-col items-start">
+              <span className="text-sm font-semibold">{patches.length === 1 ? t("rules.dirtyOne") : t("rules.dirty", { count: patches.length })}</span>
+              {blocked && (
+                <button type="button" onClick={goToError} className="text-left text-sm font-medium text-destructive underline underline-offset-2 focus-ring rounded-sm" data-testid="rules-save-blocked">
+                  {t("rules.saveBlocked")}
+                </button>
+              )}
+            </div>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={() => { setDraft({}); setSaveError(null); }} disabled={saving} data-testid="rules-discard-btn">{t("rules.discard")}</Button>
-              <Button onClick={save} disabled={saving || hasErrors || Boolean(rangeError)} data-testid="rules-save-btn">{t("rules.save")}</Button>
+              <Button onClick={save} disabled={saving || blocked} data-testid="rules-save-btn">{t("rules.save")}</Button>
             </div>
           </div>
         </div>
