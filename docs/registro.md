@@ -66,6 +66,18 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
   - Push fatto e messaggio a Youssouf mandato.
   - La tappa B viene dopo.
   - Gli altri punti del quadro «senza Youssouf» non gli interessano adesso. **Da ora interessano solo le prove che dimostrano il punto di contatto fra il lavoro del committente (app, motore, server) e quello di Youssouf (connector e dispositivi): tappa A e tappa B.**
+- **Pubblicazione di `247fda0` (committente, 15:25:16–15:36:45, registrato alle 15:41).** La prova a secco delle 15:19 era pulita.
+  - Staging: `domotica-bff-staging-00020-fvl`, `/health` 200.
+  - Produzione: `domotica-bff-00035-7lx`, `/health` 200, valori 1|3|250|300.
+  - Motore `dev`: da `d274386` a `247fda0`, `/health` 200.
+  - Per tornare indietro: `staging-00019-hwg`, `bff-00034-rt6`, `engine:d274386`.
+- **Procedure di tappa A e tappa B (o1).**
+  - `a15af58`: tappa A ricontrollata, con la sezione 4 nuova (cambio della password della Plug con `MQTT.SetConfig` dalla VM).
+  - `a37f85b`: procedura nuova `docs/procedura-tappa-b.md`.
+  - **La tappa B parte subito con la sola Plug**, senza il catalogo di Youssouf: il catalogo lo scriviamo noi (`dev-presa-lab`).
+  - Revisione indipendente in sola lettura: «eseguibile dopo correzioni», 21 punti, nessuno bloccante (`DOMOTICA/revisione-tappa-b/REVISIONE.md`). Tutti fatti da o1 in `d615a9f`; il messaggio a Youssouf lo corregge la memoria storica.
+  - `2a93426`: lab-01 si può installare prima della tappa A, perché basta il filtro per id in R2 e R4; le cautele sono nel rischio 9.
+  - Domande per il committente: 1117 (porta 8169 o 8101), poi il cambio della password (VM o a mano) e la password dei prossimi apparecchi.
 - **Proposta al cliente, frase da precisare (07:03, domanda del committente):** il passo 10 della giornata dice «Se l'ospite proverà ad accendere il clima, sarà bloccato». Nel motore: un clima acceso col telecomando con la finestra aperta viene visto solo dal suo misuratore di consumo (`_power_seen`, D14) e rispento dalla regola finestra entro circa un minuto (`_keep_window_off`, D03); senza misuratore collegato non viene visto; durante una forzatura la regola è sospesa. Non è un difetto: in una prossima versione della proposta scrivere «il motore lo rispegnerà entro un minuto». La differenza con i limiti di temperatura: accensione e spegnimento si vedono dal consumo, la temperatura scelta col telecomando no.
 - **Raccomandazione di o1:** V1 + 1-bis + testo nello stesso lotto, o1 circa 8–11 h, o2 circa 1,5–2 h, più la guida.
 - **Risposta 1097 = a (07:00):** valori iniziali di «Limiti del setpoint»: massimo da 24 a 26, raffrescamento resta 25 (D-162). Avviati V1 + 1-bis + testo (D-198): o1 motore e BFF, o2 sito; testo della regola sulla base della proposta di o2 (antigelo escluso, telecomando escluso).
