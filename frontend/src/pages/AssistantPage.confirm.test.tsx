@@ -66,12 +66,12 @@ describe("Assistente: conferma nella chat con ospiti presenti (D-154)", () => {
     expect(screen.getByTestId("ask-confirm-expiry-ask-0007")).toHaveTextContent("Scade alle 12:42");
   });
 
-  it("«Sì»: la stessa chiamata della pagina Approvazioni, poi «Approvato: il comando parte…» e niente pulsanti", async () => {
+  it("«Sì»: la stessa chiamata della pagina Approvazioni, poi «Approvato: l'esito compare qui e nelle Decisioni» e niente pulsanti", async () => {
     s.lists = [[approval("apr-0012", "pending", "Spegnere climatizzatore soggiorno")], [approval("apr-0012", "approved", "Spegnere climatizzatore soggiorno")]];
     open();
     await click(await screen.findByTestId("ask-confirm-yes-ask-0007"));
     expect(s.decide).toHaveBeenCalledWith("apr-0012", { decision: "approve" }, expect.stringMatching(/^[0-9a-f-]{36}$/));
-    await waitFor(() => expect(screen.getByTestId("ask-confirm-result-ask-0007")).toHaveTextContent("Approvato: il comando parte, l'esito arriva nell'app"));
+    await waitFor(() => expect(screen.getByTestId("ask-confirm-result-ask-0007")).toHaveTextContent("Approvato: l'esito compare qui e nelle Decisioni"));
     expect(screen.queryByTestId("ask-confirm-yes-ask-0007")).toBeNull();
   });
 
@@ -91,10 +91,33 @@ describe("Assistente: conferma nella chat con ospiti presenti (D-154)", () => {
     open();
     await click(await screen.findByTestId("ask-confirm-yes-ask-0007"));
     await waitFor(() => expect(screen.getByTestId("ask-confirm-ask-0007")).toHaveAttribute("data-approval", "apr-0013"));
-    expect(screen.getByTestId("ask-confirm-ask-0007")).toHaveTextContent("Approvato: il comando parte");
+    expect(screen.getByTestId("ask-confirm-ask-0007")).toHaveTextContent("Approvato: l'esito compare qui e nelle Decisioni");
     expect(screen.getByTestId("ask-confirm-ask-0007")).toHaveTextContent("Ora: Modalità eco");
     await click(screen.getByTestId("ask-confirm-yes-ask-0007"));
     expect(s.decide).toHaveBeenLastCalledWith("apr-0013", { decision: "approve" }, expect.any(String));
+  });
+
+  // P-90 S20: the first action decided elsewhere (or expired): the buttons moved to the second without saying so, and the
+  // first one's outcome was not said either. Now «Ora: …» comes whenever the question has several actions and one is closed.
+  it.each([
+    ["approvata altrove", approval("apr-0012", "approved", "Spegnere climatizzatore soggiorno"), "Già decisa: approvata"],
+    ["respinta altrove", approval("apr-0012", "rejected", "Spegnere climatizzatore soggiorno"), "Già decisa: respinta"],
+    ["scaduta", approval("apr-0012", "expired", "Spegnere climatizzatore soggiorno"), "Scaduta"],
+  ])("più azioni, la prima %s senza clic in questa chat: com'è andata la prima e «Ora: …» della seconda", async (_how, first, said) => {
+    s.lists = [[first, approval("apr-0013", "pending", "Modalità eco")]];
+    open();
+    const box = await screen.findByTestId("ask-confirm-ask-0007");
+    expect(box).toHaveAttribute("data-approval", "apr-0013");
+    expect(screen.getByTestId("ask-confirm-previous-ask-0007")).toHaveTextContent(said);
+    expect(box).toHaveTextContent("Ora: Modalità eco");
+  });
+
+  it("una sola azione aperta, nessuna chiusa: niente «Ora: …»", async () => {
+    s.lists = [[approval("apr-0012", "pending", "Spegnere climatizzatore soggiorno")]];
+    open();
+    const box = await screen.findByTestId("ask-confirm-ask-0007");
+    expect(box).not.toHaveTextContent("Ora:");
+    expect(screen.queryByTestId("ask-confirm-previous-ask-0007")).toBeNull();
   });
 
   it("in coda dietro un'approvazione di un'altra fonte: «In attesa…» con il link alle Approvazioni", async () => {

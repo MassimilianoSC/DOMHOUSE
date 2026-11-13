@@ -380,7 +380,7 @@
       "yes": "Sì",
       "no": "No",
       "expiresAt": "Scade alle {time}",
-      "approved": "Approvato: il comando parte, l'esito arriva nell'app",
+      "approved": "Approvato: l'esito compare qui e nelle Decisioni",
       "rejected": "Respinto",
       "next": "Ora: {description}",
       "approvedByYou": "Approvata da te alle {time}",

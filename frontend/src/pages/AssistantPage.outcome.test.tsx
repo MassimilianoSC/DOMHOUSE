@@ -53,7 +53,7 @@ beforeEach(() => {
 });
 
 describe("Assistente: dopo il proprio «Sì» (P-75)", () => {
-  it("resta «Approvato: il comando parte…», mai «Già decisa», e il badge diventa «Approvata»", async () => {
+  it("resta «Approvato: l'esito compare qui…», mai «Già decisa», e il badge diventa «Approvata»", async () => {
     s.lists = [[approval("pending")], [approval("approved", "anna@fs.it")]];
     open();
     expect(screen.getByTestId("ask-status-ask-0007")).toHaveTextContent(t("assistant.status.needs_approval"));
@@ -62,7 +62,7 @@ describe("Assistente: dopo il proprio «Sì» (P-75)", () => {
       fireEvent.click(yes);
     });
     await waitFor(() => expect(screen.getByTestId("ask-status-ask-0007")).toHaveTextContent("Approvata"));
-    expect(screen.getByTestId("ask-confirm-result-ask-0007")).toHaveTextContent("Approvato: il comando parte, l'esito arriva nell'app");
+    expect(screen.getByTestId("ask-confirm-result-ask-0007")).toHaveTextContent("Approvato: l'esito compare qui e nelle Decisioni");
     expect(screen.queryByTestId("ask-confirm-closed-ask-0007")).toBeNull();
     expect(screen.getByTestId("ask-message-ask-0007")).not.toHaveTextContent("Già decisa");
     expect(screen.getByTestId("ask-message-ask-0007")).not.toHaveTextContent(t("assistant.status.needs_approval"));

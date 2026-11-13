@@ -91,7 +91,9 @@ export function ChatApproval({ aptId, askId, correlationId, approvalId, onOutcom
     return (
       <div className="space-y-2 border-t pt-2" data-testid={`ask-confirm-${askId}`} data-approval={open.approval_id}>
         {result}
-        {last && ours.length > 1 && <p className="text-xs text-muted-foreground">{t("assistant.confirm.next", { description: open.description })}</p>}
+        {/* P-90 S20: the previous action closed elsewhere (decided on another page or phone, or expired): how it ended */}
+        {!result && closed && <p className="text-sm font-semibold" data-testid={`ask-confirm-previous-${askId}`}>{closedText(closed, me, tz)}</p>}
+        {(last || closed) && ours.length > 1 && <p className="text-xs text-muted-foreground">{t("assistant.confirm.next", { description: open.description })}</p>}
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => void decide("approve")} disabled={busy !== null} data-testid={`ask-confirm-yes-${askId}`}><Check /> {t("assistant.confirm.yes")}</Button>
           <Button size="sm" variant="outline" onClick={() => void decide("reject")} disabled={busy !== null} data-testid={`ask-confirm-no-${askId}`}><X /> {t("assistant.confirm.no")}</Button>
