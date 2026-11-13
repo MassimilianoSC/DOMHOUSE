@@ -19,6 +19,7 @@ BODY_MAX = 200
 TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400, "booking": 86400,
                "summary": 7 * 86400,   # P-60 step 11: the weekly summary stays a week
                "frost_inactive": 86400,  # D-164: a boiler without its sensor in «casa vuota»
+               "heating_unregulated": 86400,  # P-90 S18: a boiler commanded by hand without its sensor
                "schedule_failed": 86400}  # D-219: scheduled actions not done
 
 _offline_timers: dict[tuple[str, str], asyncio.Task] = {}
@@ -136,6 +137,15 @@ def booking_reset_push(apt: Apartment, decision_id: str, reasoning: str | None, 
     body = (reasoning or "").strip() or "Prenotazione annullata dopo il pre-arrivo: appartamento rimesso a vuoto"
     return build_push("booking", apt, f"{apt.name}: prenotazione annullata, appartamento rimesso a vuoto", body,
                       f"/a/{apt.apartment_id}/decisioni", f"booking:{decision_id}", ts)
+
+
+def heating_unregulated_push(apt: Apartment, device_id: str, reasoning: str | None, ts: str | None):
+    """P-90 S18: a boiler commanded by hand whose sensor is missing follows the command without regulation (D-164):
+    on, it stays on until someone switches it off."""
+    body = (reasoning or "").strip() or "Sensore di temperatura mancante: la caldaia segue il comando manuale senza regolazione"
+    return build_push("heating_unregulated", apt, f"{apt.name}: caldaia senza regolazione", body,
+                      f"/a/{apt.apartment_id}/decisioni", f"unregulated:{apt.apartment_id}:{device_id}", ts,
+                      device_id=device_id)
 
 
 def frost_inactive_push(apt: Apartment, device_id: str, reasoning: str | None, ts: str | None):
@@ -469,6 +479,10 @@ async def _offline_watch(apt: Apartment, device_id: str, ts: str | None, key: st
     from engine.core import seconds_per_minute
 
     await asyncio.sleep(max(0.0, minutes * (seconds_per_minute() if get_settings().instance_mode == "mock" else 60.0) - already_s))
+    if apt.apartment_id in _health_down:
+        return                       # P-90 S14: the system is down, its own notification says it all (resume_watches too)
+    if await _offline_alert_minutes(apt) is None:
+        return                       # P-90 S17: the rule was switched off during the wait
     dev = None
     for attempt in range(1, OFFLINE_READ_TRIES + 1):
         try:
@@ -675,6 +689,17 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
                "booking", apt.apartment_id)
     elif ev.event == "decision.logged" and data.get("action") in (*SCHEDULE_FAILURES, "schedule_partial"):   # D-219
         _schedule_not_done(apt, ev, data, ts)
+    elif ev.event == "decision.logged" and data.get("action") == "heating_unregulated":     # P-90 S18
+        device_id = str((data.get("target") or {}).get("device_id", ""))
+        _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "offline",
+                           *heating_unregulated_push(apt, device_id, data.get("reasoning"), ts)),
+               "heating_unregulated", apt.apartment_id)
+    elif (ev.event == "decision.logged" and data.get("action") == "update_rules"
+          and "offline_alert" in str(data.get("new_value") or "")):
+        # P-90 S17: the rule changed (switched on again, its minutes): the devices already offline wait again; what
+        # was already notified for an episode is stopped by the claim
+        _alert_minutes.pop(apt.apartment_id, None)
+        _spawn(resume_watches(apt), "device_offline", apt.apartment_id)
     elif ev.event == "decision.logged" and data.get("action") == "frost_inactive":     # D-164
         device_id = str((data.get("target") or {}).get("device_id", ""))
         _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "offline", *frost_inactive_push(apt, device_id, data.get("reasoning"), ts)),

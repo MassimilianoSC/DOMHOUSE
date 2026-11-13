@@ -152,7 +152,8 @@ def range_errors(sl: dict, touched: bool) -> list[tuple[int, str, str]]:
     return [(422, "invalid_range", message) for broken, message in checks if broken][:1]
 
 
-CHECKOUT_APPROVAL = "Mettere l'appartamento a vuoto dopo il check-out"   # F1 (D-137); D05 recognises it at expiry
+CHECKOUT_APPROVAL = "Mettere l'appartamento a vuoto dopo il check-out"
+BOOKING_RULES = {"prearrival": "prearrival", "checkout_eco": "checkout"}   # P-90 S11: a booking rule -> its actions' kind   # F1 (D-137); D05 recognises it at expiry
 SCHEDULE_LABELS = {"prearrival": "pre-arrivo", "checkout": "check-out", "empty": "casa vuota", "manual": "manuale",
                    "assistant": "dell'assistente"}
 
@@ -363,6 +364,8 @@ class ApartmentEngine:
         self.limits_push: dict[str, dict] = dict(self.store.get_meta("limits_push", {}) or {})
         self.modes_outside: bool = bool(self.store.get_meta("modes_outside", False))
         self.mode_notes: dict[str, str] = {}         # device -> the note of its last mode command cut by the limits
+        # P-90 S3: command -> {"mode", "body", "at", "retried"} of the commands of a mode, until their outcome
+        self.mode_cmds: dict[str, dict] = {}
         self.last_regulation = 0.0
         self.decisions: list[dict] = []
         self.asks: dict[str, dict] = {}
@@ -1002,6 +1005,54 @@ class ApartmentEngine:
                 self._auto_climate = False
         self.store.put_meta("limits_push", self.limits_push)
 
+    def _booking_rule_switched(self, rule_id: str, correlation_id: str) -> None:
+        """P-90 S11: «Pre-arrivo» or «Risparmio al check-out» switched off cancels the planned actions of the bookings
+        of that kind; on again plans them for the bookings still to come (not cancelled, the guests not in or not gone,
+        the time ahead). One decision each time, when something changed."""
+        rule, kind = self.rule(rule_id), BOOKING_RULES[rule_id]
+        now, changed = utcnow(), []
+        if not rule["enabled"]:
+            for item in self.schedule.values():
+                if item["kind"] == kind and item["source"] == "booking" and item["status"] == "planned":
+                    item["status"] = "cancelled"
+                    self._save_schedule(item)
+                    changed.append(item)
+            verb = "spenta", "annullata", "annullate"
+        else:
+            for b in self.bookings.values():
+                if b["cancelled"] or any(s["booking_id"] == b["booking_id"] and s["kind"] == kind
+                                         and s["status"] in ("planned", "done") for s in self.schedule.values()):
+                    continue
+                if kind == "prearrival":
+                    run_at, mode, gone = b["checkin"] - timedelta(hours=rule["params"]["hours_before"]), "comfort", \
+                        b["checked_in"] or b["checked_out"]
+                else:
+                    run_at, mode, gone = b["checkout"] + timedelta(minutes=rule["params"]["minutes_after"]), "empty", \
+                        b["checked_out"]
+                if run_at > now and not gone:
+                    changed.append(self.add_schedule(run_at, {"type": "apartment_mode", "mode": mode}, kind, "booking",
+                                                     b["booking_id"]))
+            verb = "riaccesa", "riprogrammata", "riprogrammate"
+        if changed:
+            n = len(changed)
+            self.log(f"rule:{rule_id}", {"type": "schedule"}, "schedule_cancel" if not rule["enabled"] else "schedule_create",
+                     None, str(n), f"Regola «{rule['label']}» {verb[0]}: {n} {'azione' if n == 1 else 'azioni'} delle "
+                     f"prenotazioni {verb[1] if n == 1 else verb[2]}", "applied", correlation_id)
+            self.apartment_changed(correlation_id)
+
+    def _offline_rule_switched(self) -> None:
+        """P-90 S17: off, the waits running give nothing; on again, the devices already offline wait again (as D30 does
+        for the windows)."""
+        self.offline_watch.clear()
+        if self.rule("offline_alert")["enabled"]:
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                return                                       # no loop: the start arms them (D12)
+            for device_id, d in self.devices.items():
+                if not d["online"]:
+                    self._watch_offline(device_id, False)
+
     def _modes_outside_check(self, correlation_id: str | None = None) -> None:
         """1097 = a: a rule saved before the check (first values 24 and 25) with the modes' temperatures outside its
         limits, while on: one decision per episode, also across restarts; not refused nor corrected on its own. The
@@ -1055,7 +1106,8 @@ class ApartmentEngine:
         async def later():
             await asyncio.sleep(minutes * seconds_per_minute())
             device = self.devices.get(device_id)
-            if self.offline_watch.get(device_id) is episode and device and not device["online"]:
+            if (self.offline_watch.get(device_id) is episode and device and not device["online"]
+                    and self.rule("offline_alert")["enabled"]):          # P-90 S17: switched off meanwhile, nothing
                 self.log("rule:offline_alert", {"type": "device", "device_id": device_id}, "offline_alert", "online",
                          "offline", f"{device['label']} offline da oltre {fmt_num(minutes)} minuti", "informational",
                          str(uuid.uuid4()))
@@ -1227,16 +1279,15 @@ class ApartmentEngine:
         of the mode goes back to the mode: the boiler's intention again, its relay switched by the thermostat (at most one
         switch every THERMOSTAT_MIN_SWITCH_MINUTES); the climate by the comfort regulation, once its pause and the
         compressor's are over. One a person had turned on goes back as it was. A command meanwhile took it out of here
-        (create_command); during a hold nothing comes back, the hold wins. Each return is a decision."""
+        (create_command); during a hold nothing comes back, the hold wins, and the return waits for its end (P-90 S2:
+        before, the hold cleared it, and the boiler stayed off for the rest of the stay). Each return is a decision."""
         if not self.window_off:
             return
+        if self.hold:
+            return                                           # S2: kept, it comes back after the hold
         if self.window_open() and self.window_rule_active():
             return
         if time.monotonic() - self.windows_closed_at < seconds_per_minute():
-            return
-        if self.hold:
-            self.window_off = {}
-            self.store.put_meta("window_off", self.window_off)
             return
         wait = self.setting("THERMOSTAT_MIN_SWITCH_MINUTES") * seconds_per_minute()
         for device_id, entry in list(self.window_off.items()):
@@ -1382,7 +1433,8 @@ class ApartmentEngine:
             elif episode == "regolazione":
                 reasoning = (f"{device['label']}: sensore di temperatura mancante, regolazione automatica disattivata "
                              f"({problem})")
-            else:
+            else:                               # P-90 S18: its own action, the BFF's push «caldaia senza regolazione»
+                action = "heating_unregulated"
                 reasoning = f"{device['label']}: {problem}; segue il comando manuale senza regolazione"
         self.log("system", {"type": "device", "device_id": device_id}, action, None,
                  "problema" if episode else "ok", reasoning, "informational", str(uuid.uuid4()))
@@ -1644,6 +1696,19 @@ class ApartmentEngine:
                  f"{device['label']} non raggiungibile durante il passaggio a {mode}: {what}", "informational",
                  correlation_id)
 
+    def _mode_command_failed(self, cmd: dict) -> None:
+        """P-90 S3: a command of the current mode created and then failed or timed out (D16 covered only a device
+        unreachable before its command). The boiler takes the mode's intention anyway, an engine's value its relay
+        follows (regulate); a climate's command waits and goes again once (_mode_pending_send). Not when the mode
+        changed or a person commanded the device meanwhile."""
+        entry = self.mode_cmds.pop(cmd["command_id"], None)
+        if (entry is None or entry["retried"] or entry["mode"] != self.mode
+                or self.commanded_at.get(cmd["device_id"], float("-inf")) > entry["at"]
+                or cmd["device_id"] not in self.devices):
+            return
+        self._mode_wait(cmd["device_id"], entry["body"], entry["mode"], cmd["correlation_id"])
+        self.store.put_meta("mode_pending", {k: {"body": v["body"], "mode": v["mode"]} for k, v in self.mode_pending.items()})
+
     def _mode_pending_send(self) -> None:
         """D16: the waiting commands of the mode, for the devices reachable again; dropped when the mode changed or
         someone commanded the device meanwhile (D13's commanded_at)."""
@@ -1659,8 +1724,12 @@ class ApartmentEngine:
             self.mode_pending.pop(device_id, None)
             self._auto_climate = True
             try:
-                self.create_command(device_id, wait["body"], "system:engine", str(uuid.uuid4()), decision_actor="system",
-                                    reasoning=f"Modalità {self.mode}: {device['label']} di nuovo raggiungibile")
+                cmd = self.create_command(device_id, wait["body"], "system:engine", str(uuid.uuid4()),
+                                          decision_actor="system",
+                                          reasoning=f"Modalità {self.mode}: {device['label']} di nuovo raggiungibile")
+                if cmd:                                      # S3: a retry that fails is not tried again
+                    self.mode_cmds[cmd["command_id"]] = {"mode": self.mode, "body": copy.deepcopy(wait["body"]),
+                                                         "at": time.monotonic(), "retried": True}
             except MockError as exc:
                 logs.warn("waiting mode command not sent", apartment_id=self.apartment_id, device_id=device_id,
                           error=exc.error)
@@ -1691,6 +1760,7 @@ class ApartmentEngine:
         self._auto_climate = True
         self._frost_command = mode == "empty"
         self._mode_in_progress = mode
+        self.mode_cmds = {}                              # S3: the previous mode's commands that fail are not repeated
         try:
             self.mode_pending = {}                       # D16: a new mode replaces what the previous one left waiting
             sent: set[str] = set()
@@ -1701,6 +1771,8 @@ class ApartmentEngine:
                                               reasoning=f"Modalità {mode}" + (f"; {note}" if note else ""))
                     if cmd:
                         command_ids.append(cmd["command_id"])
+                        self.mode_cmds[cmd["command_id"]] = {"mode": mode, "body": copy.deepcopy(body),
+                                                             "at": time.monotonic(), "retried": False}
                     sent.add(device_id)
                 except MockError as exc:
                     if self._schedule_run:                     # D-219 (2): a command of a scheduled action not sent
@@ -1715,6 +1787,8 @@ class ApartmentEngine:
             self._auto_climate = False
             self._frost_command = False
             self._mode_in_progress = None
+        if mode != "empty":
+            self._close_empty_power_requests(correlation_id)      # P-90 S12
         # D-169: in comfort every climate is the regulation's until a person changes it; in eco and «casa vuota» none
         self.climate_by_mode = ({d["device_id"] for d in self.devices.values() if "climate" in d["capabilities"]}
                                 if mode == "comfort" else set())
@@ -2154,6 +2228,7 @@ class ApartmentEngine:
             self._set_status(cmd, "timeout", "no_confirmation")
             self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state), no_confirmation, "failed",
                      cmd["correlation_id"], command_id=cmd["command_id"])
+            self._mode_command_failed(cmd)
             return
         if result.outcome == "failed":
             logs.warn("command failed", apartment_id=self.apartment_id, reason=result.reason, detail=result.detail, **ids)
@@ -2163,6 +2238,7 @@ class ApartmentEngine:
                    "device_rejected": "Il dispositivo ha rifiutato il comando"}.get(reason, "Errore interno del collegamento")
             self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state), why, "failed",
                      cmd["correlation_id"], command_id=cmd["command_id"])
+            self._mode_command_failed(cmd)
             return
         # the simulated connector reports the new state through changes() before the outcome, so it is already here;
         # a connector may also confirm only in its result. "delivered" got here confirmed by the meter, or not to be
@@ -2175,6 +2251,7 @@ class ApartmentEngine:
                      f"Comando a {device['label'].lower()} non verificato: il misuratore «{meter['label']}» è offline",
                      "informational", cmd["correlation_id"], command_id=cmd["command_id"])
         self._settle(device, cap, new_state, reported, cmd["correlation_id"], heard=result.outcome == "confirmed")
+        self.mode_cmds.pop(cmd["command_id"], None)
         self._set_status(cmd, "acked")
         self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state), reasoning, "applied",
                  cmd["correlation_id"], command_id=cmd["command_id"])
@@ -2463,6 +2540,11 @@ class ApartmentEngine:
                  "applied", correlation_id)
         self._apply_limits(correlation_id, emit=True)       # D-174: the switch and the limits take effect now
         self._modes_outside_check(correlation_id)           # 1097 = a: the episode of a rule saved before ends here
+        for p in patches:
+            if p.get("rule_id") in BOOKING_RULES and "enabled" in p:
+                self._booking_rule_switched(p["rule_id"], correlation_id)     # P-90 S11
+        if any(p.get("rule_id") == "offline_alert" and "enabled" in p for p in patches):
+            self._offline_rule_switched()                                       # P-90 S17
         try:
             asyncio.get_running_loop()
             self._push_limits(correlation_id)                # 1097 = a: the climates the new limits cut, now
@@ -2595,7 +2677,12 @@ class ApartmentEngine:
         ids: list[str] = []
         moved_reset = False
         reset = False
-        if ev["type"] == "booking_cancelled":
+        extended = False
+        old_checkin = booking["checkin"]
+        if ev["type"] == "booking_cancelled" and booking["cancelled"]:
+            # P-90 S21: already cancelled (the same cancellation again, another id): acknowledged, nothing changes
+            reasoning = f"Prenotazione {bid} già cancellata: niente da fare"
+        elif ev["type"] == "booking_cancelled":
             booking["cancelled"] = True
             for s in items:
                 if s["status"] == "planned":
@@ -2632,6 +2719,20 @@ class ApartmentEngine:
                     existing["run_at"] = iso(run_at)
                     ids.append(existing["schedule_id"])
                     continue
+                if checkout <= now and (kind == "prearrival" or self.mode == "empty"):
+                    continue        # P-90 S21: a stay already over (received late): no warming, no «casa vuota» again
+                if done and kind == "checkout" and run_at > now and not booking["checked_out"]:
+                    # P-90 S5: a late check-out or one more night after the check-out action: planned again, and with
+                    # the guests in (the stay in course) the comfort back now, through the scheduler
+                    ids.append(self.add_schedule(run_at, {"type": "apartment_mode", "mode": mode}, kind, "booking",
+                                                 bid)["schedule_id"])
+                    if booking["checkin"] <= now and self.mode != "comfort":
+                        ids.append(self.add_schedule(now, {"type": "apartment_mode", "mode": "comfort"}, "prearrival",
+                                                     "booking", bid)["schedule_id"])
+                        extended = True
+                    continue
+                if done and kind == "prearrival" and checkin == old_checkin:
+                    continue        # P-90 S19: the arrival did not change (a prearrival moved by hand ran): nothing
                 if done and (run_at <= now or booking["checked_in"] or booking["checked_out"]):
                     continue        # D06 (P-83): already done for this booking, its time past or the guests in or gone
                 if done and kind == "prearrival" and not moved_reset and not self._booking_needs_comfort(bid):
@@ -2656,6 +2757,11 @@ class ApartmentEngine:
             self.log("system", {"type": "apartment"}, "booking_moved_reset", self.mode, "empty",
                      f"Arrivo della prenotazione {bid} spostato al {arrival}, dopo il pre-arrivo: appartamento rimesso a "
                      f"vuoto, si riscalda al nuovo pre-arrivo", "informational", correlation_id, emit=emit)
+        if extended:
+            departure = booking["checkout"].astimezone(ZoneInfo(self.timezone)).strftime("%d/%m %H:%M")
+            self.log("system", {"type": "apartment"}, "booking_extended_comfort", self.mode, "comfort",
+                     f"Partenza della prenotazione {bid} spostata al {departure}, dopo il check-out: appartamento "
+                     f"rimesso in comfort, check-out riprogrammato", "informational", correlation_id, emit=emit)
         if reset:   # its own decision, which the BFF turns into a push to the managers (D-121)
             self.log("system", {"type": "apartment"}, "booking_cancel_reset", self.mode, "empty",
                      f"Prenotazione {bid} annullata dopo il pre-arrivo: appartamento rimesso a vuoto", "informational",
@@ -2795,6 +2901,27 @@ class ApartmentEngine:
         return self._new_approval("rule", f"Spegnere {label.lower()}", reason,
                                   {"type": "device_command", "device_id": target["device_id"], "capability": cap,
                                    "action": "turn_off"}, self.setting("EMPTY_POWER_EXPIRED_ACTION"), correlation_id)
+
+    def _close_empty_power_requests(self, correlation_id: str | None) -> None:
+        """P-90 S12: the requests «Spegnere … con l'appartamento vuoto» (F2) lose their reason when the apartment is no
+        longer empty: the open one closes without running (status expired, with its decision), the queued ones go."""
+        def f2(a: dict) -> bool:
+            return a["source"] == "rule" and a["proposed_action"]["type"] == "device_command"
+        queued = [a for a in self.approval_queue if f2(a)]
+        if queued:
+            self.approval_queue = [a for a in self.approval_queue if not f2(a)]
+            self._save_queue()
+        closed = False
+        for a in self.approvals:
+            if a["status"] == "pending" and f2(a):
+                a["status"] = "expired"
+                self._save_approval(a)
+                self.log("system", self._approval_target(a), "expire", "pending", "expired",
+                         "Richiesta chiusa senza eseguire: l'appartamento non è più vuoto", "informational",
+                         correlation_id or str(uuid.uuid4()), approval_id=a["approval_id"])
+                closed = True
+        if closed:
+            self._dequeue_approval()
 
     def _watch_empty_power(self) -> None:
         """F2, at every tick: in an empty apartment and outside a hold, a meter above EMPTY_POWER_WATTS for
@@ -3356,6 +3483,15 @@ class ApartmentEngine:
                 self.log("system", {"type": "schedule"}, "schedule_deferred", item["run_at"], self.hold["until"],
                          f"{reasoning}: rimandata per la forzatura, si esegue alla sua fine (alle {until})",
                          "informational", corr)
+            return
+        rule_id = next((r for r, k in BOOKING_RULES.items() if k == item["kind"]), None)
+        if item["source"] == "booking" and rule_id and not self.rule(rule_id)["enabled"]:
+            # P-90 S11: its rule is off (the switch cancels them; this one was left, e.g. a rule saved off)
+            item.update(status="cancelled", executed_at=iso(now))
+            self._save_schedule(item)
+            self.log(f"rule:{rule_id}", {"type": "schedule"}, "schedule_cancel", item["run_at"], None,
+                     f"{reasoning}: annullata, la regola «{self.rule(rule_id)['label']}» è spenta", "applied", corr)
+            self.apartment_changed(corr)
             return
         if self.deferred.pop(item["schedule_id"], None) is not None:
             self.store.put_meta("deferred", self.deferred)

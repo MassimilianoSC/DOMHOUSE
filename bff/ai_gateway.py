@@ -128,7 +128,8 @@ def _alert_email(to: list[str], month: str, spent: float) -> EmailMessage:
     msg["To"] = ", ".join(to)
     msg.set_content(
         f"Nel mese {month} l'assistente ha speso {spent:.2f} € sui {s.ai_monthly_cap_eur:.2f} € del tetto del progetto.\n"
-        f"Al tetto l'assistente si ferma fino al mese prossimo e risponde «{CAP_MESSAGE}».\n")
+        f"Al tetto il modello dell'assistente non viene più chiamato fino al mese prossimo: alle domande risponde "
+        f"la risposta rapida, che capisce i comandi semplici (D-182).\n")
     return msg
 
 

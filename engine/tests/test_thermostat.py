@@ -122,14 +122,14 @@ def test_sensor_problems_are_decisions_and_the_relay_follows_the_intention():
         e.test_state({"device_id": SENSOR, "online": False}, ACTOR, CORR)
         await wait_min_switch()
         await regulate_and_wait(e)
-        issues = [d for d in e.decisions if d["action"] == "thermostat_sensor"]
+        issues = [d for d in e.decisions if d["action"] in SENSOR_ACTIONS]
         assert len(issues) == 1 and "non disponibile" in issues[0]["reasoning"]
         assert e.relay[BOILER] is True                                 # no reading: follows "enabled"
         await regulate_and_wait(e)
-        assert len([d for d in e.decisions if d["action"] == "thermostat_sensor"]) == 1   # once per problem
+        assert len([d for d in e.decisions if d["action"] in SENSOR_ACTIONS]) == 1   # once per problem
         e.test_state({"device_id": SENSOR, "online": True}, ACTOR, CORR)
         await regulate_and_wait(e)
-        back = [d for d in e.decisions if d["action"] == "thermostat_sensor"]
+        back = [d for d in e.decisions if d["action"] in SENSOR_ACTIONS]
         assert len(back) == 2 and "ripresa" in back[-1]["reasoning"]
     asyncio.run(main())
 
@@ -155,8 +155,12 @@ def test_the_intention_survives_a_restart(tmp_path):
 
 
 # -------- D-164: a boiler without a usable sensor never heats by itself --------
+# P-90 S18: the episode of a boiler commanded by hand (never by a mode) is heating_unregulated, the BFF's push
+SENSOR_ACTIONS = ("thermostat_sensor", "heating_unregulated")
+
+
 def _no_sensor_decisions(e):
-    return [d for d in e.decisions if d["action"] in ("thermostat_sensor", "frost_inactive")]
+    return [d for d in e.decisions if d["action"] in ("thermostat_sensor", "frost_inactive", "heating_unregulated")]
 
 
 def test_without_a_sensor_a_modes_intention_keeps_the_relay_off_a_persons_is_followed():
@@ -181,6 +185,7 @@ def test_without_a_sensor_a_modes_intention_keeps_the_relay_off_a_persons_is_fol
         await wait_min_switch()
         await regulate_and_wait(e)
         assert e.relay[BOILER] is True and "segue il comando manuale" in _no_sensor_decisions(e)[-1]["reasoning"]
+        assert _no_sensor_decisions(e)[-1]["action"] == "heating_unregulated"
     asyncio.run(main())
 
 

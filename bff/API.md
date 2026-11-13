@@ -429,20 +429,20 @@ La notifica la mostra il service worker della PWA, che ignora le chiavi in più.
 |---|---|---|
 | `title` | sempre | «<nome appartamento>: approvazione richiesta» / «…: dispositivo offline» / «…: sistema domotico non raggiungibile» / «…: prenotazione annullata, appartamento rimesso a vuoto» / «…: riepilogo della settimana» / «…: antigelo non attivo» / «…: azione programmata non eseguita» («…: azioni programmate non eseguite» se più d'una) |
 | `body` | sempre | testo breve, tagliato a 200 caratteri con «…» |
-| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking), `/a/<apartment_id>/riepiloghi/<week>` (summary), `/a/<apartment_id>/decisioni` (frost_inactive), `/a/<apartment_id>/programmazione` (schedule_failed) |
+| `link` | sempre | percorso relativo: `/a/<apartment_id>/approvazioni` (approval), `/a/<apartment_id>` (device_offline, instance_down), `/a/<apartment_id>/decisioni` (booking), `/a/<apartment_id>/riepiloghi/<week>` (summary), `/a/<apartment_id>/decisioni` (frost_inactive, heating_unregulated), `/a/<apartment_id>/programmazione` (schedule_failed) |
 | `tag` | sempre | `approval:<approval_id>`, `offline:<apartment_id>:<device_id>`, `instance:<apartment_id>`, `booking:<decision_id>`, `summary:<apartment_id>:<week>`, `frost:<apartment_id>:<device_id>`, `schedule:<apartment_id>:<decision_id della prima>` |
-| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` \| `summary` \| `frost_inactive` \| `schedule_failed` |
+| `kind` | sempre | `approval` \| `device_offline` \| `instance_down` \| `booking` \| `summary` \| `frost_inactive` \| `heating_unregulated` \| `schedule_failed` |
 | `apartment_id` | sempre | |
 | `approval_id` | solo `approval` | |
-| `device_id` | solo `device_offline` e `frost_inactive` | |
+| `device_id` | solo `device_offline`, `frost_inactive` e `heating_unregulated` | |
 | `ts` | se l'evento del motore lo porta | `ts` dell'evento, ISO 8601 UTC |
 
 `webpush.headers`: `Urgency: high` (`normal` per `summary`, che non è un allarme); `TTL` (secondi, stringa) `3600` per
-`approval`, `86400` per `device_offline`, `instance_down` e `booking`, `604800` (una settimana) per `summary`, `86400` per `frost_inactive` e `schedule_failed`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
+`approval`, `86400` per `device_offline`, `instance_down` e `booking`, `604800` (una settimana) per `summary`, `86400` per `frost_inactive`, `heating_unregulated` e `schedule_failed`. Il messaggio intero resta sotto i 4 kB (prova `test_body_cut_and_size_under_4kb`).
 
 Preferenze: `approval` ← `notification_prefs.approvals`; `device_offline` e `instance_down` ← `notification_prefs.offline`;
 `booking` ← `notification_prefs.bookings` («Prenotazioni», D-123, attiva di default anche per chi aveva già salvato le
-preferenze); `frost_inactive` ← `notification_prefs.offline` (D-164: caldaia senza sensore di temperatura utilizzabile a «casa vuota», l'antigelo non può agire; parte dalla decisione `frost_inactive`, una per episodio, il `body` è il suo testo); `summary` ← `notification_prefs.summary` («Riepilogo», D-150, attiva di default allo stesso modo).
+preferenze); `frost_inactive` ← `notification_prefs.offline` (D-164: caldaia senza sensore di temperatura utilizzabile a «casa vuota», l'antigelo non può agire; parte dalla decisione `frost_inactive`, una per episodio, il `body` è il suo testo); `heating_unregulated` ← `notification_prefs.offline` (P-90 S18: caldaia comandata a mano con il sensore mancante, segue il comando senza regolazione, D-164; titolo «<appartamento>: caldaia senza regolazione», il `body` è il testo della decisione `heating_unregulated`, una per episodio); `summary` ← `notification_prefs.summary` («Riepilogo», D-150, attiva di default allo stesso modo).
 `schedule_failed` (D-219) parte dalle decisioni `schedule_failed` (azione programmata rifiutata dal motore alla sua
 ora) e `schedule_missed` (saltata perché il motore era fermo all'ora prevista). Categoria dal tipo dell'azione in
 `new_value`: `prearrival`, `checkout`, `empty` ← `notification_prefs.bookings`; `manual`, l'assistente o un tipo che il
@@ -538,6 +538,12 @@ rifà quelli cambiati e, con FCM acceso, apre quelli mancanti. L'ultimo id di og
 (`stream_cursors`, scadenza 7 giorni): un'istanza nuova chiede al motore ciò che ha perso, e le prenotazioni fermano ciò che era già
 stato notificato. Se l'id salvato è più vecchio di un'ora, la finestra garantita dal contratto, gli eventi mancanti possono essere
 persi: nel log compare «stream resumes past the engine's window».
+
+Dal 13 novembre 2026 (P-90): «Esci da tutti i dispositivi» (`POST /app/me/revoke-sessions`) svuota anche i
+`push_tokens` della persona, così un telefono perso smette di ricevere notifiche (S7). L'attesa di `device_offline`
+non manda niente se l'appartamento risulta già fermo (`instance_down`, S14) o se nel frattempo la regola «Avviso
+dispositivo offline» è stata spenta; quando la regola cambia (decisione `update_rules` con `offline_alert`) i dispositivi
+già offline riprendono l'attesa (S17). Un nuovo collegamento dell'appartamento azzera `energy_since` (S15).
 
 ## Pseudonimo verso il motore e cancellazione (P-48, D-87)
 

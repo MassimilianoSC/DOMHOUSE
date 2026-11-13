@@ -45,8 +45,13 @@ async def patch_profile(body: ProfilePatch, identity: Identity = Depends(resolve
 @router.post("/revoke-sessions", status_code=204)
 async def revoke_sessions(identity: Identity = Depends(resolve_own_identity)):
     """Signs the person out everywhere (D-178: also a platform manager without an organisation): every refresh token is
-    revoked and current ID tokens are refused. One Firebase account for every environment: everywhere means everywhere."""
+    revoked and current ID tokens are refused. One Firebase account for every environment: everywhere means everywhere.
+    P-90 S7: also every push token of the person, so a lost phone stops showing apartments and approvals (the revoked
+    session does not invalidate a token for FCM, and the service worker shows a push without a session)."""
     await asyncio.to_thread(accounts.revoke_sessions, identity.uid)
+    if identity.user is not None:
+        await get_repository().update_user_if_present(
+            identity.user.uid, lambda cur: cur.model_copy(update={"push_tokens": []}))
 
 
 @router.delete("", status_code=204)

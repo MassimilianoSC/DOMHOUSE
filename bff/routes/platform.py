@@ -460,6 +460,8 @@ async def relink_tenant_apartment(tenant_id: str, apartment_id: str, body: Apart
             await instances.release_link(apt.instance_url, apt.port, apartment_id)   # undo the new link claim
         return err(409, "external_id_in_use", "Codice Italianway già in uso")
     apt.external_ids.italianway = new_code
+    if (apt.instance_url, apt.port) != (old_url, old_port):
+        apt.energy_since = None     # P-90 S15: another engine, another history: bff/energy_since.py looks for it again
     saved = await repo.upsert_apartment(apt)
     if link_changes:
         await instances.release_link(old_url, old_port, apartment_id)

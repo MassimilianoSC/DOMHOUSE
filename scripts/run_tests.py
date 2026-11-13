@@ -58,7 +58,7 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "tests/staging_targets_test.py", "tests/booking_order_test.py", "tests/booking_fields_test.py",
                 "tests/rule_recognizer_off_test.py", "tests/publish_resume_test.py", "tests/summary_known_features_test.py",
                 "tests/rules_feature_gate_test.py", "tests/atomic_writes_test.py", "tests/offline_push_retry_test.py",
-                "tests/webhook_signature_test.py",
+                "tests/webhook_signature_test.py", "tests/p90_scenari_test.py",
                 "engine/connector/tests/test_interface.py",
                 "engine/connector/shelly/tests/test_battery.py",
                 "engine/connector/shelly/tests/test_catalog.py",
@@ -95,7 +95,7 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "engine/tests/test_command_queued_state.py", "engine/tests/test_approved_after_its_time.py",
                 "engine/tests/test_question_text_not_kept.py", "engine/tests/test_schedule_partial.py",
                 "engine/tests/test_approval_values.py", "engine/tests/test_manual_mode_during_hold.py",
-                "engine/tests/test_limits_coherent.py"]
+                "engine/tests/test_limits_coherent.py", "engine/tests/test_p90_scenari.py"]
 SITE_SUITE = "sito"
 CONFORMANCE_SUITE = "conformita"
 CONFORMANCE_DIR = "contract/conformance"

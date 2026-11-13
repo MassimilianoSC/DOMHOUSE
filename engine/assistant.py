@@ -88,6 +88,7 @@ Ogni azione ha una di queste forme:
 {{"tipo": "programma", "quando": "<data e ora locale AAAA-MM-GGTHH:MM:SS>", "modalita": "comfort" | "eco" | "empty"}}
 {{"tipo": "programma", "quando": "<data e ora locale>", e device_id, capability, action, params come in un comando}}
 Nessun campo con valore null.
+Per accendere un clima o una caldaia spenti includi "on": true.
 Per una domanda senza azioni, «azioni» è vuoto."""
 
 
@@ -563,11 +564,19 @@ class Assistant:
         cap, action, params = e.validate_command(device, body)
         target = e.target_state(device, cap, action, params)
         label = device["label"].lower()
-        if not target.get("on"):
+        if not target.get("on") and self._switches_off(device, cap, action, params):
             return f"spegnere {label}"
         if cap in ("climate", "heating") and target.get("setpoint") is not None:
             return f"{label} a {target['setpoint']:g} °C"
         return f"accendere {label}"
+
+    @staticmethod
+    def _switches_off(device: dict, cap: str, action: str, params: dict, now: bool = True) -> bool:
+        """P-90 S13: a command switches a device off when it says so (turn_off, "on": false) or, `now`, when the device
+        is on and stays off after it; a setpoint alone on a device that is off leaves it off, it switches nothing."""
+        if action == "turn_off" or params.get("on") is False:
+            return True
+        return now and bool(device["capabilities"].get(cap, {}).get("on")) and params.get("on") is not True
 
     def _guests_at(self, p: dict) -> bool:
         """Guests in at a scheduled action's time (by the calendar)."""
@@ -603,7 +612,7 @@ class Assistant:
         if not device:
             return False
         cap, action, params = self.e.validate_command(device, a)
-        return cap in ("climate", "heating") and not self.e.target_state(device, cap, action, params).get("on")
+        return cap in ("climate", "heating") and self._switches_off(device, cap, action, params, now=False)
 
     def needs_approval(self, p: dict, together: bool) -> bool:
         """D-132 point 2: with guests in, the guest's comfort (switching off a climate or a boiler, the mode); and any
@@ -626,7 +635,8 @@ class Assistant:
             return True
         device = self.e.devices[p["device_id"]]
         cap, action, params = self.e.validate_command(device, p["body"])
-        return cap in ("climate", "heating") and not self.e.target_state(device, cap, action, params).get("on")
+        return (cap in ("climate", "heating") and bool(device["capabilities"][cap].get("on"))      # P-90 S13: on now
+                and not self.e.target_state(device, cap, action, params).get("on"))
 
     async def apply(self, proposals: list[dict], ask: dict, actor: str, until: float | None = None) -> list[str]:
         """Runs the proposals; waits for the commands' outcome at most ACK_WAIT_S and never beyond `until` (C-10: a
@@ -689,7 +699,7 @@ class Assistant:
             if status == "acked":
                 lines.append(f"Fatto: {what}.")
             elif status in FINAL:
-                lines.append(f"Non riuscito: {what} ({e.commands[command_id].get('reason') or status}).")
+                lines.append(f"Non riuscito: {what} ({e._command_failure(e.commands[command_id])}).")   # P-90 T6
             else:
                 lines.append(f"Comando inviato: {what}, l'esito arriva nell'app.")
         return lines
