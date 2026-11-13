@@ -495,3 +495,45 @@ def test_s6_a_window_contact_offline_while_open_counts_as_closed(fast):
     assert (d["actor"], d["target"]) == ("rule:window_open_off", {"type": "device", "device_id": WINDOW})
     assert d["reasoning"] == ("Finestra camera senza segnale mentre era aperta: considerata chiusa per la regola "
                               "«Finestra aperta spegne il clima» finché non torna raggiungibile")
+
+
+# -------- S10 (answer 1103 = a) --------
+def manual_eco_with_guests(monkeypatch, mode="eco", guests=True):
+    """bk-a in course (checked in) and in comfort; at T0 + 1 day an action «mode» set by hand in Programmazione."""
+    e, ci, co = booked(monkeypatch)
+    at(monkeypatch, T0)
+    tick(e)
+    if guests:
+        at(monkeypatch, ci + timedelta(minutes=10))
+        ev(e, "bk-a", "checkin", ci, co, 2)
+    else:
+        ev(e, "bk-a", "booking_cancelled", ci, co, 2)
+        tick(e)
+        in_loop(e.set_mode, "comfort", ACTOR, CORR, "Gestore", by_hand=True)
+    when = T0 + timedelta(days=1)
+    in_loop(e.create_schedule, {"run_at": core.iso(when), "action": {"type": "apartment_mode", "mode": mode}}, ACTOR, CORR)
+    at(monkeypatch, when + timedelta(seconds=1))
+    tick(e)
+    return e, when
+
+
+@pytest.mark.parametrize("mode, name", [("eco", "eco"), ("empty", "casa vuota")])
+def test_s10_a_manual_eco_or_empty_with_guests_in_asks_first(monkeypatch, mode, name):
+    e, when = manual_eco_with_guests(monkeypatch, mode)
+    assert e.mode == "comfort"
+    a = e.pending_approval()
+    assert a["description"] == f"Passare alla modalità {name} con ospiti in casa"
+    assert a["reason"] == ("Azione programmata a mano per le 14:00 del 03/11: alla sua ora c'è una prenotazione in corso, "
+                           "gli ospiti potrebbero essere in casa")
+    assert a["proposed_action"] == {"type": "apartment_mode", "mode": mode} and a["expires_action"] == "reject"
+    assert a["source"] == "rule"
+    d = [d for d in e.decisions if d.get("approval_id") == a["approval_id"]][-1]
+    assert (d["actor"], d["outcome"]) == ("system", "pending_approval")
+    at(monkeypatch, core.parse_dt(a["expires_at"]) + timedelta(seconds=1))
+    tick(e)
+    assert a["status"] == "expired" and e.mode == "comfort"            # no answer: rejected, the guests stay warm
+
+
+def test_s10_without_guests_it_runs_as_before(monkeypatch):
+    e, when = manual_eco_with_guests(monkeypatch, "eco", guests=False)
+    assert e.mode == "eco" and e.pending_approval() is None

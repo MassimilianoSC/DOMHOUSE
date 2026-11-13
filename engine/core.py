@@ -2941,7 +2941,8 @@ class ApartmentEngine:
         """Who asks, in the Decisions: the assistant, the check-out rule (F1), the engine (F2, no rule of its own)."""
         if approval["source"] == "assistant":
             return "assistant"
-        return "rule:checkout_eco" if approval["proposed_action"]["type"] == "apartment_mode" else "system"
+        # P-90 S10: a mode asked because of a manual action that found guests in is the engine's, not checkout_eco's
+        return "rule:checkout_eco" if approval["description"] == CHECKOUT_APPROVAL else "system"
 
     # ---- approvals from real sources (P-60 step 8, D-137) ------------------------------------------------------
     def _power_target(self, meter: dict) -> dict | None:
@@ -3566,6 +3567,18 @@ class ApartmentEngine:
         if (item["kind"] == "checkout" and act["type"] == "apartment_mode" and act.get("mode") == "empty"
                 and self._checkout_keeps_comfort(item["booking_id"], corr)):
             item.update(status="done", command_ids=[], executed_at=iso(now))   # D05: the next guest keeps the warmth
+            self._save_schedule(item)
+            self.apartment_changed(corr)
+            return
+        if (item["source"] == "manual" and act["type"] == "apartment_mode" and act.get("mode") in ("eco", "empty")
+                and self.guests_in()):
+            # P-90 S10 (answer 1103 = a): set by hand in Programmazione, it finds guests in: the manager decides, like
+            # F1; no answer = rejected, the guests stay as they are
+            at = parse_dt(item["run_at"]).astimezone(ZoneInfo(self.timezone)).strftime("%H:%M del %d/%m")
+            self._new_approval("rule", f"Passare alla modalità {'casa vuota' if act['mode'] == 'empty' else act['mode']} con ospiti in casa",
+                               f"Azione programmata a mano per le {at}: alla sua ora c'è una prenotazione in corso, gli "
+                               f"ospiti potrebbero essere in casa", dict(act), "reject", corr)
+            item.update(status="done", command_ids=[], executed_at=iso(now))
             self._save_schedule(item)
             self.apartment_changed(corr)
             return
