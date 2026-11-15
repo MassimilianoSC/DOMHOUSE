@@ -33,8 +33,14 @@ STUBS = {
     "id": '#!/usr/bin/env bash\necho 0\n',
     "sleep": '#!/usr/bin/env bash\nexit 0\n',
     # docker inspect answers the state written in state-<container> (lot 39: the watch and start-all read it)
-    "docker": ('#!/usr/bin/env bash\necho "$* [ENGINE_BIND_IP=${ENGINE_BIND_IP:-}]" >> "$STUB_DIR/docker.log"\n'
-               'if [ "$1" = inspect ]; then cat "$STUB_DIR/state-${!#}" 2>/dev/null; fi\nexit 0\n'),
+    "docker": ('#!/usr/bin/env bash\necho "$* [ENGINE_BIND_IP=${ENGINE_BIND_IP:-}] [ENGINE_MEM_LIMIT=${ENGINE_MEM_LIMIT:-}]" >> "$STUB_DIR/docker.log"\n'
+               'if [ "$1" = inspect ]; then cat "$STUB_DIR/state-${!#}" 2>/dev/null; fi\n'
+               # E-31: the hourly probe of the metadata server from a container; open only if the test says so
+               'if [ "$1" = run ]; then [ -f "$STUB_DIR/metadata-open" ] && { echo OPEN; exit 0; }; exit 1; fi\nexit 0\n'),
+    # E-31: nft keeps what it is given with -f; «list table» fails when the test put a file "no-metadata-table"
+    "nft": ('#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/nft.log"\n'
+            'if [ "$1" = -f ]; then cat "$2" >> "$STUB_DIR/nft-applied"; exit 0; fi\n'
+            'if [ "$1" = list ] && [ -f "$STUB_DIR/no-metadata-table" ]; then exit 1; fi\nexit 0\n'),
     # flock: refuses (as flock -n would) when the test put a file "locked"
     "flock": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/flock.log"\n[ ! -f "$STUB_DIR/locked" ]\n',
     "ip": '#!/usr/bin/env bash\ncat "$STUB_DIR/addresses" 2>/dev/null\nexit 0\n',
@@ -97,6 +103,7 @@ def vm(tmp_path):
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}" {env} '
                f'DOMHOUSE_ETC="{posix(etc)}" DOMHOUSE_OPT="{posix(opt)}" DOMHOUSE_HEALTH_TRIES=2 '
                f'DOMHOUSE_DATA="{posix(data)}" DOMHOUSE_SYSTEMD="{posix(units)}" DOMHOUSE_BIND_IP="{bind}" '
+               f'DOMHOUSE_JOURNALD_DIR="{posix(tmp_path / "journald")}" '
                f'DOMHOUSE_OPS_CONFIG="{posix(tmp_path / "ops" / "config.yaml")}" DOMHOUSE_MEMINFO="{posix(tmp_path / "meminfo")}"; '
                f'bash "{posix(SCRIPT)}" ' + " ".join(f"'{a}'" for a in args))
         return subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=60)
@@ -343,6 +350,77 @@ def test_backup_refuses_a_wal_file_that_is_a_link(vm):
     r = vm("backup", APT)
     assert r.returncode != 0
     assert "backup refused" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+
+
+def test_metadata_block_drops_the_metadata_server_from_every_docker_network(vm):
+    """E-31: every container reached the metadata server, and so the VM's token. The block is a table of its own,
+    on the forward hook (the traffic of every Docker network, docker0 and the Compose bridges), by destination;
+    the host's own processes (output hook) still reach it."""
+    r = vm("metadata-block")
+    assert r.returncode == 0, r.stderr
+    rules = (vm.stubs / "nft-applied").read_text(encoding="utf-8")
+    assert "table inet domhouse_metadata" in rules and "hook forward" in rules
+    assert "ip daddr 169.254.169.254" in rules and "drop" in rules
+    assert "ip6 daddr fd20:ce::254" in rules                       # the metadata server's IPv6 address, if any
+    assert "iifname" not in rules                                   # by destination, not by interface
+
+
+def test_timers_install_the_metadata_block_before_docker_and_a_journal_limit(vm):
+    r = vm("timers")
+    assert r.returncode == 0, r.stderr
+    unit = (vm.units / "domhouse-metadata-block.service").read_text(encoding="utf-8")
+    assert "Before=docker.service" in unit and "engine-vm.sh metadata-block" in unit
+    assert "enable domhouse-metadata-block.service" in (vm.stubs / "systemctl.log").read_text(encoding="utf-8")
+    journald = (vm.units.parent / "journald" / "domhouse.conf").read_text(encoding="utf-8")
+    assert "SystemMaxUse=500M" in journald
+
+
+def test_the_watch_puts_the_metadata_block_back_when_it_is_missing(vm):
+    (vm.stubs / "no-metadata-table").write_text("", encoding="utf-8")
+    vm("check-all")
+    assert "metadata block restored" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert "table inet domhouse_metadata" in (vm.stubs / "nft-applied").read_text(encoding="utf-8")
+
+
+def test_the_hourly_probe_from_an_engines_network_says_if_the_metadata_server_answers(vm):
+    vm("check-all")
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert "metadata blocked" in syslog and "metadata OPEN" not in syslog
+    docker = (vm.stubs / "docker.log").read_text(encoding="utf-8")
+    assert f"--network domhouse-{APT}_default" in docker and "169.254.169.254" in docker
+    (vm.stubs / "metadata-open").write_text("", encoding="utf-8")
+    (vm.opt / ".metadata-checked").unlink()                       # the next hour
+    vm("check-all")
+    assert "metadata OPEN" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+
+
+def test_engines_get_a_memory_limit_lower_for_the_test_ones(vm):
+    """Limits (decision 1128): staging engines (dev, lab-, test-) 120 MB each, four under 500 MB; the others 256 MB;
+    a line ENGINE_MEM_LIMIT in the apartment's settings wins."""
+    assert vm("set", APT, "CONFIRM_ON_WATTS=30").returncode == 0
+    assert "[ENGINE_MEM_LIMIT=256m]" in (vm.stubs / "docker.log").read_text(encoding="utf-8")
+    lab = vm.opt / "lab-02.settings"
+    lab.write_text("APARTMENT_ID=lab-02\nPORT=8150\nCONNECTOR=shelly\nENGINE_IMAGE=x:1\n", encoding="utf-8", newline="\n")
+    (vm.stubs / "docker.log").unlink()
+    assert vm("limits", "lab-02").returncode == 0
+    update = (vm.stubs / "docker.log").read_text(encoding="utf-8")
+    assert "update --memory 120m --memory-swap 120m --cpus 1.0 --pids-limit 128 engine-lab-02" in update
+
+
+def test_compose_files_carry_the_limits():
+    compose = (ROOT / "engine" / "compose.yaml").read_text(encoding="utf-8")
+    for line in ("mem_limit: ${ENGINE_MEM_LIMIT", "memswap_limit: ${ENGINE_MEM_LIMIT", "cpus: ${ENGINE_CPUS",
+                 "pids_limit: ${ENGINE_PIDS_LIMIT", "cap_drop: [ALL]", "no-new-privileges:true"):
+        assert line in compose, line
+    broker = (ROOT / "engine" / "broker" / "compose.yaml").read_text(encoding="utf-8")
+    assert "cpus: 1.0" in broker and "pids_limit: 256" in broker
+
+
+def test_the_watch_writes_the_data_size_of_each_apartment_once_an_hour(vm):
+    _engine_db(vm.data / APT / "engine.db", "dati")
+    vm("check-all", env="DOMHOUSE_DATA_ALERT_MB=0")
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert f"data {APT} mb=" in syslog and f"data large {APT}" in syslog
 
 
 def _connector(vm, name):

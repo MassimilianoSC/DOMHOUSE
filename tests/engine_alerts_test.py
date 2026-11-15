@@ -26,10 +26,12 @@ def regex_of(flt: str) -> str:
     return re.search(r'=~"((?:[^"\\]|\\.)*)"', flt).group(1).replace("\\\\", "\\")
 
 
-def test_eight_policies_on_the_bff_channel():
+def test_twelve_policies_on_the_bff_channel():
     found = policies()
     assert set(found) == {"vm-muta.json", "motore-muto.json", "motore-errori.json", "backup-mancato.json", "disco-vm.json",
-                          "broker-giu.json", "broker-certificato.json", "broker-accessi-rifiutati.json"}
+                          "broker-giu.json", "broker-certificato.json", "broker-accessi-rifiutati.json",
+                          "metadati-aperti.json", "broker-rinnovo-fallito.json", "broker-sync-tenuto.json",
+                          "dati-appartamento.json"}
     for name, p in found.items():
         assert p["displayName"].startswith("Motori: ") and p["notificationChannels"] == ["__CHANNEL__"], name
         assert p["severity"] in ("CRITICAL", "ERROR", "WARNING") and p["documentation"]["content"], name
@@ -74,6 +76,29 @@ def test_the_filters_match_the_watchs_real_lines(tag):
     assert not re.search(regex_of(refused), f"{HOST}{tag}broker ok cert_days=60")
     errors = found["motore-errori.json"]["conditions"][0]["conditionMatchedLog"]
     assert 'log_id("domhouse_engine")' in errors["filter"] and 'jsonPayload.level="error"' in errors["filter"]
+
+
+NEW_POLICIES = {   # E-31, E-33, the certificate's renewal and the data of an apartment (15 November)
+    "metadati-aperti.json": ("metadata OPEN", "metadata blocked"),
+    "broker-rinnovo-fallito.json": ("broker cert renew failed (mqtt.dh-lab.eu)", "broker cert new notAfter=Jan  1 00:00:00 2027 GMT"),
+    "broker-sync-tenuto.json": ("broker sync kept lab-01", "broker ok cert_days=60"),
+    "dati-appartamento.json": ("data large lab-01 mb=612", "data lab-01 mb=12"),
+}
+
+
+@pytest.mark.parametrize("tag", ["domhouse-check: ", "domhouse-check[4242]: "])
+def test_the_new_policies_match_their_lines_and_say_what_to_do(tag):
+    found = policies()
+    for name, (alarm, quiet) in NEW_POLICIES.items():
+        assert name in found, name
+        p = found[name]
+        assert p["displayName"].startswith("Motori: ") and p["notificationChannels"] == ["__CHANNEL__"], name
+        flt = p["conditions"][0]["conditionMatchedLog"]["filter"]
+        assert re.search(regex_of(flt), f"{HOST}{tag}{alarm}"), name
+        assert not re.search(regex_of(flt), f"{HOST}{tag}{quiet}"), name
+    renew = found["broker-rinnovo-fallito.json"]["documentation"]["content"]
+    assert "docs/procedura-permesso-dns.md" in renew and "D4" in renew      # decision 1128: put the DNS permission back
+    assert "E-31" in found["metadati-aperti.json"]["documentation"]["content"]
 
 
 GCLOUD = r'''#!/usr/bin/env bash
