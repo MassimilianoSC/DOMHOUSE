@@ -2,7 +2,7 @@
 
 *Aggiornato il 13 novembre 2026, di Youssouf. La prima versione (20–21 ottobre) confrontava due trasporti, MQTT e
 WebSocket; quella del 10 novembre fissava la scelta di MQTT e le prove con la Plug. Questa descrive il connector
-com'è oggi in `main`, con i modelli Gen4 e i sensori BLU, più i seguiti della pull request #10 (segnati con «#10»).*
+com'è oggi in `main`, con i modelli Gen4 e i sensori BLU.*
 
 Dove guardare per il resto:
 - **il contratto fra motore e connector**: `engine/connector/connector-v2.md` (i rimandi «§» sono a quel file);
@@ -93,11 +93,17 @@ devices:
 ### 3.3 Online, offline e fotografia
 
 - **Dispositivi alimentati**: l'offline arriva dal broker (ultima volontà, 30–90 s dopo la caduta con il keep-alive di
-  60 s); il silenzio oltre la soglia (120 s) è la rete di sicurezza. A ogni ritorno online il connector chiede
-  `Shelly.GetStatus` per la fotografia del §2.6; se fallisce, ritenta a ogni controllo del silenzio.
+  60 s); il silenzio oltre la soglia (120 s) è la rete di sicurezza.
+- **A ogni ritorno online**, in quest'ordine:
+  1. `Shelly.GetDeviceInfo` per controllare il modello. Se non è quello del catalogo il dispositivo torna offline,
+     la fotografia non viene chiesta e le sue notifiche sono ignorate fino alla connessione successiva. Se il
+     controllo non riesce (timeout) si va avanti con il profilo del catalogo e si riprova alla connessione dopo.
+  2. `Shelly.GetStatus` per la fotografia del §2.6. Se fallisce il dispositivo resta online e la lettura si ritenta a
+     ogni controllo del silenzio, finché riesce o finché arriva una `NotifyFullStatus`, che vale come fotografia.
+  3. Solo per un ponte con sensori nel catalogo: `Shelly.GetComponents` (§3.4).
 - **Sensori BLU**: offline subito insieme al loro ponte. Con il ponte online conta l'ultimo pacchetto ricevuto, fra
-  tutti i componenti del sensore, contro la soglia del tipo. Un sensore mai sentito resta offline fino al primo
-  pacchetto: nessuno stato inventato.
+  i componenti del sensore **che non sono in errore** (§3.4), contro la soglia del tipo. Un sensore mai sentito
+  resta offline fino al primo pacchetto: nessuno stato inventato.
 - **Soglie** (`offline_thresholds.toml`): regola «tre beacon persi più 20 s» con i ritmi misurati. Contatto 920 s,
   Motion 2720 s; H&T 300 s, più larga della regola perché è il sensore che regola il riscaldamento.
 
@@ -112,18 +118,57 @@ devices:
   meglio nessuno stato che lo stato di un altro sensore.
 - Inclinazione e livello di luce sono ignorati: non sono fra le otto capacità.
 - **Sensore che il ponte non decodifica**: il ponte riporta `errors` sul `bthomedevice` e continua ad aggiornarne
-  l'ora. Un componente in errore non conta come pacchetto: il sensore va offline alla soglia, con un warn. Finché
-  l'errore dura la mappa viene riletta, al massimo ogni 5 minuti per ponte (#10; prima a ogni controllo).
+  l'ora. Un componente in errore non conta come pacchetto: il sensore va offline alla soglia, con un warn.
+- **Rilettura per errori**: finché un sensore **del catalogo** è in errore, la mappa del suo ponte viene riletta,
+  perché il ritorno potrebbe non essere mai notificato. Al massimo una volta ogni 5 minuti per ponte, contati
+  dall'ultima lettura della mappa di qualunque tipo (connessione, abbinamento, errori). Avviene a un controllo del
+  silenzio, con il ponte online. Se la rilettura fallisce, la mappa di prima resta e si riprova alla scadenza
+  successiva. I sensori fuori catalogo in errore non fanno rileggere niente.
 
 ### 3.5 Orologi e `ts`
 
-- Il `ts` di uno `StateChange` è l'ora del dispositivo quando dista meno di 300 s dalla nostra, altrimenti l'ora di
-  ricezione. **Mai oltre l'ora di ricezione** (uno Shelly con l'orologio avanti sposterebbe i consumi nel giorno
-  sbagliato) e **mai all'indietro** nel flusso, nemmeno fra dispositivi diversi.
-- **L'età di un pacchetto BLU si conta sull'orologio del ponte**, che è quello che scrive `last_updated_ts`. Il
-  connector tiene per ogni ponte lo scarto fra il suo orologio e il nostro, preso solo da `sys.unixtime` e dalle
-  notifiche con componenti BLU. Lo scarto si azzera quando il ponte cade; uno scarto oltre un giorno è ignorato
-  (#10; prima lo scarto veniva dal `ts` di qualunque notifica e sopravviveva alla caduta).
+**Il `ts` di uno `StateChange`**, secondo da dove viene:
+
+| Origine | `ts` |
+|---|---|
+| Notifica di uno Shelly alimentato (`NotifyStatus`, `NotifyFullStatus`) | l'ora del dispositivo se dista meno di 300 s dalla nostra, altrimenti l'ora di ricezione |
+| Fotografia da `Shelly.GetStatus` | l'ora di ricezione della risposta |
+| Pacchetto di un sensore BLU | `last_updated_ts` riportato sul nostro orologio con lo scarto del ponte (sotto). La regola dei 300 s **non** vale: un pacchetto vecchio resta vecchio. Solo un valore nel futuro diventa l'ora di ricezione |
+
+Per tutti: **mai oltre l'ora di ricezione** (uno Shelly con l'orologio avanti sposterebbe i consumi nel giorno
+sbagliato) e **mai all'indietro** nel flusso, nemmeno fra dispositivi diversi. Quando le due regole si scontrano
+vince la seconda.
+
+**L'età di un pacchetto BLU si conta sull'orologio del ponte**, che è quello che scrive `last_updated_ts`. Il
+connector tiene per ogni ponte lo scarto fra il suo orologio e il nostro.
+
+- **Da dove si prende lo scarto**, e solo da qui:
+  - `sys.unixtime` di `Shelly.GetStatus`, che si legge alla connessione, al nuovo tentativo dopo una lettura fallita
+    e per confermare un candidato (sotto). Non a intervalli;
+  - il `ts` di una `NotifyStatus` che porta componenti BLU. Non le `NotifyFullStatus` né le `NotifyEvent`, e non le
+    altre notifiche del ponte: l'EM Mini manda la potenza con il `ts` ~13,5 s indietro.
+- **Scarto entro 300 s**: adottato subito. Sotto i 2 s conta come zero.
+- **Scarto oltre 300 s**: è un **candidato**, non viene adottato. Lo diventa solo se una fonte successiva, almeno
+  5 minuti dopo, dà lo stesso valore entro 5 s; allora esce il warn `bridge clock off`. Se in quei 5 minuti non
+  arrivano pacchetti, al controllo del silenzio il connector rilegge `Shelly.GetStatus`. Una fonte con uno scarto
+  diverso fa ripartire l'attesa; una con uno scarto entro 300 s cancella il candidato.
+- **Mentre un candidato aspetta** vale lo scarto adottato prima, se c'era; altrimenti nessuno, cioè il nostro
+  orologio. Il candidato non serve mai a datare né a calcolare un'età.
+- **Scarto oltre un giorno**: ignorato, con il warn `bridge clock implausible`. Resta lo scarto di prima, se c'era.
+- **Quando il ponte cade** scarto, candidato e avvisi si azzerano. Una notifica arrivata dopo la caduta non li
+  reimposta.
+
+**Dopo un riavvio del ponte.** Lo Shelly riparte con l'orologio sbagliato finché non si sincronizza (al banco la
+prima `NotifyFullStatus` dello Shelly 1 Gen4 era fuori di ~1750 s). Quello scarto resta un candidato: con la
+riconnessione il connector usa il nostro orologio, senza riconnessione lo scarto di prima. Un sensore che taceva
+da tempo resta offline. Il prezzo: un sensore vivo può risultare offline per qualche minuto dopo il riavvio, e un
+ponte con l'orologio stabilmente sbagliato tiene i suoi sensori offline per i 5 minuti della conferma.
+
+**Limiti noti**
+- Se dopo un riavvio l'orologio resta sbagliato per più di 5 minuti, lo scarto viene confermato e adottato. Quanto
+  dura davvero va misurato al banco (§5 punto 2).
+- Dopo una correzione dell'orologio del ponte lo scarto resta quello vecchio fino al prossimo pacchetto BLU: con il
+  solo Motion o il contatto, anche molti minuti. Pesa solo su una lettura della mappa che capiti in mezzo.
 
 ## 4. Verificato in laboratorio
 
