@@ -89,7 +89,80 @@ def test_editing_the_devices_secret():
         ba.edit_devices("remove", "altro", text)
 
 
-def test_sync_changes_nothing_if_a_secret_cannot_be_read(tmp_path, monkeypatch, capsys):
+def _secrets_get(readable: dict[str, str]):
+    """A stand-in for the VM's calls: the token, the project, and the secrets in `readable` (name -> text); any other
+    secret answers 404, as a missing secret or one without a version does."""
+    import base64
+
+    def get(url, headers):
+        if url.endswith("/token"):
+            return b'{"access_token": "t"}'
+        if url.endswith("/project-id"):
+            return b"p"
+        name = url.split("/secrets/")[1].split("/")[0]
+        if name not in readable:
+            raise OSError("404")
+        return json.dumps({"payload": {"data": base64.b64encode(readable[name].encode()).decode()}}).encode()
+    return get
+
+
+def test_sync_keeps_the_accounts_of_an_unreadable_apartment_and_updates_the_others(tmp_path, monkeypatch, capsys):
+    """E-33: a secret of one apartment that cannot be read (missing, without a version, malformed) used to stop the
+    sync of every apartment: no new device, no rotation, no revocation anywhere. Now that apartment keeps the lines it
+    had, the others are updated, and a line «kept <apartment_id>» says which one (broker-vm.sh makes it an alert)."""
+    auth = tmp_path / "auth"
+    auth.mkdir()
+    list_file = tmp_path / "apartments"
+    list_file.write_text("apt-a\napt-b\n", encoding="utf-8")
+    (auth / "connectors.passwd").write_text("apt-a.connector:$7$1000$aa$bb\napt-b.connector:$7$1000$cc$dd\n",
+                                            encoding="utf-8")
+    (auth / "devices.passwd").write_text("apt-a.d1:$7$1000$x$y\napt-b.d9:$7$1000$p$q\n", encoding="utf-8")
+    monkeypatch.setattr(ba, "_get", _secrets_get({"langbrain-shelly-apt-a": PASSWORD,
+                                                  "langbrain-shelly-apt-a-devices": json.dumps({"d2": PASSWORD})}))
+    assert ba.main(["sync", str(list_file), str(auth)]) == 0
+    out = capsys.readouterr()
+    assert "kept apt-b" in out.out.splitlines() and "changed" == out.out.splitlines()[-1]
+    assert "langbrain-shelly-apt-b" in out.err and PASSWORD not in out.out + out.err
+    devices = (auth / "devices.passwd").read_text(encoding="utf-8")
+    assert "apt-b.d9:$7$1000$p$q\n" in devices                     # apt-b: its line as it was
+    assert "apt-a.d1:" not in devices and ba.hash_matches(ba.read_passwd(auth / "devices.passwd")["apt-a.d2"], PASSWORD)
+    connectors = ba.read_passwd(auth / "connectors.passwd")
+    assert connectors["apt-b.connector"] == "$7$1000$cc$dd" and ba.hash_matches(connectors["apt-a.connector"], PASSWORD)
+    acl = (auth / "devices.acl").read_text(encoding="utf-8")
+    assert "user apt-b.d9\ntopic readwrite apt-b/d9/#\n" in acl and "user apt-a.d2\ntopic readwrite apt-a/d2/#\n" in acl
+    assert "user apt-b.connector\ntopic readwrite apt-b/#\n" in (auth / "connectors.acl").read_text(encoding="utf-8")
+
+
+def test_sync_of_a_single_unreadable_apartment_keeps_its_accounts(tmp_path, monkeypatch, capsys):
+    """The case of today, with lab-01 only: its secret unreadable, its devices keep entering the broker."""
+    auth = tmp_path / "auth"
+    auth.mkdir()
+    list_file = tmp_path / "apartments"
+    list_file.write_text("apt-a\n", encoding="utf-8")
+    (auth / "connectors.passwd").write_text("apt-a.connector:$7$1000$aa$bb\n", encoding="utf-8")
+    (auth / "devices.passwd").write_text("apt-a.d1:$7$1000$x$y\n", encoding="utf-8")
+    monkeypatch.setattr(ba, "_get", _secrets_get({}))
+    assert ba.main(["sync", str(list_file), str(auth)]) == 0
+    assert "kept apt-a" in capsys.readouterr().out.splitlines()
+    assert (auth / "devices.passwd").read_text(encoding="utf-8") == "apt-a.d1:$7$1000$x$y\n"
+    assert (auth / "devices.acl").read_text(encoding="utf-8") == "user apt-a.d1\ntopic readwrite apt-a/d1/#\n\n"
+
+
+def test_sync_keeps_an_apartment_whose_devices_secret_is_malformed(tmp_path, monkeypatch, capsys):
+    auth = tmp_path / "auth"
+    auth.mkdir()
+    list_file = tmp_path / "apartments"
+    list_file.write_text("apt-a\n", encoding="utf-8")
+    (auth / "devices.passwd").write_text("apt-a.d1:$7$1000$x$y\n", encoding="utf-8")
+    monkeypatch.setattr(ba, "_get", _secrets_get({"langbrain-shelly-apt-a": PASSWORD,
+                                                  "langbrain-shelly-apt-a-devices": "{non json"}))
+    assert ba.main(["sync", str(list_file), str(auth)]) == 0
+    assert "kept apt-a" in capsys.readouterr().out.splitlines()
+    assert (auth / "devices.passwd").read_text(encoding="utf-8") == "apt-a.d1:$7$1000$x$y\n"
+
+
+def test_sync_changes_nothing_without_the_vms_token(tmp_path, monkeypatch, capsys):
+    """Without the VM's token no apartment can be read: that is no apartment's fault, and nothing changes."""
     auth = tmp_path / "auth"
     auth.mkdir()
     list_file = tmp_path / "apartments"
@@ -97,14 +170,10 @@ def test_sync_changes_nothing_if_a_secret_cannot_be_read(tmp_path, monkeypatch, 
     (auth / "devices.passwd").write_text("apt-a.d1:$7$1000$x$y\n", encoding="utf-8")
 
     def get(url, headers):
-        if url.endswith("/token"):
-            return b'{"access_token": "t"}'
-        if url.endswith("/project-id"):
-            return b"p"
-        raise OSError("404")
+        raise OSError("metadata down")
     monkeypatch.setattr(ba, "_get", get)
     assert ba.main(["sync", str(list_file), str(auth)]) == 1
-    assert "non leggibile" in capsys.readouterr().err
+    assert "token della VM" in capsys.readouterr().err
     assert (auth / "devices.passwd").read_text(encoding="utf-8") == "apt-a.d1:$7$1000$x$y\n"
     assert not (auth / "devices.acl").exists()
 
