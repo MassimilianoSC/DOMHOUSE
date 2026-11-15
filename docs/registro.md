@@ -135,6 +135,16 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
   - due prove al banco: la seconda rete Wi-Fi e la configurazione dal PC.
   - **Il messaggio a Youssouf di lunedì** è in `per-youssouf/messaggio-2026-11-16-lunedi.md`, perché quello del 13 è superato. Contiene la sezione 6 con tre domande: seconda rete Wi-Fi, configurazione dal PC, relè e termostato BTHome come antigelo.
   - **Stime chieste a o1 e o2** (solo lettura): `DOMOTICA/stime/messa-in-servizio-o1.md` e `-o2.md`. La domanda 1120 (forma dello strumento A) resta aperta fino alle stime.
+- **Stime arrivate (o2 alle 09:32, o1 alle 09:33; sola lettura, ore stimate e non misurate).** Le cifre sono nel documento, sezione 12.
+  - **A, script:** o1 30–45 h. Non va dato al cliente, perché con l'amministratore della VM si leggono i segreti di tutti.
+  - **A, tutto dall'app:** o1 70–110 h più una revisione di sicurezza, o2 40–55 h, Youssouf 16–30 h. Servono un agente sulla VM con un elenco chiuso di operazioni e staging e produzione separati.
+  - **A, «pronti all'uso»:** o1 18–30 h, o2 35–46 h, Youssouf 3–6 h, perché il motore deve partire senza catalogo. Copre solo la creazione del posto.
+  - **Capienza:** 3–5 h; allarme sotto 500 MB per 10 minuti, rifiuto sotto 400 MB residui; oggi ci stanno circa altri 7 motori.
+  - **B:** o1 16–26 h, o2 10–14 h (primo passo 5–7 h), Youssouf 4–8 h.
+  - **C:** o1 5–8 h, o2 circa 1 h.
+  - **Pareri.** o1: per il pilota lo script usato da noi; per l'autonomia del cliente «tutto dall'app» a tappe; «pronti all'uso» no. o2: B primo passo, poi C, poi A dopo la 1120, il formato del catalogo e la prova del 16; il ruolo «Installatore» non serve.
+  - **Correzioni di o1 al documento, fatte:** la soglia di 15 W si può già cambiare per appartamento, ma solo dalla VM; «mai collegato» e gli accessi rifiutati probabilmente ci sono già; il certificato vale 90 giorni e si rinnova verso il sessantesimo; nello staging la porta va scelta fra quelle ammesse; la VM non ha il permesso di scrivere i segreti, che servirebbe a uno strumento automatico.
+  - **La tappa A di lunedì non è toccata (o1, 09:34):** in R1 la versione nuova la scrive il committente dal PC; R2 e R3 leggono soltanto.
 - **Proposta al cliente, frase da precisare (07:03, domanda del committente):** il passo 10 della giornata dice «Se l'ospite proverà ad accendere il clima, sarà bloccato». Nel motore: un clima acceso col telecomando con la finestra aperta viene visto solo dal suo misuratore di consumo (`_power_seen`, D14) e rispento dalla regola finestra entro circa un minuto (`_keep_window_off`, D03); senza misuratore collegato non viene visto; durante una forzatura la regola è sospesa. Non è un difetto: in una prossima versione della proposta scrivere «il motore lo rispegnerà entro un minuto». La differenza con i limiti di temperatura: accensione e spegnimento si vedono dal consumo, la temperatura scelta col telecomando no.
 - **Raccomandazione di o1:** V1 + 1-bis + testo nello stesso lotto, o1 circa 8–11 h, o2 circa 1,5–2 h, più la guida.
 - **Risposta 1097 = a (07:00):** valori iniziali di «Limiti del setpoint»: massimo da 24 a 26, raffrescamento resta 25 (D-162). Avviati V1 + 1-bis + testo (D-198): o1 motore e BFF, o2 sito; testo della regola sulla base della proposta di o2 (antigelo escluso, telecomando escluso).
