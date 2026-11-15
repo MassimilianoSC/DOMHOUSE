@@ -319,7 +319,7 @@ I passi 5.1 e 6 qui sotto valgono solo con la scelta (a).
 6. (solo con la scelta a) Un timer cancella i file di `/data/_deleted` con più di 30 giorni, compresi `-wal` e `-shm`, e scrive una riga per ogni file tolto.
 7. **Recupero:** dagli snapshot, entro 30 giorni (scelta c), oppure anche dalla copia (scelta a). Procedura scritta, lanciata da noi. I dispositivi vanno riconfigurati con password nuove.
 
-## 9. Cosa cambia nel codice di oggi (dopo le prove di lunedì 16)
+## 9. Cosa cambia nel codice di oggi (dopo la fine delle prove con Youssouf)
 
 1. **Subito, vale già oggi (E-31), per conto suo e prima dello strumento A:** la tabella dei metadati del §4.3, con la prova rossa scritta e committata per prima. Prima la richiesta della sola zona da dentro `engine-dev` ed `engine-lab-01` (oggi risponde) e la riga oraria del controllo (oggi «metadata OPEN»); poi la tabella; poi lego in `--network host` e `cert-renew force`. Insieme: il backup notturno che non segue link in `/data/<apt>` e il `sync` isolato per appartamento, che sono difetti di oggi anche loro.
 2. `engine-vm.sh`:
