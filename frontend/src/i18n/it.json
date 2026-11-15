@@ -513,7 +513,46 @@
     "mainMenu": "Menu principale",
     "openMenu": "Apri il menu",
     "closeMenu": "Chiudi il menu",
-    "apartmentMenu": "Menu appartamento"
+    "apartmentMenu": "Menu appartamento",
+    "deviceStatus": "Stato dei dispositivi"
+  },
+  "deviceStatus": {
+    "title": "Stato dei dispositivi",
+    "subtitle": "Per ogni dispositivo dell'appartamento: se è in linea, quando si è fatto sentire l'ultima volta e cosa controllare se non risponde.",
+    "summary": "In linea: {online} · Offline: {offline} · Mai collegati: {never}",
+    "empty": "Nessun dispositivo in questo appartamento.",
+    "unreachable": "Il sistema domotico dell'appartamento non risponde: qui sotto c'è l'ultimo stato ricevuto.",
+    "connectorDown": "Il collegamento fra il sistema domotico e i dispositivi è fermo, quindi tutti risultano offline: finché non riparte, lo stato dei singoli dispositivi non dice niente.",
+    "columns": {
+      "device": "Dispositivo",
+      "room": "Stanza",
+      "status": "Stato",
+      "lastSeen": "Ultima volta visto",
+      "advice": "Cosa fare"
+    },
+    "lastSeenNever": "Mai",
+    "nothingToDo": "Niente da fare",
+    "status": {
+      "online": "In linea",
+      "offline": "Offline da {for}",
+      "never": "Mai collegato"
+    },
+    "elapsed": {
+      "lessThanMinute": "meno di un minuto",
+      "minute": "1 minuto",
+      "minutes": "{count} minuti",
+      "hour": "1 ora",
+      "hours": "{count} ore",
+      "day": "1 giorno",
+      "days": "{count} giorni"
+    },
+    "advice": {
+      "neverDevice": "Non si è mai collegato. Controlla che abbia corrente, che sia collegato al Wi-Fi dell'appartamento e che le impostazioni del broker sul dispositivo siano giuste.",
+      "neverSensor": "Non si è mai fatto sentire. Controlla che abbia la batteria, che sia abbinato al suo ponte e che non sia troppo lontano dal ponte.",
+      "offlineDevice": "Prima funzionava, ora non risponde. Controlla che abbia corrente e che il Wi-Fi dell'appartamento funzioni.",
+      "offlineSensor": "Prima funzionava, ora non manda più letture. Controlla la batteria e che il ponte sia acceso e in linea.",
+      "connectorDown": "Non è un problema di questo dispositivo: il sistema domotico non riceve notizie da nessun dispositivo."
+    }
   },
   "occupancy": {
     "vacant": "Vuoto",

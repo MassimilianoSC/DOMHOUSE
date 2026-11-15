@@ -4,6 +4,7 @@ import { NavLink, Outlet, useLocation, useMatch } from "react-router-dom";
 import { Download, LogOut, Menu, X } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth, useRole } from "@/auth/AuthProvider";
+import { useCan } from "@/auth/permissions";
 import { isIos, useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { Button } from "@/components/ui/button";
 import { useFeatures } from "@/hooks/useFeatures";
@@ -21,7 +22,8 @@ function useNav() {
   const { has, summary, denied } = useFeatures(aptId);
   // Simulatore: admins only, on a simulated apartment, in any environment (D-97).
   const simulator = isAdmin && summary.data?.simulated === true;
-  const apt = aptId && !denied ? apartmentNav(aptId, simulator).filter((i) => !i.feature || has(i.feature)) : [];
+  const deviceStatus = useCan("devices.status");
+  const apt = aptId && !denied ? apartmentNav(aptId, simulator, deviceStatus).filter((i) => !i.feature || has(i.feature)) : [];
   return { aptId, apt, global: globalNav(isAdmin, { platform: isPlatform, tenant: hasTenant }), aptName: summary.data?.name };
 }
 

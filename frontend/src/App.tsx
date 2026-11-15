@@ -1,6 +1,7 @@
 import { Suspense, type ComponentType } from "react";
 import { Navigate, Route, Routes, useParams } from "react-router-dom";
 import { useAuth, useRole } from "@/auth/AuthProvider";
+import { useCan, type Permission } from "@/auth/permissions";
 import { AppShell } from "@/components/layout/AppShell";
 import { PageProblem } from "@/components/layout/PageProblem";
 import { Skeleton } from "@/components/ui/primitives";
@@ -23,6 +24,7 @@ const DecisionsPage = lazyPage(() => import("@/pages/DecisionsPage"));
 const EnergyPage = lazyPage(() => import("@/pages/EnergyPage"));
 const AssistantPage = lazyPage(() => import("@/pages/AssistantPage"));
 const SimulatorPage = lazyPage(() => import("@/pages/SimulatorPage"));
+const DeviceStatusPage = lazyPage(() => import("@/pages/DeviceStatusPage"));
 const SummariesPage = lazyPage(() => import("@/pages/SummariesPage"));
 const AdminPage = lazyPage(() => import("@/pages/AdminPage"));
 const SettingsPage = lazyPage(() => import("@/pages/SettingsPage"));
@@ -71,6 +73,11 @@ function SimulatorOnly({ children }: { children: React.ReactNode }) {
   return isAdmin && summary.data?.simulated === true ? <>{children}</> : <NotFound />;
 }
 
+/** A page behind a permission (src/auth/permissions.ts): anyone else gets "Pagina non trovata", as for the Simulatore. */
+function Allowed({ permission, children }: { permission: Permission; children: React.ReactNode }) {
+  return useCan(permission) ? <>{children}</> : <NotFound />;
+}
+
 const PHASE2: { path: string; feature: AppFeature; element: React.ReactNode }[] = [
   { path: "programmazione", feature: "schedule", element: <Lazy page={SchedulePage} /> },
   { path: "regole", feature: "rules", element: <Lazy page={RulesPage} /> },
@@ -102,6 +109,7 @@ export default function App() {
             <Route key={p.path} path={p.path} element={<FeatureGate feature={p.feature}>{p.element}</FeatureGate>} />
           ))}
           <Route path="simulatore" element={<SimulatorOnly><Lazy page={SimulatorPage} /></SimulatorOnly>} />
+          <Route path="stato-dispositivi" element={<FeatureGate feature="devices"><Allowed permission="devices.status"><Lazy page={DeviceStatusPage} /></Allowed></FeatureGate>} />
           {/* D-150: made by the BFF, not by the engine, so no feature gate; every role */}
           <Route path="riepiloghi" element={<Lazy page={SummariesPage} />} />
           <Route path="riepiloghi/:week" element={<Lazy page={SummariesPage} />} />
