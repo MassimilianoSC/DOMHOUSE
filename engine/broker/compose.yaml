@@ -18,6 +18,8 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     mem_limit: 512m
+    cpus: 1.0                  # decision 1128: never more than one of the VM's two CPUs
+    pids_limit: 256
     ulimits:
       nofile: 65536
     stop_grace_period: 30s

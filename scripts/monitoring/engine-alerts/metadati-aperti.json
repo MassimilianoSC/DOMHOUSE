@@ -1,0 +1,26 @@
+{
+  "displayName": "Motori: metadati raggiungibili dai container",
+  "documentation": {
+    "content": "Un container della VM raggiunge il server dei metadati di Google, quindi il lasciapassare dell'account della VM (difetto E-31), oppure la prova oraria non è riuscita a girare. Primo passo: SSH alla VM via IAP (docs/motore-vm.md), poi «sudo nft list table inet domhouse_metadata» (deve esserci) e «sudo bash /opt/domhouse/engine-vm.sh metadata-block» per rimetterla. Avvisa o1.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «metadata OPEN» o «metadata probe failed» del controllo orario",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\[[0-9]+\\])?: metadata (OPEN|probe failed)\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "3600s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "CRITICAL"
+}

@@ -1,0 +1,26 @@
+{
+  "displayName": "Motori: rinnovo del certificato del broker non riuscito",
+  "documentation": {
+    "content": "Il rinnovo giornaliero del certificato del broker non è riuscito. Il certificato di adesso resta valido: l'allarme «in scadenza» arriva a 14 giorni dalla fine. Primo passo: rimettere il permesso della VM sull'account DNS, blocco D4 di docs/procedura-permesso-dns.md, se è stato tolto. Poi SSH alla VM via IAP e «sudo journalctl -u domhouse-broker-cert.service -n 20 --no-pager». Avvisa o1.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «broker cert renew failed» del rinnovo giornaliero",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\[[0-9]+\\])?: broker cert renew failed\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "43200s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "ERROR"
+}

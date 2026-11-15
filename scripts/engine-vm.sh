@@ -70,6 +70,18 @@ BROKER_INTERNAL_PORT=1883
 BACKUP_DAYS=7
 BACKUP_AT="22:30:00 UTC"                 # before the daily snapshot of the disk (23:00 UTC)
 ADDRESS_WAIT_S="${DOMHOUSE_ADDRESS_WAIT_S:-120}"   # start-all: how long a boot may take to put the internal address
+# E-31: the metadata server (and so the VM's token) closed to every container: a table of its own on the forward hook,
+# by destination, loaded before docker at every boot (domhouse-metadata-block.service), put back by the watch, probed
+# once an hour from an engine's Compose network. The host's own processes (output hook) still reach it
+METADATA_TABLE=domhouse_metadata
+METADATA_V4=169.254.169.254
+METADATA_V6=fd20:ce::254
+METADATA_FILE="${OPT}/metadata.nft"
+HOURLY_S=3600                            # the metadata probe and the data sizes, once an hour
+DATA_ALERT_MB="${DOMHOUSE_DATA_ALERT_MB:-500}"   # an apartment's /data above this: "data large" (decision 1128)
+JOURNALD_DIR="${DOMHOUSE_JOURNALD_DIR:-/etc/systemd/journald.conf.d}"
+ENGINE_CPUS=1.0                          # decision 1128: every engine's share of the VM's two CPUs, at most
+ENGINE_PIDS_LIMIT=128
 
 die() { echo "errore: $*" >&2; exit 1; }
 step() { printf '\n== %s\n' "$*"; }
@@ -206,6 +218,15 @@ change_setting() {
   die "impostazione ${name} non applicata"
 }
 
+mem_limit_of() {
+  # decision 1128: a line ENGINE_MEM_LIMIT in the apartment's settings wins; else 120 MB for the test engines (dev,
+  # lab-, test-: four of them stay under 500 MB) and 256 MB for the others
+  local own
+  own="$(sed -n 's/^ENGINE_MEM_LIMIT=//p' "$(settings_file "$1")" 2>/dev/null | head -1)"
+  if [[ "${own}" =~ ^[0-9]{2,5}m$ ]]; then echo "${own}"; return; fi
+  case "$1" in dev|lab-*|test-*) echo 120m ;; *) echo 256m ;; esac
+}
+
 compose() {
   # a real connector also joins the broker's internal network (compose.broker.yaml, installed with the broker);
   # the simulated engines never depend on the broker
@@ -220,7 +241,8 @@ compose() {
   if [ "$(sed -n 's/^CONNECTOR=//p' "$(settings_file "${apt}")")" != "simulated" ] && [ -f "${OPT}/compose.broker.yaml" ]; then
     files+=(-f "${OPT}/compose.broker.yaml")
   fi
-  ENGINE_BIND_IP="${BIND_IP:?}" docker compose --env-file "$(settings_file "${apt}")" "${files[@]}" "$@"
+  ENGINE_BIND_IP="${BIND_IP:?}" ENGINE_MEM_LIMIT="$(mem_limit_of "${apt}")" ENGINE_CPUS="${ENGINE_CPUS}" \
+    ENGINE_PIDS_LIMIT="${ENGINE_PIDS_LIMIT}" docker compose --env-file "$(settings_file "${apt}")" "${files[@]}" "$@"
 }
 
 wait_healthy() {
@@ -358,8 +380,28 @@ TimeoutStartSec=15min
 [Install]
 WantedBy=multi-user.target
 UNIT
+  step "Metadati chiusi ai container a ogni avvio, prima di docker: domhouse-metadata-block.service (E-31)"
+  cat > "${SYSTEMD}/domhouse-metadata-block.service" <<UNIT
+[Unit]
+Description=DOMHOUSE: the metadata server closed to every container (engine-vm.sh metadata-block, E-31)
+Before=docker.service
+After=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash ${OPT}/engine-vm.sh metadata-block
+
+[Install]
+WantedBy=multi-user.target docker.service
+UNIT
+  step "Registro di sistema al massimo 500 MB: ${JOURNALD_DIR}/domhouse.conf (decisione 1128)"
+  install -d -m 755 "${JOURNALD_DIR}"
+  printf '[Journal]\nSystemMaxUse=500M\n' > "${JOURNALD_DIR}/domhouse.conf"
+  systemctl restart systemd-journald
   systemctl daemon-reload
   systemctl enable domhouse-engines-start.service > /dev/null       # at the next boot; nothing to start now
+  systemctl enable domhouse-metadata-block.service > /dev/null      # at the next boot; now: engine-vm.sh metadata-block
   systemctl enable --now domhouse-engine-backup.timer domhouse-engine-check.timer > /dev/null
   systemctl list-timers domhouse-engine-backup.timer domhouse-engine-check.timer --no-pager | sed -n 1,3p
 }
@@ -405,6 +447,8 @@ check_all() {
   watch_line "domhouse-check: ${total} motori, ${silent} muti"
   vm_line
   egress_line
+  metadata_lines
+  data_lines
   # after the summary: a stuck broker check must never look like a silent VM
   if [ -f "${OPT}/_broker/broker.settings" ]; then
     bash "${OPT}/broker-vm.sh" check || watch_line "broker down (controllo non riuscito)"
@@ -451,6 +495,83 @@ start_all() {
     else
       watch_line "engine start failed ${apt} (all'avvio della VM, contenitore ${state:-assente})"
     fi
+  done
+}
+
+metadata_rules() {
+  # one transaction: the table is created if missing, emptied and written again, so a repeat leaves one copy
+  cat <<NFT
+# written by engine-vm.sh metadata-block (E-31): no container reaches the metadata server, so none gets the VM's token
+add table inet ${METADATA_TABLE}
+delete table inet ${METADATA_TABLE}
+table inet ${METADATA_TABLE} {
+  chain forward {
+    type filter hook forward priority -10; policy accept;
+    ip daddr ${METADATA_V4} counter drop comment "domhouse-metadata"
+    ip6 daddr ${METADATA_V6} counter drop comment "domhouse-metadata"
+  }
+}
+NFT
+}
+
+apply_metadata_block() {
+  command -v nft > /dev/null || die "manca nft sulla VM (sudo apt-get install -y nftables)"
+  install -d -m 755 "${OPT}"
+  metadata_rules > "${METADATA_FILE}"
+  nft -f "${METADATA_FILE}"
+  echo "metadati chiusi ai container: tabella inet ${METADATA_TABLE}, aggancio forward, verso ${METADATA_V4} e ${METADATA_V6}"
+}
+
+hourly_due() {
+  # hourly_due <name>: true once an hour, the hour kept in a file (the watch runs every 5 minutes)
+  local now last
+  now=$(date +%s)
+  last=$(cat "${OPT}/.$1-checked" 2>/dev/null || echo 0)
+  [ $((now - last)) -ge "${HOURLY_S}" ] || return 1
+  echo "${now}" > "${OPT}/.$1-checked"
+}
+
+metadata_lines() {
+  # E-31: the table put back if it went (only once metadata-block has been run: it writes METADATA_FILE); once an
+  # hour, from a throwaway container on an engine's own Compose network, with that engine's image, the probe:
+  # "metadata blocked" or "metadata OPEN" (an alert), "metadata probe failed" when the container could not run
+  local settings apt image out
+  if [ -f "${METADATA_FILE}" ] && ! nft list table inet "${METADATA_TABLE}" > /dev/null 2>&1; then
+    if (apply_metadata_block > /dev/null 2>&1); then watch_line "metadata block restored"; else watch_line "metadata block missing"; fi
+  fi
+  hourly_due metadata || return 0
+  settings="$(ls "${OPT}"/*.settings 2>/dev/null | head -1)"
+  [ -n "${settings}" ] || return 0
+  apt="$(basename "${settings}" .settings)"
+  image="$(sed -n 's/^ENGINE_IMAGE=//p' "${settings}")"
+  out="$(timeout 30 docker run --rm --network "domhouse-${apt}_default" --read-only --cap-drop ALL \
+    --security-opt no-new-privileges:true --entrypoint python "${image}" -c \
+    "import urllib.request as u
+try:
+    u.urlopen(u.Request('http://${METADATA_V4}/computeMetadata/v1/instance/zone', headers={'Metadata-Flavor': 'Google'}), timeout=3)
+    print('OPEN')
+except Exception:
+    print('BLOCKED')" 2>/dev/null || true)"
+  case "${out}" in
+    *OPEN*) watch_line "metadata OPEN (dalla rete di ${apt})" ;;
+    *BLOCKED*) watch_line "metadata blocked" ;;
+    *) watch_line "metadata probe failed (dalla rete di ${apt})" ;;
+  esac
+}
+
+data_lines() {
+  # decision 1128: once an hour the size of each apartment's data; above DATA_ALERT_MB "data large" (an alert).
+  # du does not follow links (the engine's folder may hold them)
+  local settings apt mb
+  hourly_due data || return 0
+  for settings in "${OPT}"/*.settings; do
+    [ -f "${settings}" ] || continue
+    apt="$(basename "${settings}" .settings)"
+    [ -d "${DATA}/${apt}" ] || continue
+    mb="$(du -sm "${DATA}/${apt}" 2>/dev/null | cut -f1)"
+    [[ "${mb}" =~ ^[0-9]+$ ]] || continue
+    watch_line "data ${apt} mb=${mb}"
+    if [ "${mb}" -gt "${DATA_ALERT_MB}" ]; then watch_line "data large ${apt} mb=${mb}"; fi
   done
 }
 
@@ -523,7 +644,7 @@ start() {
 }
 
 cmd="${1:-}"; shift || true
-case "${cmd}" in backup|backup-all|timers|logs-agent|"") ;; *) resolve_bind_ip ;; esac
+case "${cmd}" in backup|backup-all|timers|logs-agent|metadata-block|limits|"") ;; *) resolve_bind_ip ;; esac
 case "${cmd}" in
   install)
     # D62 (P-83): the connector is always said (simulated or shelly): it was simulated when forgotten
@@ -650,7 +771,21 @@ case "${cmd}" in
     docker ps --filter "name=engine-${apt}" --format '{{.Names}}  {{.Image}}  {{.Status}}'
     wait_healthy "${apt}"
     ;;
+  metadata-block)
+    [ $# -eq 0 ] || die "uso: metadata-block"
+    apply_metadata_block
+    ;;
+  limits)
+    # decision 1128: the limits on a running engine, without recreating it (docker update); compose.yaml carries the
+    # same ones for the next recreation
+    [ $# -eq 1 ] || die "uso: limits <apartment_id>"
+    apt="$1"; valid_id "${apt}"
+    [ -f "$(settings_file "${apt}")" ] || die "${apt} non è installato (manca $(settings_file "${apt}"))"
+    mem="$(mem_limit_of "${apt}")"
+    docker update --memory "${mem}" --memory-swap "${mem}" --cpus "${ENGINE_CPUS}" --pids-limit "${ENGINE_PIDS_LIMIT}" "engine-${apt}"
+    echo "engine-${apt}: memoria ${mem}, cpus ${ENGINE_CPUS}, processi ${ENGINE_PIDS_LIMIT}"
+    ;;
   *)
-    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | start-all | timers | logs-agent (vedi l'intestazione)"
+    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | start-all | timers | logs-agent | metadata-block | limits (vedi l'intestazione)"
     ;;
 esac

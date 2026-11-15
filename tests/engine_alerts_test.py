@@ -1,4 +1,4 @@
-"""scripts/monitoring/engine-alerts.sh and its policies (P-60 step 10c, D-104, D-148): the eight policy files (the
+"""scripts/monitoring/engine-alerts.sh and its policies (P-60 step 10c, D-104, D-148): the twelve policy files (the
 broker's three included, D-209) are valid,
 their filters and label extractors match the real lines of engine-vm.sh check-all (with or without the PID rsyslog may
 add to the tag), and the script creates only what is missing (DRY_RUN creates nothing), with gcloud replaced by a
@@ -141,7 +141,7 @@ def alerts(tmp_path):
     def run(dry=False):
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; '
                f'{"DRY_RUN=1 " if dry else ""}GCP_PROJECT_ID=progetto bash "{posix(SCRIPT)}"')
-        # one run starts about 40 processes (python3, gcloud, sed, mktemp for each of 8 policies): 5.3-6.5 s with the PC
+        # one run starts about 40 processes (python3, gcloud, sed, mktemp for each of 12 policies): 5.3-6.5 s with the PC
         # at rest (11 November), over 60 s in the full run of 10 November, with Docker and the other suites running.
         # The limit is there only to catch a hang (risposta 885)
         out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=300)
@@ -158,12 +158,12 @@ def alerts(tmp_path):
 def test_dry_run_creates_nothing_and_the_real_run_creates_what_is_missing(alerts):
     out, calls, created = alerts(dry=True)
     assert out.returncode == 0, out.stderr
-    assert "create" not in calls and created == "" and out.stdout.count("(prova a secco) la creerei da") == 8
+    assert "create" not in calls and created == "" and out.stdout.count("(prova a secco) la creerei da") == 12
     out, calls, created = alerts()
     assert out.returncode == 0, out.stderr
-    assert "logging metrics create domhouse_check_runs" in calls and calls.count("policies create") == 8
-    assert "__CHANNEL__" not in created and created.count("notificationChannels/9514864875489091801") == 8
+    assert "logging metrics create domhouse_check_runs" in calls and calls.count("policies create") == 12
+    assert "__CHANNEL__" not in created and created.count("notificationChannels/9514864875489091801") == 12
     (alerts.stubs / "metric-exists").write_text("", encoding="utf-8")
     (alerts.stubs / "policies-exist").write_text("", encoding="utf-8")
     out, calls, created = alerts()                                      # again: everything exists, nothing changes
-    assert out.returncode == 0 and "create" not in calls and out.stdout.count("esiste già") == 9
+    assert out.returncode == 0 and "create" not in calls and out.stdout.count("esiste già") == 13

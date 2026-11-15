@@ -12,6 +12,7 @@
 #   sudo bash /opt/domhouse/broker-vm.sh reload                        # SIGHUP: certificate, users and permissions
 #   sudo bash /opt/domhouse/broker-vm.sh cert-renew [force]            # the daily timer: renews only when due
 #   sudo bash /opt/domhouse/broker-vm.sh cert-revoke <key-compromise|superseded>   # revokes, then a new key and certificate
+#   sudo bash /opt/domhouse/broker-vm.sh cert-test                      # a whole renewal against the test server of Let's Encrypt: nothing replaced
 #   sudo bash /opt/domhouse/broker-vm.sh install-cert <fullchain> <privkey>   # a certificate from elsewhere; checks it first
 #   sudo bash /opt/domhouse/broker-vm.sh add-apartment <apartment_id>  # its accounts from Secret Manager
 #   sudo bash /opt/domhouse/broker-vm.sh remove-apartment <apartment_id>
@@ -76,6 +77,7 @@ CERT_ALERT_DAYS=14                       # a 45-day certificate is renewed with 
 ACCOUNTS="${OPT}/broker_accounts.py"
 LEGO_IMAGE="goacme/lego:v5.6.0@sha256:6f1583fc026a455ea46a7a5858c576105bb69c2e2de69db391cab7f14750350c"
 LETS_ENCRYPT="https://acme-v02.api.letsencrypt.org/directory"
+LETS_ENCRYPT_TEST="https://acme-staging-v02.api.letsencrypt.org/directory"   # cert-test: certificates nobody trusts, no weekly limit
 ACME_ACCOUNT_ID=domhouse-broker          # no email: Let's Encrypt sends none, and no address leaves the VM
 ACME_CHAIN="ISRG Root X1"               # the chain that ends at the root every client has; the default one today
 LIMIT="${DOMHOUSE_LIMIT:-on}"            # "off" only on the unprivileged test bench, which shares the host's network
@@ -299,7 +301,9 @@ prepare_tls_disk() {
 
 lego() {
   # lego in its container as the broker's user: it reads and writes only the ACME folder on the keys' disk
-  local network="${DOMHOUSE_LEGO_NETWORK:-bridge}" test_args=() env_args=()
+  # E-31: on the host's network: the metadata server is closed to the containers' networks, and lego needs the VM's
+  # token to act as the DNS account
+  local network="${DOMHOUSE_LEGO_NETWORK:-host}" test_args=() env_args=()
   [ -z "${DOMHOUSE_ACME_TEST:-}" ] || test_args=(--tls-skip-verify)    # tests only: a local Pebble
   [ "$1" != "run" ] || env_args=(-e "GCE_IMPERSONATE_SERVICE_ACCOUNT=$(acme_setting ACME_DNS_ACCOUNT)" -e "GCE_ZONE_ID=$(acme_setting ACME_DNS_ZONE)")
   [ -z "${DOMHOUSE_ACME_TEST:-}" ] || env_args=(-e EXEC_PATH=/bin/true)
@@ -552,6 +556,33 @@ case "${cmd}" in
     need_tls_disk
     if [ $# -eq 1 ]; then acme_get --renew-force; else acme_get; fi   # force: the renewal tried once during the run-in (D-210)
     ;;
+  cert-test)
+    # after E-31: a whole renewal (lego on the host's network, the VM acting as the DNS account, the DNS challenge)
+    # against Let's Encrypt's test server, in a folder of its own on the keys' disk, removed at the end. The certificate
+    # the broker serves and the real ACME account are never touched: no device reconnects, no weekly limit is used
+    [ $# -eq 0 ] || die "uso: cert-test"
+    [ -f "${ACME_SETTINGS}" ] || die "manca ${ACME_SETTINGS}: nessun certificato automatico da provare"
+    need_tls_disk
+    domain="$(acme_setting ACME_DOMAIN)"
+    test_dir="${TLS_MOUNT}/acme-test"
+    rm -rf "${test_dir}"
+    install -d -m 700 "${test_dir}"
+    chown "${BROKER_UID}:${BROKER_UID}" "${test_dir}"
+    step "Rinnovo di prova di ${domain} contro il server di prova di Let's Encrypt"
+    if docker run --rm --user "${BROKER_UID}:${BROKER_UID}" --read-only --tmpfs /tmp --cap-drop ALL \
+         --security-opt no-new-privileges:true --network "${DOMHOUSE_LEGO_NETWORK:-host}" -v "${test_dir}:/acme" \
+         -e "GCE_IMPERSONATE_SERVICE_ACCOUNT=$(acme_setting ACME_DNS_ACCOUNT)" -e "GCE_ZONE_ID=$(acme_setting ACME_DNS_ZONE)" \
+         "${LEGO_IMAGE}" run --accept-tos -d "${domain}" --no-random-sleep --key-type RSA2048 --dns gcloud \
+         --path /acme --server "${LETS_ENCRYPT_TEST}" --account-id domhouse-broker-test --log.format text; then
+      until="$(openssl x509 -in "${test_dir}/certificates/${domain}.crt" -noout -enddate 2>/dev/null || true)"
+      rm -rf "${test_dir}"
+      watch_line "broker cert test ok (${domain}${until:+, ${until}})"
+    else
+      rm -rf "${test_dir}"
+      watch_line "broker cert test failed (${domain})"
+      die "rinnovo di prova non riuscito: permesso sul DNS (docs/procedura-permesso-dns.md, D4)? rete? lego?"
+    fi
+    ;;
   cert-revoke)
     [ $# -eq 1 ] || die "uso: cert-revoke <key-compromise|superseded>"
     case "$1" in key-compromise) reason=1 ;; superseded) reason=4 ;; *) die "motivo non previsto: $1 (key-compromise o superseded)" ;; esac
@@ -617,6 +648,6 @@ case "${cmd}" in
     check
     ;;
   *)
-    die "uso: prepare-tls-disk | cert-new | install | update | restart | reload | cert-renew | cert-revoke | install-cert | add-apartment | remove-apartment | sync | check | limit | status (vedi l'intestazione)"
+    die "uso: prepare-tls-disk | cert-new | install | update | restart | reload | cert-renew | cert-test | cert-revoke | install-cert | add-apartment | remove-apartment | sync | check | limit | status (vedi l'intestazione)"
     ;;
 esac

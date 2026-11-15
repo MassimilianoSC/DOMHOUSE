@@ -31,6 +31,14 @@ services:
         required: true
       - path: /etc/domhouse/${APARTMENT_ID}.settings.env
         required: false
+    # decision 1128: limits for each engine (engine-vm.sh passes them: 120 MB for the test engines dev/lab-/test-,
+    # 256 MB for the others, no swap; one CPU at most; 128 processes), and no capability: the engine needs none
+    mem_limit: ${ENGINE_MEM_LIMIT:-256m}
+    memswap_limit: ${ENGINE_MEM_LIMIT:-256m}
+    cpus: ${ENGINE_CPUS:-1.0}
+    pids_limit: ${ENGINE_PIDS_LIMIT:-128}
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     ports:
       - "${ENGINE_BIND_IP:?ENGINE_BIND_IP}:${PORT}:${PORT}"
     volumes:

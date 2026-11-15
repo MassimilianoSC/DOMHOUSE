@@ -1,0 +1,26 @@
+{
+  "displayName": "Motori: dati di un appartamento oltre 500 MB",
+  "documentation": {
+    "content": "La cartella dei dati di un appartamento sulla VM supera 500 MB (decisione 1128): può riempire il disco condiviso. L'appartamento è nel testo della riga. Primo passo: SSH alla VM via IAP e «sudo du -sh /data/<appartamento>/*». Avvisa o1.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «data large» del controllo orario",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\[[0-9]+\\])?: data large\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "43200s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "WARNING"
+}

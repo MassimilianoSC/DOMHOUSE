@@ -33,6 +33,10 @@ STUBS = {
     "mountpoint": "#!/usr/bin/env bash\nexit 0\n",
     "python3": "#!/usr/bin/env bash\nexit 0\n",
     "chown": "#!/usr/bin/env bash\nexit 0\n",
+    # install without owner and modes (Windows refuses them): folders made, files copied
+    "install": ('#!/usr/bin/env bash\nd=""; pos=()\nwhile [ $# -gt 0 ]; do case "$1" in -o|-g|-m) shift 2 ;; '
+                '-d) d=1; shift ;; *) pos+=("$1"); shift ;; esac; done\n'
+                'if [ -n "$d" ]; then mkdir -p "${pos[@]}"; else cp "${pos[0]}" "${pos[1]}"; fi\n'),
     # docker run of lego: notes its arguments; fails when the test put a file "lego-fails"
     "docker": ('#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/docker.log"\n'
                'if [ "$1" = run ] && [ -f "$STUB_DIR/lego-fails" ]; then exit 1; fi\nexit 0\n'),

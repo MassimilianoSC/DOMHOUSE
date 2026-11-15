@@ -1,0 +1,26 @@
+{
+  "displayName": "Motori: broker, un appartamento non aggiornato",
+  "documentation": {
+    "content": "Il broker non è riuscito a leggere i segreti di un appartamento (mancanti, senza versione o malformati) e ne ha tenuto gli utenti di prima (E-33): i suoi dispositivi entrano ancora, ma un dispositivo nuovo, una password cambiata o una revoca non valgono finché il segreto non torna leggibile. L'appartamento è nel testo della riga. Primo passo: «gcloud secrets versions list langbrain-shelly-<appartamento>» e «…-devices» dal PC. Avvisa o1.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «broker sync kept» del broker",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\[[0-9]+\\])?: broker sync kept\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "3600s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "ERROR"
+}

@@ -36,7 +36,7 @@ STUBS = {
     "docker": ('#!/usr/bin/env bash\necho "$* [ENGINE_BIND_IP=${ENGINE_BIND_IP:-}] [ENGINE_MEM_LIMIT=${ENGINE_MEM_LIMIT:-}]" >> "$STUB_DIR/docker.log"\n'
                'if [ "$1" = inspect ]; then cat "$STUB_DIR/state-${!#}" 2>/dev/null; fi\n'
                # E-31: the hourly probe of the metadata server from a container; open only if the test says so
-               'if [ "$1" = run ]; then [ -f "$STUB_DIR/metadata-open" ] && { echo OPEN; exit 0; }; exit 1; fi\nexit 0\n'),
+               'if [ "$1" = run ]; then [ -f "$STUB_DIR/metadata-open" ] && { echo OPEN; exit 0; }; echo BLOCKED; exit 0; fi\nexit 0\n'),
     # E-31: nft keeps what it is given with -f; «list table» fails when the test put a file "no-metadata-table"
     "nft": ('#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/nft.log"\n'
             'if [ "$1" = -f ]; then cat "$2" >> "$STUB_DIR/nft-applied"; exit 0; fi\n'
@@ -376,10 +376,24 @@ def test_timers_install_the_metadata_block_before_docker_and_a_journal_limit(vm)
 
 
 def test_the_watch_puts_the_metadata_block_back_when_it_is_missing(vm):
+    """Once metadata-block has been run (it writes its file), a table that went (a flush of the firewall) is put back
+    by the 5-minute watch. Before that, the watch never applies it by itself: the block arrives with its procedure."""
     (vm.stubs / "no-metadata-table").write_text("", encoding="utf-8")
+    vm("check-all")
+    assert "metadata block restored" not in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert vm("metadata-block").returncode == 0
+    (vm.stubs / "nft-applied").unlink()
     vm("check-all")
     assert "metadata block restored" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
     assert "table inet domhouse_metadata" in (vm.stubs / "nft-applied").read_text(encoding="utf-8")
+
+
+def test_the_hourly_probe_says_when_it_could_not_run(vm):
+    (vm.stubs / "docker").write_text('#!/usr/bin/env bash\n[ "$1" = run ] && exit 125\nexit 0\n', encoding="utf-8",
+                                     newline="\n")
+    vm("check-all")
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert "metadata probe failed" in syslog and "metadata blocked" not in syslog
 
 
 def test_the_hourly_probe_from_an_engines_network_says_if_the_metadata_server_answers(vm):
