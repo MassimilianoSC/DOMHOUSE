@@ -243,24 +243,55 @@ wait_healthy() {
 
 db_of() { echo "${DATA}/$1/engine.db"; }
 
+real_dir() {
+  # E-32: a true folder at the very path given: not a link, and no link on the way (realpath gives the same path)
+  [ -d "$1" ] && [ ! -L "$1" ] && [ "$(realpath -e -- "$1" 2>/dev/null)" = "$1" ]
+}
+
+backup_refused() {
+  watch_line "backup refused $1 ($2)"
+  die "backup di $1 rifiutato: $2"
+}
+
 backup() {
-  local apt="$1" dir="${DATA}/$1/backup" day file
-  [ -f "$(db_of "${apt}")" ] || die "$(db_of "${apt}") non esiste (motore mai avviato?)"
-  install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${dir}"
+  # E-32: /data/<apt> belongs to the engine, which may be compromised: root never opens, copies or changes anything
+  # there by following a link. The database is read by the engine's user (setpriv) into memory and written to stdout;
+  # root receives it in its own folder on the same disk (/data/_backup.tmp, 700) and moves it into the backup folder
+  # (a rename, which replaces a link instead of following it). What is left is a race between the check of the -wal
+  # and -shm files and SQLite opening them: the window is of milliseconds, and the engine's user can reach only files
+  # of the engines' user, never root's.
+  local apt="$1" base="${DATA}/$1" dir="${DATA}/$1/backup" db day file staging tmp p
+  db="$(db_of "${apt}")"
+  real_dir "${base}" || backup_refused "${apt}" "${base} non è una cartella vera"
+  for p in "${db}" "${db}-wal" "${db}-shm"; do
+    [ ! -L "${p}" ] || backup_refused "${apt}" "$(basename "${p}") è un link"
+  done
+  [ -f "${db}" ] || die "${db} non esiste (motore mai avviato?)"
+  [ -e "${dir}" ] || [ -L "${dir}" ] || install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${dir}"
+  real_dir "${dir}" || backup_refused "${apt}" "${dir} non è una cartella vera"
+  staging="${DATA}/_backup.tmp"         # an apartment_id cannot start with «_» (valid_id): never an apartment's
+  install -d -m 700 -o root -g root "${staging}"
+  real_dir "${staging}" || die "${staging} non è una cartella vera"
   day="$(date -u +%Y-%m-%d)"
   file="${dir}/engine-${day}.db"
-  python3 - "$(db_of "${apt}")" "${file}.tmp" <<'PY'
+  tmp="$(mktemp "${staging}/${apt}.XXXXXX")"
+  if ! setpriv --reuid="${ENGINE_UID}" --regid="${ENGINE_UID}" --clear-groups python3 - "${db}" > "${tmp}" <<'PY'
 import sqlite3, sys
-src, dst = sqlite3.connect(sys.argv[1]), sqlite3.connect(sys.argv[2])
-with dst:
-    src.backup(dst)                      # SQLite's online backup: consistent even while the engine writes (WAL)
-ok = dst.execute("PRAGMA integrity_check").fetchone()[0]
-dst.close(); src.close()
-sys.exit(0 if ok == "ok" else f"integrity_check: {ok}")
+src, mem = sqlite3.connect(sys.argv[1]), sqlite3.connect(":memory:")
+src.backup(mem)                          # SQLite's online backup: consistent even while the engine writes (WAL)
+ok = mem.execute("PRAGMA integrity_check").fetchone()[0]
+if ok != "ok":
+    sys.exit(f"integrity_check: {ok}")
+sys.stdout.buffer.write(mem.serialize())
+mem.close(); src.close()
 PY
-  mv -f "${file}.tmp" "${file}"
-  chown "${ENGINE_UID}:${ENGINE_UID}" "${file}"
-  chmod 640 "${file}"
+  then
+    rm -f "${tmp}"
+    die "backup di ${apt} non riuscito"
+  fi
+  chown "${ENGINE_UID}:${ENGINE_UID}" "${tmp}"
+  chmod 640 "${tmp}"
+  mv -f "${tmp}" "${file}"
   # the daily copies and, P-71 (D-142), the databases set aside by restore (before-restore-*.db and their -wal, -shm)
   find "${dir}" -maxdepth 1 \( -name 'engine-*.db' -o -name 'before-restore-*.db*' \) -mtime "+$((BACKUP_DAYS - 1))"     -print -delete | sed 's/^/tolto (oltre 7 giorni): /'
   echo "backup ${apt}: ${file} ($(stat -c %s "${file}") byte, integrity_check ok)"
