@@ -292,6 +292,13 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
   7. **Piano dei due mesi in due parti:** (A) il primo appartamento, attivato da noi con le procedure di oggi; (B) dal secondo, l'opzione 1, che può finire nel mese di prove. Va verificato se o1 ci sta con le stime alte: la sua parte di (A) è chiesta a o1.
   8. **Trasmettitore a infrarossi:** domanda 6 aggiunta al messaggio per Youssouf di lunedì (stima della sua parte, prova al banco, ostacoli).
   9. **Messaggio per Italianway:** lo manda il committente a Leonardo. Il file è `app/docs/da-inviare/messaggio-italianway-per-leonardo.md`.
+- **Permesso DNS: procedura di o1** (`docs/procedura-permesso-dns.md`, `dd5a218`, 11:21), riletta dalla memoria storica: va bene.
+  - Il permesso serve a lego solo quando rinnova. Il prossimo rinnovo è intorno al **10 gennaio 2027**: il certificato vale 90 giorni, oggi `cert_days`=86.
+  - Il controllo ogni 5 minuti non lo usa. **L'allarme sulla scadenza scatta a 14 giorni.**
+  - Nessun rischio per le prove di lunedì. Si toglie oggi (D1, D2); domani D3 verifica se il giro giornaliero lascia una riga d'errore.
+  - **Da rimettere (D4) quando `cert_days` ≤ 35, cioè ai primi di gennaio 2027, dopo la correzione di E-31.** Con E-31 il permesso non diventa inutile, perché lego ne ha bisogno a ogni rinnovo.
+  - Scelta per dopo: tenerlo solo durante i rinnovi (circa 10 minuti ogni due mesi).
+  - D1 e D2 dati al committente alle 11:22. I file della procedura sono bloccati (C-13).
 - **Proposta al cliente, frase da precisare (07:03, domanda del committente):** il passo 10 della giornata dice «Se l'ospite proverà ad accendere il clima, sarà bloccato». Nel motore: un clima acceso col telecomando con la finestra aperta viene visto solo dal suo misuratore di consumo (`_power_seen`, D14) e rispento dalla regola finestra entro circa un minuto (`_keep_window_off`, D03); senza misuratore collegato non viene visto; durante una forzatura la regola è sospesa. Non è un difetto: in una prossima versione della proposta scrivere «il motore lo rispegnerà entro un minuto». La differenza con i limiti di temperatura: accensione e spegnimento si vedono dal consumo, la temperatura scelta col telecomando no.
 - **Raccomandazione di o1:** V1 + 1-bis + testo nello stesso lotto, o1 circa 8–11 h, o2 circa 1,5–2 h, più la guida.
 - **Risposta 1097 = a (07:00):** valori iniziali di «Limiti del setpoint»: massimo da 24 a 26, raffrescamento resta 25 (D-162). Avviati V1 + 1-bis + testo (D-198): o1 motore e BFF, o2 sito; testo della regola sulla base della proposta di o2 (antigelo escluso, telecomando escluso).

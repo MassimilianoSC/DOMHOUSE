@@ -123,6 +123,7 @@
 
 | Limite | Cosa succede | Stato |
 |---|---|---|
+| **Permesso DNS della VM tolto (15 novembre, difetto E-31)** | Senza il permesso su `domhouse-dns-lab@`, il certificato del broker non si può rinnovare. Il prossimo rinnovo è intorno al 10 gennaio 2027; l'allarme sulla scadenza scatta a 14 giorni. La riga «broker cert renew failed» oggi non ha un allarme | **Rimettere il permesso (procedura `docs/procedura-permesso-dns.md`, D4) quando `cert_days` ≤ 35, ai primi di gennaio 2027**, dopo la correzione di E-31 |
 | **Certificato pubblico su uno Shelly Gen4** | Nessuna fonte elenca le autorità incluse nel firmware | Da verificare con la prova su un Gen4 (bloccante) |
 | **Prefisso con la barra** | La documentazione non conferma che `topic_prefix` accetti `/` né che valga per le richieste RPC | Da verificare sulla stessa prova; se non vale, i permessi vanno adattati |
 | **Keep-alive e dimensione dei messaggi Shelly** | Non noti: per ora nessun limite sul keep-alive e pacchetti fino a 256 KB | Da fissare dopo la prova |
