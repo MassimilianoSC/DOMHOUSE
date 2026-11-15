@@ -45,3 +45,49 @@ Contratto fissato e controllato dalla CI; motore sulla VM con riavvio automatico
 disco; server in modalità reale collegato alla VM dalla rete interna; chiavi in Secret Manager, nessun segreto nel repository;
 conservazione dei dati automatica (D-94); registro attività, sospensione, accesso di assistenza, pseudonimi; guida e checklist
 aggiornate a ogni lotto; giro completo di prove (con il controllo Linux) e CI a ogni lotto.
+
+## D. Controlli fatti e controlli ancora da analizzare
+
+*Aggiunta il 15 novembre 2026 su richiesta del committente (risposta 1130). Motivo: tre difetti di sicurezza dentro
+la VM (E-31, E-32, E-33) non erano stati trovati da nessuno dei controlli precedenti, perché nessuno aveva il compito
+di cercarli. Un tipo di controllo mai fatto è un punto cieco, anche quando gli altri controlli sono stati molti.*
+
+### D.1 Controlli già fatti
+
+| Controllo | Quando | Cosa guardava | Cosa NON guardava |
+|---|---|---|---|
+| **Revisione avversaria di P-36** (Fable) | 16 ottobre | il codice delle organizzazioni multiple, da avversario | il resto del sistema |
+| **Analisi del design** | 23 ottobre | coerenza del progetto (`docs/analisi-design-2026-10-23.md`) | il codice e l'infrastruttura |
+| **Spiegazione operativa P-82** | 10 novembre | il percorso dal sensore all'interfaccia; ha trovato 5 difetti veri, anche se non era il suo scopo | non era una revisione |
+| **Revisione del codice con agenti indipendenti P-83** | 10–11 novembre | errori del codice di sito, server e motore, con verifiche; in più l'infrastruttura **vista da fuori**: permessi di Google, firewall, segreti, account | la separazione **dentro** la VM: cosa raggiunge un programma compromesso |
+| **Revisione per scenari P-90** | 13 novembre | il comportamento nei casi della vita reale (finestra, prenotazioni, telecomando, limiti): errori di logica | la sicurezza |
+| **Revisioni delle pull request di Youssouf**, con revisori indipendenti e mutazioni | 11–15 novembre | il codice del connector, una modifica alla volta, e la forza delle sue prove | il resto del sistema |
+| **Revisioni indipendenti delle procedure** (tappa B e altre) | 13 novembre | che i comandi dati al committente siano giusti e sicuri | il codice |
+| **Revisione di sicurezza del progetto dello strumento A**, due letture | 15 novembre | il progetto dell'Autonomia, da avversario; ha trovato **per caso** E-31, E-32 ed E-33, che esistevano già | il codice esistente, salvo dove serviva al progetto |
+| **Prove automatiche**: giro completo (circa 2700 prove: server, Firestore, broker, motore, conformità, sito, browser, Linux) e CI sul contratto | a ogni lotto | che il codice faccia quello che le prove descrivono | quello che le prove non descrivono |
+| **Prove a mano nello staging** e checklist di collaudo | a ogni lotto, 13 novembre | quello che vede chi usa l'app | sicurezza e carico |
+| **Prove sull'infrastruttura**: due istanze del server (9 nov), spegnimento e riaccensione della VM (11 nov), certificato del broker rinnovato e revocato (10 nov), scansione delle porte da fuori (10 nov) | 9–11 novembre | che il sistema regga quelle situazioni | la compromissione di un pezzo |
+| **Prove con dispositivi veri**: tappa A (verifiche 1 e 2), tappa B (la Plug vista e comandata dall'app) | 11–13 novembre | il collegamento vero fra app e dispositivi | il lungo periodo e gli appartamenti veri |
+| **Produzione in rodaggio**, con il rapporto settimanale | dal 9 novembre | come si comporta la produzione nel tempo | i casi che in rodaggio non capitano |
+
+### D.2 Obbligo prima della produzione vera: analizzare i tipi di controllo non ancora fatti
+
+**Prima del primo appartamento vero**, per ognuno dei tipi qui sotto la memoria storica, con o1 e o2, scrive in questa
+sezione: se va fatto, con quale ampiezza, chi lo fa, oppure perché non serve. Il committente decide. Nessun tipo resta
+senza una decisione scritta. Il primo è già deciso.
+
+| Tipo di controllo | Domanda a cui risponde | Stato |
+|---|---|---|
+| **Sicurezza dentro la VM** (compromissione e movimenti laterali) | se un motore, il broker o un dispositivo sono ostili, fin dove arrivano? | **deciso (risposta 1130 = a):** pochi agenti in sola lettura più un verificatore, dopo l'applicazione delle correzioni di E-31, E-32 ed E-33 e prima del primo appartamento vero |
+| **Prova di carico** (P-84) | quante persone e appartamenti regge il sistema insieme? | prevista, procedura pronta (`docs/procedura-prova-di-carico.md`); da fare |
+| **Attacco da fuori al sito e al server** | accessi non autorizzati, iniezioni, CORS, limiti di frequenza, sessioni: cosa può fare uno sconosciuto da internet? | da analizzare |
+| **Ripristino vero dalle copie** | se si perde il database o il disco della VM, si torna indietro davvero, in quanto tempo e con quali dati? | da analizzare (o1 ha stimato una prova di ripristino sul motore di produzione) |
+| **Dipendenze e aggiornamenti di sicurezza** | librerie, immagini dei container e firmware degli Shelly con difetti noti: chi li controlla e quando? | da analizzare |
+| **Dati personali** | l'informativa e i trattamenti sono corretti per il titolare? | bozza pronta; manca il consulente del titolare |
+| **Sicurezza in appartamento** | un ospite sulla rete Wi-Fi di casa può aprire la pagina di uno Shelly o disturbare i dispositivi? | da analizzare (collegata alla rete solo per i dispositivi, decisione 6 della proposta) |
+| **Usabilità per chi non è tecnico** | gestori, operatori e cliente capiscono l'app e le guide senza aiuto? | in parte (collaudo dei colleghi, D-200); da analizzare per l'Autonomia |
+| **Aggiornamenti e ritorni indietro** | una pubblicazione sbagliata si annulla davvero, anche sui motori e sul broker? | da analizzare |
+| **Lungo periodo con dispositivi veri** | batterie, orologi, disconnessioni, firmware dopo settimane | coperto dal mese di prove del primo appartamento; da scrivere cosa si misura |
+
+**Regola da qui in avanti:** quando un controllo trova un difetto di un tipo nuovo, si aggiunge una riga in D.2 per quel
+tipo, e si valuta se ripetere quel controllo su tutto il sistema.
