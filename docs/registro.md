@@ -272,6 +272,16 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
   - **E-31 da precisare:** la regola vale per tutte le reti di Docker; una tabella nftables caricata prima di Docker; il controllo la rimette e dà allarme; IPv6; la prova dalla rete Compose ogni ora; `cert-renew force` dopo il passaggio di lego.
   - Correzioni minori chieste a o1 alle 11:16, solo nel progetto. **Sui tempi del codice decide il committente.**
 - **Controllo in sola lettura suggerito dal revisore (11:16):** negli ultimi 30 giorni la zona DNS del laboratorio è stata cambiata solo due volte, il 10 novembre alle 09:57 e alle 09:58 UTC, da `domhouse-dns-lab@`; c'è una sola `GenerateAccessToken` di `langbrain-vm@`, alle 09:57:53 dello stesso giorno. È il rilascio del certificato del broker. **Nessun uso anomalo dell'account del DNS.**
+- **Correzioni della seconda lettura scritte da o1 nel progetto** (`a69240b`, 11:17; tabella in §10.1).
+  - Il blocco lo prende solo l'esecutore (`DOMHOUSE_LOCK_HELD=1`).
+  - La lettura del server vale solo sulle `langbrain-api-key-`.
+  - Socket in `/run/domhouse-agent` con SO_PEERCRED, e «prod» sempre rifiutato sulla VM condivisa.
+  - Nessun parametro immagine.
+  - Le voci interrotte risultano «fallito: interrotto».
+  - Nessun account con `secrets.delete`: vuoti e orfani li cancella uno script mensile del committente.
+  - La copia del database si fa come utente 10001.
+  - E-31 con una tabella nftables propria, caricata prima di Docker e rimessa ogni 5 minuti, con una prova oraria; la procedura di E-31 si scrive quando il committente fissa i tempi del codice.
+  - **Scelta per il committente, da chiedere al momento dell'eliminazione (§8.2.3):** storico eliminato senza copia, recuperabile dagli snapshot per 30 giorni (consigliata dal revisore e da o1), oppure con copia e 60 giorni dichiarati.
 - **Proposta al cliente, frase da precisare (07:03, domanda del committente):** il passo 10 della giornata dice «Se l'ospite proverà ad accendere il clima, sarà bloccato». Nel motore: un clima acceso col telecomando con la finestra aperta viene visto solo dal suo misuratore di consumo (`_power_seen`, D14) e rispento dalla regola finestra entro circa un minuto (`_keep_window_off`, D03); senza misuratore collegato non viene visto; durante una forzatura la regola è sospesa. Non è un difetto: in una prossima versione della proposta scrivere «il motore lo rispegnerà entro un minuto». La differenza con i limiti di temperatura: accensione e spegnimento si vedono dal consumo, la temperatura scelta col telecomando no.
 - **Raccomandazione di o1:** V1 + 1-bis + testo nello stesso lotto, o1 circa 8–11 h, o2 circa 1,5–2 h, più la guida.
 - **Risposta 1097 = a (07:00):** valori iniziali di «Limiti del setpoint»: massimo da 24 a 26, raffrescamento resta 25 (D-162). Avviati V1 + 1-bis + testo (D-198): o1 motore e BFF, o2 sito; testo della regola sulla base della proposta di o2 (antigelo escluso, telecomando escluso).
