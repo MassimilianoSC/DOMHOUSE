@@ -120,12 +120,9 @@ def parse_devices(text: str, secret: str) -> dict[str, str]:
     return devices
 
 
-def _passwd_text(wanted: dict[str, str], previous: dict[str, str]) -> str:
-    lines = []
-    for user in sorted(wanted):
-        old = previous.get(user)
-        lines.append(f"{user}:{old if old and hash_matches(old, wanted[user]) else hash_password(wanted[user])}\n")
-    return "".join(lines)
+def _hash_for(old: str | None, password: str) -> str:
+    """The stored hash when it still matches the password (a sync that changes nothing rewrites nothing), else a new one."""
+    return old if old and hash_matches(old, password) else hash_password(password)
 
 
 def read_passwd(path: Path) -> dict[str, str]:
@@ -134,19 +131,31 @@ def read_passwd(path: Path) -> dict[str, str]:
     return dict(line.split(":", 1) for line in path.read_text(encoding="utf-8").splitlines() if ":" in line)
 
 
-def render(apartments: dict[str, tuple[str, dict[str, str]]], auth_dir: Path) -> dict[str, str]:
-    """The four files' text from {apartment: (connector's password, {device: password})}."""
+def render(apartments: dict[str, tuple[str, dict[str, str]]], auth_dir: Path, kept: tuple[str, ...] = ()) -> dict[str, str]:
+    """The four files' text from {apartment: (connector's password, {device: password})}. An apartment in `kept`
+    (E-33: its secrets could not be read) keeps the users and hashes it has in the files now, with their permissions:
+    the others are still updated. A user belongs to the apartment before its first dot (ids have no dots)."""
+    previous_devices = read_passwd(auth_dir / "devices.passwd")
+    previous_connectors = read_passwd(auth_dir / "connectors.passwd")
     connectors, devices, connector_acl, device_acl = {}, {}, [], []
-    for apartment in sorted(apartments):
-        password, its_devices = apartments[apartment]
-        connectors[connector_user(apartment)] = password
-        connector_acl.append(f"user {connector_user(apartment)}\ntopic readwrite {apartment}/#\n\n")
-        for device in sorted(its_devices):
-            devices[device_user(apartment, device)] = its_devices[device]
+    for apartment in sorted(set(apartments) | set(kept)):
+        user = connector_user(apartment)
+        if apartment in apartments:
+            password, its_devices = apartments[apartment]
+            connectors[user] = _hash_for(previous_connectors.get(user), password)
+            hashes = {d: _hash_for(previous_devices.get(device_user(apartment, d)), p) for d, p in its_devices.items()}
+        else:
+            if user in previous_connectors:
+                connectors[user] = previous_connectors[user]
+            hashes = {u.split(".", 1)[1]: h for u, h in previous_devices.items() if u.split(".", 1)[0] == apartment}
+        if user in connectors:
+            connector_acl.append(f"user {user}\ntopic readwrite {apartment}/#\n\n")
+        for device in sorted(hashes):
+            devices[device_user(apartment, device)] = hashes[device]
             device_acl.append(f"user {device_user(apartment, device)}\ntopic readwrite {apartment}/{device}/#\n\n")
-    return {"devices.passwd": _passwd_text(devices, read_passwd(auth_dir / "devices.passwd")),
+    return {"devices.passwd": "".join(f"{u}:{h}\n" for u, h in sorted(devices.items())),
             "devices.acl": "".join(device_acl),
-            "connectors.passwd": _passwd_text(connectors, read_passwd(auth_dir / "connectors.passwd")),
+            "connectors.passwd": "".join(f"{u}:{h}\n" for u, h in sorted(connectors.items())),
             "connectors.acl": "".join(connector_acl)}
 
 
@@ -194,8 +203,12 @@ def read_apartments(path: Path) -> list[str]:
 
 
 def sync(apartments_file: Path, auth_dir: Path) -> int:
+    """E-33: each apartment on its own. One whose secrets cannot be read (missing, without a version, malformed) keeps
+    the accounts it has and is named in a line «kept <apartment_id>» (broker-vm.sh makes it a line of the watch); the
+    others are updated. Without the VM's token nothing can be read: nothing changes, as before."""
     ids = read_apartments(apartments_file)
     loaded: dict[str, tuple[str, dict[str, str]]] = {}
+    kept: list[str] = []
     if ids:
         meta = {"Metadata-Flavor": "Google"}
         try:
@@ -206,11 +219,15 @@ def sync(apartments_file: Path, auth_dir: Path) -> int:
         for apartment in ids:
             connector = f"{SECRET_PREFIX}{apartment}"
             devices = f"{connector}-devices"
-            password = check_password(access_secret(connector, token, project), f"connector di {apartment}")
-            loaded[apartment] = (password, parse_devices(access_secret(devices, token, project), devices))
-    changed = write_files(render(loaded, auth_dir), auth_dir)
+            try:
+                password = check_password(access_secret(connector, token, project), f"connector di {apartment}")
+                loaded[apartment] = (password, parse_devices(access_secret(devices, token, project), devices))
+            except AccountError as exc:
+                kept.append(apartment)
+                print(f"errore: {exc}; {apartment}: tenuti gli utenti di prima", file=sys.stderr)
+    changed = write_files(render(loaded, auth_dir, tuple(kept)), auth_dir)
     for apartment in ids:
-        print(f"{apartment}: connector e {len(loaded[apartment][1])} dispositivi")
+        print(f"kept {apartment}" if apartment in kept else f"{apartment}: connector e {len(loaded[apartment][1])} dispositivi")
     print("changed" if changed else "unchanged")
     return 0
 

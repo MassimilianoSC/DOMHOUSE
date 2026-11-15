@@ -84,6 +84,7 @@ LIMIT_FILE="${BROKER_OPT}/limit.nft"
 LIMIT_RATE="30/minute"                   # per source address, after the first LIMIT_BURST
 LIMIT_BURST=60                           # an apartment's relays reconnecting together after a power cut
 AUTH_ALERT_PER_HOUR="${DOMHOUSE_AUTH_ALERT_PER_HOUR:-100}"   # one relay with a wrong password retrying alone stays under
+KEPT=""                                  # E-33: the apartments the last sync kept as they were (sync_accounts)
 
 die() { echo "errore: $*" >&2; exit 1; }
 step() { printf '\n== %s\n' "$*"; }
@@ -203,10 +204,14 @@ cert_in_place() {
 }
 
 sync_accounts() {
-  # the list of apartments may have just been changed by the caller: the broker reloads only if a file changed
-  local out
+  # the list of apartments may have just been changed by the caller: the broker reloads only if a file changed.
+  # E-33: an apartment whose secrets cannot be read keeps its accounts («kept <apartment_id>»), the others are
+  # updated; each kept one becomes a line of the watch, and KEPT tells the caller which ones
+  local out kept
   out="$(python3 "${ACCOUNTS}" sync "${APARTMENTS}" "${AUTH}")" || return 1   # a return: add-apartment must undo its line
   printf '%s\n' "${out}"
+  KEPT="$(printf '%s\n' "${out}" | sed -n 's/^kept //p')"
+  for kept in ${KEPT}; do watch_line "broker sync kept ${kept}"; done
   if [ "$(printf '%s\n' "${out}" | tail -1)" = "changed" ] && [ "$(docker inspect -f '{{.State.Running}}' "${CONTAINER}" 2>/dev/null || true)" = "true" ]; then
     hup
     echo "utenti e permessi ricaricati"
@@ -565,7 +570,10 @@ case "${cmd}" in
     need_installed
     valid_id "$1"
     if grep -qx "$1" "${APARTMENTS}"; then echo "$1 è già nell'elenco"; else printf '%s\n' "$1" >> "${APARTMENTS}"; fi
-    sync_accounts || { grep -vx "$1" "${APARTMENTS}" > "${APARTMENTS}.new" || true; mv -f "${APARTMENTS}.new" "${APARTMENTS}"; exit 1; }
+    undo_line() { grep -vx "$1" "${APARTMENTS}" > "${APARTMENTS}.new" || true; mv -f "${APARTMENTS}.new" "${APARTMENTS}"; }
+    sync_accounts || { undo_line "$1"; exit 1; }
+    # E-33: a new apartment whose secrets cannot be read has no accounts to keep: it is not added
+    if printf '%s\n' "${KEPT}" | grep -qx "$1"; then undo_line "$1"; die "segreti di $1 non leggibili dalla VM: non aggiunto (broker-secrets.sh add-apartment $1 fatto?)"; fi
     ;;
   remove-apartment)
     [ $# -eq 1 ] || die "uso: remove-apartment <apartment_id>"
