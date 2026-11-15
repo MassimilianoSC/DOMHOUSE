@@ -16,7 +16,13 @@
 2. **Pub/Sub, per ambiente:** una coda «ordini» con schema e dimensione massima; una coda «risultati»; una coda «scarti».
 3. **Sulla VM, due servizi systemd** (non container: un container con il socket di Docker sarebbe root lo stesso):
    - **il lettore**, utente senza privilegi `domhouse-agent`: preleva gli ordini con il token della VM, controlla schema, ambiente, età e sequenza, scrive il giornale e pubblica i risultati;
-   - **l'esecutore**, root, minimo: ascolta solo su un socket UNIX locale leggibile dal lettore. Accetta solo le 7 operazioni del §3, con argomenti già controllati, e li ricontrolla. Lancia `/opt/domhouse/engine-vm.sh` e `/opt/domhouse/broker-vm.sh` (di root, non scrivibili da altri) con `execve` e una lista di argomenti, mai `sh -c`, con l'ambiente pulito (`env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin`), mai `bash -x`.
+   - **l'esecutore**, root, minimo: ascolta solo su un socket UNIX locale. Accetta solo le 7 operazioni del §3, con argomenti già controllati, e li ricontrolla. Lancia `/opt/domhouse/engine-vm.sh` e `/opt/domhouse/broker-vm.sh` (di root, non scrivibili da altri) con `execve` e una lista di argomenti, mai `sh -c`, con l'ambiente pulito (`env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin`), mai `bash -x`.
+   - **Il confine fra i due.** Il lettore è il pezzo esposto (legge JSON da Pub/Sub e ha il token): se è compromesso, l'esecutore è l'unica difesa.
+     1. Il socket sta in `/run/domhouse-agent`: cartella di root, gruppo `domhouse-agent`, permessi 750; socket 660.
+     2. L'esecutore controlla `SO_PEERCRED` e accetta solo l'uid del lettore.
+     3. L'esecutore **ripete** tutti questi controlli, senza fidarsi del lettore: id (§2.1); prefisso contro ambiente; `ENV` del file delle impostazioni; `dev` escluso; porta e fascia; immagine; dimensioni (ordine, catalogo, elenco dei dispositivi); numero massimo dei motori dello staging; `seq`.
+     4. L'esecutore ha l'ambiente ammesso nella **propria** configurazione di root: sulla VM condivisa rifiuta qualunque ordine con ambiente `prod`, qualunque cosa dica il lettore.
+   - **Il blocco lo prende una volta sola l'esecutore**, per tutta l'operazione. Lancia gli script passando il descrittore già bloccato e la variabile `DOMHOUSE_LOCK_HELD=1`, l'unica ammessa nell'ambiente pulito oltre a `PATH`: gli script allora non lo riprendono. Lanciati a mano, gli script lo prendono come oggi. `broker-vm.sh check` (dentro `check-all`, ogni 5 minuti) non lo prende mai: lo prendono solo i comandi che cambiano qualcosa. Così `crea_motore` (`install` più `add-apartment`) e `togli_motore` (che finisce con `remove-apartment`) non si fermano su sé stessi.
 4. **Secret Manager:** per ogni appartamento la chiave del motore e il conto del connector; **un segreto per dispositivo**.
 
 ## 2. Nomi e ambienti
@@ -51,6 +57,8 @@ Dalla forma nuova nessuna collisione è possibile: `_` non può stare negli id.
 - etichette `domhouse-env`, `domhouse-apt`, `domhouse-op`;
 - **ritardo di distruzione di 7 giorni** (`version_destroy_ttl`). Una versione «distrutta» diventa subito disattivata e illeggibile, e per 7 giorni si può ancora riattivare dopo un incidente. Da verificare con la prova 1125.
 
+**Prima di creare un segreto** il server scrive in Firestore l'intenzione (op_id e nome). Se cade fra la creazione e la scrittura dell'esito, il segreto non risulta «suo»: con gli id casuali se ne genera un altro, e il controllo degli orfani trova quello rimasto.
+
 **Un segreto che esiste già** si riusa solo se due condizioni valgono entrambe:
 
 1. il Firestore di quell'ambiente registra di averlo creato lui (op_id);
@@ -62,7 +70,9 @@ Altrimenti: errore, allarme, nessuna versione aggiunta.
 
 `resource.name` di un segreto è `projects/444239063209/secrets/<nome>`, e quello di una versione ha in più `/versions/N`. La forma con il numero è **da confermare con la prova 1125**, che prova anche quella con l'identificativo.
 
-**Staging:**
+**Due condizioni per ambiente, mai una sola:** la condizione «versioni» copre password e chiavi; la condizione «lettura» copre **solo** le chiavi dei motori. Così il server non legge mai le password dei dispositivi né quella del connector.
+
+**Staging, «versioni»** (ruoli «creazione» e «versioni»):
 
 ```
 resource.name.startsWith("projects/444239063209/secrets/langbrain-shelly-lab-") ||
@@ -71,12 +81,27 @@ resource.name.startsWith("projects/444239063209/secrets/langbrain-api-key-lab-")
 resource.name.startsWith("projects/444239063209/secrets/langbrain-api-key-test-")
 ```
 
-**Produzione:**
+**Staging, «lettura»** (`secretAccessor`):
+
+```
+resource.name.startsWith("projects/444239063209/secrets/langbrain-api-key-lab-") ||
+resource.name.startsWith("projects/444239063209/secrets/langbrain-api-key-test-")
+```
+
+**Produzione, «versioni»:**
 
 ```
 resource.name.startsWith("projects/444239063209/secrets/langbrain-shelly-a-") ||
 resource.name.startsWith("projects/444239063209/secrets/langbrain-api-key-a-")
 ```
+
+**Produzione, «lettura»:**
+
+```
+resource.name.startsWith("projects/444239063209/secrets/langbrain-api-key-a-")
+```
+
+Le chiavi di `dev` e `lab-01` restano lette con i permessi segreto per segreto di oggi.
 
 **Prefissi positivi per tutti e due gli ambienti**, con il trattino. Nessuno dei due copre `dev`, `devon-01`, `labrador` o un id maiuscolo.
 
@@ -85,7 +110,8 @@ resource.name.startsWith("projects/444239063209/secrets/langbrain-api-key-a-")
 - `langbrain-shelly-labrador`;
 - `langbrain-shelly-devon-01`;
 - `langbrain-shelly-LAB-01`;
-- `langbrain-shelly-dev_01`.
+- `langbrain-shelly-dev_01`;
+- e un caso di lettura: un account con la sola condizione «lettura» non legge un segreto `langbrain-shelly-test-…`.
 
 ### 2.4 La prova di carico
 
@@ -118,7 +144,7 @@ Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima 
 | Operazione | Parametri | Cosa fa | Controlli in più |
 |---|---|---|---|
 | `capienza` | — | `MemAvailable` e numero dei motori, per ambiente | — |
-| `crea_motore` | `apartment_id`, porta | installa il motore (catalogo vuoto, `CONNECTOR=shelly`, `ENV`), poi `add-apartment` sul broker | **porta:** intero `^[1-9][0-9]{3,4}$` nella fascia dell'ambiente, assente da ogni `/opt/domhouse/*.settings` dei due ambienti e da `ss -ltn`. **Immagine:** non è un parametro: quella approvata nella configurazione dell'agente, per digest. **Capienza:** §7. Se l'appartamento esiste già con gli stessi parametri: riuscito, senza rifare niente; con parametri diversi: rifiuto |
+| `crea_motore` | `apartment_id`, porta | scrive **prima** il catalogo vuoto in `/etc/domhouse/<apt>.catalog.yaml` (se mancasse, al `compose up` Docker creerebbe al suo posto una cartella), poi installa il motore (`CONNECTOR=shelly`, `ENV`), poi `add-apartment` sul broker | **porta:** intero `^[1-9][0-9]{3,4}$`; per lo staging **solo 8150–8159**; assente da ogni `/opt/domhouse/*.settings` dei due ambienti e da `ss -ltn` (i motori della prova di carico, creati dallo script, si vedono solo con `ss`: le fasce sono separate). **Immagine:** non è un parametro, né per la produzione né per lo staging: quella approvata nella configurazione dell'agente, per digest. **Capienza:** §7. Se l'appartamento esiste già con gli stessi parametri: riuscito, senza rifare niente; con parametri diversi: rifiuto |
 | `aggiorna_motore` | `apartment_id` | porta il motore all'immagine approvata (`engine-vm.sh update`) | stessi controlli dell'immagine |
 | `aggiorna_broker` | `apartment_id`, elenco dei dispositivi | scrive `/etc/domhouse/_broker/devices/<apt>` (di root) e lancia il `sync` | ogni id con la regola del §2.1; al massimo 200 dispositivi |
 | `applica_catalogo` | `apartment_id`, catalogo, versione | §3.1 | versione più alta dell'ultima applicata |
@@ -132,7 +158,7 @@ Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima 
 - La controllano sia l'agente sia `engine-vm.sh`: difesa doppia.
 - `registry_login` rifiuta ogni host diverso da `europe-west8-docker.pkg.dev`.
 - `update` non usa più l'immagine dentro `sed "s#…#…#"`.
-- Lo staging può scegliere fra le immagini del registro, la produzione solo quella approvata.
+- Lo staging e la produzione usano tutti e due l'immagine della configurazione dell'agente. L'immagine di prova si cambia nella configurazione, di root: meno superficie.
 
 ### 3.1 Applicare un catalogo
 
@@ -159,8 +185,9 @@ Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima 
 
 **Mai** al server: `versions.access` sulle password, `versions.enable`, `secrets.update`, `secrets.delete`, `secrets.setIamPolicy`, `secrets.getIamPolicy`.
 
-- I segreti rimasti vuoti dopo un'eliminazione li cancella dopo 30 giorni un nostro controllo periodico.
-- Il controllo periodico cerca anche gli orfani: segreti `langbrain-*` senza appartamento o dispositivo nei due Firestore portano a un allarme.
+- **Nessun account di servizio riceve `secrets.delete`.**
+- I segreti rimasti vuoti dopo un'eliminazione, e gli orfani, li cancella **uno script che il committente lancia una volta al mese con il suo account** (D-116). Lo script elenca i segreti `langbrain-*` senza appartamento o dispositivo nei due Firestore, oppure vuoti da oltre 30 giorni, li mostra e chiede conferma prima di cancellare.
+- Lo stesso elenco, in sola lettura, gira anche nel controllo periodico e dà un allarme se trova orfani.
 
 **Registri di accesso ai dati di Secret Manager** attivi, con allarmi su:
 
@@ -186,11 +213,14 @@ Un risultato vale solo se si riferisce a un `op_id` in attesa, con stesso ambien
 | `secretmanager.secretAccessor` | con condizione sul nome: i prefissi del §2.3 più quelli di oggi (`dev`, `lab-01`) |
 | quelli di oggi | Artifact Registry Reader, Logs Writer, Monitoring Metric Writer, «Creatore di token» su `domhouse-dns-lab@` (per lego) |
 
-**Il token della VM non deve essere raggiungibile dai container** (vale già oggi, §9):
+**Il token della VM non deve essere raggiungibile dai container.** È un difetto di oggi (E-31), da correggere per conto suo, prima dello strumento A, con la prova rossa scritta prima (§9.1):
 
-- una regola nella catena `DOCKER-USER` scarta il traffico dalle reti di Docker verso `169.254.169.254`, rimessa a ogni avvio da un servizio systemd come `domhouse-broker-limit`;
-- lego, che oggi usa l'identità della VM dalla rete bridge, passa a `--network host`;
-- `check-all` verifica da un container di prova che i metadati non rispondano.
+1. **Una tabella nftables propria**, `inet domhouse_metadata`, aggancio `forward`, priorità -10, come quella del limite del broker. Scarta per **destinazione** `169.254.169.254` tutto il traffico inoltrato, cioè quello di **tutte** le reti di Docker: `docker0`, i ponti `br-…` dei progetti Compose dei motori, la rete interna del broker. Se la VM ha IPv6, una seconda regola per l'indirizzo IPv6 dei metadati (da verificare sulla VM). Il traffico dei processi dell'host (lettore, esecutore, Ops Agent, script) non passa dall'inoltro e non viene toccato.
+2. **Caricata prima di Docker:** un servizio systemd con `Before=docker.service`, così a ogni avvio o riavvio di Docker non resta nessuna finestra. Docker non la tocca, perché non è la sua catena.
+3. **Rimessa da sola:** se la tabella manca, il controllo ogni 5 minuti la rimette e scrive una riga, come fa già per il limite del broker («broker limit restored»).
+4. **Provata una volta all'ora**, come `egress`: un container usa e getta sulla rete Compose di un motore (`--network domhouse-<apt>_default`), con l'immagine approvata del motore, prova a leggere la sola zona con un tempo massimo di 3 s. Se risponde, la riga è «metadata OPEN», con allarme email.
+5. **lego** passa a `--network host`, restando con utente 1883, sola lettura e `cap_drop ALL`. Subito dopo si prova `broker-vm.sh cert-renew force`: lego deve ancora farsi dare il token.
+6. In sola lettura si guarda il registro di controllo IAM per usi di `domhouse-dns-lab@` non fatti da lego. I token durano un'ora: se non risulta niente, non serve cambiare chiavi.
 
 Il lettore e l'esecutore girano sull'host: per loro il token c'è.
 
@@ -200,15 +230,15 @@ Il lettore e l'esecutore girano sull'host: per loro il token c'è.
 
 1. **Code separate per ambiente.** L'agente sa l'ambiente dalla sottoscrizione.
 2. **Prefissi positivi** (§2) per segreti e appartamenti, più `ENV` nel file delle impostazioni.
-3. **Fasce di porte** (decisione da confermare prima del codice):
+3. **Fasce di porte** (accettate dal revisore il 15 novembre):
    - produzione 8101–8149;
-   - staging creato dall'app 8150–8159;
+   - staging creato dall'app 8150–8159: l'agente ammette **solo** queste per un `crea_motore` dello staging;
    - `lab-01` resta su 8169;
-   - prova di carico 8170–8199;
-   - `INSTANCE_ALLOWED` dello staging diventa `8100,8150-8199`.
+   - prova di carico 8170–8199, creata dal suo script;
+   - `INSTANCE_ALLOWED` dello staging diventa `10.198.0.2:8100,10.198.0.2:8150-8199`, nella forma che il server legge. È più largo della fascia dell'agente perché il server deve raggiungere anche `lab-01` e la prova di carico; non comprende nessuna porta della produzione.
 4. **La produzione non manda ordini alla VM condivisa:** la sottoscrizione degli ordini della produzione non si crea su `langbrain-dev`, e il server di produzione non ha `publisher`. La regola «seconda VM prima del primo appartamento vero» la impone la tecnica.
 5. **Nello staging creano ed eliminano appartamenti solo i gestori della piattaforma**, non gli amministratori dei clienti: Firebase Authentication è condiviso.
-6. **Numero massimo di motori dello staging nell'agente:** 4, `dev` e `lab-01` compresi, indipendente dalla capienza.
+6. **Numero massimo di motori dello staging nell'agente:** 4, `dev` e `lab-01` compresi (accettato). Il numero da solo non protegge la memoria: **la somma dei tetti di memoria dei motori dello staging resta sotto circa 500 MB** (per esempio `mem_limit` 128 MB, se la misura lo permette). In più il rifiuto per capienza conta anche quella somma, non solo `MemAvailable`. La prova di carico resta fuori dal limite: si fa di notte, con la sua procedura.
 7. **Seconda VM:** un account di servizio per VM, ciascuno con la lettura dei soli segreti del suo ambiente; un broker per VM; la regola dei prefissi resta come seconda difesa.
 8. **Rischio accettato per iscritto fino alla seconda VM:** lo staging può disturbare (blocco unico, memoria) i motori di produzione già esistenti. Oggi non ce ne sono (D-134).
 
@@ -216,8 +246,10 @@ Il lettore e l'esecutore girano sull'host: per loro il token c'è.
 
 1. **Un solo esecutore per tutta la VM**, un ordine alla volta, con priorità alla produzione quando ci sarà. Il blocco di `engine-vm.sh` è già unico per la VM; `broker-vm.sh` prende lo stesso blocco.
 2. **Giornale sulla VM:** «ricevuto» e «in corso» si scrivono **prima** di eseguire. Un doppione di un ordine in corso o finito si ignora, e si ripubblica l'esito registrato.
+   - **Dopo un riavvio della VM** l'ordine già confermato non torna da Pub/Sub. All'avvio il lettore pubblica «fallito: interrotto» per ogni voce del giornale non chiusa e non la riesegue: c'è «Riprova».
 3. **Conferma subito, risultato sulla seconda coda:** il lettore conferma l'ordine appena l'ha scritto nel giornale. Il tempo di conferma di Pub/Sub non conta più.
 4. **Sequenza:** `seq` per appartamento (§3); chiave d'ordine di Pub/Sub = `apartment_id`, come aiuto e non come garanzia.
+   - Il file di root con l'ultima `seq` applicata **resta per sempre**, anche dopo `togli_motore`, come una lapide: pochi byte. Così un `crea_motore` vecchio, con una `seq` più bassa e ancora entro i 15 minuti, non ricrea un appartamento appena eliminato.
 5. **Età dell'ordine** da `publish_time` di Pub/Sub, che chi pubblica non può falsificare.
    - Oltre 15 minuti: scartato, con un risultato «scartato» e una riga nel registro di sistema.
    - Allarme se succede in produzione.
@@ -260,25 +292,36 @@ Il lettore e l'esecutore girano sull'host: per loro il token c'è.
 2. **Prima «Disattiva»** per un periodo fissato. Email al gestore e agli altri amministratori dell'organizzazione a «Disattiva» e a «Elimina».
 3. **Conferma** scrivendo il nome, con il testo:
    - **si perde subito:** la configurazione, il motore, le credenziali dei dispositivi. Dopo un recupero ogni Shelly va riconfigurato sul posto con password nuove;
-   - **resta:** prenotazioni e riepiloghi per 12 mesi, registro amministrativo per 24, lo storico del motore **fino a 60 giorni** (30 nella copia, e altri 30 negli snapshot del disco).
+   - **resta:** prenotazioni e riepiloghi per 12 mesi, registro amministrativo per 24, lo storico del motore per il tempo della scelta qui sotto.
    - Va scritto anche nell'informativa sulla privacy: compito della memoria storica.
+
+**Scelta per il committente: quanto resta recuperabile lo storico di un appartamento eliminato.** Gli snapshot fatti **prima** dell'eliminazione contengono comunque `engine.db` e restano 30 giorni.
+
+| Scelta | Durata reale | Cosa comporta |
+|---|---|---|
+| **c. Nessuna copia: recupero solo dagli snapshot** (consiglio del revisore, e mio) | 30 giorni | meno codice (niente `/data/_deleted`, niente timer, niente copia come utente 10001), meno copie di dati personali; il recupero è più pesante (disco dallo snapshot), ma è un caso raro dopo «Disattiva», la conferma con il nome e gli avvisi |
+| a. Copia sul disco di avvio | fino a 60 giorni | accettabile solo se dichiarata nel testo di conferma e nell'informativa, con lo scopo |
+| b. Copia su un disco a parte senza snapshot | circa 30 giorni | sconsigliata: un disco in più da gestire per nessun guadagno reale |
+
+I passi 5.1 e 6 qui sotto valgono solo con la scelta (a).
 4. **Ordine imposto dal server**, con «Riprova» e lo stato dell'ultimo passo:
    1. `togli_motore` riuscito;
    2. distruzione, con ritardo, delle versioni dei segreti dell'appartamento;
    3. eliminazione in Firestore (`remove_apartment`): la porta si libera solo qui.
 5. **`togli_motore`, tutto sotto il blocco**, ogni passo saltato senza errore se è già fatto:
-   1. copia coerente del database **prima** di fermare il motore: backup in linea di SQLite e `PRAGMA integrity_check`, eseguiti come utente 10001 (`setpriv`) o aprendo i file senza seguire link. La copia va in `/data/_deleted/<apt>-<data>.db`: cartella di root 700, file di root 600;
+   1. (solo con la scelta a) copia coerente del database **prima** di fermare il motore: backup in linea di SQLite e `PRAGMA integrity_check`, eseguiti **come utente 10001** (`setpriv --reuid=10001 --regid=10001 --clear-groups`), così anche `-wal` e `-shm`, che SQLite apre da solo, non seguono link verso file di root. L'utente 10001 non può scrivere in `/data/_deleted`: scrive la copia su stdout, e root la salva con `umask 077` in `/data/_deleted/<apt>-<data>.db` (cartella di root 700, file di root 600);
    2. `compose down`;
    3. tolto `/opt/domhouse/<apt>.settings` (il controllo ogni 5 minuti e l'avvio non lo vedono più);
    4. tolti `/etc/domhouse/<apt>.env`, `.settings.env`, `.catalog.yaml`;
    5. tolto `/data/<apt>`, backup compresi;
    6. `remove-apartment` sul broker e il suo file dei dispositivi.
-6. Un timer cancella i file di `/data/_deleted` con più di 30 giorni, compresi `-wal` e `-shm`, e scrive una riga per ogni file tolto.
-7. **Recupero entro 30 giorni** dalla copia, oppure entro 60 dagli snapshot: procedura scritta, lanciata da noi. I dispositivi vanno riconfigurati con password nuove.
+   7. Il file della `seq` dell'appartamento **resta** (§6.4).
+6. (solo con la scelta a) Un timer cancella i file di `/data/_deleted` con più di 30 giorni, compresi `-wal` e `-shm`, e scrive una riga per ogni file tolto.
+7. **Recupero:** dagli snapshot, entro 30 giorni (scelta c), oppure anche dalla copia (scelta a). Procedura scritta, lanciata da noi. I dispositivi vanno riconfigurati con password nuove.
 
 ## 9. Cosa cambia nel codice di oggi (dopo le prove di lunedì 16)
 
-1. **Subito, vale già oggi:** blocco dei metadati per i container, lego in `--network host`, controllo in `check-all`.
+1. **Subito, vale già oggi (E-31), per conto suo e prima dello strumento A:** la tabella dei metadati del §4.3, con la prova rossa scritta e committata per prima. Prima la richiesta della sola zona da dentro `engine-dev` ed `engine-lab-01` (oggi risponde) e la riga oraria del controllo (oggi «metadata OPEN»); poi la tabella; poi lego in `--network host` e `cert-renew force`. Insieme: il backup notturno che non segue link in `/data/<apt>` e il `sync` isolato per appartamento, che sono difetti di oggi anche loro.
 2. `engine-vm.sh`:
    - regole degli id e dell'immagine;
    - `registry_login` ancorato;
@@ -323,8 +366,19 @@ Il lettore e l'esecutore girano sull'host: per loro il token c'è.
 | 24 | accolto: settima operazione `aggiorna_motore` in §3 |
 | 25 | accolto in §1.3 (script di `/opt/domhouse`, di root, mai copie dall'agente) |
 
-**Domande che restano per la rilettura:**
+### 10.1 Seconda lettura del revisore (15 novembre, 11:11): «si può cominciare il codice»
 
-1. le fasce di porte del §5.3;
-2. il massimo di 4 motori di staging;
-3. la conservazione fino a 60 giorni dello storico eliminato, o una copia fuori dal disco degli snapshot.
+| Punto | Esito |
+|---|---|
+| S1.1, condizione unica per lettura e versioni | corretto in §2.3 (due condizioni per ambiente; caso di lettura negativo nella prova 1125) |
+| S1.2, intenzione prima della creazione | corretto in §2.2 |
+| S1.3 e S2.3, confine fra lettore ed esecutore; catalogo prima del `compose up` | corretto in §1.3 (socket, `SO_PEERCRED`, controlli ripetuti, `prod` rifiutato sulla VM condivisa) e §3 `crea_motore` |
+| S1.4 e S5, regola dei metadati | corretto in §4.3 e §9.1 (destinazione su tutte le reti di Docker, tabella propria prima di Docker, rimessa dal controllo, IPv6, prova oraria dalla rete Compose, `cert-renew force`, registro IAM) |
+| S1.6 e S2.4, immagine dello staging | corretto in §3: nessun parametro immagine, nemmeno per lo staging |
+| S1.10 e S2.2, ordini interrotti e sequenza dopo l'eliminazione | corretto in §6.2 e §6.4 |
+| S1.13, chi cancella vuoti e orfani | corretto in §4.1 (script mensile del committente, nessun account di servizio con `secrets.delete`) |
+| S1.15, `setpriv` e `/data/_deleted` | corretto in §8.2.5 |
+| S2.1, il blocco che si ferma su sé stesso | corretto in §1.3 (blocco preso una volta dall'esecutore, `DOMHOUSE_LOCK_HELD`, `check` senza blocco) |
+| S3.1, porte | accettate, scritte in §5.3 e §3 |
+| S3.2, 4 motori di staging | accettato, con la somma dei tetti di memoria in §5.6 |
+| S3.3, storico eliminato | scelta per il committente in §8.2.3; consiglio (c) |
