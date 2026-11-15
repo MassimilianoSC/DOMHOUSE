@@ -229,6 +229,17 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
   1. comandi, via e pubblicazioni: 3–5 h a settimana (stima);
   2. lettura e decisioni, misurata dal registro: settimana 2–6 novembre quasi ferma (45 minuti il 5); settimana 9–13 novembre **circa 48 ore di presenza** dal primo all'ultimo aggiornamento del registro di ogni giorno, con almeno 45 risposte registrate; il 15 novembre circa 2 ore e mezza fino alle 10:52.
   Il committente aveva osservato che 3–5 h gli sembravano poche: valgono solo per la prima voce.
+- **Procedura della prova sulla condizione per creare segreti (o1, `572eb3a`, 10:58), riletta dalla memoria storica alle 11:00: va bene.** 9 blocchi P0–P8, 15–35 minuti.
+  - Un account di controllo senza condizione assorbe il ritardo dei permessi: il nome giusto si prova solo dopo il controllo, lo sbagliato solo dopo il giusto.
+  - Le due forme, numero e identificativo, si provano con due account, perché la documentazione non dice quale vale.
+  - Oggetti di prova con il prefisso `dhprova-`, segreti vuoti; la pulizia tocca solo i nomi di prova; P8 elenca cosa è rimasto.
+  - **Domanda 1126:** farla adesso o dopo le prove di lunedì. Consiglio: dopo.
+- **Primo passo della pagina «Stato dei dispositivi» fatto (o2, `59e546a`, 10:47–10:59; non pubblicato).**
+  - Pagina `/a/<id>/stato-dispositivi`, solo per l'amministratore. Il permesso passa da un punto solo (`src/auth/permissions.ts`, «devices.status»), pronto per il ruolo «Installatore».
+  - Mostra stato (In linea / Offline da … / Mai collegato), ultima volta visto e «Cosa fare», diverso per Shelly e sensore. Avvisi quando il collegamento è fermo o il sistema non risponde. La colonna degli accessi rifiutati si aggiunge senza rifare la pagina.
+  - «Mai collegato» verificato con o1: `last_seen` resta vuoto solo per un dispositivo mai visto. Un dispositivo sostituito con lo stesso `device_id` appare offline: aggiunto a `limiti-noti.md`.
+  - Prove: 81/81 verdi, tsc pulito alle 10:59:02, tre mutazioni colte. La memoria storica ha controllato gli screenshot a 1280 e 390 px.
+  - **Testi per la guida**, da inserire quando la pagina sarà pubblicata: nel resoconto di o2 delle 11:00 (titolo, sottotitolo, conteggio, colonne, stati, durate, cinque «Cosa fare», due avvisi, «Nessun dispositivo in questo appartamento.»).
 - **Proposta al cliente, frase da precisare (07:03, domanda del committente):** il passo 10 della giornata dice «Se l'ospite proverà ad accendere il clima, sarà bloccato». Nel motore: un clima acceso col telecomando con la finestra aperta viene visto solo dal suo misuratore di consumo (`_power_seen`, D14) e rispento dalla regola finestra entro circa un minuto (`_keep_window_off`, D03); senza misuratore collegato non viene visto; durante una forzatura la regola è sospesa. Non è un difetto: in una prossima versione della proposta scrivere «il motore lo rispegnerà entro un minuto». La differenza con i limiti di temperatura: accensione e spegnimento si vedono dal consumo, la temperatura scelta col telecomando no.
 - **Raccomandazione di o1:** V1 + 1-bis + testo nello stesso lotto, o1 circa 8–11 h, o2 circa 1,5–2 h, più la guida.
 - **Risposta 1097 = a (07:00):** valori iniziali di «Limiti del setpoint»: massimo da 24 a 26, raffrescamento resta 25 (D-162). Avviati V1 + 1-bis + testo (D-198): o1 motore e BFF, o2 sito; testo della regola sulla base della proposta di o2 (antigelo escluso, telecomando escluso).
