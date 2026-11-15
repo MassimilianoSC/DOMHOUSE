@@ -2,12 +2,12 @@
 
 | Stato | Preparata | Chi lancia | Durata | Comandi |
 |---|---|---|---|---|
-| **Pronta** | o1, 15 novembre 2026 | il committente, in Git Bash | 5 minuti oggi; 2 minuti il giorno dopo; 5 minuti al momento di rimetterlo | 4 blocchi (D1–D4) |
+| **D1 e D2 fatti** dal committente il 15 novembre 2026 alle 11:41 (D2: nessun permesso rimasto su `domhouse-dns-lab@`). Restano D3 e D4 | o1, 15 novembre 2026 | il committente, in Git Bash | 5 minuti per D1 e D2; 2 minuti per D3, almeno un giorno dopo D1; 5 minuti per D4 | 4 blocchi (D1–D4) |
 
 ## Perché
 
 - La VM (`langbrain-vm@`) ha il ruolo «Creatore di token» sull'account `domhouse-dns-lab@`, che può scrivere nella zona DNS `domhouse-lab`. Serve solo a **lego**, per rinnovare il certificato del broker (D-207).
-- Oggi i container della VM raggiungono il token della VM (difetto E-31, da correggere martedì). Un container compromesso potrebbe quindi prendere l'identità dell'account DNS e farsi rilasciare un certificato per `mqtt.dh-lab.eu`.
+- Oggi i container della VM raggiungono il token della VM (difetto E-31, da correggere dopo la fine delle prove con Youssouf). Un container compromesso potrebbe quindi prendere l'identità dell'account DNS e farsi rilasciare un certificato per `mqtt.dh-lab.eu`.
 - Togliere il permesso adesso chiude subito questa strada.
 
 ## Quando serve davvero
@@ -19,8 +19,8 @@
 3. **Da verificare:** se lego, nel giro giornaliero quando il rinnovo non è dovuto, tocca comunque l'account DNS all'avvio.
    - Il giro di oggi stampa «certificato invariato».
    - Se senza il permesso stampasse invece «broker cert renew failed», l'effetto sarebbe solo quella riga nel registro una volta al giorno, senza email: per questa riga non c'è un allarme.
-   - Il certificato in uso non cambia e il broker non si ferma. Il blocco D3 lo controlla il giorno dopo.
-4. **Nessun rischio per le prove di lunedì:** il broker serve il certificato che ha già, e lego non ne ha bisogno prima di gennaio.
+   - Il certificato in uso non cambia e il broker non si ferma. Il blocco D3 lo controlla almeno un giorno dopo D1.
+4. **Nessun rischio per le prove con Youssouf:** il broker serve il certificato che ha già, e lego non ne ha bisogno prima di gennaio.
 5. **Dopo la correzione di E-31** lego girerà sulla rete dell'host e avrà ancora bisogno del permesso a ogni rinnovo. Quindi il permesso non diventa inutile: va rimesso prima di ogni rinnovo (D4).
 
 ## D1. Togliere il permesso (scrive su Google Cloud)
@@ -43,7 +43,7 @@ gcloud iam service-accounts get-iam-policy domhouse-dns-lab@domotica-poc-511707.
 
 - **Atteso:** nessuna riga `serviceAccount:langbrain-vm@…` sotto `roles/iam.serviceAccountTokenCreator`. Può non comparire nessun `bindings`: va bene.
 
-## D3. Il giorno dopo: il giro giornaliero del certificato (sola lettura sulla VM)
+## D3. Almeno un giorno dopo D1: il giro giornaliero del certificato (sola lettura sulla VM)
 
 ```bash
 # Git Bash
