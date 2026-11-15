@@ -64,6 +64,10 @@ STUBS = {
              '*) echo \'{"status": "ok", "implementation": {}, "connector": {"status": "up"}}\' ;; esac\n'),
     "logger": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/syslog.log"\n',
     "systemctl": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/systemctl.log"\nexit 0\n',
+    # E-32: setpriv drops to the engine's user on the VM; here it notes its options and runs the rest as it is
+    "setpriv": ('#!/usr/bin/env bash\nopts=()\nwhile [[ "$1" == --* ]]; do opts+=("$1"); shift; done\n'
+                'echo "${opts[*]}" >> "$STUB_DIR/setpriv.log"\nexec "$@"\n'),
+    "chown": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/chown.log"\nexit 0\n',
 }
 
 
@@ -265,6 +269,80 @@ def test_the_daily_backup_writes_its_line(vm):
     sqlite3.connect(db).close()
     script = SCRIPT.read_text(encoding="utf-8")
     assert 'logger -t domhouse-backup "backup ok ${apt} ${file}"' in script
+
+
+def _engine_db(path: Path, marker: str) -> None:
+    import sqlite3
+    path.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE IF NOT EXISTS t (v TEXT)")
+    con.execute("INSERT INTO t VALUES (?)", (marker,))
+    con.commit()
+    con.close()
+
+
+def _backups(folder: Path) -> list[Path]:
+    return sorted(folder.glob("engine-*.db")) if folder.is_dir() else []
+
+
+def test_backup_reads_the_database_as_the_engines_user_and_writes_a_consistent_copy(vm):
+    """E-32: the copy is read by the engine's user (setpriv), never by root, and arrives whole: no temporary file left
+    in the apartment's folder, the copy is a database with the engine's data."""
+    import sqlite3
+    _engine_db(vm.data / APT / "engine.db", "dati-di-questo")
+    r = vm("backup", APT)
+    assert r.returncode == 0, r.stderr
+    assert "--reuid=10001" in (vm.stubs / "setpriv.log").read_text(encoding="utf-8")
+    copies = _backups(vm.data / APT / "backup")
+    assert len(copies) == 1
+    assert sqlite3.connect(copies[0]).execute("SELECT v FROM t").fetchone()[0] == "dati-di-questo"
+    assert not [p for p in (vm.data / APT / "backup").iterdir() if p.name.startswith(".")]
+
+
+def _symlink(link: Path, target: Path) -> None:
+    try:
+        link.symlink_to(target, target_is_directory=target.is_dir())
+    except OSError as exc:      # Windows without the right to make links
+        pytest.skip(f"link simbolici non disponibili: {exc}")
+
+
+def test_backup_refuses_a_database_that_is_a_link_to_another_apartment(vm):
+    """E-32: a compromised engine replaces its engine.db with a link to another apartment's database. Root used to copy
+    that database into the first apartment's backup folder, readable by its engine: a leak between apartments."""
+    other = vm.data / "apt-altro" / "engine.db"
+    _engine_db(other, "dati-di-un-altro")
+    (vm.data / APT).mkdir(parents=True, exist_ok=True)
+    _symlink(vm.data / APT / "engine.db", other)
+    r = vm("backup", APT)
+    assert r.returncode != 0
+    assert "backup refused" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert _backups(vm.data / APT / "backup") == []
+
+
+def test_backup_refuses_a_backup_folder_that_is_a_link(vm):
+    """E-32: the backup folder replaced by a link to a folder elsewhere: nothing is written there, and no owner or mode
+    of that folder is changed."""
+    _engine_db(vm.data / APT / "engine.db", "dati-di-questo")
+    elsewhere = vm.data / "altrove"
+    elsewhere.mkdir()
+    _symlink(vm.data / APT / "backup", elsewhere)
+    r = vm("backup", APT)
+    assert r.returncode != 0
+    assert "backup refused" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert list(elsewhere.iterdir()) == []
+    assert str(elsewhere.as_posix()).split("/")[-1] not in ((vm.stubs / "chown.log").read_text(encoding="utf-8")
+                                                            if (vm.stubs / "chown.log").exists() else "")
+
+
+def test_backup_refuses_a_wal_file_that_is_a_link(vm):
+    """E-32: SQLite opens engine.db-wal and engine.db-shm by itself: a link there would read or write another file."""
+    _engine_db(vm.data / APT / "engine.db", "dati-di-questo")
+    other = vm.data / "apt-altro" / "engine.db"
+    _engine_db(other, "dati-di-un-altro")
+    _symlink(vm.data / APT / "engine.db-wal", other)
+    r = vm("backup", APT)
+    assert r.returncode != 0
+    assert "backup refused" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
 
 
 def _connector(vm, name):
