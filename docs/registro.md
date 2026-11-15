@@ -150,6 +150,13 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
   - **Le 130–200 h non comprendono la scrittura automatica nello Shelly:** sono 14–23 h in più, più Youssouf, e serve un programma sul PC della sede del cliente. L'app non lo può fare, perché il browser blocca le chiamate verso la rete locale e la VM non la vede.
   - Seconda VM: +4–6 h nette e circa 15 € al mese. Consigliata da o1.
   - Scelta tecnica aperta: un segreto per dispositivo, oppure il permesso di scrittura alla VM.
+- **Seconda rete Wi-Fi negli Shelly: confermata dalla documentazione ufficiale (comunicato dal committente, registrato alle 09:54).** La guida dello Shelly 1 Gen4 dice fino a 2 reti Wi-Fi attive insieme: se il dispositivo ne perde una, si collega all'altra. La documentazione tecnica, dalla seconda generazione in poi, prevede nel componente WiFi `sta` e `sta1`, con la seconda di riserva. **La prova di lunedì 16 con Youssouf si riduce a tre verifiche:** dopo quanto tempo passa alla seconda rete; se torna da solo sulla prima; se EM Mini Gen4 e Plug M Gen3 si comportano come lo Shelly 1 Gen4. Documento aggiornato:
+  - il passo 1 raccoglie il Wi-Fi dell'appartamento;
+  - al passo 6 la rete dell'appartamento è la principale e quella della sede la riserva;
+  - al passo 13 l'elettricista configura a mano solo i dispositivi che non compaiono;
+  - al passo 17 la rete della sede si toglie a distanza (comando che oggi non esiste, da mettere nello strumento A);
+  - «ufficio» è diventato «sede del cliente», con la spiegazione.
+  - Il messaggio a Youssouf, domanda 1, ora chiede solo le tre verifiche.
 - **Proposta al cliente, frase da precisare (07:03, domanda del committente):** il passo 10 della giornata dice «Se l'ospite proverà ad accendere il clima, sarà bloccato». Nel motore: un clima acceso col telecomando con la finestra aperta viene visto solo dal suo misuratore di consumo (`_power_seen`, D14) e rispento dalla regola finestra entro circa un minuto (`_keep_window_off`, D03); senza misuratore collegato non viene visto; durante una forzatura la regola è sospesa. Non è un difetto: in una prossima versione della proposta scrivere «il motore lo rispegnerà entro un minuto». La differenza con i limiti di temperatura: accensione e spegnimento si vedono dal consumo, la temperatura scelta col telecomando no.
 - **Raccomandazione di o1:** V1 + 1-bis + testo nello stesso lotto, o1 circa 8–11 h, o2 circa 1,5–2 h, più la guida.
 - **Risposta 1097 = a (07:00):** valori iniziali di «Limiti del setpoint»: massimo da 24 a 26, raffrescamento resta 25 (D-162). Avviati V1 + 1-bis + testo (D-198): o1 motore e BFF, o2 sito; testo della regola sulla base della proposta di o2 (antigelo escluso, telecomando escluso).
