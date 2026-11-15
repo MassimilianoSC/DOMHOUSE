@@ -382,3 +382,17 @@ I passi 5.1 e 6 qui sotto valgono solo con la scelta (a).
 | S3.1, porte | accettate, scritte in §5.3 e §3 |
 | S3.2, 4 motori di staging | accettato, con la somma dei tetti di memoria in §5.6 |
 | S3.3, storico eliminato | scelta per il committente in §8.2.3; consiglio (c) |
+
+### 10.2 I sette punti «corretti in parte»: stato finale
+
+| N. | Stato | Motivo (dalla seconda lettura del revisore) |
+|---|---|---|
+| 1 | **chiuso** | mancavano le due condizioni separate, perché il `secretAccessor` del server non coprisse anche `langbrain-shelly-`: ora §2.3 ne ha due per ambiente, e la prova 1125 ha il caso di lettura negativo |
+| 3 | **chiuso** | mancavano il confine fra lettore ed esecutore e il catalogo prima del `compose up`: ora §1.3 (socket, `SO_PEERCRED`, controlli ripetuti, `prod` rifiutato) e §3 `crea_motore` |
+| 4 | **chiuso** | la regola dei metadati andava precisata in sei punti: ora §4.3 e §9.1. Il codice si prepara con la prova rossa per prima (E-31) |
+| 6 | **chiuso** | c'era una contraddizione sull'immagine dello staging: scelta la proposta del revisore, nessun parametro immagine per nessun ambiente (§3) |
+| 10 | **chiuso** | mancavano lo stallo del blocco, gli ordini interrotti da un riavvio e la `seq` dopo l'eliminazione: ora §1.3, §6.2 e §6.4 |
+| 13 | **chiuso** | non era scritto chi cancella vuoti e orfani, e con quale identità: ora §4.1, con uno script mensile del committente e nessun account di servizio con `secrets.delete` |
+| 15 | **chiuso** | `setpriv` contro `/data/_deleted` di root: ora §8.2.5 (copia su stdout, salvata da root). Con la scelta (c) del §8.2.3 la copia non serve affatto |
+
+Nessun punto «accettato così»: tutti e sette sono corretti come chiedeva il revisore.
