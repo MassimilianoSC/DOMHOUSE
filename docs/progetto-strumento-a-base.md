@@ -387,21 +387,23 @@ I passi 5.1 e 6 qui sotto valgono solo con la scelta (a).
 
 **Perché:** chi è sulla stessa rete Wi-Fi (gli ospiti) apre la pagina web locale dello Shelly, ne cambia le impostazioni e ne legge parte della configurazione (§2.5, rischio 3). Youssouf la consiglia su tutti i modelli dal primo appartamento. Lo Shelly la imposta con `Shelly.SetAuth` (utente `admin`, realm = id del dispositivo) e la controlla con l'autenticazione digest SHA-256.
 
-**Proposta:**
+**Attenzione, rilievo della memoria storica (16 novembre):** l'`ha1` del digest **non** è come l'impronta PBKDF2 del broker. Con l'`ha1` ci si autentica alla pagina locale senza conoscere la password: per il digest vale quanto la password. Quindi non deve viaggiare né restare da nessuna parte come se fosse un'impronta.
 
-1. **Non si conserva, come quella del broker (D-233).**
-   - `Shelly.SetAuth` non vuole la password ma il suo `ha1`, cioè SHA-256 di `admin:<id del dispositivo>:<password>`. Il server genera la password (casuale, 32 caratteri), ne calcola l'`ha1` e manda all'agente **solo l'`ha1`**.
-   - La password non va in Firestore, né in Secret Manager, né negli ordini. Con 192 bit casuali l'`ha1` non si inverte per tentativi.
-2. **Chi la imposta:** l'agente sulla VM, con `Shelly.SetAuth` via MQTT, come R2 della tappa A.
-   - Le chiamate via MQTT passano dal broker con l'utente del connector e **non** chiedono la password della pagina locale: si può impostare e cambiare a distanza in ogni momento, anche quando nessuno la conosce.
-   - Serve un'operazione nuova nell'elenco chiuso (§3): `imposta_accesso_locale`, con l'`id` del dispositivo e l'`ha1` (64 caratteri esadecimali, controllati come le impronte). Entra con A3.
-3. **Quando:** subito dopo il primo collegamento al broker, per ogni dispositivo. Di norma **nessuno la vede**: la pagina locale resta chiusa a tutti.
-4. **Per l'assistenza** (raro: quasi tutto si fa via MQTT): «Apri la pagina locale», solo per il gestore della piattaforma.
-   - Genera una password nuova, la **mostra una volta** e ne manda l'`ha1`.
-   - Dopo l'intervento si rifà, così quella vista non vale più.
-   - Va nel registro delle azioni.
+**Proposta (rivista):**
+
+1. **Di norma la password nasce sull'agente e non esce dalla VM**, come `cambia_password` dell'opzione 2.
+   - L'agente genera una password casuale (32 caratteri), ne calcola l'`ha1` e la imposta con `Shelly.SetAuth` via MQTT. Le chiamate via MQTT passano dal broker con l'utente del connector e **non** chiedono la password della pagina locale.
+   - Né la password né l'`ha1` si scrivono: non nel giornale, non nei log, non nel risultato. Al server torna solo «fatto».
+   - Serve un'operazione nuova nell'elenco chiuso (§3): `chiudi_accesso_locale`, con il solo `id` del dispositivo. Entra con A3.
+2. **Quando:** subito dopo il primo collegamento al broker, per ogni dispositivo, e dopo ogni intervento di assistenza. Nessuno la conosce: la pagina locale resta chiusa a tutti.
+3. **Per l'assistenza** (raro: quasi tutto si fa via MQTT) una persona deve conoscerla: è l'unico caso in cui un segreto viaggia.
+   - «Apri la pagina locale», solo per il gestore della piattaforma: il server genera una password, la **mostra una volta** e manda all'agente l'`ha1` con l'operazione `apri_accesso_locale`.
+   - L'`ha1` è trattato come un segreto: mai in Firestore, mai nel giornale del lettore né in quello dell'esecutore, mai nei log; l'ordine scade dopo 2 minuti invece di 15. Resta però nella coda di Pub/Sub fino alla consegna (al massimo l'ora di conservazione della sottoscrizione): è il rischio da accettare per iscritto.
+   - Dopo l'intervento, e comunque dopo 24 ore, il server manda `chiudi_accesso_locale`: la password vista non vale più. Tutto va nel registro delle azioni.
+   - **Alternativa senza segreti in viaggio:** l'assistenza sulla pagina locale la fa chi è sul posto con un ripristino di fabbrica e una nuova messa in servizio. È più lenta.
+4. **Revisione di sicurezza:** il punto va riletto con A3 (domanda della memoria storica).
 5. **«Rigenera»** (password del broker, §8.1) non la tocca: sono due segreti separati.
-6. **«Revoca»:** prima di togliere l'utente del broker, l'agente imposta una password nuova che nessuno conosce. Un dispositivo che torna in uso si riporta alle impostazioni di fabbrica.
+6. **«Revoca»:** prima di togliere l'utente del broker, `chiudi_accesso_locale`: una password nuova che nessuno conosce. Un dispositivo che torna in uso si riporta alle impostazioni di fabbrica.
 7. **Nelle nostre procedure** la pagina locale si apre dal browser, non con `curl` da Windows, che non fa il digest SHA-256 (nota di Youssouf). Da uno script: Python con `requests` e `HTTPDigestAuth`.
 8. **Da verificare con Youssouf:**
    - che `Shelly.SetAuth` via MQTT funzioni su tutti i modelli ammessi;
