@@ -37,12 +37,14 @@ function effective(rule: Rule, d?: Draft[string]) {
 }
 
 /** 1098 = b: «Limiti del setpoint» in two groups, winter (heating) and summer (cooling), in the order of their checks;
+ *  A8: a third one, the split measured by its meter (off_watts, valid also with the rule off: said in its note);
  *  any other parameter (and every other rule) in one group without a title, as before. */
-type Group = { id: string; title?: () => string; keys: string[] };
+type Group = { id: string; title?: () => string; note?: () => string; keys: string[] };
 const GROUPS: Record<string, Group[]> = {
   setpoint_limits: [
     { id: "winter", title: () => t("rules.groups.winter"), keys: ["min", "max", "eco_celsius", "comfort_celsius"] },
     { id: "summer", title: () => t("rules.groups.summer"), keys: ["summer_min", "summer_max", "comfort_cool_celsius"] },
+    { id: "split", title: () => t("rules.groups.split"), note: () => t("rules.notes.off_watts"), keys: ["off_watts"] },
   ],
 };
 
@@ -168,6 +170,7 @@ function RuleCard({ rule, draft, onChange, canWrite, problems = [] }: { rule: Ru
             </div>
           ))}
           </div>
+          {group.note && <p className="text-xs text-muted-foreground" data-testid={`rule-group-note-${rule.rule_id}-${group.id}`}>{group.note()}</p>}
           {(group.id === "winter" || group.id === "summer") && <LimitMessages ruleId={rule.rule_id} place={group.id} problems={problems} />}
         </div>
         {group.id === "winter" && <LimitMessages ruleId={rule.rule_id} place="between" problems={problems} />}

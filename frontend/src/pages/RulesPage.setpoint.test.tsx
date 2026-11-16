@@ -202,3 +202,56 @@ describe("Regole: «Ultima modifica» nell'ora dell'appartamento (P-83, D71)", (
     expect(screen.getByTestId("rules-updated-at")).not.toHaveTextContent("16:00");
   });
 });
+
+// A8 of the Autonomia (o1 d26bf21, 16 Nov): off_watts of «Limiti del setpoint», the watts under which an infrared split
+// confirmed by its meter is off. A measure of the split, not a limit: it is used, and stays editable, with the rule off.
+// Limits from the rule (5–100), never in the site's code.
+describe("Regole: soglia di «spento» del climatizzatore (A8)", () => {
+  const A8 = (enabled: boolean) => ({
+    ...SETPOINT, enabled,
+    params: { ...SETPOINT.params, off_watts: 15 },
+    limits: { ...SETPOINT.limits, off_watts: { min: 5, max: 100 } },
+  });
+
+  it("il campo nel suo gruppo, con i limiti della regola, il valore e la spiegazione", async () => {
+    s.rules = [A8(true)];
+    await open();
+    const group = screen.getByTestId("rule-group-setpoint_limits-split");
+    expect(group).toHaveTextContent("Climatizzatore con misuratore");
+    expect(group).toHaveTextContent("Soglia di spento (W) (da 5 a 100)");
+    expect(screen.getByTestId("rule-param-setpoint_limits-off_watts")).toHaveValue(15);
+    expect(screen.getByTestId("rule-group-note-setpoint_limits-split")).toHaveTextContent(
+      "Sotto questo consumo il climatizzatore risulta spento. Vale anche con la regola spenta. Riguarda solo i climatizzatori a infrarossi controllati da un misuratore.");
+    // not among the winter or summer temperatures
+    expect(screen.getByTestId("rule-group-setpoint_limits-winter")).not.toHaveTextContent("Soglia di spento");
+    expect(screen.getByTestId("rule-group-setpoint_limits-summer")).not.toHaveTextContent("Soglia di spento");
+  });
+
+  it("con la regola spenta il campo resta modificabile e si salva da solo: {rule_id, params: {off_watts}}", async () => {
+    s.rules = [A8(false)];
+    s.canWrite = true;
+    s.update.mockResolvedValue({ updated_at: "2026-11-16T17:00:00.000Z", rules: [A8(false)] });
+    await open();
+    const box = screen.getByTestId("rule-param-setpoint_limits-off_watts");
+    expect(box).not.toBeDisabled();
+    expect(screen.getByTestId("rule-group-note-setpoint_limits-split")).toHaveTextContent("Vale anche con la regola spenta.");
+    fireEvent.change(box, { target: { value: "20" } });
+    await act(async () => { fireEvent.click(screen.getByTestId("rules-save-btn")); });
+    expect(s.update).toHaveBeenCalledWith({ rules: [{ rule_id: "setpoint_limits", params: { off_watts: 20 } }] }, expect.anything());
+  });
+
+  it("fuori dai limiti: il messaggio sotto il campo e il salvataggio bloccato", async () => {
+    s.rules = [A8(true)];
+    s.canWrite = true;
+    await open();
+    fireEvent.change(screen.getByTestId("rule-param-setpoint_limits-off_watts"), { target: { value: "3" } });
+    expect(screen.getByTestId("rule-param-error-setpoint_limits-off_watts")).toHaveTextContent("Valore fuori dai limiti (5–100)");
+    expect(screen.getByTestId("rules-save-btn")).toBeDisabled();
+    expect(screen.getByTestId("rules-save-blocked")).toBeInTheDocument();
+  });
+
+  it("un motore che non ha ancora off_watts: nessun gruppo vuoto", async () => {
+    await open();
+    expect(screen.queryByTestId("rule-group-setpoint_limits-split")).toBeNull();
+  });
+});

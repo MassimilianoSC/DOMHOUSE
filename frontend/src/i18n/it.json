@@ -101,7 +101,11 @@
     "coolOutsideSummer": "La temperatura di raffrescamento deve stare fra il minimo e il massimo estivi",
     "groups": {
       "winter": "Inverno (riscaldamento)",
-      "summer": "Estate (raffrescamento)"
+      "summer": "Estate (raffrescamento)",
+      "split": "Climatizzatore con misuratore"
+    },
+    "notes": {
+      "off_watts": "Sotto questo consumo il climatizzatore risulta spento. Vale anche con la regola spenta. Riguarda solo i climatizzatori a infrarossi controllati da un misuratore."
     },
     "rangeWarning": "«Limiti del setpoint» da correggere: {problem}.",
     "dirty": "{count} regole modificate",
@@ -123,7 +127,8 @@
       "eco_celsius": "Temperatura in eco (°C)",
       "comfort_cool_celsius": "Raffrescamento in comfort (°C)",
       "summer_min": "Minimo (°C)",
-      "summer_max": "Massimo (°C)"
+      "summer_max": "Massimo (°C)",
+      "off_watts": "Soglia di spento (W)"
     },
     "desc": {
       "window_open_off": "Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.",
