@@ -346,3 +346,23 @@ def test_n1_the_alarm_reads_the_fault_lines():
     policy = json.loads((ROOT / "scripts" / "agent" / "allarmi" / "agente-allarme.json").read_text(encoding="utf-8"))
     flt = policy["conditions"][0]["conditionMatchedLog"]["filter"]
     assert "fault message" in flt and "fault journal" in flt
+
+
+# ---- fourth reading, 16 November (N1 alarm line, _answer_unjournalled) ---------------------------------------------
+def test_n1_an_error_after_the_ack_writes_the_alarm_line(w):
+    def broken(data):
+        raise RuntimeError("qualunque cosa")
+    w.answer = broken
+    w.pubsub.put(order())
+    w.reader.step()
+    assert any(l.startswith(f"agent fault message op_id={OP} RuntimeError") for l in w.logs), w.logs
+
+
+def test_a_refusal_whose_publish_raises_anything_is_still_acknowledged(w, monkeypatch):
+    def broken(result):
+        raise RuntimeError("qualunque cosa")
+    monkeypatch.setattr(w.pubsub, "publish", broken)
+    ack = w.pubsub.put(order(apartment_id="lab_01"))
+    w.reader.step()
+    assert w.pubsub.acked == [ack] and w.pubsub.nacked == []
+    assert any(l.startswith("agent fault publish") for l in w.logs)

@@ -74,6 +74,7 @@ STATE_MESSAGES = {"inviato": "Ordine inviato all'agente sulla VM, in attesa dell
 STAGING_ID_RE = re.compile(r"^(lab|test)-[a-z0-9]([a-z0-9-]*[a-z0-9])?$")     # R15, the same as the VM's
 PROD_ID_RE = re.compile(r"^a-[a-z0-9]{8}$")
 DATA_KEYS_MAX = 20
+UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 
 
 def utcnow() -> datetime:
@@ -122,7 +123,9 @@ TOKEN_MAX = 4096
 ISSUERS = ("https://accounts.google.com", "accounts.google.com")          # N3
 FORCED_REFRESH_S = 60       # N4: an unknown kid forces a new download at most once a minute
 RETRY_AFTER_FAILURE_S = 30  # N5: after a failed download, the certificates of before (even expired) for 30 s
-_CERTS: dict = {"certs": None, "until": 0.0, "refreshed": 0.0, "failed": 0.0}
+# from minus infinity: right after a start (time.monotonic() may be a few seconds) nothing waits
+CERTS_INITIAL = {"certs": None, "until": float("-inf"), "refreshed": float("-inf"), "failed": float("-inf")}
+_CERTS: dict = dict(CERTS_INITIAL)
 _CERTS_LOCK = threading.Lock()
 
 
@@ -278,7 +281,7 @@ def _readable(body) -> tuple[dict, dict] | str:
         result = json.loads(data.decode("utf-8"))
         if not isinstance(result, dict) or result.get("esito") not in OUTCOMES or result.get("codice") not in CODES \
                 or result.get("ambiente") != s.agent_ambiente or not isinstance(result.get("op_id"), str) \
-                or len(result["op_id"]) > 80:
+                or not UUID_RE.fullmatch(result["op_id"]):          # never a path-like id to the repository
             return "non_valido"
         dati = result.get("dati") if isinstance(result.get("dati"), dict) else {}
         dati = {k: v for k, v in list(dati.items())[:DATA_KEYS_MAX] if isinstance(k, str) and len(k) <= 40 and (

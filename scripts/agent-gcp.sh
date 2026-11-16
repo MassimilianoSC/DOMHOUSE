@@ -138,11 +138,8 @@ if found is not None:
         problems.append(f"può pubblicare sulla coda degli ordini anche {m} ({role})")
 found = analysis("asset-sa.json", "account del server")
 if found is not None:
-    for m, role in sorted(found.items()):
-        if m == vm or (m.startswith(("serviceAccount:", "group:", "domain:", "allUsers", "allAuthenticatedUsers"))
-                       and m != server):
-            problems.append(f"può impersonare il server dello staging anche {m} ({role})")
-        elif m.startswith("user:") and m not in people:
+    for m, role in sorted(found.items()):                 # an allow-list: principal://, deleted:, groups… all stop
+        if m != server and m not in people:
             problems.append(f"può impersonare il server dello staging anche {m} ({role})")
 
 
@@ -209,7 +206,11 @@ checks() {
     || stop "Non leggo chi può impersonare il server dello staging (analisi dei permessi, API Cloud Asset): abilitala o controlla a mano, poi rilancia."
   PYTHONIOENCODING=utf-8 python3 "${CHECKER}" "${WORK}" "$1" "${SERVER}" "${VM}" "${PUBSUB_AGENT}" "${PERSONE_AMMESSE}" \
     "${ORDERS}" "${RESULTS}" "${DEAD}" "${SUB}" "${DEAD_SUB}" "${PUSH_SUB}" "${P}" "${ENDPOINT}" "${PUSH_EMAIL}" \
-    || stop "Controlli non superati ($1): niente è stato cambiato${1/dopo/ dopo questo punto}. Leggi le righe qui sopra."
+    || { if [ "$1" = "prima" ]; then
+           stop "Controlli non superati (prima): niente è stato cambiato. Leggi le righe qui sopra."
+         else
+           stop "Controlli non superati (dopo): le scritture qui sopra sono fatte; leggi le righe qui sopra e decidi con la memoria storica."
+         fi; }
 }
 
 say "Controlli prima di scrivere (sola lettura)"

@@ -338,3 +338,29 @@ def test_n5_the_cheap_check_happens_before_the_thread(server, monkeypatch):
     threads.clear()
     assert push(answer(op), token="non-un-token").status_code == 401
     assert threads == []
+
+
+# ---- fourth reading, 16 November (op_id as a UUID only, certificates from boot) -----------------------------------
+def test_an_op_id_that_is_not_a_uuid_is_never_looked_up(server, monkeypatch):
+    looked = []
+    real = get_repository().get_agent_op
+
+    async def spy(op_id):
+        looked.append(op_id)
+        return await real(op_id)
+    monkeypatch.setattr(get_repository(), "get_agent_op", spy)
+    op = prova().json()
+    for bad in ("a/b", "..", "x" * 36):
+        assert push(answer(op, op_id=bad)).status_code == 204
+    assert looked == []
+
+
+def test_certificates_are_downloaded_right_after_boot(monkeypatch):
+    calls = []
+    monkeypatch.setattr(agent, "_fetch_certs", lambda: calls.append(1) or ({"k1": "A"}, 3600))
+    monkeypatch.setattr(agent, "_decode", lambda token, certs, audience: {"aud": audience})
+    monkeypatch.setattr(agent.time, "monotonic", lambda: 5.0)            # the VM, or the container, just started
+    agent._CERTS.clear()
+    agent._CERTS.update(agent.CERTS_INITIAL)
+    agent.verify_push_token(token_with("k1"), AUD)
+    assert calls == [1]

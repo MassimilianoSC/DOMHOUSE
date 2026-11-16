@@ -178,10 +178,12 @@ class Lettore:
             self._ack(ack_id, order.op_id)
             try:
                 answer = self.execute(data)
-            except Exception:                            # noqa: BLE001 - any failure of the executor's call
+            except Exception as exc:                     # noqa: BLE001 - any failure of the executor's call
+                self.log(f"agent fault message op_id={safe(order.op_id)} {type(exc).__name__}")
                 answer = None
             result = self._filtered(entry, answer)
-        except Exception:                                # noqa: BLE001 - N1
+        except Exception as exc:                         # noqa: BLE001 - N1
+            self.log(f"agent fault message op_id={safe(order.op_id)} {type(exc).__name__}")
             result = self._result(entry, "fallito", "errore_interno")
         self._close(entry, result)
 
@@ -198,8 +200,8 @@ class Lettore:
         self._ack(ack_id, result.get("op_id"))
         try:
             self.pubsub.publish(result)
-        except OSError:
-            self.log(f"agent fault publish op_id={result.get('op_id')}")
+        except Exception:                                # noqa: BLE001 - any failure of the call
+            self.log(f"agent fault publish op_id={safe(result.get('op_id'))}")
 
     # ---- results -----------------------------------------------------------------------------------------------
     @staticmethod

@@ -345,3 +345,22 @@ def test_r3e_topics_publishers_of_the_results_and_readers_of_the_orders(gcp):
         {"role": "roles/pubsub.subscriber", "members": [VM_SA, "user:curioso@example.com"]}]})
     out, _ = gcp("staging")
     assert out.returncode != 0 and "legge la sottoscrizione" in (out.stderr + out.stdout)
+
+
+# ---- fourth reading, 16 November (impersonation by allow-list, the stop message) -----------------------------------
+@pytest.mark.parametrize("member", ["principal://iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/subject/s",
+                                    "principalSet://iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/*",
+                                    "deleted:serviceAccount:vecchio@x.iam.gserviceaccount.com?uid=1"])
+def test_impersonation_only_the_server_and_the_admitted_persons(gcp, member):
+    write(gcp, "asset-sa.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": [
+        {"iamBinding": {"role": "roles/iam.serviceAccountTokenCreator", "members": [member]}}]}})
+    out, _ = gcp("staging")
+    assert out.returncode != 0 and "impersonare" in (out.stderr + out.stdout)
+
+
+def test_the_stop_message_before_writing_says_nothing_changed(gcp):
+    (gcp.stubs / "exists").write_text("", encoding="utf-8")
+    write(gcp, "change-sub.json", {"enableMessageOrdering": False})
+    out, _ = gcp("staging")
+    text = out.stderr + out.stdout
+    assert "Controlli non superati (prima): niente è stato cambiato." in text and "cambiatoprima" not in text
