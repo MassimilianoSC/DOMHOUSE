@@ -64,9 +64,8 @@ function withoutKey<T>(rec: Record<string, T>, key: string): Record<string, T> {
 }
 
 /** Contract 1.0.6: device.state and device.online may carry the battery level, optional. Present (even null) it
- *  replaces the level; absent, the one already known stays (an older engine never sends it). */
-type WithBattery = { battery_percent?: number | null };
-function batteryFrom(data: WithBattery): WithBattery {
+ *  replaces the level; absent, the one already known stays (the engine sends it only when the connector knows it). */
+function batteryFrom(data: { battery_percent?: number | null }): Pick<Device, "battery_percent"> {
   return "battery_percent" in data ? { battery_percent: data.battery_percent } : {};
 }
 
@@ -91,7 +90,7 @@ export function applyEvent(state: LiveState, env: StreamEnvelope): LiveState {
   const next = { ...state, lastEventId: env.id ?? state.lastEventId };
   switch (env.event) {
     case "device.state": {
-      const data = env.data as unknown as EventDeviceState & WithBattery;
+      const data = env.data as unknown as EventDeviceState;
       return {
         ...next,
         devices: mapDevice(state, data.device_id, (d) => ({
@@ -102,7 +101,7 @@ export function applyEvent(state: LiveState, env: StreamEnvelope): LiveState {
       };
     }
     case "device.online": {
-      const data = env.data as unknown as EventDeviceOnline & WithBattery;
+      const data = env.data as unknown as EventDeviceOnline;
       return {
         ...next,
         devices: mapDevice(state, data.device_id, (d) => ({ ...d, online: data.online, last_seen: data.last_seen, ...batteryFrom(data) })),

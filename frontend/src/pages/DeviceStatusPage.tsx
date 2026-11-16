@@ -1,8 +1,9 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import type { Device } from "@/api/types";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge, Card, Skeleton } from "@/components/ui/primitives";
 import { t } from "@/i18n";
-import { adviceFor, batteryLow, batteryText, isSensor, sortForDiagnosis, statusOf, statusText, type DeviceStatus, type DiagnosisFacts, type StatusDevice } from "@/lib/deviceStatus";
+import { adviceFor, batteryLow, batteryText, isSensor, sortForDiagnosis, statusOf, statusText, type DeviceStatus, type DiagnosisFacts } from "@/lib/deviceStatus";
 import { DEFAULT_TZ, fmtShortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
@@ -23,7 +24,7 @@ const BADGE: Record<DeviceStatus, string> = {
   never: "border-warning-border bg-warning-bg text-warning-fg",
 };
 
-type Row = { device: StatusDevice; room: string; status: DeviceStatus };
+type Row = { device: Device; room: string; status: DeviceStatus };
 type Ctx = { now: number; tz: string; facts: DiagnosisFacts };
 
 /**
@@ -78,8 +79,8 @@ export default function DeviceStatusPage() {
   const now = useMinuteClock();
   const connectorDown = !unreachable && health?.connector.status === "down";
   const ctx: Ctx = { now, tz, facts: { connectorDown: unreachable || connectorDown } };
-  const roomName = (d: StatusDevice) => rooms.find((r) => r.room_id === d.room_id)?.name ?? t("overview.otherRoom");
-  const rows: Row[] = sortForDiagnosis(devices as StatusDevice[], roomName).map((d) => ({ device: d, room: roomName(d), status: statusOf(d) }));
+  const roomName = (d: Device) => rooms.find((r) => r.room_id === d.room_id)?.name ?? t("overview.otherRoom");
+  const rows: Row[] = sortForDiagnosis(devices, roomName).map((d) => ({ device: d, room: roomName(d), status: statusOf(d) }));
   const count = (s: DeviceStatus) => rows.filter((r) => r.status === s).length;
   const lowBatteries = rows.filter((r) => batteryLow(r.device)).length;
 

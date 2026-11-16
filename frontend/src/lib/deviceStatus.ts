@@ -15,10 +15,6 @@ export interface DiagnosisFacts {
   connectorDown: boolean;
 }
 
-/** The device as this page reads it: battery_percent is not in the contract yet (o1 adds it to Device and to the
- *  stream after the committente's go); until then it is optional here, and missing means «non nota». */
-export type StatusDevice = Device & { battery_percent?: number | null };
-
 /** A sensor at or under this level is «da cambiare presto» (Youssouf, 16 Nov: the sensors call themselves flat at
  *  15 %, he proposes 20 %). Provisional: the one place to change it. */
 export const BATTERY_LOW_PERCENT = 20;
@@ -37,19 +33,19 @@ export function isSensor(d: Pick<Device, "capabilities">): boolean {
 }
 
 /** The battery level of a sensor, or null: mains-powered devices have none, and an engine may not send it yet. */
-function batteryOf(d: Pick<StatusDevice, "capabilities" | "battery_percent">): number | null {
+function batteryOf(d: Pick<Device, "capabilities" | "battery_percent">): number | null {
   if (!isSensor(d) || typeof d.battery_percent !== "number") return null;
   return Math.round(d.battery_percent);
 }
 
 /** A sensor whose battery is at or under BATTERY_LOW_PERCENT. */
-export function batteryLow(d: Pick<StatusDevice, "capabilities" | "battery_percent">): boolean {
+export function batteryLow(d: Pick<Device, "capabilities" | "battery_percent">): boolean {
   const b = batteryOf(d);
   return b !== null && b <= BATTERY_LOW_PERCENT;
 }
 
 /** «78 %», «15 %, da cambiare presto», «non nota» (a sensor without the data), «—» (mains-powered). */
-export function batteryText(d: Pick<StatusDevice, "capabilities" | "battery_percent">): string {
+export function batteryText(d: Pick<Device, "capabilities" | "battery_percent">): string {
   if (!isSensor(d)) return "—";
   const b = batteryOf(d);
   if (b === null) return t("deviceStatus.battery.unknown");
@@ -76,7 +72,7 @@ export function statusText(d: Pick<Device, "online" | "last_seen">, now: number)
 }
 
 /** What to check, in plain words; null when there is nothing to do. */
-export function adviceFor(d: Pick<StatusDevice, "online" | "last_seen" | "capabilities" | "battery_percent">, facts: DiagnosisFacts): string | null {
+export function adviceFor(d: Pick<Device, "online" | "last_seen" | "capabilities" | "battery_percent">, facts: DiagnosisFacts): string | null {
   const s = statusOf(d);
   if (s === "online") return batteryLow(d) ? t("deviceStatus.advice.lowBattery") : null;
   if (facts.connectorDown) return t("deviceStatus.advice.connectorDown");
@@ -87,7 +83,7 @@ export function adviceFor(d: Pick<StatusDevice, "online" | "last_seen" | "capabi
 }
 
 /** Never connected, offline, online with a battery to change, online. */
-function rank(d: Pick<StatusDevice, "online" | "last_seen" | "capabilities" | "battery_percent">): number {
+function rank(d: Pick<Device, "online" | "last_seen" | "capabilities" | "battery_percent">): number {
   const s = statusOf(d);
   if (s === "never") return 0;
   if (s === "offline") return 1;
@@ -95,7 +91,7 @@ function rank(d: Pick<StatusDevice, "online" | "last_seen" | "capabilities" | "b
 }
 
 /** Problems first (never connected, offline, battery to change), then by room and name: the list reads as a to-do. */
-export function sortForDiagnosis<D extends Pick<StatusDevice, "online" | "last_seen" | "label" | "capabilities" | "battery_percent">>(devices: D[], roomOf: (d: D) => string): D[] {
+export function sortForDiagnosis<D extends Pick<Device, "online" | "last_seen" | "label" | "capabilities" | "battery_percent">>(devices: D[], roomOf: (d: D) => string): D[] {
   return [...devices].sort((a, b) =>
     rank(a) - rank(b) || roomOf(a).localeCompare(roomOf(b), "it") || a.label.localeCompare(b.label, "it"));
 }
