@@ -63,6 +63,13 @@ function withoutKey<T>(rec: Record<string, T>, key: string): Record<string, T> {
   return copy;
 }
 
+/** Contract 1.0.6: device.state and device.online may carry the battery level, optional. Present (even null) it
+ *  replaces the level; absent, the one already known stays (an older engine never sends it). */
+type WithBattery = { battery_percent?: number | null };
+function batteryFrom(data: WithBattery): WithBattery {
+  return "battery_percent" in data ? { battery_percent: data.battery_percent } : {};
+}
+
 function mapDevice(state: LiveState, deviceId: string, fn: (d: Device) => Device): Device[] {
   return state.devices.map((d) => (d.device_id === deviceId ? fn(d) : d));
 }
@@ -84,20 +91,21 @@ export function applyEvent(state: LiveState, env: StreamEnvelope): LiveState {
   const next = { ...state, lastEventId: env.id ?? state.lastEventId };
   switch (env.event) {
     case "device.state": {
-      const data = env.data as unknown as EventDeviceState;
+      const data = env.data as unknown as EventDeviceState & WithBattery;
       return {
         ...next,
         devices: mapDevice(state, data.device_id, (d) => ({
           ...d,
           capabilities: { ...d.capabilities, [data.capability]: data.state },
+          ...batteryFrom(data),
         })),
       };
     }
     case "device.online": {
-      const data = env.data as unknown as EventDeviceOnline;
+      const data = env.data as unknown as EventDeviceOnline & WithBattery;
       return {
         ...next,
-        devices: mapDevice(state, data.device_id, (d) => ({ ...d, online: data.online, last_seen: data.last_seen })),
+        devices: mapDevice(state, data.device_id, (d) => ({ ...d, online: data.online, last_seen: data.last_seen, ...batteryFrom(data) })),
       };
     }
     case "command.updated": {

@@ -1,9 +1,8 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
-import type { Device } from "@/api/types";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { Badge, Card, Skeleton } from "@/components/ui/primitives";
 import { t } from "@/i18n";
-import { adviceFor, sortForDiagnosis, statusOf, statusText, type DeviceStatus, type DiagnosisFacts } from "@/lib/deviceStatus";
+import { adviceFor, batteryLow, batteryText, isSensor, sortForDiagnosis, statusOf, statusText, type DeviceStatus, type DiagnosisFacts, type StatusDevice } from "@/lib/deviceStatus";
 import { DEFAULT_TZ, fmtShortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
@@ -24,11 +23,11 @@ const BADGE: Record<DeviceStatus, string> = {
   never: "border-warning-border bg-warning-bg text-warning-fg",
 };
 
-type Row = { device: Device; room: string; status: DeviceStatus };
+type Row = { device: StatusDevice; room: string; status: DeviceStatus };
 type Ctx = { now: number; tz: string; facts: DiagnosisFacts };
 
 /**
- * The columns, in one list: a later step adds «Accessi rifiutati» or «Controlli» as one more entry here (with its own
+ * The columns, in one list: a later step adds «Segnale» (rssi), «Accessi rifiutati» or «Controlli» as one more entry here (with its own
  * width), and the advice reads the new facts from DiagnosisFacts; rows, header and phone layout follow by themselves.
  * `label: null` = no caption (the device's name heads its card on the phone); `phoneHidden` = only in the table.
  */
@@ -52,6 +51,16 @@ const COLUMNS: { key: string; header: () => string; label: (() => string) | null
     cell: (r, c) => <span className="tabular">{r.device.last_seen ? fmtShortDateTime(r.device.last_seen, c.tz) : t("deviceStatus.lastSeenNever")}</span>,
   },
   {
+    key: "battery", header: () => t("deviceStatus.columns.battery"), label: () => t("deviceStatus.columns.battery"), width: "minmax(0,1.4fr)",
+    cell: (r) =>
+      batteryLow(r.device) ? (
+        // may wrap on a narrow table instead of spilling into «Cosa fare»
+        <Badge className={cn(BADGE.never, "max-w-full shrink whitespace-normal rounded-xl")} data-battery="low">{batteryText(r.device)}</Badge>
+      ) : (
+        <span className={cn("tabular", !isSensor(r.device) && "text-muted-foreground")}>{batteryText(r.device)}</span>
+      ),
+  },
+  {
     key: "advice", header: () => t("deviceStatus.columns.advice"), label: () => t("deviceStatus.columns.advice"), width: "minmax(0,2.2fr)",
     cell: (r, c) => {
       const advice = adviceFor(r.device, c.facts);
@@ -69,9 +78,10 @@ export default function DeviceStatusPage() {
   const now = useMinuteClock();
   const connectorDown = !unreachable && health?.connector.status === "down";
   const ctx: Ctx = { now, tz, facts: { connectorDown: unreachable || connectorDown } };
-  const roomName = (d: Device) => rooms.find((r) => r.room_id === d.room_id)?.name ?? t("overview.otherRoom");
-  const rows: Row[] = sortForDiagnosis(devices, roomName).map((d) => ({ device: d, room: roomName(d), status: statusOf(d) }));
+  const roomName = (d: StatusDevice) => rooms.find((r) => r.room_id === d.room_id)?.name ?? t("overview.otherRoom");
+  const rows: Row[] = sortForDiagnosis(devices as StatusDevice[], roomName).map((d) => ({ device: d, room: roomName(d), status: statusOf(d) }));
   const count = (s: DeviceStatus) => rows.filter((r) => r.status === s).length;
+  const lowBatteries = rows.filter((r) => batteryLow(r.device)).length;
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
@@ -90,6 +100,7 @@ export default function DeviceStatusPage() {
         <>
           <p className="text-sm font-semibold" data-testid="device-status-summary">
             {t("deviceStatus.summary", { online: count("online"), offline: count("offline"), never: count("never") })}
+            {lowBatteries > 0 && t("deviceStatus.summaryBattery", { count: lowBatteries })}
           </p>
           <Card className="px-4 md:px-5" style={gridStyle} data-testid="device-status-list">
             <div aria-hidden className={cn("hidden border-b py-3 text-xs font-semibold text-muted-foreground", GRID)}>

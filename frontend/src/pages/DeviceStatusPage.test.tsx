@@ -142,6 +142,28 @@ describe("Stato dei dispositivi: cosa mostra", () => {
     expect(screen.getByTestId("device-status-empty")).toHaveTextContent("Nessun dispositivo in questo appartamento.");
   });
 
+  it("batteria: colonna «Batteria», «—» per lo Shelly, giallo sotto il 20 %, conteggio nel riepilogo e prima in elenco", () => {
+    const withBattery = (d: Device, battery_percent: number | null) => ({ ...d, battery_percent }) as Device;
+    const BAGNO = withBattery(device("bagno", "Sensore bagno", "soggiorno", true, ago(1), { temperature: { celsius: 21 } }), 15);
+    const SALA = withBattery(device("sala", "Sensore sala", "soggiorno", true, ago(1), { temperature: { celsius: 20 } }), 78);
+    openPage([CALDAIA, SALA, BAGNO]);
+    expect(screen.getByTestId("device-status-summary")).toHaveTextContent("In linea: 3 · Offline: 0 · Mai collegati: 0 · Batterie da cambiare: 1");
+    expect(screen.getByTestId("device-status-bagno-battery")).toHaveTextContent("15 %, da cambiare presto");
+    expect(screen.getByTestId("device-status-bagno-battery").querySelector("[data-battery='low']")).not.toBeNull();
+    expect(screen.getByTestId("device-status-sala-battery")).toHaveTextContent("78 %");
+    expect(screen.getByTestId("device-status-sala-battery").querySelector("[data-battery='low']")).toBeNull();
+    expect(screen.getByTestId("device-status-caldaia-battery")).toHaveTextContent("—");
+    expect(screen.getByTestId("device-status-bagno-advice")).toHaveTextContent("Batteria quasi scarica: cambiala presto");
+    const rows = within(screen.getByTestId("device-status-list")).getAllByRole("listitem");
+    expect(rows[0]).toHaveAttribute("data-testid", "device-status-row-bagno");
+  });
+
+  it("batteria: senza il dato (motore che non lo manda ancora) «non nota», e nel riepilogo nessun conteggio", () => {
+    openPage([device("x", "Sensore", "camera", true, ago(1), { temperature: { celsius: 18 } })]);
+    expect(screen.getByTestId("device-status-x-battery")).toHaveTextContent("non nota");
+    expect(screen.getByTestId("device-status-summary")).not.toHaveTextContent("Batterie");
+  });
+
   it("stanza che non c'è più: «Senza stanza», come nella Panoramica", () => {
     openPage([device("x", "Sensore", "cantina", true, ago(1), { temperature: { celsius: 18 } })]);
     expect(screen.getByTestId("device-status-x-room")).toHaveTextContent("Senza stanza");

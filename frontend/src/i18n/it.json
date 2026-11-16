@@ -520,6 +520,7 @@
     "title": "Stato dei dispositivi",
     "subtitle": "Per ogni dispositivo dell'appartamento: se è in linea, quando si è fatto sentire l'ultima volta e cosa controllare se non risponde.",
     "summary": "In linea: {online} · Offline: {offline} · Mai collegati: {never}",
+    "summaryBattery": " · Batterie da cambiare: {count}",
     "empty": "Nessun dispositivo in questo appartamento.",
     "unreachable": "Il sistema domotico dell'appartamento non risponde: qui sotto c'è l'ultimo stato ricevuto.",
     "connectorDown": "Il collegamento fra il sistema domotico e i dispositivi è fermo, quindi tutti risultano offline: finché non riparte, lo stato dei singoli dispositivi non dice niente.",
@@ -528,7 +529,13 @@
       "room": "Stanza",
       "status": "Stato",
       "lastSeen": "Ultima volta visto",
+      "battery": "Batteria",
       "advice": "Cosa fare"
+    },
+    "battery": {
+      "level": "{percent} %",
+      "low": "{percent} %, da cambiare presto",
+      "unknown": "non nota"
     },
     "lastSeenNever": "Mai",
     "nothingToDo": "Niente da fare",
@@ -551,7 +558,9 @@
       "neverSensor": "Non si è mai fatto sentire. Controlla che abbia la batteria, che sia abbinato al suo ponte e che non sia troppo lontano dal ponte.",
       "offlineDevice": "Prima funzionava, ora non risponde. Controlla che abbia corrente e che il Wi-Fi dell'appartamento funzioni.",
       "offlineSensor": "Prima funzionava, ora non manda più letture. Controlla la batteria e che il ponte sia acceso e in linea.",
-      "connectorDown": "Non è un problema di questo dispositivo: il sistema domotico non riceve notizie da nessun dispositivo."
+      "connectorDown": "Non è un problema di questo dispositivo: il sistema domotico non riceve notizie da nessun dispositivo.",
+      "lowBattery": "Batteria quasi scarica: cambiala presto, prima che il sensore smetta di mandare letture.",
+      "offlineLowBattery": "L'ultima volta la batteria era al {percent} %: probabilmente è scarica. Cambiala, poi controlla che il ponte sia acceso e in linea."
     }
   },
   "occupancy": {
