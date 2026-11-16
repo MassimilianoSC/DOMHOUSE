@@ -33,6 +33,7 @@ spec.loader.exec_module(comune)
 AUD = "https://domotica-bff-staging-abc123-ew.a.run.app/internal/agent/risultati"
 PUSH = "domhouse-push-staging@domotica-poc-511707.iam.gserviceaccount.com"
 TOPIC = "projects/domotica-poc-511707/topics/domhouse-staging-ordini"
+SUBSCRIPTION = "projects/domotica-poc-511707/subscriptions/domhouse-staging-risultati-push"
 MANAGER = Identity(uid="UpLatM4nager", email="gestore@piattaforma.it", display_name="Gestore", user=None,
                    platform_manager=True)
 
@@ -44,7 +45,8 @@ def run(coro):
 @pytest.fixture
 def server(monkeypatch):
     settings = dataclasses.replace(get_settings(), agent_ambiente="staging", agent_orders_topic=TOPIC,
-                                   agent_push_audience=AUD, agent_push_email=PUSH)
+                                   agent_push_audience=AUD, agent_push_email=PUSH,
+                                   agent_push_subscription=SUBSCRIPTION)
     monkeypatch.setattr(agent, "get_settings", lambda: settings)
     published = []
     state = type("S", (), {"fail": False, "now": None})()
@@ -82,7 +84,7 @@ def prova(apartment="lab-01"):
 
 def push(result: dict, token="buono"):
     body = {"message": {"data": base64.b64encode(json.dumps(result).encode()).decode(), "messageId": "1"},
-            "subscription": "projects/domotica-poc-511707/subscriptions/domhouse-staging-risultati-push"}
+            "subscription": SUBSCRIPTION}
     headers = {"Authorization": f"Bearer {token}"} if token else {}
     return run(call("POST", "/internal/agent/risultati", json=body, headers=headers))
 
@@ -178,3 +180,63 @@ def test_the_server_knows_the_agents_lists():
     assert agent.OUTCOMES == comune.OUTCOMES and set(agent.CODES) >= set(comune.CODES)
     assert all(agent.MESSAGES.get(code) for code in agent.CODES)
     assert agent.STAGING_ID_RE.pattern == comune.STAGING_ID_RE.pattern                 # R15
+
+
+# ---- second reading, 16 November (security review of A1: R1, R2, R5, R18) ----------------------------------------
+def b64url(data: dict) -> str:
+    return base64.urlsafe_b64encode(json.dumps(data).encode()).decode().rstrip("=")
+
+
+GOOD_TOKEN = f"{b64url({'alg': 'RS256', 'kid': 'k1', 'typ': 'JWT'})}.{b64url({'sub': 'x'})}.firma"
+
+
+def test_r1_a_cheap_check_before_any_certificate_and_the_certificates_cached(monkeypatch):
+    fetched, decoded = [], []
+
+    def fetch():
+        fetched.append(1)
+        return {"k1": "PEM"}, 3600
+    monkeypatch.setattr(agent, "_fetch_certs", fetch)
+    monkeypatch.setattr(agent, "_decode", lambda token, certs, audience: decoded.append(certs) or {"aud": audience})
+    agent._CERTS.update(certs=None, until=0.0)
+    for junk in ("", "abc", "a.b", "a.b.c.d", "x" * 5000 + ".a.b",
+                 f"{b64url({'alg': 'none', 'kid': 'k1'})}.e30.x", f"{b64url({'alg': 'RS256'})}.e30.x",
+                 f"{b64url({'alg': 'HS256', 'kid': 'k1'})}.e30.x", "!!!.???.***"):
+        with pytest.raises(ValueError):
+            agent.verify_push_token(junk, AUD)
+    assert fetched == [] and decoded == []                         # nothing fetched for a token that cannot be one
+    agent.verify_push_token(GOOD_TOKEN, AUD)
+    agent.verify_push_token(GOOD_TOKEN, AUD)
+    assert fetched == [1] and decoded == [{"k1": "PEM"}, {"k1": "PEM"}]   # one fetch, cached for its max-age
+
+
+def test_r1_r18_google_is_called_outside_the_event_loop(server, monkeypatch):
+    threads = []
+    real = agent.asyncio.to_thread
+
+    async def spy(fn, *args, **kw):
+        threads.append({agent.publish: "publish", agent.verify_push_token: "verify_push_token"}.get(fn, fn))
+        return await real(fn, *args, **kw)
+    monkeypatch.setattr(agent.asyncio, "to_thread", spy)
+    op = prova().json()
+    push(answer(op))
+    assert "publish" in threads and "verify_push_token" in threads
+
+
+def test_r2_whatever_the_push_carries_the_server_answers_204(server):
+    op = prova().json()
+    deep = base64.b64encode(b"[" * 60_000 + b"]" * 60_000).decode()
+    for body in (["lista"], {"message": "testo"}, {"message": {"data": deep}}, {"message": {"data": None}},
+                 {"message": {"data": base64.b64encode(b'{"op_id": 1, "esito": []}').decode()}}):
+        r = run(call("POST", "/internal/agent/risultati", json={**body, "subscription": SUBSCRIPTION}
+                     if isinstance(body, dict) else body, headers={"Authorization": "Bearer buono"}))
+        assert r.status_code == 204, body
+    assert get(op["op_id"]).json()["stato"] == "inviato"
+
+
+def test_r5_a_result_from_another_subscription_is_ignored(server):
+    op = prova().json()
+    body = {"message": {"data": base64.b64encode(json.dumps(answer(op)).encode()).decode()},
+            "subscription": "projects/domotica-poc-511707/subscriptions/un-altra"}
+    r = run(call("POST", "/internal/agent/risultati", json=body, headers={"Authorization": "Bearer buono"}))
+    assert r.status_code == 204 and get(op["op_id"]).json()["stato"] == "inviato"

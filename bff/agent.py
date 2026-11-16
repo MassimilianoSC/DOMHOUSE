@@ -18,9 +18,12 @@ empty: production until the second VM (§5.4).
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import json
 import re
+import threading
+import time
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -114,11 +117,53 @@ def publish(topic: str, body: bytes, ordering_key: str | None) -> None:
         raise OSError(f"pubsub publish {r.status_code}")
 
 
+GOOGLE_CERTS = "https://www.googleapis.com/oauth2/v1/certs"
+TOKEN_MAX = 4096
+_CERTS: dict = {"certs": None, "until": 0.0}
+_CERTS_LOCK = threading.Lock()
+
+
+def _b64json(segment: str) -> dict:
+    data = json.loads(base64.urlsafe_b64decode(segment + "=" * (-len(segment) % 4)).decode("utf-8"))
+    if not isinstance(data, dict):
+        raise ValueError("segmento non valido")
+    return data
+
+
+def _fetch_certs() -> tuple[dict, float]:
+    """Google's public certificates for the OIDC tokens, and how long they may be kept (Cache-Control max-age)."""
+    import requests
+    r = requests.get(GOOGLE_CERTS, timeout=5)
+    r.raise_for_status()
+    found = re.search(r"max-age=(\d+)", r.headers.get("Cache-Control", ""))
+    return r.json(), float(found.group(1)) if found else 300.0
+
+
+def _decode(token: str, certs: dict, audience: str) -> dict:
+    from google.auth import jwt
+    return jwt.decode(token, certs=certs, audience=audience)
+
+
 def verify_push_token(token: str, audience: str) -> dict:
-    """Google's signature and the audience; raises ValueError when they do not hold."""
-    import google.auth.transport.requests
-    from google.oauth2 import id_token
-    return id_token.verify_oauth2_token(token, google.auth.transport.requests.Request(), audience=audience)
+    """R1 (security review of A1): a cheap check first (three segments, at most 4 KB, header RS256 with a kid), so
+    that a forged request costs nothing; then Google's certificates, kept for their max-age, and the signature with
+    the audience. Raises ValueError when anything does not hold. Synchronous: called with asyncio.to_thread."""
+    if not isinstance(token, str) or len(token) > TOKEN_MAX or token.count(".") != 2:
+        raise ValueError("token non valido")
+    try:
+        header = _b64json(token.split(".", 1)[0])
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise ValueError("token non valido") from exc
+    if header.get("alg") != "RS256" or not isinstance(header.get("kid"), str):
+        raise ValueError("token non valido")
+    with _CERTS_LOCK:
+        if _CERTS["certs"] is None or time.monotonic() > _CERTS["until"]:
+            certs, max_age = _fetch_certs()
+            _CERTS.update(certs=certs, until=time.monotonic() + max_age)
+        certs = _CERTS["certs"]
+    if header["kid"] not in certs:
+        raise ValueError("certificato sconosciuto")
+    return _decode(token, certs, audience)
 
 
 # ---- the operations ---------------------------------------------------------------------------------------------
@@ -136,7 +181,8 @@ async def send(operazione: str, apartment_id: str | None, uid: str) -> AgentOp:
     order = {"op_id": op.op_id, "operazione": op.operazione, "apartment_id": op.apartment_id, "seq": op.seq,
              "parametri": {}, "ambiente": op.ambiente, "richiesto_da": op.richiesto_da}
     try:
-        publish(s.agent_orders_topic, json.dumps(order).encode("utf-8"), op.apartment_id)
+        # R18: the publish is a blocking call: outside the event loop
+        await asyncio.to_thread(publish, s.agent_orders_topic, json.dumps(order).encode("utf-8"), op.apartment_id)
     except Exception as exc:                                     # noqa: BLE001 - any failure of the publish
         warn("agent order not published", op_id=op.op_id, error=type(exc).__name__)
         await get_repository().finish_agent_op(op.op_id, op.ambiente, op.apartment_id, op.operazione,
@@ -174,28 +220,41 @@ def describe(op: AgentOp) -> dict:
             "dati": op.dati, "creato_at": op.creato_at, "finito_at": op.finito_at}
 
 
-def authorised(authorization: str | None) -> bool:
+async def authorised(authorization: str | None) -> bool:
     """§4.2: Google's signature, aud = the exact address of this environment's route, email = its push account,
-    email_verified."""
+    email_verified. R1: the check runs outside the event loop."""
     s = get_settings()
-    if not (s.agent_push_audience and s.agent_push_email) or not authorization or \
+    if not (s.agent_push_audience and s.agent_push_email) or not isinstance(authorization, str) or \
             not authorization.startswith("Bearer "):
         return False
     try:
-        claims = verify_push_token(authorization[len("Bearer "):], s.agent_push_audience)
+        claims = await asyncio.to_thread(verify_push_token, authorization[len("Bearer "):], s.agent_push_audience)
     except Exception:                                            # noqa: BLE001 - any failure of the check
+        return False
+    if not isinstance(claims, dict):
         return False
     return claims.get("aud") == s.agent_push_audience and claims.get("email") == s.agent_push_email \
         and claims.get("email_verified") is True
 
 
 async def receive(body) -> str:
-    """A pushed result: what happened to it, for the log («chiuso» or why it was ignored)."""
+    """A pushed result: what happened to it, for the log («chiuso» or why it was ignored). R2: never raises: whatever
+    the push carries is acknowledged (the route answers 204), so that Pub/Sub never retries it for 7 days."""
+    try:
+        return await _receive(body)
+    except Exception:                                            # noqa: BLE001 - R2
+        return "illeggibile"
+
+
+async def _receive(body) -> str:
     s = get_settings()
+    if not isinstance(body, dict) or body.get("subscription") != s.agent_push_subscription \
+            or not s.agent_push_subscription:
+        return "sottoscrizione_diversa"                          # R5
     try:
         data = base64.b64decode(body["message"]["data"], validate=True)
         result = json.loads(data.decode("utf-8"))
-    except (KeyError, TypeError, ValueError, UnicodeDecodeError):
+    except (KeyError, TypeError, ValueError, UnicodeDecodeError, RecursionError):
         return "illeggibile"
     if not isinstance(result, dict) or result.get("esito") not in OUTCOMES or result.get("codice") not in CODES \
             or result.get("ambiente") != s.agent_ambiente or not isinstance(result.get("op_id"), str):

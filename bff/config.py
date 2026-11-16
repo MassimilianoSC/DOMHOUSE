@@ -82,6 +82,7 @@ class Settings:
     agent_orders_topic: str = ""
     agent_push_audience: str = ""
     agent_push_email: str = ""
+    agent_push_subscription: str = ""         # R5: the push subscription a result must come from
 
     @property
     def mail_configured(self) -> bool:
@@ -124,6 +125,7 @@ def get_settings() -> Settings:
         agent_orders_topic=e("AGENT_ORDERS_TOPIC", "").strip(),
         agent_push_audience=e("AGENT_PUSH_AUDIENCE", "").strip(),
         agent_push_email=e("AGENT_PUSH_EMAIL", "").strip(),
+        agent_push_subscription=e("AGENT_PUSH_SUBSCRIPTION", "").strip(),
         italianway_webhook_secret=e("ITALIANWAY_WEBHOOK_SECRET", ""),
         italianway_signature_header=e("ITALIANWAY_SIGNATURE_HEADER", "X-Signature"),
         port=int(e("PORT", "8000")),

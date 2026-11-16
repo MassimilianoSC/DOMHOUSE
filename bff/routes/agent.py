@@ -26,11 +26,11 @@ def err(status: int, error: str, message: str, **details) -> JSONResponse:
 
 @internal.post("/risultati")
 async def results(request: Request):
-    if not agent.authorised(request.headers.get("authorization")):
+    if not await agent.authorised(request.headers.get("authorization")):
         return Response(status_code=401)
     try:
         body = await request.json()
-    except ValueError:
+    except Exception:                                            # noqa: BLE001 - R2: any body is acknowledged
         body = None
     outcome = await agent.receive(body)
     if outcome != "chiuso":
