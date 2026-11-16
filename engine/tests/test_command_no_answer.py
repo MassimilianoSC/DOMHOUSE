@@ -74,7 +74,8 @@ def test_a_device_that_does_not_answer_is_offline_for_the_app_and_says_what_to_c
     final, decision, warned = run(CommandResult("failed", "internal_error", detail="transport timeout"), monkeypatch)
     assert (final["status"], final["reason"]) == ("failed", "device_offline")
     assert (decision["outcome"], decision["reasoning"]) == (
-        "failed", "Il dispositivo non ha risposto: controlla che sia acceso e collegato")
+        "failed", "Il dispositivo non ha risposto: riprova, e se succede ancora controlla che sia acceso e "
+        "collegato")
     # what the connector said stays in the log: a broker that is down is still told apart from an unplugged socket
     assert [(w["reason"], w["detail"]) for w in warned] == [("internal_error", "transport timeout")]
 

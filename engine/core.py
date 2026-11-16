@@ -2246,7 +2246,8 @@ class ApartmentEngine:
             # timeout» (translate.error_result); connector-v2 §7.2 wants device_offline. Until it says so itself, the
             # engine translates; the connector's own reason and detail stay in the log line above
             if reason == "internal_error" and result.detail == "transport timeout":
-                reason, why = "device_offline", "Il dispositivo non ha risposto: controlla che sia acceso e collegato"
+                reason, why = "device_offline", ("Il dispositivo non ha risposto: riprova, e se succede ancora "
+                                                 "controlla che sia acceso e collegato")
             self._set_status(cmd, "failed", reason)
             self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state), why, "failed",
                      cmd["correlation_id"], command_id=cmd["command_id"])
