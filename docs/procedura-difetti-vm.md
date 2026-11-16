@@ -287,6 +287,68 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 - `/opt/domhouse/prima-difetti-vm` resta: è il ritorno indietro. Si toglie dopo una settimana senza problemi.
 
+## Dopo V16, a parte: il catalogo di Youssouf nel motore `lab-01` (risposta 1144)
+
+**Non fa parte di V0–V16.** Si fa dopo V16, oppure un altro momento: lo decide il committente. Sono i passi 6.5 della tappa B, con il file unito in `main` (`4c5f427`).
+
+**Prima di cominciare, da sapere:**
+
+1. **Lo Shelly 1 e l'EM Mini risultano «non in linea»** finché non c'è la procedura `docs/procedura-lab01-due-shelly.md`. Senza di loro, anche i tre sensori BLU (che passano dallo Shelly 1) restano «non in linea». È atteso.
+2. **L'immagine di `lab-01` è `engine:247fda0`.** Il catalogo con quel codice si carica (controllato da o1). Ma per i sensori BLU mancano le correzioni dell'orologio del ponte (#12 e #13, tappa B 6.4): finché l'immagine non si aggiorna, dopo un riavvio del ponte un sensore morto può sembrare vivo per qualche minuto.
+3. **Quando lo Shelly 1 sarà collegato**, il motore regola la «Caldaia» con il sensore H&T: il relè può scattare da solo. Al banco a valle c'è solo la ciabatta con la spia.
+4. **La Plug resta `dev-presa-lab`:** l'app tiene il suo nome di oggi e il suo storico.
+5. **Ricreare il container** (comando `key`) applica il `compose.yaml` installato in V2, con i tetti di V11: è atteso.
+
+### C1. Il catalogo sul PC (sola lettura)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+git log --oneline -1 4c5f427 && .venv/Scripts/python.exe -c "from pathlib import Path; from engine.connector.shelly.catalog import load_catalog; from engine.connector.shelly.offline import load_thresholds; c = load_catalog(Path('engine/connector/shelly/cataloghi/lab-01.yaml'), load_thresholds()); print('catalogo valido:', [(d.device_id, d.shelly_id or d.blu.addr, d.device_type) for d in c.devices])"
+```
+
+- **Atteso:** la riga di `4c5f427`, poi `catalogo valido:` con sei dispositivi, il primo `('dev-presa-lab', 'shellyplugmg3-9070695cb0d0', 'plug')`.
+- Se la Plug ha un altro `device_id`, fermati: l'app perderebbe lo storico.
+
+### C2. Copia di sicurezza, file nuovo, motore ricreato (scrive sulla VM)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute scp engine/connector/shelly/cataloghi/lab-01.yaml langbrain-dev:catalog-lab-01.yaml --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo cp -p /data/lab-01/catalog.yaml /data/lab-01/catalog.yaml.prima && sudo install -m 640 -o 10001 -g 10001 ~/catalog-lab-01.yaml /data/lab-01/catalog.yaml && sudo ls -ln /data/lab-01 && sudo bash /opt/domhouse/engine-vm.sh key lab-01'
+```
+
+- `key` riscrive il file della chiave e ricrea il container: il motore rilegge il catalogo.
+- **Atteso:** `catalog.yaml` e `catalog.yaml.prima` nella cartella, poi `health 200: ok … connector up`.
+
+### C3. Controllo (sola lettura)
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo docker logs --since 5m engine-lab-01 2>&1 | grep -E "shelly connector started|engine started|link ignored|not supported|unknown shelly|blu sensor not paired" | cut -c1-220'
+```
+
+- **Atteso:**
+  1. «shelly connector started» con `devices: 6` (o `"devices": 6`);
+  2. «engine started» con 6 dispositivi;
+  3. **nessuna** riga «link ignored» (il collegamento caldaia → sensore H&T è valido) né «not supported».
+- «blu sensor not paired» compare solo quando lo Shelly 1 è collegato e un sensore non risulta abbinato al ponte: da incollare.
+- Poi, nell'app di staging, la pagina dei dispositivi di `lab-01`: sei dispositivi, la Plug in linea, gli altri «non in linea» finché non c'è la procedura dei due Shelly.
+
+### C4. Tornare al catalogo di prima (scrive sulla VM), solo se il motore non riparte o qualcosa non va
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo cp -p /data/lab-01/catalog.yaml.prima /data/lab-01/catalog.yaml && sudo bash /opt/domhouse/engine-vm.sh key lab-01'
+```
+
+- **Atteso:** `health 200: ok … connector up`, con la sola Plug.
+- I dispositivi nuovi restano salvati nel motore ma non si aggiornano più. Lo storico della Plug non cambia.
+
 ## Da incollare alla memoria storica
 
 Le uscite di V0.2 (prova rossa), V0.3 (prova rossa di E-34), V5 (prova verde), V7, V9, V10, V10b, V11, V13 e V15.
+Se si fa anche il catalogo: C1, C2 e C3.
