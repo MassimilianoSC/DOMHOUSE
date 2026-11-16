@@ -36,11 +36,22 @@ describe("CommandChip, lo stato dell'ultimo comando di un dispositivo", () => {
     expect(screen.queryByTestId(`${TEST_ID}-correlation`)).toBeNull();
   });
 
-  it("failed con il motivo: «errore: <motivo> · <codice>» e l'ID richiesta da copiare", () => {
+  it("failed con il motivo: «errore: <motivo>» in parole, il codice solo nell'attributo, e l'ID richiesta da copiare", () => {
     show(cmd({ status: "failed", reason: "blocked_by_rule", correlationId: "c0ffee00-1111-2222-3333-444455556666" }));
-    expect(chip()).toHaveTextContent(/^errore: bloccato da una regola · blocked_by_rule/);
+    expect(chip()).toHaveTextContent(/^errore: bloccato da una regola/);
+    expect(chip()).not.toHaveTextContent("blocked_by_rule");
+    expect(chip()).toHaveAttribute("data-reason", "blocked_by_rule");
     expect(chip().className).toContain("bg-negative-bg");
     expect(screen.getByTestId(`${TEST_ID}-correlation`)).toHaveAttribute("data-correlation-id", "c0ffee00-1111-2222-3333-444455556666");
+  });
+
+  // E-35 (16 nov, prova con la Plug staccata): il dispositivo che non risponde non è un «errore interno»; il motore manda
+  // device_offline e il chip dice cosa controllare, come il toast «… è offline» che arriva quando il motore lo segna.
+  it("failed perché il dispositivo non ha risposto: cosa controllare, senza codice tecnico", () => {
+    show(cmd({ status: "failed", reason: "device_offline", correlationId: "110fdb9b-0000-0000-0000-000000000000" }));
+    expect(chip()).toHaveTextContent(/^errore: il dispositivo non ha risposto, controlla che sia acceso e collegato/);
+    expect(chip()).not.toHaveTextContent(/device_offline|errore interno/);
+    expect(screen.getByTestId(`${TEST_ID}-correlation`)).toHaveAttribute("data-correlation-id", "110fdb9b-0000-0000-0000-000000000000");
   });
 
   it("timeout senza motivo: «nessuna risposta», senza i due punti", () => {
@@ -51,7 +62,8 @@ describe("CommandChip, lo stato dell'ultimo comando di un dispositivo", () => {
 
   it("un motivo che l'app non conosce ancora si mostra con il suo codice", () => {
     show(cmd({ status: "failed", reason: "nuovo_motivo" as TrackedCommand["reason"] }));
-    expect(chip()).toHaveTextContent(/^errore: nuovo_motivo · nuovo_motivo$/);
+    expect(chip()).toHaveTextContent(/^errore: nuovo_motivo$/);
+    expect(chip()).toHaveAttribute("data-reason", "nuovo_motivo");
   });
 
   it("un errore senza comando (la richiesta non è partita): il messaggio e il suo ID", () => {
@@ -85,6 +97,6 @@ describe("CommandChip, i testi dei motivi", () => {
     const reasons = /CommandReason:\s*\n\s*type: string\s*\n\s*enum: \[([^\]]+)\]/.exec(contract)?.[1].split(",").map((s) => s.trim());
     expect(reasons?.length).toBeGreaterThan(0);
     expect(Object.keys(itJson.command.reason).sort()).toEqual([...(reasons ?? [])].sort());
-    for (const r of reasons ?? []) expect(reasonText(r)).toBe(`${(itJson.command.reason as Record<string, string>)[r]} · ${r}`);
+    for (const r of reasons ?? []) expect(reasonText(r)).toBe((itJson.command.reason as Record<string, string>)[r]);
   });
 });

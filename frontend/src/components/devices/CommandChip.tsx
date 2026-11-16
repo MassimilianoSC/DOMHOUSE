@@ -5,9 +5,11 @@ import { cn } from "@/lib/utils";
 import type { TrackedCommand, DeviceError } from "@/store/streamReducer";
 import { isInProgress } from "@/store/streamReducer";
 
+/** The reason in words; its code stays out of sight (E-35, in `data-reason` for the support), and a reason the app does
+ *  not know yet shows its code, the only name it has. */
 export function reasonText(reason: string | null | undefined): string {
   if (!reason) return "";
-  return `${tOr(`command.reason.${reason}`, reason)} · ${reason}`;
+  return tOr(`command.reason.${reason}`, reason);
 }
 
 /**
@@ -39,7 +41,7 @@ export function CommandChip({ command, error, testId }: { command?: TrackedComma
     );
   }
   return (
-    <span data-testid={testId} data-status={command.status} role="status" className={chip("err")}>
+    <span data-testid={testId} data-status={command.status} data-reason={command.reason ?? undefined} role="status" className={chip("err")}>
       <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
       {t(`command.${command.status === "timeout" ? "timeout" : "failed"}`)}
       {command.reason ? `: ${reasonText(command.reason)}` : ""}
