@@ -78,6 +78,8 @@ case "${cmd}" in
     for s in "${SERVICES[@]}"; do install -m 644 -o root -g root "${SRC}/${s}" "${UNITS}/${s}"; done
     systemctl daemon-reload
     for s in "${SERVICES[@]}"; do systemctl enable --now "${s}"; done      # the executor first: the reader needs it
+    # R17: installing again must run the new code, not only put it on disk; the executor first, again
+    for s in "${SERVICES[@]}"; do systemctl restart "${s}"; done
     echo "agente installato: ambiente ${AMBIENTE}"
     ;;
   status)

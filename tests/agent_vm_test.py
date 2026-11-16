@@ -156,3 +156,12 @@ def test_the_units_keep_the_reader_unprivileged_and_the_socket_folder_closed():
                  "StateDirectoryMode=0700", "NoNewPrivileges=yes", "ExecStart=/usr/bin/python3 -I /opt/domhouse/agent/esecutore.py"):
         assert line in executor, line
     assert "Environment" not in reader + executor                     # no variable from outside the code
+
+
+def test_r17_installing_again_restarts_both_services_executor_first(vm):
+    """R17 (security review of A1): a new version of the code is running after install, not only on disk."""
+    assert vm("install", env=GOOD).returncode == 0
+    systemctl = log(vm, "systemctl")
+    first, second = (systemctl.index("restart domhouse-agent-esecutore.service"),
+                     systemctl.index("restart domhouse-agent-lettore.service"))
+    assert systemctl.index("enable --now domhouse-agent-lettore.service") < first < second
