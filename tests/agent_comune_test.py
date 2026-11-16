@@ -165,3 +165,28 @@ def test_a_result_carries_codes_only():
     with pytest.raises(ValueError):
         comune.result(o, "riuscito", "ok", {"testo": "x" * 300})              # data: short values only
     assert len(json.dumps(comune.result(o, "fallito", "interrotto"))) < 1024
+
+
+# ---- second reading, 16 November (security review of A1: R2, R6, R15) ---------------------------------------------
+@pytest.mark.parametrize("apt", ["test-", "lab--", "lab-01-", "test--x", "lab-" + "a" * 61])
+def test_r15_staging_ids_are_whole_words(apt):
+    assert code(order(apartment_id=apt)) == "id_non_valido"
+    assert comune.STAGING_ID_RE.pattern == r"^(lab|test)-[a-z0-9]([a-z0-9-]*[a-z0-9])?$"
+
+
+def test_r6_the_sequence_has_a_maximum():
+    assert comune.check_order(raw(order(seq=2**31 - 1)), "staging").seq == 2**31 - 1
+    assert code(order(seq=2**31)) == "campo_non_valido"
+
+
+def test_r2_a_poisoned_order_is_refused_never_raises():
+    deep = b"[" * 60_000 + b"]" * 60_000                                   # under 128 KB, RecursionError in json.loads
+    assert code(deep) == "json_non_valido"
+    lone = order(operazione="applica_catalogo", parametri={"catalogo": "x", "versione": 1})
+    text = json.dumps(lone).replace('"catalogo": "x"', r'"catalogo": "\ud800"').encode()
+    assert code(text) == "parametri_non_validi"                              # a lone surrogate cannot be encoded
+    bad_id = json.dumps(order()).replace(OP, r"\ud800" * 3).encode()
+    assert code(bad_id) == "campo_non_valido"
+    r = comune.result_for_raw(bad_id, "rifiutato", "campo_non_valido")
+    assert r["op_id"] is None and json.dumps(r, ensure_ascii=False).encode("utf-8")   # publishable
+    assert comune.result_for_raw(deep, "rifiutato", "json_non_valido")["op_id"] is None

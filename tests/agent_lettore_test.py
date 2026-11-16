@@ -133,6 +133,7 @@ def test_a_refused_order_never_reaches_the_executor(w):
     w.pubsub.put(order(apartment_id="lab_01"))
     w.pubsub.put(None, raw=b"\xff\xfe non json")
     w.reader.step()
+    w.reader.step()                                       # R4: one order per pull
     assert [(r["esito"], r["codice"]) for r in w.pubsub.published] == [("rifiutato", "id_non_valido"),
                                                                        ("rifiutato", "json_non_valido")]
     assert w.calls == [] and len(w.pubsub.acked) == 2
@@ -216,6 +217,7 @@ def test_log_lines_have_no_email_and_the_day_is_counted(w):
     w.pubsub.put(order())
     w.pubsub.put(order(op_id=OP2, apartment_id="lab_01"))
     w.reader.step()
+    w.reader.step()                                       # R4: one order per pull
     w.reader.count_line()
     line = w.logs[-1]
     assert line.startswith("agent count ambiente=staging") and "ricevuti=2" in line and "riusciti=1" in line
@@ -235,3 +237,59 @@ def test_the_configuration_is_strict(tmp_path):
         bad.write_text(text, encoding="utf-8")
         with pytest.raises(ValueError):
             lettore.read_config(bad)
+
+
+# ---- second reading, 16 November (security review of A1: R2, R4, R9-R12) -----------------------------------------
+def test_r4_one_order_per_pull():
+    assert lettore.PULL_MAX == 1
+
+
+def test_r2_a_poisoned_message_never_stops_the_reader(w, monkeypatch):
+    w.pubsub.put(None, raw=b"[" * 60_000 + b"]" * 60_000)
+    w.pubsub.put(None, raw=json.dumps(order()).replace(OP, r"\ud800" * 3).encode())
+    w.reader.step()
+    w.reader.step()
+    assert [(r["esito"], r["codice"]) for r in w.pubsub.published] == [("rifiutato", "json_non_valido"),
+                                                                       ("rifiutato", "campo_non_valido")]
+    assert all(line.isascii() for line in w.logs)
+
+    def boom(item):
+        raise RecursionError("qualunque cosa")
+    monkeypatch.setattr(w.reader, "_one", boom)
+    ack = w.pubsub.put(order(op_id=OP2))
+    w.reader.step()                                       # does not raise
+    assert w.pubsub.nacked == [ack] and any(l.startswith("agent fault message") for l in w.logs)
+
+
+def test_r9_a_late_copy_of_an_executed_order_gets_its_result_not_scartato(w):
+    w.pubsub.put(order())
+    w.reader.step()
+    w.pubsub.put(order(), age_s=20 * 60)                  # the same order, delivered again after 20 minutes
+    w.reader.step()
+    assert len(w.calls) == 1 and [r["esito"] for r in w.pubsub.published] == ["riuscito", "riuscito"]
+
+
+def test_r10_the_folder_is_synced_after_each_replace(w, monkeypatch):
+    synced = []
+    monkeypatch.setattr(lettore, "_sync_dir", lambda path: synced.append(path))
+    w.pubsub.put(order())
+    w.reader.step()
+    assert synced and all(p == w.journal for p in synced)
+
+
+def test_r11_an_ack_answered_with_rubbish_still_executes(w, monkeypatch):
+    def rubbish(ack_id):
+        raise ValueError("risposta non JSON")
+    monkeypatch.setattr(w.pubsub, "ack", rubbish)
+    w.pubsub.put(order())
+    w.reader.step()
+    assert len(w.calls) == 1 and w.pubsub.published[0]["esito"] == "riuscito"
+
+
+def test_r12_no_full_scan_of_the_journal_at_every_step(w, monkeypatch):
+    w.pubsub.fail_publish = 1
+    w.pubsub.put(order())
+    w.reader.step()                                        # the result waits to be published
+    monkeypatch.setattr(lettore.Path, "glob", lambda *a, **k: (_ for _ in ()).throw(AssertionError("scan")))
+    w.reader.step()                                        # published from the index, without reading the folder
+    assert [r["op_id"] for r in w.pubsub.published] == [OP]

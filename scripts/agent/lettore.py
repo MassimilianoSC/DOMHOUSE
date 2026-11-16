@@ -48,10 +48,29 @@ PUBSUB = "https://pubsub.googleapis.com/v1/"
 TOKEN_URL = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
 JOURNAL_DAYS = 14
 EXECUTOR_TIMEOUT_S = 600            # an operation of a later package (crea_motore) can take minutes
-PULL_MAX = 5
+PULL_MAX = 1                        # R4: one order at a time, so that none waits for its ack behind others
 RESULT_KEYS = ("op_id", "operazione", "apartment_id", "ambiente", "seq", "esito", "codice", "dati")
 SUBSCRIPTION_RE = re.compile(r"^projects/[a-z][a-z0-9-]{4,29}/subscriptions/[A-Za-z][A-Za-z0-9._~%+-]{2,254}$")
 TOPIC_RE = re.compile(r"^projects/[a-z][a-z0-9-]{4,29}/topics/[A-Za-z][A-Za-z0-9._~%+-]{2,254}$")
+
+
+def safe(value) -> str:
+    """R2: what goes into a log line is printable ASCII, whatever an order carried."""
+    return str(value).encode("ascii", "backslashreplace").decode("ascii")[:120]
+
+
+def _sync_dir(path: Path) -> None:
+    """R10: fsync of the folder after a rename (Linux); a no-op where folders cannot be opened (Windows, the tests)."""
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
 
 
 def read_config(path: Path) -> dict:
@@ -80,16 +99,27 @@ class Lettore:
         self.clock, self.log = clock, log
         self.counts: Counter = Counter()
         self.day = clock().date()
+        self.pending: set[str] = set()      # R12: op_ids closed but not yet published (filled by recover, kept here)
 
     # ---- the loop ----------------------------------------------------------------------------------------------
     def step(self) -> int:
-        """One pull: the results still to publish first, then each order received."""
+        """One pull: the results still to publish first, then each order received. R2: nothing that one message does
+        stops the reader: an unexpected error is logged and the message is not acknowledged (Pub/Sub tries again,
+        then the dead letters, with their alarm)."""
         self._publish_pending()
         received = self.pubsub.pull(PULL_MAX)
         for item in received:
-            self._one(item)
+            try:
+                self._one(item)
+            except Exception as exc:                     # noqa: BLE001 - R2: a poisoned message never stops the loop
+                self.log(f"agent fault message {type(exc).__name__}")
+                try:
+                    self.pubsub.nack(item.get("ackId") if isinstance(item, dict) else None)
+                except Exception:                        # noqa: BLE001
+                    pass
         if self.clock().date() != self.day:
             self.count_line()
+            self._purge()                                # R12: once a day, not at every step
         return len(received)
 
     def recover(self) -> None:
@@ -98,6 +128,8 @@ class Lettore:
             entry = self._read(path)
             if entry and entry.get("stato") == "in_corso":
                 self._close(entry, self._result(entry, "fallito", "interrotto"))
+            elif entry and entry.get("stato") == "chiuso" and entry.get("pubblicato") is False:
+                self.pending.add(entry["op_id"])
         self._purge()
 
     def count_line(self) -> None:
@@ -114,24 +146,24 @@ class Lettore:
             data = base64.b64decode(message.get("data", ""), validate=True)
         except (ValueError, TypeError):
             data = b""
-        published = self._publish_time(message.get("publishTime"))
-        if published is None or self.clock() - published > timedelta(seconds=comune.MAX_AGE_S):
-            self._answer_unjournalled(ack_id, comune.result_for_raw(data, "scartato", "scaduto"))
-            return
         try:
             order = comune.check_order(data, self.ambiente)
         except comune.Refused as refused:
             if refused.code == "ambiente_diverso":
                 self.log(f"agent alarm codice=ambiente_diverso ambiente={self.ambiente} "
-                         f"op_id={comune.result_for_raw(data, 'rifiutato', 'ambiente_diverso')['op_id']}")
+                         f"op_id={safe(comune.result_for_raw(data, 'rifiutato', 'ambiente_diverso')['op_id'])}")
             self._answer_unjournalled(ack_id, comune.result_for_raw(data, "rifiutato", refused.code))
             return
-        entry = self._read(self.journal / f"{order.op_id}.json")
+        entry = self._read(self.journal / f"{order.op_id}.json")     # R9: the journal before the age
         if entry is not None:
-            self.pubsub.ack(ack_id)
+            self._ack(ack_id, order.op_id)
             if entry.get("stato") == "chiuso":
                 self._publish(entry)                     # the recorded result, again
             return                                       # in progress: a copy, ignored
+        published = self._publish_time(message.get("publishTime"))
+        if published is None or self.clock() - published > timedelta(seconds=comune.MAX_AGE_S):
+            self._answer_unjournalled(ack_id, comune.result_for_raw(data, "scartato", "scaduto"))
+            return
         entry = {"op_id": order.op_id, "operazione": order.operazione, "apartment_id": order.apartment_id,
                  "ambiente": order.ambiente, "seq": order.seq, "stato": "in_corso",
                  "ricevuto": self.clock().isoformat()}
@@ -141,19 +173,24 @@ class Lettore:
             self.pubsub.nack(ack_id)                     # not in the journal: Pub/Sub tries again
             self.log(f"agent fault journal op_id={order.op_id}")
             return
-        try:
-            self.pubsub.ack(ack_id)
-        except OSError:                                  # in the journal: a copy delivered again is recognised
-            self.log(f"agent fault ack op_id={order.op_id}")
+        self._ack(ack_id, order.op_id)
         try:
             answer = self.execute(data)
         except (OSError, ValueError):
             answer = None
         self._close(entry, self._filtered(entry, answer))
 
+    def _ack(self, ack_id, op_id) -> None:
+        """R11: an ack that fails (no answer, an answer that is not JSON) is logged; the order is in the journal, so a
+        copy delivered again is recognised."""
+        try:
+            self.pubsub.ack(ack_id)
+        except (OSError, ValueError):
+            self.log(f"agent fault ack op_id={safe(op_id)}")
+
     def _answer_unjournalled(self, ack_id, result: dict) -> None:
         self._line(result)
-        self.pubsub.ack(ack_id)
+        self._ack(ack_id, result.get("op_id"))
         try:
             self.pubsub.publish(result)
         except OSError:
@@ -189,22 +226,27 @@ class Lettore:
     def _publish(self, entry: dict) -> None:
         try:
             self.pubsub.publish(entry["risultato"])
-        except OSError:
+        except (OSError, ValueError):
             self.log(f"agent fault publish op_id={entry['op_id']}")
+            self.pending.add(entry["op_id"])
             return
+        self.pending.discard(entry["op_id"])
         if not entry.get("pubblicato"):
             self._write(entry["op_id"], {**entry, "pubblicato": True})
 
     def _publish_pending(self) -> None:
-        for path in sorted(self.journal.glob("*.json")) if self.journal.is_dir() else []:
-            entry = self._read(path)
+        """R12: only the op_ids in the index, never a scan of the journal."""
+        for op_id in sorted(self.pending):
+            entry = self._read(self.journal / f"{op_id}.json")
             if entry and entry.get("stato") == "chiuso" and entry.get("pubblicato") is False:
                 self._publish(entry)
+            else:
+                self.pending.discard(op_id)
 
     def _line(self, result: dict) -> None:
         self.counts[result["esito"]] += 1
-        self.log(f"agent order op_id={result.get('op_id')} operazione={result.get('operazione')} "
-                 f"apartment={result.get('apartment_id')} ambiente={self.ambiente} esito={result['esito']} "
+        self.log(f"agent order op_id={safe(result.get('op_id'))} operazione={safe(result.get('operazione'))} "
+                 f"apartment={safe(result.get('apartment_id'))} ambiente={self.ambiente} esito={result['esito']} "
                  f"codice={result['codice']}")
 
     # ---- the journal -------------------------------------------------------------------------------------------
@@ -217,6 +259,7 @@ class Lettore:
             f.flush()
             os.fsync(f.fileno())
         os.replace(tmp, self.journal / f"{op_id}.json")
+        _sync_dir(self.journal)                          # R10: the rename itself is on disk
 
     @staticmethod
     def _read(path: Path) -> dict | None:
@@ -298,7 +341,7 @@ def main() -> int:
         try:
             if reader.step() == 0:
                 time.sleep(1)
-        except (OSError, ValueError) as exc:
+        except Exception as exc:                         # noqa: BLE001 - R2: the loop never ends on an error
             syslog.syslog(syslog.LOG_WARNING, f"agent fault pull {type(exc).__name__}")
             time.sleep(10)
 

@@ -34,7 +34,10 @@ DEV_ALLOWED = {"stato", "capienza"}
 
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 UID_RE = re.compile(r"^[A-Za-z0-9]{1,128}$")
-GENERIC_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,63}$")
+# R15 (security review of A1): a whole word after the prefix, no trailing or doubled hyphen at its start; at most 64
+STAGING_ID_RE = re.compile(r"^(lab|test)-[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
+MAX_ID_LEN = 64
+MAX_SEQ = 2**31 - 1        # R6
 PROD_ID_RE = re.compile(r"^a-[a-z0-9]{8}$")
 DEVICE_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 HASH_RE = re.compile(r"^\$7\$[0-9]{3,6}\$[A-Za-z0-9+/]{16}\$[A-Za-z0-9+/]{86}==$")
@@ -55,6 +58,7 @@ CODES = (
 )
 DATA_MAX_LEN = 200                        # a value of «dati»: a number or a short string
 
+PRINTABLE_RE = re.compile(r"[ -~]*")
 FIELDS = ("op_id", "operazione", "apartment_id", "seq", "parametri", "ambiente", "richiesto_da")
 
 
@@ -100,10 +104,8 @@ def check_apartment(apartment_id, ambiente: str, operazione: str) -> None:
         if ambiente != "prod":
             raise Refused("prefisso_sbagliato")
         return
-    if not GENERIC_ID_RE.fullmatch(apartment_id):
+    if len(apartment_id) > MAX_ID_LEN or not STAGING_ID_RE.fullmatch(apartment_id):
         raise Refused("id_non_valido")
-    if not apartment_id.startswith(("lab-", "test-")) or len(apartment_id) < len("lab-") + 1:
-        raise Refused("id_non_valido" if ambiente == "staging" else "prefisso_sbagliato")
     if ambiente != "staging":
         raise Refused("prefisso_sbagliato")
 
@@ -151,12 +153,23 @@ def check_parameters(operazione: str, parametri: dict, ambiente: str) -> dict:
 
 
 def check_order(data: bytes, ambiente: str) -> Order:
-    """The whole order, as bytes, against the environment of the subscription (or of the executor's configuration)."""
+    """The whole order, as bytes, against the environment of the subscription (or of the executor's configuration).
+    R2: it never raises anything but Refused: a poisoned order (JSON nested beyond the recursion limit, a lone
+    surrogate) is refused like any other."""
+    try:
+        return _check_order(data, ambiente)
+    except Refused:
+        raise
+    except Exception:                                    # noqa: BLE001 - R2: whatever it is, the order is refused
+        raise Refused("parametri_non_validi") from None
+
+
+def _check_order(data: bytes, ambiente: str) -> Order:
     if not isinstance(data, (bytes, bytearray)) or len(data) > MAX_ORDER_BYTES:
         raise Refused("troppo_grande")
     try:
         o = json.loads(bytes(data).decode("utf-8"))
-    except (UnicodeDecodeError, ValueError):
+    except (UnicodeDecodeError, ValueError, RecursionError):
         raise Refused("json_non_valido") from None
     if not isinstance(o, dict):
         raise Refused("json_non_valido")
@@ -182,7 +195,7 @@ def check_order(data: bytes, ambiente: str) -> Order:
     else:
         if o["apartment_id"] is None or o["seq"] is None:
             raise Refused("campo_non_valido")
-        if not _int(o["seq"]) or o["seq"] < 1:
+        if not _int(o["seq"]) or not 1 <= o["seq"] <= MAX_SEQ:
             raise Refused("campo_non_valido")
         check_apartment(o["apartment_id"], ambiente, operazione)
     parametri = check_parameters(operazione, o["parametri"], ambiente)
@@ -194,14 +207,15 @@ def result_for_raw(data, esito: str, codice: str) -> dict:
     so that the server can still match it to its op_id; None for the others."""
     try:
         o = json.loads(bytes(data).decode("utf-8")) if len(data) <= MAX_ORDER_BYTES else {}
-    except (UnicodeDecodeError, ValueError, TypeError):
+    except Exception:                                    # noqa: BLE001 - R2: a poisoned order gives an empty result
         o = {}
     if not isinstance(o, dict):
         o = {}
 
     def short(key):
+        """R2: printable ASCII only, so that the result and the log lines can always be written."""
         value = o.get(key)
-        return value if isinstance(value, str) and len(value) <= 80 else None
+        return value if isinstance(value, str) and len(value) <= 80 and PRINTABLE_RE.fullmatch(value) else None
     seq = o.get("seq") if _int(o.get("seq")) else None
     if esito not in OUTCOMES or codice not in CODES:
         raise ValueError("esito o codice fuori dall'elenco")
