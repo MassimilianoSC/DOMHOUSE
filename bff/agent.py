@@ -119,7 +119,10 @@ def publish(topic: str, body: bytes, ordering_key: str | None) -> None:
 
 GOOGLE_CERTS = "https://www.googleapis.com/oauth2/v1/certs"
 TOKEN_MAX = 4096
-_CERTS: dict = {"certs": None, "until": 0.0}
+ISSUERS = ("https://accounts.google.com", "accounts.google.com")          # N3
+FORCED_REFRESH_S = 60       # N4: an unknown kid forces a new download at most once a minute
+RETRY_AFTER_FAILURE_S = 30  # N5: after a failed download, the certificates of before (even expired) for 30 s
+_CERTS: dict = {"certs": None, "until": 0.0, "refreshed": 0.0, "failed": 0.0}
 _CERTS_LOCK = threading.Lock()
 
 
@@ -144,23 +147,48 @@ def _decode(token: str, certs: dict, audience: str) -> dict:
     return jwt.decode(token, certs=certs, audience=audience)
 
 
-def verify_push_token(token: str, audience: str) -> dict:
-    """R1 (security review of A1): a cheap check first (three segments, at most 4 KB, header RS256 with a kid), so
-    that a forged request costs nothing; then Google's certificates, kept for their max-age, and the signature with
-    the audience. Raises ValueError when anything does not hold. Synchronous: called with asyncio.to_thread."""
+def precheck(token) -> dict:
+    """R1, N5: the cheap check (three segments, at most 4 KB, header RS256 with a kid), before any thread and any
+    download: a forged request costs nothing. Raises ValueError; returns the header."""
     if not isinstance(token, str) or len(token) > TOKEN_MAX or token.count(".") != 2:
         raise ValueError("token non valido")
     try:
         header = _b64json(token.split(".", 1)[0])
     except (ValueError, UnicodeDecodeError) as exc:
         raise ValueError("token non valido") from exc
-    if header.get("alg") != "RS256" or not isinstance(header.get("kid"), str):
+    if header.get("alg") != "RS256" or not isinstance(header.get("kid"), str) or len(header["kid"]) > 100:
         raise ValueError("token non valido")
+    return header
+
+
+def _certificates(kid: str) -> dict:
+    """Google's certificates: kept for their max-age; an unknown kid forces a new download at most once a minute
+    (N4); a failed download keeps the certificates of before, even expired, and is not tried again for 30 s (N5)."""
+    now = time.monotonic()
     with _CERTS_LOCK:
-        if _CERTS["certs"] is None or time.monotonic() > _CERTS["until"]:
-            certs, max_age = _fetch_certs()
-            _CERTS.update(certs=certs, until=time.monotonic() + max_age)
         certs = _CERTS["certs"]
+        expired = certs is None or now > _CERTS["until"]
+        unknown = certs is not None and kid not in certs and now - _CERTS["refreshed"] >= FORCED_REFRESH_S
+        if (expired or unknown) and now - _CERTS["failed"] >= RETRY_AFTER_FAILURE_S:
+            try:
+                fresh, max_age = _fetch_certs()
+            except Exception:                                    # noqa: BLE001 - the network, Google, anything
+                _CERTS["failed"] = now
+            else:
+                _CERTS.update(certs=fresh, until=now + max_age)
+                if unknown:
+                    _CERTS["refreshed"] = now
+                certs = fresh
+        if certs is None:
+            raise ValueError("certificati di Google non disponibili")
+        return certs
+
+
+def verify_push_token(token: str, audience: str) -> dict:
+    """R1: the cheap check, then Google's certificates and the signature with the audience. Raises ValueError when
+    anything does not hold. Synchronous: called with asyncio.to_thread, after precheck in the event loop."""
+    header = precheck(token)
+    certs = _certificates(header["kid"])
     if header["kid"] not in certs:
         raise ValueError("certificato sconosciuto")
     return _decode(token, certs, audience)
@@ -227,41 +255,47 @@ async def authorised(authorization: str | None) -> bool:
     if not (s.agent_push_audience and s.agent_push_email) or not isinstance(authorization, str) or \
             not authorization.startswith("Bearer "):
         return False
+    token = authorization[len("Bearer "):]
     try:
-        claims = await asyncio.to_thread(verify_push_token, authorization[len("Bearer "):], s.agent_push_audience)
+        precheck(token)                                          # N5: before any thread
+        claims = await asyncio.to_thread(verify_push_token, token, s.agent_push_audience)
     except Exception:                                            # noqa: BLE001 - any failure of the check
         return False
-    if not isinstance(claims, dict):
+    if not isinstance(claims, dict) or claims.get("iss") not in ISSUERS:     # N3
         return False
     return claims.get("aud") == s.agent_push_audience and claims.get("email") == s.agent_push_email \
         and claims.get("email_verified") is True
 
 
-async def receive(body) -> str:
-    """A pushed result: what happened to it, for the log («chiuso» or why it was ignored). R2: never raises: whatever
-    the push carries is acknowledged (the route answers 204), so that Pub/Sub never retries it for 7 days."""
+def _readable(body) -> tuple[dict, dict] | str:
+    """The pushed result and its data, or why it is unreadable. R2: never raises."""
     try:
-        return await _receive(body)
+        s = get_settings()
+        if not isinstance(body, dict) or body.get("subscription") != s.agent_push_subscription \
+                or not s.agent_push_subscription:
+            return "sottoscrizione_diversa"                      # R5
+        data = base64.b64decode(body["message"]["data"], validate=True)
+        result = json.loads(data.decode("utf-8"))
+        if not isinstance(result, dict) or result.get("esito") not in OUTCOMES or result.get("codice") not in CODES \
+                or result.get("ambiente") != s.agent_ambiente or not isinstance(result.get("op_id"), str) \
+                or len(result["op_id"]) > 80:
+            return "non_valido"
+        dati = result.get("dati") if isinstance(result.get("dati"), dict) else {}
+        dati = {k: v for k, v in list(dati.items())[:DATA_KEYS_MAX] if isinstance(k, str) and len(k) <= 40 and (
+            isinstance(v, (int, float)) or v is None or (isinstance(v, str) and len(v) <= 200))}
+        return result, dati
     except Exception:                                            # noqa: BLE001 - R2
         return "illeggibile"
 
 
-async def _receive(body) -> str:
-    s = get_settings()
-    if not isinstance(body, dict) or body.get("subscription") != s.agent_push_subscription \
-            or not s.agent_push_subscription:
-        return "sottoscrizione_diversa"                          # R5
-    try:
-        data = base64.b64decode(body["message"]["data"], validate=True)
-        result = json.loads(data.decode("utf-8"))
-    except (KeyError, TypeError, ValueError, UnicodeDecodeError, RecursionError):
-        return "illeggibile"
-    if not isinstance(result, dict) or result.get("esito") not in OUTCOMES or result.get("codice") not in CODES \
-            or result.get("ambiente") != s.agent_ambiente or not isinstance(result.get("op_id"), str):
-        return "non_valido"
-    dati = result.get("dati") if isinstance(result.get("dati"), dict) else {}
-    dati = {k: v for k, v in list(dati.items())[:DATA_KEYS_MAX] if isinstance(k, str) and len(k) <= 40 and (
-        isinstance(v, (int, float)) or v is None or (isinstance(v, str) and len(v) <= 200))}
+async def receive(body) -> str:
+    """A pushed result: what happened to it («chiuso» or why it was ignored). A body that cannot be read is
+    acknowledged (the route answers 204, Pub/Sub never retries it); N2: a failure of the repository RAISES, so that
+    the route answers 503 and Pub/Sub delivers the result again."""
+    readable = _readable(body)
+    if isinstance(readable, str):
+        return readable
+    result, dati = readable
     op = await get_repository().get_agent_op(result["op_id"])
     if op is not None and _too_old(op):
         await _expire(op)

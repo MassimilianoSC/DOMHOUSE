@@ -32,7 +32,11 @@ async def results(request: Request):
         body = await request.json()
     except Exception:                                            # noqa: BLE001 - R2: any body is acknowledged
         body = None
-    outcome = await agent.receive(body)
+    try:
+        outcome = await agent.receive(body)
+    except Exception as exc:                                     # noqa: BLE001 - N2: the repository failed
+        warn("agent result not saved", error=type(exc).__name__)
+        return Response(status_code=503)                         # Pub/Sub delivers it again
     if outcome != "chiuso":
         warn("agent result ignored", reason=outcome)
     return Response(status_code=204)

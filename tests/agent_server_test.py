@@ -58,9 +58,11 @@ def server(monkeypatch):
     monkeypatch.setattr(agent, "publish", publish)
 
     def verify(token, audience):
-        claims = {"buono": {"email": PUSH, "email_verified": True, "aud": audience},
-                  "altro": {"email": "intruso@example.com", "email_verified": True, "aud": audience},
-                  "non-verificato": {"email": PUSH, "email_verified": False, "aud": audience}}
+        token = agent.precheck(token)["kid"]                    # the name travels in the kid of a well-formed token
+        g = "https://accounts.google.com"
+        claims = {"buono": {"email": PUSH, "email_verified": True, "aud": audience, "iss": g},
+                  "altro": {"email": "intruso@example.com", "email_verified": True, "aud": audience, "iss": g},
+                  "non-verificato": {"email": PUSH, "email_verified": False, "aud": audience, "iss": g}}
         if token not in claims or audience != AUD:
             raise ValueError("firma non valida")
         return claims[token]
@@ -85,8 +87,16 @@ def prova(apartment="lab-01"):
 def push(result: dict, token="buono"):
     body = {"message": {"data": base64.b64encode(json.dumps(result).encode()).decode(), "messageId": "1"},
             "subscription": SUBSCRIPTION}
-    headers = {"Authorization": f"Bearer {token}"} if token else {}
+    headers = {"Authorization": f"Bearer {jwt_named(token)}"} if token else {}
     return run(call("POST", "/internal/agent/risultati", json=body, headers=headers))
+
+
+def jwt_named(name: str) -> str:
+    """A token with the shape of Google's (precheck passes), its name in the kid; «non-un-token» stays as it is."""
+    if name == "non-un-token":
+        return name
+    header = base64.urlsafe_b64encode(json.dumps({"alg": "RS256", "kid": name}).encode()).decode().rstrip("=")
+    return f"{header}.e30.firma"
 
 
 def answer(op: dict, esito="riuscito", codice="ok", **kw) -> dict:
@@ -158,7 +168,7 @@ def test_a_result_that_does_not_match_its_operation_is_ignored(server):
         assert push(answer(op, **wrong)).status_code == 204, wrong
         assert get(op["op_id"]).json()["stato"] == "inviato", wrong
     r = run(call("POST", "/internal/agent/risultati", json={"message": {"data": "non base64!"}},
-                 headers={"Authorization": "Bearer buono"}))
+                 headers={"Authorization": f"Bearer {jwt_named('buono')}"}))
     assert r.status_code == 204                                                   # acknowledged, never retried
 
 
@@ -198,7 +208,8 @@ def test_r1_a_cheap_check_before_any_certificate_and_the_certificates_cached(mon
         return {"k1": "PEM"}, 3600
     monkeypatch.setattr(agent, "_fetch_certs", fetch)
     monkeypatch.setattr(agent, "_decode", lambda token, certs, audience: decoded.append(certs) or {"aud": audience})
-    agent._CERTS.update(certs=None, until=0.0)
+    agent._CERTS.update(certs=None, until=0.0, refreshed=0.0, failed=0.0)
+    monkeypatch.setattr(agent.time, "monotonic", lambda: 1000.0)
     for junk in ("", "abc", "a.b", "a.b.c.d", "x" * 5000 + ".a.b",
                  f"{b64url({'alg': 'none', 'kid': 'k1'})}.e30.x", f"{b64url({'alg': 'RS256'})}.e30.x",
                  f"{b64url({'alg': 'HS256', 'kid': 'k1'})}.e30.x", "!!!.???.***"):
@@ -229,7 +240,7 @@ def test_r2_whatever_the_push_carries_the_server_answers_204(server):
     for body in (["lista"], {"message": "testo"}, {"message": {"data": deep}}, {"message": {"data": None}},
                  {"message": {"data": base64.b64encode(b'{"op_id": 1, "esito": []}').decode()}}):
         r = run(call("POST", "/internal/agent/risultati", json={**body, "subscription": SUBSCRIPTION}
-                     if isinstance(body, dict) else body, headers={"Authorization": "Bearer buono"}))
+                     if isinstance(body, dict) else body, headers={"Authorization": f"Bearer {jwt_named('buono')}"}))
         assert r.status_code == 204, body
     assert get(op["op_id"]).json()["stato"] == "inviato"
 
@@ -238,5 +249,92 @@ def test_r5_a_result_from_another_subscription_is_ignored(server):
     op = prova().json()
     body = {"message": {"data": base64.b64encode(json.dumps(answer(op)).encode()).decode()},
             "subscription": "projects/domotica-poc-511707/subscriptions/un-altra"}
-    r = run(call("POST", "/internal/agent/risultati", json=body, headers={"Authorization": "Bearer buono"}))
+    r = run(call("POST", "/internal/agent/risultati", json=body, headers={"Authorization": f"Bearer {jwt_named('buono')}"}))
     assert r.status_code == 204 and get(op["op_id"]).json()["stato"] == "inviato"
+
+
+# ---- third reading, 16 November (N2-N5) ---------------------------------------------------------------------------
+REAL_VERIFY = agent.verify_push_token
+def test_n2_a_repository_failure_is_a_5xx_so_that_pubsub_retries(server, monkeypatch):
+    op = prova().json()
+
+    async def broken(*a, **k):
+        raise RuntimeError("Firestore non risponde")
+    monkeypatch.setattr(get_repository(), "finish_agent_op", broken)
+    assert push(answer(op)).status_code == 503
+    monkeypatch.setattr(get_repository(), "get_agent_op", broken)
+    assert push(answer(op)).status_code == 503
+    r = run(call("POST", "/internal/agent/risultati", json=["lista"], headers={"Authorization": f"Bearer {jwt_named('buono')}"}))
+    assert r.status_code == 204                                        # unreadable: acknowledged, never retried
+
+
+def test_n3_the_issuer_must_be_google(server, monkeypatch):
+    monkeypatch.setattr(agent, "verify_push_token", lambda token, audience: {
+        "email": PUSH, "email_verified": True, "aud": audience, "iss": "https://evil.example"})
+    op = prova().json()
+    assert push(answer(op)).status_code == 401
+    monkeypatch.setattr(agent, "verify_push_token", lambda token, audience: {
+        "email": PUSH, "email_verified": True, "aud": audience, "iss": "accounts.google.com"})
+    assert push(answer(op)).status_code == 204
+
+
+def certs_world(monkeypatch, answers):
+    """_fetch_certs answering from a list: a dict of certificates, or an exception to raise."""
+    calls = []
+
+    def fetch():
+        calls.append(1)
+        a = answers.pop(0)
+        if isinstance(a, Exception):
+            raise a
+        return a, 3600
+    monkeypatch.setattr(agent, "_fetch_certs", fetch)
+    monkeypatch.setattr(agent, "_decode", lambda token, certs, audience: {"aud": audience, "certs": dict(certs)})
+    clock = {"t": 1000.0}
+    monkeypatch.setattr(agent.time, "monotonic", lambda: clock["t"])
+    agent._CERTS.update(certs=None, until=0.0, refreshed=0.0, failed=0.0)
+    return calls, clock
+
+
+def token_with(kid):
+    return f"{b64url({'alg': 'RS256', 'kid': kid})}.{b64url({'sub': 'x'})}.firma"
+
+
+def test_n4_an_unknown_kid_forces_one_refresh_a_minute(monkeypatch):
+    calls, clock = certs_world(monkeypatch, [{"k1": "A"}, {"k1": "A", "k2": "B"}, {"k3": "C"}])
+    agent.verify_push_token(token_with("k1"), AUD)
+    assert agent.verify_push_token(token_with("k2"), AUD)["certs"] == {"k1": "A", "k2": "B"}   # refreshed for k2
+    with pytest.raises(ValueError):
+        agent.verify_push_token(token_with("k9"), AUD)                  # unknown again, within the minute: no fetch
+    assert len(calls) == 2
+    clock["t"] += 61
+    with pytest.raises(ValueError):
+        agent.verify_push_token(token_with("k9"), AUD)                  # after a minute: one more fetch
+    assert len(calls) == 3
+
+
+def test_n5_old_certificates_are_kept_and_a_failed_download_waits(monkeypatch):
+    calls, clock = certs_world(monkeypatch, [{"k1": "A"}, OSError("rete"), {"k1": "A2"}])
+    agent.verify_push_token(token_with("k1"), AUD)
+    clock["t"] += 3601                                                  # expired
+    assert agent.verify_push_token(token_with("k1"), AUD)["certs"] == {"k1": "A"}   # download failed: the old ones
+    clock["t"] += 10
+    agent.verify_push_token(token_with("k1"), AUD)
+    assert len(calls) == 2                                              # within 30 s of the failure: no new try
+    clock["t"] += 31
+    assert agent.verify_push_token(token_with("k1"), AUD)["certs"] == {"k1": "A2"}
+
+
+def test_n5_the_cheap_check_happens_before_the_thread(server, monkeypatch):
+    monkeypatch.setattr(agent, "verify_push_token", REAL_VERIFY)
+    threads = []
+    real = agent.asyncio.to_thread
+
+    async def spy(fn, *args, **kw):
+        threads.append(fn)
+        return await real(fn, *args, **kw)
+    monkeypatch.setattr(agent.asyncio, "to_thread", spy)
+    op = prova().json()
+    threads.clear()
+    assert push(answer(op), token="non-un-token").status_code == 401
+    assert threads == []
