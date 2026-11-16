@@ -13,7 +13,10 @@
 ## 1. I pezzi
 
 1. **Il server dell'app** (staging e, dopo la seconda VM, produzione): decide, crea i due segreti di ogni appartamento, genera le password dei dispositivi e ne tiene solo l'impronta, manda gli ordini, tiene lo stato in Firestore.
-2. **Pub/Sub, per ambiente:** una coda «ordini» con schema e dimensione massima; una coda «risultati»; una coda «scarti».
+2. **Pub/Sub, per ambiente:** una coda «ordini», una coda «risultati», una coda «scarti».
+   - **Nessuno schema Pub/Sub sulla coda degli ordini** (scelta del 16 novembre, A1, `524386c`): i parametri cambiano con l'operazione, e la codifica JSON di Avro avvolgerebbe ogni valore facoltativo (`{"string": "lab-01"}`), quindi l'ordine non sarebbe più il JSON che controlliamo.
+   - Lo schema e la dimensione massima (128 KB) si controllano **due volte sulla VM**: dal lettore e, di nuovo, dall'esecutore (`scripts/agent/comune.py`). L'unico publisher della coda è il server del suo ambiente (§10.3).
+   - È una domanda esplicita per la revisione di sicurezza (§10.3).
 3. **Sulla VM, due servizi systemd** (non container: un container con il socket di Docker sarebbe root lo stesso):
    - **il lettore**, utente senza privilegi `domhouse-agent`: preleva gli ordini con il token della VM, controlla schema, ambiente, età e sequenza, scrive il giornale e pubblica i risultati;
    - **l'esecutore**, root, minimo: ascolta solo su un socket UNIX locale. Accetta solo le 7 operazioni del §3, con argomenti già controllati, e li ricontrolla. Lancia `/opt/domhouse/engine-vm.sh` e `/opt/domhouse/broker-vm.sh` (di root, non scrivibili da altri) con `execve` e una lista di argomenti, mai `sh -c`, con l'ambiente pulito (`env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin`), mai `bash -x`.
@@ -142,7 +145,7 @@ Oggi crea appartamenti `carico-NN` con segreti leggibili dallo staging (`scripts
 
 1. chi può scrivere Firestore come il server (un server compromesso) può mettere l'impronta di una password che conosce e fingersi quel dispositivo. Era lo stesso con `versions.add` sul segreto per dispositivo: **rischio pari**;
 2. le impronte in Firestore sono leggibili da più persone dei segreti (console). Con password casuali di 192 bit non si invertono. PBKDF2 con 1000 iterazioni è debole solo per password umane, che il sistema non ammette;
-3. la password resta **dentro lo Shelly**, che la usa per collegarsi. **Da verificare con Youssouf** (domanda 8 del messaggio del 16 novembre): se la pagina web locale dello Shelly la mostra o la lascia leggere a chi sta sulla stessa rete Wi-Fi, per esempio gli ospiti. Se sì, va protetta la pagina locale (password dello Shelly): è un punto della «sicurezza in appartamento», non di questo progetto;
+3. la password resta **dentro lo Shelly**, che la usa per collegarsi. **Da verificare con Youssouf** (domanda 8 del messaggio del 16 novembre): se la pagina web locale dello Shelly la mostra o la lascia leggere a chi sta sulla stessa rete Wi-Fi, per esempio gli ospiti. Youssouf consiglia la password della pagina locale su tutti i modelli dal primo appartamento (16 novembre): diventa un secondo segreto per dispositivo, §8.3;
 4. **pubblicare nella coda degli ordini equivale a poter creare un utente del broker.** `aggiorna_broker` porta le impronte: chi mette lì l'impronta di una password che conosce si collega come quel dispositivo. Oggi nella coda «ordini» di un ambiente può pubblicare solo il server di quell'ambiente (§4.1), quindi il rischio è pari a «server compromesso». **Condizione da non allargare mai:** nessun altro account, persona o servizio riceve `pubsub.publisher` sulle code «ordini». Si controlla in ogni revisione dei permessi IAM, con il comando di sola lettura che elenca chi ha quel ruolo sulle due code.
 
 ## 3. L'elenco chiuso delle operazioni
@@ -380,6 +383,54 @@ I passi 5.1 e 6 qui sotto valgono solo con la scelta (a).
 6. (solo con la scelta a) Un timer cancella i file di `/data/_deleted` con più di 30 giorni, compresi `-wal` e `-shm`, e scrive una riga per ogni file tolto.
 7. **Recupero:** dagli snapshot, entro 30 giorni (scelta c), oppure anche dalla copia (scelta a). Procedura scritta, lanciata da noi. I dispositivi vanno riconfigurati con password nuove.
 
+### 8.3 La password della pagina locale degli Shelly (proposta del 16 novembre, nessun codice)
+
+**Perché:** chi è sulla stessa rete Wi-Fi (gli ospiti) apre la pagina web locale dello Shelly, ne cambia le impostazioni e ne legge parte della configurazione (§2.5, rischio 3). Youssouf la consiglia su tutti i modelli dal primo appartamento. Lo Shelly la imposta con `Shelly.SetAuth` (utente `admin`, realm = id del dispositivo) e la controlla con l'autenticazione digest SHA-256.
+
+**Proposta:**
+
+1. **Non si conserva, come quella del broker (D-233).**
+   - `Shelly.SetAuth` non vuole la password ma il suo `ha1`, cioè SHA-256 di `admin:<id del dispositivo>:<password>`. Il server genera la password (casuale, 32 caratteri), ne calcola l'`ha1` e manda all'agente **solo l'`ha1`**.
+   - La password non va in Firestore, né in Secret Manager, né negli ordini. Con 192 bit casuali l'`ha1` non si inverte per tentativi.
+2. **Chi la imposta:** l'agente sulla VM, con `Shelly.SetAuth` via MQTT, come R2 della tappa A.
+   - Le chiamate via MQTT passano dal broker con l'utente del connector e **non** chiedono la password della pagina locale: si può impostare e cambiare a distanza in ogni momento, anche quando nessuno la conosce.
+   - Serve un'operazione nuova nell'elenco chiuso (§3): `imposta_accesso_locale`, con l'`id` del dispositivo e l'`ha1` (64 caratteri esadecimali, controllati come le impronte). Entra con A3.
+3. **Quando:** subito dopo il primo collegamento al broker, per ogni dispositivo. Di norma **nessuno la vede**: la pagina locale resta chiusa a tutti.
+4. **Per l'assistenza** (raro: quasi tutto si fa via MQTT): «Apri la pagina locale», solo per il gestore della piattaforma.
+   - Genera una password nuova, la **mostra una volta** e ne manda l'`ha1`.
+   - Dopo l'intervento si rifà, così quella vista non vale più.
+   - Va nel registro delle azioni.
+5. **«Rigenera»** (password del broker, §8.1) non la tocca: sono due segreti separati.
+6. **«Revoca»:** prima di togliere l'utente del broker, l'agente imposta una password nuova che nessuno conosce. Un dispositivo che torna in uso si riporta alle impostazioni di fabbrica.
+7. **Nelle nostre procedure** la pagina locale si apre dal browser, non con `curl` da Windows, che non fa il digest SHA-256 (nota di Youssouf). Da uno script: Python con `requests` e `HTTPDigestAuth`.
+8. **Da verificare con Youssouf:**
+   - che `Shelly.SetAuth` via MQTT funzioni su tutti i modelli ammessi;
+   - che il realm sia l'id del dispositivo su tutti;
+   - che una password impostata così non blocchi le chiamate del connector.
+9. **Stima:** 3–5 h dentro A3; corretta circa 2–3 h.
+
+### 8.4 Il collaudo guidato (pacchetto A4): cosa serve nel motore (scheda, nessun codice)
+
+**Il requisito:** un dispositivo alla volta, collaudo obbligatorio; le regole agiscono su un dispositivo solo dopo il suo collaudo superato.
+
+**Cosa serve nel motore:**
+
+1. **Uno stato per dispositivo: «in collaudo» oppure «collaudato».**
+   - **Proposta:** lo decide il catalogo, con un campo per dispositivo (`collaudato: true`). Il server lo scrive quando il collaudo è superato e applica il catalogo nuovo (`applica_catalogo`, §3.1). Il motore non ha un'API nuova e il contratto non cambia.
+   - **Alternativa:** un campo nel contratto (`Device.collaudato`) e una rotta per segnarlo. Cambia il contratto: serve una decisione del committente.
+2. **Le regole e le modalità ignorano i dispositivi «in collaudo».** Finestra, antigelo, termostato, risparmio al check-out, pre-arrivo e programmi non li comandano né li leggono come condizione: un sensore in collaudo non spegne il clima.
+3. **I comandi manuali dall'app restano ammessi:** sono il collaudo stesso (accendi e spegni, leggi il consumo).
+4. **Le decisioni** registrano i passi del collaudo e il suo esito, con chi lo ha fatto.
+5. **Passi guidati per tipo**, dal server, che legge gli eventi del motore:
+   - presa e relè: accendi, spegni, stato confermato;
+   - misuratore: una lettura dei watt diversa da zero con un carico acceso;
+   - sensori BLU: un pacchetto ricevuto dal ponte, temperatura plausibile, batteria letta;
+   - contatto: aperto e chiuso;
+   - movimento: un passaggio;
+   - clima a infrarossi: accensione confermata dal consumo, con il limite della verifica differita (stima 1141).
+6. **Da Youssouf:** il connector porta il campo del catalogo nel `DeviceInfo` del dispositivo. È un campo in più nell'interfaccia (`interface.py`, nostra), da concordare come la batteria.
+7. **Stima della parte del motore:** 6–9 h; corretta circa 4–5 h. Esclusi la pagina del sito (o2) e la parte del connector (Youssouf).
+
 ## 9. Cosa cambia nel codice di oggi (dopo la fine delle prove con Youssouf)
 
 1. **Subito, vale già oggi (E-31), per conto suo e prima dello strumento A:** la tabella dei metadati del §4.3, con la prova rossa scritta e committata per prima. Prima la richiesta della sola zona da dentro `engine-dev` ed `engine-lab-01` (oggi risponde) e la riga oraria del controllo (oggi «metadata OPEN»); poi la tabella; poi lego in `--network host` e `cert-renew force`. Insieme: il backup notturno che non segue link in `/data/<apt>` e il `sync` isolato per appartamento, che sono difetti di oggi anche loro.
@@ -484,6 +535,12 @@ Nessun punto «accettato così»: tutti e sette sono corretti come chiedeva il r
 - **14** («Rigenera» in corsa): non si basa più sulle versioni di Secret Manager, ma sul blocco in Firestore e sull'elenco completo.
 
 **Condizione da non allargare mai (rilettura della memoria storica, 1230f81):** con D-233 la coda «ordini» porta le impronte, quindi chi vi pubblica può creare un utente del broker (§2.5, rischio 4). Solo il server del suo ambiente pubblica in quella coda; nessun altro `pubsub.publisher`, mai. Va controllato in ogni revisione dei permessi IAM.
+
+**Scelta da rileggere nella revisione di sicurezza del codice di A1:** nessuno schema Pub/Sub sulla coda degli ordini (§1.2).
+
+- **Motivo:** i parametri variano con l'operazione, e lo schema Avro con codifica JSON cambierebbe il formato dell'ordine.
+- **Difese che restano:** schema e 128 KB controllati dal lettore e di nuovo dall'esecutore; un solo publisher (la condizione qui sopra).
+- **Alternativa scartata, per ora:** uno schema Avro di soli campi fissi, con i parametri come stringa JSON e nessun valore nullo (`apartment_id` vuoto e `seq` 0 per «capienza»). Rifiuterebbe in Pub/Sub un ordine malformato, al prezzo di un formato più complicato.
 
 **Da verificare prima del codice:**
 
