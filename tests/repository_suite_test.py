@@ -699,3 +699,32 @@ def test_stream_cursors(repo):
     run(repo.put_stream_cursor("apt-cursore", "42", "http://motore.test", 1030.5))
     assert run(repo.get_stream_cursor("apt-cursore")) == {"last_id": "42", "instance_url": "http://motore.test", "saved_at": 1030.5}
 
+
+
+def test_agent_operations_sequence_and_closing_once(repo):
+    """Tool A, A1: the sequence number per apartment in the same transaction as the order (none for «capienza»); an
+    operation is closed once, only with the same environment, apartment and operation."""
+    from bff.repository.base import AgentOp
+
+    def op(n, apt="lab-01", operazione="stato"):
+        return AgentOp(op_id=f"00000000-0000-4000-8000-00000000000{n}", operazione=operazione, apartment_id=apt,
+                       ambiente="staging", richiesto_da="Uk9TgS2vLmQ1")
+    assert run(repo.create_agent_op(op(1))).seq == 1
+    assert run(repo.create_agent_op(op(2))).seq == 2
+    assert run(repo.create_agent_op(op(3, apt="lab-02"))).seq == 1
+    assert run(repo.create_agent_op(op(4, apt=None, operazione="capienza"))).seq is None
+    first = op(1).op_id
+    assert run(repo.finish_agent_op(first, "staging", "lab-02", "stato", {"stato": "riuscito", "codice": "ok"}, 1200)) \
+        == "diverso"
+    assert run(repo.finish_agent_op(first, "prod", "lab-01", "stato", {"stato": "riuscito", "codice": "ok"}, 1200)) \
+        == "diverso"
+    outcome = {"stato": "riuscito", "codice": "ok", "dati": {"health": 200}}
+    assert run(repo.finish_agent_op(first, "staging", "lab-01", "stato", outcome, 1200)) == "chiuso"
+    assert run(repo.finish_agent_op(first, "staging", "lab-01", "stato", {"stato": "fallito", "codice": "x"}, 1200)) \
+        == "gia_chiuso"
+    seen = run(repo.get_agent_op(first))
+    assert (seen.stato, seen.codice, seen.dati, seen.seq) == ("riuscito", "ok", {"health": 200}, 1) and seen.finito_at
+    assert run(repo.finish_agent_op("00000000-0000-4000-8000-000000000009", "staging", "lab-01", "stato", outcome,
+                                    1200)) == "sconosciuto"
+    assert run(repo.get_agent_op("00000000-0000-4000-8000-000000000009")) is None
+    assert run(repo.finish_agent_op(op(2).op_id, "staging", "lab-01", "stato", outcome, -1)) == "tardi"

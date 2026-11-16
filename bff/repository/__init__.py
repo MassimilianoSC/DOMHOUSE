@@ -3,6 +3,7 @@ from functools import lru_cache
 from ..config import get_settings
 from .base import (
     ActorRecord,
+    AgentOp,
     Apartment,
     AuditActor,
     AuditEntry,

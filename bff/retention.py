@@ -23,6 +23,7 @@ WEBHOOK_DAYS = 90          # received Italianway calls, besides the 100 per orga
 MAIL_DAYS = 3              # anti-abuse counters: their windows last at most a day
 PEOPLE_MONTHS = 24         # audit_people: from the last entry that cites the person (every entry rewrites them)
 ACTOR_MONTHS = 24          # pseudonyms: from the last use, renewed at most weekly (bff/actors.py)
+AGENT_OP_DAYS = 90         # tool A, A1: the orders to the VM and their outcome (the sequence numbers never expire)
 
 
 def now() -> datetime:
@@ -87,8 +88,13 @@ def pseudonym(_doc: dict | None = None) -> datetime:
 
 
 # collection group -> rule; the TTL policies are created on exactly these names (also the subcollection "audit")
+def agent_op(doc: dict) -> datetime:
+    return parse(doc["creato_at"]) + timedelta(days=AGENT_OP_DAYS)
+
+
 COLLECTIONS = {
     "bookings": booking,
+    "agent_ops": agent_op,
     "audit": audit,
     "platform_audit": audit,
     "support_access": support,

@@ -75,6 +75,13 @@ class Settings:
     # D04 (P-83): in staging, the engines it may reach, «host:porta» or «host:prima-ultima» separated by commas; empty =
     # any (production). Checked before any key is read (bff/instances.py target_problem)
     instance_allowed: str = ""
+    # Tool A, A1 (docs/progetto-strumento-a-base.md §3, §4.2): the order receiver on the VM. Empty AGENT_AMBIENTE = off
+    # (production until the second VM, §5.4). The orders' topic of this environment, and the address and account the
+    # results' push must be signed for
+    agent_ambiente: str = ""
+    agent_orders_topic: str = ""
+    agent_push_audience: str = ""
+    agent_push_email: str = ""
 
     @property
     def mail_configured(self) -> bool:
@@ -113,6 +120,10 @@ def get_settings() -> Settings:
         instance_api_key_fallback=e("INSTANCE_API_KEY_FALLBACK") or secrets.token_urlsafe(24),
         instance_timeout_s=float(e("INSTANCE_TIMEOUT_S", "10")),
         instance_allowed=e("INSTANCE_ALLOWED", "").strip(),
+        agent_ambiente=e("AGENT_AMBIENTE", "").strip(),
+        agent_orders_topic=e("AGENT_ORDERS_TOPIC", "").strip(),
+        agent_push_audience=e("AGENT_PUSH_AUDIENCE", "").strip(),
+        agent_push_email=e("AGENT_PUSH_EMAIL", "").strip(),
         italianway_webhook_secret=e("ITALIANWAY_WEBHOOK_SECRET", ""),
         italianway_signature_header=e("ITALIANWAY_SIGNATURE_HEADER", "X-Signature"),
         port=int(e("PORT", "8000")),

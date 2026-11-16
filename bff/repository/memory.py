@@ -1,7 +1,18 @@
 import time
 
-from .base import (EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
+
+
+def _agent_age_s(op) -> float:
+    from datetime import UTC, datetime
+    from ..retention import parse
+    return (datetime.now(UTC) - parse(op.creato_at)).total_seconds()
+
+
+def now_iso_() -> str:
+    from .base import now_iso
+    return now_iso()
 
 
 class InMemoryRepository:
@@ -26,6 +37,34 @@ class InMemoryRepository:
         self.support_access: dict[str, SupportAccess] = {}
         self.actor_refs: dict[str, str] = {}             # uid -> pseudonym
         self.actors: dict[str, ActorRecord] = {}         # pseudonym -> who
+        self.agent_ops: dict[str, AgentOp] = {}           # tool A, A1: op_id -> order and outcome
+        self.agent_seq: dict[str, int] = {}               # apartment -> last sequence number given (never removed)
+
+    # tool A, A1: no await between the reads and the writes, so atomic within the (single) process
+    async def create_agent_op(self, op):
+        op = op.model_copy(deep=True)
+        if op.apartment_id is not None:
+            op.seq = self.agent_seq.get(op.apartment_id, 0) + 1
+            self.agent_seq[op.apartment_id] = op.seq
+        self.agent_ops[op.op_id] = op
+        return op.model_copy(deep=True)
+
+    async def get_agent_op(self, op_id):
+        op = self.agent_ops.get(op_id)
+        return op.model_copy(deep=True) if op else None
+
+    async def finish_agent_op(self, op_id, ambiente, apartment_id, operazione, outcome, max_age_s):
+        op = self.agent_ops.get(op_id)
+        if op is None:
+            return "sconosciuto"
+        if (op.ambiente, op.apartment_id, op.operazione) != (ambiente, apartment_id, operazione):
+            return "diverso"
+        if op.stato != "inviato":
+            return "gia_chiuso"
+        if _agent_age_s(op) > max_age_s and outcome.get("stato") != "fallito":
+            return "tardi"
+        self.agent_ops[op_id] = op.model_copy(update={**outcome, "finito_at": now_iso_()}, deep=True)
+        return "chiuso"
 
     async def get_tenant(self, tenant_id):
         t = self.tenants.get(tenant_id)

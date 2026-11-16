@@ -260,6 +260,23 @@ class ActorRecord(BaseModel):
     email: str
 
 
+class AgentOp(BaseModel):
+    """Tool A, A1 (docs/progetto-strumento-a-base.md §3, §6): an order sent to the receiver on the VM and its outcome.
+    seq is the apartment's sequence number, given by the repository in the same transaction that saves the order;
+    stato goes from «inviato» to the outcome of the result (riuscito, rifiutato, scartato, fallito), once."""
+    op_id: str
+    operazione: str
+    apartment_id: str | None = None
+    seq: int | None = None
+    ambiente: str
+    richiesto_da: str                       # a Firebase uid, never an email
+    stato: Literal["inviato", "riuscito", "rifiutato", "scartato", "fallito"] = "inviato"
+    codice: str | None = None
+    dati: dict = Field(default_factory=dict)
+    creato_at: str = Field(default_factory=now_iso)
+    finito_at: str | None = None
+
+
 class SupportAccess(BaseModel):
     """P-50 (D-86): a platform manager inside an organisation for 1-24 h, with the rights of an operator. Its status is
     computed from closed_at and expires_at (see bff/support.py): nothing has to run when it expires."""
@@ -337,6 +354,15 @@ class Repository(Protocol):
     # P-49: anti-abuse counters for invitation emails. Atomic: when every bucket is below its limit each one goes up by
     # one and the answer is True; otherwise nothing changes and the answer is False
     async def take_mail_quota(self, buckets: list[tuple[str, int]]) -> bool: ...
+
+    # Tool A, A1: the orders to the VM. create_agent_op gives the apartment's next sequence number and saves the order
+    # in one transaction (the sequence documents are never deleted: a tombstone, §6.4; «capienza» has none);
+    # finish_agent_op closes an operation ONCE, only if it is still «inviato», with the same environment, apartment and
+    # operation, and not older than max_age_s: answers «chiuso», «sconosciuto», «diverso», «gia_chiuso» or «tardi»
+    async def create_agent_op(self, op: "AgentOp") -> "AgentOp": ...
+    async def get_agent_op(self, op_id: str) -> "AgentOp | None": ...
+    async def finish_agent_op(self, op_id: str, ambiente: str, apartment_id: str | None, operazione: str,
+                              outcome: dict, max_age_s: float) -> str: ...
 
     # P-60 step 9 (D-132, D-143): the assistant's spending of a month (UTC, "YYYY-MM") for the whole project:
     # {cost_eur, calls, input_tokens, output_tokens, alerted}; add is atomic and returns the totals after it;

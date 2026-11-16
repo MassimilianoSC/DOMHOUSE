@@ -13,7 +13,7 @@ from google.cloud import firestore
 
 from .. import retention
 
-from .base import (EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email, now_iso)
 
 
@@ -223,6 +223,55 @@ class FirestoreRepository:
 
     # invitation email limits (P-49): mail_limits/{bucket} = {count}; one transaction reads every bucket, then raises
     # all of them or none
+    # tool A, A1: agent_ops/{op_id} (90 days) and agent_seq/{apartment_id} (never removed: a tombstone, §6.4)
+    async def create_agent_op(self, op):
+        op = op.model_copy(deep=True)
+        op_ref = self._col("agent_ops").document(op.op_id)
+        seq_ref = self._col("agent_seq").document(op.apartment_id) if op.apartment_id is not None else None
+
+        @firestore.async_transactional
+        async def txn(tx):
+            if seq_ref is not None:
+                snap = await seq_ref.get(transaction=tx)
+                op.seq = ((snap.to_dict() or {}).get("seq", 0) if snap.exists else 0) + 1
+                tx.set(seq_ref, {"seq": op.seq, "updated_at": now_iso()})
+            doc = op.model_dump()
+            tx.create(op_ref, {**doc, retention.FIELD: retention.agent_op(doc)})
+        async with self._lock(f"agent_seq:{op.apartment_id}"):
+            await txn(self.db.transaction())
+        return op
+
+    async def get_agent_op(self, op_id):
+        snap = await self._col("agent_ops").document(op_id).get()
+        if not snap.exists:
+            return None
+        doc = snap.to_dict()
+        doc.pop(retention.FIELD, None)
+        return AgentOp(**doc)
+
+    async def finish_agent_op(self, op_id, ambiente, apartment_id, operazione, outcome, max_age_s):
+        ref = self._col("agent_ops").document(op_id)
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            if not snap.exists:
+                return "sconosciuto"
+            doc = snap.to_dict()
+            doc.pop(retention.FIELD, None)
+            op = AgentOp(**doc)
+            if (op.ambiente, op.apartment_id, op.operazione) != (ambiente, apartment_id, operazione):
+                return "diverso"
+            if op.stato != "inviato":
+                return "gia_chiuso"
+            age = time.time() - retention.parse(op.creato_at).timestamp()
+            if age > max_age_s and outcome.get("stato") != "fallito":
+                return "tardi"
+            tx.update(ref, {**outcome, "finito_at": now_iso()})
+            return "chiuso"
+        async with self._lock(f"agent_op:{op_id}"):
+            return await txn(self.db.transaction())
+
     async def take_mail_quota(self, buckets):
         refs = [(self._col("mail_limits").document(key), limit) for key, limit in buckets]
 
