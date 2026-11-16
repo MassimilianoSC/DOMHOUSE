@@ -195,6 +195,8 @@ if problems:
 print("controlli superati")
 PY
 say "Fatto"
-echo "Per il server dello ${ENVIRONMENT}: AGENT_ORDERS_TOPIC=projects/${P}/topics/${ORDERS}, AGENT_PUSH_AUDIENCE=${ENDPOINT},"
-echo "AGENT_PUSH_EMAIL=${PUSH_EMAIL} (nel manifesto, poi una pubblicazione). Per la VM: scripts/agent-vm.sh install con"
+echo "Per il server dello ${ENVIRONMENT}: AGENT_AMBIENTE=${ENVIRONMENT}, AGENT_ORDERS_TOPIC=projects/${P}/topics/${ORDERS},"
+echo "AGENT_PUSH_AUDIENCE=${ENDPOINT}, AGENT_PUSH_EMAIL=${PUSH_EMAIL},"
+echo "AGENT_PUSH_SUBSCRIPTION=projects/${P}/subscriptions/${PUSH_SUB} (nel manifesto, poi una pubblicazione)."
+echo "Per la VM: scripts/agent-vm.sh install con"
 echo "SOTTOSCRIZIONE=projects/${P}/subscriptions/${SUB} RISULTATI=projects/${P}/topics/${RESULTS}."

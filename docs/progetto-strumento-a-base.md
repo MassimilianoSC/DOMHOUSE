@@ -150,7 +150,7 @@ Oggi crea appartamenti `carico-NN` con segreti leggibili dallo staging (`scripts
 
 ## 3. L'elenco chiuso delle operazioni
 
-Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima di 128 KB:
+Ogni ordine porta questi campi, con una dimensione massima di 128 KB. **Nessuno schema Pub/Sub** (scelta di A1, §1.2): lo schema lo controllano il lettore e, di nuovo, l'esecutore (`scripts/agent/comune.py`); la revisione di sicurezza di A1 l'ha accettato a condizione dei rilievi R2 (un ordine «avvelenato» non ferma niente) e R3 (`agent-gcp.sh` si ferma se la coda degli ordini ha un publisher diverso dal server):
 
 - `op_id`;
 - `operazione`;
@@ -204,6 +204,21 @@ Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima 
    - La copia di prima (`.catalog.yaml.prima`) e la versione applicata stanno accanto, sempre di root.
    - Così un motore compromesso non può mettere link simbolici dove scrive l'agente.
 4. Scrittura atomica, riavvio con `key`. Se il motore non torna sano, si rimette la copia e si riavvia.
+
+### 3.2 Dalla revisione di sicurezza di A1 (16 novembre): cosa resta per A2
+
+**R8, il token della VM.** Qualunque processo dell'host ha il token di `langbrain-vm@`, quindi può pubblicare nella coda dei risultati un risultato falso. In A1 un risultato falso cambia solo l'esito di un «stato». Con A2 (`crea_motore`, `aggiorna_broker`) conta di più.
+
+1. **In A2 i risultati li firma l'esecutore** con un HMAC-SHA256: chiave casuale di root sulla VM (`/etc/domhouse/agent-hmac.key`, 600, mai leggibile dal lettore). Una copia della chiave sta in Secret Manager, letta dal server per controllare la firma.
+   - La firma copre op_id, ambiente, appartamento, operazione, seq, esito, codice e dati.
+   - Il lettore inoltra la firma senza poterla fare.
+   - Il server scarta un risultato senza firma valida.
+2. **Prima dell'installazione di A1:** la procedura controlla che la correzione E-31 (metadati chiusi ai container) sia attiva. Così il token non è raggiungibile dai motori, che sono il pezzo più esposto. Controlli: `sudo nft list table inet domhouse_metadata` e l'ultima riga «metadata blocked» del controllo orario.
+
+**Altre scelte confermate dalla revisione:**
+
+- l'esecutore con `ProtectSystem=strict` e nessuna capacità (R7). Da verificare sulla VM che `docker inspect` funzioni così;
+- il «Creatore di token» all'agente di servizio di Pub/Sub non serve: il progetto è del 15 ottobre 2026, dopo l'aprile 2021 (domanda b). Tolto da `agent-gcp.sh`.
 
 ## 4. Permessi
 
