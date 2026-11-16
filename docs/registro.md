@@ -395,6 +395,9 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
      - **niente lampada:** alla Plug è attaccato **solo lo schermo del PC**, non il computer, e i watt e i comandi si osservano sullo schermo;
      - **§7 (relè):** soprattutto domande, e per la prova basta lo Shelly 1 Gen4 del banco, anche senza caldaia;
      - **§8 (infrarossi):** Youssouf probabilmente non ha il trasmettitore; prima gli si chiede se ce l'ha, e se no quale comprare e cosa serve per provarlo. La stima può darla dalla documentazione, e la prova si fa solo quando il dispositivo c'è.
+     - **§6 domanda 6 (ponte):** la regola pratica per il cliente (distanza, sensori per ponte, quando aggiungere uno Shelly solo come ponte), dopo l'obiezione di Youssouf sugli appartamenti con più stanze.
+     - **§3:** che cosa trova di nuovo su GitHub. In `engine/connector/` solo le sue #10, #11 e #12; in `engine/` solo i limiti di risorse nei due compose (verificato con `git diff 04be45b origin/main -- engine/`); il resto non lo riguarda. Per la prossima pull request deve partire da `main` aggiornato.
+   - **Obiezioni di Youssouf sull'Autonomia** (riferite dal committente): Shelly diversi in numero e tipo, e ponti in più negli appartamenti grandi. Risposte: ogni appartamento ha il suo catalogo e il codice è lo stesso; il catalogo dà già un ponte a ogni sensore; il confine vero sono i modelli ammessi. **Prompt per una revisione avversaria indipendente** del ragionamento: `DOMOTICA/documenti-interni/autonomia/prompt-revisione-avversaria-autonomia.md`, che il committente fa leggere a un agente.
 
 - **Autonomia: cosa blocca e cosa no (domanda del committente, 12:38).**
   - **Leonardo:** nessuna riga del documento 2 lo riguarda. Italianway serve al primo appartamento, non all'Autonomia.
