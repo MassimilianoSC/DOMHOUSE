@@ -148,7 +148,7 @@ prova dh-prova-id dhprova-i-ok- dhprova-i-no-1
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-for s in $(gcloud secrets list --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --filter='name:dhprova-' --format='value(name.basename())'); do case "$s" in dhprova-*) gcloud secrets delete "$s" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --quiet;; esac; done
+for s in $(gcloud secrets list --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --filter='name:dhprova-' --format='value(name.basename())' | tr -d '\r'); do case "$s" in dhprova-*) gcloud secrets delete "$s" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --quiet;; esac; done
 for a in dh-prova-ctrl dh-prova-num dh-prova-id; do gcloud projects remove-iam-policy-binding domotica-poc-511707 --account=m.scardovellicrac@gmail.com --member="serviceAccount:$a@domotica-poc-511707.iam.gserviceaccount.com" --role=projects/domotica-poc-511707/roles/dhProvaCreaSegreti1116 --all --format='value(etag)'; done
 for a in dh-prova-ctrl dh-prova-num dh-prova-id; do gcloud iam service-accounts delete "$a@domotica-poc-511707.iam.gserviceaccount.com" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --quiet; done
 gcloud iam roles delete dhProvaCreaSegreti1116 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --quiet --format='value(deleted)'
@@ -160,6 +160,7 @@ gcloud iam roles delete dhProvaCreaSegreti1116 --project=domotica-poc-511707 --a
   3. tre «deleted service account»;
   4. `True` per il ruolo.
 - Cancellando gli account sparisce anche il tuo permesso di impersonarli (P3).
+- `tr -d '\r'`: in Git Bash `gcloud` chiude ogni riga con un ritorno a capo di Windows, che finiva nel nome; il 16 novembre il ciclo ha mancato `dhprova-c-1` per questo (registro `e17c52e`).
 
 ## P8. Controllo finale: non resta niente (sola lettura)
 
