@@ -138,7 +138,7 @@ def test_faults_become_the_three_outcomes():
         device.hang_next("Switch.Set")
         with pytest.raises(TransportTimeout) as info:
             await transport.call(SID, "Switch.Set", {"id": 0, "on": True}, 0.05)
-        assert error_result(info.value).reason == "internal_error"
+        assert error_result(info.value).reason == "device_offline"
 
         transport.set_online(SID, False)
         with pytest.raises(TransportOffline) as info:

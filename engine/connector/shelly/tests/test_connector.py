@@ -279,15 +279,33 @@ def test_command_rejected_by_the_device_keeps_no_device_text():
     run(scenario)
 
 
-def test_command_timeout_is_internal_error():
+def test_command_timeout_is_device_offline_and_the_device_stays_online():
     async def scenario(w):
         await w.connect()
         w.plugs[SID_A].hang_next("Switch.GetStatus")
         w.plugs[SID_A].hang_next("Switch.GetStatus")
         result = await w.conn.execute(cmd(True), lambda s: None)
-        assert (result.outcome, result.reason, result.detail) == ("failed", "internal_error",
+        assert (result.outcome, result.reason, result.detail) == ("failed", "device_offline",
                                                                   "read back failed: transport timeout")
         assert w.info().online
+    run(scenario, rpc_timeout_s=0.1)
+
+
+def test_set_without_answer_does_not_put_the_device_offline():
+    """The 16 November case: Switch.Set gets no answer (unplugged before the broker noticed, or slow, or its answer
+    lost). The command is failed/device_offline "transport timeout", but the device's online state is not touched:
+    no online=False, still online, and the next command goes. Its state comes from the broker and the silence."""
+    async def scenario(w):
+        await w.connect()
+        start = len(w.changes)
+        w.plugs[SID_A].hang_next("Switch.Set")
+        result = await w.conn.execute(cmd(True), lambda s: None)
+        assert (result.outcome, result.reason, result.detail) == ("failed", "device_offline", "transport timeout")
+        await w.settle(0.3)
+        assert not any(c.kind == "online" for c in w.changes[start:])
+        assert w.info().online
+        result = await w.conn.execute(cmd(True, n=2), lambda s: None)
+        assert (result.outcome, result.state) == ("confirmed", {"on": True})
     run(scenario, rpc_timeout_s=0.1)
 
 

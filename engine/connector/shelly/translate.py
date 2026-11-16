@@ -474,7 +474,20 @@ def error_result(exc: Exception, prefix: str = "") -> CommandResult:
     """A transport error -> the failed outcome of connector.md §2.5. detail is short English and never carries what
     the device said (an RPC error keeps its code only); prefix tells where it happened ("read back failed: ").
     Only Exception is handled: asyncio.CancelledError, a BaseException, must reach the engine and never becomes an
-    outcome."""
+    outcome.
+
+    A request without answer is device_offline too (connector-v2 §7.2), with its own detail "transport timeout", so the
+    logs still tell it from a device the transport already knew offline ("device offline"). It means «the device did
+    not answer in time», NOT always switched off or unplugged. The cases we know:
+      - unplugged a moment ago, before the broker noticed (up to 60-90 s): the case of the 16 November test;
+      - on but slow: a Shelly acting as a Bluetooth bridge answered in up to 3.0 s, beyond the 3 s wait; the command
+        may have been carried out;
+      - the answer dropped by the broker, the device lacking the permission on its reply topic: the device acted, we
+        only get the timeout;
+      - the request lost on the way (requests are QoS 0).
+    In all of them the true state comes with the next notification or snapshot. A timeout does not put the device
+    offline in the connector (connector.py, execute): its online state still comes from the broker and the silence.
+    internal_error is for the connector's own errors only (here, an exception not expected)."""
     if not isinstance(exc, Exception):
         raise TypeError("error_result handles Exception only")
     if isinstance(exc, RpcError):
@@ -482,7 +495,7 @@ def error_result(exc: Exception, prefix: str = "") -> CommandResult:
     elif isinstance(exc, TransportOffline):
         reason, detail = "device_offline", "device offline"
     elif isinstance(exc, TransportTimeout):
-        reason, detail = "internal_error", "transport timeout"
+        reason, detail = "device_offline", "transport timeout"
     else:
         reason, detail = "internal_error", type(exc).__name__
     return CommandResult(outcome="failed", reason=reason, detail=prefix + detail)

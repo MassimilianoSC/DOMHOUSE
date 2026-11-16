@@ -15,6 +15,14 @@ The sequence:
      (§2.5). If the retry fails too, or the read back gets an RPC error, the outcome is error_result with detail
      "read back failed: ...", so the logs tell a failed read back from a failed command;
   4. confirmed_result on what was read back: reached -> confirmed, not reached -> failed/device_rejected.
+A request without answer, of the set or of the read back, ends as failed/device_offline with detail "transport
+timeout" (connector-v2 §7.2): «the device did not answer in time», which is NOT always switched off or unplugged.
+It may be unplugged a moment ago, before the broker noticed (up to 60-90 s); on but slow (a Shelly acting as a
+Bluetooth bridge answered in up to 3.0 s, beyond the 3 s wait), the command maybe carried out; its answer dropped by
+the broker for lack of permission on the reply topic, the device having acted; the request lost on the way (QoS 0).
+The true state comes with the next notification or snapshot, and the device is not put offline for it (connector.py).
+failed/internal_error is for the connector's own errors: target not valid, deadline already passed, read back without
+the expected field, an exception not expected.
 Every RPC gets the smaller of rpc_timeout_s and the time left before the deadline; nothing is tried after it.
 asyncio.CancelledError is never caught: the engine cancels a command past its deadline, and no state of the command
 is kept here. The device may have acted already (the set request may have reached it before the cancellation): after

@@ -188,7 +188,7 @@ def test_read_back_without_output_is_an_internal_error():
 def test_errors_map_to_the_three_reasons():
     cases = {RpcError(-103, "Argument 'on', value 42 not valid"): ("device_rejected", "rpc error -103"),
              TransportOffline(): ("device_offline", "device offline"),
-             TransportTimeout(): ("internal_error", "transport timeout"),
+             TransportTimeout(): ("device_offline", "transport timeout"),
              RuntimeError("boom with a secret"): ("internal_error", "RuntimeError")}
     for exc, (reason, detail) in cases.items():
         result = error_result(exc)
