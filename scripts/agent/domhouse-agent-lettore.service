@@ -1,0 +1,45 @@
+# Tool A, A1 (docs/progetto-strumento-a-base.md §1): the reader of the order receiver. Unprivileged
+# (domhouse-agent): takes the orders from the environment's Pub/Sub subscription with the VM's token, keeps the
+# journal in /var/lib/domhouse-agent, talks to the executor on its local socket. Installed by scripts/agent-vm.sh.
+[Unit]
+Description=DOMHOUSE agent: reader of the orders (unprivileged, Pub/Sub)
+After=network-online.target domhouse-agent-esecutore.service
+Wants=network-online.target
+Requires=domhouse-agent-esecutore.service
+
+[Service]
+Type=simple
+User=domhouse-agent
+Group=domhouse-agent
+ExecStart=/usr/bin/python3 -I /opt/domhouse/agent/lettore.py
+StateDirectory=domhouse-agent
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectHome=yes
+ProtectSystem=strict
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+MemoryMax=128M
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

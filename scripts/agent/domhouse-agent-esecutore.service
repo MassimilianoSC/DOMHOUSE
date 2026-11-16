@@ -1,0 +1,35 @@
+# Tool A, A1 (docs/progetto-strumento-a-base.md §1): the executor of the order receiver. Root, minimal: a local
+# UNIX socket only (/run/domhouse-agent, root:domhouse-agent 750; socket 660), served to the reader's uid alone.
+# Installed by scripts/agent-vm.sh install; never by hand.
+[Unit]
+Description=DOMHOUSE agent: executor of the orders (root, local socket only)
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=simple
+User=root
+Group=domhouse-agent
+ExecStart=/usr/bin/python3 -I /opt/domhouse/agent/esecutore.py
+RuntimeDirectory=domhouse-agent
+RuntimeDirectoryMode=0750
+StateDirectory=domhouse-executor
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+# A1 only reads (stato, capienza): /usr, /boot and /etc read-only. A2 (crea_motore) will open what it writes
+ProtectSystem=full
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryMax=128M
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
