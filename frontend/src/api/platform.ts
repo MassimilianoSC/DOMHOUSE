@@ -113,4 +113,27 @@ export const platformApi = {
   /** Only the platform deletes apartments, in every mode (D-65, D-77). */
   deleteApartment: (tenantId: string, aptId: string, correlationId: string) =>
     bffFetch<void>(`${apts(tenantId)}/${enc(aptId)}`, { method: "DELETE", correlationId }),
+  /** «Prova l'agente» (strumento A, A1; o1 448a71a, bff/API.md): an order «stato» to the agent on the VM, for a staging
+   *  apartment (lab-…, test-…) or dev. 202 with the operation; 422 invalid_apartment; 503 agent_not_configured;
+   *  502 agent_publish_failed. */
+  agentTest: (apartmentId: string, correlationId: string) =>
+    bffFetch<AgentOp>("/app/platform/agent/prova", { method: "POST", body: { apartment_id: apartmentId }, correlationId }),
+  /** The operation, to read again while it is «inviato»; after 20 minutes the server gives it «fallito/tempo_scaduto». */
+  agentOp: (opId: string) => bffFetch<AgentOp>(`/app/platform/agent/ops/${enc(opId)}`),
 };
+
+/** An order to the agent on the VM and its outcome (bff/agent.py describe). */
+export interface AgentOp {
+  op_id: string;
+  operazione: string;
+  apartment_id: string;
+  seq: number;
+  stato: "inviato" | "riuscito" | "rifiutato" | "scartato" | "fallito";
+  codice: string | null;
+  /** The Italian sentence of the code, ready to show. */
+  messaggio: string;
+  /** Only when riuscito, for «stato»: health 200 = engine sound, 0 = not answering. */
+  dati: { health?: number; stato?: string; connector?: "up" | "down"; immagine?: string } | null;
+  creato_at: string;
+  finito_at: string | null;
+}

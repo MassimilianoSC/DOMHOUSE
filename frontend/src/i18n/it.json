@@ -1021,6 +1021,19 @@
     }
   },
   "platform": {
+    "agent": {
+      "button": "Prova l'agente",
+      "ok": "Agente raggiungibile.",
+      "engine": "Motore: {state}",
+      "engineOk": "sano",
+      "engineDown": "non risponde",
+      "connector": "collegamento ai dispositivi: {state}",
+      "connectorUp": "attivo",
+      "connectorDown": "fermo",
+      "version": "versione: {version}",
+      "timeout": "Nessuna risposta dall'agente entro 20 minuti: riprova",
+      "notConfigured": "Agente non ancora installato in questo ambiente."
+    },
     "title": "Organizzazioni",
     "subtitle": "Le organizzazioni che usano l'app e i gestori della piattaforma",
     "noAccess": "Non hai più accesso a questa pagina: il ruolo di gestore della piattaforma ti è stato tolto.",

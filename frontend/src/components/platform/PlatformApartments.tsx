@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { VerifyResult } from "@/api/admin";
 import { platformApi, type PlatformApartment } from "@/api/platform";
 import { APARTMENT_ID_RE, DemoBadge, defaultInstanceUrl, Field, isBuiltinMock, LastCheck, SimulatedField, useInstanceMode, useInstanceUrlHint, VerifyBadge } from "@/components/admin/apartmentForm";
+import { AgentTest, agentTestable } from "@/components/platform/AgentTest";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
@@ -178,6 +179,12 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
                   </div>
                 </div>
                 {v && v !== "loading" && <VerifyBadge r={v} />}
+                {/* strumento A, A1: the agent on the VM answers for the staging apartments and dev only */}
+                {agentTestable(a.apartment_id) && (
+                  <div className="flex flex-wrap items-center gap-2" data-testid={`platform-apt-agent-${a.apartment_id}`}>
+                    <AgentTest apartmentId={a.apartment_id} />
+                  </div>
+                )}
               </li>
             );
           })}

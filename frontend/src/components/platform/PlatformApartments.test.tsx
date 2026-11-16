@@ -283,3 +283,18 @@ describe("Piattaforma: istanza simulata nel ricollegamento (N4, D-100)", () => {
     expect(s.patchConnection.mock.calls[0][2]).not.toHaveProperty("simulated");
   });
 });
+
+describe("Piattaforma > Appartamenti: «Prova l'agente» (strumento A, A1)", () => {
+  it("solo sulle righe degli appartamenti dello staging (lab-…, test-…) e di dev", async () => {
+    s.apartments.mockResolvedValue([
+      ...APTS,
+      { ...APTS[0], apartment_id: "lab-01", name: "Laboratorio" },
+      { ...APTS[0], apartment_id: "dev", name: "Sviluppo" },
+    ]);
+    await open();
+    await screen.findByTestId("platform-apt-lab-01");
+    expect(within(screen.getByTestId("platform-apt-lab-01")).getByTestId("agent-test-btn-lab-01")).toHaveTextContent("Prova l'agente");
+    expect(within(screen.getByTestId("platform-apt-dev")).getByTestId("agent-test-btn-dev")).toBeInTheDocument();
+    for (const id of ["apt-001", "apt-002", "apt-003"]) expect(screen.queryByTestId(`platform-apt-agent-${id}`)).toBeNull();
+  });
+});
