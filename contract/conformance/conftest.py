@@ -1,5 +1,5 @@
 """
-Suite di conformità al contratto `contract/openapi.yaml` (versione 1.0.4).
+Suite di conformità al contratto `contract/openapi.yaml` (la versione è in `info.version` del contratto).
 
 Esecuzione contro un'istanza reale:
     pytest contract/conformance --base-url http://10.0.0.10:8101/api/v1 --api-key "$LB_API_KEY"
