@@ -49,7 +49,9 @@ HEALTH_MAX_BYTES = 64 * 1024
 JOURNAL_DAYS = 14
 REQUEST_MAX_BYTES = 2 * comune.MAX_ORDER_BYTES + 1024
 PEER_TIMEOUT_S = 10                 # R14: a peer that sends nothing does not hold the only executor
-ALARM_CODES = {"chiamante_non_ammesso", "prod_non_ammesso", "ambiente_diverso"}   # R16: a reader compromised?
+# R16: every refusal the reader should have made itself means a reader that lets things through (compromised?):
+# an alarm; not these three, which are normal outcomes, nor errore_interno, which has its own line
+NORMAL_REFUSALS = {"seq_vecchia", "non_disponibile", "motore_assente", "errore_interno"}
 PORT_RE = re.compile(r"^PORT=([0-9]{4,5})$", re.M)
 ENV_RE = re.compile(r"^ENV=(staging|prod)$", re.M)
 METADATA_IP = "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip"
@@ -173,7 +175,7 @@ class Esecutore:
             out = comune.result_for_raw(data, "rifiutato", "chiamante_non_ammesso")
         else:
             out = self._checked(data, output)
-        if out["codice"] in ALARM_CODES:                      # R16
+        if out["esito"] == "rifiutato" and out["codice"] not in NORMAL_REFUSALS:      # R16
             self.log(f"agent alarm codice={out['codice']} ambiente={self.config.ambiente} op_id={out.get('op_id')}")
         self._record(out, started, output)
         return out
@@ -219,7 +221,9 @@ class Esecutore:
             connector = health.get("connector")
             if isinstance(connector, dict) and _short(connector.get("status")):
                 dati["connector"] = connector["status"]
-        rc, image = self.run([DOCKER, "inspect", "-f", "{{.Config.Image}}", f"engine-{apartment_id}"], CLEAN_ENV,
+        # docker's own folder in the executor's state: /root/.docker is hidden by ProtectHome
+        env = {**CLEAN_ENV, "DOCKER_CONFIG": str(self.config.state / "docker")}
+        rc, image = self.run([DOCKER, "inspect", "-f", "{{.Config.Image}}", f"engine-{apartment_id}"], env,
                              RUN_TIMEOUT_S)
         output.append(f"docker inspect: {rc} {image.strip()[:200]}")
         image = image.strip()
@@ -271,6 +275,8 @@ class Esecutore:
             text = path.read_text(encoding="utf-8").strip()
         except FileNotFoundError:
             last = 0
+        except (OSError, UnicodeDecodeError) as exc:       # R6: a folder, no permission, not text: unreadable
+            raise ValueError("lapide illeggibile") from exc
         else:
             if not re.fullmatch(r"[1-9][0-9]{0,9}", text):
                 raise ValueError("lapide illeggibile")

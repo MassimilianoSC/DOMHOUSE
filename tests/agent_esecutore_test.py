@@ -91,7 +91,8 @@ def test_stato_answers_health_connector_and_image(w):
     assert w.gets == ["http://10.198.0.2:8169/api/v1/health"]
     [(argv, env)] = w.runs
     assert argv == ["/usr/bin/docker", "inspect", "-f", "{{.Config.Image}}", "engine-lab-01"]
-    assert env == {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin"}                      # env -i: nothing else
+    assert env == {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin",                     # env -i: nothing else but
+                   "DOCKER_CONFIG": str(w.state / "docker")}                    # docker's folder in the state (ProtectHome)
 
 
 def test_stato_of_an_engine_that_does_not_answer(w):
@@ -273,3 +274,29 @@ def test_r14_a_stranger_is_answered_before_anything_is_read_and_a_silent_peer_ti
     t.join(5)
     server.server_close()
     assert answer["codice"] == "chiamante_non_ammesso"
+
+
+# ---- third reading, 16 November (R16, R6, DOCKER_CONFIG) -----------------------------------------------------------
+def test_r16_every_refusal_the_reader_should_have_made_raises_an_alarm(w):
+    w.ex.handle(order(apartment_id="lab_01"), READER_UID)                       # id_non_valido: the reader lets it pass?
+    w.ex.handle(order(parametri={"x": 1}), READER_UID)
+    w.ex.handle(b"{rotto", READER_UID)
+    w.ex.handle(order(operazione="togli_motore", seq=1, apartment_id="lab-02"), READER_UID)   # non_disponibile: normal
+    w.ex.handle(order(apartment_id="lab-99", seq=1), READER_UID)                              # motore_assente: normal
+    w.ex.handle(order(seq=1), READER_UID)
+    w.ex.handle(order(seq=1, op_id="9c3a7b4f-5d2e-4f60-8b1c-2d3e4f5a6b7c"), READER_UID)       # seq_vecchia: normal
+    codes = [l.split()[2] for l in w.logs if l.startswith("agent alarm ")]
+    assert codes == ["codice=id_non_valido", "codice=parametri_non_validi", "codice=json_non_valido"]
+
+
+@pytest.mark.parametrize("kind", ["cartella", "binario"])
+def test_r6_a_tombstone_unreadable_in_any_way_is_refused_with_an_alarm(w, kind):
+    folder = w.state / "seq"
+    folder.mkdir(parents=True)
+    if kind == "cartella":
+        (folder / "lab-01").mkdir()
+    else:
+        (folder / "lab-01").write_bytes(b"\xff\xfe\x00")
+    r = w.ex.handle(order(seq=9), READER_UID)
+    assert (r["esito"], r["codice"]) == ("rifiutato", "errore_interno") and w.gets == []
+    assert any(l.startswith("agent alarm codice=lapide_illeggibile") for l in w.logs)
