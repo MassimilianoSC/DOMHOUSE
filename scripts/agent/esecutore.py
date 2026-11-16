@@ -48,6 +48,8 @@ HEALTH_TIMEOUT_S = 5
 HEALTH_MAX_BYTES = 64 * 1024
 JOURNAL_DAYS = 14
 REQUEST_MAX_BYTES = 2 * comune.MAX_ORDER_BYTES + 1024
+PEER_TIMEOUT_S = 10                 # R14: a peer that sends nothing does not hold the only executor
+ALARM_CODES = {"chiamante_non_ammesso", "prod_non_ammesso", "ambiente_diverso"}   # R16: a reader compromised?
 PORT_RE = re.compile(r"^PORT=([0-9]{4,5})$", re.M)
 ENV_RE = re.compile(r"^ENV=(staging|prod)$", re.M)
 METADATA_IP = "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip"
@@ -108,10 +110,38 @@ def run_program(argv: list[str], env: dict, timeout: float) -> tuple[int, str]:
     return done.returncode, (done.stdout or "")[-4000:]
 
 
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    """R13: an engine is not trusted: a redirect is never followed (it answers with its 3xx code)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+# R13: no redirects, and no proxy from the environment (the environment is clean anyway)
+HEALTH_OPENER = urllib.request.OpenerDirector()
+for _handler in (urllib.request.ProxyHandler({}), urllib.request.UnknownHandler(), urllib.request.HTTPHandler(),
+                 urllib.request.HTTPDefaultErrorHandler(), NoRedirect(), urllib.request.HTTPErrorProcessor()):
+    HEALTH_OPENER.add_handler(_handler)
+
+
+def _sync_dir(path: Path) -> None:
+    """R6, R10: fsync of the folder after a rename (Linux); a no-op where folders cannot be opened."""
+    try:
+        fd = os.open(path, os.O_RDONLY)
+    except OSError:
+        return
+    try:
+        os.fsync(fd)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 def http_get(url: str, timeout: float) -> tuple[int, dict | None]:
     """The engine's /health: code and JSON, the body read up to HEALTH_MAX_BYTES (the engine is not trusted)."""
     try:
-        with urllib.request.urlopen(url, timeout=timeout) as answer:
+        with HEALTH_OPENER.open(url, timeout=timeout) as answer:
             body = answer.read(HEALTH_MAX_BYTES + 1)
             code = answer.status
     except urllib.error.HTTPError as exc:
@@ -143,6 +173,8 @@ class Esecutore:
             out = comune.result_for_raw(data, "rifiutato", "chiamante_non_ammesso")
         else:
             out = self._checked(data, output)
+        if out["codice"] in ALARM_CODES:                      # R16
+            self.log(f"agent alarm codice={out['codice']} ambiente={self.config.ambiente} op_id={out.get('op_id')}")
         self._record(out, started, output)
         return out
 
@@ -157,7 +189,12 @@ class Esecutore:
             return comune.result(order, "rifiutato", "non_disponibile")
         if order.operazione == "capienza":
             return comune.result(order, "riuscito", "ok", self._capacity())
-        if not self._next_seq(order.apartment_id, order.seq):       # first: the tombstone holds without the engine
+        try:
+            fresh = self._next_seq(order.apartment_id, order.seq)    # first: the tombstone holds without the engine
+        except ValueError:                                           # R6: unreadable: refused, with an alarm
+            self.log(f"agent alarm codice=lapide_illeggibile apartment={order.apartment_id}")
+            return comune.result(order, "rifiutato", "errore_interno")
+        if not fresh:
             return comune.result(order, "rifiutato", "seq_vecchia")
         port = self._port(order.apartment_id)
         if port is None:
@@ -225,19 +262,28 @@ class Esecutore:
         return ip
 
     def _next_seq(self, apartment_id: str, seq: int) -> bool:
-        """Higher than the last applied, then written (atomically) before the operation runs. The file stays."""
+        """Higher than the last applied, then written (atomically, synced) before the operation runs. The file stays.
+        R6: a tombstone that is there but unreadable, empty or 0 raises ValueError: never read as «none»."""
         folder = self.config.state / "seq"
         folder.mkdir(parents=True, exist_ok=True, mode=0o700)
         path = folder / apartment_id
         try:
-            last = int(path.read_text(encoding="utf-8").strip() or "0")
+            text = path.read_text(encoding="utf-8").strip()
         except FileNotFoundError:
             last = 0
+        else:
+            if not re.fullmatch(r"[1-9][0-9]{0,9}", text):
+                raise ValueError("lapide illeggibile")
+            last = int(text)
         if seq <= last:
             return False
         tmp = folder / f".{apartment_id}.tmp"
-        tmp.write_text(f"{seq}\n", encoding="utf-8")
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write(f"{seq}\n")
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp, path)
+        _sync_dir(folder)
         return True
 
     def _record(self, out: dict, started: float, output: list[str]) -> None:
@@ -269,14 +315,24 @@ def make_server(path: Path, executor: Esecutore) -> socketserver.UnixStreamServe
 
     class Handler(socketserver.StreamRequestHandler):
         def handle(self):
-            line = self.rfile.readline(REQUEST_MAX_BYTES + 1)
+            # R14: the peer first, before reading a byte; then at most PEER_TIMEOUT_S to send its request
+            uid = peer_uid(self.connection)
+            if uid != executor.config.reader_uid:
+                out = executor.handle(b"", uid)
+                self.wfile.write(json.dumps(out, ensure_ascii=False).encode("utf-8") + b"\n")
+                return
+            self.connection.settimeout(PEER_TIMEOUT_S)
+            try:
+                line = self.rfile.readline(REQUEST_MAX_BYTES + 1)
+            except OSError:
+                return
             try:
                 request = json.loads(line.decode("utf-8")) if len(line) <= REQUEST_MAX_BYTES else None
                 data = request["ordine"].encode("utf-8") if isinstance(request, dict) and \
                     isinstance(request.get("ordine"), str) else b""
             except (UnicodeDecodeError, ValueError):
                 data = b""
-            out = executor.handle(data, peer_uid(self.connection))
+            out = executor.handle(data, uid)
             self.wfile.write(json.dumps(out, ensure_ascii=False).encode("utf-8") + b"\n")
 
     if path.exists() or path.is_symlink():

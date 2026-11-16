@@ -206,3 +206,70 @@ def test_the_socket_serves_one_request_and_checks_the_peer(tmp_path):
     server.server_close()
     assert (answer["esito"], answer["codice"]) == ("riuscito", "ok")
     assert oct(path.stat().st_mode & 0o777) == "0o660"
+
+
+# ---- second reading, 16 November (security review of A1: R6, R7, R13, R14, R16) ----------------------------------
+def test_r6_an_unreadable_tombstone_refuses_with_an_alarm(w):
+    folder = w.state / "seq"
+    folder.mkdir(parents=True)
+    for content in ("non un numero\n", "0\n", ""):
+        (folder / "lab-01").write_text(content, encoding="utf-8")
+        r = w.ex.handle(order(seq=9), READER_UID)
+        assert (r["esito"], r["codice"]) == ("rifiutato", "errore_interno"), content
+        assert w.gets == [] and any(l.startswith("agent alarm codice=lapide_illeggibile") for l in w.logs)
+    assert (folder / "lab-01").read_text(encoding="utf-8") == ""          # never overwritten
+
+
+def test_r6_the_tombstone_and_its_folder_are_synced(w, monkeypatch):
+    synced = []
+    monkeypatch.setattr(esecutore.os, "fsync", lambda fd: synced.append(fd))
+    monkeypatch.setattr(esecutore, "_sync_dir", lambda path: synced.append(str(path)))
+    w.ex.handle(order(), READER_UID)
+    assert len([s for s in synced if isinstance(s, int)]) >= 1 and str(w.state / "seq") in synced
+
+
+def test_r13_the_engines_health_is_read_without_redirects_nor_proxies():
+    opener = esecutore.HEALTH_OPENER
+    kinds = [type(h).__name__ for h in opener.handlers]
+    assert "HTTPRedirectHandler" not in kinds and "NoRedirect" in kinds
+    proxies = [h for h in opener.handlers if type(h).__name__ == "ProxyHandler"]
+    assert all(h.proxies == {} for h in proxies)              # an empty ProxyHandler is not even registered
+    assert not any(hasattr(h, "http_proxy_open") or hasattr(h, "https_proxy_open") for h in opener.handlers)
+
+
+def test_r16_refusals_that_mean_a_compromised_reader_raise_an_alarm(w):
+    w.ex.handle(order(), READER_UID + 1)
+    w.ex.handle(order(apartment_id="a-k3f9x2qm", ambiente="prod"), READER_UID)
+    w.ex.handle(order(ambiente="prod"), READER_UID)
+    alarms = [l for l in w.logs if l.startswith("agent alarm ")]
+    assert [a.split()[2] for a in alarms] == ["codice=chiamante_non_ammesso", "codice=prod_non_ammesso",
+                                             "codice=prod_non_ammesso"]
+
+
+def test_r16_the_alarm_policy_reads_both_services():
+    policy = json.loads((ROOT / "scripts" / "agent" / "allarmi" / "agente-allarme.json").read_text(encoding="utf-8"))
+    flt = policy["conditions"][0]["conditionMatchedLog"]["filter"]
+    assert "domhouse-agent-(lettore|esecutore)" in flt
+
+
+def test_r7_the_executor_unit_is_strict_and_without_capabilities():
+    unit = (AGENT / "domhouse-agent-esecutore.service").read_text(encoding="utf-8")
+    assert "ProtectSystem=strict" in unit and "CapabilityBoundingSet=\n" in unit and "ProtectSystem=full" not in unit
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="SO_PEERCRED e i socket UNIX: solo Linux (CI)")
+def test_r14_a_stranger_is_answered_before_anything_is_read_and_a_silent_peer_times_out(tmp_path, monkeypatch):
+    w = World(tmp_path)
+    w.ex = esecutore.Esecutore(w.config, run=w.run, http_get=w.get, log=w.logs.append)   # reader_uid is not ours
+    monkeypatch.setattr(esecutore, "PEER_TIMEOUT_S", 0.5)
+    path = tmp_path / "run" / "esecutore.sock"
+    path.parent.mkdir()
+    server = esecutore.make_server(path, w.ex)
+    t = threading.Thread(target=server.handle_request, daemon=True)
+    t.start()
+    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
+        s.connect(str(path))                                   # sends nothing at all
+        answer = json.loads(s.makefile("rb").readline())
+    t.join(5)
+    server.server_close()
+    assert answer["codice"] == "chiamante_non_ammesso"

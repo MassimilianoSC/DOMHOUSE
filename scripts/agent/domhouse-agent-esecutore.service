@@ -19,8 +19,12 @@ UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectHome=yes
-# A1 only reads (stato, capienza): /usr, /boot and /etc read-only. A2 (crea_motore) will open what it writes
-ProtectSystem=full
+# R7: A1 only reads (stato, capienza): the whole system read-only but its StateDirectory and RuntimeDirectory, and
+# no capability. A2 (crea_motore) will open exactly what it writes. Da verificare sulla VM: «docker inspect» works
+# without capabilities (the socket /run/docker.sock is root's: owner, no DAC override needed)
+ProtectSystem=strict
+CapabilityBoundingSet=
+AmbientCapabilities=
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
