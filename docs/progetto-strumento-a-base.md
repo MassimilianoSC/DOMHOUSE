@@ -2,9 +2,9 @@
 
 | Stato | Scritto da | Decisioni | Prossimo passo |
 |---|---|---|---|
-| **Progetto, nessun codice. Seconda stesura**, con le correzioni della revisione di sicurezza (`DOMOTICA/revisione-progetto-a/REVISIONE-SICUREZZA.md`, 25 punti) | o1, 15 novembre 2026 | 1123 = a: un segreto per dispositivo; coda Pub/Sub. 1125 = a: prova della condizione sul nome. Opzione 1 del documento interno (§14) | rilettura delle sezioni cambiate da parte del revisore; prova 1125; poi il codice |
+| **Progetto, nessun codice. Terza stesura (16 novembre):** le password dei dispositivi si conservano solo come **impronta** (D-233). La seconda stesura (15 novembre) aveva le correzioni della revisione di sicurezza (`DOMOTICA/revisione-progetto-a/REVISIONE-SICUREZZA.md`, 25 punti) | o1, 15–16 novembre 2026 | D-230 (1123 = a): coda Pub/Sub; **il segreto per dispositivo è una strada scartata** (registro §7.1). D-233 (1133 = a): impronte. 1125 = a: prova della condizione sul nome. Opzione 1 del documento interno (§14) | rilettura della memoria storica; poi una revisione di sicurezza delle parti cambiate (§10.3); prova 1125; poi il codice |
 
-**Cosa copre:** l'agente sulla VM, la creazione e l'eliminazione del «posto» di un appartamento, le credenziali dei dispositivi, la capienza.
+**Cosa copre:** l'agente sulla VM, la creazione e l'eliminazione del «posto» di un appartamento, le credenziali dei dispositivi (registrazione, «Rigenera», «Revoca»), la capienza.
 
 **Cosa non copre:** il modulo del catalogo, che aspetta il formato di Youssouf. Qui c'è solo l'operazione che lo applica.
 
@@ -12,7 +12,7 @@
 
 ## 1. I pezzi
 
-1. **Il server dell'app** (staging e, dopo la seconda VM, produzione): decide, crea i segreti, manda gli ordini, tiene lo stato in Firestore.
+1. **Il server dell'app** (staging e, dopo la seconda VM, produzione): decide, crea i due segreti di ogni appartamento, genera le password dei dispositivi e ne tiene solo l'impronta, manda gli ordini, tiene lo stato in Firestore.
 2. **Pub/Sub, per ambiente:** una coda «ordini» con schema e dimensione massima; una coda «risultati»; una coda «scarti».
 3. **Sulla VM, due servizi systemd** (non container: un container con il socket di Docker sarebbe root lo stesso):
    - **il lettore**, utente senza privilegi `domhouse-agent`: preleva gli ordini con il token della VM, controlla schema, ambiente, età e sequenza, scrive il giornale e pubblica i risultati;
@@ -23,7 +23,8 @@
      3. L'esecutore **ripete** tutti questi controlli, senza fidarsi del lettore: id (§2.1); prefisso contro ambiente; `ENV` del file delle impostazioni; `dev` escluso; porta e fascia; immagine; dimensioni (ordine, catalogo, elenco dei dispositivi); numero massimo dei motori dello staging; `seq`.
      4. L'esecutore ha l'ambiente ammesso nella **propria** configurazione di root: sulla VM condivisa rifiuta qualunque ordine con ambiente `prod`, qualunque cosa dica il lettore.
    - **Il blocco lo prende una volta sola l'esecutore**, per tutta l'operazione. Lancia gli script passando il descrittore già bloccato e la variabile `DOMHOUSE_LOCK_HELD=1`, l'unica ammessa nell'ambiente pulito oltre a `PATH`: gli script allora non lo riprendono. Lanciati a mano, gli script lo prendono come oggi. `broker-vm.sh check` (dentro `check-all`, ogni 5 minuti) non lo prende mai: lo prendono solo i comandi che cambiano qualcosa. Così `crea_motore` (`install` più `add-apartment`) e `togli_motore` (che finisce con `remove-apartment`) non si fermano su sé stessi.
-4. **Secret Manager:** per ogni appartamento la chiave del motore e il conto del connector; **un segreto per dispositivo**.
+4. **Secret Manager:** per ogni appartamento **solo due segreti**, la chiave del motore e il conto del connector. Il server ha bisogno della chiave in chiaro per chiamare il motore; il motore ha bisogno della password del connector.
+5. **Le password dei dispositivi non si conservano da nessuna parte (D-233).** Restano solo le loro impronte: in Firestore (la fonte) e nel file dei dispositivi dell'appartamento sulla VM, che il broker legge (§2.5).
 
 ## 2. Nomi e ambienti
 
@@ -36,19 +37,18 @@
 | `dev` | esiste, resta com'è (D-118); **escluso da ogni ordine** salvo `stato` e `capienza` | — |
 | Dispositivo | `^[a-z0-9][a-z0-9-]{0,63}$` (gli id Shelly lo sono già) | `shellyplugmg3-9070695cb0d0` |
 
-**Nessun id contiene `_`**, che diventa il separatore. Agente, server e `engine-vm.sh` usano le stesse regole: niente maiuscole.
+**Nessun id contiene `_` né `.`**. Agente, server e `engine-vm.sh` usano le stesse regole: niente maiuscole. Il punto separa appartamento e dispositivo nel nome utente del broker (`<apt>.<device>`); il trattino basso resta escluso anche se, con D-233, non c'è più un segreto per dispositivo da separare.
 
 **Vietato finché esiste un segreto della forma vecchia:** un id di appartamento che finisce con `-devices`. Oggi c'è solo `langbrain-shelly-lab-01-devices`, da migrare (§9).
 
 ### 2.2 Segreti
 
-| Segreto | Nome |
-|---|---|
-| Chiave del motore | `langbrain-api-key-<apt>` (nome di oggi: lo usa il server per chiamare il motore) |
-| Conto del connector | `langbrain-shelly-<apt>` |
-| Dispositivo | `langbrain-shelly-<apt>_<device>` |
+| Segreto | Nome | Chi lo legge |
+|---|---|---|
+| Chiave del motore | `langbrain-api-key-<apt>` (nome di oggi: lo usa il server per chiamare il motore) | il server e la VM |
+| Conto del connector | `langbrain-shelly-<apt>` | solo la VM (lo scrive nel file della chiave del motore) |
 
-Dalla forma nuova nessuna collisione è possibile: `_` non può stare negli id.
+**Nessun segreto per i dispositivi** (D-233): le loro password non si conservano (§2.5). Il segreto vecchio `langbrain-shelly-lab-01-devices` resta solo per `lab-01`, finché non si migra (§9.7).
 
 **Ogni segreto si crea con parametri fissi, scritti nel codice e provati:**
 
@@ -70,7 +70,7 @@ Altrimenti: errore, allarme, nessuna versione aggiunta.
 
 `resource.name` di un segreto è `projects/444239063209/secrets/<nome>`, e quello di una versione ha in più `/versions/N`. La forma con il numero è **da confermare con la prova 1125**, che prova anche quella con l'identificativo.
 
-**Due condizioni per ambiente, mai una sola:** la condizione «versioni» copre password e chiavi; la condizione «lettura» copre **solo** le chiavi dei motori. Così il server non legge mai le password dei dispositivi né quella del connector.
+**Due condizioni per ambiente, mai una sola:** la condizione «versioni» copre i due segreti dell'appartamento (chiave del motore e conto del connector); la condizione «lettura» copre **solo** le chiavi dei motori. Così il server non legge mai la password del connector. Le password dei dispositivi non sono in Secret Manager.
 
 **Staging, «versioni»** (ruoli «creazione» e «versioni»):
 
@@ -121,6 +121,29 @@ Oggi crea appartamenti `carico-NN` con segreti leggibili dallo staging (`scripts
 - Prima si cancellano i segreti `langbrain-api-key-carico-*` rimasti.
 - Le sue porte passano a **8170–8199** (§5.3).
 
+### 2.5 Le password dei dispositivi: solo l'impronta (D-233)
+
+**Perché basta.** Mosquitto conserva e confronta solo impronte. Oggi `broker_accounts.py` legge la password in chiaro solo per calcolarne l'impronta (`$7$`, PBKDF2-SHA512, 1000 iterazioni, sale di 12 byte, il formato di Mosquitto). La stessa funzione, `hash_password`, la può usare il server.
+
+| Passo | Dove | Cosa succede |
+|---|---|---|
+| 1. Nasce la password | **il server**, quando il cliente registra uno Shelly o preme «Rigenera» | `secrets.token_urlsafe(24)`: 32 caratteri, 192 bit casuali. **Sempre generata dal sistema, mai scelta da una persona**: con una password umana l'impronta si potrebbe invertire per tentativi |
+| 2. Si calcola l'impronta | il server | `hash_password`, la stessa funzione di `broker_accounts.py`. Una prova automatica controlla che l'impronta del server la accetti il broker vero (`tests/broker_container_test.py`) |
+| 3. Si salva l'impronta | Firestore, documento del dispositivo, in una transazione | impronta, versione, op_id, stato («in attesa del broker»). **Mai la password** |
+| 4. Il cliente la vede una volta | la risposta di quella sola chiamata; nell'app una finestra con «Copia» | poi sparisce; §8.1 |
+| 5. L'impronta arriva al broker | ordine `aggiorna_broker` (§3) con l'elenco completo dei dispositivi dell'appartamento e le loro impronte | l'agente la scrive nel file dei dispositivi, poi il `sync`. Un'impronta nel messaggio non è un segreto: senza la password non serve a entrare |
+| 6. Il broker la carica | `sync` isolato per appartamento (E-33): il conto del connector da Secret Manager, i dispositivi dal file delle impronte | ricarica con SIGHUP |
+
+**Il file dei dispositivi** sta in `/etc/domhouse/_broker/devices/<apt>`: di root, permessi 600, una riga `<device> <impronta>` per dispositivo. Lo scrive solo l'esecutore, in modo atomico.
+
+**Se la VM si perde:** il file torna dallo snapshot del disco, oppure il server rimanda le impronte che ha in Firestore con un `aggiorna_broker`.
+
+**Rischi:**
+
+1. chi può scrivere Firestore come il server (un server compromesso) può mettere l'impronta di una password che conosce e fingersi quel dispositivo. Era lo stesso con `versions.add` sul segreto per dispositivo: **rischio pari**;
+2. le impronte in Firestore sono leggibili da più persone dei segreti (console). Con password casuali di 192 bit non si invertono. PBKDF2 con 1000 iterazioni è debole solo per password umane, che il sistema non ammette;
+3. la password resta **dentro lo Shelly**, che la usa per collegarsi. **Da verificare con Youssouf** (domanda 8 del messaggio del 16 novembre): se la pagina web locale dello Shelly la mostra o la lascia leggere a chi sta sulla stessa rete Wi-Fi, per esempio gli ospiti. Se sì, va protetta la pagina locale (password dello Shelly): è un punto della «sicurezza in appartamento», non di questo progetto.
+
 ## 3. L'elenco chiuso delle operazioni
 
 Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima di 128 KB:
@@ -146,10 +169,16 @@ Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima 
 | `capienza` | — | `MemAvailable` e numero dei motori, per ambiente | — |
 | `crea_motore` | `apartment_id`, porta | scrive **prima** il catalogo vuoto in `/etc/domhouse/<apt>.catalog.yaml` (se mancasse, al `compose up` Docker creerebbe al suo posto una cartella), poi installa il motore (`CONNECTOR=shelly`, `ENV`), poi `add-apartment` sul broker | **porta:** intero `^[1-9][0-9]{3,4}$`; per lo staging **solo 8150–8159**; assente da ogni `/opt/domhouse/*.settings` dei due ambienti e da `ss -ltn` (i motori della prova di carico, creati dallo script, si vedono solo con `ss`: le fasce sono separate). **Immagine:** non è un parametro, né per la produzione né per lo staging: quella approvata nella configurazione dell'agente, per digest. **Capienza:** §7. Se l'appartamento esiste già con gli stessi parametri: riuscito, senza rifare niente; con parametri diversi: rifiuto |
 | `aggiorna_motore` | `apartment_id` | porta il motore all'immagine approvata (`engine-vm.sh update`) | stessi controlli dell'immagine |
-| `aggiorna_broker` | `apartment_id`, elenco dei dispositivi | scrive `/etc/domhouse/_broker/devices/<apt>` (di root) e lancia il `sync` | ogni id con la regola del §2.1; al massimo 200 dispositivi |
+| `aggiorna_broker` | `apartment_id`, **elenco completo** dei dispositivi dell'appartamento, ciascuno con la sua **impronta** (D-233) | sostituisce, in modo atomico, `/etc/domhouse/_broker/devices/<apt>` (di root, 600) e lancia il `sync`. Un dispositivo che non è nell'elenco perde il suo utente: è così che funzionano «Rigenera» e «Revoca» (§8.1) | ogni id con la regola del §2.1; ogni impronta nel formato di Mosquitto, controllato con l'espressione `^\$7\$[0-9]{3,6}\$[A-Za-z0-9+/]{16}\$[A-Za-z0-9+/]{86}==$`; al massimo 200 dispositivi; **mai** una password in chiaro (un campo che non è un'impronta valida fa rifiutare l'ordine intero) |
 | `applica_catalogo` | `apartment_id`, catalogo, versione | §3.1 | versione più alta dell'ultima applicata |
 | `stato` | `apartment_id` | `/health` del motore e immagine in uso | ammesso anche per `dev` |
 | `togli_motore` | `apartment_id` | §8.2 | ripetibile: «già tolto» vale come riuscito |
+
+**Un'ottava operazione, solo per l'opzione 2 (non fa parte dell'opzione 1):** `cambia_password`, per il cambio automatico al primo collegamento.
+
+- La password nuova la genera **l'agente sulla VM**, la scrive nello Shelly con `MQTT.SetConfig` (come R2 della tappa A), aggiorna il file delle impronte, fa il `sync` e riavvia lo Shelly (come R3 ed R4).
+- Al server restituisce **solo l'impronta**: la password non lascia mai la VM.
+- **Da verificare con Youssouf** e con la sezione 4 della tappa A di oggi: che ogni modello ammesso accetti `MQTT.SetConfig` arrivato via MQTT, e che una password di 32 caratteri vada bene a tutti (per la Plug M Gen3 va bene: è quella di oggi).
 
 **L'immagine, in ogni caso**, deve seguire la regola ancorata:
 
@@ -178,9 +207,10 @@ Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima 
 
 | Ruolo | Permessi esatti | Condizione |
 |---|---|---|
-| «creazione» | `secretmanager.secrets.create` | il §2.3 del suo ambiente, **se la prova 1125 riesce**. Se fallisce: nessuna condizione per la produzione, che però non riusa mai un segreto non suo (§2.2); **nessuna creazione per lo staging**, i cui segreti di prova li prepariamo noi |
-| «versioni» | `secretmanager.versions.add`, `secretmanager.versions.list`, `secretmanager.versions.destroy`, `secretmanager.secrets.get` | il §2.3 del suo ambiente |
+| «creazione» | `secretmanager.secrets.create` | il §2.3 del suo ambiente, **se la prova 1125 riesce**. Se fallisce: nessuna condizione per la produzione, che però non riusa mai un segreto non suo (§2.2); **nessuna creazione per lo staging**, i cui segreti di prova li prepariamo noi. Con D-233 si creano solo due segreti per appartamento, una volta, alla creazione |
+| «versioni» | `secretmanager.versions.add`, `secretmanager.versions.list`, `secretmanager.versions.destroy`, `secretmanager.secrets.get` | il §2.3 del suo ambiente. Servono solo alla creazione dell'appartamento (prima versione) e alla sua eliminazione (distruzione con ritardo): **non** a «Rigenera» né a «Revoca» |
 | lettura delle chiavi dei motori | `secretmanager.secretAccessor` | solo `langbrain-api-key-…` del suo ambiente |
+| impronte dei dispositivi | i permessi di Firestore che il server ha già | il documento del dispositivo, nel database del suo ambiente. Nessuno dei client legge Firestore (regole di produzione di oggi) |
 | ordini | `pubsub.publisher` | solo la sua coda «ordini» |
 
 **Mai** al server: `versions.access` sulle password, `versions.enable`, `secrets.update`, `secrets.delete`, `secrets.setIamPolicy`, `secrets.getIamPolicy`.
@@ -193,6 +223,8 @@ Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima 
 
 - raffiche di `DestroySecretVersion`;
 - ogni accesso negato a un server su `langbrain-shelly-*`.
+
+**Registro delle impronte:** ogni impronta scritta, sostituita o tolta in Firestore lascia una riga nel registro amministrativo (chi, quale dispositivo, «generata», «rigenerata», «revocata»), mai l'impronta stessa né la password.
 
 ### 4.2 Risultati verso il server (consegna «push»)
 
@@ -210,7 +242,7 @@ Un risultato vale solo se si riferisce a un `op_id` in attesa, con stesso ambien
 |---|---|
 | `pubsub.subscriber` | la sottoscrizione «ordini» dello **staging**. Quella della produzione **non esiste sulla VM condivisa** (§5.4) |
 | `pubsub.publisher` | la coda «risultati» dello staging |
-| `secretmanager.secretAccessor` | con condizione sul nome: i prefissi del §2.3 più quelli di oggi (`dev`, `lab-01`) |
+| `secretmanager.secretAccessor` | con condizione sul nome: i prefissi del §2.3 (chiave del motore e conto del connector) più quelli di oggi (`dev`, `lab-01`, compreso `langbrain-shelly-lab-01-devices` fino alla migrazione). Nessun permesso nuovo con D-233: le impronte arrivano negli ordini |
 | quelli di oggi | Artifact Registry Reader, Logs Writer, Monitoring Metric Writer, «Creatore di token» su `domhouse-dns-lab@` (per lego) |
 
 **Il token della VM non deve essere raggiungibile dai container.** È un difetto di oggi (E-31), da correggere per conto suo, prima dello strumento A, con la prova rossa scritta prima (§9.1):
@@ -273,18 +305,46 @@ Il lettore e l'esecutore girano sull'host: per loro il token c'è.
 
 ## 8. Credenziali dei dispositivi ed eliminazione
 
-### 8.1 Registrare un dispositivo, «Rigenera»
+### 8.1 Registrare un dispositivo, «Rigenera», «Revoca» (D-233)
 
-1. **Un blocco per dispositivo** in Firestore (transazione) per creazione, «Rigenera» e rimozione.
-2. Il server genera la password, aggiunge la versione e la **mostra una volta**. Poi distrugge, con ritardo, **tutte le versioni attive tranne quella appena creata**, di cui conosce il numero dalla risposta di `versions.add`.
-3. **Stato «revoca in corso»** finché non arriva il risultato riuscito di `aggiorna_broker`: fino ad allora la password vecchia vale ancora sul broker, e l'app non dice «revocata». Allarme se non arriva.
-4. **Dove la password non deve restare:**
-   - mai nei registri, nemmeno la richiesta a Secret Manager (un'eccezione si registra solo con la sua classe);
-   - mai in Firestore né in una risposta salvata per i tentativi: una seconda chiamata dice «già generata, usa Rigenera»;
-   - nel sito solo in memoria nel componente, `autocomplete="off"`, mai nell'URL, in `localStorage` o nella cache delle query;
-   - nella guida, l'avvertenza sugli appunti sincronizzati.
-5. **Il `sync` del broker è isolato per appartamento:** se i segreti di un appartamento non si leggono, si tengono le sue righe di prima (o le si toglie, se è in eliminazione), si aggiornano gli altri, e una riga d'allarme dice quale. La VM sa quali segreti leggere dal file dei dispositivi del §3: niente `secrets.list`.
-6. **Limiti di frequenza** per organizzazione su creazioni, «Rigenera» ed eliminazioni.
+**Comune a tutte e tre:**
+
+- un **blocco per dispositivo** in Firestore (transazione): due «Rigenera» insieme non si scavalcano, perché la seconda trova la versione cambiata e si ferma;
+- l'ordine `aggiorna_broker` porta **sempre l'elenco completo** delle impronte dell'appartamento, preso da Firestore dentro la transazione, con una `seq` nuova: un ordine vecchio non può rimettere un'impronta tolta (§6.4).
+
+**Registrare uno Shelly** (nel modulo del catalogo, alla riga del dispositivo):
+
+1. il server genera la password e ne salva l'impronta (§2.5), stato «in attesa del broker»;
+2. la mostra **una volta** nell'app, con i valori da copiare nella pagina dello Shelly (§14 del documento interno);
+3. manda `aggiorna_broker`; al risultato riuscito lo stato diventa «pronto»: da lì lo Shelly può collegarsi.
+
+**«Rigenera»** (una password persa prima di copiarla, o da cambiare):
+
+1. stesso percorso: password nuova, impronta nuova al posto della vecchia, mostrata una volta;
+2. **stato «cambio in corso»** finché non arriva il risultato riuscito di `aggiorna_broker`. Fino ad allora la password vecchia vale ancora sul broker, e l'app non dice «cambiata». Allarme se non arriva;
+3. lo Shelly va riconfigurato con la password nuova, sul posto o in sede.
+
+**«Revoca»** (un dispositivo perso, rubato, o tolto dall'impianto):
+
+1. il server toglie l'impronta da Firestore (lo stato resta, «revocato», per il registro) e manda `aggiorna_broker` senza quel dispositivo;
+2. **stato «revoca in corso»** finché non arriva il risultato riuscito; poi «revocato»;
+3. per rimettere lo stesso Shelly serve una registrazione nuova, con una password nuova.
+
+**Da verificare (nostro, sul broker vero, prima del codice):** se una ricarica di Mosquitto con un utente tolto o con un'impronta cambiata **fa cadere** il collegamento già aperto da quell'utente.
+
+- Se non lo fa cadere, un dispositivo revocato, o chi usa una password trapelata, resta collegato fino al prossimo ricollegamento.
+- In quel caso «Revoca» e «Rigenera» devono anche chiudere quel collegamento: un riavvio del broker (fa ricollegare tutti), oppure il plugin di sicurezza dinamica di Mosquitto, da valutare.
+- Si prova in `tests/broker_container_test.py`.
+
+**Dove la password non deve restare:**
+
+- mai nei registri, né nell'ordine Pub/Sub, né in Firestore, né in una risposta salvata per i tentativi: una seconda chiamata dice «già generata, usa Rigenera»;
+- nel sito solo in memoria nel componente, `autocomplete="off"`, mai nell'URL, in `localStorage` o nella cache delle query;
+- nella guida, l'avvertenza sugli appunti sincronizzati.
+
+**Il `sync` del broker è isolato per appartamento** (E-33, fatto il 15 novembre): se il segreto del connector di un appartamento non si legge, o il suo file delle impronte è malformato, si tengono le sue righe di prima (o le si toglie, se è in eliminazione), si aggiornano gli altri, e una riga d'allarme dice quale. La VM non elenca segreti: i dispositivi li legge dal file delle impronte.
+
+**Limiti di frequenza** per organizzazione su registrazioni, «Rigenera», «Revoca» ed eliminazioni: ognuno fa un `sync` e una ricarica del broker.
 
 ### 8.2 Eliminazione
 
@@ -305,9 +365,9 @@ Il lettore e l'esecutore girano sull'host: per loro il token c'è.
 
 I passi 5.1 e 6 qui sotto valgono solo con la scelta (a).
 4. **Ordine imposto dal server**, con «Riprova» e lo stato dell'ultimo passo:
-   1. `togli_motore` riuscito;
-   2. distruzione, con ritardo, delle versioni dei segreti dell'appartamento;
-   3. eliminazione in Firestore (`remove_apartment`): la porta si libera solo qui.
+   1. `togli_motore` riuscito (toglie anche il file delle impronte dell'appartamento e i suoi utenti del broker);
+   2. distruzione, con ritardo, delle versioni dei **due** segreti dell'appartamento (chiave del motore e conto del connector);
+   3. eliminazione in Firestore (`remove_apartment`), comprese le impronte dei dispositivi: la porta si libera solo qui.
 5. **`togli_motore`, tutto sotto il blocco**, ogni passo saltato senza errore se è già fatto:
    1. (solo con la scelta a) copia coerente del database **prima** di fermare il motore: backup in linea di SQLite e `PRAGMA integrity_check`, eseguiti **come utente 10001** (`setpriv --reuid=10001 --regid=10001 --clear-groups`), così anche `-wal` e `-shm`, che SQLite apre da solo, non seguono link verso file di root. L'utente 10001 non può scrivere in `/data/_deleted`: scrive la copia su stdout, e root la salva con `umask 077` in `/data/_deleted/<apt>-<data>.db` (cartella di root 700, file di root 600);
    2. `compose down`;
@@ -330,11 +390,14 @@ I passi 5.1 e 6 qui sotto valgono solo con la scelta (a).
    - comando `remove`;
    - `backup` senza seguire link;
    - porte normalizzate e confrontate.
-3. `broker-vm.sh`: `remove-apartment` ripetibile; un blocco; file dei dispositivi.
-4. `broker_accounts.py`: segreti per dispositivo; `sync` isolato per appartamento.
+3. `broker-vm.sh`: `remove-apartment` ripetibile; un blocco; file delle impronte dei dispositivi.
+4. `broker_accounts.py` (D-233): i dispositivi dal file delle impronte, prese così come sono; il conto del connector da Secret Manager, come oggi. Il `sync` isolato per appartamento c'è già (E-33). Per un appartamento senza file delle impronte resta il segreto vecchio `-devices` (solo `lab-01`, fino alla migrazione).
 5. `engine/compose.yaml`: tetto di memoria e contenitore più chiuso; catalogo in sola lettura.
 6. `scripts/load`: appartamenti `test-carico-NN`, porte 8170–8199.
-7. **Migrazione di `lab-01`** dal segreto `-devices` ai segreti per dispositivo, con la stessa password: la Plug non cade. Procedura scritta a parte.
+7. **Migrazione di `lab-01`** dal segreto `-devices` al file delle impronte, con la stessa password: la Plug non cade.
+   - La VM calcola l'impronta dalla password che legge oggi e la scrive nel file; il `sync` dice «unchanged», perché l'impronta corrisponde.
+   - Poi il segreto `-devices` si svuota e, dopo qualche giorno, si cancella.
+   - Procedura scritta a parte, dopo il cambio di password della tappa A.
 
 ## 10. Punti della revisione di sicurezza
 
@@ -396,3 +459,30 @@ I passi 5.1 e 6 qui sotto valgono solo con la scelta (a).
 | 15 | **chiuso** | `setpriv` contro `/data/_deleted` di root: ora §8.2.5 (copia su stdout, salvata da root). Con la scelta (c) del §8.2.3 la copia non serve affatto |
 
 Nessun punto «accettato così»: tutti e sette sono corretti come chiedeva il revisore.
+
+### 10.3 Terza stesura (16 novembre): impronte al posto del segreto per dispositivo (D-233)
+
+**Cosa è cambiato**, da far rileggere a una revisione di sicurezza:
+
+| Sezione | Prima (D-230) | Ora (D-233) |
+|---|---|---|
+| §1.4–1.5, §2.2 | un segreto per dispositivo | solo due segreti per appartamento; le password dei dispositivi non si conservano |
+| §2.5 (nuova) | — | dove nasce la password, l'impronta, come arriva al broker, i rischi |
+| §2.3 | condizioni anche per i segreti dei dispositivi | le stesse condizioni, che ora coprono solo chiave del motore e conto del connector |
+| §3 `aggiorna_broker` | id dei dispositivi | id e impronte, con il controllo del formato; nessuna password nei messaggi |
+| §3 `cambia_password` (nuova, solo opzione 2) | il cambio automatico passava da Secret Manager | lo fa l'agente; al server torna solo l'impronta |
+| §4.1 | versioni dei segreti dei dispositivi aggiunte e distrutte a ogni «Rigenera» | versioni solo alla creazione e all'eliminazione dell'appartamento; impronte in Firestore, con il registro |
+| §4.3 | — | nessun permesso nuovo alla VM |
+| §8.1 | «Rigenera» con versioni e distruzione | registrazione, «Rigenera» e «Revoca» con le impronte in Firestore e l'elenco completo in ogni `aggiorna_broker` |
+| §8.2 | distruzione dei segreti dei dispositivi | distruzione dei due segreti; le impronte si tolgono con l'appartamento |
+| §9.4, §9.7 | segreti per dispositivo, migrazione verso di essi | file delle impronte, migrazione verso di esso |
+
+**Punti della prima revisione che cambiano:**
+
+- **13** (distruzione di massa): più piccola, perché ci sono due soli segreti per appartamento;
+- **14** («Rigenera» in corsa): non si basa più sulle versioni di Secret Manager, ma sul blocco in Firestore e sull'elenco completo.
+
+**Da verificare prima del codice:**
+
+1. **nostro:** se la ricarica del broker fa cadere un collegamento il cui utente è stato tolto o cambiato (§8.1);
+2. **con Youssouf:** la pagina locale dello Shelly e la password del broker (§2.5, rischio 3); `MQTT.SetConfig` via MQTT e password di 32 caratteri su tutti i modelli ammessi (§3, `cambia_password`, solo opzione 2).
