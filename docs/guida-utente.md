@@ -1042,6 +1042,7 @@ Nelle Decisioni compare «Approvazione scaduta».
 | «Minuti» | «Finestra aperta spegne il clima», «Avviso dispositivo offline» |
 | Gruppo «Inverno (riscaldamento)»: «Minimo (°C)», «Massimo (°C)», «Temperatura in eco (°C)», «Temperatura in comfort (°C)» | «Limiti del setpoint» |
 | Gruppo «Estate (raffrescamento)»: «Minimo (°C)», «Massimo (°C)», «Raffrescamento in comfort (°C)» | «Limiti del setpoint» |
+| Gruppo «Climatizzatore con misuratore»: «Soglia di spento (W)» | «Limiti del setpoint» |
 | «Temperatura (°C)» | «Antigelo a casa vuota» |
 | «Umidità (%)» | «Antimuffa a casa vuota» |
 | «Ore prima del check-in» | «Pre-arrivo» |
@@ -2392,12 +2393,20 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | «Estate (raffrescamento)» | «Minimo (°C)» | 18 | Da 16 a 28 |
 | «Estate (raffrescamento)» | «Massimo (°C)» | 28 | Da 22 a 30 |
 | «Estate (raffrescamento)» | «Raffrescamento in comfort (°C)» | 25 | Da 22 a 28 |
+| «Climatizzatore con misuratore» | «Soglia di spento (W)» | 15 | Da 5 a 100 |
 
 **Le temperature vanno in quest'ordine.** La pagina Regole non salva valori fuori ordine:
 
 - **Inverno:** minimo ≤ eco ≤ comfort ≤ massimo.
 - **Estate:** minimo ≤ raffrescamento ≤ massimo.
 - **Fra le stagioni:** il raffrescamento deve essere più alto del comfort.
+
+**La soglia di spento** (gruppo «Climatizzatore con misuratore»):
+
+- **Cosa fa**: sotto questo consumo un climatizzatore a infrarossi controllato da un misuratore risulta spento.
+- **Vale anche con la regola spenta**: è una misura del climatizzatore, non un limite.
+- **Quando alzarla**: d'inverno l'unità esterna può consumare più di 15 W anche da spenta; se un climatizzatore spento
+  risulta acceso, alza la soglia sopra quel consumo.
 - **Fra i due gruppi non ci sono altri vincoli:** per esempio, il massimo invernale può essere 20 e il minimo estivo 24.
 
 ### Le otto regole: che cosa fanno davvero
@@ -2868,6 +2877,8 @@ Per ogni problema annota:
 - **Comando a un dispositivo che non risponde**: al posto di «errore interno» compare «il dispositivo non ha risposto;
   riprova, e se succede ancora controlla che sia acceso e collegato».
 - **Sotto i comandi** non compare più il codice tecnico in inglese del motivo.
+- **«Limiti del setpoint»** ha un terzo gruppo, «Climatizzatore con misuratore», con la «Soglia di spento (W)» (da 5 a
+  100, 15 all'inizio), che vale anche con la regola spenta.
 
 ### 13 novembre 2026
 

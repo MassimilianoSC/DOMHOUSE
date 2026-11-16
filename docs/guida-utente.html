@@ -1903,6 +1903,7 @@ modifiche» e «Annulla le modifiche» (riporta i campi ai valori salvati).</p>
 <tr><td data-label="Campo numerico" class="align-left">«Minuti»</td><td data-label="Regola" class="align-left">«Finestra aperta spegne il clima», «Avviso dispositivo offline»</td></tr>
 <tr><td data-label="Campo numerico" class="align-left">Gruppo «Inverno (riscaldamento)»: «Minimo (°C)», «Massimo (°C)», «Temperatura in eco (°C)», «Temperatura in comfort (°C)»</td><td data-label="Regola" class="align-left">«Limiti del setpoint»</td></tr>
 <tr><td data-label="Campo numerico" class="align-left">Gruppo «Estate (raffrescamento)»: «Minimo (°C)», «Massimo (°C)», «Raffrescamento in comfort (°C)»</td><td data-label="Regola" class="align-left">«Limiti del setpoint»</td></tr>
+<tr><td data-label="Campo numerico" class="align-left">Gruppo «Climatizzatore con misuratore»: «Soglia di spento (W)»</td><td data-label="Regola" class="align-left">«Limiti del setpoint»</td></tr>
 <tr><td data-label="Campo numerico" class="align-left">«Temperatura (°C)»</td><td data-label="Regola" class="align-left">«Antigelo a casa vuota»</td></tr>
 <tr><td data-label="Campo numerico" class="align-left">«Umidità (%)»</td><td data-label="Regola" class="align-left">«Antimuffa a casa vuota»</td></tr>
 <tr><td data-label="Campo numerico" class="align-left">«Ore prima del check-in»</td><td data-label="Regola" class="align-left">«Pre-arrivo»</td></tr>
@@ -4012,6 +4013,7 @@ della stagione: quello <strong>invernale</strong> quando si scalda, quello <stro
 <tr><td data-label="Gruppo" class="align-left">«Estate (raffrescamento)»</td><td data-label="Campo" class="align-left">«Minimo (°C)»</td><td data-label="All&#x27;inizio" class="align-left">18</td><td data-label="Limiti" class="align-left">Da 16 a 28</td></tr>
 <tr><td data-label="Gruppo" class="align-left">«Estate (raffrescamento)»</td><td data-label="Campo" class="align-left">«Massimo (°C)»</td><td data-label="All&#x27;inizio" class="align-left">28</td><td data-label="Limiti" class="align-left">Da 22 a 30</td></tr>
 <tr><td data-label="Gruppo" class="align-left">«Estate (raffrescamento)»</td><td data-label="Campo" class="align-left">«Raffrescamento in comfort (°C)»</td><td data-label="All&#x27;inizio" class="align-left">25</td><td data-label="Limiti" class="align-left">Da 22 a 28</td></tr>
+<tr><td data-label="Gruppo" class="align-left">«Climatizzatore con misuratore»</td><td data-label="Campo" class="align-left">«Soglia di spento (W)»</td><td data-label="All&#x27;inizio" class="align-left">15</td><td data-label="Limiti" class="align-left">Da 5 a 100</td></tr>
 </tbody></table></div>
 <p><strong>Le temperature vanno in quest&#x27;ordine.</strong> La pagina Regole non salva valori fuori ordine:</p>
 <ul>
@@ -4023,6 +4025,19 @@ della stagione: quello <strong>invernale</strong> quando si scalda, quello <stro
 </li>
 <li>
 <p><strong>Fra le stagioni:</strong> il raffrescamento deve essere più alto del comfort.</p>
+</li>
+</ul>
+<p><strong>La soglia di spento</strong> (gruppo «Climatizzatore con misuratore»):</p>
+<ul>
+<li>
+<p><strong>Cosa fa</strong>: sotto questo consumo un climatizzatore a infrarossi controllato da un misuratore risulta spento.</p>
+</li>
+<li>
+<p><strong>Vale anche con la regola spenta</strong>: è una misura del climatizzatore, non un limite.</p>
+</li>
+<li>
+<p><strong>Quando alzarla</strong>: d&#x27;inverno l&#x27;unità esterna può consumare più di 15 W anche da spenta; se un climatizzatore spento
+risulta acceso, alza la soglia sopra quel consumo.</p>
 </li>
 <li>
 <p><strong>Fra i due gruppi non ci sono altri vincoli:</strong> per esempio, il massimo invernale può essere 20 e il minimo estivo 24.</p>
@@ -4667,6 +4682,10 @@ riprova, e se succede ancora controlla che sia acceso e collegato».</p>
 </li>
 <li>
 <p><strong>Sotto i comandi</strong> non compare più il codice tecnico in inglese del motivo.</p>
+</li>
+<li>
+<p><strong>«Limiti del setpoint»</strong> ha un terzo gruppo, «Climatizzatore con misuratore», con la «Soglia di spento (W)» (da 5 a
+100, 15 all&#x27;inizio), che vale anche con la regola spenta.</p>
 </li>
 </ul>
 <h3 id="13-novembre-2026-11e5f0c5">13 novembre 2026</h3>
