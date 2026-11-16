@@ -19,7 +19,7 @@ Prima di tutto leggi, sul disco: `CLAUDE.md`, `docs/regole-convivenza.md` (vinco
 | `bff/**` (codice, `Dockerfile`, `cloudrun.yaml`, `cloudrun.staging.yaml`, `requirements.txt`, `.env.example`) | `frontend/**` (è di o2) |
 | `engine/**` (motore, connector simulato, `engine/connector/interface.py` e le prove comuni), `ci/engine.vars`, `cloudbuild.engine.yaml` | `engine/connector/connector-v2.md` (in vigore dal 10 novembre 2026, D-215) e `engine/connector/connector.md` (21 ottobre, storico: non si modifica), della memoria storica; `engine/connector/shelly/` (Youssouf) |
 | `tests/**` | `docs/**`, `CLAUDE.md`, `README.md` (della memoria storica) |
-| `scripts/**` (`deploy.sh`, `publish.sh`, `deploy-engine.sh`, `engine-vm.sh`, nuovi script) | `contract/openapi.yaml` (nessuno, mai: unica eccezione fatta, la 1.0.5 solo documentazione, D-107/D-124) |
+| `scripts/**` (`deploy.sh`, `publish.sh`, `deploy-engine.sh`, `engine-vm.sh`, nuovi script) | `contract/openapi.yaml` (nessuno senza il via del committente: eccezioni fatte la 1.0.5 solo documentazione, D-107/D-124, e la 1.0.6 con `battery_percent`, risposta 1143) |
 | `cloudbuild.yaml`, `.gcloudignore`, `Makefile` | `docs/archivio/` (documenti storici, tolte le cartelle ereditate con P-43) |
 | `bff/API.md` (da creare: le route del BFF usate dalla PWA) | |
 
