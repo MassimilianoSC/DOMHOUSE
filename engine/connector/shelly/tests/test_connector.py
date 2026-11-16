@@ -1973,6 +1973,37 @@ def test_blu_clock_candidate_is_forgotten_when_the_bridge_goes_offline():
     run_blu(scenario, sensors=(DEV_HT,))
 
 
+def test_blu_bridge_ahead_a_dead_ht_stays_offline_while_the_candidate_waits(warnings):
+    """The bridge steadily 400 s AHEAD of ours, its offset confirmed 5 minutes after the connection. The H&T stops
+    sending at 300 s and goes offline at its threshold (620 s). The bridge drops and comes back: the offset is
+    forgotten, GetStatus gives +400 s again, a candidate. The map is read: the H&T's last packet, written 700 s on
+    the bridge's clock, read without an offset would look 80 s in the future, alive. While the candidate waits the
+    larger of the candidate and the adopted offset (none: 0) dates it: 300 s on our clock, 320 s old, offline, and
+    nothing comes out."""
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=400)
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        w.shift = timedelta(seconds=300)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0})            # confirms the +400 s; the H&T's last packet
+        await w.wait_for(lambda xs: len(clock_warnings(warnings)) == 1)
+        assert abs(bridge_offset(w) - 400) <= 1 and w.info(DEV_HT).online
+        w.shift = timedelta(seconds=620)
+        await w.wait_for(lambda xs: w.blu()[-1] == (DEV_HT, "online", False, None))
+        w.transport.set_online(SID_BRIDGE, False)
+        await w.wait_for(lambda xs: not w.info(DEV_BRIDGE).online)
+        start, reads = len(w.changes), len(w.get_components_offsets())
+        w.transport.set_online(SID_BRIDGE, True)            # GetStatus: +400 s, a candidate; then the map
+        await w.wait_for(lambda xs: len(w.get_components_offsets()) > reads)
+        await w.settle(0.2)
+        bridge = w.conn._devices[DEV_BRIDGE]
+        assert bridge.clock_offset_s is None and abs(bridge.clock_candidate_s - 400) <= 1
+        assert w.blu(start) == [] and not w.info(DEV_HT).online, w.blu(start)
+        assert len(clock_warnings(warnings)) == 1           # the candidate is not adopted: no warning
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
 # --- a pairing while the bridge is online: the old map is not used --------------------------------------------------
 
 def test_blu_map_is_dropped_at_a_pairing_with_the_bridge_online():
