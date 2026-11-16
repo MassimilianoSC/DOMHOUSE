@@ -78,6 +78,8 @@ export default function DeviceStatusPage() {
   const tz = useApartmentStore((s) => s.apartment?.timezone) ?? DEFAULT_TZ;
   const now = useMinuteClock();
   const connectorDown = !unreachable && health?.connector.status === "down";
+  // The engine silent from the first opening: no last state to show, and «Nessun dispositivo» would be false (D-198).
+  const nothingReceived = unreachable && devices.length === 0;
   const ctx: Ctx = { now, tz, facts: { connectorDown: unreachable || connectorDown } };
   const roomName = (d: Device) => rooms.find((r) => r.room_id === d.room_id)?.name ?? t("overview.otherRoom");
   const rows: Row[] = sortForDiagnosis(devices, roomName).map((d) => ({ device: d, room: roomName(d), status: statusOf(d) }));
@@ -88,12 +90,12 @@ export default function DeviceStatusPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title={t("deviceStatus.title")} subtitle={t("deviceStatus.subtitle")} testId="device-status-header" />
       {unreachable && (
-        <p role="status" className="rounded-xl border border-negative-border bg-negative-bg px-3 py-2 text-sm font-medium text-negative-fg" data-testid="device-status-unreachable">{t("deviceStatus.unreachable")}</p>
+        <p role="status" className="rounded-xl border border-negative-border bg-negative-bg px-3 py-2 text-sm font-medium text-negative-fg" data-testid="device-status-unreachable">{t(nothingReceived ? "deviceStatus.unreachableNoData" : "deviceStatus.unreachable")}</p>
       )}
       {connectorDown && (
         <p role="status" className="rounded-xl border border-negative-border bg-negative-bg px-3 py-2 text-sm font-medium text-negative-fg" data-testid="device-status-connector-down">{t("deviceStatus.connectorDown")}</p>
       )}
-      {!loaded ? (
+      {nothingReceived ? null : !loaded ? (
         <Skeleton className="h-64 rounded-2xl" />
       ) : rows.length === 0 ? (
         <Card className="p-10 text-center text-sm text-muted-foreground" data-testid="device-status-empty">{t("deviceStatus.empty")}</Card>

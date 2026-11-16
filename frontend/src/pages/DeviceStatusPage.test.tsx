@@ -137,6 +137,17 @@ describe("Stato dei dispositivi: cosa mostra", () => {
     expect(screen.getByTestId("device-status-presa-advice")).toHaveTextContent("Non è un problema di questo dispositivo");
   });
 
+  // D-198 (16 Nov, found re-reading the texts for the guide): with the engine silent from the first opening there is no
+  // last state; the page said «qui sotto c'è l'ultimo stato ricevuto» over «Nessun dispositivo in questo appartamento.».
+  it("sistema domotico che non risponde già alla prima apertura: nessuno stato da mostrare, e non dice «Nessun dispositivo»", () => {
+    useApartmentStore.getState().setUnreachable("apt-001");
+    useApartmentStore.getState().setSnapshot({}, "apt-001");
+    render(<DeviceStatusPage />);
+    expect(screen.getByTestId("device-status-unreachable")).toHaveTextContent(/^Il sistema domotico dell'appartamento non risponde: lo stato dei dispositivi si vedrà quando torna raggiungibile\.$/);
+    expect(screen.queryByTestId("device-status-empty")).toBeNull();
+    expect(screen.queryByTestId("device-status-summary")).toBeNull();
+  });
+
   it("nessun dispositivo: lo dice", () => {
     openPage([]);
     expect(screen.getByTestId("device-status-empty")).toHaveTextContent("Nessun dispositivo in questo appartamento.");
