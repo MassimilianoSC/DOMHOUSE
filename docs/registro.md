@@ -387,6 +387,14 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
    - Se ci sono sia i risultati delle prove sia tutte le risposte di Youssouf, si fa **l'unico aggiornamento dei tre documenti dell'Autonomia**, con una sola rilettura, anche lunedì stesso.
    - Se le risposte sono parziali, si aspettano quelle mancanti, per non riscrivere i documenti due volte.
 5. **Quando decide il committente**, a prove finite: la procedura delle correzioni sulla VM (`docs/procedura-difetti-vm.md`, V0–V16), il controllo D3 del certificato (almeno un giorno dopo D1) e la prova sulla condizione dei segreti. Nessuna pubblicazione prima delle correzioni sulla VM.
+6. **Lunedì 16, 09:32–09:52 (ripartenza).**
+   - Sessioni: memoria storica `domotica-cd`; o1 e o2 sono `domotica-b0` e `domotica-7a`, da attribuire.
+   - **La Plug di lab-01 si è ricollegata da sola alle 08:47 ora italiana** (broker 07:47:06 UTC, TLS 1.2; il motore la segna «device online» un secondo dopo). È la prova 1, il ritorno in linea, avvenuta senza interventi; in sessione resta da vederla nell'app.
+   - Motori e broker sani. Il push di domenica è arrivato. Nessuna novità di Youssouf su GitHub.
+   - **Messaggio a Youssouf corretto prima dell'invio** (richieste del committente):
+     - **niente lampada:** alla Plug è attaccato **solo lo schermo del PC**, non il computer, e i watt e i comandi si osservano sullo schermo;
+     - **§7 (relè):** soprattutto domande, e per la prova basta lo Shelly 1 Gen4 del banco, anche senza caldaia;
+     - **§8 (infrarossi):** Youssouf probabilmente non ha il trasmettitore; prima gli si chiede se ce l'ha, e se no quale comprare e cosa serve per provarlo. La stima può darla dalla documentazione, e la prova si fa solo quando il dispositivo c'è.
 
 - **Autonomia: cosa blocca e cosa no (domanda del committente, 12:38).**
   - **Leonardo:** nessuna riga del documento 2 lo riguarda. Italianway serve al primo appartamento, non all'Autonomia.
