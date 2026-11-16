@@ -2240,9 +2240,14 @@ class ApartmentEngine:
         if result.outcome == "failed":
             logs.warn("command failed", apartment_id=self.apartment_id, reason=result.reason, detail=result.detail, **ids)
             reason = result.reason or "internal_error"
-            self._set_status(cmd, "failed", reason)
             why = {"device_offline": "Il dispositivo è andato offline durante la verifica",
                    "device_rejected": "Il dispositivo ha rifiutato il comando"}.get(reason, "Errore interno del collegamento")
+            # E-35, PROVVISORIO: the Shelly connector closes a request without answer as internal_error «transport
+            # timeout» (translate.error_result); connector-v2 §7.2 wants device_offline. Until it says so itself, the
+            # engine translates; the connector's own reason and detail stay in the log line above
+            if reason == "internal_error" and result.detail == "transport timeout":
+                reason, why = "device_offline", "Il dispositivo non ha risposto: controlla che sia acceso e collegato"
+            self._set_status(cmd, "failed", reason)
             self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state), why, "failed",
                      cmd["correlation_id"], command_id=cmd["command_id"])
             self._mode_command_failed(cmd)
