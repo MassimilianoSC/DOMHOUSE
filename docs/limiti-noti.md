@@ -40,6 +40,7 @@
 | Limite | Cosa succede | Stato |
 |---|---|---|
 | **Si spegne da solo** | Senza richieste si spegne: la prima apertura aspetta qualche secondo | Voluto |
+| **Assistente del motore di prova dopo un'ora di silenzio** | Il motore `dev` chiama l'assistente attraverso il server di staging. Se lo staging dorme, il primo «Chiedi» può superare i 28 secondi (risveglio più modello) e rispondere «Non sono riuscito a rispondere in tempo»; il secondo funziona. I motori veri usano il server di produzione, sempre acceso, e non hanno questo limite (o1, 16 novembre) | Accettato: limite dello staging |
 | **A server spento** | Niente notifiche, e gli eventi di quel periodo non si recuperano | Voluto |
 | **Dimostrativi** | Ripartono dai valori iniziali a ogni avvio del server | Voluto |
 | **Nessun backup del database** | Il database dello staging non ha backup pianificati: contiene solo dati di prova | Voluto |
