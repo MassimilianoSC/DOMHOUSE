@@ -189,6 +189,26 @@ def check_order(data: bytes, ambiente: str) -> Order:
     return Order(o["op_id"], operazione, o["apartment_id"], o["seq"], parametri, o["ambiente"], o["richiesto_da"])
 
 
+def result_for_raw(data, esito: str, codice: str) -> dict:
+    """The result of an order refused before it could be read whole: the fields that are there with the right type,
+    so that the server can still match it to its op_id; None for the others."""
+    try:
+        o = json.loads(bytes(data).decode("utf-8")) if len(data) <= MAX_ORDER_BYTES else {}
+    except (UnicodeDecodeError, ValueError, TypeError):
+        o = {}
+    if not isinstance(o, dict):
+        o = {}
+
+    def short(key):
+        value = o.get(key)
+        return value if isinstance(value, str) and len(value) <= 80 else None
+    seq = o.get("seq") if _int(o.get("seq")) else None
+    if esito not in OUTCOMES or codice not in CODES:
+        raise ValueError("esito o codice fuori dall'elenco")
+    return {"op_id": short("op_id"), "operazione": short("operazione"), "apartment_id": short("apartment_id"),
+            "ambiente": short("ambiente"), "seq": seq, "esito": esito, "codice": codice}
+
+
 def result(order: Order, esito: str, codice: str, dati: dict | None = None) -> dict:
     """What goes back on the results queue: codes and, for stato and capienza, a few short values. Never the output
     of a script, never a catalog, never an email (§6.11)."""
