@@ -1929,6 +1929,15 @@ Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»):
   sistema domotico non viene toccato.».
 - **Mostra** «Appartamento … eliminato». L'identificativo non si può riusare.
 
+**«Prova l'agente»** (solo per gli appartamenti di prova: «lab-…», «test-…» e «dev»):
+
+- **Manda** un ordine di prova al programma sulla VM che in futuro creerà gli appartamenti dall'app.
+- **In attesa** leggi «Ordine inviato all'agente sulla VM, in attesa della risposta»; l'app ricontrolla da sola.
+- **Se va bene**: «Agente raggiungibile. Motore: sano · collegamento ai dispositivi: attivo · versione: …».
+- **Se no**: il motivo in rosso, con un codice da copiare per l'assistenza.
+- **Senza risposta entro 20 minuti**: «Nessuna risposta dall'agente entro 20 minuti: riprova».
+- **Finché l'agente non è installato** leggi «Agente non ancora installato in questo ambiente.».
+
 ### Gestori della piattaforma
 
 **Aggiungere o togliere le persone di HQE.**
@@ -2877,6 +2886,7 @@ Per ogni problema annota:
 - **Comando a un dispositivo che non risponde**: al posto di «errore interno» compare «il dispositivo non ha risposto;
   riprova, e se succede ancora controlla che sia acceso e collegato».
 - **Sotto i comandi** non compare più il codice tecnico in inglese del motivo.
+- **Gestore della piattaforma**: pulsante «Prova l'agente» sugli appartamenti di prova.
 - **«Limiti del setpoint»** ha un terzo gruppo, «Climatizzatore con misuratore», con la «Soglia di spento (W)» (da 5 a
   100, 15 all'inizio), che vale anche con la regola spenta.
 
