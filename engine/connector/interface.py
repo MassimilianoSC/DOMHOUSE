@@ -36,7 +36,8 @@ class DeviceInfo:
     # never part of GET /devices: which power meter confirms a split, which sensor regulates a boiler (§2.2)
     links: dict[str, str] = field(default_factory=dict)
     # battery-powered sensors only: the last level they reported, 0-100 (BTHome object 0x01); None for mains-powered
-    # devices. Not a capability and never in GET /devices: it tells a flat battery from a device out of reach.
+    # devices. Not a capability: it tells a flat battery from a device out of reach. Since contract 1.0.6 (risposta
+    # 1143) GET /devices and the device events carry it as battery_percent, an integer 0-100, read again once a minute.
     battery_percent: float | None = None
 
 

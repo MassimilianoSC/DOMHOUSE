@@ -41,9 +41,9 @@ REGION="${GCP_REGION:-europe-west8}"
 REPO="${ARTIFACT_REPO:-domotica}"
 SRC="$(cd "$(dirname "$0")/.." && pwd)"
 ENV_FILE="${ENV_FILE:-${SRC}/frontend/.env.production}"
-# Git blob of contract/openapi.yaml v1.0.5 (line-ending independent). The contract never changes: a different blob
-# means the commit is not publishable.
-CONTRACT_BLOB="1b5cb31306cff21e2a40ed470f1c91b2cdb30e9e"
+# Git blob of contract/openapi.yaml v1.0.6 (line-ending independent; 1.0.6 = 1.0.5 + battery_percent, risposta 1143).
+# The contract changes only by a decision of the committente: a different blob means the commit is not publishable.
+CONTRACT_BLOB="54f588318b26137805b16ca3712153ee443b61e5"
 
 case "${TARGET}" in
   staging|prod) [ -n "${VPC_NETWORK:-}" ] && [ -n "${VPC_SUBNET:-}" ] \
@@ -147,8 +147,8 @@ fi
 # --- 4. Checks on the commit itself ----------------------------------------------------------------------------
 say "Controlli sul commit"
 [ "$(git -C "${SRC}" rev-parse "${SHA}:contract/openapi.yaml" 2>/dev/null)" = "${CONTRACT_BLOB}" ] \
-  || stop "contract/openapi.yaml in questo commit è diverso dal contratto v1.0.5. Non si pubblica."
-echo "contratto v1.0.5 invariato"
+  || stop "contract/openapi.yaml in questo commit è diverso dal contratto v1.0.6. Non si pubblica."
+echo "contratto v1.0.6 invariato"
 TRACKED_ENV="$(git -C "${SRC}" ls-tree -r --name-only "${SHA}" | grep -E '(^|/)\.env($|\.)' | grep -vE '\.env\.example$' || true)"
 [ -z "${TRACKED_ENV}" ] || stop "Il commit contiene file .env che non devono stare in Git: ${TRACKED_ENV}"
 echo "nessun file .env nel commit"

@@ -80,7 +80,7 @@ def test_apartment_summary():
     assert r.status_code == 200
     data = r.json()
     assert data["apartment_id"] == APT
-    assert data["contract_version"] == "1.0.5"
+    assert data["contract_version"] == "1.0.6"
 
 
 def test_unknown_apartment_tenant_isolation():

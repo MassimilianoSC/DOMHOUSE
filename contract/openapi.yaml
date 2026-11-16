@@ -2,8 +2,9 @@ openapi: 3.0.3
 
 # =============================================================================
 #  CONTRATTO DELL'APP – API DELL'ISTANZA DI APPARTAMENTO
-#  Versione 1.0.5 · 21 ottobre 2026 · proprietario: Massimiliano (HQ)
+#  Versione 1.0.6 · 16 novembre 2026 · proprietario: Massimiliano (HQ)
 #  (1.0.5 = 1.0.4 con la sola documentazione aggiornata: struttura identica, D-107)
+#  (1.0.6 = 1.0.5 con il campo facoltativo battery_percent dei dispositivi a batteria, risposta 1143)
 #
 #  Questo file è l'unico punto di contatto tecnico tra l'app (PWA + BFF su
 #  GCP/Firebase) e il motore domotico DOMHOUSE (engine/, un processo per
@@ -30,7 +31,7 @@ openapi: 3.0.3
 
 info:
   title: Domotica appartamenti – API dell'istanza
-  version: 1.0.5
+  version: 1.0.6
   description: |
     API esposta da **ogni istanza di appartamento** del motore domotico.
     L'app (BFF su Cloud Run) chiama un'istanza alla volta, sulla rete interna,
@@ -1381,7 +1382,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Version' }
               example:
-                contract_version: 1.0.5
+                contract_version: 1.0.6
                 implementation: { name: domhouse-engine, version: 0.3.0 }
                 features: [apartment, devices, commands, decisions, energy, rules, stream]
 
@@ -1539,6 +1540,12 @@ components:
         online: { type: boolean }
         last_seen: { type: string, format: date-time, nullable: true }
         capabilities: { $ref: '#/components/schemas/Capabilities' }
+        battery_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: "Facoltativo (1.0.6). Solo i dispositivi a batteria: l'ultimo livello che hanno mandato, 0–100. Assente (o null) quando il livello non è noto o il dispositivo va a corrente. Non è una capacità: distingue una pila scarica da un dispositivo fuori portata"
 
     Capabilities:
       type: object
@@ -1913,6 +1920,12 @@ components:
         device_id: { type: string }
         capability: { type: string }
         state: { type: object, additionalProperties: true, description: "Lo stato completo della capacità, come in GET /devices" }
+        battery_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: "Facoltativo (1.0.6): il livello della batteria del dispositivo in quel momento, come in GET /devices; assente se non è noto"
 
     EventDeviceOnline:
       type: object
@@ -1921,6 +1934,12 @@ components:
         device_id: { type: string }
         online: { type: boolean }
         last_seen: { type: string, format: date-time, nullable: true }
+        battery_percent:
+          type: integer
+          minimum: 0
+          maximum: 100
+          nullable: true
+          description: "Facoltativo (1.0.6): il livello della batteria del dispositivo in quel momento, come in GET /devices; assente se non è noto"
 
     EventCommandUpdated:
       type: object
@@ -1985,7 +2004,7 @@ components:
       type: object
       required: [contract_version, implementation, features]
       properties:
-        contract_version: { type: string, example: 1.0.5 }
+        contract_version: { type: string, example: 1.0.6 }
         implementation: { $ref: '#/components/schemas/Implementation' }
         features:
           type: array
