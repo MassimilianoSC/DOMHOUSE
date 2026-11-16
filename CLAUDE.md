@@ -11,6 +11,9 @@ vorrebbe dire migrare segreti e permessi senza vantaggi per chi usa l'app. Dove 
 Riferimento operativo per chi lavora in questo repository. `README.md` descrive l'app e le variabili d'ambiente;
 qui ci sono gli identificativi reali dell'infrastruttura, le convenzioni e le regole fisse.
 Questo è l'**unico** file del repository che contiene valori reali: nessun segreto, solo identificativi.
+**Eccezione (risposta 1137, 16 novembre 2026):** i cataloghi dei banchi di prova (`engine/connector/shelly/cataloghi/`,
+oggi `lab-01.yaml` del banco di Youssouf) possono contenere gli id nativi degli Shelly e i MAC dei sensori BLU veri, che
+non sono segreti. Mai password nei cataloghi. **I cataloghi degli appartamenti dei clienti non entrano mai nel repository.**
 
 ## Identificativi reali (GCP / Firebase)
 
