@@ -68,7 +68,7 @@ MESSAGES = {
 }
 STATE_MESSAGES = {"inviato": "Ordine inviato all'agente sulla VM, in attesa della risposta"}
 # the ids (docs/progetto-strumento-a-base.md §2.1; scripts/agent/comune.py, a test keeps them equal)
-STAGING_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,63}$")
+STAGING_ID_RE = re.compile(r"^(lab|test)-[a-z0-9]([a-z0-9-]*[a-z0-9])?$")     # R15, the same as the VM's
 PROD_ID_RE = re.compile(r"^a-[a-z0-9]{8}$")
 DATA_KEYS_MAX = 20
 
@@ -96,8 +96,8 @@ def apartment_allowed(apartment_id: str, ambiente: str) -> bool:
         return True
     if ambiente == "prod":
         return bool(PROD_ID_RE.fullmatch(apartment_id))
-    return bool(STAGING_ID_RE.fullmatch(apartment_id)) and apartment_id.startswith(("lab-", "test-")) \
-        and not apartment_id.endswith("-devices") and len(apartment_id) > len("lab-")
+    return len(apartment_id) <= 64 and bool(STAGING_ID_RE.fullmatch(apartment_id)) \
+        and not apartment_id.endswith("-devices")
 
 
 # ---- Google Cloud: replaced in the tests ----------------------------------------------------------------------------

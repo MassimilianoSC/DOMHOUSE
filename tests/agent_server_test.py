@@ -112,7 +112,7 @@ def test_the_button_sends_an_order_the_agent_accepts(server):
 
 
 def test_what_the_button_refuses(server):
-    for apartment in ("a-k3f9x2qm", "lab_01", "Lab-01", "../x", ""):
+    for apartment in ("a-k3f9x2qm", "lab_01", "Lab-01", "../x", "", "test-", "lab--", "lab-01-"):
         assert prova(apartment).status_code == 422, apartment
     assert server.published == []
 
@@ -177,4 +177,4 @@ def test_an_unknown_operation_and_a_non_manager(server):
 def test_the_server_knows_the_agents_lists():
     assert agent.OUTCOMES == comune.OUTCOMES and set(agent.CODES) >= set(comune.CODES)
     assert all(agent.MESSAGES.get(code) for code in agent.CODES)
-    assert agent.STAGING_ID_RE.pattern == comune.GENERIC_ID_RE.pattern
+    assert agent.STAGING_ID_RE.pattern == comune.STAGING_ID_RE.pattern                 # R15
