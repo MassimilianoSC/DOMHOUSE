@@ -142,7 +142,8 @@ Oggi crea appartamenti `carico-NN` con segreti leggibili dallo staging (`scripts
 
 1. chi può scrivere Firestore come il server (un server compromesso) può mettere l'impronta di una password che conosce e fingersi quel dispositivo. Era lo stesso con `versions.add` sul segreto per dispositivo: **rischio pari**;
 2. le impronte in Firestore sono leggibili da più persone dei segreti (console). Con password casuali di 192 bit non si invertono. PBKDF2 con 1000 iterazioni è debole solo per password umane, che il sistema non ammette;
-3. la password resta **dentro lo Shelly**, che la usa per collegarsi. **Da verificare con Youssouf** (domanda 8 del messaggio del 16 novembre): se la pagina web locale dello Shelly la mostra o la lascia leggere a chi sta sulla stessa rete Wi-Fi, per esempio gli ospiti. Se sì, va protetta la pagina locale (password dello Shelly): è un punto della «sicurezza in appartamento», non di questo progetto.
+3. la password resta **dentro lo Shelly**, che la usa per collegarsi. **Da verificare con Youssouf** (domanda 8 del messaggio del 16 novembre): se la pagina web locale dello Shelly la mostra o la lascia leggere a chi sta sulla stessa rete Wi-Fi, per esempio gli ospiti. Se sì, va protetta la pagina locale (password dello Shelly): è un punto della «sicurezza in appartamento», non di questo progetto;
+4. **pubblicare nella coda degli ordini equivale a poter creare un utente del broker.** `aggiorna_broker` porta le impronte: chi mette lì l'impronta di una password che conosce si collega come quel dispositivo. Oggi nella coda «ordini» di un ambiente può pubblicare solo il server di quell'ambiente (§4.1), quindi il rischio è pari a «server compromesso». **Condizione da non allargare mai:** nessun altro account, persona o servizio riceve `pubsub.publisher` sulle code «ordini». Si controlla in ogni revisione dei permessi IAM, con il comando di sola lettura che elenca chi ha quel ruolo sulle due code.
 
 ## 3. L'elenco chiuso delle operazioni
 
@@ -481,6 +482,8 @@ Nessun punto «accettato così»: tutti e sette sono corretti come chiedeva il r
 
 - **13** (distruzione di massa): più piccola, perché ci sono due soli segreti per appartamento;
 - **14** («Rigenera» in corsa): non si basa più sulle versioni di Secret Manager, ma sul blocco in Firestore e sull'elenco completo.
+
+**Condizione da non allargare mai (rilettura della memoria storica, 1230f81):** con D-233 la coda «ordini» porta le impronte, quindi chi vi pubblica può creare un utente del broker (§2.5, rischio 4). Solo il server del suo ambiente pubblica in quella coda; nessun altro `pubsub.publisher`, mai. Va controllato in ogni revisione dei permessi IAM.
 
 **Da verificare prima del codice:**
 
