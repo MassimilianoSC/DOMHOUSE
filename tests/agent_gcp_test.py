@@ -23,7 +23,7 @@ case "$*" in
   *"subscriptions create "*|*"topics create "*) touch "$STUB_DIR/made-$name" ;;
 esac
 case "$*" in
-  *"topics get-iam-policy"*|*"asset analyze-iam-policy"*|*"subscriptions describe"*)
+  *"get-iam-policy"*|*"asset analyze-iam-policy"*|*"subscriptions describe"*)
     exec python3 "$STUB_DIR/stub.py" "$@" ;;
   *"projects describe"*) echo 444239063209; exit 0 ;;
   *"run services describe"*"run.googleapis.com/urls"*)
@@ -38,7 +38,8 @@ exit 0
 '''
 
 
-STUB_PY = r'''"""gcloud's JSON answers for the checks of agent-gcp.sh: what the script made, changed by change-<x>.json."""
+STUB_PY = r'''"""gcloud's JSON answers for the checks of agent-gcp.sh: what the script made, changed by change-<x>.json;
+the policies (policy-<resource>.json) and the analyses (asset.json, asset-sa.json) as the test writes them."""
 import json
 import os
 import sys
@@ -47,32 +48,49 @@ from pathlib import Path
 d = Path(os.environ["STUB_DIR"])
 args = sys.argv[1:]
 line = " ".join(args)
-server = "serviceAccount:domotica-bff-staging@__P__.iam.gserviceaccount.com"
-if "topics get-iam-policy" in line:
-    f = d / "policy.json"
-    print(f.read_text() if f.exists() else json.dumps(
-        {"bindings": [{"role": "roles/pubsub.publisher", "members": [server]}]}))
+p = "__P__"
+server = f"serviceAccount:domotica-bff-staging@{p}.iam.gserviceaccount.com"
+vm = f"serviceAccount:langbrain-vm@{p}.iam.gserviceaccount.com"
+agent = "serviceAccount:service-444239063209@gcp-sa-pubsub.iam.gserviceaccount.com"
+
+
+def answer(name, default):
+    f = d / name
+    print(f.read_text() if f.exists() else json.dumps(default))
     sys.exit(0)
+
+
+if "topics get-iam-policy" in line:
+    name = args[args.index("get-iam-policy") + 1]
+    who = {"domhouse-staging-ordini": server, "domhouse-staging-risultati": vm, "domhouse-staging-scarti": agent}[name]
+    answer(f"policy-{name}.json", {"bindings": [{"role": "roles/pubsub.publisher", "members": [who]}]})
+if "subscriptions get-iam-policy" in line:
+    name = args[args.index("get-iam-policy") + 1]
+    answer(f"policy-{name}.json", {"bindings": [{"role": "roles/pubsub.subscriber", "members": [vm, agent]}]})
 if "asset analyze-iam-policy" in line:
     if (d / "asset-fails").exists():
         sys.exit(1)
-    f = d / "asset.json"
-    print(f.read_text() if f.exists() else json.dumps({"mainAnalysis": {"analysisResults": [
-        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [server]}}]}}))
-    sys.exit(0)
+    if "serviceAccounts/" in line:
+        answer("asset-sa.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": []}})
+    answer("asset.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": [
+        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [server]}}]}})
 name = args[args.index("describe") + 1]
 if not ((d / f"made-{name}").exists() or (d / "exists").exists()):
     sys.exit(1)
 endpoint = ("https://domotica-bff-staging-444239063209.europe-west8.run.app" if (d / "stable-url").exists()
             else "__URL__") + "/internal/agent/risultati"
+topic = lambda n: f"projects/{p}/topics/{n}"
 base = {
     "domhouse-staging-ordini-vm": ("sub.json", {
+        "topic": topic("domhouse-staging-ordini"),
         "ackDeadlineSeconds": 60, "messageRetentionDuration": "3600s", "enableMessageOrdering": True,
-        "deadLetterPolicy": {"deadLetterTopic": "projects/__P__/topics/domhouse-staging-scarti", "maxDeliveryAttempts": 5},
+        "deadLetterPolicy": {"deadLetterTopic": topic("domhouse-staging-scarti"), "maxDeliveryAttempts": 5},
         "retryPolicy": {"minimumBackoff": "10s", "maximumBackoff": "60s"}}),
-    "domhouse-staging-scarti-lettura": ("dead.json", {"messageRetentionDuration": "604800s"}),
-    "domhouse-staging-risultati-push": ("push.json", {"pushConfig": {"pushEndpoint": endpoint, "oidcToken": {
-        "serviceAccountEmail": "domhouse-push-staging@__P__.iam.gserviceaccount.com", "audience": endpoint}}}),
+    "domhouse-staging-scarti-lettura": ("dead.json", {"topic": topic("domhouse-staging-scarti"),
+                                                      "messageRetentionDuration": "604800s"}),
+    "domhouse-staging-risultati-push": ("push.json", {"topic": topic("domhouse-staging-risultati"), "pushConfig": {
+        "pushEndpoint": endpoint, "oidcToken": {
+            "serviceAccountEmail": f"domhouse-push-staging@{p}.iam.gserviceaccount.com", "audience": endpoint}}}),
 }[name]
 data = dict(base[1])
 change = d / f"change-{base[0]}"
@@ -110,8 +128,8 @@ def gcp(tmp_path):
                                    encoding="utf-8", newline="\n")
     (stubs / "python3").chmod(0o755)
 
-    def run(*args, dry=False):
-        cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; '
+    def run(*args, dry=False, env=""):
+        cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}" {env}; '
                f'{"DRY_RUN=1 " if dry else ""}GCP_PROJECT_ID={P} bash "{posix(SCRIPT)}" ' + " ".join(args))
         out = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", timeout=300)
         log = stubs / "calls.log"
@@ -216,20 +234,22 @@ def test_r3_the_checks_pass_on_what_the_script_made(gcp):
 
 
 def test_r3_another_publisher_on_the_orders_topic_stops_the_script(gcp):
-    write(gcp, "policy.json", {"bindings": [{"role": "roles/pubsub.publisher",
+    write(gcp, "policy-domhouse-staging-ordini.json", {"bindings": [{"role": "roles/pubsub.publisher",
                                               "members": [SERVER_SA, "serviceAccount:altro@x.iam.gserviceaccount.com"]}]})
     out, _ = gcp("staging")
     assert out.returncode != 0 and "altro@x" in (out.stderr + out.stdout)
 
 
-def test_r3_a_service_account_that_can_publish_from_the_project_stops_it_a_person_does_not(gcp):
-    write(gcp, "asset.json", {"mainAnalysis": {"analysisResults": [
+def test_r3_a_service_account_that_can_publish_from_the_project_stops_it_an_admitted_person_does_not(gcp):
+    write(gcp, "asset.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": [
         {"iamBinding": {"role": "roles/owner", "members": ["user:proprietario@example.com"]}},
         {"iamBinding": {"role": "roles/pubsub.publisher", "members": [SERVER_SA]}}]}})
-    out, _ = gcp("staging")
+    out, _ = gcp("staging", env="PERSONE_AMMESSE=proprietario@example.com")
     assert out.returncode == 0, out.stderr + out.stdout
-    assert "proprietario@example.com" in out.stdout                        # listed, accepted: a person
-    write(gcp, "asset.json", {"mainAnalysis": {"analysisResults": [
+    assert "proprietario@example.com" in out.stdout                        # listed, accepted: an admitted person
+    out, _ = gcp("staging")                                                 # R3-d: not in PERSONE_AMMESSE: stops
+    assert out.returncode != 0 and "proprietario@example.com" in (out.stderr + out.stdout)
+    write(gcp, "asset.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": [
         {"iamBinding": {"role": "roles/editor", "members": ["serviceAccount:444239063209-compute@developer.gserviceaccount.com"]}},
         {"iamBinding": {"role": "roles/pubsub.publisher", "members": [SERVER_SA]}}]}})
     out, _ = gcp("staging")
@@ -267,3 +287,61 @@ def test_the_push_goes_to_the_stable_address_of_the_service_like_deploy_sh(gcp):
     assert out.returncode == 0, out.stderr + out.stdout
     [push] = [c for c in creates(calls) if "subscriptions create domhouse-staging-risultati-push" in c]
     assert f"--push-endpoint={stable}" in push and f"--push-auth-token-audience={stable}" in push
+
+
+# ---- third reading, 16 November (R3-a to R3-e) ---------------------------------------------------------------------
+VM_SA = f"serviceAccount:langbrain-vm@{P}.iam.gserviceaccount.com"
+
+
+def test_r3a_an_existing_resource_that_differs_stops_before_any_write(gcp):
+    (gcp.stubs / "exists").write_text("", encoding="utf-8")
+    write(gcp, "change-sub.json", {"enableMessageOrdering": False})
+    out, calls = gcp("staging")
+    assert out.returncode != 0 and "prima" in (out.stderr + out.stdout)
+    assert creates(calls) == []                                              # nothing written
+
+
+@pytest.mark.parametrize("analysis, says", [
+    ({"mainAnalysis": {"fullyExplored": True, "analysisResults": []}}, "non vede il server"),
+    ({"mainAnalysis": {"fullyExplored": False, "analysisResults": [
+        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [SERVER_SA]}}]}}, "non completa"),
+    ({"mainAnalysis": {"fullyExplored": True, "nonCriticalErrors": [{"cause": "x"}], "analysisResults": [
+        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [SERVER_SA]}}]}}, "con errori"),
+])
+def test_r3b_an_analysis_that_cannot_be_trusted_stops(gcp, analysis, says):
+    write(gcp, "asset.json", analysis)
+    out, _ = gcp("staging")
+    assert out.returncode != 0 and says in (out.stderr + out.stdout)
+
+
+def test_r3c_the_vm_must_not_impersonate_the_server(gcp):
+    write(gcp, "asset-sa.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": [
+        {"iamBinding": {"role": "roles/iam.serviceAccountTokenCreator", "members": [VM_SA]}}]}})
+    out, calls = gcp("staging")
+    assert out.returncode != 0 and "impersonare" in (out.stderr + out.stdout)
+    assert "serviceAccounts/domotica-bff-staging@" in calls
+
+
+def test_r3d_a_custom_role_on_the_orders_topic_stops(gcp):
+    write(gcp, "policy-domhouse-staging-ordini.json", {"bindings": [
+        {"role": "roles/pubsub.publisher", "members": [SERVER_SA]},
+        {"role": f"projects/{P}/roles/qualcosa", "members": ["user:x@example.com"]}]})
+    out, _ = gcp("staging")
+    assert out.returncode != 0 and "ruolo personalizzato" in (out.stderr + out.stdout)
+
+
+def test_r3e_topics_publishers_of_the_results_and_readers_of_the_orders(gcp):
+    (gcp.stubs / "exists").write_text("", encoding="utf-8")
+    write(gcp, "change-dead.json", {"topic": f"projects/{P}/topics/un-altra"})
+    out, _ = gcp("staging")
+    assert out.returncode != 0 and "topic" in (out.stderr + out.stdout)
+    (gcp.stubs / "change-dead.json").unlink()
+    write(gcp, "policy-domhouse-staging-risultati.json", {"bindings": [
+        {"role": "roles/pubsub.publisher", "members": [VM_SA, "serviceAccount:altro@x.iam.gserviceaccount.com"]}]})
+    out, _ = gcp("staging")
+    assert out.returncode != 0 and "coda dei risultati" in (out.stderr + out.stdout)
+    (gcp.stubs / "policy-domhouse-staging-risultati.json").unlink()
+    write(gcp, "policy-domhouse-staging-ordini-vm.json", {"bindings": [
+        {"role": "roles/pubsub.subscriber", "members": [VM_SA, "user:curioso@example.com"]}]})
+    out, _ = gcp("staging")
+    assert out.returncode != 0 and "legge la sottoscrizione" in (out.stderr + out.stdout)

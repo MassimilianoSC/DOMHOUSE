@@ -59,6 +59,162 @@ URL="$(printf '%s' "${URLS}" | grep -oE "https://[^\"]+\.${REGION}\.run\.app" | 
 ENDPOINT="${URL}/internal/agent/risultati"
 echo "server: ${URL}"
 
+# ---- R3 (security review of A1): read-only checks, BEFORE any write (on what exists) and again at the end -----------
+# 1. the ONLY publisher of the orders is the staging server (§10.3): on the topic (and no custom role there) and from
+#    anywhere in the project (Cloud Asset analysis: the server must be among the results, the analysis fully explored
+#    and without errors; persons only from PERSONE_AMMESSE, every other user: stops);
+# 2. the VM (langbrain-vm@) cannot impersonate the staging server;
+# 3. only the VM publishes the results; only the VM and Pub/Sub's agent read the orders' subscription;
+# 4. what already exists is what this script would make: each subscription's topic, ordering, dead letters, retries,
+#    retention, push address, account and audience.
+# The project has no organisation nor folder above it (gcloud projects get-ancestors, 16 November): the analysis
+# with --project sees every binding that counts.
+PERSONE_AMMESSE="${PERSONE_AMMESSE:-m.scardovellicrac@gmail.com}"
+CHECKER="$(mktemp)"
+cat > "${CHECKER}" << 'PY'
+import json, sys
+from pathlib import Path
+(work, phase, server, vm, agent, people, orders, results, dead, sub, dead_sub, push_sub, project, endpoint,
+ push_email) = sys.argv[1:]
+work = Path(work)
+people = {f"user:{p.strip()}" for p in people.split(",") if p.strip()}
+problems = []
+publish_roles = {"roles/pubsub.publisher", "roles/pubsub.editor", "roles/pubsub.admin", "roles/owner", "roles/editor"}
+read_roles = {"roles/pubsub.subscriber", "roles/pubsub.editor", "roles/pubsub.admin", "roles/owner", "roles/editor"}
+
+
+def load(name):
+    f = work / name
+    return json.loads(f.read_text() or "{}") if f.exists() else None
+
+
+def members(policy, roles):
+    found = set()
+    for b in (policy or {}).get("bindings", []):
+        role = b.get("role", "")
+        if role.startswith(("projects/", "organizations/")):
+            problems.append(f"ruolo personalizzato {role} su una risorsa dell'agente: {', '.join(b.get('members', []))}")
+        if role in roles:
+            found |= set(b.get("members", []))
+    return found
+
+
+def analysis(name, what):
+    data = load(name)
+    if data is None:
+        return None
+    main = data.get("mainAnalysis") or {}
+    if main.get("fullyExplored") is not True:
+        problems.append(f"analisi dei permessi su {what} non completa (fullyExplored non è true)")
+    if main.get("nonCriticalErrors"):
+        problems.append(f"analisi dei permessi su {what} con errori: {main['nonCriticalErrors']}")
+    found = {}
+    for r in main.get("analysisResults", []):
+        b = r.get("iamBinding") or {}
+        for m in b.get("members", []):
+            found.setdefault(m, b.get("role"))
+    return found
+
+
+policy = load(f"topic-{orders}.json")
+if policy is not None:
+    for m in sorted(members(policy, publish_roles) - {server}):
+        problems.append(f"sulla coda degli ordini pubblica anche {m}")
+policy = load(f"topic-{results}.json")
+if policy is not None:
+    for m in sorted(members(policy, publish_roles) - {vm}):
+        problems.append(f"sulla coda dei risultati pubblica anche {m}")
+policy = load(f"subpol-{sub}.json")
+if policy is not None:
+    for m in sorted(members(policy, read_roles) - {vm, agent}):
+        problems.append(f"legge la sottoscrizione degli ordini anche {m}")
+found = analysis("asset-topic.json", "coda degli ordini")
+if found is not None:
+    if server not in found:
+        problems.append("l'analisi non vede il server fra chi pubblica sulla coda degli ordini: risultato non affidabile")
+    for m, role in sorted(found.items()):
+        if m in (server, agent) or m in people:
+            continue
+        problems.append(f"può pubblicare sulla coda degli ordini anche {m} ({role})")
+found = analysis("asset-sa.json", "account del server")
+if found is not None:
+    for m, role in sorted(found.items()):
+        if m == vm or (m.startswith(("serviceAccount:", "group:", "domain:", "allUsers", "allAuthenticatedUsers"))
+                       and m != server):
+            problems.append(f"può impersonare il server dello staging anche {m} ({role})")
+        elif m.startswith("user:") and m not in people:
+            problems.append(f"può impersonare il server dello staging anche {m} ({role})")
+
+
+def get(data, path):
+    for key in path.split("."):
+        data = data.get(key, {}) if isinstance(data, dict) else {}
+    return data
+
+
+topic = lambda name: f"projects/{project}/topics/{name}"
+expected = {
+    sub: {"topic": topic(orders), "ackDeadlineSeconds": 60, "messageRetentionDuration": "3600s",
+          "enableMessageOrdering": True, "deadLetterPolicy.deadLetterTopic": topic(dead),
+          "deadLetterPolicy.maxDeliveryAttempts": 5, "retryPolicy.minimumBackoff": "10s",
+          "retryPolicy.maximumBackoff": "60s"},
+    dead_sub: {"topic": topic(dead), "messageRetentionDuration": "604800s"},
+    push_sub: {"topic": topic(results), "pushConfig.pushEndpoint": endpoint,
+               "pushConfig.oidcToken.serviceAccountEmail": push_email, "pushConfig.oidcToken.audience": endpoint},
+}
+for name, keys in expected.items():
+    data = load(f"sub-{name}.json")
+    if data is None:
+        continue
+    for path, want in keys.items():
+        have = get(data, path)
+        if have != want:
+            problems.append(f"{name}: {path} è {have!r}, dovrebbe essere {want!r}")
+for m in sorted(people):
+    print(f"persona ammessa (PERSONE_AMMESSE): {m[len('user:'):]}")
+if problems:
+    print("\n".join(problems), file=sys.stderr)
+    sys.exit(1)
+print(f"controlli superati ({phase})")
+PY
+WORK="$(mktemp -d)"
+trap 'rm -rf "${WORK}" "${CHECKER}"' EXIT
+
+checks() {
+  # checks <prima|dopo>: collects what exists (read only) and runs the checker; stops the script on a problem
+  rm -f "${WORK}"/*
+  local t s
+  for t in "${ORDERS}" "${RESULTS}" "${DEAD}"; do
+    if gcloud pubsub topics describe "${t}" --project="${P}" > /dev/null 2>&1; then
+      gcloud pubsub topics get-iam-policy "${t}" --project="${P}" --format=json > "${WORK}/topic-${t}.json"
+    fi
+  done
+  for s in "${SUB}" "${DEAD_SUB}" "${PUSH_SUB}"; do
+    gcloud pubsub subscriptions describe "${s}" --project="${P}" --format=json > "${WORK}/sub-${s}.json" 2> /dev/null \
+      || rm -f "${WORK}/sub-${s}.json"
+  done
+  if [ -f "${WORK}/sub-${SUB}.json" ]; then
+    gcloud pubsub subscriptions get-iam-policy "${SUB}" --project="${P}" --format=json > "${WORK}/subpol-${SUB}.json"
+  fi
+  if [ -f "${WORK}/topic-${ORDERS}.json" ]; then
+    gcloud asset analyze-iam-policy --project="${P}" \
+      --full-resource-name="//pubsub.googleapis.com/projects/${P}/topics/${ORDERS}" \
+      --permissions=pubsub.topics.publish --format=json > "${WORK}/asset-topic.json" 2> /dev/null \
+      || stop "Non leggo chi può pubblicare sulla coda degli ordini (analisi dei permessi, API Cloud Asset): abilitala o controlla a mano, poi rilancia."
+  fi
+  gcloud asset analyze-iam-policy --project="${P}" \
+    --full-resource-name="//iam.googleapis.com/projects/${P}/serviceAccounts/${SERVER#serviceAccount:}" \
+    --permissions=iam.serviceAccounts.actAs,iam.serviceAccounts.getAccessToken,iam.serviceAccounts.getOpenIdToken,iam.serviceAccounts.signBlob,iam.serviceAccounts.signJwt,iam.serviceAccounts.implicitDelegation \
+    --format=json > "${WORK}/asset-sa.json" 2> /dev/null \
+    || stop "Non leggo chi può impersonare il server dello staging (analisi dei permessi, API Cloud Asset): abilitala o controlla a mano, poi rilancia."
+  PYTHONIOENCODING=utf-8 python3 "${CHECKER}" "${WORK}" "$1" "${SERVER}" "${VM}" "${PUBSUB_AGENT}" "${PERSONE_AMMESSE}" \
+    "${ORDERS}" "${RESULTS}" "${DEAD}" "${SUB}" "${DEAD_SUB}" "${PUSH_SUB}" "${P}" "${ENDPOINT}" "${PUSH_EMAIL}" \
+    || stop "Controlli non superati ($1): niente è stato cambiato${1/dopo/ dopo questo punto}. Leggi le righe qui sopra."
+}
+
+say "Controlli prima di scrivere (sola lettura)"
+checks prima
+
 # make <what> <describe command...> -- <create command...>: creates only if the describe fails
 make() {
   local what="$1"; shift
@@ -125,80 +281,8 @@ for file in "${HERE}"/agent/allarmi/*.json; do
   echo "«${name}»: creata"
 done
 
-say "Controlli (sola lettura, R3 della revisione di sicurezza)"
-# 1. the ONLY publisher of the orders is the staging server (§10.3): on the topic and from anywhere in the project
-# 2. what already existed is what this script would make (ordering, dead letters, retention, push address)
-work="$(mktemp -d)"
-trap 'rm -rf "${work}"' EXIT
-if gcloud pubsub topics describe "${ORDERS}" --project="${P}" > /dev/null 2>&1; then
-  gcloud pubsub topics get-iam-policy "${ORDERS}" --project="${P}" --format=json > "${work}/policy.json"
-  gcloud asset analyze-iam-policy --project="${P}" \
-    --full-resource-name="//pubsub.googleapis.com/projects/${P}/topics/${ORDERS}" \
-    --permissions=pubsub.topics.publish --format=json > "${work}/asset.json" 2> /dev/null \
-    || stop "Non leggo chi può pubblicare sulla coda degli ordini (analisi dei permessi, API Cloud Asset): abilitala o controlla a mano, poi rilancia."
-else
-  echo "coda ${ORDERS} assente (prova a secco): controllo dei publisher saltato"
-fi
-for s in "${SUB}" "${DEAD_SUB}" "${PUSH_SUB}"; do
-  gcloud pubsub subscriptions describe "${s}" --project="${P}" --format=json > "${work}/${s}.json" 2> /dev/null \
-    || rm -f "${work}/${s}.json"
-done
-PYTHONIOENCODING=utf-8 python3 - "${work}" "${SERVER}" "${PUBSUB_AGENT}" "${SUB}" "${DEAD_SUB}" "${PUSH_SUB}" \
-  "projects/${P}/topics/${DEAD}" "${ENDPOINT}" "${PUSH_EMAIL}" << 'PY'
-import json, sys
-from pathlib import Path
-work, server, agent, sub, dead_sub, push_sub, dead_topic, endpoint, push_email = sys.argv[1:]
-work = Path(work)
-problems, people = [], set()
-publish_roles = {"roles/pubsub.publisher", "roles/pubsub.editor", "roles/pubsub.admin", "roles/owner", "roles/editor"}
-if (work / "policy.json").exists():
-    policy = json.loads((work / "policy.json").read_text() or "{}")
-    on_topic = {m for b in policy.get("bindings", []) if b.get("role") in publish_roles for m in b.get("members", [])}
-    for m in sorted(on_topic - {server}):
-        problems.append(f"sulla coda degli ordini pubblica anche {m}")
-if (work / "asset.json").exists():
-    analysis = json.loads((work / "asset.json").read_text() or "{}")
-    results = (analysis.get("mainAnalysis") or {}).get("analysisResults", [])
-    for r in results:
-        for m in (r.get("iamBinding") or {}).get("members", []):
-            if m in (server, agent):
-                continue
-            if m.startswith("user:"):
-                people.add(m)
-            else:
-                problems.append(f"può pubblicare sulla coda degli ordini anche {m} ({r['iamBinding'].get('role')})")
-
-
-def get(data, path):
-    for key in path.split("."):
-        data = data.get(key, {}) if isinstance(data, dict) else {}
-    return data
-
-
-expected = {
-    sub: {"ackDeadlineSeconds": 60, "messageRetentionDuration": "3600s", "enableMessageOrdering": True,
-          "deadLetterPolicy.deadLetterTopic": dead_topic, "deadLetterPolicy.maxDeliveryAttempts": 5,
-          "retryPolicy.minimumBackoff": "10s", "retryPolicy.maximumBackoff": "60s"},
-    dead_sub: {"messageRetentionDuration": "604800s"},
-    push_sub: {"pushConfig.pushEndpoint": endpoint, "pushConfig.oidcToken.serviceAccountEmail": push_email,
-               "pushConfig.oidcToken.audience": endpoint},
-}
-for name, keys in expected.items():
-    f = work / f"{name}.json"
-    if not f.exists():
-        continue
-    data = json.loads(f.read_text() or "{}")
-    for path, want in keys.items():
-        have = get(data, path)
-        if have != want:
-            problems.append(f"{name}: {path} è {have!r}, dovrebbe essere {want!r}")
-for p in sorted(people):
-    print(f"può pubblicare anche {p[len('user:'):]} (una persona, con un ruolo del progetto: accettato)")
-if problems:
-    print("\n".join(problems), file=sys.stderr)
-    sys.exit(1)
-print("controlli superati")
-PY
+say "Controlli alla fine (sola lettura)"
+checks dopo
 say "Fatto"
 echo "Per il server dello ${ENVIRONMENT}: AGENT_AMBIENTE=${ENVIRONMENT}, AGENT_ORDERS_TOPIC=projects/${P}/topics/${ORDERS},"
 echo "AGENT_PUSH_AUDIENCE=${ENDPOINT}, AGENT_PUSH_EMAIL=${PUSH_EMAIL},"
