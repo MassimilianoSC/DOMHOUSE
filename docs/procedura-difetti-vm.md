@@ -1,8 +1,8 @@
-# Correzioni sulla VM: E-31 (metadati), prova del rinnovo, E-32 (backup), E-33 (broker), limiti di risorse
+# Correzioni sulla VM: E-31 (metadati), prova del rinnovo, E-32 (backup), E-33 (broker), E-34 (uscite), limiti di risorse
 
 | Stato | Preparata | Quando | Chi lancia | Durata | Comandi |
 |---|---|---|---|---|---|
-| **Pronta, da rileggere** | o1, 15 novembre 2026, sul codice di `8fe12b9` | **dopo la fine delle prove con Youssouf**; il giorno lo decide il committente (decisioni 1127 e 1128) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | circa 1 ora | 17 blocchi (V0–V16) |
+| **Pronta, da rileggere** | o1, 15 novembre 2026, sul codice di `8fe12b9` | **dopo la fine delle prove con Youssouf**; il giorno lo decide il committente (decisioni 1127 e 1128) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | circa 1 ora | 18 blocchi (V0–V16, più V10b per E-34) |
 
 **Cosa si corregge** (registro, §6):
 
@@ -11,6 +11,7 @@
 | E-31 | ogni container della VM raggiunge il server dei metadati, quindi il token di `langbrain-vm@` | prove `c94207a`, correzione `8fe12b9` |
 | E-32 | il backup notturno, da root, segue i link in `/data/<apt>` | prove `b4342d0`, correzione `06df55c` |
 | E-33 | un segreto illeggibile ferma il `sync` del broker per tutti gli appartamenti | prove `cda144b`, correzione `beeba84` |
+| E-34 | il controllo orario delle uscite segna «failed» quando il server dello staging dorme (114 volte su 131) | prove e correzione `69f2eea` (16 novembre) |
 | Limiti (1128) | nessun tetto di memoria, processore e processi sui motori; journald senza limite; nessun allarme sullo spazio dei dati | `8fe12b9` |
 
 **Regole:**
@@ -29,10 +30,11 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git log --oneline -1 8fe12b9 && git diff --quiet 8fe12b9 HEAD -- scripts/engine-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py engine/compose.yaml engine/broker/compose.yaml scripts/monitoring && echo "file uguali a 8fe12b9"
+git log --oneline -1 69f2eea && git diff --quiet 69f2eea HEAD -- scripts/engine-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py engine/compose.yaml engine/broker/compose.yaml scripts/monitoring && echo "file uguali a 69f2eea"
 ```
 
-- **Atteso:** la riga del commit `8fe12b9` e «file uguali a 8fe12b9». Se manca la seconda riga, fermati: qualcuno ha cambiato quei file dopo.
+- **Atteso:** la riga del commit `69f2eea` e «file uguali a 69f2eea». Se manca la seconda riga, fermati: qualcuno ha cambiato quei file dopo.
+- `69f2eea` è `8fe12b9` più E-34, che cambia solo `scripts/engine-vm.sh` (il controllo delle uscite) e `scripts/monitoring/rodaggio.py` (che gira sul PC, non sulla VM).
 
 **V0.2 Sulla VM: strumenti, consumo dei container e la prova rossa di E-31.**
 
@@ -50,6 +52,17 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 | `nft list tables` | c'è `table inet domhouse_broker`; **non** c'è `domhouse_metadata` |
 | numero dopo | `0` se la VM non ha IPv6 (la regola IPv6 resta innocua) |
 | `engine-dev:` ed `engine-lab-01:` | **`projects/444239063209/zones/europe-west8-a`: è la prova ROSSA di E-31**, i container raggiungono i metadati. Si chiede solo la zona, mai il token |
+
+**V0.3 Sulla VM: la prova rossa di E-34 (sola lettura).**
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo journalctl -t domhouse-check --since "-12h" --no-pager | grep " egress " | tail -6'
+```
+
+- **Atteso:** le righe orarie delle uscite. **La prova ROSSA di E-34:** almeno una «egress failed server=000 registry=401 acme=200», cioè il server dello staging che dormiva, con il registro e Let's Encrypt raggiunti.
+- Se sono tutte «egress ok», va bene lo stesso: lo staging era sveglio. Annota quante sono.
 
 ## V1. Copiare i file sulla VM (scrive solo nella cartella di chi si collega)
 
@@ -171,7 +184,27 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```
 
 - **Atteso:** «lab-01: connector e 1 dispositivi» e «unchanged». Nessuna riga «kept»: i segreti di `lab-01` si leggono, e gli hash restano uguali.
+  - Se prima è stata fatta la procedura dei due Shelly (`docs/procedura-lab01-due-shelly.md`), «connector e 3 dispositivi».
 - La Plug resta collegata.
+
+## E-34: le uscite della VM
+
+### V10b. Il controllo delle uscite con lo staging che si sveglia (scrive sulla VM solo l'ora dell'ultimo controllo)
+
+Il controllo delle uscite gira una volta all'ora. Qui si azzera l'ora dell'ultimo controllo, così parte subito.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='echo 0 | sudo tee /opt/domhouse/.egress-checked > /dev/null; sudo bash /opt/domhouse/engine-vm.sh check-all > /dev/null; sudo journalctl -t domhouse-check --since "-2min" --no-pager | grep " egress "'
+```
+
+- **Atteso:** una riga «egress ok server=… registry=401 acme=200», con il server in uno di due modi:
+  - `server=waking`: lo staging dormiva, la connessione TLS è riuscita e la risposta non è arrivata in 10 s. **È la correzione di E-34**: prima questa riga era «failed server=000»;
+  - `server=200`: lo staging era già sveglio.
+- **«egress failed server=000»** con il registro e Let's Encrypt raggiunti: il server non si raggiunge nemmeno con TLS (DNS o rete). È un esito vero, da incollare.
+- Il controllo dura al massimo circa 30 secondi (tre prove da 10 s).
+- **Ritorno indietro:** il vecchio `engine-vm.sh` di `/opt/domhouse/prima-difetti-vm` (V2). L'ora azzerata non va rimessa: al prossimo giro il controllo la riscrive.
 
 ## Limiti di risorse (decisione 1128)
 
@@ -256,4 +289,4 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 ## Da incollare alla memoria storica
 
-Le uscite di V0.2 (prova rossa), V5 (prova verde), V7, V9, V10, V11, V13 e V15.
+Le uscite di V0.2 (prova rossa), V0.3 (prova rossa di E-34), V5 (prova verde), V7, V9, V10, V10b, V11, V13 e V15.
