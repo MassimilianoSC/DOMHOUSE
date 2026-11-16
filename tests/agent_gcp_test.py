@@ -3,6 +3,7 @@
 Here gcloud is a stand-in that records what it is asked: DRY_RUN creates nothing, the real run creates only what is
 missing with the exact options, a second run changes nothing, production is refused, and the only publisher of the
 orders is the staging server's account."""
+import json
 import re
 import subprocess
 import sys
@@ -17,13 +18,63 @@ URL = "https://domotica-bff-staging-abc123-ew.a.run.app"
 
 GCLOUD = r'''#!/usr/bin/env bash
 echo "gcloud $*" >> "$STUB_DIR/calls.log"
+name="$(echo "$*" | awk '{print $4}')"
 case "$*" in
+  *"subscriptions create "*|*"topics create "*) touch "$STUB_DIR/made-$name" ;;
+esac
+case "$*" in
+  *"topics get-iam-policy"*|*"asset analyze-iam-policy"*|*"subscriptions describe"*)
+    exec python3 "$STUB_DIR/stub.py" "$@" ;;
   *"projects describe"*) echo 444239063209; exit 0 ;;
   *"run services describe"*) echo "__URL__"; exit 0 ;;
   *"channels list"*) echo "projects/__P__/notificationChannels/951"; exit 0 ;;
-  *" describe "*|*"policies list"*) [ -f "$STUB_DIR/exists" ] && { echo "esiste"; exit 0; }; exit 1 ;;
+  *" describe "*) { [ -f "$STUB_DIR/exists" ] || [ -f "$STUB_DIR/made-$name" ]; } && { echo "esiste"; exit 0; }; exit 1 ;;
+  *"policies list"*) [ -f "$STUB_DIR/exists" ] && { echo "esiste"; exit 0; }; exit 1 ;;
 esac
 exit 0
+'''
+
+
+STUB_PY = r'''"""gcloud's JSON answers for the checks of agent-gcp.sh: what the script made, changed by change-<x>.json."""
+import json
+import os
+import sys
+from pathlib import Path
+
+d = Path(os.environ["STUB_DIR"])
+args = sys.argv[1:]
+line = " ".join(args)
+server = "serviceAccount:domotica-bff-staging@__P__.iam.gserviceaccount.com"
+if "topics get-iam-policy" in line:
+    f = d / "policy.json"
+    print(f.read_text() if f.exists() else json.dumps(
+        {"bindings": [{"role": "roles/pubsub.publisher", "members": [server]}]}))
+    sys.exit(0)
+if "asset analyze-iam-policy" in line:
+    if (d / "asset-fails").exists():
+        sys.exit(1)
+    f = d / "asset.json"
+    print(f.read_text() if f.exists() else json.dumps({"mainAnalysis": {"analysisResults": [
+        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [server]}}]}}))
+    sys.exit(0)
+name = args[args.index("describe") + 1]
+if not ((d / f"made-{name}").exists() or (d / "exists").exists()):
+    sys.exit(1)
+endpoint = "__URL__/internal/agent/risultati"
+base = {
+    "domhouse-staging-ordini-vm": ("sub.json", {
+        "ackDeadlineSeconds": 60, "messageRetentionDuration": "3600s", "enableMessageOrdering": True,
+        "deadLetterPolicy": {"deadLetterTopic": "projects/__P__/topics/domhouse-staging-scarti", "maxDeliveryAttempts": 5},
+        "retryPolicy": {"minimumBackoff": "10s", "maximumBackoff": "60s"}}),
+    "domhouse-staging-scarti-lettura": ("dead.json", {"messageRetentionDuration": "604800s"}),
+    "domhouse-staging-risultati-push": ("push.json", {"pushConfig": {"pushEndpoint": endpoint, "oidcToken": {
+        "serviceAccountEmail": "domhouse-push-staging@__P__.iam.gserviceaccount.com", "audience": endpoint}}}),
+}[name]
+data = dict(base[1])
+change = d / f"change-{base[0]}"
+if change.exists():
+    data.update(json.loads(change.read_text()))
+print(json.dumps(data))
 '''
 
 
@@ -50,6 +101,7 @@ def gcp(tmp_path):
     stubs.mkdir()
     (stubs / "gcloud").write_text(GCLOUD.replace("__URL__", URL).replace("__P__", P), encoding="utf-8", newline="\n")
     (stubs / "gcloud").chmod(0o755)
+    (stubs / "stub.py").write_text(STUB_PY.replace("__URL__", URL).replace("__P__", P), encoding="utf-8")
     (stubs / "python3").write_text(f'#!/usr/bin/env bash\nexec "{posix(Path(sys.executable))}" "$@"\n',
                                    encoding="utf-8", newline="\n")
     (stubs / "python3").chmod(0o755)
@@ -135,3 +187,68 @@ def test_a_second_run_changes_nothing(gcp):
 def test_production_is_refused(gcp):
     out, calls = gcp("prod")
     assert out.returncode != 0 and "produzione" in (out.stderr + out.stdout) and creates(calls) == []
+
+
+# ---- second reading, 16 November (security review of A1: R3, question b) -----------------------------------------
+SERVER_SA = f"serviceAccount:domotica-bff-staging@{P}.iam.gserviceaccount.com"
+PUBSUB_AGENT_SA = "serviceAccount:service-444239063209@gcp-sa-pubsub.iam.gserviceaccount.com"
+
+
+def write(gcp, name, data):
+    (gcp.stubs / name).write_text(json.dumps(data), encoding="utf-8")
+
+
+def test_b_no_token_creator_for_pubsubs_agent(gcp):
+    _, calls = gcp("staging")
+    assert "serviceAccountTokenCreator" not in calls
+
+
+def test_r3_the_checks_pass_on_what_the_script_made(gcp):
+    out, calls = gcp("staging")
+    assert out.returncode == 0, out.stderr + out.stdout
+    assert "controlli superati" in out.stdout
+    assert "topics get-iam-policy domhouse-staging-ordini" in calls
+    assert "asset analyze-iam-policy" in calls and "--permissions=pubsub.topics.publish" in calls
+
+
+def test_r3_another_publisher_on_the_orders_topic_stops_the_script(gcp):
+    write(gcp, "policy.json", {"bindings": [{"role": "roles/pubsub.publisher",
+                                              "members": [SERVER_SA, "serviceAccount:altro@x.iam.gserviceaccount.com"]}]})
+    out, _ = gcp("staging")
+    assert out.returncode != 0 and "altro@x" in (out.stderr + out.stdout)
+
+
+def test_r3_a_service_account_that_can_publish_from_the_project_stops_it_a_person_does_not(gcp):
+    write(gcp, "asset.json", {"mainAnalysis": {"analysisResults": [
+        {"iamBinding": {"role": "roles/owner", "members": ["user:proprietario@example.com"]}},
+        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [SERVER_SA]}}]}})
+    out, _ = gcp("staging")
+    assert out.returncode == 0, out.stderr + out.stdout
+    assert "proprietario@example.com" in out.stdout                        # listed, accepted: a person
+    write(gcp, "asset.json", {"mainAnalysis": {"analysisResults": [
+        {"iamBinding": {"role": "roles/editor", "members": ["serviceAccount:444239063209-compute@developer.gserviceaccount.com"]}},
+        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [SERVER_SA]}}]}})
+    out, _ = gcp("staging")
+    assert out.returncode != 0 and "compute@developer" in (out.stderr + out.stdout)
+
+
+def test_r3_if_the_analysis_cannot_be_read_the_script_stops(gcp):
+    (gcp.stubs / "asset-fails").write_text("", encoding="utf-8")
+    out, _ = gcp("staging")
+    assert out.returncode != 0 and "Cloud Asset" in (out.stderr + out.stdout)
+
+
+@pytest.mark.parametrize("name, change, says", [
+    ("sub.json", {"enableMessageOrdering": False}, "enableMessageOrdering"),
+    ("sub.json", {"deadLetterPolicy": {"deadLetterTopic": "projects/x/topics/altro", "maxDeliveryAttempts": 5}},
+     "deadLetterTopic"),
+    ("push.json", {"pushConfig": {"pushEndpoint": "https://evil.example/x",
+                                  "oidcToken": {"serviceAccountEmail": "x@y", "audience": "https://evil.example/x"}}},
+     "pushEndpoint"),
+    ("dead.json", {"messageRetentionDuration": "3600s"}, "messageRetentionDuration"),
+])
+def test_r3_an_existing_resource_that_differs_stops_the_script(gcp, name, change, says):
+    (gcp.stubs / "exists").write_text("", encoding="utf-8")
+    write(gcp, f"change-{name}", change)
+    out, _ = gcp("staging")
+    assert out.returncode != 0 and says in (out.stderr + out.stdout)

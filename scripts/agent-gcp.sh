@@ -14,9 +14,9 @@
 #               account domhouse-push-staging@ with that exact address as audience (§4.2)
 #   who         the staging server (domotica-bff-staging@) is the ONLY publisher of the orders (§10.3: never widen);
 #               the VM (langbrain-vm@) reads only its subscription and publishes only the results; Pub/Sub's own
-#               service agent moves the dead letters (publisher on the dead letters, subscriber on the subscription)
-#               and signs the push (token creator on the push account only: needed by projects older than April
-#               2021, harmless otherwise; da verificare)
+#               service agent moves the dead letters (publisher on the dead letters, subscriber on the subscription).
+#               No «token creator» for it: the project was created on 15 October 2026, after April 2021 (question b
+#               of the security review of A1)
 #   alarms      «Agente: ordini finiti negli scarti» and «Agente: ordine di un altro ambiente o giornale non
 #               scrivibile», files in scripts/agent/allarmi/, on the email channel «Avvisi BFF»
 # No Pub/Sub schema on the orders topic: the parameters of an order change with the operation, and Avro's JSON
@@ -102,13 +102,6 @@ grant subscriptions "${SUB}" "${VM}" roles/pubsub.subscriber
 grant topics "${RESULTS}" "${VM}" roles/pubsub.publisher
 grant topics "${DEAD}" "${PUBSUB_AGENT}" roles/pubsub.publisher
 grant subscriptions "${SUB}" "${PUBSUB_AGENT}" roles/pubsub.subscriber
-if [ -n "${DRY_RUN}" ]; then
-  echo "(prova a secco) roles/iam.serviceAccountTokenCreator a ${PUBSUB_AGENT#serviceAccount:} su ${PUSH_EMAIL}"
-else
-  gcloud iam service-accounts add-iam-policy-binding "${PUSH_EMAIL}" --project="${P}" --member="${PUBSUB_AGENT}" \
-    --role=roles/iam.serviceAccountTokenCreator > /dev/null
-  echo "roles/iam.serviceAccountTokenCreator a ${PUBSUB_AGENT#serviceAccount:} su ${PUSH_EMAIL}"
-fi
 
 say "Allarmi"
 CHANNEL="$(gcloud beta monitoring channels list --project="${P}" --filter="displayName:\"${CHANNEL_NAME}\"" \
@@ -127,6 +120,80 @@ for file in "${HERE}"/agent/allarmi/*.json; do
   echo "«${name}»: creata"
 done
 
+say "Controlli (sola lettura, R3 della revisione di sicurezza)"
+# 1. the ONLY publisher of the orders is the staging server (§10.3): on the topic and from anywhere in the project
+# 2. what already existed is what this script would make (ordering, dead letters, retention, push address)
+work="$(mktemp -d)"
+trap 'rm -rf "${work}"' EXIT
+if gcloud pubsub topics describe "${ORDERS}" --project="${P}" > /dev/null 2>&1; then
+  gcloud pubsub topics get-iam-policy "${ORDERS}" --project="${P}" --format=json > "${work}/policy.json"
+  gcloud asset analyze-iam-policy --project="${P}" \
+    --full-resource-name="//pubsub.googleapis.com/projects/${P}/topics/${ORDERS}" \
+    --permissions=pubsub.topics.publish --format=json > "${work}/asset.json" 2> /dev/null \
+    || stop "Non leggo chi può pubblicare sulla coda degli ordini (analisi dei permessi, API Cloud Asset): abilitala o controlla a mano, poi rilancia."
+else
+  echo "coda ${ORDERS} assente (prova a secco): controllo dei publisher saltato"
+fi
+for s in "${SUB}" "${DEAD_SUB}" "${PUSH_SUB}"; do
+  gcloud pubsub subscriptions describe "${s}" --project="${P}" --format=json > "${work}/${s}.json" 2> /dev/null \
+    || rm -f "${work}/${s}.json"
+done
+PYTHONIOENCODING=utf-8 python3 - "${work}" "${SERVER}" "${PUBSUB_AGENT}" "${SUB}" "${DEAD_SUB}" "${PUSH_SUB}" \
+  "projects/${P}/topics/${DEAD}" "${ENDPOINT}" "${PUSH_EMAIL}" << 'PY'
+import json, sys
+from pathlib import Path
+work, server, agent, sub, dead_sub, push_sub, dead_topic, endpoint, push_email = sys.argv[1:]
+work = Path(work)
+problems, people = [], set()
+publish_roles = {"roles/pubsub.publisher", "roles/pubsub.editor", "roles/pubsub.admin", "roles/owner", "roles/editor"}
+if (work / "policy.json").exists():
+    policy = json.loads((work / "policy.json").read_text() or "{}")
+    on_topic = {m for b in policy.get("bindings", []) if b.get("role") in publish_roles for m in b.get("members", [])}
+    for m in sorted(on_topic - {server}):
+        problems.append(f"sulla coda degli ordini pubblica anche {m}")
+if (work / "asset.json").exists():
+    analysis = json.loads((work / "asset.json").read_text() or "{}")
+    results = (analysis.get("mainAnalysis") or {}).get("analysisResults", [])
+    for r in results:
+        for m in (r.get("iamBinding") or {}).get("members", []):
+            if m in (server, agent):
+                continue
+            if m.startswith("user:"):
+                people.add(m)
+            else:
+                problems.append(f"può pubblicare sulla coda degli ordini anche {m} ({r['iamBinding'].get('role')})")
+
+
+def get(data, path):
+    for key in path.split("."):
+        data = data.get(key, {}) if isinstance(data, dict) else {}
+    return data
+
+
+expected = {
+    sub: {"ackDeadlineSeconds": 60, "messageRetentionDuration": "3600s", "enableMessageOrdering": True,
+          "deadLetterPolicy.deadLetterTopic": dead_topic, "deadLetterPolicy.maxDeliveryAttempts": 5,
+          "retryPolicy.minimumBackoff": "10s", "retryPolicy.maximumBackoff": "60s"},
+    dead_sub: {"messageRetentionDuration": "604800s"},
+    push_sub: {"pushConfig.pushEndpoint": endpoint, "pushConfig.oidcToken.serviceAccountEmail": push_email,
+               "pushConfig.oidcToken.audience": endpoint},
+}
+for name, keys in expected.items():
+    f = work / f"{name}.json"
+    if not f.exists():
+        continue
+    data = json.loads(f.read_text() or "{}")
+    for path, want in keys.items():
+        have = get(data, path)
+        if have != want:
+            problems.append(f"{name}: {path} è {have!r}, dovrebbe essere {want!r}")
+for p in sorted(people):
+    print(f"può pubblicare anche {p[len('user:'):]} (una persona, con un ruolo del progetto: accettato)")
+if problems:
+    print("\n".join(problems), file=sys.stderr)
+    sys.exit(1)
+print("controlli superati")
+PY
 say "Fatto"
 echo "Per il server dello ${ENVIRONMENT}: AGENT_ORDERS_TOPIC=projects/${P}/topics/${ORDERS}, AGENT_PUSH_AUDIENCE=${ENDPOINT},"
 echo "AGENT_PUSH_EMAIL=${PUSH_EMAIL} (nel manifesto, poi una pubblicazione). Per la VM: scripts/agent-vm.sh install con"
