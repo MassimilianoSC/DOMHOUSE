@@ -68,7 +68,7 @@ Altrimenti: errore, allarme, nessuna versione aggiunta.
 
 ### 2.3 Condizioni IAM (testo esatto; numero del progetto 444239063209)
 
-`resource.name` di un segreto è `projects/444239063209/secrets/<nome>`, e quello di una versione ha in più `/versions/N`. La forma con il numero è **da confermare con la prova 1125**, che prova anche quella con l'identificativo.
+`resource.name` di un segreto è `projects/444239063209/secrets/<nome>`, e quello di una versione ha in più `/versions/N`. **Le condizioni si scrivono sempre con il NUMERO del progetto** (prova 1125, 16 novembre, 17:37, registro `e17c52e`): `projects/444239063209/secrets/<prefisso>` concede; la forma con l'identificativo (`projects/domotica-poc-511707/secrets/…`) non concede mai.
 
 **Due condizioni per ambiente, mai una sola:** la condizione «versioni» copre i due segreti dell'appartamento (chiave del motore e conto del connector); la condizione «lettura» copre **solo** le chiavi dei motori. Così il server non legge mai la password del connector. Le password dei dispositivi non sono in Secret Manager.
 
@@ -208,7 +208,7 @@ Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima 
 
 | Ruolo | Permessi esatti | Condizione |
 |---|---|---|
-| «creazione» | `secretmanager.secrets.create` | il §2.3 del suo ambiente, **se la prova 1125 riesce**. Se fallisce: nessuna condizione per la produzione, che però non riusa mai un segreto non suo (§2.2); **nessuna creazione per lo staging**, i cui segreti di prova li prepariamo noi. Con D-233 si creano solo due segreti per appartamento, una volta, alla creazione |
+| «creazione» | `secretmanager.secrets.create` | il §2.3 del suo ambiente: **la prova 1125 è riuscita** (16 novembre, con il numero del progetto). Con D-233 si creano solo due segreti per appartamento, una volta, alla creazione |
 | «versioni» | `secretmanager.versions.add`, `secretmanager.versions.list`, `secretmanager.versions.destroy`, `secretmanager.secrets.get` | il §2.3 del suo ambiente. Servono solo alla creazione dell'appartamento (prima versione) e alla sua eliminazione (distruzione con ritardo): **non** a «Rigenera» né a «Revoca» |
 | lettura delle chiavi dei motori | `secretmanager.secretAccessor` | solo `langbrain-api-key-…` del suo ambiente |
 | impronte dei dispositivi | i permessi di Firestore che il server ha già | il documento del dispositivo, nel database del suo ambiente. Nessuno dei client legge Firestore (regole di produzione di oggi) |
