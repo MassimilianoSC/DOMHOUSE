@@ -549,13 +549,13 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 **Come leggere se un comando è riuscito, e perché no.**
 
 - **Gli stati**: «in corso», «eseguito», «errore» o «nessuna risposta».
-- **Il motivo**, se c'è (tabella sotto), e un «ID richiesta» copiabile.
+- **Il motivo**, se c'è (tabella sotto), e un «ID richiesta» copiabile. Il codice tecnico in inglese non compare più.
 - **Un climatizzatore comandato a infrarosso** può risultare «non verificato» («Lo split non conferma l'esecuzione:
   lo stato mostrato è quello richiesto»).
 
 | Motivo | Cosa vuol dire |
 |---|---|
-| «dispositivo offline» | Il dispositivo è offline |
+| «il dispositivo non ha risposto, controlla che sia acceso e collegato» | Il comando è partito ma il dispositivo non ha risposto: staccato da poco, senza corrente o senza Wi-Fi |
 | «rifiutato dal dispositivo» | Il dispositivo non ha accettato il comando |
 | «bloccato da una regola» | Una regola (per esempio finestra aperta o pausa del compressore) ha bloccato il comando |
 | «bloccato da un'azione prioritaria» | Un'azione più importante ha bloccato il comando |
@@ -2652,7 +2652,8 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 
 | Cosa vedi | Cosa significa | Cosa fare |
 |---|---|---|
-| «Il dispositivo non è raggiungibile; riprova quando torna online», «dispositivo offline» | Il dispositivo è offline | Aspetta che torni online |
+| «Il dispositivo non è raggiungibile; riprova quando torna online» | Il dispositivo è offline: il comando non parte | Aspetta che torni online |
+| «il dispositivo non ha risposto, controlla che sia acceso e collegato» | Il comando è partito ma il dispositivo non ha risposto. Succede se è stato staccato da poco (l'app lo segna «offline» entro circa 2 minuti), se è senza corrente o senza Wi-Fi | Controlla che sia attaccato e acceso; se non torna online, assistenza |
 | «Collegamento ai dispositivi non disponibile; riprova quando torna» | Il sistema non parla con i dispositivi | Aspetta «Collegamento ai dispositivi ripristinato» nelle Decisioni |
 | «Il setpoint deve essere tra … e …», «fuori dai limiti» | Temperatura fuori dai limiti | Scegli un valore nell'intervallo «da … a … °C» |
 | «rifiutato dal dispositivo» | Il dispositivo non ha accettato il comando | Riprova; controlla il dispositivo |
