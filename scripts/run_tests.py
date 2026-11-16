@@ -46,7 +46,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 HTTP_SUITES = ["tests/backend_test.py", "tests/backend_phase2_test.py", "tests/backend_phase3_test.py", "tests/backend_phase4_test.py",
                "tests/backend_isolation_test.py", "tests/backend_platform_test.py"]
-LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py", "tests/broker_accounts_test.py", "tests/broker_container_test.py", "tests/push_test.py", "tests/hub_align_test.py",
+LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py", "tests/broker_accounts_test.py", "tests/broker_vm_cert_test.py", "tests/broker_vm_sync_test.py", "tests/broker_container_test.py", "tests/push_test.py", "tests/hub_align_test.py",
                 "tests/apartment_scope_test.py", "tests/tenant_test.py", "tests/routes_test.py", "tests/webhook_test.py",
                 "tests/platform_test.py", "tests/real_mode_test.py", "tests/firebase_flows_test.py",
                 "tests/proxy_path_test.py", "tests/mock_exposure_test.py", "tests/run_tests_checks_test.py",
@@ -95,7 +95,8 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "engine/tests/test_command_queued_state.py", "engine/tests/test_approved_after_its_time.py",
                 "engine/tests/test_question_text_not_kept.py", "engine/tests/test_schedule_partial.py",
                 "engine/tests/test_approval_values.py", "engine/tests/test_manual_mode_during_hold.py",
-                "engine/tests/test_limits_coherent.py", "engine/tests/test_p90_scenari.py"]
+                "engine/tests/test_limits_coherent.py", "engine/tests/test_p90_scenari.py",
+                "engine/tests/test_command_no_answer.py"]
 SITE_SUITE = "sito"
 CONFORMANCE_SUITE = "conformita"
 CONFORMANCE_DIR = "contract/conformance"
