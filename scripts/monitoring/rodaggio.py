@@ -272,7 +272,8 @@ def egress(start: datetime, end: datetime) -> dict:
             ok += 1
             continue
         failed += 1
-        for name, code, good in (("server", m.group(2), ("200", "nessuno")), ("registry", m.group(3), ("200", "401")),
+        # E-34: «waking» is the staging server reached while it wakes up, not a way out broken
+        for name, code, good in (("server", m.group(2), ("200", "nessuno", "waking")), ("registry", m.group(3), ("200", "401")),
                                  ("acme", m.group(4), ("200",))):
             if code not in good:
                 broken[name] += 1

@@ -66,7 +66,10 @@ STUBS = {
              'if [ -n "$host" ] && [ -f "$STUB_DIR/code-$host" ]; then code=$(cat "$STUB_DIR/code-$host"); '
              'elif [ -f "$STUB_DIR/code-$port" ]; then code=$(cat "$STUB_DIR/code-$port"); '
              'elif [ -f "$STUB_DIR/unhealthy" ]; then code=503; else code=200; fi\n'
-             'case "$*" in *%{http_code}*) printf "%s" "$code" ;; '
+             # E-34: %{time_appconnect} too: the TLS time is the file tls-<host> (0.05 s when there is none)
+             'tls=$(cat "$STUB_DIR/tls-$host" 2>/dev/null || echo 0.050000)\n'
+             'case "$*" in *%{time_appconnect}*) printf "%s %s" "$code" "$tls"; [ "$code" = 000 ] && exit 28; exit 0 ;; '
+             '*%{http_code}*) printf "%s" "$code" ;; '
              '*) echo \'{"status": "ok", "implementation": {}, "connector": {"status": "up"}}\' ;; esac\n'),
     "logger": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/syslog.log"\n',
     "systemctl": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/systemctl.log"\nexit 0\n',
@@ -243,6 +246,28 @@ def test_once_an_hour_the_watch_tries_the_ways_out_the_vm_uses(vm):
     vm("check-all")
     assert "-t domhouse-check egress failed server=200 registry=401 acme=000" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
 
+
+
+def test_a_server_waking_up_is_reached_not_failed(vm):
+    """E-34 (16 November 2026): the staging server at rest (Cloud Run, minimum 0) accepts the TLS connection at once but
+    its first answer can take more than 10 s; 114 hourly lines out of 131 said «failed» for that. TLS done and no
+    answer within 10 s is «server=waking» and counts as reached; a server not reached at all (DNS, TCP or TLS: no TLS
+    time) stays failed. Only the server: the registry and Let's Encrypt never sleep."""
+    host = "domotica-bff-staging.example.run.app"
+    vm.settings.write_text(f"MODEL_BASE_URL=https://{host}\n", encoding="utf-8", newline="\n")
+    (vm.stubs / "code-europe-west8-docker.pkg.dev").write_text("401", encoding="utf-8")
+    (vm.stubs / f"code-{host}").write_text("000", encoding="utf-8")
+    (vm.stubs / f"tls-{host}").write_text("0.084512", encoding="utf-8")          # TLS done, then no answer
+    assert vm("check-all").returncode == 0
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert "-t domhouse-check egress ok server=waking registry=401 acme=200" in syslog, syslog
+    assert "--connect-timeout 5" in (vm.stubs / "curl.log").read_text(encoding="utf-8")
+    (vm.stubs / "syslog.log").unlink()
+    (vm.opt / ".egress-checked").write_text("0", encoding="utf-8")       # an hour later: not even the TLS
+    (vm.stubs / f"tls-{host}").write_text("0.000000", encoding="utf-8")
+    vm("check-all")
+    assert "-t domhouse-check egress failed server=000 registry=401 acme=200" in (vm.stubs / "syslog.log").read_text(
+        encoding="utf-8")
 
 def test_timers_installs_the_backup_and_the_5_minute_watch(vm):
     r = vm("timers")

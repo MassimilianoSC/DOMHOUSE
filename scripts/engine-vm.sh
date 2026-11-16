@@ -23,7 +23,7 @@
 # the Ops Agent already sends to Cloud Logging) one line per apartment, "engine ok <id>", "engine down <id>" (answers 503)
 # or "engine silent <id>" (does not answer), "backup missing <id> age_h=<n>" (newest backup older than BACKUP_ALERT_H),
 # then "domhouse-check: <n> motori, <m> muti", "vm mem_used_pct=<n> disk_used_pct=<n>" (the weekly run-in report,
-# D-210), once an hour "egress ok|failed server=<code> registry=<code> acme=<code>" (the ways out the VM uses since
+# D-210), once an hour "egress ok|failed server=<code>|waking registry=<code> acme=<code>" (the ways out the VM uses since
 # the NAT went, 10 November: the server the assistant asks, Artifact Registry, Let's Encrypt; Cloud Logging is proved by
 # these very lines arriving) and, if the broker is installed, its line (scripts/broker-vm.sh check). The alerts read those lines (scripts/monitoring/engine-alerts.sh): the
 # watch writes only while the VM is alive, so a silent VM gives one email, never one per apartment. The daily backup
@@ -585,6 +585,21 @@ vm_line() {
 
 probe_code() { curl -s -o /dev/null -m 10 -w '%{http_code}' "$1" 2>/dev/null || true; }
 
+probe_server() {
+  # E-34: the server the assistant asks (Cloud Run; staging at rest with minimum 0) accepts the TLS connection at once,
+  # but its first answer can take more than 10 s while it wakes up. TLS done and no answer is «waking»: reached, not a
+  # failure. Not reached at all (DNS, TCP within 5 s, TLS: no TLS time) stays the code, 000.
+  local out code tls
+  out="$(curl -s -o /dev/null --connect-timeout 5 -m 10 -w '%{http_code} %{time_appconnect}' "$1" 2>/dev/null || true)"
+  code="${out%% *}"; tls=""
+  [ "${out}" = "${code}" ] || tls="${out#* }"
+  if [ "${code:-000}" = "000" ] && [[ "${tls}" =~ ^[0-9.]+$ ]] && [[ "${tls}" =~ [1-9] ]]; then
+    echo waking
+  else
+    echo "${code:-000}"
+  fi
+}
+
 egress_line() {
   # D-212: once an hour, the ways out the VM really uses; the hour is kept in a file, so a 5-minute timer is enough
   local now last url server registry acme
@@ -593,10 +608,10 @@ egress_line() {
   [ $((now - last)) -ge "${EGRESS_EVERY_S}" ] || return 0
   echo "${now}" > "${OPT}/.egress-checked"
   url="$(cat "${ETC}"/*.settings.env 2>/dev/null | sed -n 's/^MODEL_BASE_URL=//p' | head -1)"
-  if [ -n "${url}" ]; then server="$(probe_code "${url%/}/health")"; else server="nessuno"; fi
+  if [ -n "${url}" ]; then server="$(probe_server "${url%/}/health")"; else server="nessuno"; fi
   registry="$(probe_code "${REGISTRY_URL}")"
   acme="$(probe_code "${ACME_URL}")"
-  if [[ "${server}" =~ ^(200|nessuno)$ ]] && [[ "${registry}" =~ ^(200|401)$ ]] && [ "${acme}" = "200" ]; then
+  if [[ "${server}" =~ ^(200|nessuno|waking)$ ]] && [[ "${registry}" =~ ^(200|401)$ ]] && [ "${acme}" = "200" ]; then
     watch_line "egress ok server=${server:-000} registry=${registry:-000} acme=${acme:-000}"
   else
     watch_line "egress failed server=${server:-000} registry=${registry:-000} acme=${acme:-000}"

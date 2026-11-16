@@ -160,6 +160,16 @@ def test_the_ways_out_of_the_vm_days_covered_and_what_failed(monkeypatch):
     assert got == {"ok": 2, "failed": 2, "days": 3, "period_days": 7, "broken": {"acme": 1, "server": 1, "registry": 1}}
 
 
+def test_a_server_waking_up_is_not_counted_as_broken(monkeypatch):
+    """E-34: «server=waking» is the staging server reached while it wakes up: an ok line is ok, and in a failed line
+    (another way out broken) the server is not counted among the broken ones."""
+    line = lambda text, hours: {"timestamp": z(START + timedelta(hours=hours)), "jsonPayload": {"message": text}}
+    fake(monkeypatch, {"egress ": [line("domhouse-check: egress ok server=waking registry=401 acme=200", 0),
+                                   line("domhouse-check: egress failed server=waking registry=401 acme=000", 1)]})
+    got = rodaggio.egress(START, START + timedelta(days=7))
+    assert got == {"ok": 1, "failed": 1, "days": 1, "period_days": 7, "broken": {"acme": 1}}
+
+
 def test_the_report_compares_two_periods_and_says_what_is_missing(monkeypatch):
     calls = fake(monkeypatch, {"UptimeChecks": [check(m) for m in range(60)]})
     week = rodaggio.collect(START, END, END)
