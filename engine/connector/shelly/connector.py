@@ -57,8 +57,9 @@ holds. Read only: execute() refuses them (no command). In detail:
     the silence checks;
   - the age of a packet is counted on the BRIDGE's clock, which wrote its last_updated_ts: for every bridge the
     connector keeps the offset of its clock from ours (bridge minus ours), renewed only by the sources of the bridge's
-    time found reliable: the sys.unixtime of each Shelly.GetStatus and the "ts" of a NotifyStatus carrying at least a
-    bthomedevice or bthomesensor component. The other notifications never touch it: on the bench an EM Mini Gen4 sends
+    time found reliable: the sys.unixtime of each Shelly.GetStatus (against our time at the middle of the call: a
+    slow bridge, up to 3.2 s on the bench, would otherwise miss a confirmation) and the "ts" of a NotifyStatus
+    carrying at least a bthomedevice or bthomesensor component. The other notifications never touch it: on the bench an EM Mini Gen4 sends
     its em1:0 with a ts about 13.5 s behind, and a Shelly 1 Gen4 its first NotifyFullStatus after a restart about
     1750 s off (an H&T silent for 29 minutes would look alive). A missing or null time (a device without its time yet)
     changes nothing; an offset beyond CLOCK_OFFSET_IMPLAUSIBLE_S (a day) is not adopted, the offset of before stays
@@ -172,6 +173,11 @@ _STOP = object()
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _middle(sent: datetime, answered: datetime) -> datetime:
+    """The middle of an RPC: the best guess of when the device read its clock for the answer."""
+    return sent + (answered - sent) / 2
 
 
 def _carries_bthome(params: dict) -> bool:
@@ -493,6 +499,7 @@ class ShellyConnector:
         """Shelly.GetStatus -> the snapshot. A failure leaves the device online and is tried again at the next
         silence check, until it succeeds (or a NotifyFullStatus comes); warned once until then."""
         entry = device.entry
+        sent = self._clock()
         try:
             status = await self._transport.call(entry.shelly_id, "Shelly.GetStatus", None, self._rpc_timeout_s)
         except TransportError as exc:
@@ -503,7 +510,9 @@ class ShellyConnector:
         device.snapshot_failed = False
         device.last_seen = self._clock()
         if device.sensors and isinstance(status, dict) and isinstance(status.get("sys"), dict):
-            self._bridge_clock(device, status["sys"].get("unixtime"), device.last_seen)
+            # its time against ours at the middle of the call: a slow bridge (up to 3.2 s on the bench) read after
+            # the answer would be off by the whole wait, and a confirmation within CLOCK_CONFIRM_TOLERANCE_S missed
+            self._bridge_clock(device, status["sys"].get("unixtime"), _middle(sent, device.last_seen))
         self._snapshot(device, status if isinstance(status, dict) else {}, device.last_seen, device.last_seen)
 
     def _snapshot(self, device: _Device, status: dict, ts: datetime, received_at: datetime) -> None:
@@ -609,15 +618,15 @@ class ShellyConnector:
         """Shelly.GetStatus read again for its sys.unixtime only (no snapshot): the second source of a candidate
         offset. It confirms it, replaces it (another offset beyond the skew: the wait starts again) or drops it (one
         within). Failed, or without a time: the candidate waits, read again after clock_confirm_s."""
-        bridge.clock_reread_at = self._clock()
+        sent = bridge.clock_reread_at = self._clock()
         try:
             status = await self._transport.call(bridge.entry.shelly_id, "Shelly.GetStatus", None,
                                                 self._rpc_timeout_s)
         except TransportError:
             return
-        at = bridge.last_seen = self._clock()
+        bridge.last_seen = self._clock()
         if isinstance(status, dict) and isinstance(status.get("sys"), dict):
-            self._bridge_clock(bridge, status["sys"].get("unixtime"), at)
+            self._bridge_clock(bridge, status["sys"].get("unixtime"), _middle(sent, bridge.last_seen))
 
     def _packet_at(self, bridge: _Device, last_updated_ts, received_at: datetime) -> datetime | None:
         """translate.bthome_ts with the bridge's offset: a few seconds are the transport's delay and the whole
