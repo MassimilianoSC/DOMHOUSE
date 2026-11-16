@@ -26,6 +26,9 @@ case "$*" in
   *"topics get-iam-policy"*|*"asset analyze-iam-policy"*|*"subscriptions describe"*)
     exec python3 "$STUB_DIR/stub.py" "$@" ;;
   *"projects describe"*) echo 444239063209; exit 0 ;;
+  *"run services describe"*"run.googleapis.com/urls"*)
+    [ -f "$STUB_DIR/stable-url" ] && echo '["https://domotica-bff-staging-444239063209.europe-west8.run.app","__URL__"]'
+    exit 0 ;;
   *"run services describe"*) echo "__URL__"; exit 0 ;;
   *"channels list"*) echo "projects/__P__/notificationChannels/951"; exit 0 ;;
   *" describe "*) { [ -f "$STUB_DIR/exists" ] || [ -f "$STUB_DIR/made-$name" ]; } && { echo "esiste"; exit 0; }; exit 1 ;;
@@ -60,7 +63,8 @@ if "asset analyze-iam-policy" in line:
 name = args[args.index("describe") + 1]
 if not ((d / f"made-{name}").exists() or (d / "exists").exists()):
     sys.exit(1)
-endpoint = "__URL__/internal/agent/risultati"
+endpoint = ("https://domotica-bff-staging-444239063209.europe-west8.run.app" if (d / "stable-url").exists()
+            else "__URL__") + "/internal/agent/risultati"
 base = {
     "domhouse-staging-ordini-vm": ("sub.json", {
         "ackDeadlineSeconds": 60, "messageRetentionDuration": "3600s", "enableMessageOrdering": True,
@@ -252,3 +256,14 @@ def test_r3_an_existing_resource_that_differs_stops_the_script(gcp, name, change
     write(gcp, f"change-{name}", change)
     out, _ = gcp("staging")
     assert out.returncode != 0 and says in (out.stderr + out.stdout)
+
+
+def test_the_push_goes_to_the_stable_address_of_the_service_like_deploy_sh(gcp):
+    """The audience the manifest of the staging server holds (AGENT_PUSH_AUDIENCE) is written before the script runs:
+    https://domotica-bff-staging-<project number>.europe-west8.run.app, as scripts/deploy.sh prefers."""
+    (gcp.stubs / "stable-url").write_text("", encoding="utf-8")
+    stable = "https://domotica-bff-staging-444239063209.europe-west8.run.app/internal/agent/risultati"
+    out, calls = gcp("staging")
+    assert out.returncode == 0, out.stderr + out.stdout
+    [push] = [c for c in creates(calls) if "subscriptions create domhouse-staging-risultati-push" in c]
+    assert f"--push-endpoint={stable}" in push and f"--push-auth-token-audience={stable}" in push

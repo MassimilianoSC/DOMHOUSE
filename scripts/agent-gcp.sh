@@ -49,7 +49,12 @@ echo "Progetto ${P} · ambiente ${ENVIRONMENT}${DRY_RUN:+ · PROVA A SECCO}"
 NUMBER="$(gcloud projects describe "${P}" --format='value(projectNumber)')"
 [[ "${NUMBER}" =~ ^[0-9]+$ ]] || stop "Non leggo il numero del progetto."
 PUBSUB_AGENT="serviceAccount:service-${NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com"
-URL="$(gcloud run services describe "domotica-bff-${ENVIRONMENT}" --region="${REGION}" --project="${P}" --format='value(status.url)')"
+# The stable address https://domotica-bff-<env>-<project number>.<region>.run.app, as scripts/deploy.sh prefers: the
+# manifest's AGENT_PUSH_AUDIENCE is written with it; status.url (the random-looking one) only if it is not there
+URLS="$(gcloud run services describe "domotica-bff-${ENVIRONMENT}" --region="${REGION}" --project="${P}" \
+  --format="value(metadata.annotations.'run.googleapis.com/urls')" || true)"
+URL="$(printf '%s' "${URLS}" | grep -oE "https://[^\"]+\.${REGION}\.run\.app" | head -1 || true)"
+[ -n "${URL}" ] || URL="$(gcloud run services describe "domotica-bff-${ENVIRONMENT}" --region="${REGION}" --project="${P}" --format='value(status.url)')"
 [[ "${URL}" =~ ^https://[a-z0-9.-]+$ ]] || stop "Non leggo l'indirizzo del server dello ${ENVIRONMENT}."
 ENDPOINT="${URL}/internal/agent/risultati"
 echo "server: ${URL}"
