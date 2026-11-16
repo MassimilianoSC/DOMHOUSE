@@ -179,7 +179,7 @@ Ogni ordine porta questi campi, con uno schema Pub/Sub e una dimensione massima 
 
 - La password nuova la genera **l'agente sulla VM**, la scrive nello Shelly con `MQTT.SetConfig` (come R2 della tappa A), aggiorna il file delle impronte, fa il `sync` e riavvia lo Shelly (come R3 ed R4).
 - Al server restituisce **solo l'impronta**: la password non lascia mai la VM.
-- **Da verificare con Youssouf** e con la sezione 4 della tappa A di oggi: che ogni modello ammesso accetti `MQTT.SetConfig` arrivato via MQTT, e che una password di 32 caratteri vada bene a tutti (per la Plug M Gen3 va bene: è quella di oggi).
+- **Da verificare con Youssouf:** che ogni modello ammesso accetti `MQTT.SetConfig` arrivato via MQTT, e che una password di 32 caratteri vada bene a tutti. Per la Plug M Gen3 è provato (tappa A, sezione 4, 16 novembre): accettato via MQTT, e dopo la ricarica la presa si è ricollegata da sola con la password nuova, senza riavvio.
 
 **L'immagine, in ogni caso**, deve seguire la regola ancorata:
 
@@ -331,11 +331,11 @@ Il lettore e l'esecutore girano sull'host: per loro il token c'è.
 2. **stato «revoca in corso»** finché non arriva il risultato riuscito; poi «revocato»;
 3. per rimettere lo stesso Shelly serve una registrazione nuova, con una password nuova.
 
-**Da verificare (nostro, sul broker vero, prima del codice):** se una ricarica di Mosquitto con un utente tolto o con un'impronta cambiata **fa cadere** il collegamento già aperto da quell'utente.
+**La ricarica di Mosquitto e i collegamenti già aperti:**
 
-- Se non lo fa cadere, un dispositivo revocato, o chi usa una password trapelata, resta collegato fino al prossimo ricollegamento.
-- In quel caso «Revoca» e «Rigenera» devono anche chiudere quel collegamento: un riavvio del broker (fa ricollegare tutti), oppure il plugin di sicurezza dinamica di Mosquitto, da valutare.
-- Si prova in `tests/broker_container_test.py`.
+- **Impronta cambiata («Rigenera»): provato dal vivo il 16 novembre** (tappa A, sezione 4, R3). La ricarica ha fatto cadere, nello stesso secondo, il collegamento della Plug la cui password era cambiata; il connector, non cambiato, è rimasto collegato. Quindi per «Rigenera» la ricarica basta: chi usa la password vecchia viene staccato e non rientra.
+- **Utente tolto («Revoca»): da verificare** (nostro, sul broker in container, prima del codice). Se la ricarica non lo fa cadere, un dispositivo revocato resta collegato fino al prossimo ricollegamento, e «Revoca» deve anche chiudere quel collegamento: un riavvio del broker (fa ricollegare tutti), oppure il plugin di sicurezza dinamica di Mosquitto, da valutare.
+  - Si prova in `tests/broker_container_test.py`, **solo con il via del committente** (avvia Docker).
 
 **Dove la password non deve restare:**
 
@@ -487,5 +487,5 @@ Nessun punto «accettato così»: tutti e sette sono corretti come chiedeva il r
 
 **Da verificare prima del codice:**
 
-1. **nostro:** se la ricarica del broker fa cadere un collegamento il cui utente è stato tolto o cambiato (§8.1);
+1. **nostro:** se la ricarica del broker fa cadere un collegamento il cui utente è stato **tolto** (§8.1; per l'impronta cambiata è provato dal vivo il 16 novembre);
 2. **con Youssouf:** la pagina locale dello Shelly e la password del broker (§2.5, rischio 3); `MQTT.SetConfig` via MQTT e password di 32 caratteri su tutti i modelli ammessi (§3, `cambia_password`, solo opzione 2).

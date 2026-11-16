@@ -131,7 +131,7 @@ devices:
 
 | Origine | `ts` |
 |---|---|
-| Notifica di uno Shelly alimentato (`NotifyStatus`, `NotifyFullStatus`) | l'ora del dispositivo se dista meno di 300 s dalla nostra, altrimenti l'ora di ricezione |
+| Notifica di uno Shelly alimentato (`NotifyStatus`, `NotifyFullStatus`) | l'ora del dispositivo se dista al massimo 300 s dalla nostra (300 compresi), altrimenti l'ora di ricezione |
 | Fotografia da `Shelly.GetStatus` | l'ora di ricezione della risposta |
 | Pacchetto di un sensore BLU | `last_updated_ts` riportato sul nostro orologio con lo scarto del ponte (sotto). La regola dei 300 s **non** vale: un pacchetto vecchio resta vecchio. Solo un valore nel futuro diventa l'ora di ricezione |
 
@@ -144,31 +144,48 @@ connector tiene per ogni ponte lo scarto fra il suo orologio e il nostro.
 
 - **Da dove si prende lo scarto**, e solo da qui:
   - `sys.unixtime` di `Shelly.GetStatus`, che si legge alla connessione, al nuovo tentativo dopo una lettura fallita
-    e per confermare un candidato (sotto). Non a intervalli;
+    e per confermare un candidato (sotto). Non a intervalli. Lo scarto si calcola con l'ora a metà della chiamata,
+    fra l'invio e la risposta: un ponte lento a rispondere non lo falsa;
   - il `ts` di una `NotifyStatus` che porta componenti BLU. Non le `NotifyFullStatus` né le `NotifyEvent`, e non le
     altre notifiche del ponte: l'EM Mini manda la potenza con il `ts` ~13,5 s indietro.
-- **Scarto entro 300 s**: adottato subito. Sotto i 2 s conta come zero.
+- **Scarto entro 300 s** (300 compresi): adottato subito. Sotto i 2 s conta come zero.
 - **Scarto oltre 300 s**: è un **candidato**, non viene adottato. Lo diventa solo se una fonte successiva, almeno
-  5 minuti dopo, dà lo stesso valore entro 5 s; allora esce il warn `bridge clock off`. Se in quei 5 minuti non
-  arrivano pacchetti, al controllo del silenzio il connector rilegge `Shelly.GetStatus`. Una fonte con uno scarto
-  diverso fa ripartire l'attesa; una con uno scarto entro 300 s cancella il candidato.
-- **Mentre un candidato aspetta** vale lo scarto adottato prima, se c'era; altrimenti nessuno, cioè il nostro
-  orologio. Il candidato non serve mai a datare né a calcolare un'età.
+  5 minuti dopo la prima (300 s compresi), dà lo stesso valore entro 5 s; allora esce il warn `bridge clock off`.
+  - Una fonte uguale arrivata **prima** dei 5 minuti non conferma, e l'attesa resta contata dalla prima.
+  - Al primo controllo del silenzio dopo i 5 minuti il connector rilegge `Shelly.GetStatus` per avere la seconda
+    fonte, anche se nel frattempo sono arrivati pacchetti con lo stesso scarto. Una rilettura per scadenza.
+  - Una fonte con uno scarto grande diverso sostituisce il candidato e l'attesa riparte; una con uno scarto entro
+    300 s lo cancella.
+  - Uno scarto grande uguale a quello già adottato lo rinnova, senza creare un candidato.
+- **Mentre un candidato aspetta** si usa, per datare i pacchetti e calcolarne l'età, **il maggiore fra il candidato
+  e lo scarto adottato** (o zero, se non ce n'è uno). È la direzione prudente: uno scarto più grande fa sembrare i
+  pacchetti più vecchi, mai più recenti.
+  - Candidato **indietro** (negativo): non si usa. Vale lo scarto di prima, o il nostro orologio.
+  - Candidato **avanti** (positivo): si usa subito, senza essere adottato.
 - **Scarto oltre un giorno**: ignorato, con il warn `bridge clock implausible`. Resta lo scarto di prima, se c'era.
 - **Quando il ponte cade** scarto, candidato e avvisi si azzerano. Una notifica arrivata dopo la caduta non li
   reimposta.
 
 **Dopo un riavvio del ponte.** Lo Shelly riparte con l'orologio sbagliato finché non si sincronizza (al banco la
-prima `NotifyFullStatus` dello Shelly 1 Gen4 era fuori di ~1750 s). Quello scarto resta un candidato: con la
-riconnessione il connector usa il nostro orologio, senza riconnessione lo scarto di prima. Un sensore che taceva
-da tempo resta offline. Il prezzo: un sensore vivo può risultare offline per qualche minuto dopo il riavvio, e un
-ponte con l'orologio stabilmente sbagliato tiene i suoi sensori offline per i 5 minuti della conferma.
+prima `NotifyFullStatus` dello Shelly 1 Gen4 era fuori di ~1750 s, indietro). Quello scarto resta un candidato.
+- **Orologio indietro**, come al banco: con la riconnessione il connector usa il nostro orologio, senza
+  riconnessione lo scarto di prima. Un sensore che taceva da tempo resta offline. Il prezzo: un sensore vivo può
+  risultare offline per qualche minuto.
+- **Orologio avanti**: il candidato si usa subito. Un sensore vivo resta online, uno che taceva resta offline.
+
+**Ponte con l'orologio stabilmente sbagliato**, dopo ogni connessione:
+- **indietro**: i suoi sensori restano offline per i 5 minuti della conferma, poi tornano;
+- **avanti**: i sensori vivi sono online da subito, quelli che tacevano restano offline.
 
 **Limiti noti**
-- Se dopo un riavvio l'orologio resta sbagliato per più di 5 minuti, lo scarto viene confermato e adottato. Quanto
-  dura davvero va misurato al banco (§5 punto 2).
+- Se dopo un riavvio l'orologio resta sbagliato **indietro** per più di 5 minuti, lo scarto viene confermato e
+  adottato, e un sensore che taceva torna online con la lettura vecchia. Una prova lo documenta
+  (`test_blu_known_limit_a_wrong_clock_lasting_beyond_clock_confirm_s_brings_a_dead_ht_back`). Quanto dura davvero
+  l'orologio sbagliato va misurato al banco (§5 punto 2). La documentazione Shelly dice che `sys.unixtime` è nullo
+  finché l'ora non è sincronizzata: se al banco è così, la regola si può rendere più forte.
 - Dopo una correzione dell'orologio del ponte lo scarto resta quello vecchio fino al prossimo pacchetto BLU: con il
-  solo Motion o il contatto, anche molti minuti. Pesa solo su una lettura della mappa che capiti in mezzo.
+  solo Motion o il contatto, anche molti minuti. Se la correzione lascia il ponte oltre i 300 s, lo scarto vecchio
+  resta anche per i 5 minuti della conferma. Pesa solo su una lettura della mappa che capiti in mezzo.
 
 ## 4. Verificato in laboratorio
 

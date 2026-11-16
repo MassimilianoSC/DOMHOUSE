@@ -1,6 +1,6 @@
 # Suite di conformità al contratto
 
-Verifica che un'istanza implementi `contract/openapi.yaml` (1.0.4). Due livelli:
+Verifica che un'istanza implementi `contract/openapi.yaml` (la versione è in `info.version`). Due livelli:
 
 1. **Forma** — Schemathesis genera richieste da ogni operazione del contratto e controlla che
    le risposte rispettino schemi e codici dichiarati.

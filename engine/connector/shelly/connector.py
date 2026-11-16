@@ -57,8 +57,9 @@ holds. Read only: execute() refuses them (no command). In detail:
     the silence checks;
   - the age of a packet is counted on the BRIDGE's clock, which wrote its last_updated_ts: for every bridge the
     connector keeps the offset of its clock from ours (bridge minus ours), renewed only by the sources of the bridge's
-    time found reliable: the sys.unixtime of each Shelly.GetStatus and the "ts" of a NotifyStatus carrying at least a
-    bthomedevice or bthomesensor component. The other notifications never touch it: on the bench an EM Mini Gen4 sends
+    time found reliable: the sys.unixtime of each Shelly.GetStatus (against our time at the middle of the call: a
+    slow bridge, up to 3.2 s on the bench, would otherwise miss a confirmation) and the "ts" of a NotifyStatus
+    carrying at least a bthomedevice or bthomesensor component. The other notifications never touch it: on the bench an EM Mini Gen4 sends
     its em1:0 with a ts about 13.5 s behind, and a Shelly 1 Gen4 its first NotifyFullStatus after a restart about
     1750 s off (an H&T silent for 29 minutes would look alive). A missing or null time (a device without its time yet)
     changes nothing; an offset beyond CLOCK_OFFSET_IMPLAUSIBLE_S (a day) is not adopted, the offset of before stays
@@ -69,8 +70,12 @@ holds. Read only: execute() refuses them (no command). In detail:
     the catalog), so adopting it at once would bring an H&T silent for 29 minutes back online with its old reading
     dated «now». The candidate is adopted only when a later source, at least CLOCK_CONFIRM_S (5 minutes, our clock)
     after the first, gives the same offset within CLOCK_CONFIRM_TOLERANCE_S; a different one beyond the skew
-    replaces it (the wait starts again), one within drops it. Meanwhile the offset adopted before is used, or none
-    (our clock), never the candidate: a sensor believed dead for a few minutes rather than a dead one believed alive.
+    replaces it (the wait starts again), one within drops it. Meanwhile the packets are dated and aged with the
+    larger of the candidate and the offset adopted before (or 0, our clock), the prudent side: a larger offset makes
+    them look older, never more recent. A candidate behind (the restart above) is therefore never used; one ahead (a
+    bridge steadily ahead of ours, a candidate again after each reconnection) is, so that a sensor dead a little more
+    than its threshold is not brought back by its last packet looking recent. A sensor believed dead for a few
+    minutes rather than a dead one believed alive.
     So that the wait does not last for ever when no packet comes (a Motion at rest sends every 15 minutes), a
     candidate that waited CLOCK_CONFIRM_S gets Shelly.GetStatus read again at the next silence check, for its
     sys.unixtime only, once per wait. The candidate is logged once (info); "bridge clock off" is warned when such an
@@ -82,7 +87,8 @@ holds. Read only: execute() refuses them (no command). In detail:
     every notification brings its own ts, read before its values, so the old offset only dates a read of the map in
     between (a pairing, a read for errors). With the candidate's rule: a correction that brings the bridge within
     MAX_CLOCK_SKEW_S is adopted at that first packet; one that leaves it beyond (or takes it there) is a candidate,
-    adopted only when confirmed, the old offset used meanwhile. The packet's time on our clock is
+    adopted only when confirmed, the old offset (or the candidate, if larger) used meanwhile. The packet's time on our
+    clock is
     last_updated_ts - offset, never later than its reception (translate.bthome_ts), and it is both the sensor's last
     packet and the ts of its changes; so a bridge steadily 400 s behind does not keep offline a sensor that sends
     every minute once its offset is confirmed (before that it may be offline: the price wanted), and a packet hours
@@ -167,6 +173,11 @@ _STOP = object()
 
 def utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _middle(sent: datetime, answered: datetime) -> datetime:
+    """The middle of an RPC: the best guess of when the device read its clock for the answer."""
+    return sent + (answered - sent) / 2
 
 
 def _carries_bthome(params: dict) -> bool:
@@ -491,6 +502,7 @@ class ShellyConnector:
         """Shelly.GetStatus -> the snapshot. A failure leaves the device online and is tried again at the next
         silence check, until it succeeds (or a NotifyFullStatus comes); warned once until then."""
         entry = device.entry
+        sent = self._clock()
         try:
             status = await self._transport.call(entry.shelly_id, "Shelly.GetStatus", None, self._rpc_timeout_s)
         except TransportError as exc:
@@ -501,7 +513,9 @@ class ShellyConnector:
         device.snapshot_failed = False
         device.last_seen = self._clock()
         if device.sensors and isinstance(status, dict) and isinstance(status.get("sys"), dict):
-            self._bridge_clock(device, status["sys"].get("unixtime"), device.last_seen)
+            # its time against ours at the middle of the call: a slow bridge (up to 3.2 s on the bench) read after
+            # the answer would be off by the whole wait, and a confirmation within CLOCK_CONFIRM_TOLERANCE_S missed
+            self._bridge_clock(device, status["sys"].get("unixtime"), _middle(sent, device.last_seen))
         self._snapshot(device, status if isinstance(status, dict) else {}, device.last_seen, device.last_seen)
 
     def _snapshot(self, device: _Device, status: dict, ts: datetime, received_at: datetime) -> None:
@@ -556,7 +570,8 @@ class ShellyConnector:
             about 1750 s behind), and its GetStatus at the connection reads that clock. The candidate is adopted only
             when a later source, at least clock_confirm_s after the first (our clock), gives the same offset within
             CLOCK_CONFIRM_TOLERANCE_S; a different one replaces it and the wait starts again from there. Meanwhile the
-            offset adopted before is used, or none (our clock): never the candidate. Logged once per candidate (info),
+            packets are dated with the larger of the candidate and the offset adopted before (or 0, _packet_at): a
+            candidate behind is never used, one ahead is, on the prudent side. Logged once per candidate (info),
             and "bridge clock off" is warned when such an offset is ADOPTED, once, again only after one within came."""
         if isinstance(bridge_time, bool) or not isinstance(bridge_time, (int, float)) or bridge_time <= 0:
             return
@@ -606,22 +621,29 @@ class ShellyConnector:
         """Shelly.GetStatus read again for its sys.unixtime only (no snapshot): the second source of a candidate
         offset. It confirms it, replaces it (another offset beyond the skew: the wait starts again) or drops it (one
         within). Failed, or without a time: the candidate waits, read again after clock_confirm_s."""
-        bridge.clock_reread_at = self._clock()
+        sent = bridge.clock_reread_at = self._clock()
         try:
             status = await self._transport.call(bridge.entry.shelly_id, "Shelly.GetStatus", None,
                                                 self._rpc_timeout_s)
         except TransportError:
             return
-        at = bridge.last_seen = self._clock()
+        bridge.last_seen = self._clock()
         if isinstance(status, dict) and isinstance(status.get("sys"), dict):
-            self._bridge_clock(bridge, status["sys"].get("unixtime"), at)
+            self._bridge_clock(bridge, status["sys"].get("unixtime"), _middle(sent, bridge.last_seen))
 
     def _packet_at(self, bridge: _Device, last_updated_ts, received_at: datetime) -> datetime | None:
         """translate.bthome_ts with the bridge's offset: a few seconds are the transport's delay and the whole
-        seconds of sys.unixtime, not a clock off, and count as none."""
+        seconds of sys.unixtime, not a clock off, and count as none. While a candidate waits, the larger of the
+        candidate and the adopted offset (or 0) dates the packets: the prudent side. A larger offset makes them look
+        older, never more recent; so a candidate AHEAD (a bridge steadily ahead, after each reconnection) counts, and
+        a dead sensor is not brought back by its last packet looking recent, while one BEHIND (a bridge restarted on
+        a wrong clock) does not. The candidate is not adopted by this: it keeps its rules of confirmation."""
         offset = bridge.clock_offset_s
         if offset is not None and abs(offset) < CLOCK_OFFSET_IGNORED_S:
             offset = 0.0
+        candidate = bridge.clock_candidate_s
+        if candidate is not None and candidate > (offset or 0.0):
+            offset = candidate
         return bthome_ts(last_updated_ts, received_at, bridge_offset_s=offset)
 
     def _bridge_of(self, sensor: _Device) -> _Device:

@@ -1,5 +1,5 @@
 """
-Scenari C01–C16 di `x-conformita` in contract/openapi.yaml (1.0.4).
+Scenari C01–C16 di `x-conformita` in contract/openapi.yaml (la versione è in `info.version`).
 Ogni test cita lo scenario nel docstring. Regole in conftest.py.
 """
 from __future__ import annotations

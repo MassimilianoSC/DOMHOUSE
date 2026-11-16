@@ -4,7 +4,7 @@ App per il gestore di appartamenti in affitto breve: riscaldamento e clima, cons
 approvazioni. Frontend React 18 + Vite (PWA), BFF FastAPI stateless che autentica, instrada verso l'istanza
 domotica dell'appartamento, rilancia lo stream SSE e inoltra le prenotazioni.
 
-- **Contratto**: `contract/openapi.yaml` (v1.0.5) è il contratto fra app e motore, confrontato in CI: **non va mai modificato** (unica eccezione la 1.0.5 di sola documentazione, D-107).
+- **Contratto**: `contract/openapi.yaml` (v1.0.6) è il contratto fra app e motore, confrontato in CI: **si modifica solo con il via del committente** (eccezioni finora: la 1.0.5 di sola documentazione, D-107; la 1.0.6 con `battery_percent` facoltativo, risposta 1143).
   I tipi TypeScript si rigenerano con `make gen-api`.
 - **Motore**: `engine/` è il motore domotico, uno per appartamento (`python -m engine`, vedi «Motore e connector sul
   proprio PC»). Lo stesso codice, con il connector simulato, fa gli appartamenti dimostrativi del BFF, montati su

@@ -11,6 +11,9 @@ vorrebbe dire migrare segreti e permessi senza vantaggi per chi usa l'app. Dove 
 Riferimento operativo per chi lavora in questo repository. `README.md` descrive l'app e le variabili d'ambiente;
 qui ci sono gli identificativi reali dell'infrastruttura, le convenzioni e le regole fisse.
 Questo è l'**unico** file del repository che contiene valori reali: nessun segreto, solo identificativi.
+**Eccezione (risposta 1137, 16 novembre 2026):** i cataloghi dei banchi di prova (`engine/connector/shelly/cataloghi/`,
+oggi `lab-01.yaml` del banco di Youssouf) possono contenere gli id nativi degli Shelly e i MAC dei sensori BLU veri, che
+non sono segreti. Mai password nei cataloghi. **I cataloghi degli appartamenti dei clienti non entrano mai nel repository.**
 
 ## Identificativi reali (GCP / Firebase)
 
@@ -69,10 +72,12 @@ documento «Infrastruttura Domotica PoC – riepilogo e configurazione.docx» ne
 
 ## Regole fisse
 
-1. **`contract/openapi.yaml` non si modifica mai, per nessun motivo**, con un'unica eccezione decisa dal committente: la
-   versione 1.0.5 **solo documentazione** (D-107, P-63: descrizioni, esempi e chiavi `x-*`; struttura identica, provata da
-   uno script che confronta gli alberi senza quei campi; `CONTRACT_SHA256` nella CI e `CONTRACT_BLOB` in `scripts/publish.sh`
-   aggiornati nello stesso commit). È il contratto v1.0.5 fra app e motore (il nostro, `engine/`) e confrontato in CI. Se una funzionalità sembra richiedere un campo in più, si risolve nel BFF o nel
+1. **`contract/openapi.yaml` non si modifica mai senza il via esplicito del committente.** Eccezioni decise finora:
+   la versione 1.0.5 **solo documentazione** (D-107, P-63: descrizioni, esempi e chiavi `x-*`; struttura identica, provata da
+   uno script che confronta gli alberi senza quei campi) e la **1.0.6** (risposta 1143, 16 novembre 2026: `battery_percent`
+   facoltativo in `Device`, `device.state` e `device.online`, nessun campo obbligatorio nuovo). A ogni versione
+   `CONTRACT_SHA256` nella CI e `CONTRACT_BLOB` in `scripts/publish.sh` si aggiornano nello stesso commit. È il contratto
+   v1.0.6 fra app e motore (il nostro, `engine/`) e confrontato in CI. Se una funzionalità sembra richiedere un campo in più, si risolve nel BFF o nel
    frontend (come già fatto per «Soggiorno in corso»), non nel contratto. Prima di ogni commit `git diff --stat contract/`
    deve essere vuoto. I tipi TypeScript si rigenerano con `make gen-api`, mai a mano.
 2. **Nessun segreto né file `.env*` in Git.** Niente chiavi API, HMAC, token, chiavi JSON di service account, né `bff/.env`,

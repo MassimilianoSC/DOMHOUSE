@@ -532,6 +532,8 @@ export interface components {
             /** Format: date-time */
             last_seen: string | null;
             capabilities: components["schemas"]["Capabilities"];
+            /** @description Facoltativo (1.0.6). Solo i dispositivi a batteria: l'ultimo livello che hanno mandato, 0–100. Assente (o null) quando il livello non è noto o il dispositivo va a corrente. Non è una capacità: distingue una pila scarica da un dispositivo fuori portata */
+            battery_percent?: number | null;
         };
         /** @description Una chiave per capacità presente. L'app ignora chiavi che non conosce. */
         Capabilities: {
@@ -843,12 +845,16 @@ export interface components {
             state: {
                 [key: string]: unknown;
             };
+            /** @description Facoltativo (1.0.6): il livello della batteria del dispositivo in quel momento, come in GET /devices; assente se non è noto */
+            battery_percent?: number | null;
         };
         EventDeviceOnline: {
             device_id: string;
             online: boolean;
             /** Format: date-time */
             last_seen: string | null;
+            /** @description Facoltativo (1.0.6): il livello della batteria del dispositivo in quel momento, come in GET /devices; assente se non è noto */
+            battery_percent?: number | null;
         };
         EventCommandUpdated: {
             command_id: string;
@@ -893,7 +899,7 @@ export interface components {
             checked_at: string;
         };
         Version: {
-            /** @example 1.0.5 */
+            /** @example 1.0.6 */
             contract_version: string;
             implementation: components["schemas"]["Implementation"];
             features: ("apartment" | "devices" | "commands" | "energy" | "schedule" | "rules" | "approvals" | "decisions" | "ask" | "bookings" | "stream")[];
@@ -2486,7 +2492,7 @@ export interface operations {
                 content: {
                     /**
                      * @example {
-                     *       "contract_version": "1.0.5",
+                     *       "contract_version": "1.0.6",
                      *       "implementation": {
                      *         "name": "domhouse-engine",
                      *         "version": "0.3.0"

@@ -49,7 +49,7 @@ describe("CommandChip, lo stato dell'ultimo comando di un dispositivo", () => {
   // device_offline e il chip dice cosa controllare, come il toast «… è offline» che arriva quando il motore lo segna.
   it("failed perché il dispositivo non ha risposto: cosa controllare, senza codice tecnico", () => {
     show(cmd({ status: "failed", reason: "device_offline", correlationId: "110fdb9b-0000-0000-0000-000000000000" }));
-    expect(chip()).toHaveTextContent(/^errore: il dispositivo non ha risposto, controlla che sia acceso e collegato/);
+    expect(chip()).toHaveTextContent(/^errore: il dispositivo non ha risposto; riprova, e se succede ancora controlla che sia acceso e collegato/);
     expect(chip()).not.toHaveTextContent(/device_offline|errore interno/);
     expect(screen.getByTestId(`${TEST_ID}-correlation`)).toHaveAttribute("data-correlation-id", "110fdb9b-0000-0000-0000-000000000000");
   });

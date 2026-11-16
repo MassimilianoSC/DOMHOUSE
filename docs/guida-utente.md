@@ -555,7 +555,7 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 
 | Motivo | Cosa vuol dire |
 |---|---|
-| «il dispositivo non ha risposto, controlla che sia acceso e collegato» | Il comando è partito ma il dispositivo non ha risposto: staccato da poco, senza corrente o senza Wi-Fi |
+| «il dispositivo non ha risposto; riprova, e se succede ancora controlla che sia acceso e collegato» | Il comando è partito ma il dispositivo non ha risposto in tempo: lento, staccato da poco, senza corrente o senza Wi-Fi |
 | «rifiutato dal dispositivo» | Il dispositivo non ha accettato il comando |
 | «bloccato da una regola» | Una regola (per esempio finestra aperta o pausa del compressore) ha bloccato il comando |
 | «bloccato da un'azione prioritaria» | Un'azione più importante ha bloccato il comando |
@@ -1264,12 +1264,13 @@ riquadro: la conversazione e, in fondo, il campo per scrivere.
 
 ## 6. Amministratore: che cosa puoi fare in più
 
-**La pagina «Amministrazione», la copia delle regole e il Simulatore.**
+**La pagina «Amministrazione», la copia delle regole, lo stato dei dispositivi e il Simulatore.**
 
 L'amministratore fa tutto quello delle parti 4 e 5 su tutti gli appartamenti dell'organizzazione e in più ha:
 
 - **La pagina «Amministrazione»** («Utenti, appartamenti e funzioni della tua organizzazione»).
 - **La copia delle regole** su altri appartamenti.
+- **Lo stato dei dispositivi**: chi risponde, la batteria dei sensori e cosa controllare.
 - **Il Simulatore** sugli appartamenti dimostrativi.
 
 ### Amministrazione: le sei schede
@@ -1615,6 +1616,48 @@ in ciascuno, poi confermi.».
 > - **Se le regole di partenza sono cambiate**: «Le regole dell'appartamento di partenza sono cambiate: rifai
 >   l'anteprima».
 > - **Ogni appartamento toccato** ha una riga nelle sue Decisioni e nel «Registro dell'organizzazione».
+
+### Stato dei dispositivi
+
+**Quali dispositivi rispondono, da quando, e cosa controllare se uno non risponde.**
+
+- **Dove**: menu dell'appartamento, «Stato dei dispositivi», fra «Assistente» e «Simulatore» (sul telefono nel menu a
+  scomparsa).
+- **Chi la vede**: solo l'Amministratore, e solo se l'appartamento ha la funzione dei dispositivi. Operatore e Sola
+  lettura non hanno la voce.
+- **In alto** il riepilogo: «In linea: 6 · Offline: 1 · Mai collegati: 0», più «· Batterie da cambiare: 2» se ce ne
+  sono.
+- **Sul computer** una tabella; **sul telefono** una scheda per dispositivo.
+- **L'ordine**: prima i mai collegati, poi gli offline, poi quelli con la batteria da cambiare, poi gli altri.
+
+| Colonna | Cosa vedi |
+|---|---|
+| «Dispositivo», «Stanza» | Il nome e la stanza («Senza stanza» se la stanza non c'è più) |
+| «Stato» | «In linea» (verde); «Offline da …» (rosso: «meno di un minuto», «5 minuti», «3 ore», «4 giorni»…, si aggiorna da solo); «Mai collegato» (giallo: non si è mai fatto sentire) |
+| «Ultima volta visto» | Data e ora, per esempio «lun 16 nov, 11:59»; «Mai» se non si è mai fatto sentire |
+| «Batteria» | «78 %»; in giallo «15 %, da cambiare presto» (dal 20 % in giù); «non nota» se il livello non è ancora arrivato; «—» per i dispositivi a corrente |
+| «Cosa fare» | Il consiglio, tabella sotto |
+
+| Caso | «Cosa fare» |
+|---|---|
+| In linea, batteria a posto | «Niente da fare» |
+| Sensore in linea, batteria bassa | «Batteria quasi scarica: cambiala presto, prima che il sensore smetta di mandare letture.» |
+| Dispositivo a corrente mai collegato | «Non si è mai collegato. Controlla che abbia corrente, che sia collegato al Wi-Fi dell'appartamento e che le impostazioni del broker sul dispositivo siano giuste.» |
+| Sensore a batteria mai collegato | «Non si è mai fatto sentire. Controlla che abbia la batteria, che sia abbinato al suo ponte e che non sia troppo lontano dal ponte.» |
+| Dispositivo a corrente offline | «Prima funzionava, ora non risponde. Controlla che abbia corrente e che il Wi-Fi dell'appartamento funzioni.» |
+| Sensore offline, batteria buona o non nota | «Prima funzionava, ora non manda più letture. Controlla la batteria e che il ponte sia acceso e in linea.» |
+| Sensore offline, ultima batteria bassa | «L'ultima volta la batteria era al 12 %: probabilmente è scarica. Cambiala, poi controlla che il ponte sia acceso e in linea.» |
+| Nessun dispositivo risponde perché il sistema domotico è fermo | «Non è un problema di questo dispositivo: il sistema domotico non riceve notizie da nessun dispositivo.» |
+
+> **Da sapere**
+>
+> - **Sistema domotico che non risponde**: in alto, in rosso, «Il sistema domotico dell'appartamento non risponde: qui
+>   sotto c'è l'ultimo stato ricevuto.» Se non è mai arrivato uno stato: «Il sistema domotico dell'appartamento non
+>   risponde: lo stato dei dispositivi si vedrà quando torna raggiungibile.»
+> - **Collegamento ai dispositivi fermo**: «Il collegamento fra il sistema domotico e i dispositivi è fermo, quindi
+>   tutti risultano offline: finché non riparte, lo stato dei singoli dispositivi non dice niente.»
+> - **Senza dispositivi** leggi «Nessun dispositivo in questo appartamento.»
+> - **La batteria** arriva dai sensori Shelly BLU; con un sistema domotico non ancora aggiornato compare «non nota».
 
 ### Simulatore: finestre, movimento, connettività, approvazione
 
@@ -2112,7 +2155,8 @@ all'amministratore. Non serve un'approvazione preventiva.
    online».
 7. **Nel riepilogo del lunedì** un dispositivo ancora offline da più di 24 ore compare come «… è offline da più di
    24 ore.».
-8. **Se il problema continua**, l'amministratore prova «Verifica connessione» in Amministrazione e avvisa
+8. **L'Amministratore** trova in «Stato dei dispositivi» da quanto è offline e cosa controllare.
+9. **Se il problema continua**, l'amministratore prova «Verifica connessione» in Amministrazione e avvisa
    l'assistenza.
 
 **Se è l'intero sistema domotico a non rispondere:**
@@ -2653,7 +2697,7 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | Cosa vedi | Cosa significa | Cosa fare |
 |---|---|---|
 | «Il dispositivo non è raggiungibile; riprova quando torna online» | Il dispositivo è offline: il comando non parte | Aspetta che torni online |
-| «il dispositivo non ha risposto, controlla che sia acceso e collegato» | Il comando è partito ma il dispositivo non ha risposto. Succede se è stato staccato da poco (l'app lo segna «offline» entro circa 2 minuti), se è senza corrente o senza Wi-Fi | Controlla che sia attaccato e acceso; se non torna online, assistenza |
+| «il dispositivo non ha risposto; riprova, e se succede ancora controlla che sia acceso e collegato» | Il comando è partito ma il dispositivo non ha risposto in tempo. Può essere solo lento (per esempio uno Shelly che fa da ponte per i sensori), oppure staccato da poco (l'app lo segna «offline» entro circa 2 minuti), senza corrente o senza Wi-Fi. Le Decisioni dicono «Il dispositivo non ha risposto: riprova, e se succede ancora controlla che sia acceso e collegato» | Riprova; se succede ancora, controlla che sia attaccato e acceso; se non torna online, assistenza |
 | «Collegamento ai dispositivi non disponibile; riprova quando torna» | Il sistema non parla con i dispositivi | Aspetta «Collegamento ai dispositivi ripristinato» nelle Decisioni |
 | «Il setpoint deve essere tra … e …», «fuori dai limiti» | Temperatura fuori dai limiti | Scegli un valore nell'intervallo «da … a … °C» |
 | «rifiutato dal dispositivo» | Il dispositivo non ha accettato il comando | Riprova; controlla il dispositivo |
@@ -2816,6 +2860,14 @@ Per ogni problema annota:
 ## 14. Novità
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
+
+### Prossimo aggiornamento (non ancora pubblicato)
+
+- **Nuova pagina «Stato dei dispositivi»** per l'Amministratore: chi risponde, da quando, la batteria dei sensori e
+  cosa controllare.
+- **Comando a un dispositivo che non risponde**: al posto di «errore interno» compare «il dispositivo non ha risposto;
+  riprova, e se succede ancora controlla che sia acceso e collegato».
+- **Sotto i comandi** non compare più il codice tecnico in inglese del motivo.
 
 ### 13 novembre 2026
 

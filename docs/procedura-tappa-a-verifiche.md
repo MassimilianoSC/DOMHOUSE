@@ -64,7 +64,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 - **Atteso:** solo righe delle prime tre file della tabella, e la presa che non cambia stato.
 - **Da verificare:** i nomi dei topic di controllo vengono dalla documentazione Shelly Gen2+. Se Y ne conosce altri per la Plug M Gen3, o1 aggiunge un comando.
 
-## 4. Cambio della password della presa (rotate-device)
+## 4. Cambio della password della presa (rotate-device) — superata il 16 novembre
 
 **Perché:** la password di oggi è passata nella chat aziendale (risposta 1080). Quella nuova la scrive **la VM** nella presa con un comando MQTT (`MQTT.SetConfig`), mentre la presa è collegata. Nessuna persona la vede, nessuno la copia.
 
@@ -113,12 +113,12 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 - **Come passa la password:** la VM la legge dal segreto e la mette nel messaggio, che `mosquitto_pub` legge da stdin (`-s`), non dalla riga di comando. Il messaggio va alla presa attraverso il broker, poi in TLS. La risposta della presa non contiene la password.
 - **Atteso:** una riga `{"id":901,"src":"shellyplugmg3-9070695cb0d0","dst":"lab-01/shellyplugmg3-9070695cb0d0/connector","result":{"restart_required":true}}`, poi «uscita 0».
-- La presa tiene la password nuova, ma la usa solo dal prossimo riavvio. Fino ad allora resta collegata con quella vecchia.
-- **Subito dopo «uscita 0», senza aspettare, R3 e poi R4.** Se la presa si ricollegasse da sola (per esempio per il Wi-Fi), userebbe già la password nuova, che il broker conosce solo dopo R3.
+- La presa tiene la password nuova e resta collegata con il collegamento già aperto. **Al primo ricollegamento usa già la password nuova, senza riavvio** (visto il 16 novembre: dopo R3 si è ricollegata in 3 secondi ed è stata accettata).
+- **Subito dopo «uscita 0», senza aspettare, R3.** Se la presa si ricollegasse da sola prima di R3 (per esempio per il Wi-Fi), userebbe la password nuova, che il broker conosce solo dopo R3, e sarebbe rifiutata.
 - **«uscita 1» senza righe:** la presa non ha risposto in 10 secondi, probabilmente è scollegata. Non fare R3. Controlla con la verifica 1 se è collegata, poi ripeti R2.
 - Il comando tiene solo la risposta con `"id":901`: un'eventuale risposta a una chiamata del connector, se il motore fosse acceso, non conta.
 - **Una riga con `"error"`:** la presa ha rifiutato. Non fare R3; incolla il testo alla memoria storica.
-- **Da verificare la prima volta:** che la Plug M Gen3 accetti `MQTT.SetConfig` arrivato proprio via MQTT. La documentazione Shelly Gen2+ lo prevede, ma noi non l'abbiamo ancora provato.
+- **Provato il 16 novembre:** la Plug M Gen3 accetta `MQTT.SetConfig` arrivato via MQTT (risposta `restart_required: true`).
 
 ### R3. Il broker accetta la password nuova (scrive sulla VM)
 
@@ -129,10 +129,16 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```
 
 - **Atteso:** «lab-01: connector e 1 dispositivi», «changed», «utenti e permessi ricaricati».
-- La ricarica non fa cadere chi è collegato: la presa resta collegata.
-- **Subito dopo, R4.** Da adesso il broker conosce solo la password nuova: se la presa si ricollegasse prima del riavvio, con quella vecchia, sarebbe rifiutata.
+- **La ricarica fa cadere l'utente la cui password è cambiata** (visto il 16 novembre, alle 15:20:32 UTC):
+  1. nei log del broker, nello stesso secondo, «Reloading config.» e «Client lab-01.shellyplugmg3-9070695cb0d0 disconnected.»;
+  2. la presa si ricollega da sola dopo pochi secondi **con la password nuova** ed è accettata («New client connected … as lab-01.shellyplugmg3-9070695cb0d0»);
+  3. il connector, la cui password non cambia, resta collegato.
+- **Controllo:** nei log del broker, dopo la ricarica, la presa scollegata e poi ricollegata. Se invece compare «not authorised» con il nome della presa, la presa non ha la password nuova: fermati e incolla il testo alla memoria storica.
+- Poi R4, come controllo.
 
 ### R4. Riavvio della presa e controllo (scrive nella presa)
+
+Dopo il 16 novembre R4 è un **controllo**: la presa usa già la password nuova dal ricollegamento di R3. Il riavvio prova che anche dopo un'accensione la presa torna con la password nuova (il 16 novembre: ricollegata alle 15:21:19 UTC).
 
 **Y guarda la presa:** si spegne la luce per qualche secondo e torna.
 

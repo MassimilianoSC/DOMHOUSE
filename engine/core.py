@@ -1,4 +1,4 @@
-"""The engine of one apartment (contract 1.0.5): rules, modes, bookings, schedule, approvals, decisions, assistant,
+"""The engine of one apartment (contract 1.0.6): rules, modes, bookings, schedule, approvals, decisions, assistant,
 the commands' life and the event stream. Its state is in a store: SQLite on the VM (engine/store.py SqliteStore, opened
 by engine/service.py since P-60 step 3), in memory (MemoryStore) for the BFF's built-in engine and the tests.
 
@@ -26,7 +26,7 @@ from .mold import mold_action
 from .connector.simulated import SimulatedConnector
 from .store import MemoryStore
 
-CONTRACT_VERSION = "1.0.5"
+CONTRACT_VERSION = "1.0.6"
 COMMAND_DEADLINE_S = 9           # the connector's deadline, inside the contract's 10 s (connector-v2.md §2.2)
 # what a command asks the device: only the device's fields of the capability (connector-v2.md §2.4, D-108)
 TARGET_FIELDS = {"switch": ("on",), "climate": ("on", "mode", "setpoint", "fan"), "heating": ("on",)}
@@ -206,6 +206,13 @@ def parse_dt(value) -> datetime:
 
 def fmt_num(n) -> str:
     return f"{n:g}".replace(".", ",")
+
+
+def battery_level(value) -> int | None:
+    """DeviceInfo.battery_percent as the contract has it (1.0.6): an integer 0-100, None when not known."""
+    if value is None or isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:
+        return None
+    return int(min(max(round(value), 0), 100))
 
 
 class MockError(Exception):
@@ -711,8 +718,28 @@ class ApartmentEngine:
             for key, value in self._starting_values(d.device_id, cap, state).items():
                 state.setdefault(key, value)
             caps[cap] = state
-        return {"device_id": d.device_id, "label": d.label, "room_id": d.room_id, "online": d.online,
-                "last_seen": iso(d.last_seen) if d.last_seen else None, "capabilities": caps}
+        device = {"device_id": d.device_id, "label": d.label, "room_id": d.room_id, "online": d.online,
+                  "last_seen": iso(d.last_seen) if d.last_seen else None, "capabilities": caps}
+        battery = battery_level(d.battery_percent)
+        if battery is not None:
+            device["battery_percent"] = battery      # contract 1.0.6 (risposta 1143): only when the connector knows it
+        return device
+
+    def _refresh_batteries(self) -> None:
+        """Once a minute (housekeeping): the battery levels the connector has now (contract 1.0.6). A new level is in
+        GET /devices from here and in the next device.state / device.online of that device; no event of its own."""
+        for info in self.connector.devices():
+            device = self.devices.get(info.device_id)
+            if device is None:
+                continue
+            battery = battery_level(info.battery_percent)
+            if battery == device.get("battery_percent"):
+                continue
+            if battery is None:
+                device.pop("battery_percent", None)
+            else:
+                device["battery_percent"] = battery
+            self._save_device(device)
 
     def _starting_values(self, device_id: str, cap: str, state: dict) -> dict:
         """The engine's fields before anything is known (a catalog lists `switch: {}`); sensors' readings have none."""
@@ -1480,6 +1507,10 @@ class ApartmentEngine:
         return lock
 
     def emit(self, event: str, data: dict, correlation_id: str | None = None) -> dict:
+        if event in ("device.state", "device.online") and "battery_percent" not in data:
+            battery = self.devices.get(data.get("device_id"), {}).get("battery_percent")
+            if battery is not None:                  # contract 1.0.6: the device's level at that moment
+                data = {**data, "battery_percent": battery}
         env = {"event": event, "ts": iso(utcnow()), "apartment_id": self.apartment_id,
                "correlation_id": correlation_id, "data": copy.deepcopy(data)}
         t = time.time()
@@ -2246,7 +2277,8 @@ class ApartmentEngine:
             # timeout» (translate.error_result); connector-v2 §7.2 wants device_offline. Until it says so itself, the
             # engine translates; the connector's own reason and detail stay in the log line above
             if reason == "internal_error" and result.detail == "transport timeout":
-                reason, why = "device_offline", "Il dispositivo non ha risposto: controlla che sia acceso e collegato"
+                reason, why = "device_offline", ("Il dispositivo non ha risposto: riprova, e se succede ancora "
+                                                 "controlla che sia acceso e collegato")
             self._set_status(cmd, "failed", reason)
             self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state), why, "failed",
                      cmd["correlation_id"], command_id=cmd["command_id"])
@@ -3439,6 +3471,7 @@ class ApartmentEngine:
         retention clean-up."""
         if time.monotonic() - self.last_retention >= RETENTION_EVERY_S:
             self._purge_retention()
+        self._refresh_batteries()
         self._mold_check()
         stale = [k for k in self.deferred if self.schedule.get(k, {}).get("status") != "planned"]
         if stale:                                        # deferred actions cancelled or gone meanwhile (D-122)

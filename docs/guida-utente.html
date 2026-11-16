@@ -327,6 +327,7 @@
 <li><a href="#prenotazioni-ricevute-6f485002">Prenotazioni ricevute</a></li>
 <li><a href="#registro-dell-organizzazione-0698e175">Registro dell&#x27;organizzazione</a></li>
 <li><a href="#copiare-le-regole-su-altri-appartamenti-c3f16daf">Copiare le regole su altri appartamenti</a></li>
+<li><a href="#stato-dei-dispositivi-63cd6ec4">Stato dei dispositivi</a></li>
 <li><a href="#simulatore-finestre-movimento-connettivita-approvazione-a36cdab5">Simulatore: finestre, movimento, connettività, approvazione</a></li>
 <li><a href="#simulatore-evento-prenotazione-e-ripristino-65ced25d">Simulatore: evento prenotazione e ripristino</a></li>
 <li><a href="#l-avviso-di-assistenza-hqe-327ab47a">L&#x27;avviso di assistenza HQE</a></li>
@@ -392,6 +393,7 @@
 </li>
 <li><a href="#14-novita-710a48f5">14. Novità</a>
 <ol>
+<li><a href="#prossimo-aggiornamento-non-ancora-pubblicato-6d88fd35">Prossimo aggiornamento (non ancora pubblicato)</a></li>
 <li><a href="#13-novembre-2026-11e5f0c5">13 novembre 2026</a></li>
 <li><a href="#9-novembre-2026-lotti-35-e-36-fd660053">9 novembre 2026 (lotti 35 e 36)</a></li>
 <li><a href="#23-ottobre-2026-lotto-35-0ef8641e">23 ottobre 2026 (lotto 35)</a></li>
@@ -1196,7 +1198,7 @@ lo stato mostrato è quello richiesto»).</p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Motivo</th><th scope="col" class="align-left">Cosa vuol dire</th></tr></thead>
 <tbody>
-<tr><td data-label="Motivo" class="align-left">«il dispositivo non ha risposto, controlla che sia acceso e collegato»</td><td data-label="Cosa vuol dire" class="align-left">Il comando è partito ma il dispositivo non ha risposto: staccato da poco, senza corrente o senza Wi-Fi</td></tr>
+<tr><td data-label="Motivo" class="align-left">«il dispositivo non ha risposto; riprova, e se succede ancora controlla che sia acceso e collegato»</td><td data-label="Cosa vuol dire" class="align-left">Il comando è partito ma il dispositivo non ha risposto in tempo: lento, staccato da poco, senza corrente o senza Wi-Fi</td></tr>
 <tr><td data-label="Motivo" class="align-left">«rifiutato dal dispositivo»</td><td data-label="Cosa vuol dire" class="align-left">Il dispositivo non ha accettato il comando</td></tr>
 <tr><td data-label="Motivo" class="align-left">«bloccato da una regola»</td><td data-label="Cosa vuol dire" class="align-left">Una regola (per esempio finestra aperta o pausa del compressore) ha bloccato il comando</td></tr>
 <tr><td data-label="Motivo" class="align-left">«bloccato da un&#x27;azione prioritaria»</td><td data-label="Cosa vuol dire" class="align-left">Un&#x27;azione più importante ha bloccato il comando</td></tr>
@@ -2250,7 +2252,7 @@ presenti richiede la tua approvazione.», oppure «C&#x27;è già un&#x27;approv
 </section>
 <section aria-labelledby="6-amministratore-che-cosa-puoi-fare-in-piu-41468aea">
 <h2 id="6-amministratore-che-cosa-puoi-fare-in-piu-41468aea">6. <span class="role-label">Amministratore</span>: che cosa puoi fare in più</h2>
-<p class="lead"><strong>La pagina «Amministrazione», la copia delle regole e il Simulatore.</strong></p>
+<p class="lead"><strong>La pagina «Amministrazione», la copia delle regole, lo stato dei dispositivi e il Simulatore.</strong></p>
 <p>L&#x27;amministratore fa tutto quello delle parti 4 e 5 su tutti gli appartamenti dell&#x27;organizzazione e in più ha:</p>
 <ul>
 <li>
@@ -2258,6 +2260,9 @@ presenti richiede la tua approvazione.», oppure «C&#x27;è già un&#x27;approv
 </li>
 <li>
 <p><strong>La copia delle regole</strong> su altri appartamenti.</p>
+</li>
+<li>
+<p><strong>Lo stato dei dispositivi</strong>: chi risponde, la batteria dei sensori e cosa controllare.</p>
 </li>
 <li>
 <p><strong>Il Simulatore</strong> sugli appartamenti dimostrativi.</p>
@@ -2810,6 +2815,69 @@ l&#x27;anteprima».</p>
 </li>
 <li>
 <p><strong>Ogni appartamento toccato</strong> ha una riga nelle sue Decisioni e nel «Registro dell&#x27;organizzazione».</p>
+</li>
+</ul>
+</blockquote>
+<h3 id="stato-dei-dispositivi-63cd6ec4">Stato dei dispositivi</h3>
+<p class="lead"><strong>Quali dispositivi rispondono, da quando, e cosa controllare se uno non risponde.</strong></p>
+<ul>
+<li>
+<p><strong>Dove</strong>: menu dell&#x27;appartamento, «Stato dei dispositivi», fra «Assistente» e «Simulatore» (sul telefono nel menu a
+scomparsa).</p>
+</li>
+<li>
+<p><strong>Chi la vede</strong>: solo l&#x27;Amministratore, e solo se l&#x27;appartamento ha la funzione dei dispositivi. Operatore e Sola
+lettura non hanno la voce.</p>
+</li>
+<li>
+<p><strong>In alto</strong> il riepilogo: «In linea: 6 · Offline: 1 · Mai collegati: 0», più «· Batterie da cambiare: 2» se ce ne
+sono.</p>
+</li>
+<li>
+<p><strong>Sul computer</strong> una tabella; <strong>sul telefono</strong> una scheda per dispositivo.</p>
+</li>
+<li>
+<p><strong>L&#x27;ordine</strong>: prima i mai collegati, poi gli offline, poi quelli con la batteria da cambiare, poi gli altri.</p>
+</li>
+</ul>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Colonna</th><th scope="col" class="align-left">Cosa vedi</th></tr></thead>
+<tbody>
+<tr><td data-label="Colonna" class="align-left">«Dispositivo», «Stanza»</td><td data-label="Cosa vedi" class="align-left">Il nome e la stanza («Senza stanza» se la stanza non c&#x27;è più)</td></tr>
+<tr><td data-label="Colonna" class="align-left">«Stato»</td><td data-label="Cosa vedi" class="align-left">«In linea» (verde); «Offline da …» (rosso: «meno di un minuto», «5 minuti», «3 ore», «4 giorni»…, si aggiorna da solo); «Mai collegato» (giallo: non si è mai fatto sentire)</td></tr>
+<tr><td data-label="Colonna" class="align-left">«Ultima volta visto»</td><td data-label="Cosa vedi" class="align-left">Data e ora, per esempio «lun 16 nov, 11:59»; «Mai» se non si è mai fatto sentire</td></tr>
+<tr><td data-label="Colonna" class="align-left">«Batteria»</td><td data-label="Cosa vedi" class="align-left">«78 %»; in giallo «15 %, da cambiare presto» (dal 20 % in giù); «non nota» se il livello non è ancora arrivato; «—» per i dispositivi a corrente</td></tr>
+<tr><td data-label="Colonna" class="align-left">«Cosa fare»</td><td data-label="Cosa vedi" class="align-left">Il consiglio, tabella sotto</td></tr>
+</tbody></table></div>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Caso</th><th scope="col" class="align-left">«Cosa fare»</th></tr></thead>
+<tbody>
+<tr><td data-label="Caso" class="align-left">In linea, batteria a posto</td><td data-label="«Cosa fare»" class="align-left">«Niente da fare»</td></tr>
+<tr><td data-label="Caso" class="align-left">Sensore in linea, batteria bassa</td><td data-label="«Cosa fare»" class="align-left">«Batteria quasi scarica: cambiala presto, prima che il sensore smetta di mandare letture.»</td></tr>
+<tr><td data-label="Caso" class="align-left">Dispositivo a corrente mai collegato</td><td data-label="«Cosa fare»" class="align-left">«Non si è mai collegato. Controlla che abbia corrente, che sia collegato al Wi-Fi dell&#x27;appartamento e che le impostazioni del broker sul dispositivo siano giuste.»</td></tr>
+<tr><td data-label="Caso" class="align-left">Sensore a batteria mai collegato</td><td data-label="«Cosa fare»" class="align-left">«Non si è mai fatto sentire. Controlla che abbia la batteria, che sia abbinato al suo ponte e che non sia troppo lontano dal ponte.»</td></tr>
+<tr><td data-label="Caso" class="align-left">Dispositivo a corrente offline</td><td data-label="«Cosa fare»" class="align-left">«Prima funzionava, ora non risponde. Controlla che abbia corrente e che il Wi-Fi dell&#x27;appartamento funzioni.»</td></tr>
+<tr><td data-label="Caso" class="align-left">Sensore offline, batteria buona o non nota</td><td data-label="«Cosa fare»" class="align-left">«Prima funzionava, ora non manda più letture. Controlla la batteria e che il ponte sia acceso e in linea.»</td></tr>
+<tr><td data-label="Caso" class="align-left">Sensore offline, ultima batteria bassa</td><td data-label="«Cosa fare»" class="align-left">«L&#x27;ultima volta la batteria era al 12 %: probabilmente è scarica. Cambiala, poi controlla che il ponte sia acceso e in linea.»</td></tr>
+<tr><td data-label="Caso" class="align-left">Nessun dispositivo risponde perché il sistema domotico è fermo</td><td data-label="«Cosa fare»" class="align-left">«Non è un problema di questo dispositivo: il sistema domotico non riceve notizie da nessun dispositivo.»</td></tr>
+</tbody></table></div>
+<blockquote class="note-info">
+<p><strong>Da sapere</strong></p>
+<ul>
+<li>
+<p><strong>Sistema domotico che non risponde</strong>: in alto, in rosso, «Il sistema domotico dell&#x27;appartamento non risponde: qui
+sotto c&#x27;è l&#x27;ultimo stato ricevuto.» Se non è mai arrivato uno stato: «Il sistema domotico dell&#x27;appartamento non
+risponde: lo stato dei dispositivi si vedrà quando torna raggiungibile.»</p>
+</li>
+<li>
+<p><strong>Collegamento ai dispositivi fermo</strong>: «Il collegamento fra il sistema domotico e i dispositivi è fermo, quindi
+tutti risultano offline: finché non riparte, lo stato dei singoli dispositivi non dice niente.»</p>
+</li>
+<li>
+<p><strong>Senza dispositivi</strong> leggi «Nessun dispositivo in questo appartamento.»</p>
+</li>
+<li>
+<p><strong>La batteria</strong> arriva dai sensori Shelly BLU; con un sistema domotico non ancora aggiornato compare «non nota».</p>
 </li>
 </ul>
 </blockquote>
@@ -3553,6 +3621,9 @@ online».</p>
 <li>
 <p><strong>Nel riepilogo del lunedì</strong> un dispositivo ancora offline da più di 24 ore compare come «… è offline da più di
 24 ore.».</p>
+</li>
+<li>
+<p><strong>L&#x27;Amministratore</strong> trova in «Stato dei dispositivi» da quanto è offline e cosa controllare.</p>
 </li>
 <li>
 <p><strong>Se il problema continua</strong>, l&#x27;amministratore prova «Verifica connessione» in Amministrazione e avvisa
@@ -4412,7 +4483,7 @@ dell&#x27;email di chi comanda.</p>
 <thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa significa</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
 <tbody>
 <tr><td data-label="Cosa vedi" class="align-left">«Il dispositivo non è raggiungibile; riprova quando torna online»</td><td data-label="Cosa significa" class="align-left">Il dispositivo è offline: il comando non parte</td><td data-label="Cosa fare" class="align-left">Aspetta che torni online</td></tr>
-<tr><td data-label="Cosa vedi" class="align-left">«il dispositivo non ha risposto, controlla che sia acceso e collegato»</td><td data-label="Cosa significa" class="align-left">Il comando è partito ma il dispositivo non ha risposto. Succede se è stato staccato da poco (l&#x27;app lo segna «offline» entro circa 2 minuti), se è senza corrente o senza Wi-Fi</td><td data-label="Cosa fare" class="align-left">Controlla che sia attaccato e acceso; se non torna online, assistenza</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">«il dispositivo non ha risposto; riprova, e se succede ancora controlla che sia acceso e collegato»</td><td data-label="Cosa significa" class="align-left">Il comando è partito ma il dispositivo non ha risposto in tempo. Può essere solo lento (per esempio uno Shelly che fa da ponte per i sensori), oppure staccato da poco (l&#x27;app lo segna «offline» entro circa 2 minuti), senza corrente o senza Wi-Fi. Le Decisioni dicono «Il dispositivo non ha risposto: riprova, e se succede ancora controlla che sia acceso e collegato»</td><td data-label="Cosa fare" class="align-left">Riprova; se succede ancora, controlla che sia attaccato e acceso; se non torna online, assistenza</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Collegamento ai dispositivi non disponibile; riprova quando torna»</td><td data-label="Cosa significa" class="align-left">Il sistema non parla con i dispositivi</td><td data-label="Cosa fare" class="align-left">Aspetta «Collegamento ai dispositivi ripristinato» nelle Decisioni</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«Il setpoint deve essere tra … e …», «fuori dai limiti»</td><td data-label="Cosa significa" class="align-left">Temperatura fuori dai limiti</td><td data-label="Cosa fare" class="align-left">Scegli un valore nell&#x27;intervallo «da … a … °C»</td></tr>
 <tr><td data-label="Cosa vedi" class="align-left">«rifiutato dal dispositivo»</td><td data-label="Cosa significa" class="align-left">Il dispositivo non ha accettato il comando</td><td data-label="Cosa fare" class="align-left">Riprova; controlla il dispositivo</td></tr>
@@ -4584,6 +4655,20 @@ dell&#x27;email di chi comanda.</p>
 <section aria-labelledby="14-novita-710a48f5">
 <h2 id="14-novita-710a48f5">14. Novità</h2>
 <p class="lead"><strong>Che cosa è cambiato, aggiornamento per aggiornamento.</strong></p>
+<h3 id="prossimo-aggiornamento-non-ancora-pubblicato-6d88fd35">Prossimo aggiornamento (non ancora pubblicato)</h3>
+<ul>
+<li>
+<p><strong>Nuova pagina «Stato dei dispositivi»</strong> per l&#x27;Amministratore: chi risponde, da quando, la batteria dei sensori e
+cosa controllare.</p>
+</li>
+<li>
+<p><strong>Comando a un dispositivo che non risponde</strong>: al posto di «errore interno» compare «il dispositivo non ha risposto;
+riprova, e se succede ancora controlla che sia acceso e collegato».</p>
+</li>
+<li>
+<p><strong>Sotto i comandi</strong> non compare più il codice tecnico in inglese del motivo.</p>
+</li>
+</ul>
 <h3 id="13-novembre-2026-11e5f0c5">13 novembre 2026</h3>
 <p class="lead"><strong>Temperature:</strong></p>
 <ul>
