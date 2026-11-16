@@ -1973,6 +1973,204 @@ def test_blu_clock_candidate_is_forgotten_when_the_bridge_goes_offline():
     run_blu(scenario, sensors=(DEV_HT,))
 
 
+def test_blu_bridge_ahead_a_dead_ht_stays_offline_while_the_candidate_waits(warnings):
+    """The bridge steadily 400 s AHEAD of ours, its offset confirmed 5 minutes after the connection. The H&T stops
+    sending at 300 s and goes offline at its threshold (620 s). The bridge drops and comes back: the offset is
+    forgotten, GetStatus gives +400 s again, a candidate. The map is read: the H&T's last packet, written 700 s on
+    the bridge's clock, read without an offset would look 80 s in the future, alive. While the candidate waits the
+    larger of the candidate and the adopted offset (none: 0) dates it: 300 s on our clock, 320 s old, offline, and
+    nothing comes out."""
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=400)
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        w.shift = timedelta(seconds=300)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0})            # confirms the +400 s; the H&T's last packet
+        await w.wait_for(lambda xs: len(clock_warnings(warnings)) == 1)
+        assert abs(bridge_offset(w) - 400) <= 1 and w.info(DEV_HT).online
+        w.shift = timedelta(seconds=620)
+        await w.wait_for(lambda xs: w.blu()[-1] == (DEV_HT, "online", False, None))
+        w.transport.set_online(SID_BRIDGE, False)
+        await w.wait_for(lambda xs: not w.info(DEV_BRIDGE).online)
+        start, reads = len(w.changes), len(w.get_components_offsets())
+        w.transport.set_online(SID_BRIDGE, True)            # GetStatus: +400 s, a candidate; then the map
+        await w.wait_for(lambda xs: len(w.get_components_offsets()) > reads)
+        await w.settle(0.2)
+        bridge = w.conn._devices[DEV_BRIDGE]
+        assert bridge.clock_offset_s is None and abs(bridge.clock_candidate_s - 400) <= 1
+        assert w.blu(start) == [] and not w.info(DEV_HT).online, w.blu(start)
+        assert len(clock_warnings(warnings)) == 1           # the candidate is not adopted: no warning
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_clock_offset_off_already_adopted_is_renewed_without_a_candidate(warnings, monkeypatch):
+    """The bridge 400 s behind, its offset confirmed 5 minutes after the connection. Two more packets, 60 s and 400 s
+    after the confirmation, give the same offset: it is renewed, no new candidate (one "bridge clock offset to be
+    confirmed" in all, the connection's) and no GetStatus read again for it."""
+    infos = clock_infos(monkeypatch)
+
+    async def scenario(w):
+        w.bridge.clock_skew = timedelta(seconds=-400)
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        w.shift = timedelta(seconds=300)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0})             # confirmed
+        await w.wait_for(lambda xs: bridge_offset(w) is not None)
+        await w.settle(0.1)
+        calls = get_status_calls(w)
+        for n, at_s in enumerate((360, 700), start=2):
+            w.shift = timedelta(seconds=at_s)
+            w.bridge.blu_packet(ADDR_HT, {69: 20.0 + n})
+            await w.wait_for(lambda xs: (DEV_HT, "state", "temperature", {"celsius": 20.0 + n}) in w.blu())
+            await w.settle(0.15)
+        assert len(infos) == 1 and get_status_calls(w) == calls
+        assert abs(bridge_offset(w) + 400) <= 1 and w.conn._devices[DEV_BRIDGE].clock_candidate_s is None
+        assert len(clock_warnings(warnings)) == 1
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def whole_second(w, ahead_s=1):
+    """Our clock to the whole second, a little ahead: offsets computed from it are exact."""
+    return datetime.fromtimestamp(int((datetime.now(UTC) + w.shift).timestamp()) + ahead_s, UTC)
+
+
+def bthome_time(w, offset_s, received):
+    """A bthomedevice NotifyStatus of the stranger (on the bridge, not in the catalog: it touches no sensor),
+    received at `received` with the bridge's ts offset_s from it: one source of the bridge's time, exact. Its
+    reception time is given, not our clock: the silence checks, on our clock, never find a candidate due for the
+    read of GetStatus."""
+    key = w.bridge.blu_keys(ADDR_STRANGER)[0]
+    return Notification("NotifyStatus", SID_BRIDGE, {"ts": received.timestamp() + offset_s, key: {"rssi": -61}},
+                        received)
+
+
+@pytest.mark.parametrize("apart_s, confirmed", [(4.5, True), (5.5, False)])
+def test_blu_clock_confirmation_within_the_tolerance_only(warnings, apart_s, confirmed):
+    """A candidate (-400 s) and, 300 s later, a source apart_s from it: 4.5 s, within CLOCK_CONFIRM_TOLERANCE_S,
+    confirms it; 5.5 s replaces it (a new candidate, the wait from there, nothing adopted)."""
+    assert connector_module.CLOCK_CONFIRM_TOLERANCE_S == 5
+
+    async def scenario(w):
+        w.pair(ADDR_STRANGER)
+        await w.connect_bridge()
+        before = bridge_offset(w)
+        first = whole_second(w)
+        later = first + timedelta(seconds=300)
+        w.transport.inject(bthome_time(w, -400, first))
+        w.transport.inject(bthome_time(w, -400 - apart_s, later))
+        await w.settle(0.2)
+        bridge = w.conn._devices[DEV_BRIDGE]
+        if confirmed:
+            assert bridge.clock_offset_s == pytest.approx(-404.5) and bridge.clock_candidate_s is None
+            assert len(clock_warnings(warnings)) == 1
+        else:
+            assert bridge.clock_offset_s == before
+            assert bridge.clock_candidate_s == pytest.approx(-405.5) and bridge.clock_candidate_at == later
+            assert clock_warnings(warnings) == []
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+@pytest.mark.parametrize("offset_s, adopted", [(-300.0, True), (-300.1, False), (300.0, True), (300.1, False)])
+def test_blu_clock_offset_of_300_s_is_adopted_and_beyond_is_a_candidate(warnings, offset_s, adopted):
+    """MAX_CLOCK_SKEW_S included: 300 s exactly (behind or ahead) is adopted at once; 300.1 s is a candidate."""
+    async def scenario(w):
+        w.pair(ADDR_STRANGER)
+        await w.connect_bridge()
+        before = bridge_offset(w)
+        w.transport.inject(bthome_time(w, offset_s, whole_second(w)))
+        await w.settle(0.2)
+        bridge = w.conn._devices[DEV_BRIDGE]
+        if adopted:
+            assert bridge.clock_offset_s == offset_s and bridge.clock_candidate_s is None
+        else:
+            assert bridge.clock_offset_s == before and bridge.clock_candidate_s == pytest.approx(offset_s)
+        assert clock_warnings(warnings) == []
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_clock_confirmation_at_299_s_is_too_early_at_300_s_confirms(warnings):
+    """The same -400 s 299 s after the candidate does not confirm it (the wait still counts from the first); 300 s
+    after it, it does."""
+    async def scenario(w):
+        w.pair(ADDR_STRANGER)
+        await w.connect_bridge()
+        first = whole_second(w)
+        w.transport.inject(bthome_time(w, -400, first))
+        w.transport.inject(bthome_time(w, -400, first + timedelta(seconds=299)))
+        await w.settle(0.2)
+        bridge = w.conn._devices[DEV_BRIDGE]
+        assert bridge.clock_candidate_s == -400 and bridge.clock_candidate_at == first
+        assert clock_warnings(warnings) == []
+        w.transport.inject(bthome_time(w, -400, first + timedelta(seconds=300)))
+        await w.settle(0.2)
+        assert bridge.clock_offset_s == -400 and bridge.clock_candidate_s is None
+        assert len(clock_warnings(warnings)) == 1
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_clock_slow_bridge_get_status_confirms_with_the_time_at_the_middle_of_the_call(warnings):
+    """A slow bridge: its GetStatus answer arrives 6 s (our clock) after it read its own time. The candidate (-400 s)
+    comes from a BLU packet; the GetStatus read again 5 minutes later, with the same clock, must confirm it. Taken
+    after the answer, its offset would be 6 s (plus the whole seconds of sys.unixtime) off the candidate, beyond the
+    5 s: the wait would start again. Taken at the middle of the call, 3 s: confirmed."""
+    async def scenario(w):
+        w.pair(ADDR_HT)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        real_call = w.transport.call
+
+        async def slow_call(shelly_id, method, params, timeout_s):
+            result = await real_call(shelly_id, method, params, timeout_s)    # the bridge's clock is read here
+            if method == "Shelly.GetStatus":
+                w.shift += timedelta(seconds=6)                              # ... its answer arrives 6 s later
+            return result
+        w.transport.call = slow_call
+        w.bridge.clock_skew = timedelta(seconds=-400)
+        w.shift = timedelta(seconds=10)
+        w.bridge.blu_packet(ADDR_HT, {69: 21.0})              # the candidate, -400 s
+        await w.settle(0.1)
+        assert w.conn._devices[DEV_BRIDGE].clock_candidate_s == pytest.approx(-400, abs=0.1)
+        w.shift = timedelta(seconds=310)                      # the silence check reads GetStatus again
+        await w.wait_for(lambda xs: get_status_calls(w) >= 2)
+        await w.settle(0.2)
+        assert bridge_offset(w) == pytest.approx(-403.5, abs=0.6), bridge_offset(w)
+        assert len(clock_warnings(warnings)) == 1
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_known_limit_a_wrong_clock_lasting_beyond_clock_confirm_s_brings_a_dead_ht_back(warnings):
+    """KNOWN LIMIT (DESIGN.md §3.5), asserted as it is today, not as it should be: whoever changes the rule sees what
+    this touches. The bridge restarts without a reconnection, its clock 1750 s behind, and STAYS wrong longer than
+    clock_confirm_s: a packet of the stranger gives the candidate, another 300 s later confirms it, the offset is
+    adopted. Then the map is read (a pairing): the H&T, silent since 2040 s, comes back online with its old reading,
+    its last packet dated 290 s ago by the wrong offset."""
+    async def scenario(w):
+        w.pair(ADDR_HT, ADDR_STRANGER)
+        w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
+        await w.connect_bridge()
+        w.shift = timedelta(seconds=1740)
+        await w.wait_for(lambda xs: w.blu()[-1] == (DEV_HT, "online", False, None))
+        start = len(w.changes)
+        w.bridge.clock_skew = timedelta(seconds=-1750)       # restarted, its clock not yet synchronised
+        w.bridge.reboot()
+        w.bridge.blu_packet(ADDR_STRANGER, {69: 19.0, 46: 50}, battery=80)   # the candidate
+        await w.settle(0.2)
+        w.shift = timedelta(seconds=2040)
+        w.bridge.blu_packet(ADDR_STRANGER, {69: 19.5})       # 300 s later, still wrong: confirmed
+        await w.wait_for(lambda xs: bridge_offset(w) is not None and bridge_offset(w) < -1700)
+        reads = len(w.get_components_offsets())
+        w.pair(ADDR_MOTION)                                  # component_added: the map is read again
+        await w.wait_for(lambda xs: len(w.get_components_offsets()) > reads)
+        await w.settle(0.2)
+        assert w.info(DEV_HT).online                         # the limit: a dead H&T believed alive
+        assert w.blu(start)[:2] == [(DEV_HT, "online", True, None),
+                                    (DEV_HT, "state", "temperature", {"celsius": 20.0})]
+        assert len(clock_warnings(warnings)) == 1
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
 # --- a pairing while the bridge is online: the old map is not used --------------------------------------------------
 
 def test_blu_map_is_dropped_at_a_pairing_with_the_bridge_online():
@@ -2034,6 +2232,7 @@ def test_blu_restart_with_reconnection_and_its_clock_behind_keeps_a_dead_ht_offl
         w.transport.set_online(SID_BRIDGE, True)            # GetStatus (sys.unixtime), then the map
         w.bridge.reboot()                                   # NotifyFullStatus
         await w.wait_for(lambda xs: len(w.get_components_offsets()) > reads)
+        w.bridge.blu_device_report(ADDR_HT)                 # a second source, same wrong clock, no new packet
         await w.settle(0.2)
         assert w.blu(start) == [] and not w.info(DEV_HT).online, (w.blu(start), bridge_offset(w))
     run_blu(scenario, sensors=(DEV_HT,))
