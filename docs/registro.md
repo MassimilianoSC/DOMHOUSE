@@ -407,6 +407,17 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
      - (1) **cinque domande aggiunte al messaggio per Youssouf**, §6 domande 8–12: pagina locale e password del broker leggibile; il ponte inoltra solo i suoi sensori?; impianti provati; versione precisa del firmware; Wi-Fi cambiato a distanza e `rssi`;
      - (2) domanda a o1 sull'impronta delle password, da mandare appena si sa quale sessione è o1;
      - (3) **per l'unico aggiornamento dopo le prove:** correggere il documento 3 §7 (il secondo appartamento, non il primo); aggiungere al piano in pacchetti il collaudo guidato e obbligatorio, l'elenco degli impianti ammessi, la forza del segnale, «Revoca» e il cambio del Wi-Fi a distanza; alzare la sicurezza in appartamento a condizione del primo appartamento.
+   - **o1 sulle «password non conservate» (10:12, solo lettura; dettaglio in `stime/messa-in-servizio-o1.md` §11): si può fare, ed è meglio di D-230.**
+     - Mosquitto legge solo impronte PBKDF2: oggi `broker_accounts.py` legge la password in chiaro solo per calcolarne l'impronta, e lo può fare il server.
+     - **Opzione 1:** il server genera la password, la mostra una volta e conserva solo l'impronta (Firestore); `aggiorna_broker` porta l'impronta all'agente, che la scrive nel file dei dispositivi.
+     - **Opzione 2:** la password la genera l'agente sulla VM e la manda nello Shelly; al server arriva solo l'impronta, e il chiaro non lascia mai la VM.
+     - **Vantaggi:** niente segreto per dispositivo (circa −4 $ al mese ogni 10 appartamenti); niente versioni da distruggere né corse di «Rigenera»; nessun permesso nuovo alla VM.
+     - **Rischi:** un server compromesso che scrive un'impronta falsa equivale a D-230; le impronte si leggono, ma con password casuali di 192 bit non si invertono (le password le genera sempre il sistema).
+     - **Restano segreti** la chiave del motore e il conto del connector.
+     - **Progetto:** da riscrivere §2.2, §2.3/§4.1, §3 (`aggiorna_broker`), §8.1 e §8.2. Le credenziali passano da 14–20 a circa 9–13 h.
+     - **Prova 1125:** serve ancora, solo per creare chiave del motore e conto del connector, una volta per appartamento.
+     - La tappa A di oggi su lab-01 non cambia.
+     - **Cambia D-230: domanda al committente (1133).**
 
 - **Autonomia: cosa blocca e cosa no (domanda del committente, 12:38).**
   - **Leonardo:** nessuna riga del documento 2 lo riguarda. Italianway serve al primo appartamento, non all'Autonomia.
