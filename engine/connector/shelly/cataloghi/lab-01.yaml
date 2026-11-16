@@ -1,0 +1,49 @@
+# Catalogo di lab-01: il banco di Youssouf (laboratorio, 16 novembre 2026).
+# Formato di engine/connector/shelly/catalog.py. Nessun segreto in questo file.
+#
+# Apparecchi fisici e loro utente sul broker (lab-01.<id nativo>):
+#   shellyplugmg3-9070695cb0d0    Shelly Plug M Gen3   ospita dev-presa-lab
+#   shelly1g4-98a3166d8d80        Shelly 1 Gen4        ospita dev-caldaia-lab; ponte dei tre sensori BLU
+#   shellyemminig4-acebe6e42d6c   Shelly EM Mini Gen4  ospita dev-misura-lab
+# I sensori BLU non hanno un utente sul broker: passano dal ponte.
+#
+# Cosa è attaccato al banco:
+#   Plug                  solo lo schermo del PC (non il computer)
+#   EM Mini -> Shelly 1   in serie; a valle una ciabatta con la sola spia, senza carico: si può spegnere liberamente
+#
+# Firmware al 16 novembre 2026: Plug 1.8.99, Shelly 1 Gen4 2.2.0, EM Mini 1.7.0.
+# Password della pagina locale attiva su Plug e Shelly 1 (utente admin); non sta in questo file né nel repository.
+rooms:
+  - {room_id: laboratorio, name: Laboratorio}
+devices:
+  - device_id: dev-presa-lab
+    label: Presa
+    room_id: laboratorio
+    capabilities: {switch: {}, power_meter: {}}
+    shelly: {id: shellyplugmg3-9070695cb0d0, type: plug}
+  - device_id: dev-caldaia-lab
+    label: Caldaia
+    room_id: laboratorio
+    capabilities: {heating: {setpoint_min: 7, setpoint_max: 23}}
+    links: {sensor_device_id: dev-ambiente-lab}
+    shelly: {id: shelly1g4-98a3166d8d80, type: relay}
+  - device_id: dev-misura-lab
+    label: Misuratore
+    room_id: laboratorio
+    capabilities: {power_meter: {}}
+    shelly: {id: shellyemminig4-acebe6e42d6c, type: energy_meter}
+  - device_id: dev-ambiente-lab
+    label: Sensore ambiente
+    room_id: laboratorio
+    capabilities: {temperature: {}, humidity: {}}
+    shelly: {addr: "74:0b:12:92:9f:aa", bridge: shelly1g4-98a3166d8d80, type: blu_ht}
+  - device_id: dev-movimento-lab
+    label: Movimento
+    room_id: laboratorio
+    capabilities: {motion: {}}
+    shelly: {addr: "98:2a:c3:7c:25:37", bridge: shelly1g4-98a3166d8d80, type: blu_motion}
+  - device_id: dev-finestra-lab
+    label: Finestra
+    room_id: laboratorio
+    capabilities: {contact: {}}
+    shelly: {addr: "74:0b:12:8f:13:54", bridge: shelly1g4-98a3166d8d80, type: blu_door_window}
