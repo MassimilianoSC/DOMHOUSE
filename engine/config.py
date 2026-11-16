@@ -33,6 +33,8 @@ SETTINGS: dict[str, tuple[float, float, float]] = {
     # D-131: an infrared split's switch-on is confirmed when its linked meter's watts rise by at least this much over
     # what they were before the command, its switch-off when they drop under the second; within 10 s
     "CONFIRM_ON_WATTS": (20.0, 1.0, 5000.0),
+    # A8 (16 November 2026): CONFIRM_OFF_WATTS is only the first value of the rule setpoint_limits' off_watts, that the
+    # app changes (5-100 W); the engine reads the threshold from the rule (core.ApartmentEngine.off_watts)
     "CONFIRM_OFF_WATTS": (15.0, 1.0, 5000.0),
     # P-90 S1 (answer 1101 = a): a split with no command running is believed switched off by its remote only after
     # its meter stays under CONFIRM_OFF_WATTS for these minutes (a split at its temperature may stop for a while, S9)

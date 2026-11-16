@@ -108,7 +108,7 @@ def applied(e, cmd):
 def test_the_first_values_two_ranges():
     rule = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False).rule("setpoint_limits")
     assert rule["params"] == {"min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18,
-                              "comfort_cool_celsius": 25, "summer_min": 18, "summer_max": 28}
+                              "comfort_cool_celsius": 25, "summer_min": 18, "summer_max": 28, "off_watts": 15}   # A8
     assert rule["limits"]["summer_min"] == {"min": 16, "max": 28} and rule["limits"]["summer_max"] == {"min": 22, "max": 30}
 
 

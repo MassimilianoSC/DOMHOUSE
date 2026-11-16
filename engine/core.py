@@ -79,6 +79,9 @@ QUEUE_FULL = object()       # D-198: in a reader's queue, it stopped reading: en
 
 NAMES = {"apt-rimini-01": "Via Roma 12 – int. 3", "apt-bologna-01": "Corso Italia 5 – int. 7"}
 
+OFF_WATTS_LIMITS = (5, 100)   # A8: the app's range for setpoint_limits.off_watts (W)
+OFF_WATTS_ABOVE_ON = 5        # A8: a split is seen on (absolute) at off_watts + this, if above CONFIRM_ON_WATTS
+
 DEFAULT_RULES = [
     {"rule_id": "window_open_off", "label": "Finestra aperta spegne il clima", "enabled": True, "editable": True,
      "params": {"minutes": 5}, "limits": {"minutes": {"min": 1, "max": 30}}},
@@ -90,11 +93,14 @@ DEFAULT_RULES = [
      # summer_min/summer_max the SUMMER one (a climate cooling or dehumidifying: the cooling inside it); no tie between
      # them but comfort < cooling (D-162). A rule saved before gets the summer one with its first values (_rule_defaults);
      # first values 16–24 and 18–28 (answer 1099)
+     # A8 (16 November 2026): off_watts, the watts under which an infrared split confirmed by its meter is off; valid
+     # also with the rule off (a measure of the split, not a limit); first value CONFIRM_OFF_WATTS (_off_watts_from_settings)
      "params": {"min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18, "comfort_cool_celsius": 25,
-                "summer_min": 18, "summer_max": 28},
+                "summer_min": 18, "summer_max": 28, "off_watts": 15},
      "limits": {"min": {"min": 7, "max": 20}, "max": {"min": 20, "max": 28}, "comfort_celsius": {"min": 16, "max": 26},
                 "eco_celsius": {"min": 10, "max": 22}, "comfort_cool_celsius": {"min": 22, "max": 28},
-                "summer_min": {"min": 16, "max": 28}, "summer_max": {"min": 22, "max": 30}}},
+                "summer_min": {"min": 16, "max": 28}, "summer_max": {"min": 22, "max": 30},
+                "off_watts": {"min": OFF_WATTS_LIMITS[0], "max": OFF_WATTS_LIMITS[1]}}},
     {"rule_id": "frost_protection", "label": "Antigelo a casa vuota", "enabled": True, "editable": True,
      "params": {"celsius": 8}, "limits": {"celsius": {"min": 5, "max": 12}}},
     {"rule_id": "mold_protection", "label": "Antimuffa a casa vuota", "enabled": True, "editable": True,
@@ -328,11 +334,13 @@ class ApartmentEngine:
         self.timezone = str(self.settings["TIMEZONE"])  # D-177: TIMEZONE, declared in /apartment.timezone
         if confirm_watts:
             self.settings["CONFIRM_ON_WATTS"], self.settings["CONFIRM_OFF_WATTS"] = confirm_watts
-        self.power_waiters: dict[str, list[tuple[str, float, asyncio.Future]]] = {}   # meter -> commands watching it
+        # meter -> commands watching it: (direction, watts before, future, the split's off_watts)
+        self.power_waiters: dict[str, list[tuple[str, float, asyncio.Future, float]]] = {}
         self.rooms = [{"room_id": r.room_id, "name": r.name} for r in self.connector.rooms()]
         self.rules = copy.deepcopy(DEFAULT_RULES)
         self._compressor_from_settings()
         self._presence_from_settings(fresh=True)
+        self._off_watts_from_settings(fresh=True)
         # (device_id, capability, correlation_id, state requested) of the commands running: at most one per device
         self.inflight: list[tuple[str, str, str, dict]] = []
         self.device_locks: dict[str, asyncio.Lock] = {}
@@ -433,6 +441,8 @@ class ApartmentEngine:
 
     @property
     def confirm_off_watts(self) -> float:
+        """The setting CONFIRM_OFF_WATTS: since A8 only the first value of setpoint_limits' off_watts; the engine reads
+        the threshold with off_watts(split_id)."""
         return self.settings["CONFIRM_OFF_WATTS"]
 
     def _compressor_from_settings(self) -> None:
@@ -468,6 +478,29 @@ class ApartmentEngine:
                     value = self.setting("CHECKOUT_PRESENCE_MINUTES")
                     rule["params"]["presence_minutes"] = int(value) if value == int(value) else value
                 rule["limits"]["presence_minutes"] = {"min": int(low), "max": int(high)}
+
+    def _off_watts_from_settings(self, fresh: bool = False) -> None:
+        """A8: setpoint_limits' off_watts starts from the setting CONFIRM_OFF_WATTS, within OFF_WATTS_LIMITS (a rule saved
+        before the parameter existed gets it too); once the rule holds a value, the app's value wins."""
+        low, high = OFF_WATTS_LIMITS
+        for rule in self.rules:
+            if rule["rule_id"] == "setpoint_limits":
+                if fresh or "off_watts" not in rule["params"]:
+                    value = min(max(float(self.setting("CONFIRM_OFF_WATTS")), low), high)
+                    rule["params"]["off_watts"] = int(value) if value == int(value) else value
+                rule["limits"]["off_watts"] = {"min": low, "max": high}
+
+    def off_watts(self, split_id: str | None = None) -> float:
+        """A8, §7.1: the watts under which an infrared split confirmed by its meter is off. THE one place that reads it:
+        today setpoint_limits' off_watts for every split, also with the rule off; the catalog may give one per device
+        here later."""
+        return float(self.rule("setpoint_limits")["params"]["off_watts"])
+
+    def on_watts_seen(self, split_id: str | None = None) -> float:
+        """A8: the absolute watts above which a split with no command running is seen on through its meter: the larger
+        of CONFIRM_ON_WATTS and off_watts + OFF_WATTS_ABOVE_ON, so that the two never overlap (the confirmation of a
+        switch-on stays relative to the watts before the command, confirmation.power_confirms)."""
+        return max(float(self.confirm_on_watts), self.off_watts(split_id) + OFF_WATTS_ABOVE_ON)
 
     def next_id(self, prefix: str) -> str:
         self.counter += 1
@@ -544,6 +577,7 @@ class ApartmentEngine:
         self.rules = apt.get("rules", self.rules)
         self._compressor_from_settings()
         self._presence_from_settings()
+        self._off_watts_from_settings()
         self._rule_defaults()                  # after presence_minutes, which takes its first value from the setting
         self.rules_updated_at = apt.get("rules_updated_at", self.rules_updated_at)
         self.counter = st.get_meta("counter", self.counter)
@@ -2213,7 +2247,7 @@ class ApartmentEngine:
         ids = {"correlation_id": cmd["correlation_id"], "command_id": cmd["command_id"], "device_id": device["device_id"]}
         deadline = parse_dt(cmd["created_at"]) + timedelta(seconds=COMMAND_DEADLINE_S)
         check = self._power_check(device, cap, new_state)        # D-131: (meter, direction, watts before) or None
-        waiter = self._watch_power(check) if check and check[0]["online"] else None
+        waiter = self._watch_power(check, device["device_id"]) if check and check[0]["online"] else None
         no_confirmation = "Nessuna conferma dal dispositivo entro il tempo massimo"
         async with self._device_lock(device["device_id"]):       # at most one command per device (connector-v2.md §2.5)
             # D32 (P-83): what it asks is computed from the state the command before it left (it was computed at its
@@ -2225,7 +2259,7 @@ class ApartmentEngine:
                 if waiter is not None:
                     self._unwatch_power(check[0]["device_id"], waiter)
                 check = self._power_check(device, cap, new_state)
-                waiter = self._watch_power(check) if check and check[0]["online"] else None
+                waiter = self._watch_power(check, device["device_id"]) if check and check[0]["online"] else None
             deadline = max(deadline, utcnow() + timedelta(seconds=COMMAND_DEADLINE_S))
             if cap == "climate" and new_state["on"] and not device["capabilities"][cap]["on"]:
                 # D11 (P-83): the pause checked again here, where a turn_off sent before this command is over (its
@@ -2317,10 +2351,11 @@ class ApartmentEngine:
             return None
         return meter, direction, float(meter["capabilities"]["power_meter"].get("watts") or 0)
 
-    def _watch_power(self, check: tuple[dict, str, float]) -> asyncio.Future:
+    def _watch_power(self, check: tuple[dict, str, float], split_id: str | None = None) -> asyncio.Future:
         meter, direction, baseline = check
         waiter = asyncio.get_running_loop().create_future()
-        self.power_waiters.setdefault(meter["device_id"], []).append((direction, baseline, waiter))
+        self.power_waiters.setdefault(meter["device_id"], []).append((direction, baseline, waiter,
+                                                                     self.off_watts(split_id)))
         return waiter
 
     def _unwatch_power(self, meter_id: str, waiter: asyncio.Future) -> None:
@@ -2335,9 +2370,8 @@ class ApartmentEngine:
         meter and with no command running follows it (drawing: on; nothing: off), so a start that came after its
         command's window, or a split switched by its own remote, is seen as it is (the window rule turns it off)."""
         watts = float(state.get("watts") or 0)
-        for direction, baseline, waiter in self.power_waiters.get(meter_id, []):
-            if not waiter.done() and confirm.power_confirms(direction, baseline, watts, self.confirm_on_watts,
-                                                            self.confirm_off_watts):
+        for direction, baseline, waiter, off in self.power_waiters.get(meter_id, []):
+            if not waiter.done() and confirm.power_confirms(direction, baseline, watts, self.confirm_on_watts, off):
                 waiter.set_result(True)
         busy = {c["device_id"] for c in self.commands.values() if c["status"] not in FINAL} | {r[0] for r in self.inflight}
         for split in self.devices.values():
@@ -2345,7 +2379,8 @@ class ApartmentEngine:
             if (not climate or climate.get("confirmation") != "power" or split["device_id"] in busy
                     or (self.confirmation_meter(split["device_id"]) or {}).get("device_id") != meter_id):
                 continue
-            seen_on = (True if watts >= self.confirm_on_watts else False if watts < self.confirm_off_watts else None)
+            on, off = self.on_watts_seen(split["device_id"]), self.off_watts(split["device_id"])     # A8
+            seen_on = True if watts >= on else False if watts < off else None
             if seen_on is not False:
                 self.remote_low.pop(split["device_id"], None)
             if seen_on is None or seen_on == bool(climate.get("on")):
@@ -2383,7 +2418,7 @@ class ApartmentEngine:
             self._save_device(split)
             corr = str(uuid.uuid4())
             self.emit("device.state", {"device_id": device_id, "capability": "climate", "state": climate}, corr)
-            reasoning = (f"{split['label']}: spento col telecomando (consumo sotto {fmt_num(self.confirm_off_watts)} W "
+            reasoning = (f"{split['label']}: spento col telecomando (consumo sotto {fmt_num(self.off_watts(device_id))} W "
                          f"da {fmt_num(self.setting('REMOTE_OFF_MINUTES'))} minuti)")
             if device_id in self.climate_by_mode:
                 self.climate_by_mode.discard(device_id)

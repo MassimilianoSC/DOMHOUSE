@@ -8,8 +8,9 @@ CONFIRM_OFF_WATTS; both within CONFIRM_UNTIL_S of the command's creation (inside
 command ends in timeout, reason no_confirmation. Not verified, acked with the state requested (as `confirmation:
 none`): a change that neither switches the split on nor off (setpoint, mode, fan: the watts say nothing reliable in
 10 s), a split without a valid link (logged at start, step 7b), and a linked meter offline when the command starts (a
-decision says so). The two thresholds are the engine's settings CONFIRM_ON_WATTS and CONFIRM_OFF_WATTS
-(engine/config.py), per apartment.
+decision says so). CONFIRM_ON_WATTS is the engine's setting (engine/config.py), per apartment; the «off» threshold is,
+since A8, the parameter off_watts of the rule setpoint_limits, changed from the app (first value CONFIRM_OFF_WATTS),
+read by core.ApartmentEngine.off_watts(split_id).
 """
 # CONFIRM_ON_WATTS and CONFIRM_OFF_WATTS: settings of the engine (engine/config.py, SETTINGS: 20 and 15 by default)
 CONFIRM_UNTIL_S = 9.5          # from the command's creation: its final status within the contract's 10 s
