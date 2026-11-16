@@ -1,0 +1,26 @@
+{
+  "displayName": "Agente: ordine di un altro ambiente o giornale non scrivibile",
+  "documentation": {
+    "content": "Il lettore dello strumento A sulla VM ha scritto una riga «agent alarm» (un ordine con un ambiente diverso da quello della sua sottoscrizione: §3, §5) oppure «agent fault journal» (non riesce a scrivere il giornale: gli ordini non si confermano e finiscono negli scarti). Primo passo: «sudo journalctl -u domhouse-agent-lettore -n 50» sulla VM. Avvisa o1.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «agent alarm» o «agent fault journal» del lettore",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-agent-lettore(\\[[0-9]+\\])?: agent (alarm|fault journal)\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "3600s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "ERROR"
+}
