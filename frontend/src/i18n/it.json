@@ -708,7 +708,7 @@
     "failed": "errore",
     "timeout": "nessuna risposta",
     "reason": {
-      "device_offline": "il dispositivo non ha risposto, controlla che sia acceso e collegato",
+      "device_offline": "il dispositivo non ha risposto; riprova, e se succede ancora controlla che sia acceso e collegato",
       "device_rejected": "rifiutato dal dispositivo",
       "blocked_by_rule": "bloccato da una regola",
       "blocked_by_priority": "bloccato da un'azione prioritaria",
