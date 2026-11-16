@@ -293,3 +293,56 @@ def test_r12_no_full_scan_of_the_journal_at_every_step(w, monkeypatch):
     monkeypatch.setattr(lettore.Path, "glob", lambda *a, **k: (_ for _ in ()).throw(AssertionError("scan")))
     w.reader.step()                                        # published from the index, without reading the folder
     assert [r["op_id"] for r in w.pubsub.published] == [OP]
+
+
+# ---- third reading, 16 November (N1: a fault after the ack never leaves an entry «in corso») ---------------------
+def entry_of(w, op_id=OP):
+    return json.loads((w.journal / f"{op_id}.json").read_text(encoding="utf-8"))
+
+
+def test_n1_an_ack_that_raises_anything_does_not_stop_the_order(w, monkeypatch):
+    def broken(ack_id):
+        raise RuntimeError("HTTPException o altro")
+    monkeypatch.setattr(w.pubsub, "ack", broken)
+    w.pubsub.put(order())
+    w.reader.step()
+    assert entry_of(w)["stato"] == "chiuso" and w.pubsub.published[0]["esito"] == "riuscito"
+
+
+def test_n1_an_executor_that_raises_anything_closes_the_entry_failed(w):
+    def broken(data):
+        raise RuntimeError("qualunque cosa")
+    w.answer = broken
+    w.pubsub.put(order())
+    w.reader.step()
+    assert entry_of(w)["stato"] == "chiuso"
+    assert (w.pubsub.published[0]["esito"], w.pubsub.published[0]["codice"]) == ("fallito", "errore_interno")
+
+
+def test_n1_a_journal_that_cannot_be_closed_still_publishes_and_raises_the_alarm(w, monkeypatch):
+    original = w.reader._write
+
+    def full_at_close(op_id, entry):
+        if entry["stato"] == "chiuso":
+            raise OSError("disco pieno")
+        original(op_id, entry)
+    monkeypatch.setattr(w.reader, "_write", full_at_close)
+    w.pubsub.put(order())
+    w.reader.step()
+    assert w.pubsub.published[0]["esito"] == "riuscito"
+    assert any(line.startswith("agent fault journal") for line in w.logs)
+
+
+def test_n1_a_publish_that_raises_anything_waits_in_the_index(w, monkeypatch):
+    def broken(result):
+        raise RuntimeError("qualunque cosa")
+    monkeypatch.setattr(w.pubsub, "publish", broken)
+    w.pubsub.put(order())
+    w.reader.step()
+    assert entry_of(w)["stato"] == "chiuso" and OP in w.reader.pending
+
+
+def test_n1_the_alarm_reads_the_fault_lines():
+    policy = json.loads((ROOT / "scripts" / "agent" / "allarmi" / "agente-allarme.json").read_text(encoding="utf-8"))
+    flt = policy["conditions"][0]["conditionMatchedLog"]["filter"]
+    assert "fault message" in flt and "fault journal" in flt

@@ -173,19 +173,24 @@ class Lettore:
             self.pubsub.nack(ack_id)                     # not in the journal: Pub/Sub tries again
             self.log(f"agent fault journal op_id={order.op_id}")
             return
-        self._ack(ack_id, order.op_id)
+        # N1: from here the entry is «in corso» on disk: whatever happens it is closed, with a result, never left open
         try:
-            answer = self.execute(data)
-        except (OSError, ValueError):
-            answer = None
-        self._close(entry, self._filtered(entry, answer))
+            self._ack(ack_id, order.op_id)
+            try:
+                answer = self.execute(data)
+            except Exception:                            # noqa: BLE001 - any failure of the executor's call
+                answer = None
+            result = self._filtered(entry, answer)
+        except Exception:                                # noqa: BLE001 - N1
+            result = self._result(entry, "fallito", "errore_interno")
+        self._close(entry, result)
 
     def _ack(self, ack_id, op_id) -> None:
         """R11: an ack that fails (no answer, an answer that is not JSON) is logged; the order is in the journal, so a
         copy delivered again is recognised."""
         try:
             self.pubsub.ack(ack_id)
-        except (OSError, ValueError):
+        except Exception:                                # noqa: BLE001 - N1: any failure of the call
             self.log(f"agent fault ack op_id={safe(op_id)}")
 
     def _answer_unjournalled(self, ack_id, result: dict) -> None:
@@ -218,21 +223,34 @@ class Lettore:
         return out
 
     def _close(self, entry: dict, result: dict) -> None:
+        """N1: the result is published even when the journal cannot be closed (disk full): an alarm line says so,
+        and at the next start the entry still open becomes «interrotto», which the server ignores (already closed)."""
         self._line(result)
         entry = {**entry, "stato": "chiuso", "risultato": result, "pubblicato": False, "chiuso": self.clock().isoformat()}
-        self._write(entry["op_id"], entry)
+        try:
+            self._write(entry["op_id"], entry)
+        except Exception as exc:                         # noqa: BLE001 - N1
+            self.log(f"agent fault journal close op_id={safe(entry['op_id'])} {type(exc).__name__}")
+            try:
+                self.pubsub.publish(result)
+            except Exception:                            # noqa: BLE001
+                self.log(f"agent fault publish op_id={safe(entry['op_id'])}")
+            return
         self._publish(entry)
 
     def _publish(self, entry: dict) -> None:
         try:
             self.pubsub.publish(entry["risultato"])
-        except (OSError, ValueError):
-            self.log(f"agent fault publish op_id={entry['op_id']}")
+        except Exception:                                # noqa: BLE001 - N1: any failure of the call
+            self.log(f"agent fault publish op_id={safe(entry['op_id'])}")
             self.pending.add(entry["op_id"])
             return
         self.pending.discard(entry["op_id"])
         if not entry.get("pubblicato"):
-            self._write(entry["op_id"], {**entry, "pubblicato": True})
+            try:
+                self._write(entry["op_id"], {**entry, "pubblicato": True})
+            except Exception as exc:                     # noqa: BLE001 - published anyway: at worst published again
+                self.log(f"agent fault journal publish op_id={safe(entry['op_id'])} {type(exc).__name__}")
 
     def _publish_pending(self) -> None:
         """R12: only the op_ids in the index, never a scan of the journal."""

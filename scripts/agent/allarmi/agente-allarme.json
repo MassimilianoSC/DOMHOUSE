@@ -1,15 +1,15 @@
 {
   "displayName": "Agente: ordine sospetto o giornale non scrivibile",
   "documentation": {
-    "content": "Il ricevitore dello strumento A sulla VM ha scritto «agent alarm»: un ordine di un altro ambiente (lettore), oppure, dall'esecutore, un chiamante diverso dal lettore, un ordine «prod» sulla VM condivisa o una lapide di sequenza illeggibile (R16: possibile lettore compromesso); oppure «agent fault journal» (il lettore non scrive il giornale: gli ordini finiscono negli scarti). Primo passo: «sudo journalctl -u domhouse-agent-lettore -u domhouse-agent-esecutore -n 80» sulla VM. Avvisa o1.",
+    "content": "Il ricevitore dello strumento A sulla VM ha scritto «agent alarm»: un ordine di un altro ambiente (lettore), oppure, dall'esecutore, un chiamante diverso dal lettore, un ordine «prod» sulla VM condivisa o una lapide di sequenza illeggibile (R16: possibile lettore compromesso); oppure «agent fault journal» (il lettore non scrive il giornale: gli ordini finiscono negli scarti). Primo passo: «sudo journalctl -u domhouse-agent-lettore -u domhouse-agent-esecutore -n 80» sulla VM. Avvisa o1. Anche «agent fault message»: un messaggio che il lettore non ha saputo trattare (riprovato, poi negli scarti).",
     "mimeType": "text/markdown"
   },
   "combiner": "OR",
   "conditions": [
     {
-      "displayName": "Riga «agent alarm» del lettore o dell'esecutore, o «agent fault journal»",
+      "displayName": "Riga «agent alarm», «agent fault journal» o «agent fault message» del lettore o dell'esecutore",
       "conditionMatchedLog": {
-        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-agent-(lettore|esecutore)(\\[[0-9]+\\])?: agent (alarm|fault journal)\""
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-agent-(lettore|esecutore)(\\[[0-9]+\\])?: agent (alarm|fault journal|fault message)\""
       }
     }
   ],
