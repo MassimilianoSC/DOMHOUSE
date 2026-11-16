@@ -443,12 +443,12 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
 | A0 Prerequisiti | committente, o1 | prove con Youssouf finite | da fare |
 | A1 Ricevitore di ordini | o1 | [P] A0 | da fare |
 | A2 Posto dell'appartamento dall'app | o1, o2 | [P] A1; [Cl] chi crea (D-232) | da fare |
-| A3 Credenziali dei dispositivi | o1, o2 | [P] A1; [Prova] 1125 | da fare |
+| A3 Credenziali dei dispositivi | o1, o2 | [P] A1; [Prova] 1125 | da fare; **con D-233 diventa impronte in Firestore, «Registra», «Rigenera», «Revoca»** (progetto `19cb001`, `de45ae0`, `4bf57ba`): la scheda sotto va riscritta nell'aggiornamento unico |
 | A4 Elenco dei dispositivi (catalogo) e motore vuoto | o1, o2, Youssouf | [P] A2, A3; [Y-ris] formato; [Y-cod] motore vuoto | da fare |
-| A5 Stato dei dispositivi: accessi rifiutati | o1, o2 | [VM]; [P] A3 | primo passo fatto (`59e546a`); resto da fare |
+| A5 Stato dei dispositivi: accessi rifiutati | o1, o2 | [VM]; [P] A3 | pagina fatta nel codice (`59e546a`, batteria `b980c47` con il contratto 1.0.6 `f684ea1`, `b7dd8bb`); accessi rifiutati da fare |
 | A6 Eliminazione dell'appartamento | o1, o2 | [P] A2, A3; [Cl] D-232; [C] storico 30 o 60 giorni | da fare |
 | A7 Capienza della VM | o1 | [P] A1, A2 | da fare |
-| A8 Soglia di «spento» del clima | o1, o2 | nessuna | da fare |
+| A8 Soglia di «spento» del clima | o1, o2 | nessuna | **avviato il 16 nov, 17:14** (proposta di o1 prima del codice) |
 | A9 Guide | memoria storica, Youssouf, o2 | [P] A2–A8; [Y-ris] schermate; [Cl] chi prepara i kit, rete Wi-Fi | da fare |
 | A10 Seconda VM | o1, committente | [P] A1–A7 provati; [C] entro la fine del mese di prove | da fare |
 | A11 Pubblicazione e prova con il cliente | committente, memoria storica, cliente | [P] A1–A10; [Cl] decisioni 1–4 della proposta | da fare |
