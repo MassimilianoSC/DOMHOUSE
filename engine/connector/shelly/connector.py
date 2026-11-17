@@ -131,8 +131,10 @@ holds. Read only: execute() refuses them (no command). In detail:
     not in the catalog is ignored, warned once.
 
 Commands: command.run_command (set, then read back, every RPC within cmd.deadline). A device the connector has
-offline fails at once with failed/device_offline, nothing queued (§2.5, §6); a device_offline outcome of a device the
-connector had online puts it offline through its queue, so online=False goes out in its order (§2.6). Cancelling
+offline fails at once with failed/device_offline, nothing queued (§2.5, §6). Of the device_offline outcomes, only the
+one whose detail ends with "device offline" (the transport said so, on the set or on the read back) puts a device the
+connector had online offline, through its queue, so online=False goes out in its order (§2.6); a request without
+answer ("transport timeout") changes nothing: the online state still comes from the broker and the silence. Cancelling
 execute() (the engine past the deadline) calls nothing back: a request already handed to the transport may have
 reached the device (the MQTT transport publishes it at once and then waits for the answer), which acts on it. The
 connector keeps no state of a command, so after a cancellation the state is, as always, what the device reports in
@@ -156,7 +158,8 @@ from .battery import BTHOME_BATTERY_OBJ_ID, BatteryTracker, battery_from_bthome_
 from .catalog import Catalog, CatalogDevice
 from .command import RPC_TIMEOUT_S, run_command
 from .offline import is_offline
-from .translate import (BTHOME_DEVICE, BTHOME_SENSOR, MAX_CLOCK_SKEW_S, BthomeComponent, UnknownModel,
+from .translate import (BTHOME_DEVICE, BTHOME_SENSOR, DETAIL_DEVICE_OFFLINE, MAX_CLOCK_SKEW_S, BthomeComponent,
+                        UnknownModel,
                         apply_notify_status, blu_reading, bthome_components, bthome_ts, capabilities_from_status,
                         component_event_targets, notification_ts, profile_for)
 from .transport.base import ConnectionEvent, Notification, Transport, TransportError
@@ -344,7 +347,7 @@ class ShellyConnector:
             return self._result(CommandResult("failed", "internal_error",
                                               detail="capability not commandable on this device"), ids)
         if not device.online or device.rejected:
-            return self._result(CommandResult("failed", "device_offline", detail="device offline"), ids)
+            return self._result(CommandResult("failed", "device_offline", detail=DETAIL_DEVICE_OFFLINE), ids)
 
         def progress(step: str) -> None:
             if step == "sent":
@@ -360,7 +363,7 @@ class ShellyConnector:
             raise
         # online=False in the device's order (§2.6), only when the transport said offline: a request without answer
         # ("transport timeout", also device_offline) does not change the online state, still from broker and silence
-        if (result.reason == "device_offline" and result.detail.endswith("device offline") and device.online
+        if (result.reason == "device_offline" and result.detail.endswith(DETAIL_DEVICE_OFFLINE) and device.online
                 and device.queue is not None):
             device.queue.put_nowait(_Lost(self._clock()))
         return self._result(result, ids)
