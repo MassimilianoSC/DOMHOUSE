@@ -95,7 +95,8 @@ class Connector(Protocol):
         # chiude tutto in modo pulito (serve alle prove e allo spegnimento del container)
     def rooms(self) -> list[Room]
     def devices(self) -> list[DeviceInfo]
-        # il catalogo con l'ultimo stato noto; sempre tutti i dispositivi del catalogo, anche offline
+        # il catalogo con l'ultimo stato noto; sempre tutti i dispositivi del catalogo, anche offline.
+        # rooms() e devices() possono essere liste vuote: il catalogo vuoto è valido (decisione 1140, §5)
     async def execute(self, cmd: ConnectorCommand, on_progress: Callable[[str], None]) -> CommandResult
     def changes(self) -> AsyncIterator[StateChange]
         # un solo consumatore (il motore); non finisce finché il connector non viene fermato
@@ -381,6 +382,9 @@ prove del trasporto stanno a parte, accanto al suo modulo.
   `confirmation`) e, per ognuno, una sezione `shelly:` (id del dispositivo Shelly, canale, componente; per `climate` il
   blaster e il `power_meter` collegato). Niente segreti nel catalogo. Il formato lo proponi tu; lo leggono
   `catalog.py` e il motore attraverso `devices()` e `rooms()`.
+- **Catalogo vuoto** (decisione 1140, PR #17): `rooms: []` e `devices: []` è un catalogo valido, quello con cui parte
+  il motore di un appartamento nuovo; `rooms()` e `devices()` restituiscono allora liste vuote. Il catalogo si legge
+  una volta all'avvio: quello nuovo vale al riavvio del motore.
 
   **Esempio indicativo, ancora con gli id della versione del 21 ottobre: il formato definitivo e gli id dei
   dispositivi Gen4 li proponi tu.**
