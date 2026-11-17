@@ -19,6 +19,7 @@
 #   sudo bash /opt/domhouse/broker-vm.sh sync                          # rereads the secrets of every apartment
 #   sudo bash /opt/domhouse/broker-vm.sh check                         # one line for the 5-minute watch
 #   sudo bash /opt/domhouse/broker-vm.sh limit                         # (re)applies the limit on new connections
+#   sudo bash /opt/domhouse/broker-vm.sh network                       # the broker's network on its subnet (C2)
 #
 # Folders: /opt/domhouse/_broker (compose, configuration, settings), /etc/domhouse/_broker (auth, the list of
 # apartments, acme.settings), /data/_broker (the broker's persistence). The underscore on purpose: an apartment_id
@@ -50,6 +51,12 @@
 # nftables table of its own (inet domhouse_broker): beyond LIMIT_BURST at once and LIMIT_RATE after, that address's
 # new connections are dropped until it slows down. No ban: the devices of an apartment share one public address, and a
 # single relay with a wrong password must not lock out its neighbours; guessing a random 192-bit password is hopeless.
+#
+# Way out (C2, step 3 of the plan, 17 November): nothing in the broker starts a connection (devices and engines come
+# in, lego runs on the host's network), so the same table drops every NEW connection out of the broker's default
+# network, BROKER_SUBNET, both forwarded and to the VM itself; the answers of the connections that came in are not new.
+# The subnet is fixed in engine/broker/compose.yaml; compose does not move an existing network, so install (and
+# network) make it again, with the broker stopped for a moment, when Docker had given it another one.
 set -euo pipefail
 set +x                                   # never trace
 
@@ -85,6 +92,8 @@ LIMIT_TABLE=domhouse_broker
 LIMIT_FILE="${BROKER_OPT}/limit.nft"
 LIMIT_RATE="30/minute"                   # per source address, after the first LIMIT_BURST
 LIMIT_BURST=60                           # an apartment's relays reconnecting together after a power cut
+BROKER_SUBNET=172.30.84.0/24             # C2: the default network of engine/broker/compose.yaml (the same subnet)
+BRIDGE_NETWORK=domhouse-broker_default
 AUTH_ALERT_PER_HOUR="${DOMHOUSE_AUTH_ALERT_PER_HOUR:-100}"   # one relay with a wrong password retrying alone stays under
 KEPT=""                                  # E-33: the apartments the last sync kept as they were (sync_accounts)
 
@@ -354,6 +363,14 @@ table inet ${LIMIT_TABLE} {
     tcp dport 8883 ct state new add @sources4 { ip saddr limit rate over ${LIMIT_RATE} burst ${LIMIT_BURST} packets } counter drop comment "domhouse-broker-limit"
     tcp dport 8883 ct state new add @sources6 { ip6 saddr limit rate over ${LIMIT_RATE} burst ${LIMIT_BURST} packets } counter drop comment "domhouse-broker-limit"
   }
+  chain egress_forward {
+    type filter hook forward priority -5; policy accept;
+    ip saddr ${BROKER_SUBNET} ct state new counter drop comment "domhouse-broker-egress"
+  }
+  chain egress_input {
+    type filter hook input priority -5; policy accept;
+    ip saddr ${BROKER_SUBNET} ct state new counter drop comment "domhouse-broker-egress"
+  }
 }
 NFT
 }
@@ -365,6 +382,26 @@ apply_limit() {
   limit_rules > "${LIMIT_FILE}"
   nft -f "${LIMIT_FILE}"
   echo "limite attivo: alla porta 8883, oltre ${LIMIT_BURST} collegamenti nuovi di fila e poi ${LIMIT_RATE} per indirizzo, il resto è scartato"
+  echo "uscita chiusa: nessun collegamento nuovo parte dalla rete del broker (${BROKER_SUBNET})"
+}
+
+dropped() {   # comment: the packets dropped by the table's rules with that comment
+  nft list table inet "${LIMIT_TABLE}" | awk -v c="\"$1\"" \
+    'index($0, "comment " c) {for (i = 1; i < NF; i++) if ($i == "packets") s += $(i + 1)} END {print s + 0}'
+}
+
+ensure_network() {
+  # C2: the default network on BROKER_SUBNET, where the way out is closed. Docker chose the subnet before 17 November,
+  # and compose keeps an existing network as it is: the broker stops, the network is made again, compose makes it
+  local current
+  current="$(docker network inspect -f '{{range .IPAM.Config}}{{.Subnet}} {{end}}' "${BRIDGE_NETWORK}" 2>/dev/null \
+    | awk '{print $1}' || true)"
+  if [ -z "${current}" ]; then echo "rete ${BRIDGE_NETWORK}: la crea compose su ${BROKER_SUBNET}"; return 0; fi
+  if [ "${current}" = "${BROKER_SUBNET}" ]; then echo "rete ${BRIDGE_NETWORK}: già su ${BROKER_SUBNET}"; return 0; fi
+  echo "rete ${BRIDGE_NETWORK}: ${current} -> ${BROKER_SUBNET}; il broker si ferma un momento, i dispositivi si ricollegano"
+  compose stop broker
+  compose rm -f broker
+  docker network rm "${BRIDGE_NETWORK}" > /dev/null
 }
 
 limit_active() { nft list table inet "${LIMIT_TABLE}" > /dev/null 2>&1; }
@@ -492,6 +529,7 @@ case "${cmd}" in
     if [ "${LIMIT}" = "on" ]; then apply_limit; else echo "non applicato (DOMHOUSE_LIMIT=${LIMIT}, solo nelle prove)"; fi
     step "Avvio di ${CONTAINER} con ${image}"
     compose pull --quiet
+    ensure_network
     compose up -d
     # mosquitto.conf is mounted as a single file and put_files replaces it with a new one: a broker already running
     # keeps reading the old one, also after a reload, and compose does not recreate it for a change of content. When
@@ -627,6 +665,14 @@ case "${cmd}" in
     [ $# -eq 0 ] || die "uso: limit"
     apply_limit
     ;;
+  network)
+    [ $# -eq 0 ] || die "uso: network"
+    need_installed
+    need_tls_disk
+    ensure_network
+    compose up -d
+    wait_healthy
+    ;;
   status)
     need_installed
     cat "${SETTINGS}"
@@ -640,7 +686,8 @@ case "${cmd}" in
     echo "accessi rifiutati sulla 8883 nell'ultima ora: $(auth_refused_pairs | grep -c . || true)"
     if [ "${LIMIT}" = "on" ]; then
       if limit_active; then
-        echo "collegamenti scartati dal limite: $(nft list table inet "${LIMIT_TABLE}" | awk '{for (i = 1; i < NF; i++) if ($i == "packets") s += $(i + 1)} END {print s + 0}')"
+        echo "collegamenti scartati dal limite: $(dropped domhouse-broker-limit)"
+        echo "collegamenti in uscita dal broker scartati: $(dropped domhouse-broker-egress)"
       else
         echo "limite sui collegamenti assente: sudo bash /opt/domhouse/broker-vm.sh limit"
       fi
@@ -648,6 +695,6 @@ case "${cmd}" in
     check
     ;;
   *)
-    die "uso: prepare-tls-disk | cert-new | install | update | restart | reload | cert-renew | cert-test | cert-revoke | install-cert | add-apartment | remove-apartment | sync | check | limit | status (vedi l'intestazione)"
+    die "uso: prepare-tls-disk | cert-new | install | update | restart | reload | cert-renew | cert-test | cert-revoke | install-cert | add-apartment | remove-apartment | sync | check | limit | network | status (vedi l'intestazione)"
     ;;
 esac

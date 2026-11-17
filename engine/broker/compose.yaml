@@ -55,6 +55,12 @@ services:
       start_period: 5s
 
 networks:
+  default:
+    # C2 (17 November): a subnet of its own, fixed, the one where scripts/broker-vm.sh limit drops every new connection
+    # out of the broker (BROKER_SUBNET there); nothing in the broker starts one
+    ipam:
+      config:
+        - subnet: 172.30.84.0/24
   internal:
     name: domhouse-broker-internal
     internal: true
