@@ -1936,7 +1936,8 @@ Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»):
 - **Se va bene**: «Agente raggiungibile. Motore: sano · collegamento ai dispositivi: attivo · versione: …».
 - **Se no**: il motivo in rosso, con un codice da copiare per l'assistenza.
 - **Senza risposta entro 20 minuti**: «Nessuna risposta dall'agente entro 20 minuti: riprova».
-- **Finché l'agente non è installato** leggi «Agente non ancora installato in questo ambiente.».
+- **Dove l'agente non è ancora configurato** (oggi la produzione) leggi «Agente non ancora installato in questo
+  ambiente.».
 
 ### Gestori della piattaforma
 
@@ -2879,7 +2880,7 @@ Per ogni problema annota:
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
 
-### Prossimo aggiornamento (non ancora pubblicato)
+### 17 novembre 2026
 
 - **Nuova pagina «Stato dei dispositivi»** per l'Amministratore: chi risponde, da quando, la batteria dei sensori e
   cosa controllare.
