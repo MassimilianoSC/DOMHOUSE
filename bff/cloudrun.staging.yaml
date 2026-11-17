@@ -95,6 +95,16 @@ spec:
               value: your-vm-internal-ip:8100,your-vm-internal-ip:8150-8169
             - name: INSTANCE_TIMEOUT_S
               value: "10"
+            - name: AGENT_AMBIENTE         # tool A, A1 (docs/procedura-installazione-a1.md I5.1): the order receiver on
+              value: staging            # the VM, staging only; production has none, the agent off there (§5.4)
+            - name: AGENT_ORDERS_TOPIC     # the queues made by scripts/agent-gcp.sh staging (I3)
+              value: projects/your-gcp-project-id/topics/domhouse-staging-ordini
+            - name: AGENT_PUSH_AUDIENCE    # the stable address of this service (§4.2), as agent-gcp.sh signs the push
+              value: https://domotica-bff-staging-444239063209.europe-west8.run.app/internal/agent/risultati
+            - name: AGENT_PUSH_EMAIL
+              value: domhouse-push-staging@your-gcp-project-id.iam.gserviceaccount.com
+            - name: AGENT_PUSH_SUBSCRIPTION
+              value: projects/your-gcp-project-id/subscriptions/domhouse-staging-risultati-push
             - name: ITALIANWAY_SIGNATURE_HEADER
               value: X-Signature
             - name: ITALIANWAY_WEBHOOK_SECRET

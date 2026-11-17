@@ -30,7 +30,11 @@ def annotation(manifest: str, key: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
-ONLY_STAGING = {"INSTANCE_ALLOWED"}      # D04 (P-83): the engines staging may reach; production has no list
+ONLY_STAGING = {"INSTANCE_ALLOWED",      # D04 (P-83): the engines staging may reach; production has no list
+                # tool A, A1 (I5.1): the order receiver on the VM, staging only; without them production's agent is
+                # off (bff/agent.py: 503, and the results' route 401), until the second VM (§5.4)
+                "AGENT_AMBIENTE", "AGENT_ORDERS_TOPIC", "AGENT_PUSH_AUDIENCE", "AGENT_PUSH_EMAIL",
+                "AGENT_PUSH_SUBSCRIPTION"}
 
 
 def test_same_variables_and_secrets():
