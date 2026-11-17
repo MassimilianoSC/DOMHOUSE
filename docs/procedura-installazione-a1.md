@@ -10,7 +10,7 @@
 |---|---|
 | Google Cloud | code `domhouse-staging-ordini`, `-risultati`, `-scarti`; tre sottoscrizioni; l'account di push `domhouse-push-staging@`; i permessi su ogni risorsa; due allarmi (`scripts/agent-gcp.sh`) |
 | Firestore (staging) | la scadenza a 90 giorni delle operazioni (`agent_ops`) |
-| Server dello staging | cinque variabili `AGENT_*`: senza, l'agente è spento (503) |
+| Server dello staging | cinque variabili `AGENT_*` (commit `61c136a`), pubblicate solo nello staging: senza, l'agente è spento (503) |
 | VM | l'utente `domhouse-agent`, il lettore e l'esecutore come servizi systemd (`scripts/agent-vm.sh`) |
 | Sito dello staging | il pulsante «Prova l'agente» di o2, nella pagina della piattaforma |
 
@@ -113,9 +113,9 @@ gcloud firestore fields ttls update expire_at --collection-group=agent_ops --ena
 - **Atteso:** l'operazione avviata e poi «ttlConfig: state: CREATING» o `ACTIVE`. Controllo: `gcloud firestore fields ttls list --database=staging --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com` mostra `agent_ops` con `expire_at`.
 - **Ritorno indietro:** lo stesso comando con `--disable-ttl`. Non toglie niente: le operazioni restano finché non si ricancellano.
 
-## I5. Le variabili del server dello staging (o1, commit; poi la pubblicazione del committente)
+## I5. Le variabili del server dello staging (o1, commit; poi la pubblicazione del solo staging)
 
-**I5.1 o1 aggiunge le variabili a `bff/cloudrun.staging.yaml`** (commit [o1], niente push; la memoria storica lo registra). Valori, come li vedrà il servizio dopo la pubblicazione:
+**I5.1 Le variabili nel manifesto: fatto da o1, commit `61c136a`** (17 novembre, registrato in `105d3f6`). Valori, come li vedrà il servizio dopo la pubblicazione:
 
 | Variabile | Valore |
 |---|---|
@@ -125,30 +125,55 @@ gcloud firestore fields ttls update expire_at --collection-group=agent_ops --ena
 | `AGENT_PUSH_EMAIL` | `domhouse-push-staging@domotica-poc-511707.iam.gserviceaccount.com` |
 | `AGENT_PUSH_SUBSCRIPTION` | `projects/domotica-poc-511707/subscriptions/domhouse-staging-risultati-push` |
 
-- La produzione (`bff/cloudrun.yaml`) **non** le riceve: lì l'agente resta spento (§5.4).
-- Il pulsante «Prova l'agente» di o2 deve essere nello stesso lotto: la memoria storica controlla che il commit del lotto lo contenga.
+- Nel manifesto il progetto è scritto `your-gcp-project-id`, come nel resto del file: `deploy.sh` lo sostituisce.
+- La produzione (`bff/cloudrun.yaml`) **non** le riceve: lì l'agente resta spento (§5.4). Per questo le cinque stanno in `ONLY_STAGING` di `tests/cloudrun_manifests_test.py`, che altrimenti vuole le stesse variabili nei due manifesti.
+- **Fra I5.1 e la fine di I3 nessuno spinge.** Una pubblicazione con le variabili e senza le code darebbe al pulsante un errore 502 invece di «Agente non ancora installato».
+- Il pulsante «Prova l'agente» di o2 è già pubblicato (`f4c6a20`).
 
-**I5.2 La pubblicazione del lotto** (procedura `docs/procedura-ambienti-separati.md`, M18: prima a secco, poi vera).
+**I5.2 La pubblicazione del solo staging.** Il codice del server e del sito non cambia da `f4c6a20`: cambia solo il manifesto dello staging. Quindi `publish.sh` con `TARGET=staging`, senza la produzione (D-203 riguarda solo la produzione) e senza il sito (`SKIP_HOSTING=1`). Le impostazioni si leggono da `scripts/publish-settings.conf`, come fa `publish-all.sh`: solo righe `NOME=valore`, nessun segreto.
 
-```bash
-# Git Bash
-cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git log --oneline -1 && grep -c "name: AGENT_" bff/cloudrun.staging.yaml && DRY_RUN=1 bash scripts/publish-all.sh "$(git rev-parse --short HEAD)"
-```
-
-- **Atteso:** la riga del commit del lotto, poi `5` (le cinque variabili), poi la prova a secco come in M18.1.
-- Poi la pubblicazione vera, come in M18.2: `bash scripts/publish-all.sh "$(git rev-parse --short HEAD)"`.
-
-**I5.3 Controllo (sola lettura).**
+I5.2a Prova a secco (sola lettura). Dopo il push, che si fa solo a I3 finito.
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud run services describe domotica-bff-staging --region=europe-west8 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="yaml(spec.template.spec.containers[0].env)" | grep -A1 "name: AGENT_"
+git fetch -q origin && git merge-base --is-ancestor 61c136a HEAD && git merge-base --is-ancestor HEAD origin/main && git log --oneline -1 && git show HEAD:bff/cloudrun.staging.yaml | grep -c "name: AGENT_" && while IFS='=' read -r k v; do v="${v%$'\r'}"; case "$k" in ''|'#'*) ;; *) export "$k=$v" ;; esac; done < scripts/publish-settings.conf && DRY_RUN=1 TARGET=staging SKIP_HOSTING=1 bash scripts/publish.sh "$(git rev-parse --short HEAD)"
 ```
 
-- **Atteso:** le cinque variabili con i valori della tabella di I5.1.
-- **Ritorno indietro:** I14.2.
+- **Atteso:**
+  1. la riga del commit, poi `5`;
+  2. «ambiente di prova: servizio domotica-bff-staging, database staging, sito …» e «contratto v1.0.6 invariato»;
+  3. nessuna riga «non è su GitHub»;
+  4. nel confronto dei valori attivi con il manifesto, solo «non cambia».
+- Se la catena si ferma prima della prova a secco, manca il push oppure `HEAD` non contiene `61c136a`: fermati.
+
+I5.2b Pubblicazione vera dello staging (scrive su Cloud Run).
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+while IFS='=' read -r k v; do v="${v%$'\r'}"; case "$k" in ''|'#'*) ;; *) export "$k=$v" ;; esac; done < scripts/publish-settings.conf && TARGET=staging SKIP_HOSTING=1 bash scripts/publish.sh "$(git rev-parse --short HEAD)"
+```
+
+- **Atteso:** l'immagine del server di quel commit costruita (il tag è nuovo), «gcloud run services replace» riuscito, in fondo «PWA: non pubblicata (SKIP_HOSTING)».
+- Se chiede «non è su GitHub … (scrivi si)», rispondi altro: si ferma. Prima il push.
+- Fino al prossimo lotto lo staging resta più avanti della produzione, con lo stesso codice del server. `publish-all.sh` non li confronta fra loro: nel giro dopo pubblica lo staging e poi la produzione, come sempre.
+
+**I5.3 Controllo (sola lettura).** `publish.sh` da solo non fa i controlli di `publish-all.sh`: si fanno qui.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud run services describe domotica-bff-staging --region=europe-west8 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="value(status.latestReadyRevisionName,status.traffic[0].percent,spec.template.spec.containers[0].image)" && curl -s -m 60 -o /dev/null -w "health %{http_code}\n" https://domotica-bff-staging-444239063209.europe-west8.run.app/health && gcloud run services describe domotica-bff-staging --region=europe-west8 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="yaml(spec.template.spec.containers[0].env)" | grep -A1 "name: AGENT_"
+```
+
+- **Atteso:**
+  1. la revisione nuova, `100`, l'immagine con il tag del commit;
+  2. `health 200`;
+  3. le cinque variabili con i valori della tabella di I5.1.
+- **Ritorno indietro:** la revisione di prima (quella di `f4c6a20`, `domotica-bff-staging-00021-56w`):
+  `gcloud run services update-traffic domotica-bff-staging --to-revisions=domotica-bff-staging-00021-56w=100 --region europe-west8 --project domotica-poc-511707 --account=m.scardovellicrac@gmail.com`
+  Per togliere le variabili per sempre: I14.2.
 
 ## I6. I file dell'agente sulla VM (scrive solo nella cartella di chi si collega)
 
@@ -280,7 +305,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 - **Atteso:** «agente tolto; restano i giornali e le lapidi …».
 
-**I14.2 Il server.** o1 toglie le cinque variabili (un commit che annulla quello di I5.1), poi la pubblicazione del lotto come in I5.2. Senza le variabili il pulsante risponde «L'agente sulla VM non è configurato» (503).
+**I14.2 Il server.** o1 toglie le cinque variabili (un commit che annulla quello di I5.1, `61c136a`), poi la pubblicazione del solo staging come in I5.2 e il controllo di I5.3. Senza le variabili il pulsante risponde «L'agente sulla VM non è configurato» (503).
 
 **I14.3 Google Cloud** (scrive su Google Cloud). Solo se si decide di togliere tutto; prima I14.1 e I14.2.
 
