@@ -10,6 +10,8 @@ Run: python -m pytest engine/tests/test_command_no_answer.py -q
 import asyncio
 from datetime import UTC, datetime
 
+import pytest
+
 from engine import core
 from engine import log as logs
 from engine.connector.interface import CommandResult, ConnectorStatus, DeviceInfo, Room
@@ -90,3 +92,17 @@ def test_offline_during_the_check_keeps_its_own_words(monkeypatch):
     final, decision, _ = run(CommandResult("failed", "device_offline", detail="device offline"), monkeypatch)
     assert (final["status"], final["reason"]) == ("failed", "device_offline")
     assert decision["reasoning"] == "Il dispositivo è andato offline durante la verifica"
+
+
+# ---- PR #15 (17 November): the connector says device_offline «transport timeout» itself -------------------------
+@pytest.mark.parametrize("reason, detail", [
+    ("device_offline", "transport timeout"),                       # PR #15: Switch.Set without answer
+    ("device_offline", "read back failed: transport timeout"),     # PR #15: the read back without answer, twice
+    ("internal_error", "read back failed: transport timeout"),     # before PR #15, the read back
+])
+def test_a_request_without_answer_has_the_e35_words_whatever_the_connector_version(reason, detail, monkeypatch):
+    final, decision, warned = run(CommandResult("failed", reason, detail=detail), monkeypatch)
+    assert (final["status"], final["reason"]) == ("failed", "device_offline")
+    assert decision["reasoning"] == (
+        "Il dispositivo non ha risposto: riprova, e se succede ancora controlla che sia acceso e collegato")
+    assert [(w["reason"], w["detail"]) for w in warned] == [(reason, detail)]
