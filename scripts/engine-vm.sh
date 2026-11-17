@@ -77,6 +77,7 @@ METADATA_TABLE=domhouse_metadata
 METADATA_V4=169.254.169.254
 METADATA_V6=fd20:ce::254
 METADATA_FILE="${OPT}/metadata.nft"
+BROKER_NETWORKS=(domhouse-broker_default domhouse-broker-internal)   # C8: probed too, when the broker is there
 HOURLY_S=3600                            # the metadata probe and the data sizes, once an hour
 DATA_ALERT_MB="${DOMHOUSE_DATA_ALERT_MB:-500}"   # an apartment's /data above this: "data large" (decision 1128)
 JOURNALD_DIR="${DOMHOUSE_JOURNALD_DIR:-/etc/systemd/journald.conf.d}"
@@ -533,30 +534,42 @@ hourly_due() {
 
 metadata_lines() {
   # E-31: the table put back if it went (only once metadata-block has been run: it writes METADATA_FILE); once an
-  # hour, from a throwaway container on an engine's own Compose network, with that engine's image, the probe:
-  # "metadata blocked" or "metadata OPEN" (an alert), "metadata probe failed" when the container could not run
-  local settings apt image out
+  # hour the probe, from a throwaway container on EVERY network of the VM's containers (C8, step 3 of the plan,
+  # 17 November: before, only the first engine's), with an engine's image: each engine's Compose network, and the
+  # broker's two when they exist. "metadata blocked reti=<n>" when no network reaches the metadata server, otherwise
+  # one "metadata OPEN (dalla rete di <network>)" (an alert) or "metadata probe failed (dalla rete di <network>)" (the
+  # container could not run) for each network that did not answer BLOCKED
+  local settings image net out networks=() bad=0
   if [ -f "${METADATA_FILE}" ] && ! nft list table inet "${METADATA_TABLE}" > /dev/null 2>&1; then
     if (apply_metadata_block > /dev/null 2>&1); then watch_line "metadata block restored"; else watch_line "metadata block missing"; fi
   fi
   hourly_due metadata || return 0
-  settings="$(ls "${OPT}"/*.settings 2>/dev/null | head -1)"
-  [ -n "${settings}" ] || return 0
-  apt="$(basename "${settings}" .settings)"
-  image="$(sed -n 's/^ENGINE_IMAGE=//p' "${settings}")"
-  out="$(timeout 30 docker run --rm --network "domhouse-${apt}_default" --read-only --cap-drop ALL \
-    --security-opt no-new-privileges:true --entrypoint python "${image}" -c \
-    "import urllib.request as u
+  shopt -s nullglob
+  for settings in "${OPT}"/*.settings; do
+    networks+=("domhouse-$(basename "${settings}" .settings)_default")
+    [ -n "${image:-}" ] || image="$(sed -n 's/^ENGINE_IMAGE=//p' "${settings}")"
+  done
+  shopt -u nullglob
+  [ "${#networks[@]}" -gt 0 ] || return 0
+  for net in "${BROKER_NETWORKS[@]}"; do
+    if docker network inspect "${net}" > /dev/null 2>&1; then networks+=("${net}"); fi
+  done
+  for net in "${networks[@]}"; do
+    out="$(timeout 30 docker run --rm --network "${net}" --read-only --cap-drop ALL \
+      --security-opt no-new-privileges:true --entrypoint python "${image}" -c \
+      "import urllib.request as u
 try:
     u.urlopen(u.Request('http://${METADATA_V4}/computeMetadata/v1/instance/zone', headers={'Metadata-Flavor': 'Google'}), timeout=3)
     print('OPEN')
 except Exception:
     print('BLOCKED')" 2>/dev/null || true)"
-  case "${out}" in
-    *OPEN*) watch_line "metadata OPEN (dalla rete di ${apt})" ;;
-    *BLOCKED*) watch_line "metadata blocked" ;;
-    *) watch_line "metadata probe failed (dalla rete di ${apt})" ;;
-  esac
+    case "${out}" in
+      *OPEN*) watch_line "metadata OPEN (dalla rete di ${net})"; bad=1 ;;
+      *BLOCKED*) ;;
+      *) watch_line "metadata probe failed (dalla rete di ${net})"; bad=1 ;;
+    esac
+  done
+  [ "${bad}" -eq 1 ] || watch_line "metadata blocked reti=${#networks[@]}"
 }
 
 data_lines() {

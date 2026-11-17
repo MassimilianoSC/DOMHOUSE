@@ -36,7 +36,10 @@ STUBS = {
     "docker": ('#!/usr/bin/env bash\necho "$* [ENGINE_BIND_IP=${ENGINE_BIND_IP:-}] [ENGINE_MEM_LIMIT=${ENGINE_MEM_LIMIT:-}]" >> "$STUB_DIR/docker.log"\n'
                'if [ "$1" = inspect ]; then cat "$STUB_DIR/state-${!#}" 2>/dev/null; fi\n'
                # E-31: the hourly probe of the metadata server from a container; open only if the test says so
-               'if [ "$1" = run ]; then [ -f "$STUB_DIR/metadata-open" ] && { echo OPEN; exit 0; }; echo BLOCKED; exit 0; fi\nexit 0\n'),
+               # C8: open from one network only with a file metadata-open-<network>; no broker networks with "no-broker"
+               'if [ "$1" = network ] && [ "$2" = inspect ]; then [ -f "$STUB_DIR/no-broker" ] && exit 1; exit 0; fi\n'
+               'if [ "$1" = run ]; then for a in "$@"; do [ -f "$STUB_DIR/metadata-open-$a" ] && { echo OPEN; exit 0; }; done; '
+               '[ -f "$STUB_DIR/metadata-open" ] && { echo OPEN; exit 0; }; echo BLOCKED; exit 0; fi\nexit 0\n'),
     # E-31: nft keeps what it is given with -f; «list table» fails when the test put a file "no-metadata-table"
     "nft": ('#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/nft.log"\n'
             'if [ "$1" = -f ]; then cat "$2" >> "$STUB_DIR/nft-applied"; exit 0; fi\n'
@@ -680,3 +683,40 @@ def test_an_old_settings_file_without_the_connector_gets_simulated_once(vm):
     assert path.read_text(encoding="utf-8").count("CONNECTOR=simulated") == 1
     assert "CONNECTOR=simulated aggiunto" in r.stdout + r.stderr
     assert "compose.broker.yaml" not in (vm.stubs / "docker.log").read_text(encoding="utf-8")
+
+
+# ---- C8 (step 3 of the plan, 17 November): the hourly probe from every network, the broker's too ------------------
+def second_engine(vm, apt="lab-01", port=8169):
+    (vm.opt / f"{apt}.settings").write_text(f"APARTMENT_ID={apt}\nPORT={port}\nCONNECTOR=shelly\nENGINE_IMAGE=x:2\n",
+                                            encoding="utf-8", newline="\n")
+
+
+def probed(vm) -> list[str]:
+    docker = (vm.stubs / "docker.log").read_text(encoding="utf-8")
+    return [line.split("--network ")[1].split()[0] for line in docker.splitlines()
+            if line.startswith("run ") and "--entrypoint python" in line]      # the probe's code goes on other lines
+
+
+def test_c8_the_hourly_probe_tries_every_engine_network_and_the_brokers(vm):
+    second_engine(vm)
+    vm("check-all")
+    assert sorted(probed(vm)) == sorted([f"domhouse-{APT}_default", "domhouse-lab-01_default",
+                                         "domhouse-broker_default", "domhouse-broker-internal"])
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert "metadata blocked reti=4" in syslog and "metadata OPEN" not in syslog
+
+
+def test_c8_one_open_network_is_named_and_nothing_says_blocked(vm):
+    second_engine(vm)
+    (vm.stubs / "metadata-open-domhouse-broker_default").write_text("", encoding="utf-8")
+    vm("check-all")
+    syslog = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    assert "metadata OPEN (dalla rete di domhouse-broker_default)" in syslog
+    assert syslog.count("metadata OPEN") == 1 and "metadata blocked" not in syslog
+
+
+def test_c8_without_the_broker_only_the_engines_networks(vm):
+    (vm.stubs / "no-broker").write_text("", encoding="utf-8")
+    vm("check-all")
+    assert probed(vm) == [f"domhouse-{APT}_default"]
+    assert "metadata blocked reti=1" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
