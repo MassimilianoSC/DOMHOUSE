@@ -35,8 +35,9 @@ STUBS = {
     # sysctl -n <key>: the value in the file sysctl-<key> (0 if missing); anything else recorded
     "sysctl": ("#!/usr/bin/env bash\n" + LOG +
                'if [ "$1" = -n ]; then cat "$STUB_DIR/sysctl-$2" 2>/dev/null || echo 0; fi\nexit 0\n'),
-    "systemctl": "#!/usr/bin/env bash\n" + LOG + "exit 0\n",
-    "systemd-run": "#!/usr/bin/env bash\n" + LOG + "exit 0\n",
+    "systemctl": ("#!/usr/bin/env bash\n" + LOG +
+                  'if [ "$1" = is-active ] && [ -f "$STUB_DIR/timer-inactive" ]; then exit 3; fi\nexit 0\n'),
+    "systemd-run": "#!/usr/bin/env bash\n" + LOG + '[ ! -f "$STUB_DIR/run-fails" ]\n',
     # sshd -t fails when the test put a file "sshd-bad"; sshd -T prints the file sshd-T
     "sshd": ("#!/usr/bin/env bash\n" + LOG +
              'if [ "$1" = -t ]; then [ ! -f "$STUB_DIR/sshd-bad" ]; exit; fi\n'
@@ -151,3 +152,44 @@ def test_check_says_what_is_in_force(host):
     assert "kernel.kptr_restrict 1" in out and "kernel.yama.ptrace_scope 1" in out
     assert "x11forwarding no" in out and "maxauthtries 3" in out and "allowtcpforwarding yes" in out
     assert "porte LLMNR 5355 in ascolto: 0" in out
+
+
+# ---- review of the procedure (17 November): never locked out, confirm only what is pending ---------------------
+def test_the_revert_is_armed_before_the_reload_and_an_old_one_is_stopped_first(host):
+    assert host("apply").returncode == 0
+    log = calls(host)
+    stop, run, reload = (log.index("systemctl stop domhouse-sshd-ritorno.timer"), log.index("systemd-run "),
+                         log.index("systemctl reload ssh"))
+    assert stop < run < reload, log
+    [run_line] = [l for l in log.splitlines() if l.startswith("systemd-run ")]
+    assert "--timer-property=RemainAfterElapse=no" in run_line
+
+
+def test_a_second_apply_arms_the_revert_again(host):
+    assert host("apply").returncode == 0
+    r = host("apply")
+    assert r.returncode == 0, r.stderr
+    assert calls(host).count("systemd-run ") == 2
+
+
+def test_if_the_revert_cannot_be_armed_sshd_is_not_reloaded_and_the_file_goes(host):
+    (host.stubs / "run-fails").write_text("", encoding="utf-8")
+    r = host("apply")
+    assert r.returncode != 0 and "ritorno" in r.stderr
+    assert "systemctl reload ssh" not in calls(host)
+    assert not (host.dirs["sshd_config.d"] / "90-domhouse.conf").exists()
+
+
+def test_confirm_after_the_revert_says_there_is_nothing_to_confirm(host):
+    assert host("apply").returncode == 0
+    assert host("undo-sshd").returncode == 0                     # what the timer runs after 10 minutes
+    r = host("confirm")
+    assert r.returncode != 0 and "già stato tolto" in r.stderr
+    assert "il file di sshd resta" not in r.stdout
+
+
+def test_confirm_without_a_pending_revert_says_so(host):
+    assert host("apply").returncode == 0
+    (host.stubs / "timer-inactive").write_text("", encoding="utf-8")
+    r = host("confirm")
+    assert r.returncode != 0 and "niente da confermare" in r.stderr

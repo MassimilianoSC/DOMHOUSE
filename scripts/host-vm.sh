@@ -61,8 +61,16 @@ apply_sshd() {
     rm -f "${SSHD_DIR}/${NAME}"
     die "sshd -t rifiuta la configurazione: file tolto, sshd non ricaricato"
   fi
+  # the revert is armed BEFORE the reload (review of 17 November): never an sshd changed without its way back. A
+  # revert left from a previous apply is stopped first, and RemainAfterElapse=no lets the same unit name be used again
+  systemctl stop "${REVERT_UNIT}.timer" 2> /dev/null || true
+  systemctl stop "${REVERT_UNIT}.service" 2> /dev/null || true
+  if ! systemd-run --unit="${REVERT_UNIT}" --on-active="${REVERT_S}" --timer-property=RemainAfterElapse=no \
+       /bin/bash "${OPT}/host-vm.sh" undo-sshd > /dev/null; then
+    rm -f "${SSHD_DIR}/${NAME}"
+    die "il ritorno da solo non si arma: file di sshd tolto, sshd non ricaricato"
+  fi
   systemctl reload ssh
-  systemd-run --unit="${REVERT_UNIT}" --on-active="${REVERT_S}" /bin/bash "${OPT}/host-vm.sh" undo-sshd > /dev/null
   echo "sshd ricaricato. Fra $((REVERT_S / 60)) minuti il file si toglie da solo: da una connessione NUOVA lancia"
   echo "  sudo bash ${OPT}/host-vm.sh confirm"
 }
@@ -83,7 +91,11 @@ case "${cmd}" in
     apply_sshd
     ;;
   confirm)
-    systemctl stop "${REVERT_UNIT}.timer" 2> /dev/null || true
+    # only what is pending: after the revert by itself the file is gone, and "the file stays" would be false
+    [ -f "${SSHD_DIR}/${NAME}" ] || die "niente da confermare: il file di sshd è già stato tolto (il ritorno da solo è scattato)"
+    systemctl is-active --quiet "${REVERT_UNIT}.timer" \
+      || die "niente da confermare: nessun ritorno in attesa (già confermato?)"
+    systemctl stop "${REVERT_UNIT}.timer"
     echo "confermato: il file di sshd resta"
     ;;
   undo-sshd)
