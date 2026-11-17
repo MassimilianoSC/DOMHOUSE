@@ -456,3 +456,41 @@ def test_the_admitted_list_cannot_be_widened_from_outside(gcp):
     write(gcp, "asset-sa.json", [entry("roles/iam.serviceAccountTokenCreator", [eighth])])
     out, _ = gcp("staging", dry=True, env=f'AMMESSI_IMPERSONAZIONE="{eighth}"')
     assert out.returncode != 0 and eighth in (out.stdout + out.stderr)
+
+
+# ---- answer 1152 (17 November): who may publish on the orders topic, by exact name --------------------------------
+TOPIC_PREVIEW = Path(__file__).resolve().parent / "dati" / "asset-topic-anteprima-2026-11-17.json"
+OLD_CLOUD_BUILD = "serviceAccount:444239063209@cloudbuild.gserviceaccount.com"
+
+
+def orders_analysis(without=()):
+    """The project's publishers as the read-only analysis of an existing topic showed them (17 November), plus the
+    server's own binding on the orders topic."""
+    real = [e for e in json.loads(TOPIC_PREVIEW.read_text(encoding="utf-8"))
+            if not set(e["policy"]["binding"]["members"]) & set(without)]
+    return real + [entry("roles/pubsub.publisher", [SERVER_SA])]
+
+
+def test_the_publishers_of_answer_1152_pass(gcp):
+    write(gcp, "asset.json", orders_analysis(without=[OLD_CLOUD_BUILD]))
+    out, _ = gcp("staging")
+    text = out.stdout + out.stderr
+    assert out.returncode == 0, text
+    for m in ("gcp-sa-artifactregistry", "gcp-sa-cloudbuild", "container-analysis", "containerregistry",
+              "firebase-rules"):
+        assert f"ammesso (risposta 1152): serviceAccount:service-444239063209@{m}." in text, m
+    assert "controlli superati (dopo)" in out.stdout
+
+
+def test_the_old_cloud_build_account_stops_the_script(gcp):
+    write(gcp, "asset.json", orders_analysis())
+    out, _ = gcp("staging")
+    text = out.stdout + out.stderr
+    assert out.returncode != 0
+    assert f"può pubblicare sulla coda degli ordini anche {OLD_CLOUD_BUILD}" in text
+
+
+def test_the_publishers_list_cannot_be_widened_from_outside(gcp):
+    write(gcp, "asset.json", orders_analysis())
+    out, _ = gcp("staging", env=f'AMMESSI_PUBBLICAZIONE="{OLD_CLOUD_BUILD}"')
+    assert out.returncode != 0 and OLD_CLOUD_BUILD in (out.stdout + out.stderr)

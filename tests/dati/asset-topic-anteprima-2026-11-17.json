@@ -1,0 +1,212 @@
+[
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "pubsub.topics.publish"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:service-444239063209@gcp-sa-artifactregistry.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//pubsub.googleapis.com/projects/domotica-poc-511707/topics/container-analysis-notes-v1"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:service-444239063209@gcp-sa-artifactregistry.iam.gserviceaccount.com"
+        ],
+        "role": "roles/artifactregistry.serviceAgent"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "pubsub.topics.publish"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:444239063209@cloudbuild.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//pubsub.googleapis.com/projects/domotica-poc-511707/topics/container-analysis-notes-v1"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:444239063209@cloudbuild.gserviceaccount.com"
+        ],
+        "role": "roles/cloudbuild.builds.builder"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "pubsub.topics.publish"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:service-444239063209@gcp-sa-cloudbuild.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//pubsub.googleapis.com/projects/domotica-poc-511707/topics/container-analysis-notes-v1"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:service-444239063209@gcp-sa-cloudbuild.iam.gserviceaccount.com"
+        ],
+        "role": "roles/cloudbuild.serviceAgent"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "pubsub.topics.publish"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:service-444239063209@container-analysis.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//pubsub.googleapis.com/projects/domotica-poc-511707/topics/container-analysis-notes-v1"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:service-444239063209@container-analysis.iam.gserviceaccount.com"
+        ],
+        "role": "roles/containeranalysis.ServiceAgent"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "pubsub.topics.publish"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:service-444239063209@containerregistry.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//pubsub.googleapis.com/projects/domotica-poc-511707/topics/container-analysis-notes-v1"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:service-444239063209@containerregistry.iam.gserviceaccount.com"
+        ],
+        "role": "roles/containerregistry.ServiceAgent"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "pubsub.topics.publish"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:service-444239063209@firebase-rules.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//pubsub.googleapis.com/projects/domotica-poc-511707/topics/container-analysis-notes-v1"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:service-444239063209@firebase-rules.iam.gserviceaccount.com"
+        ],
+        "role": "roles/firebaserules.system"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "pubsub.topics.publish"
+          }
+        ],
+        "identities": [
+          {
+            "name": "user:m.scardovellicrac@gmail.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//pubsub.googleapis.com/projects/domotica-poc-511707/topics/container-analysis-notes-v1"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "user:m.scardovellicrac@gmail.com"
+        ],
+        "role": "roles/owner"
+      }
+    }
+  }
+]

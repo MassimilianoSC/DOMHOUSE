@@ -90,15 +90,26 @@ AMMESSI_IMPERSONAZIONE+=",serviceAccount:service-444239063209@compute-system.iam
 AMMESSI_IMPERSONAZIONE+=",serviceAccount:service-444239063209@gcp-sa-pubsub.iam.gserviceaccount.com"
 AMMESSI_IMPERSONAZIONE+=",serviceAccount:service-444239063209@serverless-robot-prod.iam.gserviceaccount.com"
 AMMESSI_IMPERSONAZIONE+=",serviceAccount:firebase-adminsdk-fbsvc@domotica-poc-511707.iam.gserviceaccount.com"
+# Who may publish on the orders topic besides the server, Pub/Sub's agent and PERSONE_AMMESSE: answer 1152 of 17
+# November, by exact name (Google's service agents that publish on any topic of the project from project bindings, as
+# the read-only analysis of an existing topic showed). NOT admitted: 444239063209@cloudbuild.gserviceaccount.com, the
+# old Cloud Build account that runs builds (its builder role is taken away before I3; seen again, the script stops).
+# A closed list, written here and never read from outside
+AMMESSI_PUBBLICAZIONE="serviceAccount:service-444239063209@gcp-sa-artifactregistry.iam.gserviceaccount.com"
+AMMESSI_PUBBLICAZIONE+=",serviceAccount:service-444239063209@gcp-sa-cloudbuild.iam.gserviceaccount.com"
+AMMESSI_PUBBLICAZIONE+=",serviceAccount:service-444239063209@container-analysis.iam.gserviceaccount.com"
+AMMESSI_PUBBLICAZIONE+=",serviceAccount:service-444239063209@containerregistry.iam.gserviceaccount.com"
+AMMESSI_PUBBLICAZIONE+=",serviceAccount:service-444239063209@firebase-rules.iam.gserviceaccount.com"
 CHECKER="$(mktemp)"
 cat > "${CHECKER}" << 'PY'
 import json, sys
 from pathlib import Path
 (work, phase, server, vm, agent, people, orders, results, dead, sub, dead_sub, push_sub, project, endpoint,
- push_email, impersonators) = sys.argv[1:]
+ push_email, impersonators, publishers) = sys.argv[1:]
 work = Path(work)
 people = {f"user:{p.strip()}" for p in people.split(",") if p.strip()}
 impersonators = {m.strip() for m in impersonators.split(",") if m.strip()}         # answer 1151: exact names only
+publishers = {m.strip() for m in publishers.split(",") if m.strip()}               # answer 1152: exact names only
 problems = []
 publish_roles = {"roles/pubsub.publisher", "roles/pubsub.editor", "roles/pubsub.admin", "roles/owner", "roles/editor"}
 read_roles = {"roles/pubsub.subscriber", "roles/pubsub.editor", "roles/pubsub.admin", "roles/owner", "roles/editor"}
@@ -173,6 +184,9 @@ if found is not None:
     for m, role in sorted(found.items()):
         if m in (server, agent) or m in people:
             continue
+        if m in publishers:
+            print(f"può pubblicare sulla coda degli ordini, ammesso (risposta 1152): {m} ({role})")
+            continue
         problems.append(f"può pubblicare sulla coda degli ordini anche {m} ({role})")
 found = analysis("asset-sa.json", "account del server")
 if found is not None:
@@ -246,7 +260,7 @@ checks() {
     || stop "Non leggo chi può impersonare il server dello staging (analisi dei permessi, API Cloud Asset): abilitala o controlla a mano, poi rilancia."
   PYTHONIOENCODING=utf-8 "${PYTHON}" "${CHECKER}" "${WORK}" "$1" "${SERVER}" "${VM}" "${PUBSUB_AGENT}" "${PERSONE_AMMESSE}" \
     "${ORDERS}" "${RESULTS}" "${DEAD}" "${SUB}" "${DEAD_SUB}" "${PUSH_SUB}" "${P}" "${ENDPOINT}" "${PUSH_EMAIL}" \
-    "${AMMESSI_IMPERSONAZIONE}" \
+    "${AMMESSI_IMPERSONAZIONE}" "${AMMESSI_PUBBLICAZIONE}" \
     || { if [ "$1" = "prima" ]; then
            stop "Controlli non superati (prima): niente è stato cambiato. Leggi le righe qui sopra."
          else
