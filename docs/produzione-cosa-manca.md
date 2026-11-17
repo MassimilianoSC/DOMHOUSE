@@ -38,6 +38,7 @@ Si aggiorna a ogni lotto; lo stato di ogni voce è quello del registro. «Da ver
 | **Dati personali, due correzioni** (D-142, P-71) | fatte (log di accesso del server spento, pulizia dei file di ripristino sulla VM) | — |
 | **Collaudo finale**: i collaboratori con la checklist (tutte le sezioni), poi la prova da un capo all'altro con un relè vero (connector di Youssouf, laboratorio) e con i due appartamenti pilota | a fine implementazione | collaboratori, Youssouf, committente |
 | **Accordi**: accettazione della proposta da parte del cliente; accordo con Youssouf (la «soglia contrattuale» del piano, §7) | in corso | committente |
+| **Allineare la produzione con lo strumento A (Autonomia)**: oggi l'agente della VM (A1) e le sue code esistono **solo per lo staging** (code `domhouse-staging-*`, variabili `AGENT_*` solo in `bff/cloudrun.staging.yaml`, agente con `AMBIENTE=staging`; sulla VM condivisa la produzione non manda ordini, §5.4). Per la produzione: seconda VM (A10, passo 15 del piano), poi `agent-gcp.sh prod` con i suoi controlli e gli elenchi chiusi degli ammessi, variabili `AGENT_*` in `bff/cloudrun.yaml`, agente installato sulla VM di produzione, prova con il pulsante | da fare con A10 (richiesta del committente del 17 novembre: «non ci dimenticheremo di allineare la produzione») | o1, comandi del committente |
 
 ## C. Cosa è già a posto
 
