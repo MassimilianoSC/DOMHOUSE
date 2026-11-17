@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Decisione | Chi lancia |
 |---|---|---|---|
-| **Da fare.** Nessun passo provato su questi due modelli | o1, 16 novembre 2026 | risposta 1138 = a | il committente, con Youssouf che guida dalla pagina locale degli Shelly |
+| **Da fare.** Nessun passo provato su questi due modelli. Riletta dalla memoria storica il 17 novembre (versione del segreto ancora 3; §5 aggiornato: catalogo già nel motore) | o1, 16 novembre 2026 | risposta 1138 = a | il committente, con Youssouf che guida dalla pagina locale degli Shelly |
 
 **Dispositivi** (catalogo di Youssouf, `per-youssouf/RISPOSTE-Y/lab-01.yaml`):
 
@@ -309,5 +309,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ## 5. Dopo
 
 - **Alla memoria storica:** l'uscita di ogni passo, tranne quella di 3.1 e 4.1, mai.
-- **Il catalogo nel motore `lab-01`** (i due Shelly e i tre sensori BLU dentro il motore) è un passo separato, dopo l'unione della pull request del catalogo di Youssouf. Finché non c'è, il motore `lab-01`, se è acceso, ignora i due Shelly (una riga di avviso per ciascuno nel suo log).
+- **Il catalogo nel motore `lab-01` c'è già** (aggiornamento della memoria storica, 17 novembre): caricato con C2 di `docs/procedura-difetti-vm.md` (sei dispositivi) e motore aggiornato a `engine:d368f0d`. Quindi, appena ciascuno Shelly si collega, **il motore lo vede subito**: nell'app di staging EM Mini, Shelly 1 («caldaia») e i tre sensori BLU passano da «non in linea» a «in linea». Controllo dopo il passo 4: pagina dei dispositivi di `lab-01`, sei dispositivi in linea, temperatura e batteria dei sensori.
+- **Lo Shelly 1 è la «caldaia» del motore:** appena collegato, il termostato del motore può comandare il relè da solo secondo la temperatura del sensore H&T e la modalità dell'appartamento. A valle c'è solo la ciabatta con la spia: è atteso.
+- **Dopo questa procedura, non prima** (risposte 1153 e 1154 del 17 novembre): Youssouf applica le tre impostazioni approvate (`initial_state` «restore_last», Matter spento, chiamate via Bluetooth spente) e poi prova il firmware 2.x, un dispositivo alla volta.
 - **Se il motore `lab-01` è acceso** durante R2 e R4: due righe «mqtt rpc answer dropped» nel suo log sono attese, come nella tappa A.
