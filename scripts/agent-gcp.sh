@@ -79,14 +79,26 @@ echo "server: ${URL}"
 # The project has no organisation nor folder above it (gcloud projects get-ancestors, 16 November): the analysis
 # with --project sees every binding that counts.
 PERSONE_AMMESSE="${PERSONE_AMMESSE:-m.scardovellicrac@gmail.com}"
+# Who may impersonate the staging server besides itself and PERSONE_AMMESSE: answer 1151 of 17 November, the committente
+# in writing, by exact name (Google's service agents of the project and Firebase's admin account, all from project
+# bindings, as the real analysis of I2 showed). A closed list, written here and never read from outside: any other
+# identity stops the script; never a pattern
+AMMESSI_IMPERSONAZIONE="serviceAccount:service-444239063209@gcp-sa-aiplatform.iam.gserviceaccount.com"
+AMMESSI_IMPERSONAZIONE+=",serviceAccount:service-444239063209@gcp-sa-cloudbuild.iam.gserviceaccount.com"
+AMMESSI_IMPERSONAZIONE+=",serviceAccount:444239063209@cloudservices.gserviceaccount.com"
+AMMESSI_IMPERSONAZIONE+=",serviceAccount:service-444239063209@compute-system.iam.gserviceaccount.com"
+AMMESSI_IMPERSONAZIONE+=",serviceAccount:service-444239063209@gcp-sa-pubsub.iam.gserviceaccount.com"
+AMMESSI_IMPERSONAZIONE+=",serviceAccount:service-444239063209@serverless-robot-prod.iam.gserviceaccount.com"
+AMMESSI_IMPERSONAZIONE+=",serviceAccount:firebase-adminsdk-fbsvc@domotica-poc-511707.iam.gserviceaccount.com"
 CHECKER="$(mktemp)"
 cat > "${CHECKER}" << 'PY'
 import json, sys
 from pathlib import Path
 (work, phase, server, vm, agent, people, orders, results, dead, sub, dead_sub, push_sub, project, endpoint,
- push_email) = sys.argv[1:]
+ push_email, impersonators) = sys.argv[1:]
 work = Path(work)
 people = {f"user:{p.strip()}" for p in people.split(",") if p.strip()}
+impersonators = {m.strip() for m in impersonators.split(",") if m.strip()}         # answer 1151: exact names only
 problems = []
 publish_roles = {"roles/pubsub.publisher", "roles/pubsub.editor", "roles/pubsub.admin", "roles/owner", "roles/editor"}
 read_roles = {"roles/pubsub.subscriber", "roles/pubsub.editor", "roles/pubsub.admin", "roles/owner", "roles/editor"}
@@ -109,19 +121,36 @@ def members(policy, roles):
 
 
 def analysis(name, what):
-    data = load(name)
-    if data is None:
+    """The real output of gcloud asset analyze-iam-policy --format=json (I2, 17 November): a LIST, one element per
+    binding, {"ACLs": [{"identities": [{"name": ...}], ...}], "policy": {"binding": {"role", "members"}}}; empty when
+    nobody. Whether it is complete gcloud says only on stderr («Your analysis request is fully explored.»), kept by the
+    script next to it (<name>.err). Every identity, of the binding and of its ACLs -> its role."""
+    f = work / name
+    if not f.exists():
         return None
-    main = data.get("mainAnalysis") or {}
-    if main.get("fullyExplored") is not True:
-        problems.append(f"analisi dei permessi su {what} non completa (fullyExplored non è true)")
-    if main.get("nonCriticalErrors"):
-        problems.append(f"analisi dei permessi su {what} con errori: {main['nonCriticalErrors']}")
+    err = work / name.replace(".json", ".err")
+    said = err.read_text(encoding="utf-8", errors="replace").lower() if err.exists() else ""
+    if "request is fully explored" not in said or "not fully explored" in said:
+        problems.append(f"analisi dei permessi su {what} non completa (gcloud non dice «fully explored»)")
+    if "error" in said:
+        problems.append(f"analisi dei permessi su {what} con errori: {' '.join(said.split())[:300]}")
+    try:
+        data = json.loads(f.read_text(encoding="utf-8").strip() or "[]")
+    except ValueError:
+        data = None
+    if not isinstance(data, list):
+        problems.append(f"analisi dei permessi su {what}: forma inattesa (non è una lista di binding)")
+        return {}
     found = {}
-    for r in main.get("analysisResults", []):
-        b = r.get("iamBinding") or {}
-        for m in b.get("members", []):
-            found.setdefault(m, b.get("role"))
+    for entry in data:
+        entry = entry if isinstance(entry, dict) else {}
+        binding = (entry.get("policy") or {}).get("binding") or {}
+        names = list(binding.get("members") or [])
+        for acl in entry.get("ACLs") or []:
+            names += [i.get("name") for i in (acl.get("identities") or []) if isinstance(i, dict)]
+        for m in names:
+            if isinstance(m, str):
+                found.setdefault(m, binding.get("role"))
     return found
 
 
@@ -148,7 +177,9 @@ if found is not None:
 found = analysis("asset-sa.json", "account del server")
 if found is not None:
     for m, role in sorted(found.items()):                 # an allow-list: principal://, deleted:, groups… all stop
-        if m != server and m not in people:
+        if m in impersonators:
+            print(f"può impersonare il server, ammesso (risposta 1151): {m} ({role})")
+        elif m != server and m not in people:
             problems.append(f"può impersonare il server dello staging anche {m} ({role})")
 
 
@@ -205,16 +236,17 @@ checks() {
   if [ -f "${WORK}/topic-${ORDERS}.json" ]; then
     gcloud asset analyze-iam-policy --project="${P}" \
       --full-resource-name="//pubsub.googleapis.com/projects/${P}/topics/${ORDERS}" \
-      --permissions=pubsub.topics.publish --format=json > "${WORK}/asset-topic.json" 2> /dev/null \
+      --permissions=pubsub.topics.publish --format=json > "${WORK}/asset-topic.json" 2> "${WORK}/asset-topic.err" \
       || stop "Non leggo chi può pubblicare sulla coda degli ordini (analisi dei permessi, API Cloud Asset): abilitala o controlla a mano, poi rilancia."
   fi
   gcloud asset analyze-iam-policy --project="${P}" \
     --full-resource-name="//iam.googleapis.com/projects/${P}/serviceAccounts/${SERVER#serviceAccount:}" \
     --permissions=iam.serviceAccounts.actAs,iam.serviceAccounts.getAccessToken,iam.serviceAccounts.getOpenIdToken,iam.serviceAccounts.signBlob,iam.serviceAccounts.signJwt,iam.serviceAccounts.implicitDelegation \
-    --format=json > "${WORK}/asset-sa.json" 2> /dev/null \
+    --format=json > "${WORK}/asset-sa.json" 2> "${WORK}/asset-sa.err" \
     || stop "Non leggo chi può impersonare il server dello staging (analisi dei permessi, API Cloud Asset): abilitala o controlla a mano, poi rilancia."
   PYTHONIOENCODING=utf-8 "${PYTHON}" "${CHECKER}" "${WORK}" "$1" "${SERVER}" "${VM}" "${PUBSUB_AGENT}" "${PERSONE_AMMESSE}" \
     "${ORDERS}" "${RESULTS}" "${DEAD}" "${SUB}" "${DEAD_SUB}" "${PUSH_SUB}" "${P}" "${ENDPOINT}" "${PUSH_EMAIL}" \
+    "${AMMESSI_IMPERSONAZIONE}" \
     || { if [ "$1" = "prima" ]; then
            stop "Controlli non superati (prima): niente è stato cambiato. Leggi le righe qui sopra."
          else

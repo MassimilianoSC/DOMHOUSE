@@ -1,0 +1,296 @@
+[
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "iam.serviceAccounts.actAs"
+          },
+          {
+            "permission": "iam.serviceAccounts.getAccessToken"
+          },
+          {
+            "permission": "iam.serviceAccounts.getOpenIdToken"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:service-444239063209@gcp-sa-aiplatform.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//iam.googleapis.com/projects/domotica-poc-511707/serviceAccounts/domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:service-444239063209@gcp-sa-aiplatform.iam.gserviceaccount.com"
+        ],
+        "role": "roles/aiplatform.serviceAgent"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "iam.serviceAccounts.getAccessToken"
+          },
+          {
+            "permission": "iam.serviceAccounts.getOpenIdToken"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:service-444239063209@gcp-sa-cloudbuild.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//iam.googleapis.com/projects/domotica-poc-511707/serviceAccounts/domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:service-444239063209@gcp-sa-cloudbuild.iam.gserviceaccount.com"
+        ],
+        "role": "roles/cloudbuild.serviceAgent"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "iam.serviceAccounts.actAs"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:444239063209@cloudservices.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//iam.googleapis.com/projects/domotica-poc-511707/serviceAccounts/domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:444239063209@cloudservices.gserviceaccount.com"
+        ],
+        "role": "roles/compute.instanceGroupManagerServiceAgent"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "iam.serviceAccounts.actAs"
+          },
+          {
+            "permission": "iam.serviceAccounts.getAccessToken"
+          },
+          {
+            "permission": "iam.serviceAccounts.getOpenIdToken"
+          },
+          {
+            "permission": "iam.serviceAccounts.implicitDelegation"
+          },
+          {
+            "permission": "iam.serviceAccounts.signJwt"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:service-444239063209@compute-system.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//iam.googleapis.com/projects/domotica-poc-511707/serviceAccounts/domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:service-444239063209@compute-system.iam.gserviceaccount.com"
+        ],
+        "role": "roles/compute.serviceAgent"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "iam.serviceAccounts.getAccessToken"
+          },
+          {
+            "permission": "iam.serviceAccounts.getOpenIdToken"
+          },
+          {
+            "permission": "iam.serviceAccounts.signBlob"
+          },
+          {
+            "permission": "iam.serviceAccounts.implicitDelegation"
+          },
+          {
+            "permission": "iam.serviceAccounts.signJwt"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:firebase-adminsdk-fbsvc@domotica-poc-511707.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//iam.googleapis.com/projects/domotica-poc-511707/serviceAccounts/domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:firebase-adminsdk-fbsvc@domotica-poc-511707.iam.gserviceaccount.com"
+        ],
+        "role": "roles/iam.serviceAccountTokenCreator"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "iam.serviceAccounts.actAs"
+          }
+        ],
+        "identities": [
+          {
+            "name": "user:m.scardovellicrac@gmail.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//iam.googleapis.com/projects/domotica-poc-511707/serviceAccounts/domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "user:m.scardovellicrac@gmail.com"
+        ],
+        "role": "roles/owner"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "iam.serviceAccounts.getAccessToken"
+          },
+          {
+            "permission": "iam.serviceAccounts.getOpenIdToken"
+          },
+          {
+            "permission": "iam.serviceAccounts.signBlob"
+          },
+          {
+            "permission": "iam.serviceAccounts.implicitDelegation"
+          },
+          {
+            "permission": "iam.serviceAccounts.signJwt"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:service-444239063209@gcp-sa-pubsub.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//iam.googleapis.com/projects/domotica-poc-511707/serviceAccounts/domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:service-444239063209@gcp-sa-pubsub.iam.gserviceaccount.com"
+        ],
+        "role": "roles/pubsub.serviceAgent"
+      }
+    }
+  },
+  {
+    "ACLs": [
+      {
+        "accesses": [
+          {
+            "permission": "iam.serviceAccounts.actAs"
+          },
+          {
+            "permission": "iam.serviceAccounts.getAccessToken"
+          },
+          {
+            "permission": "iam.serviceAccounts.getOpenIdToken"
+          },
+          {
+            "permission": "iam.serviceAccounts.signBlob"
+          }
+        ],
+        "identities": [
+          {
+            "name": "serviceAccount:service-444239063209@serverless-robot-prod.iam.gserviceaccount.com"
+          }
+        ],
+        "resources": [
+          {
+            "fullResourceName": "//iam.googleapis.com/projects/domotica-poc-511707/serviceAccounts/domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com"
+          }
+        ]
+      }
+    ],
+    "policy": {
+      "attachedResource": "//cloudresourcemanager.googleapis.com/projects/domotica-poc-511707",
+      "binding": {
+        "members": [
+          "serviceAccount:service-444239063209@serverless-robot-prod.iam.gserviceaccount.com"
+        ],
+        "role": "roles/run.serviceAgent"
+      }
+    }
+  }
+]

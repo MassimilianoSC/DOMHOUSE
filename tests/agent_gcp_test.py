@@ -60,6 +60,14 @@ def answer(name, default):
     sys.exit(0)
 
 
+def entry(role, members):
+    """One element of the real output (I2, 17 November): a binding and the identities of its ACLs."""
+    return {"ACLs": [{"accesses": [{"permission": "x"}], "identities": [{"name": m} for m in members],
+                      "resources": [{"fullResourceName": "//x"}]}],
+            "policy": {"attachedResource": f"//cloudresourcemanager.googleapis.com/projects/{p}",
+                       "binding": {"role": role, "members": members}}}
+
+
 if "topics get-iam-policy" in line:
     name = args[args.index("get-iam-policy") + 1]
     who = {"domhouse-staging-ordini": server, "domhouse-staging-risultati": vm, "domhouse-staging-scarti": agent}[name]
@@ -70,10 +78,15 @@ if "subscriptions get-iam-policy" in line:
 if "asset analyze-iam-policy" in line:
     if (d / "asset-fails").exists():
         sys.exit(1)
+    # what gcloud writes on stderr: complete unless the test put "asset-partial"; an error with "asset-errors"
+    print("Your analysis request is NOT fully explored." if (d / "asset-partial").exists() else
+          "Your analysis request is fully explored. The ACLs matching your requests are listed per IAM policy "
+          "binding, so there could be duplications.", file=sys.stderr)
+    if (d / "asset-errors").exists():
+        print("ERROR: non-critical error while exploring a resource", file=sys.stderr)
     if "serviceAccounts/" in line:
-        answer("asset-sa.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": []}})
-    answer("asset.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": [
-        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [server]}}]}})
+        answer("asset-sa.json", [])
+    answer("asset.json", [entry("roles/pubsub.publisher", [server])])
 name = args[args.index("describe") + 1]
 if not ((d / f"made-{name}").exists() or (d / "exists").exists()):
     sys.exit(1)
@@ -140,6 +153,14 @@ def gcp(tmp_path):
 
     run.stubs = stubs
     return run
+
+
+def entry(role, members):
+    """One element of the real output of gcloud asset analyze-iam-policy --format=json (I2, 17 November)."""
+    return {"ACLs": [{"accesses": [{"permission": "x"}], "identities": [{"name": m} for m in members],
+                      "resources": [{"fullResourceName": "//x"}]}],
+            "policy": {"attachedResource": f"//cloudresourcemanager.googleapis.com/projects/{P}",
+                       "binding": {"role": role, "members": members}}}
 
 
 def creates(calls: str) -> list[str]:
@@ -242,17 +263,15 @@ def test_r3_another_publisher_on_the_orders_topic_stops_the_script(gcp):
 
 
 def test_r3_a_service_account_that_can_publish_from_the_project_stops_it_an_admitted_person_does_not(gcp):
-    write(gcp, "asset.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": [
-        {"iamBinding": {"role": "roles/owner", "members": ["user:proprietario@example.com"]}},
-        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [SERVER_SA]}}]}})
+    write(gcp, "asset.json", [entry("roles/owner", ["user:proprietario@example.com"]),
+                              entry("roles/pubsub.publisher", [SERVER_SA])])
     out, _ = gcp("staging", env="PERSONE_AMMESSE=proprietario@example.com")
     assert out.returncode == 0, out.stderr + out.stdout
     assert "proprietario@example.com" in out.stdout                        # listed, accepted: an admitted person
     out, _ = gcp("staging")                                                 # R3-d: not in PERSONE_AMMESSE: stops
     assert out.returncode != 0 and "proprietario@example.com" in (out.stderr + out.stdout)
-    write(gcp, "asset.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": [
-        {"iamBinding": {"role": "roles/editor", "members": ["serviceAccount:444239063209-compute@developer.gserviceaccount.com"]}},
-        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [SERVER_SA]}}]}})
+    write(gcp, "asset.json", [entry("roles/editor", ["serviceAccount:444239063209-compute@developer.gserviceaccount.com"]),
+                              entry("roles/pubsub.publisher", [SERVER_SA])])
     out, _ = gcp("staging")
     assert out.returncode != 0 and "compute@developer" in (out.stderr + out.stdout)
 
@@ -302,22 +321,23 @@ def test_r3a_an_existing_resource_that_differs_stops_before_any_write(gcp):
     assert creates(calls) == []                                              # nothing written
 
 
-@pytest.mark.parametrize("analysis, says", [
-    ({"mainAnalysis": {"fullyExplored": True, "analysisResults": []}}, "non vede il server"),
-    ({"mainAnalysis": {"fullyExplored": False, "analysisResults": [
-        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [SERVER_SA]}}]}}, "non completa"),
-    ({"mainAnalysis": {"fullyExplored": True, "nonCriticalErrors": [{"cause": "x"}], "analysisResults": [
-        {"iamBinding": {"role": "roles/pubsub.publisher", "members": [SERVER_SA]}}]}}, "con errori"),
+@pytest.mark.parametrize("analysis, flag, says", [
+    ([], None, "non vede il server"),
+    (None, "asset-partial", "non completa"),                   # gcloud does not say «fully explored» on stderr
+    (None, "asset-errors", "con errori"),
+    ({"mainAnalysis": {}}, None, "forma inattesa"),             # not the list of the real output
 ])
-def test_r3b_an_analysis_that_cannot_be_trusted_stops(gcp, analysis, says):
-    write(gcp, "asset.json", analysis)
+def test_r3b_an_analysis_that_cannot_be_trusted_stops(gcp, analysis, flag, says):
+    if analysis is not None:
+        write(gcp, "asset.json", analysis)
+    if flag:
+        (gcp.stubs / flag).write_text("", encoding="utf-8")
     out, _ = gcp("staging")
     assert out.returncode != 0 and says in (out.stderr + out.stdout)
 
 
 def test_r3c_the_vm_must_not_impersonate_the_server(gcp):
-    write(gcp, "asset-sa.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": [
-        {"iamBinding": {"role": "roles/iam.serviceAccountTokenCreator", "members": [VM_SA]}}]}})
+    write(gcp, "asset-sa.json", [entry("roles/iam.serviceAccountTokenCreator", [VM_SA])])
     out, calls = gcp("staging")
     assert out.returncode != 0 and "impersonare" in (out.stderr + out.stdout)
     assert "serviceAccounts/domotica-bff-staging@" in calls
@@ -353,8 +373,7 @@ def test_r3e_topics_publishers_of_the_results_and_readers_of_the_orders(gcp):
                                     "principalSet://iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/*",
                                     "deleted:serviceAccount:vecchio@x.iam.gserviceaccount.com?uid=1"])
 def test_impersonation_only_the_server_and_the_admitted_persons(gcp, member):
-    write(gcp, "asset-sa.json", {"mainAnalysis": {"fullyExplored": True, "analysisResults": [
-        {"iamBinding": {"role": "roles/iam.serviceAccountTokenCreator", "members": [member]}}]}})
+    write(gcp, "asset-sa.json", [entry("roles/iam.serviceAccountTokenCreator", [member])])
     out, _ = gcp("staging")
     assert out.returncode != 0 and "impersonare" in (out.stderr + out.stdout)
 
@@ -391,3 +410,49 @@ def test_without_any_python_it_stops_before_reading_anything(gcp):
     out, calls = gcp("staging", dry=True)                     # both names answer from the stand-ins, first in PATH
     assert out.returncode != 0 and "Manca Python 3" in out.stderr
     assert calls == ""
+
+
+# ---- I2, 17 November: the real output, and answer 1151 (who may impersonate the server, by exact name) -------------
+REAL = Path(__file__).resolve().parent / "dati" / "asset-sa-vero-2026-11-17.json"
+ADMITTED_1151 = [f"serviceAccount:service-444239063209@gcp-sa-aiplatform.iam.gserviceaccount.com",
+                 "serviceAccount:service-444239063209@gcp-sa-cloudbuild.iam.gserviceaccount.com",
+                 "serviceAccount:444239063209@cloudservices.gserviceaccount.com",
+                 "serviceAccount:service-444239063209@compute-system.iam.gserviceaccount.com",
+                 "serviceAccount:service-444239063209@gcp-sa-pubsub.iam.gserviceaccount.com",
+                 "serviceAccount:service-444239063209@serverless-robot-prod.iam.gserviceaccount.com",
+                 f"serviceAccount:firebase-adminsdk-fbsvc@{P}.iam.gserviceaccount.com"]
+
+
+def test_the_real_output_of_i2_passes_with_the_seven_of_answer_1151(gcp):
+    (gcp.stubs / "asset-sa.json").write_text(REAL.read_text(encoding="utf-8"), encoding="utf-8")
+    out, _ = gcp("staging", dry=True)
+    text = out.stdout + out.stderr
+    assert out.returncode == 0, text
+    for m in ADMITTED_1151:
+        assert f"ammesso (risposta 1151): {m}" in out.stdout, m
+    assert "controlli superati (prima)" in out.stdout
+
+
+def test_an_eighth_account_that_can_impersonate_the_server_stops_the_script(gcp):
+    eighth = f"serviceAccount:ottavo@{P}.iam.gserviceaccount.com"
+    real = json.loads(REAL.read_text(encoding="utf-8"))
+    (gcp.stubs / "asset-sa.json").write_text(json.dumps(real + [entry("roles/iam.serviceAccountTokenCreator", [eighth])]),
+                                             encoding="utf-8")
+    out, calls = gcp("staging", dry=True)
+    text = out.stdout + out.stderr
+    assert out.returncode != 0 and f"può impersonare il server dello staging anche {eighth}" in text
+    assert "niente è stato cambiato" in text and creates(calls) == []
+
+
+def test_the_list_is_by_exact_name_a_similar_one_stops(gcp):
+    similar = "serviceAccount:service-444239063209@gcp-sa-aiplatform-cc.iam.gserviceaccount.com"
+    write(gcp, "asset-sa.json", [entry("roles/aiplatform.serviceAgent", [similar])])
+    out, _ = gcp("staging", dry=True)
+    assert out.returncode != 0 and similar in (out.stdout + out.stderr)
+
+
+def test_the_admitted_list_cannot_be_widened_from_outside(gcp):
+    eighth = f"serviceAccount:ottavo@{P}.iam.gserviceaccount.com"
+    write(gcp, "asset-sa.json", [entry("roles/iam.serviceAccountTokenCreator", [eighth])])
+    out, _ = gcp("staging", dry=True, env=f'AMMESSI_IMPERSONAZIONE="{eighth}"')
+    assert out.returncode != 0 and eighth in (out.stdout + out.stderr)
