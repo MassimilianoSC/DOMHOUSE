@@ -24,7 +24,7 @@ case "$*" in
 esac
 case "$*" in
   *"get-iam-policy"*|*"asset analyze-iam-policy"*|*"subscriptions describe"*)
-    exec python3 "$STUB_DIR/stub.py" "$@" ;;
+    exec realpy "$STUB_DIR/stub.py" "$@" ;;
   *"projects describe"*) echo 444239063209; exit 0 ;;
   *"run services describe"*"run.googleapis.com/urls"*)
     [ -f "$STUB_DIR/stable-url" ] && echo '["https://domotica-bff-staging-444239063209.europe-west8.run.app","__URL__"]'
@@ -124,9 +124,10 @@ def gcp(tmp_path):
     (stubs / "gcloud").write_text(GCLOUD.replace("__URL__", URL).replace("__P__", P), encoding="utf-8", newline="\n")
     (stubs / "gcloud").chmod(0o755)
     (stubs / "stub.py").write_text(STUB_PY.replace("__URL__", URL).replace("__P__", P), encoding="utf-8")
-    (stubs / "python3").write_text(f'#!/usr/bin/env bash\nexec "{posix(Path(sys.executable))}" "$@"\n',
-                                   encoding="utf-8", newline="\n")
-    (stubs / "python3").chmod(0o755)
+    for name in ("realpy", "python3"):
+        (stubs / name).write_text(f'#!/usr/bin/env bash\nexec "{posix(Path(sys.executable))}" "$@"\n',
+                                  encoding="utf-8", newline="\n")
+        (stubs / name).chmod(0o755)
 
     def run(*args, dry=False, env=""):
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}" {env}; '
@@ -364,3 +365,29 @@ def test_the_stop_message_before_writing_says_nothing_changed(gcp):
     out, _ = gcp("staging")
     text = out.stderr + out.stdout
     assert "Controlli non superati (prima): niente è stato cambiato." in text and "cambiatoprima" not in text
+
+
+# ---- 17 November, I2 on the committente's PC: python3 is the empty alias of the Microsoft Store ----------------------
+WINDOWS_ALIAS = ('#!/usr/bin/env bash\necho "Python non è stato trovato; eseguire senza argomenti per installare da '
+                 'Microsoft Store" >&2\nexit 9009\n')
+
+
+def test_with_the_store_alias_for_python3_the_script_uses_python(gcp):
+    (gcp.stubs / "python3").write_text(WINDOWS_ALIAS, encoding="utf-8", newline="\n")
+    (gcp.stubs / "python").write_text(f'#!/usr/bin/env bash\nexec "{posix(Path(sys.executable))}" "$@"\n',
+                                      encoding="utf-8", newline="\n")
+    (gcp.stubs / "python").chmod(0o755)
+    out, calls = gcp("staging", dry=True)
+    text = out.stdout + out.stderr
+    assert out.returncode == 0, text
+    assert "non è stato trovato" not in text and "controlli superati (prima)" in text
+    assert creates(calls) == []
+
+
+def test_without_any_python_it_stops_before_reading_anything(gcp):
+    (gcp.stubs / "python3").write_text(WINDOWS_ALIAS, encoding="utf-8", newline="\n")
+    (gcp.stubs / "python").write_text(WINDOWS_ALIAS, encoding="utf-8", newline="\n")
+    (gcp.stubs / "python").chmod(0o755)
+    out, calls = gcp("staging", dry=True)                     # both names answer from the stand-ins, first in PATH
+    assert out.returncode != 0 and "Manca Python 3" in out.stderr
+    assert calls == ""

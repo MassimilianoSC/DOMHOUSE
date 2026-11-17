@@ -45,6 +45,15 @@ VM="serviceAccount:langbrain-vm@${P}.iam.gserviceaccount.com"
 SERVER="serviceAccount:domotica-bff-${ENVIRONMENT}@${P}.iam.gserviceaccount.com"
 PUSH_NAME="domhouse-push-${ENVIRONMENT}"; PUSH_EMAIL="${PUSH_NAME}@${P}.iam.gserviceaccount.com"
 
+# The PC's Python (I2, 17 November): on Windows «python3» may be the empty alias of the Microsoft Store, which only
+# prints «Python non è stato trovato…» and fails. The first of python3 and python that really runs Python 3, checked
+# before anything is read (scripts/monitoring/engine-alerts.sh falls back to python the same way)
+PYTHON=""
+for candidate in python3 python; do
+  if "${candidate}" -c 'import sys; sys.exit(sys.version_info < (3, 8))' > /dev/null 2>&1; then PYTHON="${candidate}"; break; fi
+done
+[ -n "${PYTHON}" ] || stop "Manca Python 3 su questo PC: né python3 né python funzionano (su Windows: python.org, non Microsoft Store)."
+
 echo "Progetto ${P} · ambiente ${ENVIRONMENT}${DRY_RUN:+ · PROVA A SECCO}"
 NUMBER="$(gcloud projects describe "${P}" --format='value(projectNumber)')"
 [[ "${NUMBER}" =~ ^[0-9]+$ ]] || stop "Non leggo il numero del progetto."
@@ -204,7 +213,7 @@ checks() {
     --permissions=iam.serviceAccounts.actAs,iam.serviceAccounts.getAccessToken,iam.serviceAccounts.getOpenIdToken,iam.serviceAccounts.signBlob,iam.serviceAccounts.signJwt,iam.serviceAccounts.implicitDelegation \
     --format=json > "${WORK}/asset-sa.json" 2> /dev/null \
     || stop "Non leggo chi può impersonare il server dello staging (analisi dei permessi, API Cloud Asset): abilitala o controlla a mano, poi rilancia."
-  PYTHONIOENCODING=utf-8 python3 "${CHECKER}" "${WORK}" "$1" "${SERVER}" "${VM}" "${PUBSUB_AGENT}" "${PERSONE_AMMESSE}" \
+  PYTHONIOENCODING=utf-8 "${PYTHON}" "${CHECKER}" "${WORK}" "$1" "${SERVER}" "${VM}" "${PUBSUB_AGENT}" "${PERSONE_AMMESSE}" \
     "${ORDERS}" "${RESULTS}" "${DEAD}" "${SUB}" "${DEAD_SUB}" "${PUSH_SUB}" "${P}" "${ENDPOINT}" "${PUSH_EMAIL}" \
     || { if [ "$1" = "prima" ]; then
            stop "Controlli non superati (prima): niente è stato cambiato. Leggi le righe qui sopra."
@@ -270,7 +279,7 @@ CHANNEL="$(gcloud beta monitoring channels list --project="${P}" --filter="displ
   --format='value(name)' | head -1)"
 [ -n "${CHANNEL}" ] || stop "Nessun canale «${CHANNEL_NAME}»: crealo prima con scripts/monitoring/setup.sh."
 for file in "${HERE}"/agent/allarmi/*.json; do
-  name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["displayName"])' "${file}")"
+  name="$("${PYTHON}" -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["displayName"])' "${file}")"
   if [ -n "$(gcloud alpha monitoring policies list --project="${P}" --filter="displayName=\"${name}\"" --format='value(name)' 2>/dev/null)" ]; then
     echo "«${name}»: esiste già"; continue
   fi
