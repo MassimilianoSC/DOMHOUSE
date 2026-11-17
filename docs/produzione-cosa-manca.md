@@ -91,3 +91,28 @@ senza una decisione scritta. Il primo è già deciso.
 
 **Regola da qui in avanti:** quando un controllo trova un difetto di un tipo nuovo, si aggiunge una riga in D.2 per quel
 tipo, e si valuta se ripetere quel controllo su tutto il sistema.
+
+## E. Da fare alla consegna al cliente (passaggio del progetto)
+
+*Sezione aggiunta il 17 novembre 2026 su richiesta del committente: «è bene che queste informazioni siano salvate in un
+file (del tipo: da fare alla vendita al cliente)». È il dettaglio della voce P-81 del registro e del passo 16 del piano
+generale. Si fa prima della consegna; fino ad allora paga e amministra il committente.*
+
+**Chi ha i poteri oggi:** una sola persona, il committente (`m.scardovellicrac@gmail.com`). Alla consegna i poteri passano
+a una persona del cliente.
+
+| N. | Che cosa passa | Oggi | Alla consegna | Stato |
+|---|---|---|---|---|
+| E1 | **Proprietario del progetto Google Cloud** (`domotica-poc-511707`) | il committente | la persona del cliente | da fare |
+| E2 | **Chi può mandare ordini all'agente sulla VM** (Autonomia, A1): elenco `PERSONE_AMMESSE` in `scripts/agent-gcp.sh` | solo il committente | la persona del cliente: si cambia il nome e si rilancia `agent-gcp.sh`, i cui controlli verificano il nuovo elenco. I sette account di Google e Firebase ammessi con la risposta 1151 restano | da fare |
+| E3 | **Accesso alla VM** (OS Login e tunnel IAP) | il committente | la persona del cliente | da fare |
+| E4 | **Firebase** (accessi all'app, sito, notifiche) | il committente | la persona del cliente | da fare |
+| E5 | **GitHub** (repository `MassimilianoSC/DOMHOUSE`, Youssouf collaboratore) | il committente | da decidere: passaggio del repository o copia per il cliente | da fare |
+| E6 | **Fatturazione** (account di fatturazione Google Cloud o organizzazione del cliente; budget e avvisi di spesa da rifare; i crediti non passano) | paga il committente | paga il cliente | da fare (P-81) |
+| E7 | **Email degli allarmi** | `m.cracchiolo@hqe.it` | probabilmente il cliente | da decidere (P-81) |
+
+**Da decidere con il cliente:**
+
+1. chi è la sua persona con i poteri;
+2. se il committente resta con un accesso di assistenza, e con quali poteri (D-225);
+3. quando si fa il passaggio e come si verifica che tutto funzioni dopo.
