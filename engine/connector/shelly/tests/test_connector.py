@@ -6,6 +6,7 @@ No pytest-asyncio: asyncio.run per test.
 import asyncio
 import copy
 import json
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -25,7 +26,7 @@ from . import fake_device
 from .fake_device import FakeBluDoorWindow, FakeBluHT, FakeBluMotion, FakeMiniEMG4, FakePlugMG3, FakeS1G4
 from .fake_mqtt import load_capture
 from .fake_transport import FakeTransport
-from .harness import CATALOG_YAML, FAKE_MQTT_ENV
+from .harness import CATALOG_YAML, FAKE_MQTT_ENV, PLUG_DEVICE_ID, PLUG_SHELLY_ID
 
 SID_A, SID_B = "shellyplugmg3-000000000001", "shellyplugmg3-000000000002"
 DEV_A, DEV_B = "dev-presa-a", "dev-presa-b"
@@ -563,6 +564,149 @@ def test_make_connector_errors_are_clear(tmp_path):
     with pytest.raises(CatalogError) as info:
         make_connector(config(tmp_path, catalog_text=CATALOG_YAML.replace("type: plug", "type: tostapane")))
     assert "shelly.type" in str(info.value) and "tostapane" not in str(info.value)
+
+
+# --- the empty catalog (decision 1140: a new apartment's engine starts with it; the VM agent restarts it) ----------
+
+EMPTY_CATALOG_YAML = "rooms: []\ndevices: []\n"
+
+
+def test_connector_with_the_empty_catalog_runs_and_ignores_every_shelly(warnings):
+    """No devices: start() connects, the status is up, nothing goes out, the silence check and the BLU reads have
+    nothing to do; a Shelly that speaks is ignored with one warning; a command is an unknown device; stop() is clean."""
+    stranger = FakePlugMG3("shellyplugmg3-0000000000ff")
+    transport = FakeTransport(stranger, announce_on_start=True)
+
+    async def main():
+        conn = ShellyConnector(parse_catalog({"rooms": [], "devices": []}, load_thresholds()), transport)
+        assert (conn.rooms(), conn.devices()) == ([], [])
+        changes: list[StateChange] = []
+
+        async def read():
+            async for change in conn.changes():
+                changes.append(change)
+        await conn.start()
+        reader = asyncio.get_running_loop().create_task(read())
+        assert conn.status().up
+        stranger.press_button()
+        stranger.add_energy(3)
+        await asyncio.sleep(0.3)
+        assert changes == [] and conn.devices() == [] and conn.status().up
+        result = await conn.execute(cmd(True), lambda s: pytest.fail("no progress for an unknown device"))
+        assert (result.outcome, result.reason, result.detail) == ("failed", "internal_error", "unknown device")
+        await conn.stop()
+        await asyncio.wait_for(reader, 2)
+        assert not conn.status().up
+        return changes
+    assert asyncio.run(asyncio.wait_for(main(), 20)) == []
+    assert [f for m, f in warnings if m == "unknown shelly device ignored"] == [
+        {"shelly_id": "shellyplugmg3-0000000000ff"}]
+    assert [m for m, _ in warnings if m != "unknown shelly device ignored"] == []
+    # only what the stranger itself answered to: no RPC of the connector to a device of its own
+    assert all(sid == "shellyplugmg3-0000000000ff" for sid, *_ in transport.calls)
+
+
+def test_make_connector_reads_the_empty_catalog(tmp_path):
+    conn = make_connector(config(tmp_path, catalog_text=EMPTY_CATALOG_YAML))
+    assert (conn.rooms(), conn.devices()) == ([], []) and isinstance(conn._transport, MqttTransport)
+    with pytest.raises(CatalogError, match="must be a mapping"):         # an empty file stays refused
+        make_connector(config(tmp_path, catalog_text=""))
+
+
+ENGINE_KEY = "prova-chiave-0123456789"
+ENGINE_HEADERS = {"X-API-Key": ENGINE_KEY, "X-Actor": "prova@hqe.it",
+                  "X-Correlation-Id": "2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10"}
+
+
+def engine_app(tmp_path, monkeypatch, catalog_text, *fakes):
+    """The engine as python -m engine builds it with CONNECTOR=shelly (load_connector, make_connector, the catalog at
+    DATA_DIR/catalog.yaml), the MQTT transport replaced by a FakeTransport: no network."""
+    from engine.config import load_config
+    from engine.service import create_engine_app
+    (tmp_path / "catalog.yaml").write_text(catalog_text, encoding="utf-8")
+    transport = FakeTransport(*fakes, announce_on_start=True)
+    monkeypatch.setattr(MqttTransport, "from_config", classmethod(lambda cls, cfg: transport))
+    cfg = load_config({"APARTMENT_ID": "apt-prova-01", "API_KEY": ENGINE_KEY, "CONNECTOR": "shelly",
+                       "DATA_DIR": str(tmp_path), **FAKE_MQTT_ENV})
+    return create_engine_app(cfg)
+
+
+def test_engine_starts_and_answers_with_the_empty_catalog(tmp_path, monkeypatch):
+    """The health the VM agent waits for (scripts/engine-vm.sh, wait_healthy: /api/v1/health 200) and every read of
+    the contract, with no rooms and no devices: 200 and empty lists, never a 500."""
+    from starlette.testclient import TestClient
+    now = datetime.now(UTC).replace(microsecond=0)
+    week = {"from": (now - timedelta(days=7)).isoformat().replace("+00:00", "Z"),
+            "to": now.isoformat().replace("+00:00", "Z")}
+    with TestClient(engine_app(tmp_path, monkeypatch, EMPTY_CATALOG_YAML)) as client:
+        health = client.get("/api/v1/health", headers={"X-API-Key": ENGINE_KEY})
+        assert health.status_code == 200, health.text
+        assert health.json()["status"] == "ok" and health.json()["connector"]["status"] == "up"
+        assert health.json()["connector"]["connected_devices"] == 0
+        devices = client.get("/api/v1/devices", headers=ENGINE_HEADERS)
+        assert devices.status_code == 200 and devices.json()["devices"] == [] and devices.json()["rooms"] == []
+        for path, params in [("/api/v1/apartment", None), ("/api/v1/rules", None), ("/api/v1/decisions", None),
+                             ("/api/v1/approvals", None), ("/api/v1/schedule", None), ("/api/v1/version", None),
+                             ("/api/v1/energy", week), ("/api/v1/energy", {**week, "bucket": "hour"})]:
+            answer = client.get(path, headers=ENGINE_HEADERS, params=params)
+            assert answer.status_code == 200, (path, params, answer.status_code, answer.text[:300])
+        # the inner loop turns with nothing to watch: still healthy a moment later
+        time.sleep(1.5)
+        assert client.get("/api/v1/health", headers={"X-API-Key": ENGINE_KEY}).json()["status"] == "ok"
+        mode = client.post("/api/v1/apartment/mode", headers=ENGINE_HEADERS,
+                           json={"mode": "away"})
+        assert mode.status_code < 500, mode.text[:300]
+
+
+def test_restart_with_a_new_catalog_keeps_what_the_engine_saved(tmp_path, monkeypatch):
+    """Solution A without Docker: the engine with the empty catalog, stopped; the catalog rewritten with a Plug, same
+    DATA_DIR; a new engine: the Plug is there, and what the engine had saved (a rule changed, the id counter) still
+    is. Then the Plug taken out of the catalog at the next restart: it is gone from /devices (what stays of it in
+    engine.db is reported, not decided here: A4, «sostituzione di un dispositivo»)."""
+    from starlette.testclient import TestClient
+    with TestClient(engine_app(tmp_path, monkeypatch, EMPTY_CATALOG_YAML)) as client:
+        rules = client.get("/api/v1/rules", headers=ENGINE_HEADERS).json()
+        rule = next(r for r in rules["rules"] if r["rule_id"] == "window_open_off")
+        changed = client.put("/api/v1/rules", headers=ENGINE_HEADERS,
+                             json={"rules": [{"rule_id": rule["rule_id"], "enabled": not rule["enabled"]}]})
+        assert changed.status_code == 200, changed.text[:300]
+    plug = FakePlugMG3(PLUG_SHELLY_ID, on=False, energy_wh=1000.0)
+    with TestClient(engine_app(tmp_path, monkeypatch, CATALOG_YAML, plug)) as client:
+        for _ in range(100):
+            devices = client.get("/api/v1/devices", headers=ENGINE_HEADERS).json()["devices"]
+            if devices and devices[0]["online"]:
+                break
+            time.sleep(0.05)
+        assert [d["device_id"] for d in devices] == [PLUG_DEVICE_ID] and devices[0]["online"]
+        rules = client.get("/api/v1/rules", headers=ENGINE_HEADERS).json()
+        assert next(r for r in rules["rules"] if r["rule_id"] == "window_open_off")["enabled"] != rule["enabled"]
+        command = client.post(f"/api/v1/devices/{PLUG_DEVICE_ID}/commands",
+                              headers={**ENGINE_HEADERS, "X-Correlation-Id": "6b1e3c2a-0d4f-4a7e-9c1b-2f3a4b5c6d01"},
+                              json={"capability": "switch", "action": "turn_on"})
+        assert command.status_code == 202, command.text[:300]
+        first_id = command.json()["command_id"]
+        for _ in range(100):
+            if client.get(f"/api/v1/commands/{first_id}", headers=ENGINE_HEADERS).json()["status"] == "acked":
+                break
+            time.sleep(0.05)
+    with TestClient(engine_app(tmp_path, monkeypatch, EMPTY_CATALOG_YAML)) as client:
+        assert client.get("/api/v1/devices", headers=ENGINE_HEADERS).json()["devices"] == []
+        assert client.get("/api/v1/health", headers={"X-API-Key": ENGINE_KEY}).status_code == 200
+        # what the engine saved stays: the Plug's command is still there, though the Plug is no longer in the catalog
+        kept = client.get(f"/api/v1/commands/{first_id}", headers=ENGINE_HEADERS)
+        assert kept.status_code == 200 and kept.json()["device_id"] == PLUG_DEVICE_ID
+        assert kept.json()["status"] == "acked"
+    with TestClient(engine_app(tmp_path, monkeypatch, CATALOG_YAML, FakePlugMG3(PLUG_SHELLY_ID, energy_wh=1000.0))) \
+            as client:
+        # the id counter survived the restarts: a new command never gets the id of the first
+        for _ in range(100):
+            if client.get("/api/v1/devices", headers=ENGINE_HEADERS).json()["devices"][0]["online"]:
+                break
+            time.sleep(0.05)
+        again = client.post(f"/api/v1/devices/{PLUG_DEVICE_ID}/commands",
+                            headers={**ENGINE_HEADERS, "X-Correlation-Id": "6b1e3c2a-0d4f-4a7e-9c1b-2f3a4b5c6d02"},
+                            json={"capability": "switch", "action": "turn_off"})
+        assert again.status_code == 202 and again.json()["command_id"] != first_id
 
 
 # --- Shelly 1 Gen4 and EM Mini Gen4 ------------------------------------------------------------------------------
