@@ -45,20 +45,22 @@ Come al §6.2 di o2, con tre precisazioni.
 | `version` | intero | per il blocco (§3); parte da 1, +1 a ogni azione |
 | `updated_at` | data e ora ISO | l'ultima azione di una persona |
 | `updated_by` | nome visibile o null | dal registro dei nomi (`actors`), mai l'email |
-| `azione` | `registra` · `rigenera` · `revoca` · `riprova` | l'ultima: serve al sito per «Non applicato» (dice cosa non è stato applicato) |
+| `azione` | `registra` · `rigenera` · `revoca` o null | l'azione **in attesa di conferma**, null quando non ce n'è; «Riprova» non la cambia (§11, punto 1): così con `non_applicato` il sito sa sempre cosa non è stato applicato, revoca compresa |
+| `engine_device_id` | stringa o null | **solo con A4**: il `device_id` del motore (`dev-presa-lab`) legato a questo id Shelly dal catalogo; prima di A4 sempre null (§11, punto 3) |
 | `op` | `{op_id, stato, messaggio}` o null | l'ultimo ordine verso il broker; `messaggio` in italiano come in «Prova l'agente»; `op_id` è l'«ID richiesta» |
-| `connection` | `{server, ssl_ca, client_id, user, topic_prefix}` | sempre presenti, anche per un revocato |
+| `connection` | `{server, ssl_ca, client_id, user, topic_prefix}` | sempre presente, anche per un revocato; `server` è **null** quando `DEVICE_BROKER_ADDRESS` è vuota (§11, punto 5) |
 | `local_page` | `{open_until}` o null | solo con il §7 |
 
 **`connection`:** `server` viene da un'impostazione nuova del server per ambiente, `DEVICE_BROKER_ADDRESS` (staging `mqtt.dh-lab.eu:8883`; produzione vuota fino alla seconda VM). `ssl_ca` è sempre `ca.pem` (il certificato integrato dello Shelly). `client_id` e `user` sono `<apt>.<device_id>`, `topic_prefix` `<apt>/<device_id>`.
 
 **Mai nelle risposte:** l'impronta, l'uid di chi ha fatto l'azione, l'email.
 
-### 2.2 Il nome dal motore
+### 2.2 Il nome dal motore (solo con A4)
 
-- Il server chiede al motore l'elenco dei dispositivi (la chiamata che già usa per «Stato dei dispositivi») e prende il `label` del dispositivo con lo stesso id Shelly del catalogo.
-- Se il motore non risponde entro il tempo solito, `name` è null e l'elenco arriva lo stesso: le credenziali non dipendono dal motore.
-- **Da verificare in A4:** oggi il catalogo lega `device_id` del motore (`dev-presa-lab`) e id Shelly (`shellyplugmg3-…`); il nome si cerca per id Shelly.
+- Il `Device` del contratto ha `device_id` del motore, `label` e capacità, **non** l'id Shelly: il legame fra i due sta solo nel catalogo.
+- **Fino ad A4:** `name` ed `engine_device_id` sono null. Il sito mostra il codice del dispositivo e non mette la voce «Credenziali» in «Stato dei dispositivi» (proposta di o2, §11 punto 3).
+- **Con A4** il catalogo lo scrive l'app e il server lo conosce: per ogni id Shelly mette `engine_device_id` e il `label`. Il sito lega le due pagine con `engine_device_id`, senza leggere il catalogo.
+- Le credenziali non dipendono mai dal motore: se il motore non risponde, l'elenco arriva lo stesso.
 
 ## 3. Il blocco (`version`)
 
@@ -70,7 +72,7 @@ Come al §6.2 di o2, con tre precisazioni.
    3. prende la `seq` nuova dell'appartamento (`agent_seq`, come in A1) e scrive l'operazione `AgentOp` «inviato» con quella `seq`;
    4. scrive nel dispositivo `pending_seq` = quella `seq`.
 4. **Dopo** la transazione il server pubblica l'ordine (§6). Se la pubblicazione fallisce, l'operazione diventa «fallito, non_inviato» e lo stato si legge «non applicato» (§4): la password, se c'era, si restituisce lo stesso (§5.3).
-5. «Registra» non ha `version` (il dispositivo non esiste): la transazione rifiuta se il documento c'è già e non è revocato.
+5. «Registra» non ha `version`: la transazione rifiuta se il documento c'è già e non è revocato. Per un revocato («Registra di nuovo») la transazione lo riporta ad attivo con `version + 1`: di due «Registra di nuovo» insieme la prima passa, la seconda trova il documento non più revocato e riceve **409 `already_registered`** (§11, punto 7).
 
 ## 4. Gli stati
 
@@ -83,9 +85,10 @@ In Firestore il dispositivo ha `stato_salvato` (`attivo` o `revocato`), l'`azion
 | `registra` | inviata, entro 20 minuti | `in_attesa` |
 | `rigenera` | inviata, entro 20 minuti | `cambio_in_corso` |
 | `revoca` | inviata, entro 20 minuti | `revoca_in_corso` |
-| `riprova` | inviata, entro 20 minuti | quello dell'azione che si riprova |
 | qualsiasi | rifiutata, scartata, fallita, o inviata da oltre 20 minuti | `non_applicato` |
 | nessuna | — | `pronto` (attivo) o `revocato` |
+
+«Riprova» cambia solo `pending_seq` (l'ordine nuovo), non `azione`: mentre è in volo lo stato è quello dell'azione riprovata, e se fallisce di nuovo `non_applicato` dice ancora quale azione manca (§11, punti 1 e 2).
 
 Calcolarlo alla lettura vuol dire che il limite dei 20 minuti (progetto §6.8) non ha bisogno di un timer.
 
@@ -104,20 +107,20 @@ Un risultato con `seq` più bassa di uno già riuscito non cambia niente (l'agen
 
 | Stato | Rigenera | Revoca | Riprova | Registra |
 |---|---|---|---|---|
-| `in_attesa` | sì (password persa prima della conferma) | sì | no | 409 `already_registered` |
-| `pronto` | sì | sì | no | 409 `already_registered` |
-| `cambio_in_corso` | no: 409 `operation_in_progress` | **sì** (domanda 3 di o2, §8) | no | 409 `already_registered` |
-| `revoca_in_corso` | no | no | no | 409 `operation_in_progress` |
-| `revocato` | no | no | no | sì: «Registra di nuovo», password nuova |
+| `in_attesa` | sì (password persa prima della conferma) | sì | 409 `invalid_state` | 409 `already_registered` |
+| `pronto` | sì | sì | 409 `invalid_state` | 409 `already_registered` |
+| `cambio_in_corso` | 409 `operation_in_progress` | **sì** (domanda 3 di o2, §8) | 409 `operation_in_progress` | 409 `already_registered` |
+| `revoca_in_corso` | 409 `operation_in_progress` | 409 `operation_in_progress` | 409 `operation_in_progress` | 409 `operation_in_progress` |
+| `revocato` | 409 `invalid_state` | 409 `invalid_state` | 409 `invalid_state` | sì: «Registra di nuovo», password nuova |
 | `non_applicato` | sì | sì | sì | 409 `already_registered` |
 
-Un'azione non ammessa per lo stato: **409 `invalid_state`** («Con lo stato di adesso questa azione non si può fare: ricarica l'elenco»), salvo i casi della tabella con un codice proprio.
+**La regola dei due codici:** `operation_in_progress` quando l'azione è bloccata da un ordine in volo (aspettando, diventerà possibile); `invalid_state` quando lo stato non la ammette proprio (il sito ricarica l'elenco). Ogni casella ha il suo codice: nessun «no» senza codice (§11, punto 6).
 
 ## 5. Le azioni, passo per passo
 
 ### 5.1 «Registra»
 
-1. Controlli: permesso (§8.1), id del dispositivo (422 `invalid_device_id`, **senza** convertire le maiuscole: domanda 6 di o2), limite di frequenza (§8.3), agente configurato (503 `agent_not_configured`), al massimo 200 dispositivi non revocati (409 `too_many_devices`).
+1. Controlli: permesso (§8.1), id del dispositivo (422 `invalid_device_id`, **senza** convertire le maiuscole: domanda 6 di o2), limite di frequenza (§8.3), agente configurato (503 `agent_not_configured`), indirizzo del broker configurato (503 `broker_address_missing`), al massimo 200 dispositivi non revocati (409 `too_many_devices`). Tutti **prima** di generare la password.
 2. La password: `secrets.token_urlsafe(24)` (32 caratteri), l'impronta con `hash_password`.
 3. La transazione del §3.
 4. La pubblicazione dell'ordine.
@@ -222,11 +225,12 @@ Rotte (gestore della piattaforma soltanto):
 | 409 | `invalid_state` | azione non ammessa per lo stato (§4.3) | «Con lo stato di adesso questa azione non si può fare: ricarica l'elenco.» |
 | 409 | `too_many_devices` | 200 non revocati | «Questo appartamento ha già 200 dispositivi registrati: è il massimo.» |
 | 429 | `rate_limited` | §8.3 | «Troppe operazioni in poco tempo: riprova fra qualche minuto.» |
-| 503 | `agent_not_configured` | agente o `DEVICE_BROKER_ADDRESS` non configurati | «L'agente sulla VM non è configurato in questo ambiente» (come oggi) |
+| 503 | `agent_not_configured` | agente non configurato (`AGENT_*`) | «L'agente sulla VM non è configurato in questo ambiente» (come oggi) |
+| 503 | `broker_address_missing` | `DEVICE_BROKER_ADDRESS` vuota (oggi la produzione); controllato **prima** di generare la password | «Indirizzo del sistema domotico per i dispositivi non configurato in questo ambiente.» |
 | 502 | `agent_publish_failed` | «Revoca» o «Riprova» non inviate (§5.3) | il messaggio di oggi, con `op_id` |
 | 403 | `forbidden` | senza permesso | come oggi |
 
-Rispetto a o2: `version_changed` e `invalid_state` in più, separati da `operation_in_progress`, perché il sito fa cose diverse (ricaricare l'elenco o aspettare).
+Rispetto a o2: `version_changed`, `invalid_state` e `broker_address_missing` in più, separati da `operation_in_progress` e `agent_not_configured`, perché il sito fa cose diverse (ricaricare l'elenco, aspettare, o dire che manca una configurazione).
 
 ### 8.3 Limiti di frequenza
 
@@ -289,3 +293,15 @@ Ore di lavoro, prove comprese, senza le attese (revisioni, via, finestre sulla V
 | Pagina locale (§7), se entra | o1, o2 | due operazioni dell'agente, due rotte, chiusura dopo 24 ore, finestra nel sito | +6–9 |
 
 **Probabile:** circa **35–45 ore** in tutto senza la pagina locale (circa 25–30 di o1 e 10–14 di o2). Le stime per pezzo tendono a essere larghe: quella del clima a infrarossi (risposta 1141) è scesa da 15–22 a 8–11 ore dopo la rilettura. La voce che può crescere è un'altra: la revisione di sicurezza di A3, che tocca password e revoche, e le sue correzioni (per A1 le letture sono state quattro).
+
+## 11. Risposte ai punti di o2 (`docs/proposta-a3-sito.md` §9, `a0b2df1`)
+
+| N. | Punto | Risposta | Dove è corretto |
+|---|---|---|---|
+| 1 | `azione` dopo «Riprova» | **o2 ha ragione.** `azione` è l'azione in attesa di conferma (`registra`, `rigenera`, `revoca`) e «Riprova» non la sovrascrive: un `non_applicato` dopo una riprova dice ancora se manca una revoca. `riprova` non è più un valore di `azione`; la riga del registro attività resta `device_credential_retried` | §2.1, §4.1 |
+| 2 | coerenza fra azione e stato durante una riprova | Con il punto 1 lo stato in volo è quello dell'azione riprovata (`in_attesa`, `cambio_in_corso`, `revoca_in_corso`) e `azione` dice la stessa cosa | §4.1 |
+| 3 | il nome del dispositivo | **o2 ha ragione:** `Device` non ha l'id Shelly. `name` null fino ad A4, nessuna voce «Credenziali» in «Stato dei dispositivi» fino ad allora; con A4 il server aggiunge `engine_device_id` e il `label` dal catalogo che conosce | §2.1, §2.2 |
+| 4 | un solo 503 per due cause | **o2 ha ragione:** codice a parte `broker_address_missing`, con il testo proposto da o2 | §5.1, §8.2 |
+| 5 | `connection.server` in produzione | Il `GET` non dà mai 503 per questo: `connection.server` è **null** e il sito scrive «non configurato» al posto del valore da copiare. «Registra» e «Rigenera» invece rispondono 503 `broker_address_missing` prima di generare la password | §2.1, §5.1 |
+| 6 | i «no» senza codice | Ogni casella del §4.3 ha ora il suo codice: `operation_in_progress` se un ordine in volo blocca (si aspetta), `invalid_state` se lo stato non ammette l'azione (si ricarica) | §4.3 |
+| 7 | due «Registra di nuovo» insieme | La transazione riporta il revocato ad attivo: la prima passa (201 con la password), la seconda riceve **409 `already_registered`** | §3 |
