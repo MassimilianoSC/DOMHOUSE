@@ -128,11 +128,11 @@ def test_connection_dropping_during_set_is_device_offline():
     assert progress == ["sent"] and calls == ["Switch.Set"]
 
 
-def test_timeout_on_set_is_an_internal_error():
+def test_timeout_on_set_is_device_offline():
     device = FakePlugMG3(SID)
     device.hang_next("Switch.Set")
     result, progress, calls = go(device, {"on": True})
-    assert (result.outcome, result.reason, result.detail) == ("failed", "internal_error", "transport timeout")
+    assert (result.outcome, result.reason, result.detail) == ("failed", "device_offline", "transport timeout")
     assert progress == ["sent"] and calls == ["Switch.Set"]
 
 
@@ -158,7 +158,7 @@ def test_read_back_timing_out_twice_says_read_back_failed():
     device.hang_next("Switch.GetStatus")
     device.hang_next("Switch.GetStatus")
     result, progress, calls = go(device, {"on": True})
-    assert (result.outcome, result.reason, result.detail) == ("failed", "internal_error",
+    assert (result.outcome, result.reason, result.detail) == ("failed", "device_offline",
                                                               "read back failed: transport timeout")
     assert progress == ["sent", "verifying"]
     assert calls == ["Switch.Set", "Switch.GetStatus", "Switch.GetStatus"]      # never a third time

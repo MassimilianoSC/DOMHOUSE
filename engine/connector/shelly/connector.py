@@ -358,8 +358,11 @@ class ShellyConnector:
         except asyncio.CancelledError:
             log.info("command cancelled", **ids)
             raise
-        if result.reason == "device_offline" and device.online and device.queue is not None:
-            device.queue.put_nowait(_Lost(self._clock()))       # online=False in the device's order (§2.6)
+        # online=False in the device's order (§2.6), only when the transport said offline: a request without answer
+        # ("transport timeout", also device_offline) does not change the online state, still from broker and silence
+        if (result.reason == "device_offline" and result.detail.endswith("device offline") and device.online
+                and device.queue is not None):
+            device.queue.put_nowait(_Lost(self._clock()))
         return self._result(result, ids)
 
     # ---- the stream of the transport -----------------------------------------------------------------------------

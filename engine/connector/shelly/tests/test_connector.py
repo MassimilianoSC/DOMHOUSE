@@ -279,15 +279,33 @@ def test_command_rejected_by_the_device_keeps_no_device_text():
     run(scenario)
 
 
-def test_command_timeout_is_internal_error():
+def test_command_timeout_is_device_offline_and_the_device_stays_online():
     async def scenario(w):
         await w.connect()
         w.plugs[SID_A].hang_next("Switch.GetStatus")
         w.plugs[SID_A].hang_next("Switch.GetStatus")
         result = await w.conn.execute(cmd(True), lambda s: None)
-        assert (result.outcome, result.reason, result.detail) == ("failed", "internal_error",
+        assert (result.outcome, result.reason, result.detail) == ("failed", "device_offline",
                                                                   "read back failed: transport timeout")
         assert w.info().online
+    run(scenario, rpc_timeout_s=0.1)
+
+
+def test_set_without_answer_does_not_put_the_device_offline():
+    """The 16 November case: Switch.Set gets no answer (unplugged before the broker noticed, or slow, or its answer
+    lost). The command is failed/device_offline "transport timeout", but the device's online state is not touched:
+    no online=False, still online, and the next command goes. Its state comes from the broker and the silence."""
+    async def scenario(w):
+        await w.connect()
+        start = len(w.changes)
+        w.plugs[SID_A].hang_next("Switch.Set")
+        result = await w.conn.execute(cmd(True), lambda s: None)
+        assert (result.outcome, result.reason, result.detail) == ("failed", "device_offline", "transport timeout")
+        await w.settle(0.3)
+        assert not any(c.kind == "online" for c in w.changes[start:])
+        assert w.info().online
+        result = await w.conn.execute(cmd(True, n=2), lambda s: None)
+        assert (result.outcome, result.state) == ("confirmed", {"on": True})
     run(scenario, rpc_timeout_s=0.1)
 
 
@@ -2114,7 +2132,9 @@ def test_blu_clock_slow_bridge_get_status_confirms_with_the_time_at_the_middle_o
     """A slow bridge: its GetStatus answer arrives 6 s (our clock) after it read its own time. The candidate (-400 s)
     comes from a BLU packet; the GetStatus read again 5 minutes later, with the same clock, must confirm it. Taken
     after the answer, its offset would be 6 s (plus the whole seconds of sys.unixtime) off the candidate, beyond the
-    5 s: the wait would start again. Taken at the middle of the call, 3 s: confirmed."""
+    5 s: the wait would start again. Taken at the middle of the call, 3 s: confirmed.
+    NOT a real case: 6 s is beyond RPC_TIMEOUT_S (3 s), in production such an answer times out. The delay only tells
+    the old rule (our time after the answer) from the new one (at the middle of the call)."""
     async def scenario(w):
         w.pair(ADDR_HT)
         w.bridge.blu_packet(ADDR_HT, {69: 20.0, 46: 40}, battery=90)
@@ -2137,6 +2157,36 @@ def test_blu_clock_slow_bridge_get_status_confirms_with_the_time_at_the_middle_o
         await w.settle(0.2)
         assert bridge_offset(w) == pytest.approx(-403.5, abs=0.6), bridge_offset(w)
         assert len(clock_warnings(warnings)) == 1
+    run_blu(scenario, sensors=(DEV_HT,))
+
+
+def test_blu_clock_slow_bridge_at_the_connection_its_candidate_is_confirmed_by_a_packet(warnings):
+    """The same slow bridge, at the connection: its clock steadily 400 s behind, the GetStatus of the connection
+    answers 6 s (our clock) after it read its own time and gives the candidate. A bthome packet 300 s later, with the
+    same clock, must confirm it. Taken after the answer, the candidate would be 6 s (plus the whole seconds of
+    sys.unixtime) off the packet, beyond the 5 s: the wait would start again. Taken at the middle of the call, 3 s.
+    NOT a real case: 6 s is beyond RPC_TIMEOUT_S (3 s), in production such an answer times out. The delay only tells
+    the old rule (our time after the answer) from the new one (at the middle of the call)."""
+    async def scenario(w):
+        w.pair(ADDR_STRANGER)
+        real_call = w.transport.call
+
+        async def slow_call(shelly_id, method, params, timeout_s):
+            result = await real_call(shelly_id, method, params, timeout_s)    # the bridge's clock is read here
+            if method == "Shelly.GetStatus":
+                w.shift += timedelta(seconds=6)                              # ... its answer arrives 6 s later
+            return result
+        w.transport.call = slow_call
+        w.bridge.clock_skew = timedelta(seconds=-400)
+        await w.connect_bridge()
+        bridge = w.conn._devices[DEV_BRIDGE]
+        assert get_status_calls(w) == 1 and bridge.clock_offset_s is None
+        candidate = bridge.clock_candidate_s
+        w.transport.inject(bthome_time(w, -400, whole_second(w) + timedelta(seconds=300)))
+        await w.settle(0.2)
+        assert bridge.clock_offset_s == -400 and bridge.clock_candidate_s is None, (candidate, bridge.clock_candidate_s)
+        assert len(clock_warnings(warnings)) == 1
+        assert candidate == pytest.approx(-403.5, abs=0.6), candidate
     run_blu(scenario, sensors=(DEV_HT,))
 
 
