@@ -17,6 +17,7 @@
 #   sudo bash /opt/domhouse/engine-vm.sh timers                                  # (re)install the timers and the boot unit
 #   sudo bash /opt/domhouse/engine-vm.sh start-all                               # after a boot: start what is down
 #   sudo bash /opt/domhouse/engine-vm.sh logs-agent                              # engines' logs to Cloud Logging
+#   sudo bash /opt/domhouse/engine-vm.sh prune-images [apply]                    # old engine images: the list, then away
 #
 # Watch (P-60 step 10, D-104, D-148): every 5 minutes the timer domhouse-engine-check.timer runs check-all, which asks
 # every installed engine for its /health and looks at the age of its newest backup, and writes to the VM's syslog (that
@@ -78,6 +79,7 @@ METADATA_V4=169.254.169.254
 METADATA_V6=fd20:ce::254
 METADATA_FILE="${OPT}/metadata.nft"
 BROKER_NETWORKS=(domhouse-broker_default domhouse-broker-internal)   # C8: probed too, when the broker is there
+KEEP_PREVIOUS=2                          # prune-images: the engine's images kept besides those in use, to go back
 HOURLY_S=3600                            # the metadata probe and the data sizes, once an hour
 DATA_ALERT_MB="${DOMHOUSE_DATA_ALERT_MB:-500}"   # an apartment's /data above this: "data large" (decision 1128)
 JOURNALD_DIR="${DOMHOUSE_JOURNALD_DIR:-/etc/systemd/journald.conf.d}"
@@ -672,7 +674,7 @@ start() {
 }
 
 cmd="${1:-}"; shift || true
-case "${cmd}" in backup|backup-all|timers|logs-agent|metadata-block|limits|"") ;; *) resolve_bind_ip ;; esac
+case "${cmd}" in backup|backup-all|timers|logs-agent|metadata-block|limits|prune-images|"") ;; *) resolve_bind_ip ;; esac
 case "${cmd}" in
   install)
     # D62 (P-83): the connector is always said (simulated or shelly): it was simulated when forgotten
@@ -813,7 +815,37 @@ case "${cmd}" in
     docker update --memory "${mem}" --memory-swap "${mem}" --cpus "${ENGINE_CPUS}" --pids-limit "${ENGINE_PIDS_LIMIT}" "engine-${apt}"
     echo "engine-${apt}: memoria ${mem}, cpus ${ENGINE_CPUS}, processi ${ENGINE_PIDS_LIMIT}"
     ;;
+  prune-images)
+    # step 3 of the plan (H7, 17 November: 20 old images): the engine's images on the VM. Kept: those in use (each
+    # engine's ENGINE_IMAGE and the image of every running container) and the KEEP_PREVIOUS newest others, to go back
+    # with update <apartment_id> <image>; the others are listed and, only with "apply", removed. Only the engine's own
+    # repository (the one of the installed engines' images): the broker's and lego's images are never touched
+    [ $# -le 1 ] || die "uso: prune-images [apply]"
+    [ "${1:-}" = "" ] || [ "${1:-}" = "apply" ] || die "uso: prune-images [apply]"
+    shopt -s nullglob
+    in_use=()
+    for settings in "${OPT}"/*.settings; do in_use+=("$(sed -n 's/^ENGINE_IMAGE=//p' "${settings}")"); done
+    shopt -u nullglob
+    [ "${#in_use[@]}" -gt 0 ] || die "nessun motore installato: niente da pulire"
+    repo="${in_use[0]%:*}"
+    while IFS= read -r image; do [ -n "${image}" ] && in_use+=("${image}"); done < <(docker ps --format '{{.Image}}')
+    kept=0
+    # docker images lists the newest first
+    while IFS= read -r image; do
+      [ -n "${image}" ] && [ "${image##*:}" != "<none>" ] || continue
+      if printf '%s\n' "${in_use[@]}" | grep -qxF "${image}"; then
+        echo "tengo ${image} (in uso)"
+      elif [ "${kept}" -lt "${KEEP_PREVIOUS}" ]; then
+        kept=$((kept + 1)); echo "tengo ${image} (per tornare indietro)"
+      elif [ "${1:-}" = "apply" ]; then
+        if docker rmi "${image}" > /dev/null; then echo "tolta ${image}"; else echo "non tolta ${image}: la tengo"; fi
+      else
+        echo "da togliere ${image}"
+      fi
+    done < <(docker images --format '{{.Repository}}:{{.Tag}}' "${repo}")
+    [ "${1:-}" = "apply" ] || echo "prova a secco: niente tolto (per togliere: prune-images apply)"
+    ;;
   *)
-    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | start-all | timers | logs-agent | metadata-block | limits (vedi l'intestazione)"
+    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | start-all | timers | logs-agent | metadata-block | limits | prune-images (vedi l'intestazione)"
     ;;
 esac

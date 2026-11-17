@@ -38,6 +38,9 @@ STUBS = {
                # E-31: the hourly probe of the metadata server from a container; open only if the test says so
                # C8: open from one network only with a file metadata-open-<network>; no broker networks with "no-broker"
                'if [ "$1" = network ] && [ "$2" = inspect ]; then [ -f "$STUB_DIR/no-broker" ] && exit 1; exit 0; fi\n'
+               # prune-images: the images (newest first) and the running containers' images from files; rmi recorded
+               'if [ "$1" = images ]; then cat "$STUB_DIR/images" 2>/dev/null; exit 0; fi\n'
+               'if [ "$1" = ps ]; then cat "$STUB_DIR/ps-images" 2>/dev/null; exit 0; fi\n'
                'if [ "$1" = run ]; then for a in "$@"; do [ -f "$STUB_DIR/metadata-open-$a" ] && { echo OPEN; exit 0; }; done; '
                '[ -f "$STUB_DIR/metadata-open" ] && { echo OPEN; exit 0; }; echo BLOCKED; exit 0; fi\nexit 0\n'),
     # E-31: nft keeps what it is given with -f; «list table» fails when the test put a file "no-metadata-table"
@@ -720,3 +723,40 @@ def test_c8_without_the_broker_only_the_engines_networks(vm):
     vm("check-all")
     assert probed(vm) == [f"domhouse-{APT}_default"]
     assert "metadata blocked reti=1" in (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+
+
+# ---- H7 (step 3 of the plan, 17 November): the old engine images, kept those in use and the two before ------------
+REPO = "europe-west8-docker.pkg.dev/domotica-poc-511707/domotica/engine"
+
+
+def images_on_the_vm(vm):
+    (vm.opt / f"{APT}.settings").write_text(f"APARTMENT_ID={APT}\nPORT=8100\nCONNECTOR=simulated\nENGINE_IMAGE={REPO}:f4c6a20\n",
+                                            encoding="utf-8", newline="\n")
+    (vm.opt / "lab-01.settings").write_text(f"APARTMENT_ID=lab-01\nPORT=8169\nCONNECTOR=shelly\nENGINE_IMAGE={REPO}:d368f0d\n",
+                                            encoding="utf-8", newline="\n")
+    newest_first = ["d368f0d", "f4c6a20", "247fda0", "d274386", "aaaa111", "bbbb222", "<none>"]
+    (vm.stubs / "images").write_text("".join(f"{REPO}:{t}\n" for t in newest_first), encoding="utf-8", newline="\n")
+    (vm.stubs / "ps-images").write_text(f"{REPO}:d368f0d\n{REPO}:f4c6a20\neclipse-mosquitto:2@sha256:75d6\n",
+                                        encoding="utf-8", newline="\n")
+
+
+def test_h7_prune_images_lists_and_removes_nothing_without_apply(vm):
+    images_on_the_vm(vm)
+    r = vm("prune-images")
+    assert r.returncode == 0, r.stderr
+    out = r.stdout
+    assert f"tengo {REPO}:d368f0d (in uso)" in out and f"tengo {REPO}:f4c6a20 (in uso)" in out
+    assert f"tengo {REPO}:247fda0 (per tornare indietro)" in out and f"tengo {REPO}:d274386 (per tornare indietro)" in out
+    assert f"da togliere {REPO}:aaaa111" in out and f"da togliere {REPO}:bbbb222" in out
+    assert "<none>" not in out and "prova a secco" in out
+    assert "rmi" not in (vm.stubs / "docker.log").read_text(encoding="utf-8")
+
+
+def test_h7_prune_images_apply_removes_only_the_older_ones(vm):
+    images_on_the_vm(vm)
+    r = vm("prune-images", "apply")
+    assert r.returncode == 0, r.stderr
+    removed = [l.split()[1] for l in (vm.stubs / "docker.log").read_text(encoding="utf-8").splitlines()
+               if l.startswith("rmi ")]
+    assert removed == [f"{REPO}:aaaa111", f"{REPO}:bbbb222"]
+    assert "images --format {{.Repository}}:{{.Tag}} " + REPO in (vm.stubs / "docker.log").read_text(encoding="utf-8")
