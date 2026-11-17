@@ -440,8 +440,8 @@ Regole di convivenza: `docs/regole-convivenza.md`. Identificativi reali e regole
 
 | Pacchetto | Chi | Dipende da | Stato |
 |---|---|---|---|
-| A0 Prerequisiti | committente, o1 | prove con Youssouf finite | da fare |
-| A1 Ricevitore di ordini | o1 | [P] A0 | da fare |
+| A0 Prerequisiti | committente, o1 | prove con Youssouf finite | **quasi fatto (17 nov):** correzioni della VM V0–V16 fatte (E-31 attivo), prova 1125 riuscita il 16; resta il controllo mirato dentro la VM (passo 3 del piano) |
+| A1 Ricevitore di ordini | o1 | [P] A0 | **codice fatto e revisione di sicurezza chiusa (`ee59625`, «installabile»)**; procedura `docs/procedura-installazione-a1.md` (`0fc6566`) da rileggere dalla memoria storica; da installare (comandi del committente) |
 | A2 Posto dell'appartamento dall'app | o1, o2 | [P] A1; [Cl] chi crea (D-232) | da fare |
 | A3 Credenziali dei dispositivi | o1, o2 | [P] A1; [Prova] 1125 **riuscita il 16 nov (forma con il numero del progetto)** | da fare; **con D-233 diventa impronte in Firestore, «Registra», «Rigenera», «Revoca»** (progetto `19cb001`, `de45ae0`, `4bf57ba`): la scheda sotto va riscritta nell'aggiornamento unico |
 | A4 Elenco dei dispositivi (catalogo) e motore vuoto, **con il collaudo guidato e obbligatorio** | o1, o2, Youssouf | [P] A2, A3; [Y-ris] formato (fatto); [Y-cod] motore vuoto (soluzione A, 1140) | da fare |
