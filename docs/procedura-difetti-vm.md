@@ -277,7 +277,8 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
   - «engine ok dev», «engine ok lab-01», «domhouse-check: 2 motori, 0 muti», `vm mem_used_pct=…`, «broker ok cert_days=…»;
   - nessuna riga `kept`, `refused`, `OPEN`;
   - broker con 1 appartamento e i suoi utenti;
-  - la Plug, se è accesa, ancora nel registro del broker: il numero in fondo è maggiore di 0. Se è spenta, `0`, e grazie a `; true` nessun errore di gcloud (regola 5).
+  - la Plug collegata: la riga «connessioni sulla porta TLS: N» con N ≥ 1 (finché sul broker c'è solo la Plug), oppure la Plug online nell'app. È questo il segno affidabile;
+  - il numero in fondo conta i collegamenti e gli scollegamenti della Plug negli ultimi 30 minuti: Mosquitto scrive il nome del client nel registro solo quando si collega o si scollega. `0` è il caso normale, anche con la Plug accesa e collegata (17 novembre: `0` con «connessioni sulla porta TLS: 1»). Grazie a `; true`, lo `0` non dà errori di gcloud (regola 5).
 
 ### V16. Pulizia della cartella di lavoro (scrive sulla VM)
 
