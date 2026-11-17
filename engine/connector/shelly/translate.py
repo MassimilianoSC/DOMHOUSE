@@ -23,6 +23,11 @@ from engine.connector.interface import CommandResult
 from .transport.base import RpcError, TransportOffline, TransportTimeout
 
 MAX_CLOCK_SKEW_S = 300.0   # a device clock further than this from our reception time is not trusted (§2.2)
+# The two details of a failed/device_offline outcome (error_result), at the end of detail after any prefix: only
+# DETAIL_DEVICE_OFFLINE puts the device offline in the connector (connector.py, execute); the engine reads
+# DETAIL_TRANSPORT_TIMEOUT for its own words (engine/core.py, E-35). Changing them changes what both read.
+DETAIL_DEVICE_OFFLINE = "device offline"
+DETAIL_TRANSPORT_TIMEOUT = "transport timeout"
 
 
 class UnknownModel(ValueError):
@@ -493,9 +498,9 @@ def error_result(exc: Exception, prefix: str = "") -> CommandResult:
     if isinstance(exc, RpcError):
         reason, detail = "device_rejected", str(exc)
     elif isinstance(exc, TransportOffline):
-        reason, detail = "device_offline", "device offline"
+        reason, detail = "device_offline", DETAIL_DEVICE_OFFLINE
     elif isinstance(exc, TransportTimeout):
-        reason, detail = "device_offline", "transport timeout"
+        reason, detail = "device_offline", DETAIL_TRANSPORT_TIMEOUT
     else:
         reason, detail = "internal_error", type(exc).__name__
     return CommandResult(outcome="failed", reason=reason, detail=prefix + detail)

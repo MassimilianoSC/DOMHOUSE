@@ -358,6 +358,24 @@ def test_connection_dropping_during_a_command_puts_the_device_offline():
     run(scenario)
 
 
+def test_read_back_finding_the_device_disconnected_puts_it_offline():
+    """Switch.Set answered, then the connection drops at both reads back: the detail carries the prefix
+    ("read back failed: device offline") and still ends with "device offline", so the device goes offline, as when the
+    set itself drops; unlike a read back without answer ("transport timeout", test above), which changes nothing.
+    The fake drops those two calls only: the notification of the set that went through then brings it back online,
+    so the test looks for the online=False sent, not for the state at the end."""
+    async def scenario(w):
+        await w.connect()
+        start = len(w.changes)
+        w.plugs[SID_A].drop_next("Switch.GetStatus")
+        w.plugs[SID_A].drop_next("Switch.GetStatus")
+        result = await w.conn.execute(cmd(True), lambda s: None)
+        assert (result.outcome, result.reason, result.detail) == ("failed", "device_offline",
+                                                                  "read back failed: device offline")
+        await w.wait_for(lambda xs: ("online", False) in kinds(xs[start:]))
+    run(scenario)
+
+
 def test_unknown_device_and_capability_are_internal_errors():
     async def scenario(w):
         await w.connect()
