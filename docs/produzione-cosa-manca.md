@@ -110,6 +110,8 @@ a una persona del cliente.
 | E5 | **GitHub** (repository `MassimilianoSC/DOMHOUSE`, Youssouf collaboratore) | il committente | da decidere: passaggio del repository o copia per il cliente | da fare |
 | E6 | **Fatturazione** (account di fatturazione Google Cloud o organizzazione del cliente; budget e avvisi di spesa da rifare; i crediti non passano) | paga il committente | paga il cliente | da fare (P-81) |
 | E7 | **Email degli allarmi** | `m.cracchiolo@hqe.it` | probabilmente il cliente | da decidere (P-81) |
+| E8 | **Elenchi chiusi dei «robot» di Google ammessi** in `scripts/agent-gcp.sh`: chi può impersonare il server (7, risposta 1151) e chi può pubblicare sulla coda degli ordini (5, risposta 1152). I nomi contengono il numero del progetto (444239063209) | scritti per il progetto di oggi | se il progetto resta lo stesso, non cambiano; se il cliente usa un progetto nuovo, cambiano tutti: si rilancia `agent-gcp.sh`, che si ferma e mostra i nomi nuovi, e si decide di nuovo | da verificare alla consegna |
+| E9 | **Ruolo `cloudbuild.builds.builder` tolto al vecchio robot di Cloud Build** (`<numero>@cloudbuild.gserviceaccount.com`, risposta 1152): le nostre costruzioni usano `domotica-build@` | tolto il 17 novembre | se il cliente usa un progetto nuovo, ripetere (il vecchio robot riceve quel ruolo alla creazione) | da ripetere solo con un progetto nuovo |
 
 **Da decidere con il cliente:**
 
