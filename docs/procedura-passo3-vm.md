@@ -166,6 +166,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```
 
 - Il `limit` di prima riscrive la tabella senza le due catene dell'uscita; `restart` fa rileggere `mosquitto.conf`.
+- **Da verificare:** il compose di prima non dice la sottorete; se `compose up` segnala che la rete esistente (`172.30.84.0/24`) è diversa da quella attesa, incolla l'uscita: la rete si toglie e si ricrea con la memoria storica.
 
 ## P4. La prova dei metadati da tutte le reti (scrive sulla VM solo l'ora dell'ultimo controllo)
 
@@ -312,7 +313,7 @@ gcloud compute disks snapshot langbrain-dev --zone=europe-west8-a --snapshot-nam
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo systemd-run --unit=domhouse-passo3-pacchetti --collect -E DEBIAN_FRONTEND=noninteractive /bin/bash -c "apt-get update -q && apt-get install -y -q --only-upgrade -o DPkg::Lock::Timeout=300 -o Dpkg::Options::=--force-confold containerd.io docker-buildx-plugin docker-ce-cli docker-ce-rootless-extras docker-ce docker-compose-plugin google-cloud-cli google-cloud-ops-agent google-compute-engine google-guest-agent google-osconfig-agent"'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo systemd-run --unit=domhouse-passo3-pacchetti --collect -E DEBIAN_FRONTEND=noninteractive /bin/bash -c "apt-get update -q -o DPkg::Lock::Timeout=300 && apt-get install -y -q --only-upgrade -o DPkg::Lock::Timeout=300 -o Dpkg::Options::=--force-confold containerd.io docker-buildx-plugin docker-ce-cli docker-ce-rootless-extras docker-ce docker-compose-plugin google-cloud-cli google-cloud-ops-agent google-compute-engine google-guest-agent google-osconfig-agent"'
 ```
 
 - **Atteso:** «Running as unit: domhouse-passo3-pacchetti.service». Il blocco finisce subito: l'aggiornamento continua sulla VM.
@@ -333,7 +334,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a; sudo apt-get install -f -y -q -o Dpkg::Options::=--force-confold; sudo systemctl start docker; sudo docker ps --format "{{.Names}} {{.Status}}"; true'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a; sudo DEBIAN_FRONTEND=noninteractive apt-get install -f -y -q -o Dpkg::Options::=--force-confold; sudo systemctl start docker; sudo docker ps --format "{{.Names}} {{.Status}}"; true'
 ```
 
   poi rilancia P10.2 e di nuovo P10.2b. Se i container restano giù, incolla tutto alla memoria storica prima di riavviare.
