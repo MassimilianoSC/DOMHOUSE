@@ -24,8 +24,9 @@ from .transport.base import RpcError, TransportOffline, TransportTimeout
 
 MAX_CLOCK_SKEW_S = 300.0   # a device clock further than this from our reception time is not trusted (§2.2)
 # The two details of a failed/device_offline outcome (error_result), at the end of detail after any prefix: only
-# DETAIL_DEVICE_OFFLINE puts the device offline in the connector (connector.py, execute); the engine reads
-# DETAIL_TRANSPORT_TIMEOUT for its own words (engine/core.py, E-35). Changing them changes what both read.
+# DETAIL_DEVICE_OFFLINE puts the device offline in the connector (connector.py, execute); the engine gives
+# DETAIL_TRANSPORT_TIMEOUT its own words (engine/core.py, E-35), reading the text, since it imports no connector:
+# changing it turns engine/tests/test_command_no_answer.py red, which passes error_result through the engine.
 DETAIL_DEVICE_OFFLINE = "device offline"
 DETAIL_TRANSPORT_TIMEOUT = "transport timeout"
 

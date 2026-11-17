@@ -2308,11 +2308,11 @@ class ApartmentEngine:
             why = {"device_offline": "Il dispositivo è andato offline durante la verifica",
                    "device_rejected": "Il dispositivo ha rifiutato il comando"}.get(reason, "Errore interno del collegamento")
             # E-35: a request without answer has its own words, not «andato offline durante la verifica». The Shelly
-            # connector's detail ends with «transport timeout» (translate.error_result; «read back failed: » before it
-            # for the read back). Before PR #15 its reason is internal_error, from PR #15 device_offline: both are
-            # read here, so the engine is right with either connector. The internal_error half is PROVVISORIO, to
-            # remove once PR #15 is in main. The connector's own reason and detail stay in the log line above
-            if reason in ("internal_error", "device_offline") and (result.detail or "").endswith("transport timeout"):
+            # connector says device_offline with a detail ending in «transport timeout» (translate.error_result,
+            # DETAIL_TRANSPORT_TIMEOUT; «read back failed: » before it for the read back). The engine knows no
+            # connector, so it reads the text: engine/tests/test_command_no_answer.py passes the connector's real
+            # outcome through here and goes red if the two part. The connector's reason and detail stay in the log
+            if reason == "device_offline" and (result.detail or "").endswith("transport timeout"):
                 reason, why = "device_offline", ("Il dispositivo non ha risposto: riprova, e se succede ancora "
                                                  "controlla che sia acceso e collegato")
             self._set_status(cmd, "failed", reason)
