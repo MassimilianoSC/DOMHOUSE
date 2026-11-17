@@ -131,9 +131,9 @@
 | **Coda per dispositivo** | 1000 messaggi o 1 MB, oltre si scarta; alla riconnessione il connector rilegge lo stato | Accettato |
 | **Memoria del broker** | Limite di 400 MB configurato, mai raggiunto nelle prove | Da provare |
 | **Numeri misurati sul PC** | 186 MB con 5000 dispositivi; non misurati la memoria libera sulla VM e la CPU reale della e2-small | Da misurare alla prima installazione |
-| **Motori sulla stessa rete interna** | Si raggiungono fra loro, protetti dalla chiave API | Accettato |
+| **Motori sulla stessa rete interna** | Si raggiungono fra loro, protetti dalla chiave API; anche attraverso l'indirizzo interno della VM (10.198.0.2), quindi il motore `dev` raggiunge le API degli altri | Accettato (controllo di sicurezza del 17 novembre, rilievo C3) |
 | **Righe del broker nei log** | Non sono JSON e finiscono nel log dei motori | Da verificare alla prima installazione |
-| **Credenziali del connector** | Non ancora passate come variabili `SHELLY_*` | Quando entra il modulo MQTT di Youssouf |
+| **Credenziali del connector** | Passate come variabili `SHELLY_MQTT_*` nel file `/etc/domhouse/<apt>.env` (600 di root) del motore; il connector usa l'ingresso interno del broker (172.30.83.2:1883, senza TLS, rete `domhouse-broker-internal`), non la 8883 pubblica | Fatto (lotto 39); verificato sulla VM il 17 novembre (controllo di sicurezza del passo 3) |
 | **Utente di un accesso rifiutato** | Mosquitto scrive il Client ID, non l'utente: per questo ogni Shelly usa un Client ID uguale al suo utente. Chi prova da fuori può scegliere un Client ID qualsiasi e uscire dal conteggio dell'allarme; il limite sui collegamenti vale lo stesso | Accettato |
 | **Limite per indirizzo** | Vale solo sugli indirizzi della VM, oggi solo IPv4 pubblico | Accettato |
 | **Ordine all'avvio** | Montaggio del disco delle chiavi prima di Docker e limite sui collegamenti: non provabili sul PC | Da verificare al primo riavvio vero della VM |
