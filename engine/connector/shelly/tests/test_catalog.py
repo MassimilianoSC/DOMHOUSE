@@ -91,13 +91,49 @@ def test_valid_links_between_devices(monkeypatch):
 @pytest.mark.parametrize("data, expected", [
     (SENTINEL, "must be a mapping"),
     ([SENTINEL], "must be a mapping"),
-    ({"rooms": [], "devices": VALID["devices"]}, "rooms must be a non-empty list"),
-    ({"rooms": VALID["rooms"], "devices": []}, "devices must be a non-empty list"),
-    ({"rooms": VALID["rooms"], "devices": SENTINEL}, "devices must be a non-empty list"),
+    (None, "must be a mapping"),                                    # an empty file, or "null": a write gone wrong
+    ({}, "rooms must be a list"),
+    ({"devices": []}, "rooms must be a list"),
+    ({"rooms": []}, "devices must be a list"),
+    ({"rooms": None, "devices": []}, "rooms must be a list"),
+    ({"rooms": [], "devices": None}, "devices must be a list"),
+    ({"rooms": SENTINEL, "devices": []}, "rooms must be a list"),
+    ({"rooms": VALID["rooms"], "devices": SENTINEL}, "devices must be a list"),
+    ({"rooms": [], "devices": VALID["devices"]}, "room_id is not a room of the catalog"),
     ({**VALID, "secret": SENTINEL}, "unknown key"),
+    ({"rooms": [], "devices": [], "secret": SENTINEL}, "unknown key"),
 ])
 def test_wrong_structure(data, expected):
     refused(data, expected)
+
+
+# --- empty (decision 1140: a new apartment's engine starts with it; the VM agent restarts it on a new catalog) ------
+
+def test_empty_catalog_is_valid():
+    cat = parse_catalog({"rooms": [], "devices": []}, THRESHOLDS)
+    assert (cat.rooms, cat.devices, cat.by_shelly_id(), cat.by_device_id()) == ((), (), {}, {})
+
+
+def test_rooms_without_devices_is_valid():
+    cat = parse_catalog({"rooms": VALID["rooms"], "devices": []}, THRESHOLDS)
+    assert cat.rooms == (Room("camera", "Camera"), Room("soggiorno", "Soggiorno")) and cat.devices == ()
+
+
+@pytest.mark.parametrize("text, expected", [
+    ("rooms: []\ndevices: []\n", None),
+    ("", "must be a mapping"),
+    ("null\n", "must be a mapping"),
+    ("rooms: []\n", "devices must be a list"),
+])
+def test_empty_catalog_file(tmp_path, text, expected):
+    path = tmp_path / "catalog.yaml"
+    path.write_text(text, encoding="utf-8")
+    if expected is None:
+        cat = load_catalog(path, THRESHOLDS)
+        assert (cat.rooms, cat.devices) == ((), ())
+    else:
+        with pytest.raises(CatalogError, match=expected):
+            load_catalog(path, THRESHOLDS)
 
 
 def test_room_errors():

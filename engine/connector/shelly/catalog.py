@@ -30,6 +30,15 @@ No id and no channel: the sensor is not a topic of the broker and has one channe
 appears once in the catalog. The capabilities are what the sensor measures: blu_ht temperature and/or humidity,
 blu_motion motion, blu_door_window contact. A section with addr or bridge is a BLU sensor, one without is a Shelly.
 
+The empty catalog, the one a new apartment's engine starts with (decision 1140, 16 November 2026):
+
+    rooms: []
+    devices: []
+
+Both keys are still required: an empty file or "null" is refused, as it may be a write gone wrong. Rooms with no
+devices yet are valid too. The catalog is read once, at start: a new catalog takes effect when the engine restarts,
+and the restart is the VM agent's job (docs/progetto-strumento-a-base.md §3.1, applica_catalogo), not the engine's.
+
 What is checked, all at start: the structure; room and device ids unique; every room_id exists; capabilities among the
 eight of interface.CAPABILITIES; links only with the keys of interface.LINKS, to devices of the catalog that have the
 right capability; shelly ids unique and one MQTT topic level each; the offline threshold of every device
@@ -141,8 +150,8 @@ def _unknown_keys(entry: Mapping, allowed: set[str], where: str) -> None:
 
 
 def _rooms(data) -> tuple[Room, ...]:
-    if not isinstance(data, list) or not data:
-        raise CatalogError("catalog: rooms must be a non-empty list")
+    if not isinstance(data, list):
+        raise CatalogError("catalog: rooms must be a list")
     rooms, seen = [], set()
     for n, entry in enumerate(data, 1):
         where = f"catalog room #{n}"
@@ -285,8 +294,8 @@ def parse_catalog(data, thresholds: OfflineThresholds) -> Catalog:
     _unknown_keys(data, {"rooms", "devices"}, "catalog")
     rooms = _rooms(data.get("rooms"))
     raw_devices = data.get("devices")
-    if not isinstance(raw_devices, list) or not raw_devices:
-        raise CatalogError("catalog: devices must be a non-empty list")
+    if not isinstance(raw_devices, list):
+        raise CatalogError("catalog: devices must be a list")
     room_ids = {r.room_id for r in rooms}
     devices: list[CatalogDevice] = []
     device_ids: set[str] = set()
