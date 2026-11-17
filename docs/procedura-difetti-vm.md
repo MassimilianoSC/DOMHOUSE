@@ -20,6 +20,7 @@
 2. Ogni passo che scrive ha accanto il ritorno indietro.
 3. Nessun motore e nessun broker si riavvia: i tetti si mettono con `docker update` sui container che girano.
 4. **Se un'uscita non torna, fermati e incolla il testo alla memoria storica.**
+5. Un comando che finisce con `grep` e non trova righe esce con codice 1. gcloud lo mostra come un guasto del collegamento («ERROR: (gcloud.compute.ssh) … plink.exe exited with return code [1]», più i consigli di `--troubleshoot`). Per questo i blocchi che finiscono con `grep` hanno `; true` in fondo: conta solo il testo che esce.
 
 **Attenzione alla prossima pubblicazione:** `publish-all.sh` copia sulla VM il nuovo `engine-vm.sh` e il nuovo `compose.yaml`, reinstalla i timer e ricrea `dev`. Quindi `dev` prenderebbe il tetto di 120 MB e il servizio del blocco verrebbe abilitato (vale dal prossimo avvio della VM). Meglio lanciare questa procedura **prima** della prossima pubblicazione.
 
@@ -41,13 +42,13 @@ git log --oneline -1 69f2eea && git diff --quiet 69f2eea HEAD -- scripts/engine-
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='python3 -c "import sys; print(\"python\", sys.version.split()[0])"; command -v setpriv nft timeout; sudo docker stats --no-stream --format "{{.Name}} {{.MemUsage}}"; sudo nft list tables; ip -6 addr show scope global | grep -c inet6; for c in engine-dev engine-lab-01; do echo "$c:"; sudo docker exec "$c" python -c "import urllib.request as u; print(u.urlopen(u.Request(\"http://169.254.169.254/computeMetadata/v1/instance/zone\", headers={\"Metadata-Flavor\": \"Google\"}), timeout=3).read().decode())" 2>&1 | tail -1; done'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='python3 -c "import sys; print(\"python\", sys.version.split()[0])"; sudo sh -c "command -v setpriv nft timeout"; sudo docker stats --no-stream --format "{{.Name}} {{.MemUsage}}"; sudo nft list tables; ip -6 addr show scope global | grep -c inet6; for c in engine-dev engine-lab-01; do echo "$c:"; sudo docker exec "$c" python -c "import urllib.request as u; print(u.urlopen(u.Request(\"http://169.254.169.254/computeMetadata/v1/instance/zone\", headers={\"Metadata-Flavor\": \"Google\"}), timeout=3).read().decode())" 2>&1 | tail -1; done'
 ```
 
 | Riga | Atteso |
 |---|---|
 | python | 3.11 o più nuovo (serve a E-32) |
-| `command -v` | tre percorsi: `setpriv`, `nft`, `timeout` |
+| `command -v` | tre percorsi: `setpriv`, `nft`, `timeout`. Con `sudo` perché `nft` sta in `/usr/sbin`, che non è nei percorsi di chi si collega |
 | `docker stats` | `engine-dev` e `engine-lab-01` sotto i 100 MiB ciascuno; `domhouse-broker` con il suo limite di 512 MiB. **Se un motore supera i 100 MiB, fermati**: il tetto di 120 MB va alzato prima |
 | `nft list tables` | c'è `table inet domhouse_broker`; **non** c'è `domhouse_metadata` |
 | numero dopo | `0` se la VM non ha IPv6 (la regola IPv6 resta innocua) |
@@ -126,7 +127,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='for c in engine-dev engine-lab-01; do echo "$c:"; sudo docker exec "$c" python -c "import urllib.request as u; print(u.urlopen(u.Request(\"http://169.254.169.254/computeMetadata/v1/instance/zone\", headers={\"Metadata-Flavor\": \"Google\"}), timeout=3).read().decode())" 2>&1 | tail -1; done; echo "host:"; curl -s -m 3 -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/zone; echo; for p in 8100 8169; do curl -s -m 5 http://10.198.0.2:$p/api/v1/health | python3 -c "import json,sys; h=json.load(sys.stdin); print(h[\"apartment_id\"], h[\"status\"], h[\"connector\"][\"status\"])"; done; sudo rm -f /opt/domhouse/.metadata-checked; sudo bash /opt/domhouse/engine-vm.sh check-all | grep -E "metadata|data "'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='for c in engine-dev engine-lab-01; do echo "$c:"; sudo docker exec "$c" python -c "import urllib.request as u; print(u.urlopen(u.Request(\"http://169.254.169.254/computeMetadata/v1/instance/zone\", headers={\"Metadata-Flavor\": \"Google\"}), timeout=3).read().decode())" 2>&1 | tail -1; done; echo "host:"; curl -s -m 3 -H "Metadata-Flavor: Google" http://169.254.169.254/computeMetadata/v1/instance/zone; echo; for p in 8100 8169; do curl -s -m 5 http://10.198.0.2:$p/api/v1/health | python3 -c "import json,sys; h=json.load(sys.stdin); print(h[\"apartment_id\"], h[\"status\"], h[\"connector\"][\"status\"])"; done; sudo rm -f /opt/domhouse/.metadata-checked; sudo bash /opt/domhouse/engine-vm.sh check-all | grep -E "metadata|data "; true'
 ```
 
 | Riga | Atteso |
@@ -196,7 +197,7 @@ Il controllo delle uscite gira una volta all'ora. Qui si azzera l'ora dell'ultim
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='echo 0 | sudo tee /opt/domhouse/.egress-checked > /dev/null; sudo bash /opt/domhouse/engine-vm.sh check-all > /dev/null; sudo journalctl -t domhouse-check --since "-2min" --no-pager | grep " egress "'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='echo 0 | sudo tee /opt/domhouse/.egress-checked > /dev/null; sudo bash /opt/domhouse/engine-vm.sh check-all > /dev/null; sudo journalctl -t domhouse-check --since "-2min" --no-pager | grep " egress "; true'
 ```
 
 - **Atteso:** una riga «egress ok server=… registry=401 acme=200», con il server in uno di due modi:
@@ -229,10 +230,11 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='journalctl --disk-usage; sudo journalctl -t domhouse-check --since "-10min" --no-pager | grep -E "data |metadata"'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo journalctl --disk-usage; sudo journalctl -t domhouse-check --since "-10min" --no-pager | grep -E "data |metadata"; true'
 ```
 
 - **Atteso:** journald sotto i 500 MB; le righe `data dev mb=…`, `data lab-01 mb=…` e `metadata blocked` di V5.
+- `journalctl --disk-usage` va con `sudo`: senza, conta solo i registri di chi si collega (il 17 novembre 13,1 MB con l'avviso «Hint: You are currently not seeing messages…», contro i 64 MB veri).
 
 ## Allarmi
 
@@ -268,14 +270,14 @@ gcloud alpha monitoring policies list --project=domotica-poc-511707 --account=m.
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/engine-vm.sh check-all; sudo bash /opt/domhouse/broker-vm.sh status | grep -E "^appartamenti|^utenti|^broker ok|connessioni"; sudo docker logs --since 30m domhouse-broker 2>&1 | grep -c "lab-01.shellyplugmg3-9070695cb0d0"'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/engine-vm.sh check-all; sudo bash /opt/domhouse/broker-vm.sh status | grep -E "^appartamenti|^utenti|^broker ok|connessioni"; sudo docker logs --since 30m domhouse-broker 2>&1 | grep -c "lab-01.shellyplugmg3-9070695cb0d0"; true'
 ```
 
 - **Atteso:**
   - «engine ok dev», «engine ok lab-01», «domhouse-check: 2 motori, 0 muti», `vm mem_used_pct=…`, «broker ok cert_days=…»;
   - nessuna riga `kept`, `refused`, `OPEN`;
   - broker con 1 appartamento e i suoi utenti;
-  - la Plug, se è accesa, ancora nel registro del broker.
+  - la Plug, se è accesa, ancora nel registro del broker: il numero in fondo è maggiore di 0. Se è spenta, `0`, e grazie a `; true` nessun errore di gcloud (regola 5).
 
 ### V16. Pulizia della cartella di lavoro (scrive sulla VM)
 
