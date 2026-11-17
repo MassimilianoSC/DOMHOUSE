@@ -4,11 +4,13 @@
 |---|---|---|---|
 | **Proposta, nessun codice** (17 novembre 2026, 11:09) | o2 | `docs/progetto-strumento-a-base.md` §2.2, §2.3, §2.5, §8.1, §8.3, §8.4 (D-233); registro, pacchetto A3; documento interno dell'Autonomia, §14 e decisione 4 del §11; `docs/motore-vm.md`, impostazioni MQTT dello Shelly | rilettura della memoria storica; o1 fissa le chiamate del server (§6); risposte alle domande (§8); poi il codice |
 
+**Termini:** quelli di `docs/guida-utente.md` (riletta il 17 novembre): «sistema domotico», «gestore della piattaforma», «accesso di assistenza», «Registro attività», «ID richiesta», «in linea». Nei testi per chi usa l'app non compaiono «catalogo», «broker» né «impronta».
+
 **Cosa copre:** le schermate di «Registra», «Rigenera» e «Revoca», la password mostrata una volta sola, gli stati, gli errori, cosa serve dal server.
 
 **Cosa non copre:**
 
-- il modulo del catalogo (A4): lì «Registra» partirà dal salvataggio, con le stesse chiamate;
+- il modulo del catalogo (A4; nella guida «elenco dei dispositivi»): lì «Registra» partirà dal salvataggio, con le stesse chiamate;
 - gli accessi rifiutati (A5): stanno nella pagina «Stato dei dispositivi»;
 - la guida: i testi per la guida li mando alla memoria storica quando il codice è fatto.
 
@@ -132,7 +134,7 @@ Questa parte aspetta la revisione di sicurezza del §8.3 (domanda 10).
 | cambio in corso | «Cambio password in corso» | giallo | «Finché il sistema non conferma, vale ancora la password vecchia.» | Dati, Revoca |
 | revoca in corso | «Revoca in corso» | giallo | «Finché il sistema non conferma, il dispositivo può ancora collegarsi.» | — |
 | revocato | «Revocato» | grigio | «Non può più collegarsi.» | Registra di nuovo |
-| non applicato | «Non applicato» | rosso | il messaggio del server, con il codice dell'operazione da copiare | Riprova, Revoca |
+| non applicato | «Non applicato» | rosso | il messaggio del server, con il pulsante «ID richiesta» da copiare (il codice dell'operazione) | Riprova, Revoca |
 
 **Note:**
 
@@ -153,7 +155,7 @@ Il testo viene dal server quando c'è; altrimenti questi, in `it.json`. Codici p
 | troppi dispositivi (200) | 409 `too_many_devices` | «Questo appartamento ha già 200 dispositivi registrati: è il massimo.» |
 | troppe operazioni ravvicinate | 429 `rate_limited` | «Troppe operazioni in poco tempo: riprova fra qualche minuto.» |
 | agente non installato | 503 `agent_not_configured` | «Agente non ancora installato in questo ambiente.» (già nel sito) |
-| ordine non inviato | 502 `agent_publish_failed` | il messaggio del server, con il codice della richiesta da copiare |
+| ordine non inviato | 502 `agent_publish_failed` | il messaggio del server, con il pulsante «ID richiesta» da copiare |
 | senza permesso | 403 | il testo che il sito usa già |
 | rete caduta durante «Registra» o «Rigenera» | — | «Non sappiamo se la password è stata creata. Ricarica l'elenco: se il dispositivo risulta registrato, usa «Rigenera».» |
 
