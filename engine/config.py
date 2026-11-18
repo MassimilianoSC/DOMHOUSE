@@ -41,7 +41,8 @@ SETTINGS: dict[str, tuple[float, float, float]] = {
     "REMOTE_OFF_MINUTES": (5.0, 1.0, 60.0),
     # D-133: the boiler's thermostat and the frost protection: on below the setpoint, off above setpoint + this (°C)
     "THERMOSTAT_HYSTERESIS_C": (0.5, 0.1, 3.0),
-    # at least these minutes between two switches of the relay made by the thermostat
+    # at least these minutes between two switches of the boiler's relay, whoever asks (E-37: a command switching it on
+    # within them applies the intention and the thermostat switches the relay when they are over; off is never held)
     "THERMOSTAT_MIN_SWITCH_MINUTES": (5.0, 1.0, 60.0),
     # the split's compressor pause (rule compressor_min_off, not editable from the app: value and limits from here)
     "COMPRESSOR_MIN_OFF_MINUTES": (3.0, 1.0, 15.0),

@@ -209,3 +209,97 @@ def test_without_a_sensor_in_casa_vuota_the_frost_protection_says_it_cannot_act(
         await regulate_and_wait(e)
         assert e.relay[BOILER] is True and "regolazione ripresa" in _no_sensor_decisions(e)[-1]["reasoning"]
     asyncio.run(main())
+
+
+# ---- E-37 (18 November): a command never switches the boiler's relay on within the minimum between two switches ----
+# D-126: at least THERMOSTAT_MIN_SWITCH_MINUTES between two switches of the relay, whoever asks. Before, a command
+# sent the relay the thermostat wanted at once: 11 clicks in 7 s on lab-01's Shelly 1 switched a boiler 11 times.
+# Switching on within the minimum: the intention applies, acked (D-128), nothing to the device, and the thermostat
+# switches it on when the minimum is over. Switching off: always at once. A command that switches counts as a switch.
+E37_MINUTES = 60                                                   # 1,2 s here: «too soon» is sure
+
+
+@pytest.fixture
+def e37_fast_commands(monkeypatch):
+    from engine.connector import simulated
+    for name in ("SENT_AFTER_S", "VERIFYING_AFTER_S", "OUTCOME_AFTER_S"):
+        monkeypatch.setattr(simulated, name, 0.01)                 # a command in hundredths, well within the minimum
+
+
+def e37_engine(conn):
+    e = core.ApartmentEngine("apt-prova-01", conn, seed=False, settings={"THERMOSTAT_MIN_SWITCH_MINUTES": E37_MINUTES})
+    e.ensure_started()
+    return e
+
+
+async def e37_command(e, body):
+    cmd = e.create_command(BOILER, body, ACTOR, CORR)
+    end = asyncio.get_running_loop().time() + 5
+    while e.commands[cmd["command_id"]]["status"] not in core.FINAL:
+        assert asyncio.get_running_loop().time() < end
+        await asyncio.sleep(0.01)
+    return e.commands[cmd["command_id"]]
+
+
+async def e37_minimum():
+    await asyncio.sleep(E37_MINUTES * MINUTE + 0.05)
+
+
+def test_e37_switching_on_by_hand_within_the_minimum_waits_for_the_thermostat(e37_fast_commands):
+    async def main():
+        conn = Recorder()
+        e = e37_engine(conn)                                           # boiler enabled at 21 °C, relay on
+        temperature(e, 23.0)
+        await regulate_and_wait(e)                                     # the thermostat switches it off: a switch
+        assert e.relay[BOILER] is False and conn.boiler_targets[-1] == {"on": False}
+        sent = len(conn.boiler_targets)
+        temperature(e, 19.0)
+        cmd = await e37_command(e, {"capability": "heating", "action": "set_heating",
+                                    "params": {"on": True, "setpoint": 22}})
+        assert cmd["status"] == "acked"                                # D-128: the intention is applied
+        heating = e.devices[BOILER]["capabilities"]["heating"]
+        assert heating["on"] is True and heating["setpoint"] == 22
+        assert len(conn.boiler_targets) == sent and e.relay[BOILER] is False      # nothing to the relay
+        [applied] = [d for d in e.decisions if d["command_id"] == cmd["command_id"]]
+        assert applied["outcome"] == "applied" and "almeno 60 minuti fra due commutazioni" in applied["reasoning"]
+        await e37_minimum()
+        await regulate_and_wait(e)                                     # the minimum is over: the thermostat
+        assert e.relay[BOILER] is True and conn.boiler_targets[-1] == {"on": True}
+        assert len(conn.boiler_targets) == sent + 1
+    asyncio.run(main())
+
+
+def test_e37_switching_off_by_hand_is_always_at_once(e37_fast_commands):
+    async def main():
+        conn = Recorder()
+        e = e37_engine(conn)
+        temperature(e, 23.0)
+        await regulate_and_wait(e)
+        temperature(e, 19.0)
+        await e37_minimum()
+        await regulate_and_wait(e)                                     # switched on by the thermostat just now
+        assert e.relay[BOILER] is True and conn.boiler_targets[-1] == {"on": True}
+        cmd = await e37_command(e, {"capability": "heating", "action": "turn_off"})
+        assert cmd["status"] == "acked"
+        assert conn.boiler_targets[-1] == {"on": False} and e.relay[BOILER] is False
+    asyncio.run(main())
+
+
+def test_e37_after_a_command_that_switches_the_thermostat_waits_too(e37_fast_commands):
+    async def main():
+        conn = Recorder()
+        e = e37_engine(conn)                                           # relay on, never switched yet
+        temperature(e, 20.0)
+        await regulate_and_wait(e)
+        assert e.relay[BOILER] is True
+        cmd = await e37_command(e, {"capability": "heating", "action": "set_heating",
+                                    "params": {"on": True, "setpoint": 19}})   # 20 > 19 + 0,5: the command switches off
+        assert cmd["status"] == "acked" and conn.boiler_targets[-1] == {"on": False} and e.relay[BOILER] is False
+        sent = len(conn.boiler_targets)
+        temperature(e, 18.0)                                           # below 19: the thermostat wants it on
+        await regulate_and_wait(e)
+        assert e.relay[BOILER] is False and len(conn.boiler_targets) == sent   # too soon after the command's switch
+        await e37_minimum()
+        await regulate_and_wait(e)
+        assert e.relay[BOILER] is True and conn.boiler_targets[-1] == {"on": True}
+    asyncio.run(main())

@@ -1257,6 +1257,17 @@ class ApartmentEngine:
             return {"on": self.thermostat(device, state)[0]}
         return self.device_target(cap, state)
 
+    def _relay_wait(self, device: dict, intention: dict) -> float:
+        """E-37 (D-126): seconds before a command may switch the boiler's relay ON, 0 when it may now. At least
+        THERMOSTAT_MIN_SWITCH_MINUTES between two switches, whoever asks: within them the intention applies and the
+        thermostat switches the relay on when they are over (regulate). Switching off is never held back, and an
+        unknown relay is commanded either way (P7a-1)."""
+        device_id = device["device_id"]
+        if not self.thermostat(device, intention)[0] or self.relay.get(device_id) is not False:
+            return 0.0
+        since = time.monotonic() - self.relay_switched.get(device_id, -1e18)
+        return max(self.setting("THERMOSTAT_MIN_SWITCH_MINUTES") * seconds_per_minute() - since, 0.0)
+
     def _sensor(self, device: dict) -> tuple[float | None, dict | None, str | None]:
         """(temperature, sensor, problem) of the sensor linked to a boiler (links.sensor_device_id)."""
         sensor_id = self.links.get(device["device_id"], {}).get("sensor_device_id")
@@ -2273,13 +2284,29 @@ class ApartmentEngine:
                         self._unwatch_power(check[0]["device_id"], waiter)
                     await self._refused_by_pause(cmd, decision_actor, reasoning, target, old, new_state, pause)
                     return
+            if cap == "heating" and (wait := self._relay_wait(device, new_state)) > 0:
+                # E-37: the relay switched less than the minimum ago: the intention applies (D-128, acked), nothing
+                # goes to the device, the thermostat switches it on when the minimum is over
+                if waiter is not None:
+                    self._unwatch_power(check[0]["device_id"], waiter)
+                self._settle(device, cap, new_state, {}, cmd["correlation_id"], heard=False)
+                self.mode_cmds.pop(cmd["command_id"], None)
+                self._set_status(cmd, "acked")
+                minutes = fmt_num(self.setting("THERMOSTAT_MIN_SWITCH_MINUTES"))
+                self.log(decision_actor, target, cmd["action"], old, describe(cap, new_state),
+                         f"{reasoning}; relè della caldaia non acceso ora: almeno {minutes} minuti fra due commutazioni, "
+                         f"il termostato lo accende fra circa {int(wait) + 1} secondi se la stanza lo chiede ancora",
+                         "applied", cmd["correlation_id"], command_id=cmd["command_id"])
+                return
+            relay_before = self.relay.get(device["device_id"])          # E-37: did this command switch the relay?
+            asked = self.connector_target(device, cap, new_state)
             running = (device["device_id"], cap, cmd["correlation_id"], new_state)
             self.inflight.append(running)
             try:
                 result = await asyncio.wait_for(self.connector.execute(
                     ConnectorCommand(command_id=cmd["command_id"], correlation_id=cmd["correlation_id"],
                                      device_id=device["device_id"], capability=cap,
-                                     target=self.connector_target(device, cap, new_state), deadline=deadline),
+                                     target=asked, deadline=deadline),
                     lambda step: self._set_status(cmd, step) if step in ("sent", "verifying") else None),
                     timeout=max((deadline - utcnow()).total_seconds(), 0))
                 if result.outcome == "delivered" and waiter is not None and not await self._power_confirmed(waiter, cmd):
@@ -2330,6 +2357,8 @@ class ApartmentEngine:
             self.log("system", target, "command_unverified", None, None,
                      f"Comando a {device['label'].lower()} non verificato: il misuratore «{meter['label']}» è offline",
                      "informational", cmd["correlation_id"], command_id=cmd["command_id"])
+        if cap == "heating" and asked.get("on") != relay_before:
+            self.relay_switched[device["device_id"]] = time.monotonic()   # E-37: a switch like the thermostat's
         self._settle(device, cap, new_state, reported, cmd["correlation_id"], heard=result.outcome == "confirmed")
         self.mode_cmds.pop(cmd["command_id"], None)
         self._set_status(cmd, "acked")
