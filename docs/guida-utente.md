@@ -2511,6 +2511,8 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 - **«Riscaldamento abilitato»** vuol dire che la caldaia può scaldare.
 - **Il termostato del sistema** accende e spegne davvero la caldaia intorno alla temperatura voluta, con un'isteresi
   di 0,5 °C e almeno 5 minuti fra due cambi, usando il sensore di temperatura collegato.
+- **Esempio:** con la temperatura voluta a 23 °C la caldaia si accende sotto 23,0 °C e si spegne sopra 23,5 °C.
+  Fra 23,0 e 23,5 resta com'è: con 23,4 °C in stanza, abilitare il riscaldamento non la accende.
 - **Con il misuratore sopra 30 W** leggi «sta scaldando ora».
 - **Il climatizzatore in comfort** segue il sensore della sua stanza (sopra). Senza sensore nella stanza lo comandi
   solo tu.
