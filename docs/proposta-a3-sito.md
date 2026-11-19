@@ -2,7 +2,7 @@
 
 | Stato | Scritto da | Basato su | Prossimo passo |
 |---|---|---|---|
-| **Proposta, nessun codice** (17 novembre 2026, 11:09; allineata alla proposta del server alle 12:43; **19 novembre, 16:56: risposte del committente 1170–1177 e di o1, §11 della proposta del server, `b05824b`**) | o2 | `docs/proposta-a3-server.md` (o1, `0f02ffa` e `b05824b`); `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §2.5, §8.1, §8.4 (D-233); registro, pacchetto A3 e risposte 1170–1177; documento interno dell'Autonomia, §14 e decisione 4 del §11; `docs/motore-vm.md`, impostazioni MQTT dello Shelly; schermate della pagina MQTT dello Shelly (committente, 17 novembre) | revisione di sicurezza di A2 e A3 insieme; poi il via al codice. Con o1 non resta niente di aperto (§9) |
+| **Codice del sito fatto** (19 novembre 2026, 18:17: `93a44dc`, `7820ed1`, `6c8e4bb`, `369e4a2`, `a92c3b4`; schermate approvate, risposta 1182; via 1184). Proposta del 17 novembre 2026, 11:09; allineata alla proposta del server alle 12:43; **19 novembre, 16:56: risposte del committente 1170–1177 e di o1, §11 della proposta del server, `b05824b`**) | o2 | `docs/proposta-a3-server.md` (o1, `0f02ffa` e `b05824b`); `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §2.5, §8.1, §8.4 (D-233); registro, pacchetto A3 e risposte 1170–1177; documento interno dell'Autonomia, §14 e decisione 4 del §11; `docs/motore-vm.md`, impostazioni MQTT dello Shelly; schermate della pagina MQTT dello Shelly (committente, 17 novembre) | prova sul server dello staging con l'agente vero, quando c'è; testi per la guida alla memoria storica. Con o1 non resta niente di aperto (§9) |
 
 **Termini:** quelli di `docs/guida-utente.md` (riletta il 17 novembre): «sistema domotico», «gestore della piattaforma», «accesso di assistenza», «Registro attività», «ID richiesta», «in linea». Nei testi per chi usa l'app non compaiono «catalogo», «broker» né «impronta».
 
@@ -157,8 +157,10 @@ Uguali alla tabella del server (§4.3). Il menu mostra solo le azioni ammesse; �
 | `cambio_in_corso` | — | **sì** | — | — |
 | `revoca_in_corso` | — | — | — | — |
 | `revocato` | — | — | — | sì |
-| `non_applicato` | sì | sì | sì | — |
+| `non_applicato` (azione `registra` o `rigenera`) | sì | sì | sì | — |
+| `non_applicato` (azione `revoca`) | — | — | **sì, solo questa** | — |
 
+- **Una revoca non applicata si chiude solo con «Riprova»** (proposta del server §4.3, revisione di sicurezza punto 10): «Rigenera» riattiverebbe il dispositivo. Nel sito la riga ha «Riprova» e «Dati di collegamento», senza menu «⋯».
 - **«Revoca» durante un cambio in corso:** ammessa, perché un dispositivo rubato non deve aspettare (risposta del server, §4.3).
 - **Mentre la pagina è aperta lo stato può cambiare:** se il server risponde `version_changed` o `invalid_state`, il sito rilegge l'elenco da solo (§4).
 
