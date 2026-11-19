@@ -14,6 +14,8 @@ export const AUDIT_ACTIONS = [
   "support_access_requested", "support_access_opened", "support_access_approved", "support_access_rejected", "support_access_closed", "support_access_expired",
   "manager_added", "manager_removed", "account_deleted",
   "energy_price_changed", "apartment_simulated_changed", "simulator_reset", "rules_changed", "timezone_changed",
+  // A3 (o1 25c97cf): target the apartment, the device in details.device_id; the last one is written by the system
+  "device_credential_registered", "device_credential_regenerated", "device_credential_revoked", "device_credential_retried", "device_credential_revoke_not_applied",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -148,6 +150,12 @@ export function describeEntry(e: AuditEntry): { sentence: string; note: string |
     }
     case "support_access_opened":
       return { sentence: t("audit.actions.support_access_opened", { ...v, until: fmtDateTime(text(d.expires_at)) }), note };
+    case "device_credential_registered":
+    case "device_credential_regenerated":
+    case "device_credential_revoked":
+    case "device_credential_retried":
+    case "device_credential_revoke_not_applied":
+      return { sentence: t(`audit.actions.${e.action}`, { ...v, device: text(d.device_id) ?? "—" }), note };
     default:
       return { sentence: t(`audit.actions.${e.action}`, v), note };
   }

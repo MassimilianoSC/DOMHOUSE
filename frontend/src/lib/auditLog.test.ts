@@ -204,3 +204,29 @@ describe("fuso orario cambiato sul motore (D-183)", () => {
       .toBe("Fuso orario dell'appartamento «Milano Centro» cambiato sul motore: Europe/Rome → Europe/London");
   });
 });
+
+describe("registro attività: credenziali dei dispositivi (A3)", () => {
+  // o1, 25c97cf: target the apartment, the device in details.device_id; never a password nor its hash
+  const apt = { type: "apartment" as const, id: "lab-prova", label: "Laboratorio" };
+  const device = { device_id: "shellyplugmg3-aa01" };
+  it.each([
+    ["device_credential_registered", "Anna Rossi ha registrato il dispositivo shellyplugmg3-aa01 in «Laboratorio»"],
+    ["device_credential_regenerated", "Anna Rossi ha creato una password nuova per il dispositivo shellyplugmg3-aa01 in «Laboratorio»"],
+    ["device_credential_revoked", "Anna Rossi ha revocato il dispositivo shellyplugmg3-aa01 in «Laboratorio»"],
+    ["device_credential_retried", "Anna Rossi ha rimandato al sistema domotico le credenziali del dispositivo shellyplugmg3-aa01 in «Laboratorio»"],
+  ])("%s", (action, text) => {
+    expect(AUDIT_ACTIONS).toContain(action);
+    expect(sentence({ action, target: apt, details: device })).toBe(text);
+  });
+
+  it("revoca non applicata: una riga del sistema, che dice che il dispositivo può ancora collegarsi (risposta 1175)", () => {
+    const system = { kind: "system" as const, uid: null, email: null, display_name: null, removed: false };
+    expect(AUDIT_ACTIONS).toContain("device_credential_revoke_not_applied");
+    expect(sentence({ action: "device_credential_revoke_not_applied", actor: system, target: apt, details: { ...device, seq: 12, op_id: "op-1" } }))
+      .toBe("Revoca del dispositivo shellyplugmg3-aa01 in «Laboratorio» non applicata: il dispositivo può ancora collegarsi. Usa «Riprova».");
+  });
+
+  it("senza il codice del dispositivo: un trattino, mai «undefined»", () => {
+    expect(sentence({ action: "device_credential_revoked", target: apt, details: {} })).toBe("Anna Rossi ha revocato il dispositivo — in «Laboratorio»");
+  });
+});
