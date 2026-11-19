@@ -2,7 +2,7 @@
 
 | Stato | Scritto da | Basato su | Prossimo passo |
 |---|---|---|---|
-| **Proposta, nessun codice** (19 novembre 2026, 16:43) | o2 | `docs/proposta-a2.md` (o1, `c7d85a8`) §2, §5, §6, §8; registro, risposte 1161–1168 e le due condizioni del committente sulle schermate (19 novembre, 16:37 e 16:39); le pagine di oggi: Organizzazioni, scheda dell'organizzazione, «Appartamenti» (`PlatformTenants.tsx`, `PlatformApartments.tsx`) | il committente guarda le immagini (§9); o1 risponde ai punti del §7; poi il via al codice |
+| **Proposta, nessun codice** (19 novembre 2026, 16:43); **schermate approvate dal committente così come sono** (risposta 1178 = a, 19 novembre) | o2 | `docs/proposta-a2.md` (o1, `c7d85a8`) §2, §5, §6, §8; registro, risposte 1161–1168 e le due condizioni del committente sulle schermate (19 novembre, 16:37 e 16:39); le pagine di oggi: Organizzazioni, scheda dell'organizzazione, «Appartamenti» (`PlatformTenants.tsx`, `PlatformApartments.tsx`) | o1 risponde ai punti del §7; revisione di sicurezza di A2 e A3 insieme; poi il via al codice |
 
 **Termini:** quelli di `docs/guida-utente.md`: «sistema domotico», «gestore della piattaforma», «ID richiesta». Nei testi per chi usa l'app non compaiono «broker», «catalogo», «segreti» né «VM»: si dice «macchina virtuale» e «chiavi».
 
@@ -188,6 +188,8 @@ Immagini statiche, fuori dal repository, in `DOMOTICA/schermate-a2/`, a 1280 e 3
 3. il modulo normale e con il limite raggiunto.
 
 Nomi e organizzazioni di prova, nessuna email vera. Sono un'anteprima: colori e componenti sono quelli del sito, il comportamento no.
+
+**Approvate dal committente così come sono** (risposta 1178 = a, 19 novembre).
 
 ## 10. Aperto
 
