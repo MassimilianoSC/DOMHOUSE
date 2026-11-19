@@ -253,21 +253,23 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 ## P8. L'utente vecchio `m_scardovellicrac` (scrive sulla VM)
 
-Non si cancella (non si potrebbe tornare indietro): esce dai gruppi `docker` e `adm`, non ha più una shell e l'account è scaduto. Si può rilanciare.
+Non si cancella (non si potrebbe tornare indietro): esce dai gruppi `docker` e `adm` e dai quattro dati dall'immagine di ottobre (`dip`, `video`, `plugdev`, `lxd`: risposta 1159 = a, 19 novembre), non ha più una shell e l'account è scaduto. Si può rilanciare.
+
+**Mai toccato:** l'utente OS Login `m_scardovellicrac_gmail_com`, quello con cui ci si collega, e l'account dell'app (nota del committente, 19 novembre).
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='set -e; sudo gpasswd -d m_scardovellicrac docker || true; sudo gpasswd -d m_scardovellicrac adm || true; sudo usermod -s /usr/sbin/nologin -e 1 m_scardovellicrac; id m_scardovellicrac; getent passwd m_scardovellicrac; sudo chage -l m_scardovellicrac | grep -i "account expires" || true'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='set -e; for g in docker adm dip video plugdev lxd; do sudo gpasswd -d m_scardovellicrac "$g" || true; done; sudo usermod -s /usr/sbin/nologin -e 1 m_scardovellicrac; id m_scardovellicrac; getent passwd m_scardovellicrac; sudo chage -l m_scardovellicrac | grep -i "account expires" || true'
 ```
 
-- **Atteso:** due «Removing user m_scardovellicrac from group …» (a un rilancio «is not a member»); `id` con solo il suo gruppo; la shell `/usr/sbin/nologin`; «Account expires: Jan 02, 1970».
+- **Atteso:** sei «Removing user m_scardovellicrac from group …» (a un rilancio «is not a member»); `id` con solo il suo gruppo (`groups=1003(m_scardovellicrac)`); la shell `/usr/sbin/nologin`; «Account expires: Jan 02, 1970».
 - **Ritorno indietro:**
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo usermod -aG docker,adm -s /bin/bash -e "" m_scardovellicrac && id m_scardovellicrac'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo usermod -aG docker,adm,dip,video,plugdev,lxd -s /bin/bash -e "" m_scardovellicrac && id m_scardovellicrac' < /dev/null
 ```
 
 ## P9. Le immagini vecchie del motore (scrive sulla VM)
@@ -370,7 +372,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 | salute | `dev ok … up` e `lab-01 ok … up` |
 | broker | «connessioni sulla porta TLS: N» con N ≥ 1 (la Plug ricollegata; se 0, aspetta un minuto e rilancia), «broker ok cert_days=…» |
 | `host-vm.sh check` | come in P6: i valori nuovi valgono anche dopo il riavvio |
-| `id m_scardovellicrac` | solo il suo gruppo, come in P8 |
+| `id m_scardovellicrac` | solo il suo gruppo, come in P8 (`groups=1003(m_scardovellicrac)`) |
 | controllo | «engine ok dev», «engine ok lab-01», «domhouse-check: 2 motori, 0 muti», «metadata blocked reti=4» |
 
 - Nell'app di staging e in quella di produzione: i dispositivi di `dev` e la Plug di `lab-01` in linea.
