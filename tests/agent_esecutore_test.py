@@ -161,8 +161,8 @@ def test_the_sequence_per_apartment_only_grows_and_stays_as_a_tombstone(w):
 
 
 def test_the_other_operations_are_not_yet_available(w):
+    # aggiorna_broker is executed since A3 (tests/agent_a3_vm_test.py)
     for op, params in (("crea_motore", {"porta": 8151}), ("aggiorna_motore", {}), ("togli_motore", {}),
-                       ("aggiorna_broker", {"dispositivi": []}),
                        ("applica_catalogo", {"catalogo": "devices: []", "versione": 1})):
         r = w.ex.handle(order(operazione=op, apartment_id="lab-02", seq=1, parametri=params), READER_UID)
         assert (r["esito"], r["codice"]) == ("rifiutato", "non_disponibile"), op
@@ -267,9 +267,11 @@ def test_r16_the_alarm_policy_reads_both_services():
     assert "domhouse-agent-(lettore|esecutore)" in flt
 
 
-def test_r7_the_executor_unit_is_strict_and_without_capabilities():
+def test_r7_the_executor_unit_is_strict_and_opens_only_what_a3_needs():
+    """R7, then A3 (N9): still ProtectSystem=strict; only /etc/domhouse/_broker writable and only CAP_CHOWN."""
     unit = (AGENT / "domhouse-agent-esecutore.service").read_text(encoding="utf-8")
-    assert "ProtectSystem=strict" in unit and "CapabilityBoundingSet=\n" in unit and "ProtectSystem=full" not in unit
+    assert "ProtectSystem=strict" in unit and "ProtectSystem=full" not in unit
+    assert "CapabilityBoundingSet=CAP_CHOWN\n" in unit and "ReadWritePaths=/etc/domhouse/_broker\n" in unit
 
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="SO_PEERCRED e i socket UNIX: solo Linux (CI)")

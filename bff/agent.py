@@ -43,6 +43,7 @@ CODES = (
     "porta_fuori_fascia", "impronta_non_valida", "troppi_dispositivi", "catalogo_troppo_grande",
     "prod_non_ammesso", "seq_vecchia", "non_disponibile", "motore_assente", "chiamante_non_ammesso",
     "scaduto", "interrotto", "errore_interno", "firma_non_valida",
+    "appartamento_sconosciuto", "sync_fallito", "migrazione_non_fatta",
     "non_inviato", "tempo_scaduto",
 )
 MESSAGES = {
@@ -70,6 +71,9 @@ MESSAGES = {
     "interrotto": "La VM si è riavviata durante l'operazione: riprova",
     "errore_interno": "Errore interno dell'agente: riprova",
     "firma_non_valida": "L'agente ha rifiutato l'ordine: firma non valida, serve un controllo",
+    "appartamento_sconosciuto": "Il sistema domotico non conosce ancora questo appartamento",
+    "sync_fallito": "Il sistema domotico non ha potuto aggiornare gli accessi: riprova",
+    "migrazione_non_fatta": "Le credenziali di questo appartamento non sono ancora passate all'app",
     "non_inviato": "Non è stato possibile mandare l'ordine: riprova",
     "tempo_scaduto": "Nessuna risposta dall'agente entro 20 minuti: riprova",
 }

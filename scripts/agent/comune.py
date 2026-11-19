@@ -24,7 +24,7 @@ from dataclasses import dataclass
 
 OPERATIONS = ("capienza", "crea_motore", "aggiorna_motore", "aggiorna_broker", "applica_catalogo", "stato",
               "togli_motore")
-EXECUTED = {"stato", "capienza"}          # A1: the other five pass the checks and are refused «non_disponibile»
+EXECUTED = {"stato", "capienza", "aggiorna_broker"}   # A1, then A3; the other four are refused «non_disponibile»
 ENVIRONMENTS = ("staging", "prod")
 MAX_ORDER_BYTES = 128 * 1024
 MAX_CATALOG_BYTES = 64 * 1024
@@ -59,6 +59,8 @@ CODES = (
     "scaduto", "interrotto", "errore_interno",
     # A3 §6.3: an order without the server's signature
     "firma_non_valida",
+    # A3 §6.1, §6.4: aggiorna_broker
+    "appartamento_sconosciuto", "sync_fallito", "migrazione_non_fatta",
 )
 DATA_MAX_LEN = 200                        # a value of «dati»: a number or a short string
 

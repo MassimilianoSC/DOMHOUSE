@@ -110,26 +110,27 @@ def test_sync_keeps_the_accounts_of_an_unreadable_apartment_and_updates_the_othe
     """E-33: a secret of one apartment that cannot be read (missing, without a version, malformed) used to stop the
     sync of every apartment: no new device, no rotation, no revocation anywhere. Now that apartment keeps the lines it
     had, the others are updated, and a line «kept <apartment_id>» says which one (broker-vm.sh makes it an alert)."""
+    # A3 §6.2: the old «-devices» secret is read only for lab-01 (before A3: any apartment)
     auth = tmp_path / "auth"
     auth.mkdir()
     list_file = tmp_path / "apartments"
-    list_file.write_text("apt-a\napt-b\n", encoding="utf-8")
-    (auth / "connectors.passwd").write_text("apt-a.connector:$7$1000$aa$bb\napt-b.connector:$7$1000$cc$dd\n",
+    list_file.write_text("lab-01\napt-b\n", encoding="utf-8")
+    (auth / "connectors.passwd").write_text("lab-01.connector:$7$1000$aa$bb\napt-b.connector:$7$1000$cc$dd\n",
                                             encoding="utf-8")
-    (auth / "devices.passwd").write_text("apt-a.d1:$7$1000$x$y\napt-b.d9:$7$1000$p$q\n", encoding="utf-8")
-    monkeypatch.setattr(ba, "_get", _secrets_get({"langbrain-shelly-apt-a": PASSWORD,
-                                                  "langbrain-shelly-apt-a-devices": json.dumps({"d2": PASSWORD})}))
+    (auth / "devices.passwd").write_text("lab-01.d1:$7$1000$x$y\napt-b.d9:$7$1000$p$q\n", encoding="utf-8")
+    monkeypatch.setattr(ba, "_get", _secrets_get({"langbrain-shelly-lab-01": PASSWORD,
+                                                  "langbrain-shelly-lab-01-devices": json.dumps({"d2": PASSWORD})}))
     assert ba.main(["sync", str(list_file), str(auth)]) == 0
     out = capsys.readouterr()
     assert "kept apt-b" in out.out.splitlines() and "changed" == out.out.splitlines()[-1]
     assert "langbrain-shelly-apt-b" in out.err and PASSWORD not in out.out + out.err
     devices = (auth / "devices.passwd").read_text(encoding="utf-8")
     assert "apt-b.d9:$7$1000$p$q\n" in devices                     # apt-b: its line as it was
-    assert "apt-a.d1:" not in devices and ba.hash_matches(ba.read_passwd(auth / "devices.passwd")["apt-a.d2"], PASSWORD)
+    assert "lab-01.d1:" not in devices and ba.hash_matches(ba.read_passwd(auth / "devices.passwd")["lab-01.d2"], PASSWORD)
     connectors = ba.read_passwd(auth / "connectors.passwd")
-    assert connectors["apt-b.connector"] == "$7$1000$cc$dd" and ba.hash_matches(connectors["apt-a.connector"], PASSWORD)
+    assert connectors["apt-b.connector"] == "$7$1000$cc$dd" and ba.hash_matches(connectors["lab-01.connector"], PASSWORD)
     acl = (auth / "devices.acl").read_text(encoding="utf-8")
-    assert "user apt-b.d9\ntopic readwrite apt-b/d9/#\n" in acl and "user apt-a.d2\ntopic readwrite apt-a/d2/#\n" in acl
+    assert "user apt-b.d9\ntopic readwrite apt-b/d9/#\n" in acl and "user lab-01.d2\ntopic readwrite lab-01/d2/#\n" in acl
     assert "user apt-b.connector\ntopic readwrite apt-b/#\n" in (auth / "connectors.acl").read_text(encoding="utf-8")
 
 
@@ -149,16 +150,17 @@ def test_sync_of_a_single_unreadable_apartment_keeps_its_accounts(tmp_path, monk
 
 
 def test_sync_keeps_an_apartment_whose_devices_secret_is_malformed(tmp_path, monkeypatch, capsys):
+    # A3 §6.2: the old «-devices» secret is read only for lab-01 (before A3: any apartment)
     auth = tmp_path / "auth"
     auth.mkdir()
     list_file = tmp_path / "apartments"
-    list_file.write_text("apt-a\n", encoding="utf-8")
-    (auth / "devices.passwd").write_text("apt-a.d1:$7$1000$x$y\n", encoding="utf-8")
-    monkeypatch.setattr(ba, "_get", _secrets_get({"langbrain-shelly-apt-a": PASSWORD,
-                                                  "langbrain-shelly-apt-a-devices": "{non json"}))
+    list_file.write_text("lab-01\n", encoding="utf-8")
+    (auth / "devices.passwd").write_text("lab-01.d1:$7$1000$x$y\n", encoding="utf-8")
+    monkeypatch.setattr(ba, "_get", _secrets_get({"langbrain-shelly-lab-01": PASSWORD,
+                                                  "langbrain-shelly-lab-01-devices": "{non json"}))
     assert ba.main(["sync", str(list_file), str(auth)]) == 0
-    assert "kept apt-a" in capsys.readouterr().out.splitlines()
-    assert (auth / "devices.passwd").read_text(encoding="utf-8") == "apt-a.d1:$7$1000$x$y\n"
+    assert "kept lab-01" in capsys.readouterr().out.splitlines()
+    assert (auth / "devices.passwd").read_text(encoding="utf-8") == "lab-01.d1:$7$1000$x$y\n"
 
 
 def test_sync_changes_nothing_without_the_vms_token(tmp_path, monkeypatch, capsys):

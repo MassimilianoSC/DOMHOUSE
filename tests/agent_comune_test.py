@@ -47,7 +47,7 @@ def test_a_valid_order_comes_back_as_its_fields():
 def test_the_closed_list_of_operations():
     assert comune.OPERATIONS == ("capienza", "crea_motore", "aggiorna_motore", "aggiorna_broker", "applica_catalogo",
                                  "stato", "togli_motore")
-    assert comune.EXECUTED == {"stato", "capienza"}               # A1: the others come with their package
+    assert comune.EXECUTED == {"stato", "capienza", "aggiorna_broker"}   # A1, then A3; the others with their package
     assert code(order(operazione="cambia_password")) == "operazione_sconosciuta"
     assert code(order(operazione="sh -c id")) == "operazione_sconosciuta"
 

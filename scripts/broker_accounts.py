@@ -66,6 +66,28 @@ def valid_device(device: str) -> str:
     return device
 
 
+# A3 §6.2: the devices of an apartment from devices/<apartment>, one «<device> <fingerprint>» per line, written by the
+# agent's executor; the old «-devices» secret only for the apartments of this list, until their migration (§6.4)
+LEGACY_SECRET = ("lab-01",)
+FILE_DEVICE_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+FILE_HASH_RE = re.compile(r"^\$7\$[0-9]{3,6}\$[A-Za-z0-9+/]{16}\$[A-Za-z0-9+/]{86}==$")
+
+
+def read_fingerprints(path: Path) -> dict[str, str]:
+    """devices/<apartment>: {device: fingerprint}, checked; any bad line refuses the whole file (the apartment keeps
+    the lines it has, E-33). Never a password: a line that is not a «$7$» fingerprint is refused."""
+    found: dict[str, str] = {}
+    for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        if not line.strip():
+            continue
+        parts = line.split()
+        if len(parts) != 2 or not FILE_DEVICE_RE.fullmatch(parts[0]) or parts[0] == RESERVED_DEVICE \
+                or not FILE_HASH_RE.fullmatch(parts[1]) or parts[0] in found:
+            raise AccountError(f"{path.name}: riga {number} non valida")
+        found[parts[0]] = parts[1]
+    return found
+
+
 def connector_user(apartment: str) -> str:
     return f"{apartment}.{RESERVED_DEVICE}"
 
@@ -141,9 +163,12 @@ def render(apartments: dict[str, tuple[str, dict[str, str]]], auth_dir: Path, ke
     for apartment in sorted(set(apartments) | set(kept)):
         user = connector_user(apartment)
         if apartment in apartments:
-            password, its_devices = apartments[apartment]
+            password, its_devices = apartments[apartment][:2]
             connectors[user] = _hash_for(previous_connectors.get(user), password)
-            hashes = {d: _hash_for(previous_devices.get(device_user(apartment, d)), p) for d, p in its_devices.items()}
+            if len(apartments[apartment]) > 2:                     # A3: fingerprints from the file, as they are
+                hashes = dict(apartments[apartment][2])
+            else:
+                hashes = {d: _hash_for(previous_devices.get(device_user(apartment, d)), p) for d, p in its_devices.items()}
         else:
             if user in previous_connectors:
                 connectors[user] = previous_connectors[user]
@@ -219,9 +244,15 @@ def sync(apartments_file: Path, auth_dir: Path) -> int:
         for apartment in ids:
             connector = f"{SECRET_PREFIX}{apartment}"
             devices = f"{connector}-devices"
+            its_file = auth_dir.parent / "devices" / apartment
             try:
                 password = check_password(access_secret(connector, token, project), f"connector di {apartment}")
-                loaded[apartment] = (password, parse_devices(access_secret(devices, token, project), devices))
+                if its_file.exists():                                    # A3 §6.2: the agent's file wins
+                    loaded[apartment] = (password, {}, read_fingerprints(its_file))
+                elif apartment in LEGACY_SECRET:
+                    loaded[apartment] = (password, parse_devices(access_secret(devices, token, project), devices))
+                else:
+                    loaded[apartment] = (password, {}, {})               # no file: no devices
             except AccountError as exc:
                 kept.append(apartment)
                 print(f"errore: {exc}; {apartment}: tenuti gli utenti di prima", file=sys.stderr)

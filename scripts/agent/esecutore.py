@@ -68,6 +68,7 @@ class Config(NamedTuple):
     max_staging: int = 4
     meminfo: Path = Path("/proc/meminfo")
     keys_dir: Path = Path("/etc/domhouse")     # A3 §6.3: agent-ordini.key and agent-risultati.key, root's, 600
+    broker_etc: Path = Path("/etc/domhouse/_broker")   # A3 §6.1: the broker's list of apartments and devices/
 
 
 def read_config(path: Path, uid_of: Callable[[str], int], check_owner: bool = True) -> Config:
@@ -263,10 +264,50 @@ class Esecutore:
             return comune.result(order, "rifiutato", "errore_interno")
         if not fresh:
             return comune.result(order, "rifiutato", "seq_vecchia")
+        if order.operazione == "aggiorna_broker":
+            return self._update_broker(order, output)
         port = self._port(order.apartment_id)
         if port is None:
             return comune.result(order, "rifiutato", "motore_assente")
         return comune.result(order, "riuscito", "ok", self._state(order.apartment_id, port, output))
+
+    # ---- A3 §6.1: aggiorna_broker -------------------------------------------------------------------------------
+    LEGACY = ("lab-01",)            # §6.4: the apartments of the old «-devices» secret, until their migration
+
+    def _update_broker(self, order: comune.Order, output: list[str]) -> dict:
+        """The complete list of fingerprints, written atomically to devices/<apt> (root, 600), then the broker's sync
+        (only the apartments' files that changed; the reload drops a device removed or changed: bench, 19 November)."""
+        apartment = order.apartment_id
+        if apartment in self.LEGACY and not (self.config.state / "migrati" / apartment).exists():
+            return comune.result(order, "rifiutato", "migrazione_non_fatta")
+        try:
+            known = (self.config.broker_etc / "apartments").read_text(encoding="utf-8").split()
+        except OSError:
+            known = []
+        if apartment not in known:
+            return comune.result(order, "rifiutato", "appartamento_sconosciuto")
+        devices = sorted(order.parametri["dispositivi"], key=lambda d: d["id"])
+        folder = self.config.broker_etc / "devices"
+        folder.mkdir(mode=0o700, exist_ok=True)
+        target, temporary = folder / apartment, folder / f".{apartment}.nuovo"
+        try:
+            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as out:
+                out.write("".join(f"{d['id']} {d['impronta']}\n" for d in devices))
+                out.flush()
+                os.fsync(out.fileno())
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, target)
+            _sync_dir(folder)
+        except OSError as exc:
+            output.append(f"scrittura di devices/{apartment}: {type(exc).__name__}")
+            return comune.result(order, "fallito", "errore_interno")
+        code, text = self.run(["/bin/bash", str(self.config.opt / "broker-vm.sh"), "sync"], dict(CLEAN_ENV),
+                              RUN_TIMEOUT_S * 4)
+        output.append(text)
+        if code != 0 or f"kept {apartment}" in text.split("\n"):
+            return comune.result(order, "fallito", "sync_fallito")
+        return comune.result(order, "riuscito", "ok", {"dispositivi": len(devices)})
 
     @staticmethod
     def _says_prod(data: bytes) -> bool:

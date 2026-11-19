@@ -23,8 +23,13 @@ ProtectHome=yes
 # no capability. A2 (crea_motore) will open exactly what it writes. Da verificare sulla VM: «docker inspect» works
 # without capabilities (the socket /run/docker.sock is root's: owner, no DAC override needed)
 ProtectSystem=strict
-CapabilityBoundingSet=
+# A3 (docs/proposta-a3-server.md §6.1, N9): aggiorna_broker writes devices/<apt> and broker-vm.sh sync rewrites auth/
+# (root:1883 750, files 1883:1883 640): the folder only, CAP_CHOWN only to give the new files to 1883, and the broker's
+# group to re-read them. Da verificare sulla VM con systemd-run (id e lettura di un file di auth/) prima di installare
+ReadWritePaths=/etc/domhouse/_broker
+CapabilityBoundingSet=CAP_CHOWN
 AmbientCapabilities=
+SupplementaryGroups=1883
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes

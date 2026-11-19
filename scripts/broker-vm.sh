@@ -78,6 +78,7 @@ SETTINGS="${BROKER_OPT}/broker.settings"
 ACME_SETTINGS="${BROKER_ETC}/acme.settings"
 APARTMENTS="${BROKER_ETC}/apartments"
 AUTH="${BROKER_ETC}/auth"
+DEVICES="${BROKER_ETC}/devices"          # A3: the devices' fingerprints per apartment, written by the agent's executor
 TLS_DIR="${TLS_MOUNT}/broker"
 ACME_DIR="${TLS_MOUNT}/acme"
 # nofail: a missing disk must not stop the VM from booting (the broker alone stays down); before docker, so that at
@@ -563,7 +564,11 @@ case "${cmd}" in
     step "Cartelle"
     install -d -m 700 "${ETC}"
     install -d -m 750 "${BROKER_ETC}"
-    install -d -m 750 -o "${BROKER_UID}" -g "${BROKER_UID}" "${AUTH}" "${BROKER_DATA}"
+    install -d -m 750 -o "${BROKER_UID}" -g "${BROKER_UID}" "${BROKER_DATA}"
+    # A3 N9: auth/ is root's with the broker's group: the agent's executor (root without CAP_DAC_OVERRIDE, group 1883)
+    # writes as the folder's owner and re-reads the files (1883:1883 640) through the group; the broker reads them
+    install -d -m 750 -o root -g "${BROKER_UID}" "${AUTH}"
+    install -d -m 700 "${DEVICES}"
     secure_keys
     [ -f "${APARTMENTS}" ] || : > "${APARTMENTS}"
     step "Utenti e permessi"
@@ -683,6 +688,9 @@ case "${cmd}" in
     [ $# -eq 1 ] || die "uso: add-apartment <apartment_id>"
     need_installed
     valid_id "$1"
+    # A3 §6.2: the file of fingerprints (empty) before the sync: an apartment of the app never reads an old secret
+    ( umask 077; mkdir -p "${DEVICES}" )                  # 700 from the umask: no separate chmod
+    [ -e "${DEVICES}/$1" ] || [ "$1" = "lab-01" ] || ( umask 077; : > "${DEVICES}/$1" )
     if grep -qx "$1" "${APARTMENTS}"; then echo "$1 è già nell'elenco"; else printf '%s\n' "$1" >> "${APARTMENTS}"; fi
     undo_line() { grep -vx "$1" "${APARTMENTS}" > "${APARTMENTS}.new" || true; mv -f "${APARTMENTS}.new" "${APARTMENTS}"; }
     sync_accounts || { undo_line "$1"; exit 1; }
@@ -696,6 +704,7 @@ case "${cmd}" in
     grep -qx "$1" "${APARTMENTS}" || die "$1 non è nell'elenco"
     grep -vx "$1" "${APARTMENTS}" > "${APARTMENTS}.new" || true
     mv -f "${APARTMENTS}.new" "${APARTMENTS}"
+    rm -f "${DEVICES}/$1"
     sync_accounts
     ;;
   sync)
