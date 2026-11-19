@@ -2,7 +2,7 @@
 
 | Stato | Scritto da | Basato su | Prossimo passo |
 |---|---|---|---|
-| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1170–1177 del 19 novembre nel §9). Nessun codice | o1 | `docs/proposta-a3-sito.md` (o2, `f607187`, `4cb6bab`); `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §2.5, §3, §3.2, §4, §6, §8.1, §8.3, §9 (D-233); il codice di A1 (`bff/agent.py`, `scripts/agent/`) | i punti di o2 chiusi (§11); revisione di sicurezza indipendente, insieme ad A2; poi il codice. **A3 prima di A2** (risposta 10: R8 entra qui), da confermare dopo la revisione |
+| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1170–1177 del 19 novembre nel §9). Nessun codice | o1 | `docs/proposta-a3-sito.md` (o2, `f607187`, `4cb6bab`); `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §2.5, §3, §3.2, §4, §6, §8.1, §8.3, §9 (D-233); il codice di A1 (`bff/agent.py`, `scripts/agent/`) | revisione di sicurezza del 19 novembre: «eseguibile dopo correzioni», correzioni scritte qui (§12); conferma della memoria storica; poi il codice. **A3 prima di A2** (risposta 10: R8 entra qui) |
 
 **Cosa copre:** le chiamate del server per «Registra», «Rigenera», «Revoca», «Riprova» e l'elenco; i dati in Firestore; gli stati e come cambiano con gli esiti dell'agente; errori, permessi, blocco, registro attività; cosa fa l'agente sulla VM (`aggiorna_broker`); le risposte tecniche alle domande di o2; la stima.
 
@@ -94,18 +94,16 @@ In Firestore il dispositivo ha `stato_salvato` (`attivo` o `revocato`), l'`azion
 
 «Riprova» cambia solo `pending_seq` (l'ordine nuovo), non `azione`: mentre è in volo lo stato è quello dell'azione riprovata, e se fallisce di nuovo `non_applicato` dice ancora quale azione manca (§11, punti 1 e 2).
 
-Calcolarlo alla lettura vuol dire che il limite dei 20 minuti (progetto §6.8) non ha bisogno di un timer.
+Calcolarlo alla lettura vuol dire che il limite dei 20 minuti (progetto §6.8) non ha bisogno di un timer **per lo stato**. L'allarme invece sì: §8.4 (revisione, punto 3).
 
 ### 4.2 Un esito conferma tutto fino alla sua `seq`
 
-Quando arriva un risultato **riuscito** di `aggiorna_broker` con `seq` S per l'appartamento:
+**Nessuna scrittura sui dispositivi** quando arriva un esito (revisione, punto 2: una scrittura «a ventaglio» fuori transazione si scavalca con una revoca che arriva nello stesso momento).
 
-- ogni dispositivo con `pending_seq ≤ S` esce dall'attesa: `registra` e `rigenera` → `pronto`; `revoca` → `revocato`;
-- perché l'ordine S portava l'elenco completo letto **dopo** tutti i cambi con `seq` più bassa.
-
-Quando arriva un risultato **non riuscito** con `seq` S: cambiano solo i dispositivi con `pending_seq = S`, che si leggono `non_applicato`. Se poi riesce un ordine con `seq` più alta, li conferma (regola sopra).
-
-Un risultato con `seq` più bassa di uno già riuscito non cambia niente (l'agente lo rifiuta comunque, §6.4 del progetto).
+- Per appartamento, in `agent_seq/{apt}`, il campo `ultima_seq_riuscita`: il ricevitore lo aggiorna **in transazione** con il massimo fra il valore salvato e la `seq` dell'operazione riuscita.
+- La `seq` si prende dall'operazione **salvata** (`AgentOp`), mai dal risultato; `finish_agent_op` controlla anche che coincida.
+- Alla lettura: un dispositivo con `pending_seq ≤ ultima_seq_riuscita` è confermato (`registra` e `rigenera` → `pronto`; `revoca` → `revocato`), perché l'ordine riuscito portava l'elenco completo letto **dopo** tutti i cambi con `seq` più bassa. Con `pending_seq` più alta, lo stato dipende dall'operazione di quella `seq` (§4.1).
+- Un risultato con `seq` più bassa di uno già riuscito non cambia niente (e l'agente lo rifiuta comunque, §6.4 del progetto).
 
 ### 4.3 Azioni ammesse per stato
 
@@ -116,7 +114,10 @@ Un risultato con `seq` più bassa di uno già riuscito non cambia niente (l'agen
 | `cambio_in_corso` | 409 `operation_in_progress` | **sì** (domanda 3 di o2, §8) | 409 `operation_in_progress` | 409 `already_registered` |
 | `revoca_in_corso` | 409 `operation_in_progress` | 409 `operation_in_progress` | 409 `operation_in_progress` | 409 `operation_in_progress` |
 | `revocato` | 409 `invalid_state` | 409 `invalid_state` | 409 `invalid_state` | sì: «Registra di nuovo», password nuova |
-| `non_applicato` | sì | sì | sì | 409 `already_registered` |
+| `non_applicato` con `azione` `registra` o `rigenera` | sì | sì | sì | 409 `already_registered` |
+| `non_applicato` con `azione` `revoca` | 409 `invalid_state` | 409 `invalid_state` | **sì, solo questa** | 409 `already_registered` |
+
+**Le regole valgono sullo stato calcolato** (§4.1), non su `stato_salvato`: durante `revoca_in_corso` quello salvato è già `revocato` (revisione, punto 10). Una revoca non applicata si chiude solo con «Riprova»: «Rigenera» riattiverebbe il dispositivo.
 
 **La regola dei due codici:** `operation_in_progress` quando l'azione è bloccata da un ordine in volo (aspettando, diventerà possibile); `invalid_state` quando lo stato non la ammette proprio (il sito ricarica l'elenco). Ogni casella ha il suo codice: nessun «no» senza codice (§11, punto 6).
 
@@ -124,7 +125,7 @@ Un risultato con `seq` più bassa di uno già riuscito non cambia niente (l'agen
 
 ### 5.1 «Registra»
 
-1. Controlli: permesso (§8.1), id del dispositivo (422 `invalid_device_id`, **senza** convertire le maiuscole: domanda 6 di o2), limite di frequenza (§8.3), agente configurato (503 `agent_not_configured`), indirizzo del broker configurato (503 `broker_address_missing`), al massimo 200 dispositivi non revocati (409 `too_many_devices`). Tutti **prima** di generare la password.
+1. Controlli: permesso (§8.1), id del dispositivo (422 `invalid_device_id`, **senza** convertire le maiuscole: domanda 6 di o2; `connector` rifiutato, è l'utente del connector: revisione, punto 11, come `broker_accounts.RESERVED_DEVICE`, e lo stesso in `comune.py`), limite di frequenza (§8.3), agente configurato (503 `agent_not_configured`), indirizzo del broker configurato (503 `broker_address_missing`), al massimo 200 dispositivi non revocati (409 `too_many_devices`). Tutti **prima** di generare la password.
 2. La password: `secrets.token_urlsafe(24)` (32 caratteri), l'impronta con `hash_password`.
 3. La transazione del §3.
 4. La pubblicazione dell'ordine.
@@ -143,7 +144,8 @@ Come «Registra» sul dispositivo che c'è: impronta nuova al posto della vecchi
 
 1. Nella transazione: l'impronta si toglie dal documento (resta il documento, `stato_salvato` `revocato`, per l'elenco e il registro), `azione` `revoca`.
 2. L'ordine porta l'elenco **senza** quel dispositivo.
-3. Al risultato riuscito il broker ha tolto l'utente. **Da verificare** (progetto §8.1): che la ricarica di Mosquitto faccia cadere anche il collegamento **già aperto** di un utente tolto. Per «Rigenera» è provato il 16 novembre; per un utente tolto si prova sul broker in container (`tests/broker_container_test.py`, **con il via del committente**). Se non cade, l'agente dopo il `sync` riavvia il broker quando un utente è stato tolto (§6.2).
+3. Al risultato riuscito il broker ha tolto l'utente **e chiuso il suo collegamento già aperto** (revisione, punto 5). `mosquitto.conf` dice che la ricarica rilegge utenti e permessi «senza far cadere chi è collegato»; lo stesso vale per **«Rigenera»**: una password uscita resterebbe dentro sul collegamento aperto. Quindi l'esecutore, dopo il `sync`, **riavvia il broker** quando l'elenco nuovo toglie un utente o gli cambia l'impronta, e l'esito è «riuscito» solo dopo il riavvio e `wait_healthy` (§6.2).
+4. Le prove sul broker vero, in container (`tests/broker_container_test.py`, `-k a3_`, **solo con il via del committente**): un dispositivo revocato già collegato non riceve e non pubblica dopo il solo `sync`; con una password nuova il collegamento vecchio resta fino al riavvio; dopo il riavvio gli altri tornano entro 30 secondi. Se la prima risulta verde, per la sola «Revoca» il riavvio si può togliere.
 
 ### 5.5 «Riprova»
 
@@ -157,10 +159,10 @@ Una transazione con `version` e una `seq` nuova che rilegge l'elenco completo; n
 
 ### 6.1 `aggiorna_broker` (l'esecutore)
 
-Oggi l'elenco chiuso lo accetta già nei controlli (`scripts/agent/comune.py`: al massimo 200, id con la regola, impronte nel formato `$7$`, mai una password) ma risponde «non_disponibile». In A3 l'esecutore lo **esegue**:
+Oggi l'elenco chiuso lo accetta già nei controlli (`scripts/agent/comune.py`: al massimo 200, id con la regola, impronte nel formato `$7$`, mai una password) ma risponde «non_disponibile». In A3 l'esecutore lo **esegue**, dopo aver verificato la firma dell'ordine (§6.3):
 
 1. sotto il blocco della VM, scrive in modo atomico `/etc/domhouse/_broker/devices/<apt>` (root, 600): una riga `<device_id> <impronta>` per dispositivo dell'elenco;
-2. lancia il `sync` del broker per quell'appartamento (isolato, E-33);
+2. lancia il `sync` del broker per quell'appartamento (isolato, E-33), poi il riavvio del broker se qualcuno è stato tolto o ha cambiato impronta (§5.4);
 3. esiti, con codici di un elenco chiuso:
 
 | Esito | Codice | Quando |
@@ -169,24 +171,41 @@ Oggi l'elenco chiuso lo accetta già nei controlli (`scripts/agent/comune.py`: a
 | rifiutato | `appartamento_sconosciuto` | il broker non ha l'appartamento (`add-apartment` non fatto: arriva con A2) |
 | rifiutato | i codici dei controlli di oggi | `troppi_dispositivi`, `id_non_valido`, `impronta_non_valida`, `parametri_non_validi` |
 | fallito | `sync_fallito` | il `sync` ha tenuto le righe di prima per quell'appartamento («kept») o non è riuscito |
+| fallito | `riavvio_fallito` | il broker non è tornato sano dopo il riavvio |
+| rifiutato | `migrazione_non_fatta` | `lab-01` prima della migrazione (§6.4) |
+| rifiutato | `firma_non_valida` | ordine senza la firma del server, o con una firma sbagliata (§6.3), con un allarme |
 | fallito | `errore_interno` | come oggi |
 
 4. Il server traduce i codici in italiano (`MESSAGES` di `bff/agent.py`).
 
+**L'unità dell'esecutore** (revisione, punto 4): oggi `ProtectSystem=strict`, nessuna capacità, `AF_UNIX AF_INET`. A3 apre esattamente:
+
+| Cosa | Perché |
+|---|---|
+| `ReadWritePaths=/etc/domhouse/_broker` | il file delle impronte e i file `auth/` scritti dal `sync` |
+| `CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER` | i file di `auth/` sono dell'utente 1883 (da verificare sulla VM se basta `CAP_CHOWN`) |
+| nessuna famiglia di indirizzi nuova | `sync` e `restart` passano dal socket di Docker (`AF_UNIX`) e da Secret Manager (`AF_INET`) |
+
+Il `sync` gira con l'ambiente ripulito (solo `PATH`): quello che gli serve passa come argomento, mai per variabile d'ambiente. Prima dell'installazione si prova sulla VM con `systemd-run` e le stesse impostazioni, come I9 di A1.
+
 ### 6.2 Il broker
 
-- `broker_accounts.py` (§9.4 del progetto): i dispositivi di un appartamento dal file delle impronte, prese così come sono; il conto del connector da Secret Manager come oggi. Senza file resta il segreto vecchio `-devices` (solo `lab-01`).
+- `broker_accounts.py` (§9.4 del progetto): i dispositivi di un appartamento dal file delle impronte, prese così come sono; il conto del connector da Secret Manager come oggi. **Il ripiego sul segreto vecchio `-devices` vale solo per un elenco esplicito, `lab-01`** (revisione, punto 12); per ogni altro appartamento senza file: nessun dispositivo. Il file (anche vuoto) si crea prima di `add-apartment`.
 - `broker-vm.sh`: la cartella `devices/` (root, 700), `remove-apartment` toglie anche il file.
-- Se la prova del §5.4 dice che un utente tolto resta collegato: dopo il `sync`, se l'elenco nuovo ha **tolto** qualcuno, `broker-vm.sh restart` (tutti si ricollegano: pochi secondi).
+- Dopo il `sync`, se l'elenco nuovo ha **tolto** qualcuno o gli ha **cambiato l'impronta**: `broker-vm.sh restart` (tutti si ricollegano: pochi secondi; i numeri veri dalla prova del §5.4). Nello staging è la scelta tecnica; per la produzione con molti appartamenti si riporta al committente con i numeri della prova.
 
 ### 6.3 Condizione di sicurezza: i risultati firmati (R8) prima di A3
 
 Con A1 un risultato falso cambia solo un «stato». Con A3 un risultato falso «riuscito» di una **revoca** farebbe vedere «Revocato» mentre il dispositivo rubato si collega ancora. Quindi **R8 (progetto §3.2) entra in A3, prima di qualunque ordine che scrive** (risposta 10). Conseguenza: A3 prima di A2, da confermare dopo la revisione di sicurezza.
 
-1. l'esecutore firma i risultati con HMAC-SHA256 (chiave di root `/etc/domhouse/agent-hmac.key`, 600; il lettore non la legge);
-2. la firma copre op_id, ambiente, appartamento, operazione, seq, esito, codice e dati;
-3. il server legge la stessa chiave da un segreto nuovo (`domhouse-agent-hmac-staging`) e scarta un risultato senza firma valida;
-4. servono: il segreto, il permesso di lettura del server su quel solo segreto, l'installazione della chiave sulla VM. Comandi del committente, in una procedura.
+**Firmare i risultati non basta** (revisione, punto 1): un lettore compromesso può passare all'esecutore un ordine ben formato con lo stesso `op_id` e la stessa `seq` di una revoca vera ma con l'elenco che contiene ancora lo Shelly rubato, e l'esecutore lo firmerebbe «riuscito»; oppure una `seq = 2^31-1` che blocca la lapide per sempre. Quindi **firme nei due sensi**, con due chiavi diverse:
+
+1. **Ordini firmati dal server:** HMAC-SHA256 con la chiave «ordini» (segreto `domhouse-agent-ordini-staging`); sulla VM la stessa chiave in un file di root (`/etc/domhouse/agent-ordini.key`, 600) letto dal solo esecutore. L'esecutore verifica la firma **prima di ogni altro controllo**; senza firma valida: rifiutato `firma_non_valida`, con un allarme.
+2. **Risultati firmati dall'esecutore:** HMAC-SHA256 con la chiave «risultati» (`/etc/domhouse/agent-risultati.key`, segreto `domhouse-agent-risultati-staging`). La firma copre op_id, ambiente, appartamento, operazione, seq, esito, codice, dati **e lo SHA-256 dell'ordine eseguito**; il server lo confronta con quello dell'ordine che ha pubblicato, salvato in `AgentOp`.
+3. **Il formato:** JSON canonico (chiavi ordinate, nessuno spazio, UTF-8); confronto con `hmac.compare_digest` (revisione, punto 9).
+4. **I risultati scritti dal lettore** (`scaduto`, `interrotto`, i rifiuti dei controlli) non hanno la firma dell'esecutore: il server li accetta **solo se non sono «riuscito»**.
+5. **Le chiavi:** generate da root sulla VM (`secrets.token_bytes(32)`), messe in Secret Manager con i comandi del committente; il server ha `secretAccessor` solo su quei due segreti. `langbrain-vm@` non deve mai poterle leggere: i nomi `domhouse-agent-…` non sono coperti dai prefissi `langbrain-` (vincolo scritto anche nella procedura). Procedura di cambio della chiave: chiave nuova accanto alla vecchia, il server accetta le due per un'ora, poi la vecchia si toglie.
+6. **Repliche:** un ordine firmato ripetuto lo fermano già la `seq` e la scadenza di 15 minuti.
 
 ### 6.4 `lab-01` prima del primo «Registra»
 
@@ -194,7 +213,8 @@ Oggi i dispositivi di `lab-01` stanno nel segreto vecchio `langbrain-shelly-lab-
 
 - **deciso (risposta 7): la migrazione prima di A3.** La VM calcola le impronte dalle password di oggi (§9.7 del progetto) e le scrive nel file; uno script le copia in Firestore come dispositivi «pronti» (le impronte, **mai** le password), così l'elenco dell'app e il file coincidono;
 - con una procedura propria e il ritorno indietro: il file nuovo si toglie e il broker torna a leggere il segreto `-devices`, che resta com'è fino alla fine della migrazione; i documenti in Firestore si tolgono con lo stesso script;
-- fatto quando: `broker-vm.sh status` con gli stessi utenti di prima, i dispositivi di `lab-01` in linea, e l'elenco dell'app uguale al file.
+- fatto quando: `broker-vm.sh status` con gli stessi utenti di prima, i dispositivi di `lab-01` in linea, e l'elenco dell'app uguale al file. Solo allora un segno di root (`/var/lib/domhouse-executor/migrati/lab-01`) apre `aggiorna_broker` su `lab-01`; prima: rifiutato `migrazione_non_fatta` (revisione, punto 12);
+- **dopo la migrazione** (revisione, punto 16): un «Rigenera» per ciascuno Shelly di `lab-01` (le password di prima sono state in un segreto leggibile), poi la distruzione con ritardo del segreto `langbrain-shelly-lab-01-devices`.
 
 ## 7. La pagina locale (§8.3 del progetto), solo se entra in A3
 
@@ -239,8 +259,8 @@ Rispetto a o2: `version_changed`, `invalid_state` e `broker_address_missing` in 
 
 ### 8.3 Limiti di frequenza
 
-- Per organizzazione: **30 azioni l'ora** fra «Registra», «Rigenera», «Revoca», «Riprova» (ognuna fa un `sync` e una ricarica del broker). Stessi contatori di oggi (`take_mail_quota`, nome da generalizzare).
-- Per appartamento: al massimo **un ordine `aggiorna_broker` in volo ogni 5 secondi**; le azioni ravvicinate si accodano nella `seq` e l'ultimo ordine porta tutto. Proposta semplice: nessuna coda, si accetta lo stesso; l'ordine più recente conferma i precedenti (§4.2).
+- Per organizzazione: **30 azioni l'ora** fra «Registra», «Rigenera», «Revoca», «Riprova» (ognuna fa un `sync`, e una revoca o una password nuova anche un riavvio del broker). Un contatore **suo**, separato da quello delle email (revisione, punto 15), con la stessa transazione di `take_mail_quota`.
+- Per appartamento: **nessun limite a parte e nessuna coda**: le azioni ravvicinate si accettano, ognuna con la sua `seq`, e l'ordine riuscito più recente conferma i precedenti (§4.2).
 - Un kit da 10 Shelly in una volta resta sotto il limite.
 
 ### 8.4 Registro attività
@@ -256,6 +276,10 @@ Quattro azioni nuove in `AuditAction`, una riga per azione di una persona:
 
 - Bersaglio: l'appartamento e l'id del dispositivo. **Mai** password né impronta.
 - Gli esiti dell'agente non fanno righe nel registro attività: restano nell'operazione (`agent_ops`, 90 giorni) e nei log del server. **Unica eccezione (risposta 8):** una riga «di sistema» quando una **revoca** finisce `non_applicato`, perché è il caso che conta per la sicurezza: azione `device_credential_revoke_not_applied`, «Revoca del dispositivo {id} non applicata: il dispositivo può ancora collegarsi. Usa «Riprova».», attore «sistema».
+- **Riga e allarme nascono senza che nessuno apra la pagina** (revisione, punto 3; lo staging ha `minScale 0`, quindi un giro periodico da solo non basta lì):
+  1. **nel ricevitore:** un esito rifiutato, scartato o fallito di una revoca o di una «Rigenera» scrive subito la riga (una volta per `seq`) e un log `agent alarm codice=revoca_non_applicata`, che fa scattare l'allarme email; la consegna push di Pub/Sub sveglia l'istanza;
+  2. **nessun esito** (VM ferma, ordine perso): lo dicono già gli allarmi di A1 sull'età dei messaggi non letti degli ordini;
+  3. **di riserva**, nel giro orario che c'è già (`summary_job`; in produzione `minScale 1`): le revoche e le «Rigenera» non confermate da oltre 20 minuti, una riga per `seq` e lo stesso log.
 
 ### 8.5 Firestore
 
@@ -288,18 +312,18 @@ Ore di lavoro, prove comprese, senza le attese (revisioni, via, finestre sulla V
 |---|---|---|---|
 | Server: dati | o1 | repository (memoria e Firestore), transazione con `seq` e operazione, calcolo dello stato | 4–6 |
 | Server: rotte | o1 | cinque rotte sotto i due prefissi (risposta 1), permessi, errori, limiti, registro con la riga di sistema (risposta 8), `DEVICE_BROKER_ADDRESS`, nome dal motore, `bff/API.md` | 6–8 |
-| Server: esiti | o1 | conferma per `seq` (§4.2) nel ricevitore dei risultati di A1 | 2–3 |
+| Server: esiti | o1 | `ultima_seq_riuscita` in transazione, `seq` dall'operazione salvata (§4.2); riga e allarme nel ricevitore e nel giro orario (§8.4) | 5–7 |
 | Server: prove | o1 | prove delle rotte, degli stati, delle corse fra azioni, dei 20 minuti, della password mai salvata | 5–7 |
-| Agente: `aggiorna_broker` | o1 | esecutore, file atomico, `sync`, codici, prove | 3–4 |
-| Broker | o1 | `broker_accounts.py` dal file, `broker-vm.sh` (cartella, `remove-apartment`), prove; la prova della revoca sul broker in container (con il via) | 3–5 |
-| R8 firma dei risultati | o1 | esecutore, lettore, server, segreto, `agent-gcp.sh`, prove | 5–7 |
+| Agente: `aggiorna_broker` | o1 | esecutore, file atomico, `sync`, riavvio, codici, segno di `lab-01`, unità allargata e prova sulla VM, prove | 6–8 |
+| Broker | o1 | `broker_accounts.py` dal file con il ripiego solo per `lab-01`, `broker-vm.sh` (cartella, `remove-apartment`), prove; le prove `a3_` sul broker in container (scritte, `59b7121`; lanciate con il via) | 3–5 |
+| R8 firme nei due sensi | o1 | ordini firmati dal server e verificati dall'esecutore, risultati firmati con l'impronta dell'ordine, JSON canonico, due segreti, cambio della chiave, `agent-gcp.sh`, prove | 8–11 |
 | `lab-01` | o1 | migrazione delle impronte (VM e Firestore), lo script e il suo ritorno indietro, procedura | 3–4 |
 | Installazione | o1 | procedura di A3 (segreto, chiave, file sulla VM, variabile del server), correzioni dopo la revisione di sicurezza | 4–6 |
 | Sito | o2 | pagina, finestre, stati, errori, rilettura ogni 4 s, permesso, prove (proposta di o2) | 10–14 |
-| **Totale** | | | **45–64** |
+| **Totale** | | | **54–76** |
 | Pagina locale (§7): **fuori da A3** (risposta 6), pezzo a parte | o1, o2 | due operazioni dell'agente, due rotte, chiusura dopo 24 ore, finestra nel sito | (6–9, a parte) |
 
-**Probabile:** circa **37–47 ore** in tutto (circa 27–33 di o1 e 10–14 di o2). Le stime per pezzo tendono a essere larghe: quella del clima a infrarossi (risposta 1141) è scesa da 15–22 a 8–11 ore dopo la rilettura. La voce che può crescere è un'altra: la revisione di sicurezza di A3, che tocca password e revoche, e le sue correzioni (per A1 le letture sono state quattro).
+**Probabile:** circa **46–56 ore** in tutto (circa 36–42 di o1 e 10–14 di o2), dopo le correzioni della revisione di sicurezza (§12). Le stime per pezzo tendono a essere larghe: quella del clima a infrarossi (risposta 1141) è scesa da 15–22 a 8–11 ore dopo la rilettura. La voce che può crescere è un'altra: la revisione di sicurezza di A3, che tocca password e revoche, e le sue correzioni (per A1 le letture sono state quattro).
 
 ## 11. Risposte ai punti di o2 (`docs/proposta-a3-sito.md` §9, `a0b2df1`)
 
@@ -312,3 +336,24 @@ Ore di lavoro, prove comprese, senza le attese (revisioni, via, finestre sulla V
 | 5 | `connection.server` in produzione | Il `GET` non dà mai 503 per questo: `connection.server` è **null** e il sito scrive «non configurato» al posto del valore da copiare. «Registra» e «Rigenera» invece rispondono 503 `broker_address_missing` prima di generare la password | §2.1, §5.1 |
 | 6 | i «no» senza codice | Ogni casella del §4.3 ha ora il suo codice: `operation_in_progress` se un ordine in volo blocca (si aspetta), `invalid_state` se lo stato non ammette l'azione (si ricarica) | §4.3 |
 | 7 | due «Registra di nuovo» insieme | La transazione riporta il revocato ad attivo: la prima passa (201 con la password), la seconda riceve **409 `already_registered`** | §3 |
+
+## 12. Correzioni dopo la revisione di sicurezza (19 novembre)
+
+Revisione indipendente (`revisione-a2-a3/REVISIONE-SICUREZZA-A2-A3.md`, fuori dal repository): A3 «eseguibile dopo correzioni». Valutazione di o1 verificata sul codice: d'accordo su tutti i punti.
+
+| Punto | Che cosa | Dove è corretto |
+|---|---|---|
+| 1 | ordini non firmati fra lettore ed esecutore: firme nei due sensi, l'impronta dell'ordine nella firma del risultato | §6.3 |
+| 2 | nessuna scrittura a ventaglio: `ultima_seq_riuscita` in transazione, `seq` dall'operazione salvata | §4.2 |
+| 3 | riga e allarme per una revoca non applicata anche senza nessuno sulla pagina: nel ricevitore, poi gli allarmi di A1, poi il giro orario | §4.1, §8.4 |
+| 4 | l'unità dell'esecutore: l'elenco esatto di cosa si apre | §6.1 |
+| 5 | il collegamento già aperto: riavvio del broker dopo una revoca **e** dopo una «Rigenera»; tre prove sul broker in container | §5.4, §6.2 |
+| 9 | R8 completo: JSON canonico, `compare_digest`, risultati del lettore mai «riuscito», chiavi mai leggibili dalla VM, cambio della chiave | §6.3 |
+| 10 | regole sullo stato calcolato; una revoca non applicata solo con «Riprova» | §4.3 |
+| 11 | `connector` rifiutato come id | §5.1 |
+| 12 | ripiego su `-devices` solo per `lab-01`; file creato prima di `add-apartment`; `lab-01` rifiutato prima della migrazione | §6.1, §6.2, §6.4 |
+| 13 | condizioni IAM: il segreto del connector di `lab-01` escluso per nome | proposta A2, §3.3 (i ruoli li usa A2) |
+| 15 | limite di frequenza senza contraddizione, contatore suo | §8.3 |
+| 16 | dopo la migrazione un «Rigenera» per ciascuno Shelly di `lab-01`, poi via il segreto `-devices` | §6.4 |
+
+I punti 6, 7, 8 e 14 sono di A2 (proposta A2, §11).
