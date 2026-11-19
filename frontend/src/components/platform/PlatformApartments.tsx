@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { PlugZap, Plus, Trash2, Waypoints } from "lucide-react";
+import { KeyRound, PlugZap, Plus, Trash2, Waypoints } from "lucide-react";
 import { toast } from "sonner";
 import type { VerifyResult } from "@/api/admin";
 import { platformApi, type PlatformApartment } from "@/api/platform";
 import { APARTMENT_ID_RE, DemoBadge, defaultInstanceUrl, Field, isBuiltinMock, LastCheck, SimulatedField, useInstanceMode, useInstanceUrlHint, VerifyBadge } from "@/components/admin/apartmentForm";
+import { useAuth } from "@/auth/AuthProvider";
+import { CredentialsWorkspace } from "@/components/credentials/CredentialsWorkspace";
 import { AgentTest, agentTestable } from "@/components/platform/AgentTest";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
@@ -15,6 +17,9 @@ import { runAction } from "@/lib/actions";
 import { instanceAddress } from "@/lib/instanceAddress";
 
 const key = (tenantId: string) => ["platform", "apartments", tenantId];
+/** A3, answer 1170: the platform manager opens the device credentials of a staging apartment (lab-…, test-…; never dev,
+ *  never a client's) from here; the server answers the /app/platform/… routes only in dev and staging. */
+const credentialsHere = (apartmentId: string) => /^(lab|test)-/.test(apartmentId);
 const toPort = (v: string) => (v.trim() ? Number(v) : null);
 
 /** New apartment: the platform chooses the id (unique on the whole platform) and the connection (D-64, D-66). */
@@ -119,6 +124,8 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<PlatformApartment | null>(null);
   const [verify, setVerify] = useState<Record<string, VerifyResult | "loading">>({});
+  const notProd = useAuth().me?.env.app_env !== "prod";
+  const [credentialsOf, setCredentialsOf] = useState<string | null>(null);
   const refresh = () => void qc.invalidateQueries({ queryKey: key(tenantId) });
 
   const check = async (id: string) => {
@@ -183,6 +190,22 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
                 {agentTestable(a.apartment_id) && (
                   <div className="flex flex-wrap items-center gap-2" data-testid={`platform-apt-agent-${a.apartment_id}`}>
                     <AgentTest apartmentId={a.apartment_id} />
+                    {notProd && credentialsHere(a.apartment_id) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        aria-expanded={credentialsOf === a.apartment_id}
+                        onClick={() => setCredentialsOf((v) => (v === a.apartment_id ? null : a.apartment_id))}
+                        data-testid={`platform-apt-credentials-btn-${a.apartment_id}`}
+                      >
+                        <KeyRound /> {t("credentials.title")}
+                      </Button>
+                    )}
+                  </div>
+                )}
+                {credentialsOf === a.apartment_id && (
+                  <div className="border-t pt-3">
+                    <CredentialsWorkspace apartmentId={a.apartment_id} scope="platform" />
                   </div>
                 )}
               </li>

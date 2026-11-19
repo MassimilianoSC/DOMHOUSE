@@ -298,3 +298,46 @@ describe("Piattaforma > Appartamenti: «Prova l'agente» (strumento A, A1)", () 
     for (const id of ["apt-001", "apt-002", "apt-003"]) expect(screen.queryByTestId(`platform-apt-agent-${id}`)).toBeNull();
   });
 });
+
+describe("Piattaforma > Appartamenti: «Credenziali dei dispositivi» (A3, risposta 1170)", () => {
+  const WITH_LAB = () => [
+    ...APTS,
+    { ...APTS[0], apartment_id: "lab-01", name: "Laboratorio" },
+    { ...APTS[0], apartment_id: "test-due", name: "Prova due" },
+    { ...APTS[0], apartment_id: "dev", name: "Sviluppo" },
+  ];
+
+  it("nello staging, solo sulle righe lab-… e test-… (non dev, non i clienti)", async () => {
+    s.appEnv = "staging";
+    s.apartments.mockResolvedValue(WITH_LAB());
+    await open();
+    await screen.findByTestId("platform-apt-lab-01");
+    expect(screen.getByTestId("platform-apt-credentials-btn-lab-01")).toHaveTextContent("Credenziali dei dispositivi");
+    expect(screen.getByTestId("platform-apt-credentials-btn-test-due")).toBeInTheDocument();
+    for (const id of ["dev", "apt-001", "apt-002", "apt-003"]) expect(screen.queryByTestId(`platform-apt-credentials-btn-${id}`)).toBeNull();
+  });
+
+  it("in produzione no, nemmeno su un lab-… (il server darebbe 404)", async () => {
+    s.appEnv = "prod";
+    s.apartments.mockResolvedValue(WITH_LAB());
+    await open();
+    await screen.findByTestId("platform-apt-lab-01");
+    expect(screen.queryByTestId("platform-apt-credentials-btn-lab-01")).toBeNull();
+  });
+
+  it("aperto, mostra l'elenco sotto la riga con le chiamate della piattaforma", async () => {
+    s.appEnv = "staging";
+    s.apartments.mockResolvedValue(WITH_LAB());
+    const fetch = vi.fn(async () => new Response(JSON.stringify({ items: [] }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetch);
+    await open();
+    const btn = await screen.findByTestId("platform-apt-credentials-btn-lab-01");
+    expect(btn).toHaveAttribute("aria-expanded", "false");
+    await click(btn);
+    expect(btn).toHaveAttribute("aria-expanded", "true");
+    expect(await within(screen.getByTestId("platform-apt-lab-01")).findByTestId("credentials-empty")).toBeInTheDocument();
+    expect(new URL(String((fetch.mock.calls[0] as unknown[])[0])).pathname).toBe("/app/platform/apartments/lab-01/device-credentials");
+    await click(btn);
+    expect(screen.queryByTestId("credentials-panel-lab-01")).toBeNull();
+  });
+});
