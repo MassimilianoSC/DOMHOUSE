@@ -8,6 +8,7 @@ import { apartmentNav } from "@/components/layout/navItems";
 import { fmtShortDateTime } from "@/lib/format";
 import { useApartmentStore } from "@/store/apartmentStore";
 import App from "@/App";
+import { LAZY_PAGE } from "@/test/lazyPage";
 import DeviceStatusPage from "./DeviceStatusPage";
 
 // «Stato dei dispositivi», first step (activation by the client §5, the committente's go of 15 Nov): one row per
@@ -63,7 +64,7 @@ beforeEach(() => {
 describe("Stato dei dispositivi: chi lo vede", () => {
   it("amministratore: voce «Stato dei dispositivi» nel menu dell'appartamento e pagina aperta", async () => {
     openApp("/a/apt-001/stato-dispositivi");
-    expect(await screen.findByTestId("device-status-header")).toHaveTextContent("Stato dei dispositivi");
+    expect(await screen.findByTestId("device-status-header", undefined, LAZY_PAGE)).toHaveTextContent("Stato dei dispositivi");
     await waitFor(() => expect(sidebarHas("deviceStatus")).toBe(true));
   });
 

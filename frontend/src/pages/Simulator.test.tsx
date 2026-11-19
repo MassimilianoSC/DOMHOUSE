@@ -7,6 +7,7 @@ import { t } from "@/i18n";
 import { fmtDateTime } from "@/lib/format";
 import { useApartmentStore } from "@/store/apartmentStore";
 import App from "@/App";
+import { LAZY_PAGE } from "@/test/lazyPage";
 
 // Simulatore (D-97): it follows the apartment, not the environment: admins only, on a simulated apartment, in
 // production too. The reset needs the built-in engine; after it everything of the apartment is read again.
@@ -80,7 +81,7 @@ beforeEach(() => {
 describe("Simulatore: chi lo vede", () => {
   it("admin, appartamento simulato, anche in produzione: voce nel menu e pagina aperta con l'etichetta «Dimostrativo»", async () => {
     open("/a/apt-001/simulatore");
-    expect(await screen.findByTestId("simulator-header")).toBeInTheDocument();
+    expect(await screen.findByTestId("simulator-header", undefined, LAZY_PAGE)).toBeInTheDocument();
     expect(screen.getByTestId("simulator-demo-badge")).toHaveTextContent(t("apartments.demo"));
     await waitFor(() => expect(sidebarHas("simulator")).toBe(true));
   });
@@ -103,7 +104,7 @@ describe("Simulatore: chi lo vede", () => {
 describe("Simulatore: ripristino dello stato iniziale", () => {
   async function openReset() {
     open("/a/apt-001/simulatore");
-    const btn = await screen.findByTestId("sim-reset-btn");
+    const btn = await screen.findByTestId("sim-reset-btn", undefined, LAZY_PAGE);
     await waitFor(() => expect(btn).toBeEnabled());
     await act(async () => {
       fireEvent.click(btn);
@@ -139,7 +140,7 @@ describe("Simulatore: ripristino dello stato iniziale", () => {
   it("simulato su un motore vero: pulsante disattivato, con la spiegazione", async () => {
     s.url = "http://10.198.0.2:8101";
     open("/a/apt-001/simulatore");
-    expect(await screen.findByTestId("sim-reset-unavailable")).toHaveTextContent(t("simulator.resetUnavailable"));
+    expect(await screen.findByTestId("sim-reset-unavailable", undefined, LAZY_PAGE)).toHaveTextContent(t("simulator.resetUnavailable"));
     expect(screen.getByTestId("sim-reset-btn")).toBeDisabled();
   });
 
@@ -160,7 +161,7 @@ describe("Simulatore: «Simula movimento» (D-140)", () => {
 
   async function openWith(devices: Device[]) {
     open("/a/apt-001/simulatore");
-    await screen.findByTestId("simulator-header");
+    await screen.findByTestId("simulator-header", undefined, LAZY_PAGE);
     act(() => {
       useApartmentStore.getState().setSnapshot({ devices });
     });
@@ -199,7 +200,7 @@ describe("Simulatore: lo stesso evento inviato di nuovo (C-4, lotto 30)", () => 
 
   it("stesso modulo, stesso event_id: la seconda volta «Evento già elaborato»; cambiando un campo è un evento nuovo", async () => {
     open("/a/apt-001/simulatore");
-    await screen.findByTestId("simulator-booking");
+    await screen.findByTestId("simulator-booking", undefined, LAZY_PAGE);
     await send();
     const first = (s.bodies["/app/apartments/apt-001/simulator/booking"] as { event_id: string }).event_id;
     expect(screen.getByTestId("sim-booking-result")).toHaveTextContent(t("simulator.scheduled", { count: 2 }));
@@ -214,7 +215,7 @@ describe("Simulatore: lo stesso evento inviato di nuovo (C-4, lotto 30)", () => 
 
   it("check-in e check-out sono l'ora dell'appartamento, non del browser (D-212)", async () => {
     open("/a/apt-001/simulatore");
-    await screen.findByTestId("simulator-booking");
+    await screen.findByTestId("simulator-booking", undefined, LAZY_PAGE);
     act(() => {
       useApartmentStore.setState({ apartment: { ...(useApartmentStore.getState().apartment ?? {}), timezone: "America/New_York" } as never });
     });

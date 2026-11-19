@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { LAZY_PAGE } from "@/test/lazyPage";
 import { create } from "zustand";
 import App from "@/App";
 
@@ -58,7 +59,7 @@ describe("il nome salvato compare nel menu subito (D-170)", () => {
     );
     const aside = within(screen.getByRole("complementary"));
     expect(aside.queryByTestId("sidebar-user-name")).toBeNull();
-    fireEvent.change(await screen.findByTestId("account-name-input"), { target: { value: "MAXX" } });
+    fireEvent.change(await screen.findByTestId("account-name-input", undefined, LAZY_PAGE), { target: { value: "MAXX" } });
     await act(async () => {
       fireEvent.submit(screen.getByTestId("account-name-form"));
     });
