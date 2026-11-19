@@ -88,6 +88,9 @@ class Settings:
     agent_ordini_key: str = ""
     agent_risultati_key: str = ""
     agent_risultati_key_prev: str = ""
+    # A3 §2.1: the broker's address the devices use (staging mqtt.dh-lab.eu:8883); empty in production until the second
+    # VM: then «Registra» and «Rigenera» answer 503 broker_address_missing and the list shows server null
+    device_broker_address: str = ""
 
     @property
     def mail_configured(self) -> bool:
@@ -134,6 +137,7 @@ def get_settings() -> Settings:
         agent_ordini_key=e("AGENT_ORDINI_KEY", "").strip(),
         agent_risultati_key=e("AGENT_RISULTATI_KEY", "").strip(),
         agent_risultati_key_prev=e("AGENT_RISULTATI_KEY_PREV", "").strip(),
+        device_broker_address=e("DEVICE_BROKER_ADDRESS", "").strip(),
         italianway_webhook_secret=e("ITALIANWAY_WEBHOOK_SECRET", ""),
         italianway_signature_header=e("ITALIANWAY_SIGNATURE_HEADER", "X-Signature"),
         port=int(e("PORT", "8000")),

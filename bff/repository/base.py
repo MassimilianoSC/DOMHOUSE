@@ -210,6 +210,9 @@ AuditAction = Literal[
     "energy_price_changed", "apartment_simulated_changed", "simulator_reset",
     "rules_changed",   # P-60 step 12 (D-151): rules applied from the assistant's proposal or copied from an apartment
     "timezone_changed",   # D-177: the engine's TIMEZONE differs from the registry's copy (written by the system)
+    # A3 (docs/proposta-a3-server.md §8.4): the devices' credentials; the last one written by the system (answer 1175)
+    "device_credential_registered", "device_credential_regenerated", "device_credential_revoked",
+    "device_credential_retried", "device_credential_revoke_not_applied",
 ]
 
 

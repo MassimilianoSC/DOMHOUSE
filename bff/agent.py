@@ -85,6 +85,10 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
+def new_op_id() -> str:
+    return str(uuid.uuid4())
+
+
 class AgentError(Exception):
     def __init__(self, status: int, error: str, message: str, op: AgentOp | None = None):
         super().__init__(message)

@@ -17,6 +17,7 @@ from .routes import ai as ai_routes
 from .routes import push as push_routes
 from .routes import rules as rules_routes
 from .routes import agent as agent_routes
+from .routes import device_credentials as device_credentials_routes
 from .sse_hub import hub_manager
 
 
@@ -147,6 +148,8 @@ def create_app() -> FastAPI:
     app.include_router(rules_routes.router)   # P-60 step 12: rules proposed by the assistant, copied
     app.include_router(agent_routes.internal)   # tool A, A1: the results of the orders, pushed by Pub/Sub
     app.include_router(agent_routes.platform)   # tool A, A1: «Prova l'agente», platform managers only
+    app.include_router(device_credentials_routes.tenant)     # tool A, A3: the devices' credentials, administrators
+    app.include_router(device_credentials_routes.platform)   # tool A, A3: the same, platform managers, staging lab-/test-
 
     # D-97: the built-in mock is mounted in every mode. D-202: production refuses mock:// (instances.demo_refused), so
     # there it serves nobody; the demonstration apartments live in staging and development.
