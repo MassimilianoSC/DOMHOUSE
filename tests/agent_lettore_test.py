@@ -34,7 +34,9 @@ NOW = datetime(2026, 11, 17, 9, 0, 0, tzinfo=UTC)
 
 def order(**kw) -> dict:
     base = {"op_id": OP, "operazione": "stato", "apartment_id": "lab-01", "seq": 3, "parametri": {},
-            "ambiente": "staging", "richiesto_da": "Uk9TgS2vLmQ1"}
+            "ambiente": "staging", "richiesto_da": "Uk9TgS2vLmQ1",
+            # A3 §6.3: the reader checks only the form of the signature's two fields (it has no key)
+            "firmato_at": "2026-11-19T21:00:00.000Z", "firma": "0" * 64}
     base.update(kw)
     return base
 

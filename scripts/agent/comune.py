@@ -16,6 +16,8 @@ Everything refused raises Refused with a code of CODES: the result says the code
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import re
 from dataclasses import dataclass
@@ -55,11 +57,49 @@ CODES = (
     "prod_non_ammesso", "seq_vecchia", "non_disponibile", "motore_assente", "chiamante_non_ammesso",
     # time and faults
     "scaduto", "interrotto", "errore_interno",
+    # A3 §6.3: an order without the server's signature
+    "firma_non_valida",
 )
 DATA_MAX_LEN = 200                        # a value of «dati»: a number or a short string
 
 PRINTABLE_RE = re.compile(r"[ -~]*")
-FIELDS = ("op_id", "operazione", "apartment_id", "seq", "parametri", "ambiente", "richiesto_da")
+FIELDS = ("op_id", "operazione", "apartment_id", "seq", "parametri", "ambiente", "richiesto_da", "firmato_at", "firma")
+# A3 §6.3 (review point 1, N5): the server signs every order with HMAC-SHA256 on its canonical form without «firma»;
+# «firmato_at» (UTC) lets the executor check the 15 minutes by itself. The reader only checks the two fields' form: it
+# has no key. The same canonical form, signature and fingerprint for the results (the «risultati» key).
+FIRMA_RE = re.compile(r"^[0-9a-f]{64}$")
+TIME_RE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]{1,6})?Z$")
+AHEAD_S = 2 * 60                          # an order signed in the future: at most the clocks' difference
+KEY_RE = re.compile(r"^[0-9a-f]{64}$")    # a key: 32 bytes in hex, one per line
+
+
+def canonical(obj: dict) -> bytes:
+    """Keys sorted, no spaces, UTF-8 (bff/device_credentials.canonical is the same: a test keeps them equal)."""
+    return json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+
+def _unsigned(obj: dict) -> dict:
+    return {k: v for k, v in obj.items() if k != "firma"}
+
+
+def signature(key: bytes, obj: dict) -> str:
+    return hmac.new(key, canonical(_unsigned(obj)), hashlib.sha256).hexdigest()
+
+
+def signed_by(keys, obj) -> bool:
+    """True when obj's «firma» is the signature of one of the keys (compare_digest, review point 9)."""
+    firma = obj.get("firma") if isinstance(obj, dict) else None
+    if not isinstance(firma, str) or not FIRMA_RE.fullmatch(firma):
+        return False
+    found = False
+    for key in keys:
+        found |= hmac.compare_digest(signature(key, obj), firma)
+    return found
+
+
+def order_sha256(obj: dict) -> str:
+    """The fingerprint of an order: SHA-256 of its canonical form without «firma»."""
+    return hashlib.sha256(canonical(_unsigned(obj))).hexdigest()
 
 
 class Refused(Exception):
@@ -183,6 +223,10 @@ def _check_order(data: bytes, ambiente: str) -> Order:
     if not isinstance(o["richiesto_da"], str) or not UID_RE.fullmatch(o["richiesto_da"]):
         raise Refused("campo_non_valido")
     if not isinstance(o["parametri"], dict):
+        raise Refused("campo_non_valido")
+    if not isinstance(o["firmato_at"], str) or not TIME_RE.fullmatch(o["firmato_at"]):
+        raise Refused("campo_non_valido")
+    if not isinstance(o["firma"], str) or not FIRMA_RE.fullmatch(o["firma"]):
         raise Refused("campo_non_valido")
     if o["operazione"] not in OPERATIONS:
         raise Refused("operazione_sconosciuta")

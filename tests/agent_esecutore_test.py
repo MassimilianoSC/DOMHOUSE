@@ -13,6 +13,7 @@ import socket
 import sys
 import threading
 import time
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -37,10 +38,21 @@ READER_UID = 4242
 OP = "8b2f6a3e-4c1d-4e5f-9a0b-1c2d3e4f5a6b"
 
 
+K_ORDINI, K_RISULTATI = bytes([0x11]) * 32, bytes([0x22]) * 32
+
+
+def KEYS(name):
+    """A3 §6.3: the executor's two keys, as read_keys would give them."""
+    return {"ordini": [K_ORDINI], "risultati": [K_RISULTATI]}[name]
+
+
 def order(**kw) -> bytes:
+    """An order signed by «the server» now, after the changes asked (A3 §6.3)."""
     base = {"op_id": OP, "operazione": "stato", "apartment_id": "lab-01", "seq": 3, "parametri": {},
-            "ambiente": "staging", "richiesto_da": "Uk9TgS2vLmQ1"}
+            "ambiente": "staging", "richiesto_da": "Uk9TgS2vLmQ1",
+            "firmato_at": datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")}
     base.update(kw)
+    base["firma"] = comune.signature(K_ORDINI, base)
     return json.dumps(base).encode("utf-8")
 
 
@@ -63,7 +75,7 @@ class World:
         self.config = esecutore.Config(ambiente=ambiente, condivisa=condivisa, reader_uid=READER_UID,
                                        opt=self.opt, state=self.state, bind_ip="10.198.0.2", max_staging=4,
                                        meminfo=self.meminfo)
-        self.ex = esecutore.Esecutore(self.config, run=self.run, http_get=self.get, log=self.logs.append)
+        self.ex = esecutore.Esecutore(self.config, run=self.run, http_get=self.get, log=self.logs.append, keys=KEYS)
 
     def run(self, argv, env, timeout):
         self.runs.append((list(argv), dict(env)))
@@ -125,7 +137,8 @@ def test_it_checks_again_what_the_reader_should_have_refused(w):
     assert w.ex.handle(order(apartment_id="lab_01"), READER_UID)["codice"] == "id_non_valido"
     assert w.ex.handle(order(apartment_id="dev", operazione="togli_motore"), READER_UID)["codice"] == "dev_escluso"
     assert w.ex.handle(order(parametri={"x": 1}), READER_UID)["codice"] == "parametri_non_validi"
-    assert w.ex.handle(b"{rotto", READER_UID)["codice"] == "json_non_valido"
+    # A3 §6.3: the signature comes before anything else, so bytes that are not an order are «firma_non_valida»
+    assert w.ex.handle(b"{rotto", READER_UID)["codice"] == "firma_non_valida"
     assert w.runs == [] and w.gets == []
 
 
@@ -143,7 +156,7 @@ def test_the_sequence_per_apartment_only_grows_and_stays_as_a_tombstone(w):
     (w.opt / "lab-01.settings").unlink()                                    # the engine goes: the tombstone stays
     again = World.__new__(World)
     again.__dict__.update(w.__dict__)
-    again.ex = esecutore.Esecutore(w.config, run=w.run, http_get=w.get, log=w.logs.append)
+    again.ex = esecutore.Esecutore(w.config, run=w.run, http_get=w.get, log=w.logs.append, keys=KEYS)
     assert again.ex.handle(order(seq=6, op_id="9c3a7b4f-5d2e-4f60-8b1c-2d3e4f5a6b7f"), READER_UID)["codice"] == "seq_vecchia"
 
 
@@ -159,7 +172,8 @@ def test_the_other_operations_are_not_yet_available(w):
 def test_a_refusal_carries_what_could_be_read_of_the_order(w):
     r = w.ex.handle(order(apartment_id="Lab-01"), READER_UID)
     assert (r["op_id"], r["operazione"], r["apartment_id"], r["ambiente"]) == (OP, "stato", "Lab-01", "staging")
-    assert set(r) <= {"op_id", "operazione", "apartment_id", "ambiente", "seq", "esito", "codice", "dati"}
+    assert set(r) <= {"op_id", "operazione", "apartment_id", "ambiente", "seq", "esito", "codice", "dati",
+                      "ordine_sha256", "firma"}                     # A3 §6.3: every result is signed
 
 
 def test_the_log_line_has_no_output_and_no_email(w):
@@ -193,7 +207,7 @@ def test_the_configuration_file_is_strict(tmp_path):
 def test_the_socket_serves_one_request_and_checks_the_peer(tmp_path):
     w = World(tmp_path)
     w.config = w.config._replace(reader_uid=os.getuid())
-    w.ex = esecutore.Esecutore(w.config, run=w.run, http_get=w.get, log=w.logs.append)
+    w.ex = esecutore.Esecutore(w.config, run=w.run, http_get=w.get, log=w.logs.append, keys=KEYS)
     path = tmp_path / "run" / "esecutore.sock"
     path.parent.mkdir()
     server = esecutore.make_server(path, w.ex)
@@ -261,7 +275,7 @@ def test_r7_the_executor_unit_is_strict_and_without_capabilities():
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="SO_PEERCRED e i socket UNIX: solo Linux (CI)")
 def test_r14_a_stranger_is_answered_before_anything_is_read_and_a_silent_peer_times_out(tmp_path, monkeypatch):
     w = World(tmp_path)
-    w.ex = esecutore.Esecutore(w.config, run=w.run, http_get=w.get, log=w.logs.append)   # reader_uid is not ours
+    w.ex = esecutore.Esecutore(w.config, run=w.run, http_get=w.get, log=w.logs.append, keys=KEYS)   # reader_uid is not ours
     monkeypatch.setattr(esecutore, "PEER_TIMEOUT_S", 0.5)
     path = tmp_path / "run" / "esecutore.sock"
     path.parent.mkdir()
@@ -286,7 +300,8 @@ def test_r16_every_refusal_the_reader_should_have_made_raises_an_alarm(w):
     w.ex.handle(order(seq=1), READER_UID)
     w.ex.handle(order(seq=1, op_id="9c3a7b4f-5d2e-4f60-8b1c-2d3e4f5a6b7c"), READER_UID)       # seq_vecchia: normal
     codes = [l.split()[2] for l in w.logs if l.startswith("agent alarm ")]
-    assert codes == ["codice=id_non_valido", "codice=parametri_non_validi", "codice=json_non_valido"]
+    # A3 §6.3: «{rotto» has no signature: refused (and raised) as firma_non_valida, before being read
+    assert codes == ["codice=id_non_valido", "codice=parametri_non_validi", "codice=firma_non_valida"]
 
 
 @pytest.mark.parametrize("kind", ["cartella", "binario"])

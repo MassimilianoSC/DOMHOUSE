@@ -49,7 +49,8 @@ TOKEN_URL = "http://metadata.google.internal/computeMetadata/v1/instance/service
 JOURNAL_DAYS = 14
 EXECUTOR_TIMEOUT_S = 600            # an operation of a later package (crea_motore) can take minutes
 PULL_MAX = 1                        # R4: one order at a time, so that none waits for its ack behind others
-RESULT_KEYS = ("op_id", "operazione", "apartment_id", "ambiente", "seq", "esito", "codice", "dati")
+RESULT_KEYS = ("op_id", "operazione", "apartment_id", "ambiente", "seq", "esito", "codice", "dati", "ordine_sha256",
+               "firma")
 SUBSCRIPTION_RE = re.compile(r"^projects/[a-z][a-z0-9-]{4,29}/subscriptions/[A-Za-z][A-Za-z0-9._~%+-]{2,254}$")
 TOPIC_RE = re.compile(r"^projects/[a-z][a-z0-9-]{4,29}/topics/[A-Za-z][A-Za-z0-9._~%+-]{2,254}$")
 
@@ -222,6 +223,12 @@ class Lettore:
                 isinstance(v, (int, float)) or v is None or (isinstance(v, str) and len(v) <= comune.DATA_MAX_LEN))}
             if clean:
                 out["dati"] = clean
+        # A3 §6.3: the executor's fingerprint and signature go through as they are; the reader has no key to check
+        # them, the server does (a result changed here would simply not be signed any more)
+        sha, firma = answer.get("ordine_sha256"), answer.get("firma")
+        if isinstance(sha, str) and comune.FIRMA_RE.fullmatch(sha) and isinstance(firma, str) \
+                and comune.FIRMA_RE.fullmatch(firma):
+            out["ordine_sha256"], out["firma"] = sha, firma
         return out
 
     def _close(self, entry: dict, result: dict) -> None:

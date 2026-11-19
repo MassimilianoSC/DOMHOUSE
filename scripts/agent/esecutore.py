@@ -67,6 +67,7 @@ class Config(NamedTuple):
     bind_ip: str | None = None
     max_staging: int = 4
     meminfo: Path = Path("/proc/meminfo")
+    keys_dir: Path = Path("/etc/domhouse")     # A3 §6.3: agent-ordini.key and agent-risultati.key, root's, 600
 
 
 def read_config(path: Path, uid_of: Callable[[str], int], check_owner: bool = True) -> Config:
@@ -100,6 +101,19 @@ def read_config(path: Path, uid_of: Callable[[str], int], check_owner: bool = Tr
         raise ValueError("BIND_IP non valido")
     return Config(ambiente=values["AMBIENTE"], condivisa=values.get("CONDIVISA", "1") == "1",
                   reader_uid=uid_of(lettore), bind_ip=bind_ip, max_staging=int(max_staging))
+
+
+def read_keys(path: Path, check_owner: bool = True) -> list[bytes]:
+    """A3 §6.3: one key per line, 32 bytes in hex; one, or two during a change of key (the new one first). On the VM
+    the file must be root's and readable by root only. Read at every order: a change needs no restart."""
+    if check_owner:
+        st = path.stat()
+        if st.st_uid != 0 or st.st_mode & 0o077:
+            raise ValueError(f"{path}: deve essere di root e leggibile solo da root")
+    lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if not 1 <= len(lines) <= 2 or not all(comune.KEY_RE.fullmatch(line) for line in lines):
+        raise ValueError(f"{path}: una o due chiavi esadecimali da 64 caratteri")
+    return [bytes.fromhex(line) for line in lines]
 
 
 def run_program(argv: list[str], env: dict, timeout: float) -> tuple[int, str]:
@@ -164,8 +178,11 @@ def _short(value) -> str | None:
 
 
 class Esecutore:
-    def __init__(self, config: Config, run=run_program, http_get=http_get, log: Callable[[str], None] = print):
+    def __init__(self, config: Config, run=run_program, http_get=http_get, log: Callable[[str], None] = print,
+                 keys: Callable[[str], list[bytes]] | None = None, clock: Callable[[], datetime] | None = None):
         self.config, self.run, self.http_get, self.log = config, run, http_get, log
+        self.keys = keys or (lambda name: read_keys(config.keys_dir / f"agent-{name}.key"))
+        self.clock = clock or (lambda: datetime.now(UTC))
 
     # ---- the request -------------------------------------------------------------------------------------------
     def handle(self, data: bytes, peer_uid: int) -> dict:
@@ -175,12 +192,60 @@ class Esecutore:
             out = comune.result_for_raw(data, "rifiutato", "chiamante_non_ammesso")
         else:
             out = self._checked(data, output)
+        out = self._signed(out, data)
         if out["esito"] == "rifiutato" and out["codice"] not in NORMAL_REFUSALS:      # R16
             self.log(f"agent alarm codice={out['codice']} ambiente={self.config.ambiente} op_id={out.get('op_id')}")
         self._record(out, started, output)
         return out
 
+    # ---- A3 §6.3: signatures both ways -------------------------------------------------------------------------
+    @staticmethod
+    def _parsed(data: bytes) -> dict | None:
+        try:
+            o = json.loads(bytes(data).decode("utf-8")) if len(data) <= comune.MAX_ORDER_BYTES else None
+        except (UnicodeDecodeError, ValueError, RecursionError):
+            return None
+        return o if isinstance(o, dict) else None
+
+    def _keys(self, name: str) -> list[bytes]:
+        try:
+            keys = self.keys(name)
+        except (OSError, ValueError):
+            keys = []
+        if not keys:
+            self.log(f"agent alarm codice=chiave_illeggibile chiave={name}")
+        return keys
+
+    def _signature_problem(self, data: bytes) -> str | None:
+        """Before anything else: the server's signature (one of the «ordini» keys), then the time by this clock."""
+        o = self._parsed(data)
+        if o is None or not comune.signed_by(self._keys("ordini"), o):
+            return "firma_non_valida"
+        at = o.get("firmato_at")
+        if not isinstance(at, str) or not comune.TIME_RE.fullmatch(at):
+            return "campo_non_valido"
+        signed_at = datetime.fromisoformat(at.replace("Z", "+00:00"))
+        now = self.clock()
+        if now - signed_at > timedelta(seconds=comune.MAX_AGE_S) or signed_at - now > timedelta(seconds=comune.AHEAD_S):
+            return "scaduto"
+        return None
+
+    def _signed(self, out: dict, data: bytes) -> dict:
+        """Every result: the fingerprint of the order executed, then the «risultati» signature. Without its key the
+        result goes unsigned (the server never takes it as a success) and an alarm is written."""
+        out = dict(out)
+        o = self._parsed(data)
+        if o is not None:
+            out["ordine_sha256"] = comune.order_sha256(o)
+        keys = self._keys("risultati")
+        if keys:
+            out["firma"] = comune.signature(keys[0], out)
+        return out
+
     def _checked(self, data: bytes, output: list[str]) -> dict:
+        problem = self._signature_problem(data)                 # first of all (review point 1)
+        if problem is not None:
+            return comune.result_for_raw(data, "rifiutato", problem)
         if self.config.condivisa and self._says_prod(data):
             return comune.result_for_raw(data, "rifiutato", "prod_non_ammesso")
         try:

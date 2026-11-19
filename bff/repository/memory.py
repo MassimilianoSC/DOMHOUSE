@@ -44,10 +44,13 @@ class InMemoryRepository:
         self.device_creds: dict[str, dict[str, dict]] = {}   # A3: apartment -> device_id -> document
 
     # tool A, A1: no await between the reads and the writes, so atomic within the (single) process
-    async def create_agent_op(self, op):
+    async def create_agent_op(self, op, build=None):
         op = op.model_copy(deep=True)
         if op.apartment_id is not None:
             op.seq = self.agent_seq.get(op.apartment_id, 0) + 1
+        if build is not None:
+            op.ordine_sha256 = build(op)
+        if op.apartment_id is not None:
             self.agent_seq[op.apartment_id] = op.seq
         self.agent_ops[op.op_id] = op
         return op.model_copy(deep=True)

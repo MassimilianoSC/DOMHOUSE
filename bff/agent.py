@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
+import hmac
 import json
 import re
 import threading
@@ -28,6 +30,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from .config import get_settings
+from .device_credentials import canonical
 from .logs import warn
 from .repository import AgentOp, get_repository
 
@@ -39,7 +42,7 @@ CODES = (
     "ambiente_diverso", "id_non_valido", "prefisso_sbagliato", "dev_escluso", "parametri_non_validi",
     "porta_fuori_fascia", "impronta_non_valida", "troppi_dispositivi", "catalogo_troppo_grande",
     "prod_non_ammesso", "seq_vecchia", "non_disponibile", "motore_assente", "chiamante_non_ammesso",
-    "scaduto", "interrotto", "errore_interno",
+    "scaduto", "interrotto", "errore_interno", "firma_non_valida",
     "non_inviato", "tempo_scaduto",
 )
 MESSAGES = {
@@ -66,6 +69,7 @@ MESSAGES = {
     "scaduto": "L'ordine è arrivato dopo più di 15 minuti e non è stato eseguito",
     "interrotto": "La VM si è riavviata durante l'operazione: riprova",
     "errore_interno": "Errore interno dell'agente: riprova",
+    "firma_non_valida": "L'agente ha rifiutato l'ordine: firma non valida, serve un controllo",
     "non_inviato": "Non è stato possibile mandare l'ordine: riprova",
     "tempo_scaduto": "Nessuna risposta dall'agente entro 20 minuti: riprova",
 }
@@ -87,9 +91,56 @@ class AgentError(Exception):
         self.status, self.error, self.message, self.op = status, error, message, op
 
 
+KEY_RE = re.compile(r"^[0-9a-f]{64}$")
+FIRMA_RE = KEY_RE
+
+
+def _key(value: str) -> bytes | None:
+    return bytes.fromhex(value) if isinstance(value, str) and KEY_RE.fullmatch(value) else None
+
+
 def configured() -> bool:
+    """A3 §6.3: the two keys are part of the configuration: without them nothing is sent (503)."""
     s = get_settings()
-    return bool(s.agent_ambiente and s.agent_orders_topic)
+    return bool(s.agent_ambiente and s.agent_orders_topic and _key(s.agent_ordini_key)
+                and _key(s.agent_risultati_key))
+
+
+# ---- A3 §6.3: signatures both ways (scripts/agent/comune.py signs and checks the same way; a test keeps them equal)
+def _unsigned(obj: dict) -> dict:
+    return {k: v for k, v in obj.items() if k != "firma"}
+
+
+def signature(key: bytes, obj: dict) -> str:
+    return hmac.new(key, canonical(_unsigned(obj)), hashlib.sha256).hexdigest()
+
+
+def order_sha256(obj: dict) -> str:
+    return hashlib.sha256(canonical(_unsigned(obj))).hexdigest()
+
+
+def signed_by(keys, obj: dict) -> bool:
+    firma = obj.get("firma")
+    if not isinstance(firma, str) or not FIRMA_RE.fullmatch(firma):
+        return False
+    found = False
+    for key in keys:
+        found |= hmac.compare_digest(signature(key, obj), firma)
+    return found
+
+
+def result_keys() -> list[bytes]:
+    s = get_settings()
+    return [k for k in (_key(s.agent_risultati_key), _key(s.agent_risultati_key_prev)) if k]
+
+
+def signed_order(op: AgentOp, parametri: dict) -> tuple[bytes, str]:
+    """The order of an operation (its seq given), with «firmato_at» and «firma»; returns the bytes and the SHA-256."""
+    order = {"op_id": op.op_id, "operazione": op.operazione, "apartment_id": op.apartment_id, "seq": op.seq,
+             "parametri": parametri, "ambiente": op.ambiente, "richiesto_da": op.richiesto_da,
+             "firmato_at": utcnow().isoformat(timespec="milliseconds").replace("+00:00", "Z")}
+    order["firma"] = signature(_key(get_settings().agent_ordini_key), order)
+    return canonical(order), order_sha256(order)
 
 
 def apartment_allowed(apartment_id: str, ambiente: str) -> bool:
@@ -206,14 +257,23 @@ async def send(operazione: str, apartment_id: str | None, uid: str) -> AgentOp:
         raise AgentError(422, "operation_not_available", "Operazione non disponibile")
     if not apartment_allowed(apartment_id, s.agent_ambiente):
         raise AgentError(422, "invalid_apartment", "Nome dell'appartamento non valido per questo ambiente")
+    built = {}
+
+    def build(sent: AgentOp) -> str:                             # inside the transaction: the seq is known
+        built["body"], sha = signed_order(sent, {})
+        return sha
     op = await get_repository().create_agent_op(AgentOp(
         op_id=str(uuid.uuid4()), operazione=operazione, apartment_id=apartment_id, ambiente=s.agent_ambiente,
-        richiesto_da=uid, creato_at=utcnow().isoformat(timespec="milliseconds").replace("+00:00", "Z")))
-    order = {"op_id": op.op_id, "operazione": op.operazione, "apartment_id": op.apartment_id, "seq": op.seq,
-             "parametri": {}, "ambiente": op.ambiente, "richiesto_da": op.richiesto_da}
+        richiesto_da=uid, creato_at=utcnow().isoformat(timespec="milliseconds").replace("+00:00", "Z")), build=build)
+    return await publish_op(op, built["body"])
+
+
+async def publish_op(op: AgentOp, body: bytes) -> AgentOp:
+    """Publish an order already saved as «inviato»; a failure leaves the operation «fallito: non_inviato» (502)."""
+    s = get_settings()
     try:
         # R18: the publish is a blocking call: outside the event loop
-        await asyncio.to_thread(publish, s.agent_orders_topic, json.dumps(order).encode("utf-8"), op.apartment_id)
+        await asyncio.to_thread(publish, s.agent_orders_topic, body, op.apartment_id)
     except Exception as exc:                                     # noqa: BLE001 - any failure of the publish
         warn("agent order not published", op_id=op.op_id, error=type(exc).__name__)
         await get_repository().finish_agent_op(op.op_id, op.ambiente, op.apartment_id, op.operazione,
@@ -300,9 +360,22 @@ async def receive(body) -> str:
         return readable
     result, dati = readable
     op = await get_repository().get_agent_op(result["op_id"])
+    # A3 §6.3: a signature, when there is one, must be right; a success must be signed and for the order published.
+    # The reader's own results (scaduto, interrotto, refusals) are unsigned and never a success.
+    if "firma" in result and not signed_by(result_keys(), result):
+        warn("agent alarm codice=firma_risultato_non_valida", op_id=result["op_id"])
+        return "firma_non_valida"
+    if result["esito"] == "riuscito":
+        if "firma" not in result:
+            warn("agent alarm codice=firma_risultato_assente", op_id=result["op_id"])
+            return "firma_non_valida"
+        if op is None or not op.ordine_sha256 or result.get("ordine_sha256") != op.ordine_sha256:
+            warn("agent alarm codice=ordine_diverso", op_id=result["op_id"])
+            return "ordine_diverso"
     if op is not None and _too_old(op):
         await _expire(op)
         return "tardi"
     return await get_repository().finish_agent_op(
         result["op_id"], result["ambiente"], result.get("apartment_id"), result.get("operazione"),
-        {"stato": result["esito"], "codice": result["codice"], "dati": dati}, MAX_WAIT.total_seconds())
+        {"stato": result["esito"], "codice": result["codice"], "dati": dati}, MAX_WAIT.total_seconds(),
+        seq=result.get("seq"))

@@ -224,7 +224,7 @@ class FirestoreRepository:
     # invitation email limits (P-49): mail_limits/{bucket} = {count}; one transaction reads every bucket, then raises
     # all of them or none
     # tool A, A1: agent_ops/{op_id} (90 days) and agent_seq/{apartment_id} (never removed: a tombstone, §6.4)
-    async def create_agent_op(self, op):
+    async def create_agent_op(self, op, build=None):
         op = op.model_copy(deep=True)
         op_ref = self._col("agent_ops").document(op.op_id)
         seq_ref = self._col("agent_seq").document(op.apartment_id) if op.apartment_id is not None else None
@@ -236,6 +236,8 @@ class FirestoreRepository:
                 op.seq = ((snap.to_dict() or {}).get("seq", 0) if snap.exists else 0) + 1
                 # merge: the same document keeps A3's ultima_seq_riuscita
                 tx.set(seq_ref, {"seq": op.seq, "updated_at": now_iso()}, merge=True)
+            if build is not None:
+                op.ordine_sha256 = build(op)
             doc = op.model_dump()
             tx.create(op_ref, {**doc, retention.FIELD: retention.agent_op(doc)})
         async with self._lock(f"agent_seq:{op.apartment_id}"):

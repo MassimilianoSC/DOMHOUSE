@@ -83,6 +83,11 @@ class Settings:
     agent_push_audience: str = ""
     agent_push_email: str = ""
     agent_push_subscription: str = ""         # R5: the push subscription a result must come from
+    # A3 §6.3: the two HMAC keys (32 bytes in hex, from Secret Manager): the server signs the orders with the first and
+    # checks the results with the second (and with the previous one, during a change of key). Without them: 503
+    agent_ordini_key: str = ""
+    agent_risultati_key: str = ""
+    agent_risultati_key_prev: str = ""
 
     @property
     def mail_configured(self) -> bool:
@@ -126,6 +131,9 @@ def get_settings() -> Settings:
         agent_push_audience=e("AGENT_PUSH_AUDIENCE", "").strip(),
         agent_push_email=e("AGENT_PUSH_EMAIL", "").strip(),
         agent_push_subscription=e("AGENT_PUSH_SUBSCRIPTION", "").strip(),
+        agent_ordini_key=e("AGENT_ORDINI_KEY", "").strip(),
+        agent_risultati_key=e("AGENT_RISULTATI_KEY", "").strip(),
+        agent_risultati_key_prev=e("AGENT_RISULTATI_KEY_PREV", "").strip(),
         italianway_webhook_secret=e("ITALIANWAY_WEBHOOK_SECRET", ""),
         italianway_signature_header=e("ITALIANWAY_SIGNATURE_HEADER", "X-Signature"),
         port=int(e("PORT", "8000")),

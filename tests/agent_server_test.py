@@ -46,7 +46,8 @@ def run(coro):
 def server(monkeypatch):
     settings = dataclasses.replace(get_settings(), agent_ambiente="staging", agent_orders_topic=TOPIC,
                                    agent_push_audience=AUD, agent_push_email=PUSH,
-                                   agent_push_subscription=SUBSCRIPTION)
+                                   agent_push_subscription=SUBSCRIPTION,
+                                   agent_ordini_key=K_ORDINI.hex(), agent_risultati_key=K_RISULTATI.hex())
     monkeypatch.setattr(agent, "get_settings", lambda: settings)
     published = []
     state = type("S", (), {"fail": False, "now": None})()
@@ -99,10 +100,17 @@ def jwt_named(name: str) -> str:
     return f"{header}.e30.firma"
 
 
+K_ORDINI, K_RISULTATI = bytes([0x11]) * 32, bytes([0x22]) * 32
+
+
 def answer(op: dict, esito="riuscito", codice="ok", **kw) -> dict:
+    """The executor's result, signed (A3 §6.3) with the fingerprint of the order the server published."""
+    saved = get_repository().agent_ops.get(op.get("op_id"))   # the memory repository, never its (spied) methods
     out = {"op_id": op["op_id"], "operazione": "stato", "apartment_id": op["apartment_id"], "ambiente": "staging",
-           "seq": op["seq"], "esito": esito, "codice": codice, "dati": {"health": 200, "connector": "up"}}
+           "seq": op["seq"], "esito": esito, "codice": codice, "dati": {"health": 200, "connector": "up"},
+           "ordine_sha256": (saved.ordine_sha256 if saved else None) or "0" * 64}
     out.update(kw)
+    out["firma"] = agent.signature(K_RISULTATI, out)
     return out
 
 

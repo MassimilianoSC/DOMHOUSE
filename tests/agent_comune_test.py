@@ -21,7 +21,9 @@ HASH = "$7$101$" + "A" * 16 + "$" + "B" * 86 + "=="
 
 def order(**kw) -> dict:
     base = {"op_id": OP, "operazione": "stato", "apartment_id": "lab-01", "seq": 3, "parametri": {},
-            "ambiente": "staging", "richiesto_da": "Uk9TgS2vLmQ1"}
+            "ambiente": "staging", "richiesto_da": "Uk9TgS2vLmQ1",
+            # A3 §6.3: the two fields of the signature; here only their form (the executor checks the signature)
+            "firmato_at": "2026-11-19T21:00:00.000Z", "firma": "0" * 64}
     base.update(kw)
     return base
 
