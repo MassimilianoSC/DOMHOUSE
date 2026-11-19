@@ -2,7 +2,7 @@
 
 | Stato | Scritto da | Basato su | Prossimo passo |
 |---|---|---|---|
-| **Proposta, nessun codice** (17 novembre 2026, 11:09; **allineata alla proposta del server alle 12:43**) | o2 | `docs/proposta-a3-server.md` (o1, `0f02ffa`); `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §2.5, §8.1, §8.3, §8.4 (D-233); registro, pacchetto A3; documento interno dell'Autonomia, §14 e decisione 4 del §11; `docs/motore-vm.md`, impostazioni MQTT dello Shelly | rilettura della memoria storica; i punti del §9 con o1; risposte alle domande (§8); poi il codice |
+| **Proposta, nessun codice** (17 novembre 2026, 11:09; allineata alla proposta del server alle 12:43; **19 novembre, 16:56: risposte del committente 1170–1177 e di o1, §11 della proposta del server, `b05824b`**) | o2 | `docs/proposta-a3-server.md` (o1, `0f02ffa` e `b05824b`); `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §2.5, §8.1, §8.4 (D-233); registro, pacchetto A3 e risposte 1170–1177; documento interno dell'Autonomia, §14 e decisione 4 del §11; `docs/motore-vm.md`, impostazioni MQTT dello Shelly; schermate della pagina MQTT dello Shelly (committente, 17 novembre) | revisione di sicurezza di A2 e A3 insieme; poi il via al codice. Con o1 non resta niente di aperto (§9) |
 
 **Termini:** quelli di `docs/guida-utente.md` (riletta il 17 novembre): «sistema domotico», «gestore della piattaforma», «accesso di assistenza», «Registro attività», «ID richiesta», «in linea». Nei testi per chi usa l'app non compaiono «catalogo», «broker» né «impronta».
 
@@ -12,6 +12,8 @@
 
 - il modulo del catalogo (A4; nella guida «elenco dei dispositivi»): lì «Registra» partirà dal salvataggio, con le stesse chiamate;
 - gli accessi rifiutati (A5): stanno nella pagina «Stato dei dispositivi»;
+- la finestra «Registra un dispositivo» dopo A4 e «Registra più dispositivi»: rimandate ad A4 (risposta 1170, domande 2 e 4);
+- la pagina locale dello Shelly: non entra in A3, viene dopo come pezzo a parte (risposta 1173);
 - la guida: i testi per la guida li mando alla memoria storica quando il codice è fatto.
 
 ## 1. Dove stanno
@@ -20,12 +22,12 @@
    - Elenca i dispositivi **registrati** (da Firestore, attraverso il server), non quelli del motore: un dispositivo si registra prima di essere nel catalogo e prima di collegarsi.
    - Nel menu dell'appartamento, accanto a «Stato dei dispositivi», visibile solo a chi ha il permesso (§1.4).
 2. **Collegamenti dalle altre pagine:**
-   - in «Stato dei dispositivi», sulla riga di un dispositivo registrato, la voce «Credenziali» porta alla sua riga (dipende dal §9.3);
+   - in «Stato dei dispositivi», sulla riga di un dispositivo registrato, la voce «Credenziali» porta alla sua riga: **solo con A4**, attraverso `engine_device_id` (§9.3); fino ad allora la voce non c'è;
    - con A4, nel modulo del catalogo, la riga di ogni Shelly ha lo stesso menu.
 3. **Perché una pagina a sé e non dentro «Stato dei dispositivi»:** quella pagina mostra il motore, e un dispositivo appena registrato non c'è ancora. Tenerle separate evita righe «fantasma» nella diagnosi.
 4. **Chi la vede:** il permesso nuovo `devices.credentials` nel punto unico dei permessi (`src/auth/permissions.ts`), per il ruolo amministratore, come sul server (proposta del server §8.1).
    - Un gestore della piattaforma con l'accesso di assistenza **non** la vede: ha i diritti di un operatore (scelta voluta, proposta del server §8.1).
-   - **Nello staging**, se il committente accetta le rotte sotto `/app/platform/…` (domanda 1 del server): lo stesso componente compare anche in «Organizzazioni», sotto la riga di un appartamento `lab-…` o `test-…`, accanto a «Prova l'agente». Cambia solo l'indirizzo delle chiamate.
+   - **Nello staging** (risposta 1170): lo stesso componente compare anche in «Organizzazioni», sotto la riga di un appartamento `lab-…` o `test-…`, accanto a «Prova l'agente», per il gestore della piattaforma. Cambia solo l'indirizzo delle chiamate (`/app/platform/apartments/{apt}/device-credentials`). Per gli appartamenti dei clienti resta la pagina dell'appartamento.
 5. **Telefono (390 px):** la pagina funziona, ma il lavoro vero si fa in sede, su un PC. Sul telefono le colonne diventano schede e i valori da copiare vanno uno sotto l'altro.
 
 ## 2. Le schermate
@@ -34,7 +36,7 @@
 
 | Colonna | Contenuto |
 |---|---|
-| Dispositivo | il nome (`name`), se il motore lo conosce; sotto, il codice (`device_id`, per esempio `shellyplugmg3-9070695cb0d0`) |
+| Dispositivo | il codice (`device_id`, per esempio `shellyplugmg3-9070695cb0d0`); con A4 sopra il codice anche il nome (`name`, null fino ad A4: §9.3) |
 | Stato | un'etichetta colorata (§3) |
 | Ultima modifica | `updated_at`, e chi l'ha fatta (`updated_by`; se è null, niente nome) |
 | Azioni | menu con le sole azioni ammesse per lo stato (§3.1) |
@@ -42,7 +44,7 @@
 - **In alto:** il pulsante «Registra un dispositivo».
 - **Elenco vuoto:** «Nessun dispositivo registrato. Registra ogni Shelly prima di montarlo: ti diamo la password da copiare nella sua pagina.»
 - **Mentre un dispositivo è in uno stato «in corso»** (`in_attesa`, `cambio_in_corso`, `revoca_in_corso`) la pagina rilegge l'elenco da sola ogni 4 secondi, per al massimo 20 minuti (come «Prova l'agente»). Dopo 20 minuti lo stato lo calcola già il server (`non_applicato`).
-- **I revocati** restano nell'elenco (il server li restituisce), in fondo e in grigio.
+- **I revocati** (risposta 1176) restano finché c'è l'appartamento, in una sezione **«Revocati (N)»** in fondo, **chiusa** all'apertura della pagina. Ogni riga: il codice, «Revocato il {data}» (`updated_at`), «Registra di nuovo». Senza revocati la sezione non c'è.
 
 ### 2.2 «Registra un dispositivo»
 
@@ -67,15 +69,17 @@ Una finestra con un solo campo.
 
 **I valori da copiare**, ognuno con il suo «Copia». Vengono da `credential.connection` e `password`: il sito non ne scrive nessuno.
 
-| Etichetta nel sito | Campo | Esempio nello staging |
-|---|---|---|
-| Server | `connection.server` | `mqtt.dh-lab.eu:8883` |
-| Certificato | `connection.ssl_ca` | `ca.pem` |
-| Client ID | `connection.client_id` | `lab-01.shellyplugmg3-9070695cb0d0` |
-| Utente | `connection.user` | `lab-01.shellyplugmg3-9070695cb0d0` |
-| **Password** | `password`, 32 caratteri, in chiaro, carattere a larghezza fissa | — |
-| Prefisso | `connection.topic_prefix` | `lab-01/shellyplugmg3-9070695cb0d0` |
-| Altre impostazioni | testo fisso del sito: notifiche RPC sì; stato generico no; controllo no | — |
+Le righe seguono l'ordine della pagina MQTT dello Shelly. Ogni riga dice anche il **nome del campo nella pagina dello Shelly** (schermate del committente del 17 novembre; da riverificare sui firmware 2.2.0 con Youssouf quando si fanno le guide, A9).
+
+| Etichetta nel sito | Nella pagina dello Shelly | Campo | Esempio nello staging |
+|---|---|---|---|
+| Tipo di collegamento | «Connection type»: scegli «Default TLS» | `connection.ssl_ca` (`ca.pem` = i certificati già nello Shelly) | testo fisso, niente da copiare |
+| Prefisso | «MQTT prefix» | `connection.topic_prefix` | `lab-01/shellyplugmg3-9070695cb0d0` |
+| Server | «Server» | `connection.server` | `mqtt.dh-lab.eu:8883` |
+| Client ID | «Client ID» | `connection.client_id` | `lab-01.shellyplugmg3-9070695cb0d0` |
+| Utente | «Username» | `connection.user` | `lab-01.shellyplugmg3-9070695cb0d0` |
+| **Password** | «Password» | `password`, 32 caratteri, in chiaro, carattere a larghezza fissa | — |
+| Altre impostazioni | le caselle delle notifiche | testo fisso del sito: notifiche RPC sì; stato generico no; controllo no | — |
 
 **Se l'ordine non è partito** (risposta 201 o 200 con `stato` `non_applicato`, proposta del server §5.3): sopra l'avvertenza, in rosso, il messaggio del server (`op.messaggio`, «Ordine non inviato al sistema domotico: copia comunque la password, poi usa «Riprova»») con il pulsante «ID richiesta». La password vale lo stesso: la finestra resta uguale.
 
@@ -97,6 +101,8 @@ La stessa tabella del §2.3, **senza la password** (`connection` c'è sempre, an
 
 Per un revocato: «Password: nessuna, il dispositivo è revocato.»
 
+**Senza indirizzo** (`connection.server` null, oggi in produzione: §9.5): al posto del server «Non configurato in questo ambiente», senza «Copia». «Registra» e «Rigenera» in quel caso rispondono 503 `broker_address_missing` prima di creare la password (§4).
+
 ### 2.5 «Rigenera»: la conferma
 
 **Titolo:** «Nuova password per {nome}?»
@@ -113,25 +119,21 @@ Per un revocato: «Password: nessuna, il dispositivo è revocato.»
 
 **Testo:**
 
-> Il dispositivo non potrà più collegarsi al sistema domotico. Usalo se è stato perso, rubato o tolto dall'impianto. Per rimetterlo in uso serve una registrazione nuova, con una password nuova, dopo averlo riportato alle impostazioni di fabbrica.
+> Il dispositivo smette subito di funzionare: non potrà più collegarsi al sistema domotico. Usalo se è stato perso, rubato o tolto dall'impianto. Per riattivarlo bisogna andare sul posto: riportarlo alle impostazioni di fabbrica e registrarlo di nuovo, con una password nuova.
 
-**Pulsanti:** «Annulla» e «Revoca», rosso. Il sito manda la `version` letta.
+**Conferma riscrivendo il codice** (risposta 1171, come per l'eliminazione):
 
-- Proposta: **niente codice da riscrivere** per confermare, perché si torna indietro con «Registra di nuovo» (domanda 5).
+1. Campo: «Per confermare, scrivi il codice del dispositivo: {device_id}».
+2. Il pulsante «Revoca», rosso, si accende solo quando il campo è **uguale** al codice (maiuscole comprese, spazi esclusi).
+3. «Annulla» chiude senza fare niente. Il sito manda la `version` letta.
 
 ### 2.7 «Riprova»
 
 Solo in `non_applicato`. Nessuna conferma: non crea password e rimanda soltanto lo stato già deciso. Dopo la risposta (202) la riga torna «in corso» e la pagina rilegge ogni 4 secondi.
 
-### 2.8 La pagina locale dello Shelly (solo se il §8.3 del progetto viene approvato)
+### 2.8 La pagina locale dello Shelly: non in A3
 
-1. **Per tutti:** nella riga del dispositivo, «Pagina locale: chiusa» oppure «aperta fino alle {ora}» (`local_page.open_until`).
-2. **Solo per il gestore della piattaforma:** «Apri la pagina locale».
-   - Mostra una password **una volta**, con la stessa finestra del §2.3 (solo utente `admin` e password).
-   - Testo: «La pagina locale resta aperta al massimo 24 ore. Quando hai finito, premi «Chiudi la pagina locale»: la password che hai visto smette di valere.»
-3. **«Chiudi la pagina locale»**, accanto, finché è aperta.
-
-Questa parte aspetta la revisione di sicurezza del §8.3 (domanda 10; proposta del server §7 e domanda 6).
+Risposta 1173: la pagina locale (progetto §8.3) viene dopo, come pezzo a parte, quando la sua revisione di sicurezza e le tre verifiche con Youssouf sono fatte. In A3 il sito non mostra niente della pagina locale e non usa `local_page`. La bozza delle schermate (stato aperta o chiusa, «Apri» e «Chiudi la pagina locale» per il gestore della piattaforma, password mostrata una volta) sta nella versione `a0b2df1` di questo documento e si riprende allora.
 
 ## 3. Gli stati
 
@@ -162,14 +164,16 @@ Uguali alla tabella del server (§4.3). Il menu mostra solo le azioni ammesse; �
 
 ### 3.2 «Non applicato»: cosa non è stato applicato
 
-Dal campo `azione`:
+Dal campo `azione`, l'azione in attesa di conferma; «Riprova» non la cambia (§9.1):
 
 | `azione` | Riga di spiegazione |
 |---|---|
 | `registra` | «La registrazione non è arrivata al sistema domotico: il dispositivo non può ancora collegarsi. Usa «Riprova».» |
 | `rigenera` | «La password nuova non è arrivata al sistema domotico: vale ancora quella vecchia. Usa «Riprova».» |
 | `revoca` | «La revoca non è arrivata al sistema domotico: **il dispositivo può ancora collegarsi.** Usa «Riprova».» |
-| `riprova` | dipende dal §9.1 |
+| null | non succede con `non_applicato`; per riserva: «L'ultima operazione non è arrivata al sistema domotico. Usa «Riprova».» |
+
+**Revoca non applicata nel Registro attività** (risposta 1175): compare anche una riga «di sistema», azione `device_credential_revoke_not_applied`, testo «Revoca del dispositivo {codice} non applicata: il dispositivo può ancora collegarsi. Usa «Riprova».» (o1, 19 novembre). Gli altri esiti dell'agente restano solo nella riga del dispositivo.
 
 **Note:**
 
@@ -192,12 +196,15 @@ Il sito mostra il testo del server quando c'è (sono quelli della proposta del s
 | 409 `invalid_state` (**nuovo**) | «Con lo stato di adesso questa azione non si può fare: ricarica l'elenco.» | rilegge l'elenco da solo e scrive «Elenco aggiornato: questa azione non c'è più per lo stato di adesso.» |
 | 409 `too_many_devices` | «Questo appartamento ha già 200 dispositivi registrati: è il massimo.» | — |
 | 429 `rate_limited` | «Troppe operazioni in poco tempo: riprova fra qualche minuto.» | — |
-| 503 `agent_not_configured` | «Agente non ancora installato in questo ambiente.» (già nel sito) | vedi §9.4 |
+| 503 `agent_not_configured` | «Agente non ancora installato in questo ambiente.» (già nel sito) | — |
+| 503 `broker_address_missing` (**nuovo**, §9.4) | «Indirizzo del sistema domotico per i dispositivi non configurato in questo ambiente.» | arriva prima che la password nasca: niente finestra della password |
 | 502 `agent_publish_failed` | il messaggio del server, con il pulsante «ID richiesta» (`op_id`) | solo per «Revoca» e «Riprova»; rilegge l'elenco: la riga è «Non applicato», con «Riprova» |
 | 403 `forbidden` | il testo che il sito usa già | — |
 | rete caduta durante «Registra» o «Rigenera» | «Non sappiamo se la password è stata creata. Ricarica l'elenco: se il dispositivo risulta registrato, usa «Rigenera».» | rilegge l'elenco |
 
 **Perché `version_changed` e `invalid_state` rileggono da soli:** tutti e due dicono che la pagina è vecchia. Il sito non ripete l'azione: la persona vede lo stato nuovo e decide.
+
+**La regola dei due codici** (§9.6): `operation_in_progress` quando un ordine in volo blocca l'azione (si aspetta: la riga torna «in corso»); `invalid_state` quando lo stato non la ammette (si rilegge l'elenco). Ogni casella della tabella del server (§4.3) ha uno dei due.
 
 **Rete caduta:** il server non conserva la password, e una seconda chiamata dà 409 (`already_registered` o `version_changed`): la strada è «Rigenera» (proposta del server §5.6).
 
@@ -215,7 +222,10 @@ Il sito mostra il testo del server quando c'è (sono quelli della proposta del s
    - la risposta con `non_applicato` mostra la password e il messaggio in rosso;
    - ogni stato del §3 ha etichetta e azioni della tabella §3.1, e ogni `azione` la sua riga del §3.2;
    - `version_changed` e `invalid_state` rileggono l'elenco;
-   - la rilettura ogni 4 secondi si ferma all'esito e dopo 20 minuti.
+   - la rilettura ogni 4 secondi si ferma all'esito e dopo 20 minuti;
+   - «Revoca» resta spento finché il codice scritto non è uguale a quello del dispositivo;
+   - i revocati stanno nella sezione chiusa in fondo, con la data e «Registra di nuovo»;
+   - `connection.server` null mostra «Non configurato in questo ambiente» senza «Copia»; `broker_address_missing` non apre la finestra della password.
 
 ## 6. Cosa usa il sito delle chiamate del server
 
@@ -232,30 +242,33 @@ Le rotte e i campi sono quelli della proposta del server (§2, §2.1), che li fi
 | `POST …/device-credentials/{device_id}/riprova` | `{version}` | 202 `{credential}` | «Riprova» |
 
 - Tutte con l'id di correlazione, come le altre.
-- Nello staging, con la domanda 1 del server accettata, le stesse sotto `/app/platform/apartments/{apt}/device-credentials`: il sito sceglie il prefisso dal posto in cui sta il componente (§1.4).
+- Nello staging (risposta 1170), per `lab-…` e `test-…`, le stesse sotto `/app/platform/apartments/{apt}/device-credentials` (altrimenti 404): il sito sceglie il prefisso dal posto in cui sta il componente (§1.4).
 - I nomi italiani delle rotte (`rigenera`, `revoca`, `riprova`) restano finché la memoria storica non sceglie l'inglese (proposta del server §2): nel sito cambierebbero in un solo file (`src/api/`).
 
 ### 6.2 I campi di `DeviceCredential` che il sito usa
 
 | Campo | Dove |
 |---|---|
-| `device_id`, `name` | colonna «Dispositivo», titoli delle finestre |
+| `device_id`, `name` | colonna «Dispositivo», titoli delle finestre; `name` null fino ad A4 |
+| `engine_device_id` | solo con A4: la voce «Credenziali» in «Stato dei dispositivi» |
 | `stato` | etichetta, azioni (§3) |
 | `version` | corpo di «Rigenera», «Revoca», «Riprova» |
 | `updated_at`, `updated_by` | colonna «Ultima modifica» |
-| `azione` | riga di «Non applicato» (§3.2) |
+| `azione` | riga di «Non applicato» (§3.2); `registra`, `rigenera`, `revoca` o null |
 | `op` | `op.messaggio` in rosso con «Non applicato»; `op.op_id` nel pulsante «ID richiesta» |
-| `connection` | «Dati di collegamento» e finestra della password |
-| `local_page` | solo con il §2.8 |
+| `connection` | «Dati di collegamento» e finestra della password; `server` può essere null (§2.4) |
+| `local_page` | tolto da `DeviceCredential` (o1, 19 novembre): la pagina locale non è in A3 (§2.8) |
 
 **Mai nelle risposte:** l'impronta, l'uid, l'email (proposta del server §2.1). Il sito non ha campi per loro.
 
 ### 6.3 Altro
 
-1. **Registro attività:** le quattro azioni della proposta del server (§8.4), con i loro testi; il sito le aggiunge a `it.json` per il «Registro attività».
+1. **Registro attività:** le quattro azioni della proposta del server (§8.4), più la riga «di sistema» della revoca non applicata (risposta 1175, §3.2), con i loro testi; il sito le aggiunge a `it.json` per il «Registro attività».
 2. **Il permesso:** `devices.credentials` per il ruolo amministratore, uguale al server (§1.4).
 3. **Nessun evento nello stream:** basta rileggere l'elenco mentre c'è un'operazione in corso.
-4. **Il contratto non cambia:** le rotte stanno in `bff/API.md` (risposta del server alla mia domanda 8). Il sito scrive i tipi a mano in `src/api/`, come per «Prova l'agente».
+4. **Il contratto non cambia** (risposta 1172): le rotte stanno solo in `bff/API.md`. Il sito scrive i tipi a mano in `src/api/`, come per «Prova l'agente».
+5. **La firma dei risultati (R8) entra in A3** (risposta 1177): lavoro del server e dell'agente; il sito non cambia.
+6. **La migrazione di `lab-01`** (risposta 1174), prima di usare A3 lì: i dispositivi di oggi arrivano come «Pronto», con le impronte e mai le password. Nel sito sono righe come le altre; per avere una password da vedere si usa «Rigenera».
 
 ## 7. Testi per la guida (da mandare alla memoria storica a codice fatto)
 
@@ -266,30 +279,36 @@ Le rotte e i campi sono quelli della proposta del server (§2, §2.1), che li fi
 5. la differenza fra «Pronto» e «in linea»;
 6. cosa vuol dire «Non applicato», in particolare dopo una revoca.
 
-## 8. Domande aperte
+## 8. Domande: le risposte
 
-Numeri invariati, così i rimandi della proposta del server restano giusti.
+Numeri invariati, così i rimandi della proposta del server restano giusti. Risposte del committente nel registro del 19 novembre (1170–1177).
 
-1. **Chi usa la pagina nello staging?** Ora è la domanda 1 della proposta del server (rotte sotto `/app/platform/…` per il gestore della piattaforma). Il sito si adatta in tutti e due i casi (§1.4).
-2. **Registrare prima di A4:** finché il modulo del catalogo non c'è, il codice si scrive a mano in «Registra un dispositivo» (§2.2). Con A4 la registrazione parte dal salvataggio del catalogo: questa finestra resta, o sparisce? (Anche domanda 2 del server.)
-3. *Risposta di o1:* «Revoca» è ammessa durante un cambio in corso (proposta del server §4.3). Nel sito: tabella §3.1.
-4. *Risposta di o1:* rete caduta, la strada del progetto: nessuna password conservata, una seconda chiamata dà 409 e si usa «Rigenera» (proposta del server §5.6). Nel sito: §4.
-5. **Conferma di «Revoca»:** basta il pulsante rosso, o si riscrive il codice del dispositivo come per l'eliminazione? (Anche domanda 3 del server.)
-6. *Risposta di o1:* il server rifiuta le maiuscole, non le converte (proposta del server §5.1). Nel sito: §2.2.
-7. **Molti dispositivi insieme (A4):** un kit ha circa 10 Shelly. Al salvataggio del catalogo le password nascono tutte insieme: una finestra con l'elenco di tutte, una per riga con «Copia»? La stampa no: il foglio dell'elettricista non contiene password. (Anche domanda 4 del server: una chiamata «Registra più dispositivi».)
-8. *Risposta tecnica di o1:* le rotte restano in `bff/API.md` e il contratto non cambia. Se il committente le vuole nel contratto, è la domanda 5 del server. Nel sito: §6.3.
-9. **PC senza internet in sede** (§2.3): va provato che la finestra resti aperta e la sessione non scada mentre il PC è collegato alla rete Wi-Fi dello Shelly. È una prova mia, con il sito di sviluppo e la rete staccata: la faccio a codice fatto.
-10. **Pagina locale (§2.8):** entra in A3 insieme, o dopo la revisione di sicurezza del §8.3, come pezzo a parte? (Anche domanda 6 del server.)
-11. **Le etichette dei campi nella pagina dello Shelly:** il sito usa «Server», «Client ID», «Utente», «Password», «Prefisso». Per la guida servono i nomi esatti della pagina locale dei modelli ammessi, con una schermata: da chiedere a Youssouf (insieme alle schermate del pacchetto A9)?
+| N. | Domanda | Risposta | Nel sito |
+|---|---|---|---|
+| 1 | Chi usa la pagina nello staging | 1170: anche il gestore della piattaforma, da «Organizzazioni», per `lab-…` e `test-…`, come «Prova l'agente» | §1.4, §6.1 |
+| 2 | La finestra «Registra un dispositivo» dopo A4 | rimandata ad A4 (1170) | resta com'è in A3 (§2.2) |
+| 3 | «Revoca» durante un cambio in corso | o1: ammessa | §3.1 |
+| 4 | Rete caduta durante «Registra» o «Rigenera» | o1: nessuna password conservata, 409 e «Rigenera» | §4 |
+| 5 | Conferma di «Revoca» | 1171: riscrivendo il codice del dispositivo; il testo dice che smette subito di funzionare e che per riattivarlo serve andare sul posto | §2.6 |
+| 6 | Le maiuscole | o1: rifiutate, non convertite | §2.2 |
+| 7 | Molti dispositivi insieme | rimandata ad A4 (1170) | — |
+| 8 | Rotte nel contratto | 1172: solo `bff/API.md`, contratto invariato | §6.3 |
+| 9 | PC senza internet in sede | prova mia, a codice fatto, con il sito di sviluppo e la rete staccata | §2.3 |
+| 10 | Pagina locale | 1173: non in A3, dopo come pezzo a parte | §2.8 |
+| 11 | Etichette della pagina dello Shelly | dalle schermate del committente del 17 novembre (pagina MQTT): «Connection type» con «Default TLS», «MQTT prefix», «Server», «Client ID», «Username», «Password»; da riverificare sui firmware 2.2.0 con Youssouf per le guide (A9) | §2.3 |
 
-## 9. Da chiarire con o1
+## 9. Chiariti con o1
 
-Incoerenze o buchi che ho trovato leggendo `docs/proposta-a3-server.md` (`0f02ffa`). Nessuno blocca la proposta; vanno chiusi prima del codice.
+I sette punti che avevo trovato leggendo `docs/proposta-a3-server.md` (`0f02ffa`). o1 li ha accettati tutti nel §11 della sua proposta (`b05824b`, ancora valido in `b83c9d1`) e me li ha confermati il 19 novembre. **Tutti chiusi.**
 
-1. **`azione` dopo «Riprova».** Il §2.1 dice che `azione` è l'ultima azione, anche `riprova`, e che serve al sito per dire cosa non è stato applicato. Ma se una «Riprova» finisce di nuovo `non_applicato`, `azione` vale `riprova` e il sito non sa più se si trattava di una registrazione, di una password nuova o di una **revoca** (il caso che conta: il dispositivo può ancora collegarsi). Il §4.1 invece mostra «lo stato dell'azione che si riprova», quindi il server la conosce. **Proposta:** `azione` resta quella riprovata (`registra`, `rigenera` o `revoca`) e «Riprova» non la sovrascrive; la riga del registro attività dice comunque «Rimandate le credenziali».
-2. **`riprova` nello stato «in corso».** Collegato al punto 1: mentre una «Riprova» è in volo il server mostra `in_attesa`, `cambio_in_corso` o `revoca_in_corso`. Va bene così; serve solo che anche `azione` sia coerente con quello stato.
-3. **Il nome dal motore e il collegamento da «Stato dei dispositivi».** Il §2.2 cerca il `label` del motore «con lo stesso id Shelly del catalogo», ma nel contratto `Device` ha solo `device_id` del motore (`dev-presa-lab`), `label` e le capacità: nessun campo con l'id Shelly. Quindi il server deve leggere il catalogo per legare i due id, e lo stesso legame serve al sito per la voce «Credenziali» in «Stato dei dispositivi» (§1.2). **Proposta:** finché non c'è A4 `name` resta null e la voce «Credenziali» non c'è; con A4 il server mette nel `DeviceCredential` anche il `device_id` del motore (per esempio `engine_device_id`), così il sito lega le due pagine senza leggere il catalogo.
-4. **Un solo codice 503 per due cause.** `agent_not_configured` vale sia per l'agente non installato sia per `DEVICE_BROKER_ADDRESS` vuoto (§8.2). Il testo del sito, «Agente non ancora installato in questo ambiente.», sarebbe sbagliato nel secondo caso. **Proposta:** un codice a parte, `broker_address_missing`, con il testo «Indirizzo del sistema domotico per i dispositivi non configurato in questo ambiente.»; oppure il sito mostra il testo del server per tutti e due.
-5. **L'elenco in produzione senza indirizzo.** Il §2.1 dice che `connection` c'è sempre, ma in produzione `DEVICE_BROKER_ADDRESS` è vuota fino alla seconda VM. Cosa vale `connection.server` nel `GET`: stringa vuota, null, o il `GET` dà 503? Il sito deve saperlo per non mostrare un campo «Server» vuoto da copiare.
-6. **Le azioni non ammesse:** per `revocato` con «Rigenera» o «Revoca», e per `revoca_in_corso` con «Rigenera», «Revoca» o «Riprova», la tabella del §4.3 dice «no» senza codice. Immagino `invalid_state` (regola generale sotto la tabella), salvo `operation_in_progress` per le azioni bloccate da un'operazione in corso: da confermare, perché il sito reagisce in modo diverso (§4).
-7. **«Registra di nuovo» e la `version`.** Il §3, punto 5, dice che «Registra» non ha `version`; per un revocato il documento esiste già con la sua `version`. Due «Registra di nuovo» insieme sullo stesso revocato: la seconda dà `already_registered`? Da confermare, così il sito sa quale messaggio aspettarsi.
+| N. | Punto | Come si chiude | Nel sito |
+|---|---|---|---|
+| 1 | `azione` dopo «Riprova» | `azione` resta quella in attesa (`registra`, `rigenera`, `revoca`); «Riprova» non la sovrascrive; `riprova` non è più un valore. Nel Registro attività resta `device_credential_retried` | §3.2 |
+| 2 | Coerenza durante una riprova | lo stato in volo è quello dell'azione riprovata e `azione` dice la stessa cosa | §3 |
+| 3 | Nome dal motore | `name` ed `engine_device_id` null fino ad A4; la voce «Credenziali» in «Stato dei dispositivi» arriva con A4, attraverso `engine_device_id` | §1.2, §2.1, §6.2 |
+| 4 | Un solo 503 per due cause | codice a parte `broker_address_missing`, con il testo proposto; `agent_not_configured` resta solo per l'agente | §4 |
+| 5 | `connection.server` senza indirizzo | il `GET` non dà 503: `server` è null e il sito scrive «Non configurato in questo ambiente»; «Registra» e «Rigenera» danno 503 `broker_address_missing` prima di creare la password | §2.4 |
+| 6 | Le azioni senza codice | ogni casella ha il suo codice: `revocato` con «Rigenera» o «Revoca» → `invalid_state`; `revoca_in_corso` con «Rigenera», «Revoca» o «Riprova» → `operation_in_progress` | §3.1, §4 |
+| 7 | Due «Registra di nuovo» insieme | il revocato torna attivo con `version + 1`: la prima chiamata riceve 201 con la password, la seconda 409 `already_registered` | §4 |
+
+**Altre cose da o1, 19 novembre:** la riga di sistema `device_credential_revoke_not_applied` (§3.2); `local_page` tolto da `DeviceCredential` (§6.2); le rotte della piattaforma danno 404 fuori dallo staging o per un id che non è `lab-…` o `test-…` (§6.1).
