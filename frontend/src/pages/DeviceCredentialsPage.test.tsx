@@ -7,6 +7,7 @@ import { roleOf } from "@/auth/AuthProvider";
 import { apartmentNav } from "@/components/layout/navItems";
 import { useApartmentStore } from "@/store/apartmentStore";
 import App from "@/App";
+import { LAZY_PAGE } from "@/test/lazyPage";
 
 // A3, «Credenziali dei dispositivi» (docs/proposta-a3-sito.md §1–§3, screens approved by the committente, 1182): the
 // page of an apartment, for admins only (permission devices.credentials), with the registered devices and their state;
@@ -76,7 +77,7 @@ beforeEach(() => {
 describe("Credenziali dei dispositivi: chi le vede", () => {
   it("amministratore: voce nel menu dell'appartamento e pagina aperta", async () => {
     openApp("/a/apt-001/credenziali");
-    expect(await screen.findByTestId("credentials-header")).toHaveTextContent("Credenziali dei dispositivi");
+    expect(await screen.findByTestId("credentials-header", undefined, LAZY_PAGE)).toHaveTextContent("Credenziali dei dispositivi");
     await waitFor(() => expect(sidebarHas("credentials")).toBe(true));
   });
 
@@ -100,7 +101,7 @@ describe("Credenziali dei dispositivi: chi le vede", () => {
 describe("l'elenco", () => {
   it("vuoto: dice di registrare ogni Shelly prima di montarlo", async () => {
     openApp("/a/apt-001/credenziali");
-    expect(await screen.findByTestId("credentials-empty")).toHaveTextContent("Nessun dispositivo registrato");
+    expect(await screen.findByTestId("credentials-empty", undefined, LAZY_PAGE)).toHaveTextContent("Nessun dispositivo registrato");
     expect(screen.getByTestId("credentials-register-btn")).toHaveTextContent("Registra un dispositivo");
   });
 
@@ -112,7 +113,7 @@ describe("l'elenco", () => {
       cred("shellyi4-ko", "non_applicato", "revoca", { op: { op_id: "7c41e9a2-0000-4000-8000-000000000001", stato: "scartato", messaggio: "Ordine scartato dal sistema domotico" } }),
     ];
     openApp("/a/apt-001/credenziali");
-    const rows = await screen.findAllByTestId(/^credential-row-/);
+    const rows = await screen.findAllByTestId(/^credential-row-/, undefined, LAZY_PAGE);
     expect(rows.map((r) => r.dataset.testid)).toEqual(["credential-row-shellyi4-ko", "credential-row-shelly1pm-attesa", "credential-row-shellyhtg3-cambio", "credential-row-shellyplugmg3-pronto"]);
     expect(screen.getByTestId("credential-state-shellyplugmg3-pronto")).toHaveTextContent("Pronto");
     expect(screen.getByTestId("credential-row-shellyplugmg3-pronto")).toHaveTextContent("Può collegarsi.");
@@ -131,14 +132,14 @@ describe("l'elenco", () => {
   it("«Non applicato» dice cosa non è stato applicato, secondo l'azione in attesa", async () => {
     s.items = [cred("d-reg", "non_applicato", "registra"), cred("d-rig", "non_applicato", "rigenera")];
     openApp("/a/apt-001/credenziali");
-    expect(await screen.findByTestId("credential-row-d-reg")).toHaveTextContent("La registrazione non è arrivata al sistema domotico: il dispositivo non può ancora collegarsi.");
+    expect(await screen.findByTestId("credential-row-d-reg", undefined, LAZY_PAGE)).toHaveTextContent("La registrazione non è arrivata al sistema domotico: il dispositivo non può ancora collegarsi.");
     expect(screen.getByTestId("credential-row-d-rig")).toHaveTextContent("La password nuova non è arrivata al sistema domotico: vale ancora quella vecchia.");
   });
 
   it("i revocati stanno in una sezione chiusa in fondo, con il numero; aperta mostra data e «Registra di nuovo»", async () => {
     s.items = [cred("d-attivo", "pronto"), cred("d-rev-1", "revocato", null, { updated_at: "2026-11-12T09:00:00Z" }), cred("d-rev-2", "revocato")];
     openApp("/a/apt-001/credenziali");
-    const toggle = await screen.findByTestId("credentials-revoked-toggle");
+    const toggle = await screen.findByTestId("credentials-revoked-toggle", undefined, LAZY_PAGE);
     expect(toggle).toHaveTextContent("Revocati (2)");
     expect(toggle).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByTestId("credential-row-d-rev-1")).toBeNull();
@@ -152,14 +153,14 @@ describe("l'elenco", () => {
   it("nessun revocato: nessuna sezione", async () => {
     s.items = [cred("d-attivo", "pronto")];
     openApp("/a/apt-001/credenziali");
-    await screen.findByTestId("credential-row-d-attivo");
+    await screen.findByTestId("credential-row-d-attivo", undefined, LAZY_PAGE);
     expect(screen.queryByTestId("credentials-revoked-toggle")).toBeNull();
   });
 
   it("i pulsanti della riga seguono lo stato: «Riprova» solo sui non applicati, «Dati di collegamento» sempre", async () => {
     s.items = [cred("d-ko", "non_applicato", "revoca"), cred("d-ok", "pronto"), cred("d-rev", "revocato")];
     openApp("/a/apt-001/credenziali");
-    await screen.findByTestId("credential-row-d-ko");
+    await screen.findByTestId("credential-row-d-ko", undefined, LAZY_PAGE);
     expect(screen.getByTestId("credential-retry-d-ko")).toBeInTheDocument();
     expect(screen.queryByTestId("credential-retry-d-ok")).toBeNull();
     expect(screen.getByTestId("credential-connection-d-ko")).toBeInTheDocument();

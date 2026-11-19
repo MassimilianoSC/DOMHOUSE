@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { t } from "@/i18n";
 import App from "@/App";
+import { LAZY_PAGE } from "@/test/lazyPage";
 
 // Platform role (P-36, D-61a): "Organizzazioni" only for platform managers, a separate guard from AdminOnly, and a
 // manager outside any organization sees only Organizzazioni and Impostazioni. A normal admin sees the app as before.
@@ -58,7 +59,7 @@ describe("ruolo di piattaforma: menu e accesso", () => {
   it("gestore della piattaforma che è anche amministratore: vede «Organizzazioni», anche nel menu del telefono", async () => {
     s.me = me("admin", true);
     open("/organizzazioni");
-    expect(await screen.findByTestId("organizations-header")).toHaveTextContent(t("platform.title"));
+    expect(await screen.findByTestId("organizations-header", undefined, LAZY_PAGE)).toHaveTextContent(t("platform.title"));
     // D-82: both roles in the sidebar, the organization's on the first line, the platform's below
     expect(screen.getByTestId("sidebar-user-role")).toHaveTextContent(/^Amministratore · Demo$/);
     expect(screen.getByTestId("sidebar-user-platform")).toHaveTextContent(/^Gestore della piattaforma$/);
@@ -77,7 +78,7 @@ describe("ruolo di piattaforma: menu e accesso", () => {
   it("gestore senza organizzazione: solo Organizzazioni e Impostazioni; «/» porta a Organizzazioni", async () => {
     s.me = me(null, true, false);
     open("/");
-    expect(await screen.findByTestId("organizations-header")).toBeInTheDocument();
+    expect(await screen.findByTestId("organizations-header", undefined, LAZY_PAGE)).toBeInTheDocument();
     expect(screen.getByTestId("where")).toHaveTextContent("/organizzazioni");
     expect(sidebarKeys()).toEqual(["sidebar-nav-organizations", "sidebar-nav-settings"]);
     expect(screen.getByTestId("sidebar-user-role")).toHaveTextContent(t("roles.platform"));
@@ -87,7 +88,7 @@ describe("ruolo di piattaforma: menu e accesso", () => {
   it("lettore con il ruolo di piattaforma: «Organizzazioni» sì, Amministrazione no", async () => {
     s.me = me("viewer", true);
     open("/organizzazioni");
-    expect(await screen.findByTestId("organizations-header")).toBeInTheDocument();
+    expect(await screen.findByTestId("organizations-header", undefined, LAZY_PAGE)).toBeInTheDocument();
     expect(sidebarKeys()).toEqual(["sidebar-nav-apartments", "sidebar-nav-organizations", "sidebar-nav-settings"]);
   });
 });
@@ -96,7 +97,7 @@ describe("«+ Appartamento» del gestore: Organizzazioni con gli appartamenti de
   it("arrivando con ?appartamenti=t1 la lista di quell'organizzazione è aperta, e l'indirizzo torna pulito", async () => {
     s.me = me("admin", true);
     open("/organizzazioni?appartamenti=t1");
-    expect(await screen.findByTestId("platform-apartments-empty-t1")).toBeInTheDocument();
+    expect(await screen.findByTestId("platform-apartments-empty-t1", undefined, LAZY_PAGE)).toBeInTheDocument();
     expect(screen.getByTestId("tenant-apartments-btn-t1")).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByTestId("where")).toHaveTextContent(/^\/organizzazioni$/);
   });
@@ -104,7 +105,7 @@ describe("«+ Appartamento» del gestore: Organizzazioni con gli appartamenti de
   it("senza il parametro le liste restano chiuse", async () => {
     s.me = me("admin", true);
     open("/organizzazioni");
-    expect(await screen.findByTestId("tenant-apartments-btn-t1")).toHaveAttribute("aria-expanded", "false");
+    expect(await screen.findByTestId("tenant-apartments-btn-t1", undefined, LAZY_PAGE)).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByTestId("platform-apartments-empty-t1")).not.toBeInTheDocument();
   });
 });
@@ -113,7 +114,7 @@ describe("gestore della piattaforma con la propria organizzazione sospesa (P-50,
   it("«/» porta a Organizzazioni; niente Appartamenti né Amministrazione; avviso e «sospesa» nella barra laterale", async () => {
     s.me = { ...me("admin", true), tenant: { tenant_id: "t1", name: "Demo", suspended: true } };
     open("/");
-    expect(await screen.findByTestId("organizations-header")).toBeInTheDocument();
+    expect(await screen.findByTestId("organizations-header", undefined, LAZY_PAGE)).toBeInTheDocument();
     expect(screen.getByTestId("where")).toHaveTextContent("/organizzazioni");
     expect(sidebarKeys()).toEqual(["sidebar-nav-organizations", "sidebar-nav-settings"]);
     expect(screen.getByTestId("own-tenant-suspended")).toHaveTextContent(t("platform.ownSuspended", { name: "Demo" }));
