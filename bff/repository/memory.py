@@ -1,7 +1,7 @@
 import copy
 import time
 
-from .base import (SEQ_UNCHECKED, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (SEQ_UNCHECKED, migrated_document, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
 
 
@@ -81,6 +81,17 @@ class InMemoryRepository:
         ops = {d["op_id"]: self.agent_ops[d["op_id"]].model_copy(deep=True) for d in docs
                if d.get("op_id") in self.agent_ops}
         return docs, self.agent_ultima.get(apartment_id, 0), ops
+
+    async def put_migrated_credentials(self, apartment_id, fingerprints, at):
+        docs = self.device_creds.setdefault(apartment_id, {})
+        for device_id, impronta in fingerprints.items():
+            docs.setdefault(device_id, migrated_document(device_id, impronta, at))
+
+    async def delete_migrated_credentials(self, apartment_id, device_ids):
+        docs = self.device_creds.get(apartment_id, {})
+        for device_id in device_ids:
+            if docs.get(device_id, {}).get("migrato"):
+                del docs[device_id]
 
     async def mark_device_alerted(self, apartment_id, device_id, seq):
         doc = self.device_creds.get(apartment_id, {}).get(device_id)

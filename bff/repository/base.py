@@ -266,6 +266,13 @@ class ActorRecord(BaseModel):
 SEQ_UNCHECKED = object()        # finish_agent_op without a result's seq (the server's own closings)
 
 
+def migrated_document(device_id: str, impronta: str, at: str) -> dict:
+    """A3 §6.4: a device of lab-01 as the broker has it today, «pronto» (no action waiting), marked «migrato»."""
+    return {"device_id": device_id, "impronta": impronta, "stato_salvato": "attivo", "azione": None,
+            "pending_seq": None, "op_id": None, "version": 1, "updated_at": at, "updated_by": None,
+            "revoked_at": None, "migrato": True}
+
+
 class AgentOp(BaseModel):
     """Tool A, A1 (docs/progetto-strumento-a-base.md §3, §6): an order sent to the receiver on the VM and its outcome.
     seq is the apartment's sequence number, given by the repository in the same transaction that saves the order;
@@ -385,6 +392,10 @@ class Repository(Protocol):
     async def device_credentials_view(self, apartment_id: str) -> tuple[list[dict], int, dict]: ...
     # A3 §8.4: True only for the first call with that seq (the device's «allarme_seq»): one alarm per order
     async def mark_device_alerted(self, apartment_id: str, device_id: str, seq: int) -> bool: ...
+    # A3 §6.4: lab-01's migration (scripts/migra_credenziali.py): devices «pronti» marked «migrato», created only if
+    # absent; the way back removes only documents marked «migrato»
+    async def put_migrated_credentials(self, apartment_id: str, fingerprints: dict, at: str) -> None: ...
+    async def delete_migrated_credentials(self, apartment_id: str, device_ids: list) -> None: ...
     async def device_credential_change(self, apartment_id: str, device_id: str, change, op: "AgentOp",
                                        build) -> tuple[dict, "AgentOp", bytes]: ...
 

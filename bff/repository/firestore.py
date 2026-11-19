@@ -13,7 +13,7 @@ from google.cloud import firestore
 
 from .. import retention
 
-from .base import (SEQ_UNCHECKED, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (SEQ_UNCHECKED, migrated_document, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email, now_iso)
 
 
@@ -300,6 +300,20 @@ class FirestoreRepository:
                 if op is not None:
                     ops[op.op_id] = op
         return docs, ultima, ops
+
+    async def put_migrated_credentials(self, apartment_id, fingerprints, at):
+        for device_id, impronta in fingerprints.items():
+            try:
+                await self._creds(apartment_id).document(device_id).create(migrated_document(device_id, impronta, at))
+            except AlreadyExists:
+                pass                                      # the app's own document stays as it is
+
+    async def delete_migrated_credentials(self, apartment_id, device_ids):
+        for device_id in device_ids:
+            ref = self._creds(apartment_id).document(device_id)
+            snap = await ref.get()
+            if snap.exists and (snap.to_dict() or {}).get("migrato"):
+                await ref.delete()
 
     async def mark_device_alerted(self, apartment_id, device_id, seq):
         ref = self._creds(apartment_id).document(device_id)

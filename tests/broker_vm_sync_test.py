@@ -89,3 +89,32 @@ def test_add_apartment_still_works_when_another_apartment_is_kept(vm):
     assert r.returncode == 0, r.stderr
     assert (etc / "_broker" / "apartments").read_text(encoding="utf-8").split() == ["apt-a", "apt-new"]
     assert "broker sync kept apt-a" in (stubs / "syslog.log").read_text(encoding="utf-8")
+
+
+# ---- A3 §6.4 (answer 1174): lab-01's migration, the VM's half --------------------------------------------------
+H1 = "$7$1000$" + "A" * 16 + "$" + "B" * 86 + "=="
+H2 = "$7$1000$" + "C" * 16 + "$" + "D" * 86 + "=="
+
+
+def test_devices_from_auth_copies_the_apartments_fingerprints_and_syncs(vm):
+    """The fingerprints the broker uses today become devices/<apt>: no password is read, the sync then changes
+    nothing (same fingerprints). It prints them, for the copy into Firestore (fingerprints are not passwords)."""
+    run, stubs, etc = vm
+    auth = etc / "_broker" / "auth"
+    (auth / "devices.passwd").write_text(f"apt-a.plug:{H1}\napt-a.shelly-1:{H2}\napt-b.x:{H1}\n", encoding="utf-8")
+    (stubs / "sync-out").write_text("apt-a: connector e 2 dispositivi\nunchanged\n", encoding="utf-8")
+    r = run("devices-from-auth", "apt-a")
+    assert r.returncode == 0, r.stderr
+    written = (etc / "_broker" / "devices" / "apt-a").read_text(encoding="utf-8")
+    assert written == f"plug {H1}\nshelly-1 {H2}\n"
+    assert f"plug {H1}" in r.stdout and "unchanged" in r.stdout
+    again = run("devices-from-auth", "apt-a")                     # never over a file that is there
+    assert again.returncode != 0 and "c'è già" in again.stderr
+
+
+def test_devices_from_auth_refuses_an_apartment_without_devices(vm):
+    run, stubs, etc = vm
+    (etc / "_broker" / "auth" / "devices.passwd").write_text(f"apt-b.x:{H1}\n", encoding="utf-8")
+    r = run("devices-from-auth", "apt-a")
+    assert r.returncode != 0 and "nessun dispositivo" in r.stderr
+    assert not (etc / "_broker" / "devices" / "apt-a").exists()

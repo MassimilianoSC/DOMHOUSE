@@ -707,6 +707,23 @@ case "${cmd}" in
     rm -f "${DEVICES}/$1"
     sync_accounts
     ;;
+  devices-from-auth)
+    # A3 §6.4 (answer 1174): an apartment of the old «-devices» secret (lab-01) passes to its file of fingerprints:
+    # the lines the broker uses today, no password read; the sync then changes nothing. The lines are printed for the
+    # copy into the app (scripts/migra_credenziali.py): fingerprints, not passwords
+    [ $# -eq 1 ] || die "uso: devices-from-auth <apartment_id>"
+    need_installed
+    valid_id "$1"
+    [ ! -e "${DEVICES}/$1" ] || die "${DEVICES}/$1 c'è già: niente da fare"
+    ( umask 077; mkdir -p "${DEVICES}" )
+    from_auth="${DEVICES}/.$1.nuovo"
+    ( umask 077; sed -n "s/^$1\.\([^:]*\):\(.*\)$/\1 \2/p" "${AUTH}/devices.passwd" > "${from_auth}" )
+    if [ ! -s "${from_auth}" ]; then rm -f "${from_auth}"; die "nessun dispositivo di $1 in ${AUTH}/devices.passwd"; fi
+    mv -f "${from_auth}" "${DEVICES}/$1"
+    echo "== impronte di $1 (${DEVICES}/$1)"
+    cat "${DEVICES}/$1"
+    sync_accounts
+    ;;
   sync)
     need_installed
     sync_accounts
@@ -750,6 +767,6 @@ case "${cmd}" in
     check
     ;;
   *)
-    die "uso: prepare-tls-disk | cert-new | install | update | restart | reload | cert-renew | cert-test | cert-revoke | install-cert | add-apartment | remove-apartment | sync | check | limit | network | status (vedi l'intestazione)"
+    die "uso: prepare-tls-disk | cert-new | install | update | restart | reload | cert-renew | cert-test | cert-revoke | install-cert | add-apartment | remove-apartment | devices-from-auth | sync | check | limit | network | status (vedi l'intestazione)"
     ;;
 esac
