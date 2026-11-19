@@ -5,9 +5,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        heading: ['"Manrope Variable"', "Manrope", "sans-serif"],
-        sans: ['"Manrope Variable"', "Manrope", "sans-serif"],
-        mono: ['"JetBrains Mono"', "monospace"],
+          heading: ['"Manrope Variable"', "Manrope", "sans-serif"],
+          sans: ['"Manrope Variable"', "Manrope", "sans-serif"],
+          mono: ['"JetBrains Mono"', "monospace"],
       },
       colors: {
         border: "hsl(var(--border))",
@@ -25,10 +25,18 @@ module.exports = {
         popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
         // status pairs (lotto 32): bg, fg (text on bg) and border, plus a text green and red that pass 4.5:1
         positive: { DEFAULT: "hsl(var(--positive))", bg: "hsl(var(--positive-bg))", fg: "hsl(var(--positive-fg))", border: "hsl(var(--positive-border))" },
-        warning: { bg: "hsl(var(--warning-bg))", fg: "hsl(var(--warning-fg))", border: "hsl(var(--warning-border))" },
+        warning: { DEFAULT: "hsl(var(--warning))", bg: "hsl(var(--warning-bg))", fg: "hsl(var(--warning-fg))", border: "hsl(var(--warning-border))" },
         negative: { DEFAULT: "hsl(var(--negative))", bg: "hsl(var(--negative-bg))", fg: "hsl(var(--negative-fg))", border: "hsl(var(--negative-border))" },
         neutral: { bg: "hsl(var(--neutral-bg))", fg: "hsl(var(--neutral-fg))", border: "hsl(var(--neutral-border))" },
-        // one colour per mode (lot 34)
+        info: { DEFAULT: "hsl(var(--info))", bg: "hsl(var(--info-bg))", fg: "hsl(var(--info-fg))", border: "hsl(var(--info-border))" },
+        temperature: {
+          freezing: "hsl(var(--temperature-freezing))",
+          cool: "hsl(var(--temperature-cool))",
+          comfort: "hsl(var(--temperature-comfort))",
+          warm: "hsl(var(--temperature-warm))",
+          hot: "hsl(var(--temperature-hot))",
+        },
+        // Operating modes keep the same meaning across every palette.
         mode: {
           comfort: { bg: "hsl(var(--mode-comfort-bg))", fg: "hsl(var(--mode-comfort-fg))" },
           eco: { bg: "hsl(var(--mode-eco-bg))", fg: "hsl(var(--mode-eco-fg))" },

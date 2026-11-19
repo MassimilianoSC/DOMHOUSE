@@ -4,72 +4,21 @@
 
 @layer base {
   :root {
-    /* Lot 34, «foglio incorniciato» (D-192, D-194): a warm sand frame around a warm white sheet, a dark brown ink,
-       taupe greys, warm status colours with a full background, one colour per mode; the brand orange only on data,
-       charts, the chat bubbles, the mark and the active menu entry's thread. */
-    --frame: 28 46% 85%; /* #EAD7C6 */
-    --background: 40 100% 99%; /* the sheet, #FFFDF9 */
-    --foreground: 24 14% 15%; /* ink #2A2420 */
-    --card: 0 0% 100%;
-    --card-foreground: 24 14% 15%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 24 14% 15%;
-    --primary: 18 72% 44%; /* brand orange #C1501F: data, charts, chat bubbles, mark */
-    --primary-foreground: 40 100% 99%;
-    --secondary: 32 32% 91%; /* taupe surface #EFE8E0 */
-    --secondary-foreground: 24 14% 15%;
-    --muted: 32 28% 92%;
-    --muted-foreground: 28 9% 37%; /* taupe text, 6:1 on the sheet */
-    --accent: 153 41% 34%; /* sage: switches on */
-    --accent-foreground: 0 0% 100%;
-    --destructive: 4 58% 42%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 30 24% 85%;
-    --input: 30 22% 80%;
-    --ring: 18 72% 44%;
     --radius: 0.75rem;
-    --chart-1: 18 72% 44%;
-    --chart-2: 153 41% 34%;
-    --chart-3: 33 88% 42%;
-    --chart-4: 208 31% 35%;
-    --chart-5: 4 58% 42%;
-    /* Status: warm, with a full background; fg is the text on bg (>= 4.5:1 on bg and on white). */
-    --positive: 153 41% 31%; /* sage #2F6F52 */
-    --positive-bg: 141 32% 91%; /* #E2F0E7 */
-    --positive-fg: 153 41% 27%;
-    --positive-border: 141 28% 80%;
-    --warning-bg: 38 84% 90%; /* amber #FBEBD0 */
-    --warning-fg: 33 88% 30%; /* #9A5A0A, a shade darker for text */
-    --warning-border: 38 70% 76%;
-    --negative: 4 58% 42%; /* brick #A8352C */
-    --negative-bg: 11 76% 92%; /* #FADFD9 */
-    --negative-fg: 4 58% 36%;
-    --negative-border: 8 60% 82%;
-    --neutral-bg: 32 32% 92%; /* taupe #F1EBE4 */
-    --neutral-fg: 28 9% 33%;
-    --neutral-border: 30 18% 80%;
-    /* One colour per mode, in the band, the selector and the apartment cards. */
-    --mode-comfort-bg: 24 71% 88%; /* #F6DCCB */
-    --mode-comfort-fg: 18 75% 32%; /* #9C3F16, darker for 4.5:1 */
-    --mode-eco-bg: 141 32% 91%;
-    --mode-eco-fg: 153 41% 27%;
-    --mode-empty-bg: 208 33% 91%; /* slate #E1E9F0 */
-    --mode-empty-fg: 208 31% 32%; /* #3D5A73 */
+    color-scheme: light;
   }
-  /* No dark theme: it was never switched on and was incomplete; it is a lot of its own (design report, lot 34). */
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
   * {
     @apply border-border;
   }
   body {
-    /* the warm frame around the sheet (lot 34); a flat ground, no texture (design review c.0) */
+    /* Semantic tokens let palette and appearance changes apply across the whole app. */
     @apply bg-frame text-foreground font-sans antialiased;
+    font-variant-numeric: tabular-nums;
   }
   h1, h2, h3 {
     @apply font-heading;
-  }
-  /* figures in columns line up everywhere (lot 34: one family, Manrope, with tabular figures) */
-  body {
-    font-variant-numeric: tabular-nums;
   }
   ::selection {
     background: hsl(var(--primary) / 0.2);
@@ -109,5 +58,103 @@
   /* Bottom of the pages: the usual room plus the iPhone's home indicator (no bottom bar any more, D-103). */
   .main-safe {
     padding-bottom: calc(2.5rem + env(safe-area-inset-bottom));
+  }
+  .apartments-hero-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+  .apartments-hero-photo {
+    grid-column: 1;
+    grid-row: 1;
+    aspect-ratio: var(--hero-image-ratio);
+  }
+  .apartments-hero-image {
+    filter: blur(1.45px) saturate(0.92) brightness(0.98);
+    transform: scale(1.012);
+  }
+  .apartments-hero-haze {
+    background-color: hsl(var(--hero-overlay));
+    opacity: 0.48;
+    animation: hero-comfort-haze 22s ease-in-out infinite alternate;
+  }
+  @keyframes hero-comfort-haze {
+    from { opacity: 0.42; }
+    to { opacity: 0.7; }
+  }
+  .apartments-hero-copy {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    z-index: 10;
+    display: flex;
+    width: 50%;
+    align-items: center;
+    padding: 0.625rem;
+  }
+  .apartments-hero-copy-content {
+    min-width: 0;
+    width: 100%;
+  }
+  .apartments-hero-energy,
+  .apartments-hero-action {
+    grid-column: 1;
+    grid-row: 2;
+    justify-self: stretch;
+    width: calc(100% - 1.5rem);
+    margin: 0.75rem;
+  }
+  .apartments-hero-layout > .apartments-hero-energy {
+    position: absolute;
+    top: 0.5625rem;
+    right: 0.5rem;
+    z-index: 20;
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: end;
+    align-self: start;
+    width: min(40%, 9.375rem);
+    min-width: 6.75rem;
+    margin: 0;
+    padding: 0.4375rem 0.5rem;
+  }
+  @media (min-width: 640px) {
+    .apartments-hero-layout {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto;
+    }
+    .apartments-hero-photo {
+      aspect-ratio: 3.4 / 1;
+    }
+    .apartments-hero-copy {
+      width: calc(100% - min(29%, 18rem) - 1.5rem);
+      max-width: 32rem;
+      padding: 1.25rem clamp(1.25rem, 5%, 2rem);
+    }
+    .apartments-hero-copy-content {
+      width: 100%;
+    }
+    .apartments-hero-layout > .apartments-hero-energy {
+      top: 50%;
+      right: clamp(1rem, 4%, 1.5rem);
+      width: min(29%, 18rem);
+      min-width: 0;
+      margin: 0;
+      padding: 0.625rem 0.75rem 0.5625rem;
+      transform: translateY(-50%);
+    }
+    .apartments-hero-action {
+      grid-row: 1;
+      justify-self: end;
+      align-self: start;
+      width: auto;
+      margin: 1rem clamp(1rem, 4%, 1.5rem) 0 0;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .apartments-hero-haze {
+      animation: none;
+      opacity: 0.56;
+    }
   }
 }

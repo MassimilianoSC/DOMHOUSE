@@ -4,6 +4,7 @@ import { isIos, useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { Button } from "@/components/ui/button";
 import { scopeSummary } from "@/components/admin/ApartmentScope";
 import { AccountSettings } from "@/components/settings/AccountSettings";
+import { AppearanceSettings } from "@/components/settings/AppearanceSettings";
 import { useApartments } from "@/hooks/useFeatures";
 import { NotificationSettings } from "@/components/settings/NotificationSettings";
 import { SettingsSection } from "@/components/settings/SettingsSection";
@@ -60,6 +61,7 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader title={t("settings.title")} testId="settings-header" />
+      <AppearanceSettings />
       <AccountSettings
         profile={
           <div>

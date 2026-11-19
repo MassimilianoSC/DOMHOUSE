@@ -58,6 +58,9 @@ chainlit.md
 .ipynb_checkpoints/
 .ac
 
+# Local Codex notes and explorations; never include in commits or pull requests
+/codex/
+
 # Deployment
 .vercel
 

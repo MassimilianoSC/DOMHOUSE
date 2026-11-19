@@ -6,7 +6,9 @@ Il registro delle decisioni è `docs/registro.md`: lo scrive **solo** la memoria
 ## Chi fa cosa
 - **Committente** (la persona per cui lavoriamo): decide, giudica l'estetica, e lancia TUTTO ciò che scrive fuori dalla
   macchina: pubblicazioni su Cloud Run e Firebase Hosting, scritture su Firestore o Secret Manager, permessi IAM,
-  cancellazioni, `git push`. Non è un tecnico: gli si parla in italiano semplice, tramite la memoria storica.
+  cancellazioni. Non è un tecnico: gli si parla in italiano semplice, tramite la memoria storica.
+- **Proprietario del repository (Massimiliano)**: revisiona e corregge le pull request e, quando le approva, esegue lui
+  il merge su `main`.
 - **Memoria storica**: registro, piano, guida utente, checklist di collaudo, prompt. Non scrive codice.
 - **o1**: il server. **o2**: il sito. Perimetri esatti in `docs/prompt-o1.md` e `docs/prompt-o2.md`.
 - Chi ha bisogno di una modifica nel perimetro dell'altro la chiede alla memoria storica, non la fa.
@@ -25,8 +27,14 @@ Il registro delle decisioni è `docs/registro.md`: lo scrive **solo** la memoria
   si va avanti con il passo successivo. Ci si ferma solo per una decisione che non è propria.
 - Prima di una funzione nuova si manda una stima (complessità, rischi, ordine dei passi) e poi si scrive il codice.
 
-## Git: tre sessioni, una sola cartella
-- Si lavora tutti in `C:\Users\mcracchiolo\Desktop\DOMOTICA\app`, sul branch `main`.
+## Git: ramo di lavoro e pull request
+- Si lavora in un ramo dedicato al cambiamento, mai direttamente su `main`. Il ramo corrente per il lavoro UX/UI è
+  `ux-uit`; evitare il prefisso `codex/` nei nomi dei rami.
+- Prima di iniziare un nuovo lotto, aggiornare i riferimenti remoti, allineare il `main` locale all'ultimo `origin/main`
+  approvato da Massimiliano e creare da lì un nuovo ramo dedicato. Non fare commit o push su `main`.
+- A lavoro pronto, pubblicare solo il ramo dedicato e aprire una pull request verso `main`. Massimiliano revisiona,
+  corregge e approva; il merge spetta a lui. Dopo il merge, sincronizzare il `main` locale con `origin/main` prima di
+  iniziare il lotto successivo.
 - Ogni commit comincia con l'etichetta: `[o1]`, `[o2]`, `[reg]` (memoria storica).
 - Si committa **per percorsi**: `git commit -F <file-messaggio> -- percorso1 percorso2`. Mai `git add -A`, mai
   `git add .`, mai `git commit` senza percorsi: l'indice è uno solo e prenderesti il lavoro degli altri.
@@ -35,7 +43,7 @@ Il registro delle decisioni è `docs/registro.md`: lo scrive **solo** la memoria
   apostrofi, backtick e `$` dentro una riga di comando si rompono.
 - Se esiste `.git/index.lock`, si aspetta che sparisca. **Non si cancella mai**: è il commit in corso di un'altra sessione.
 - `git reset` e `git commit --amend` toccano l'ULTIMO commit, che può essere di un altro: prima `git log --oneline -3`.
-- Il push lo fa il committente.
+- Il push è consentito solo verso il ramo dedicato della pull request; è vietato pushare direttamente su `main`.
 - Prima di ogni commit: niente segreti né file `.env*` nel diff, `contract/` invariato.
 
 ## Prove e pubblicazione

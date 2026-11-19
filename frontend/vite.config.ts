@@ -16,12 +16,19 @@ export default defineConfig(({ mode }) => {
         filename: "sw.ts",
         injectManifest: { globPatterns: ["**/*.{js,css,html,svg,png,woff2}"] },
         registerType: "autoUpdate",
-        includeAssets: ["favicon.svg", "icons/apple-touch-icon.png"],
+        includeAssets: [
+          "favicon.svg",
+          "brand/domhouse-mark.svg",
+          "icons/icon-192.png",
+          "icons/icon-512.png",
+          "icons/maskable-192.png",
+          "icons/maskable-512.png",
+          "icons/apple-touch-icon.png",
+        ],
         devOptions: {
-          enabled: true,
-          type: "module",
-          navigateFallbackAllowlist: [/^\/$/],
-          resolveTempFolder: () => path.resolve(__dirname, "node_modules/.vite-pwa-dev"),
+          // The custom injectManifest worker relies on a build-time precache that Vite dev does not produce.
+          // Validate PWA behavior with the production build/preview instead of registering a broken dev worker.
+          enabled: false,
         },
         manifest: {
           // Same name as app.name in src/i18n/it.json and the <title> of index.html (D-76).
@@ -31,11 +38,12 @@ export default defineConfig(({ mode }) => {
           lang: "it",
           start_url: "/",
           display: "standalone",
-          background_color: "#ead7c6",
-          theme_color: "#ead7c6",
+          background_color: "#F5FAF8",
+          theme_color: "#0D6B61",
           icons: [
-            { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-            { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+            { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+            { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+            { src: "/icons/maskable-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
             { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
           ],
         },

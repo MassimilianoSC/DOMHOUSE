@@ -597,6 +597,11 @@
   "apartments": {
     "title": "Appartamenti",
     "subtitle": "{count} appartamenti",
+    "dailyQuote": "Spunto del giorno",
+    "energyToday": "Consumo registrato oggi",
+    "energyCoverage": "Dato disponibile per {count} di {total} appartamenti",
+    "energyNoData": "Nessun dato di consumo disponibile",
+    "energyUnavailable": "Dato temporaneamente non disponibile",
     "add": "Appartamento",
     "demo": "Dimostrativo",
     "empty": "Nessun appartamento configurato",
@@ -743,6 +748,34 @@
   "phase": {
     "soon": "In arrivo",
     "soonHint": "Questa schermata verrà completata nella prossima fase di sviluppo."
+  },
+  "appearance": {
+    "title": "Aspetto",
+    "hint": "Scegli i colori e la modalità di visualizzazione di DOMHOUSE.",
+    "paletteLegend": "Palette colori",
+    "paletteHint": "La palette si applica a tutte le schermate.",
+    "paletteNames": {
+      "sorgente": "Sorgente",
+      "aria": "Aria",
+      "bosco": "Bosco"
+    },
+    "paletteDescriptions": {
+      "sorgente": "Verde petrolio, ciano e superfici luminose.",
+      "aria": "Blu e ciano, con un tono più tecnico.",
+      "bosco": "Salvia, avorio e toni naturali."
+    },
+    "modeLegend": "Modalità di visualizzazione",
+    "modeHint": "Puoi seguire il dispositivo oppure scegliere un tema.",
+    "modes": {
+      "system": "Come il dispositivo",
+      "light": "Chiara",
+      "dark": "Scura"
+    },
+    "localHint": "La preferenza viene salvata in questo browser e non si sincronizza con l’account.",
+    "saved": "Aspetto aggiornato e salvato in questo browser.",
+    "sessionOnly": "Aspetto aggiornato per questa sessione; il browser non ha consentito il salvataggio.",
+    "reset": "Preferenze visive ripristinate.",
+    "resetButton": "Ripristina predefiniti"
   },
   "settings": {
     "title": "Impostazioni",
