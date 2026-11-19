@@ -175,8 +175,8 @@ def check_parameters(operazione: str, parametri: dict, ambiente: str) -> dict:
         for d in devices:
             if not isinstance(d, dict) or set(d) != {"id", "impronta"}:
                 raise Refused("parametri_non_validi")
-            if not isinstance(d["id"], str) or not DEVICE_ID_RE.fullmatch(d["id"]):
-                raise Refused("id_non_valido")
+            if not isinstance(d["id"], str) or not DEVICE_ID_RE.fullmatch(d["id"]) or d["id"] == "connector":
+                raise Refused("id_non_valido")              # «connector» is the connector's user (A3 review, point 3)
             if not isinstance(d["impronta"], str) or not HASH_RE.fullmatch(d["impronta"]):
                 raise Refused("impronta_non_valida")       # never a password in clear: the whole order is refused
             if d["id"] in seen:

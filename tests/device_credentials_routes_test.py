@@ -319,3 +319,19 @@ def test_the_two_new_alarms_of_a1():
     threshold = unread["conditions"][0]["conditionThreshold"]
     assert "subscription/oldest_unacked_message_age" in threshold["filter"]
     assert "domhouse-staging-ordini-vm" in threshold["filter"] and threshold["thresholdValue"] == 1200
+
+
+# ---- code review of A3, point 7: an error after the transaction never loses the password ------------------------
+def test_review_7_the_password_is_given_even_if_the_log_or_the_names_fail(world, monkeypatch):
+    from bff import audit as audit_module
+
+    async def broken(*a, **k):
+        raise RuntimeError("Firestore non risponde")
+    monkeypatch.setattr(audit_module, "record", broken)
+    monkeypatch.setattr(get_repository(), "get_audit_people", broken)
+    r = register()
+    assert r.status_code == 201 and len(r.json()["password"]) == 32
+    assert world.published and r.json()["credential"]["updated_by"] is None       # the order left all the same
+    world.fail = True
+    r = call("POST", f"{BASE}/shelly-1/revoca", json={"version": 1})
+    assert r.status_code == 502 and r.json()["error"] == "agent_publish_failed"       # not a 500

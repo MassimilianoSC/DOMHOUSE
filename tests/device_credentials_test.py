@@ -148,3 +148,12 @@ def test_the_broker_list_is_complete_sorted_and_bounded():
 
 def test_the_canonical_form_does_not_depend_on_the_order_of_the_keys():
     assert dc.canonical({"b": 1, "a": "è"}) == dc.canonical({"a": "è", "b": 1}) == '{"a":"è","b":1}'.encode("utf-8")
+
+
+def test_review_5_any_action_takes_the_migration_mark_away():
+    """Code review point 5: a document changed by the app is no longer «migrato», so --annulla never removes it."""
+    migrated = {**doc(), "migrato": True}
+    for action, version in (("rigenera", 3), ("revoca", 3), ("riprova", 3)):
+        state_doc = migrated if action != "riprova" else {**migrated, "azione": "rigenera"}
+        new = dc.decide(action, "shelly-1", version, "$7$n", "uid2", NOW)(state_doc, op("fallito"), 0)
+        assert "migrato" not in new, action

@@ -51,7 +51,9 @@ REQUEST_MAX_BYTES = 2 * comune.MAX_ORDER_BYTES + 1024
 PEER_TIMEOUT_S = 10                 # R14: a peer that sends nothing does not hold the only executor
 # R16: every refusal the reader should have made itself means a reader that lets things through (compromised?):
 # an alarm; not these three, which are normal outcomes, nor errore_interno, which has its own line
-NORMAL_REFUSALS = {"seq_vecchia", "non_disponibile", "motore_assente", "errore_interno"}
+# A3 code review, point 1: lab-01 before its migration and an apartment the broker does not know are normal refusals
+NORMAL_REFUSALS = {"seq_vecchia", "non_disponibile", "motore_assente", "errore_interno", "appartamento_sconosciuto",
+                   "migrazione_non_fatta"}
 PORT_RE = re.compile(r"^PORT=([0-9]{4,5})$", re.M)
 ENV_RE = re.compile(r"^ENV=(staging|prod)$", re.M)
 METADATA_IP = "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip"

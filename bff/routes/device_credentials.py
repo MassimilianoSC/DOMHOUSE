@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from .. import agent, audit, device_alarms
 from .. import device_credentials as dc
 from ..auth import CurrentUser, Identity, get_tenant_apartment, require_admin, require_platform
+from ..logs import warn
 from ..repository import AgentOp, get_repository
 
 tenant = APIRouter(prefix="/app/apartments/{apartment_id}/device-credentials")
@@ -116,19 +117,30 @@ async def _act(action: str, apt, device_id, version, uid: str, who) -> JSONRespo
             apt.apartment_id, device_id, dc.decide(action, device_id, version, impronta, uid), template, build)
     except dc.DeviceError as exc:
         return err(exc.status, exc.error, exc.message)
-    await audit.record(AUDIT[action], who, apt.tenant_id, audit.apartment_target(apt.apartment_id, apt.name),
-                       device_id=device_id)
+    # code review, point 7: from here the change is saved; nothing after it may lose the password or the order
+    try:
+        await audit.record(AUDIT[action], who, apt.tenant_id, audit.apartment_target(apt.apartment_id, apt.name),
+                           device_id=device_id)
+    except Exception as exc:                                     # noqa: BLE001 - the activity log failed, not the change
+        warn("device credential not in the activity log", apartment_id=apt.apartment_id, error=type(exc).__name__)
     failed = None
     try:
         await agent.publish_op(op, body)
     except agent.AgentError as exc:
         failed = exc
         op = exc.op or op
-    names = await _names([uid])
+    try:
+        names = await _names([uid])
+    except Exception:                                            # noqa: BLE001 - a name is not worth the password
+        names = {}
     credential = describe(apt.apartment_id, doc, op, 0, names, datetime.now(UTC))
     if failed is not None and password is None:
         if action == "revoca":                   # N2: a revocation not applied, also from here
-            await revoke_not_applied(apt, device_id, op)
+            try:
+                await revoke_not_applied(apt, device_id, op)
+            except Exception as exc:                             # noqa: BLE001 - the hourly round writes it later
+                warn("agent alarm codice=revoca_non_applicata", apartment_id=apt.apartment_id, op_id=op.op_id,
+                     error=type(exc).__name__)
         return err(502, failed.error, failed.message, op=agent.describe(op))
     if failed is not None:
         credential["op"]["messaggio"] = NOT_SENT           # §5.3: the password is not lost, only the order

@@ -205,3 +205,25 @@ def test_broker_vm_makes_auth_roots_with_the_brokers_group_and_the_devices_folde
     assert add.index('"${DEVICES}/$1"') < add.index("sync_accounts")             # the file before the sync
     remove = script[script.index("  remove-apartment)"):script.index("  sync)")]
     assert 'rm -f "${DEVICES}/$1"' in remove
+
+
+# ---- code review of A3 (19 November, night): points 1, 2, 3 ---------------------------------------------------------
+def test_review_1_a_normal_refusal_of_a3_raises_no_alarm(vm):
+    """lab-01 before its migration and an apartment the broker does not know are normal: no R16 «compromised reader»."""
+    assert vm.send(order(apartment="lab-01"))["codice"] == "migrazione_non_fatta"
+    assert vm.send(order(apartment="lab-09", seq=2))["codice"] == "appartamento_sconosciuto"
+    assert not [line for line in vm.logs if line.startswith("agent alarm")]
+
+
+def test_review_2_a_lost_result_raises_the_vms_alarm():
+    alarm = json.loads((AGENT / "allarmi" / "agente-allarme.json").read_text(encoding="utf-8"))
+    log_filter = alarm["conditions"][0]["conditionMatchedLog"]["filter"]
+    assert "fault publish" in log_filter
+    lettore_src = (AGENT / "lettore.py").read_text(encoding="utf-8")
+    assert "agent fault publish op_id=" in lettore_src                 # the line the filter must match
+
+
+def test_review_3_connector_is_refused_in_the_orders_checks():
+    with pytest.raises(comune.Refused) as e:
+        comune.check_order(order(devices=[{"id": "connector", "impronta": H1}]), "staging")
+    assert e.value.code == "id_non_valido"

@@ -163,6 +163,7 @@ def decide(action: str, device_id: str, version: int | None, impronta: str | Non
         state = state_of(doc, op, ultima, moment)
         check_action(action, state, doc)
         new = dict(doc or {"device_id": device_id, "version": 0})
+        new.pop("migrato", None)                 # code review, point 5: changed by the app, no longer lab-01's copy
         new["version"] = int(new.get("version") or 0) + 1
         new["updated_at"] = moment.isoformat(timespec="milliseconds").replace("+00:00", "Z")
         new["updated_by"] = uid
