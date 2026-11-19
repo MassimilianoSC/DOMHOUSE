@@ -25,6 +25,7 @@ const EnergyPage = lazyPage(() => import("@/pages/EnergyPage"));
 const AssistantPage = lazyPage(() => import("@/pages/AssistantPage"));
 const SimulatorPage = lazyPage(() => import("@/pages/SimulatorPage"));
 const DeviceStatusPage = lazyPage(() => import("@/pages/DeviceStatusPage"));
+const DeviceCredentialsPage = lazyPage(() => import("@/pages/DeviceCredentialsPage"));
 const SummariesPage = lazyPage(() => import("@/pages/SummariesPage"));
 const AdminPage = lazyPage(() => import("@/pages/AdminPage"));
 const SettingsPage = lazyPage(() => import("@/pages/SettingsPage"));
@@ -110,6 +111,8 @@ export default function App() {
           ))}
           <Route path="simulatore" element={<SimulatorOnly><Lazy page={SimulatorPage} /></SimulatorOnly>} />
           <Route path="stato-dispositivi" element={<FeatureGate feature="devices"><Allowed permission="devices.status"><Lazy page={DeviceStatusPage} /></Allowed></FeatureGate>} />
+          {/* A3: made by the server, not by the engine, so no feature gate; admins only */}
+          <Route path="credenziali" element={<Allowed permission="devices.credentials"><Lazy page={DeviceCredentialsPage} /></Allowed>} />
           {/* D-150: made by the BFF, not by the engine, so no feature gate; every role */}
           <Route path="riepiloghi" element={<Lazy page={SummariesPage} />} />
           <Route path="riepiloghi/:week" element={<Lazy page={SummariesPage} />} />

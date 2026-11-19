@@ -6,6 +6,7 @@ import { apartmentNav, globalNav } from "@/components/layout/navItems";
 import { AUDIT_ACTIONS } from "@/lib/auditLog";
 import { BOOKING_TYPES, type OutcomeKind } from "@/lib/bookingLog";
 import type { SummaryStatus } from "@/api/summaries";
+import type { CredentialState, PendingAction } from "@/api/deviceCredentials";
 import * as ts from "typescript";
 import italian from "./it.json";
 
@@ -28,7 +29,7 @@ const all = <T extends string>(o: Record<T, true>) => Object.keys(o) as T[];
 const form = (tpl: string, values: readonly string[]): [string, string[]] => [tpl, values.map((v) => tpl.replace("${}", v))];
 
 const MODES = all<ApartmentMode>({ comfort: true, eco: true, empty: true });
-const NAV_KEYS = [...apartmentNav("x", true, true), ...globalNav(true, { platform: true })].map((i) => i.key);
+const NAV_KEYS = [...apartmentNav("x", true, true, true), ...globalNav(true, { platform: true })].map((i) => i.key);
 const FEATURE_NAV = APP_FEATURES.map((f) => (f === "ask" ? "assistant" : f === "apartment" ? "overview" : f));
 const NOTIFY = all<keyof NotificationPrefs>({ approvals: true, offline: true, bookings: true, summary: true });
 
@@ -50,6 +51,10 @@ const FORMS: Record<string, string[]> = Object.fromEntries([
   form("assistant.suggestions.${}", ["off", "temp", "at", "boiler"]),
   form("command.${}", ["timeout", "failed"]),
   form("command.reason.${}", all<CommandReason & string>({ device_offline: true, device_rejected: true, blocked_by_rule: true, blocked_by_priority: true, out_of_limits: true, no_confirmation: true, internal_error: true })),
+  // A3 (src/components/credentials): every state, the explanation of the not-revoked ones, the pending action
+  form("credentials.states.${}", all<CredentialState>({ in_attesa: true, pronto: true, cambio_in_corso: true, revoca_in_corso: true, revocato: true, non_applicato: true })),
+  form("credentials.lines.${}", all<Exclude<CredentialState, "non_applicato">>({ in_attesa: true, pronto: true, cambio_in_corso: true, revoca_in_corso: true, revocato: true })),
+  form("credentials.notApplied.${}", all<NonNullable<PendingAction>>({ registra: true, rigenera: true, revoca: true })),
   form("decisions.outcome.${}", all<Decision["outcome"]>({ applied: true, rejected: true, pending_approval: true, failed: true, informational: true })),
   form("decisions.target.${}", all<Decision["target"]["type"]>({ device: true, apartment: true, rules: true, schedule: true })),
   form("energy.${}", ["hour", "day"]),

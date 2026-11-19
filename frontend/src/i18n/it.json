@@ -519,7 +519,53 @@
     "openMenu": "Apri il menu",
     "closeMenu": "Chiudi il menu",
     "apartmentMenu": "Menu appartamento",
-    "deviceStatus": "Stato dei dispositivi"
+    "deviceStatus": "Stato dei dispositivi",
+    "credentials": "Credenziali dei dispositivi"
+  },
+  "credentials": {
+    "title": "Credenziali dei dispositivi",
+    "subtitle": "Le password con cui gli Shelly di questo appartamento si collegano al sistema domotico. Registra ogni Shelly prima di montarlo.",
+    "register": "Registra un dispositivo",
+    "empty": "Nessun dispositivo registrato.",
+    "emptyHint": "Registra ogni Shelly prima di montarlo: ti diamo la password da copiare nella sua pagina.",
+    "loadError": "Non riesco a leggere le credenziali dei dispositivi.",
+    "colDevice": "Dispositivo",
+    "colState": "Stato",
+    "colUpdated": "Ultima modifica",
+    "actionsOf": "Azioni per {id}",
+    "states": {
+      "in_attesa": "In preparazione",
+      "pronto": "Pronto",
+      "cambio_in_corso": "Cambio password in corso",
+      "revoca_in_corso": "Revoca in corso",
+      "revocato": "Revocato",
+      "non_applicato": "Non applicato"
+    },
+    "lines": {
+      "in_attesa": "Registrato: il sistema domotico lo sta abilitando.",
+      "pronto": "Può collegarsi.",
+      "cambio_in_corso": "Finché il sistema non conferma, vale ancora la password vecchia.",
+      "revoca_in_corso": "Finché il sistema non conferma, il dispositivo può ancora collegarsi.",
+      "revocato": "Revocato il {date}. Non può più collegarsi."
+    },
+    "readyNote": "Se è in linea lo dice «Stato dei dispositivi».",
+    "notApplied": {
+      "registra": "La registrazione non è arrivata al sistema domotico: il dispositivo non può ancora collegarsi.",
+      "rigenera": "La password nuova non è arrivata al sistema domotico: vale ancora quella vecchia.",
+      "revoca": "La revoca non è arrivata al sistema domotico: il dispositivo può ancora collegarsi.",
+      "other": "L'ultima operazione non è arrivata al sistema domotico.",
+      "useRetry": "Usa «Riprova»."
+    },
+    "requestId": "ID richiesta",
+    "revoked": "Revocati ({count})",
+    "revokedHint": "restano qui finché c'è l'appartamento",
+    "actions": {
+      "riprova": "Riprova",
+      "rigenera": "Rigenera",
+      "revoca": "Revoca",
+      "registra": "Registra di nuovo",
+      "connection": "Dati di collegamento"
+    }
   },
   "deviceStatus": {
     "title": "Stato dei dispositivi",

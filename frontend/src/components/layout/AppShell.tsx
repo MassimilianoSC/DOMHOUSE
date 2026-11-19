@@ -23,7 +23,8 @@ function useNav() {
   // Simulatore: admins only, on a simulated apartment, in any environment (D-97).
   const simulator = isAdmin && summary.data?.simulated === true;
   const deviceStatus = useCan("devices.status");
-  const apt = aptId && !denied ? apartmentNav(aptId, simulator, deviceStatus).filter((i) => !i.feature || has(i.feature)) : [];
+  const credentials = useCan("devices.credentials");
+  const apt = aptId && !denied ? apartmentNav(aptId, simulator, deviceStatus, credentials).filter((i) => !i.feature || has(i.feature)) : [];
   return { aptId, apt, global: globalNav(isAdmin, { platform: isPlatform, tenant: hasTenant }), aptName: summary.data?.name };
 }
 

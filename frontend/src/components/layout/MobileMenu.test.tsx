@@ -98,6 +98,7 @@ describe("telefono: niente barra in basso, menu a scomparsa (D-103)", () => {
       "drawer-nav-apartments",
       "drawer-nav-overview", "drawer-nav-approvals", "drawer-nav-decisions", "drawer-nav-energy", "drawer-nav-summaries", "drawer-nav-schedule", "drawer-nav-rules", "drawer-nav-assistant",
       "drawer-nav-deviceStatus",   // «Stato dei dispositivi», admins only (permission devices.status)
+      "drawer-nav-credentials",    // «Credenziali dei dispositivi» (A3), admins only (permission devices.credentials)
       "drawer-nav-admin", "drawer-nav-settings",
     ]);
     expect(within(menu).getByTestId("drawer-user-role")).toHaveTextContent(/^Amministratore · Demo$/);

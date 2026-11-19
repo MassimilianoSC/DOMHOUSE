@@ -1,0 +1,217 @@
+import { useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Ban, Check, ChevronRight, KeyRound, Link2, Loader2, Plus, RotateCcw, TriangleAlert } from "lucide-react";
+import { credentialsApi, type CredentialScope, type DeviceCredential } from "@/api/deviceCredentials";
+import { ApiError } from "@/api/bff";
+import { Button } from "@/components/ui/button";
+import { CopyableId } from "@/components/ui/CopyableId";
+import { Badge, Skeleton } from "@/components/ui/primitives";
+import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
+import { t } from "@/i18n";
+import { allowedActions, refetchEvery, splitCredentials, type CredentialAction } from "@/lib/deviceCredentials";
+import { fmtDate, fmtDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
+
+/** What a row asks the panel to do: an action of the menu, or the connection data. */
+export type RowRequest = { kind: CredentialAction | "connection"; credential: DeviceCredential };
+
+const TONE: Record<DeviceCredential["stato"], string> = {
+  pronto: "border-positive-border bg-positive-bg text-positive-fg",
+  in_attesa: "border-neutral-border bg-neutral-bg text-neutral-fg",
+  cambio_in_corso: "border-warning-border bg-warning-bg text-warning-fg",
+  revoca_in_corso: "border-warning-border bg-warning-bg text-warning-fg",
+  revocato: "border-neutral-border bg-neutral-bg text-neutral-fg",
+  non_applicato: "border-negative-border bg-negative-bg text-negative-fg",
+};
+
+function StateIcon({ stato }: { stato: DeviceCredential["stato"] }) {
+  const cls = "size-3";
+  if (stato === "pronto") return <Check className={cls} aria-hidden />;
+  if (stato === "non_applicato") return <TriangleAlert className={cls} aria-hidden />;
+  if (stato === "revocato") return <Ban className={cls} aria-hidden />;
+  return <Loader2 className={cn(cls, "motion-safe:animate-spin")} aria-hidden />;
+}
+
+/** The explanation under the state label (docs/proposta-a3-sito.md §3, §3.2). */
+function StateLine({ c }: { c: DeviceCredential }) {
+  if (c.stato === "non_applicato") {
+    const what = c.azione ? t(`credentials.notApplied.${c.azione}`) : t("credentials.notApplied.other");
+    return (
+      <div className="space-y-1 text-sm">
+        <p>
+          <strong className="font-semibold text-negative-fg">{what}</strong> {t("credentials.notApplied.useRetry")}
+        </p>
+        {c.op && (
+          <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+            {c.op.messaggio && <span>{c.op.messaggio} ·</span>}
+            <span>{t("credentials.requestId")}</span>
+            <CopyableId id={c.op.op_id} testId={`credential-op-${c.device_id}`} label={t("credentials.requestId")} />
+          </p>
+        )}
+      </div>
+    );
+  }
+  if (c.stato === "revocato") return <p className="text-sm">{t("credentials.lines.revocato", { date: fmtDate(c.updated_at) })}</p>;
+  if (c.stato === "pronto")
+    return (
+      <p className="text-sm">
+        {t("credentials.lines.pronto")} <span className="text-xs text-muted-foreground">{t("credentials.readyNote")}</span>
+      </p>
+    );
+  return <p className="text-sm">{t(`credentials.lines.${c.stato}`)}</p>;
+}
+
+const GRID = "md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.7fr)_minmax(0,0.9fr)_auto] md:items-start md:gap-4";
+
+function Row({ c, onRequest }: { c: DeviceCredential; onRequest: (r: RowRequest) => void }) {
+  const actions = allowedActions(c);
+  const menu = actions.filter((a) => a === "rigenera" || a === "revoca");
+  const label = (text: string) => <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:hidden">{text}</span>;
+  return (
+    <li
+      className={cn("space-y-3 px-4 py-3.5 md:space-y-0", GRID, c.stato === "non_applicato" && "border-l-4 border-l-negative bg-negative-bg/45")}
+      data-testid={`credential-row-${c.device_id}`}
+      data-state={c.stato}
+    >
+      <div className="min-w-0">
+        {label(t("credentials.colDevice"))}
+        {c.name && <div className="text-sm font-semibold [overflow-wrap:anywhere]">{c.name}</div>}
+        <div className="font-mono text-[13px] font-semibold [overflow-wrap:anywhere]">{c.device_id}</div>
+      </div>
+      <div className="min-w-0 space-y-1">
+        {label(t("credentials.colState"))}
+        <Badge className={TONE[c.stato]} data-testid={`credential-state-${c.device_id}`}>
+          <StateIcon stato={c.stato} /> {t(`credentials.states.${c.stato}`)}
+        </Badge>
+        <StateLine c={c} />
+      </div>
+      <div className="min-w-0 text-sm">
+        {label(t("credentials.colUpdated"))}
+        <div className="tabular">{fmtDateTime(c.updated_at)}</div>
+        {c.updated_by && <div className="text-xs text-muted-foreground">{c.updated_by}</div>}
+      </div>
+      <div className="flex flex-wrap items-center gap-2 md:justify-end">
+        {actions.includes("riprova") && (
+          <Button size="sm" onClick={() => onRequest({ kind: "riprova", credential: c })} data-testid={`credential-retry-${c.device_id}`}>
+            <RotateCcw /> {t("credentials.actions.riprova")}
+          </Button>
+        )}
+        {actions.includes("registra") && (
+          <Button size="sm" variant="outline" onClick={() => onRequest({ kind: "registra", credential: c })} data-testid={`credential-reregister-${c.device_id}`}>
+            <Plus /> {t("credentials.actions.registra")}
+          </Button>
+        )}
+        {c.stato !== "revocato" && (
+          <Button size="sm" variant="outline" onClick={() => onRequest({ kind: "connection", credential: c })} data-testid={`credential-connection-${c.device_id}`}>
+            <Link2 /> {t("credentials.actions.connection")}
+          </Button>
+        )}
+        {menu.length > 0 && (
+          <RowMenu label={t("credentials.actionsOf", { id: c.device_id })} testId={`credential-menu-${c.device_id}`}>
+            {menu.includes("rigenera") && (
+              <RowMenuItem onSelect={() => onRequest({ kind: "rigenera", credential: c })} testId={`credential-regenerate-${c.device_id}`}>
+                <KeyRound /> {t("credentials.actions.rigenera")}
+              </RowMenuItem>
+            )}
+            {menu.includes("revoca") && (
+              <RowMenuItem danger onSelect={() => onRequest({ kind: "revoca", credential: c })} testId={`credential-revoke-${c.device_id}`}>
+                <Ban /> {t("credentials.actions.revoca")}
+              </RowMenuItem>
+            )}
+          </RowMenu>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function Header() {
+  return (
+    <div className={cn("hidden rounded-t-2xl bg-secondary/50 px-4 py-2.5 text-xs font-semibold text-muted-foreground", GRID)} aria-hidden>
+      <div>{t("credentials.colDevice")}</div>
+      <div>{t("credentials.colState")}</div>
+      <div>{t("credentials.colUpdated")}</div>
+      <div />
+    </div>
+  );
+}
+
+/**
+ * The list of the device credentials of one apartment (A3), with the state of each and the actions it allows. Used by
+ * the apartment's page (scope apartment) and, in staging, under a lab-/test- apartment in Organizzazioni (scope
+ * platform). While an order is on its way the list is read again every 4 s, for at most 20 minutes.
+ */
+export function CredentialsPanel({ apartmentId, scope, onRequest, onRegister }: { apartmentId: string; scope: CredentialScope; onRequest: (r: RowRequest) => void; onRegister: () => void }) {
+  const api = credentialsApi(apartmentId, scope);
+  const pollStart = useRef(Date.now());
+  const q = useQuery({
+    queryKey: credentialsKey(apartmentId, scope),
+    queryFn: async () => (await api.list()).items,
+    refetchInterval: (query) => {
+      const every = refetchEvery(query.state.data, pollStart.current, Date.now());
+      if (every === false) pollStart.current = Date.now(); // the next order starts its own 20 minutes
+      return every;
+    },
+  });
+  const [showRevoked, setShowRevoked] = useState(false);
+  const { active, revoked } = splitCredentials(q.data ?? []);
+
+  return (
+    <div className="space-y-4" data-testid={`credentials-panel-${apartmentId}`}>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button onClick={onRegister} data-testid="credentials-register-btn">
+          <Plus /> {t("credentials.register")}
+        </Button>
+      </div>
+      {q.error && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-negative-border bg-negative-bg px-3 py-2 text-sm text-negative-fg" data-testid="credentials-error">
+          <span className="min-w-0 flex-1">{q.error instanceof ApiError ? q.error.message : t("credentials.loadError")}</span>
+          <Button size="sm" variant="outline" onClick={() => void q.refetch()}>{t("common.retry")}</Button>
+        </div>
+      )}
+      {q.isLoading ? (
+        <Skeleton className="h-40 rounded-2xl" />
+      ) : q.data && active.length === 0 && revoked.length === 0 ? (
+        <div className="rounded-2xl border bg-card p-8 text-center" data-testid="credentials-empty">
+          <p className="font-semibold">{t("credentials.empty")}</p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{t("credentials.emptyHint")}</p>
+        </div>
+      ) : (
+        q.data && (
+          <>
+            {active.length > 0 && (
+              <div className="overflow-hidden rounded-2xl border bg-card">
+                <Header />
+                <ul className="divide-y">
+                  {active.map((c) => <Row key={c.device_id} c={c} onRequest={onRequest} />)}
+                </ul>
+              </div>
+            )}
+            {revoked.length > 0 && (
+              <div className="overflow-hidden rounded-2xl border bg-card">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-4 py-3.5 text-left text-sm font-semibold focus-ring"
+                  aria-expanded={showRevoked}
+                  onClick={() => setShowRevoked((v) => !v)}
+                  data-testid="credentials-revoked-toggle"
+                >
+                  <ChevronRight className={cn("size-4 transition-transform motion-reduce:transition-none", showRevoked && "rotate-90")} aria-hidden />
+                  {t("credentials.revoked", { count: revoked.length })}
+                  <span className="text-xs font-normal text-muted-foreground">· {t("credentials.revokedHint")}</span>
+                </button>
+                {showRevoked && (
+                  <ul className="divide-y border-t">
+                    {revoked.map((c) => <Row key={c.device_id} c={c} onRequest={onRequest} />)}
+                  </ul>
+                )}
+              </div>
+            )}
+          </>
+        )
+      )}
+    </div>
+  );
+}
+
+export const credentialsKey = (apartmentId: string, scope: CredentialScope) => ["device-credentials", scope, apartmentId];

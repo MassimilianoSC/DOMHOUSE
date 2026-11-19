@@ -6,11 +6,15 @@ import { roleOf, useRole } from "@/auth/AuthProvider";
  */
 export type Permission =
   /** «Stato dei dispositivi» of an apartment: diagnosis while a kit is installed (step 17, owner of the app). */
-  | "devices.status";
+  | "devices.status"
+  /** «Credenziali dei dispositivi» (A3): the passwords of the Shelly on the broker; whoever answers for them, the admin.
+   *  A platform manager in an assistance access has an operator's rights, so not this (server proposal §8.1). */
+  | "devices.credentials";
 
 export function can(r: ReturnType<typeof roleOf>, p: Permission): boolean {
   switch (p) {
     case "devices.status":
+    case "devices.credentials":
       return r.isAdmin;
   }
 }
