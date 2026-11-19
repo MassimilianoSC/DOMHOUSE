@@ -18,6 +18,11 @@ export default defineConfig({
     browserName: "chromium",
     launchOptions: CHROMIUM_EXECUTABLE ? { executablePath: CHROMIUM_EXECUTABLE } : {},
   },
+  // CI #107: the development server is warmed first (e2e/warmup.setup.ts), so the first check does not pay for it
+  projects: [
+    { name: "riscaldamento", testMatch: /warmup\.setup\.ts$/ },
+    { name: "prove", dependencies: ["riscaldamento"] },
+  ],
   webServer: NO_BROWSER_REASON
     ? undefined
     : [
