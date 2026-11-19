@@ -123,3 +123,16 @@ Primo passo per ognuna: SSH alla VM via IAP (`docs/motore-vm.md`), poi `sudo bas
 <apartment_id>`; per i log di un motore `docker logs --tail 50 engine-<apartment_id>`, oppure Cloud Logging con il filtro
 `log_id("domhouse_engine") AND jsonPayload.apartment_id="<apartment_id>"`. Il controllo scrive solo se la VM è viva:
 con la VM muta arriva solo «VM muta», mai un'email per appartamento.
+
+## Agente sulla VM (strumento A: A1 e A3)
+
+Quattro allarmi, sul canale «Avvisi BFF», creati da `scripts/agent-gcp.sh staging` dai file di `scripts/agent/allarmi/` (solo lo staging: la produzione non ha l'agente fino alla seconda VM).
+
+| Allarme | Quando scatta | Mail |
+|---|---|---|
+| «Agente: ordine sospetto o giornale non scrivibile» | righe `agent alarm`, `agent fault journal`, `agent fault message` o `agent fault publish` del lettore o dell'esecutore nel syslog della VM | al massimo una l'ora |
+| «Agente: ordini finiti negli scarti (staging)» | la coda degli scarti non vuota per 5 minuti | finché resta aperto |
+| «Agente: allarme dal server dello staging» (A3) | righe `agent alarm` nei log di Cloud Run di `domotica-bff-staging`: una revoca o una password nuova di un dispositivo non applicata, oppure un risultato con una firma sbagliata o per un altro ordine | **al massimo una l'ora** |
+| «Agente: ordini non letti da oltre 20 minuti (staging)» (A3) | il messaggio più vecchio della sottoscrizione `domhouse-staging-ordini-vm` oltre 20 minuti: lettore fermo o VM spenta | finché resta aperto |
+
+**Il limite di una mail l'ora** (`notificationRateLimit` 3600 s) vale per «Agente: allarme dal server dello staging»: altre revoche non applicate nella stessa ora si vedono nei log di Cloud Run (`agent alarm`) e nelle righe di sistema del registro attività («Revoca del dispositivo … non applicata»), non in altre mail.
