@@ -23,7 +23,7 @@
 
 **Quando:** dopo il passo 3 del piano, a finestra chiusa (controllo di sicurezza della VM, `docs/procedura-passo3-vm.md`). Il giorno lo decide il committente.
 
-**Ogni `gcloud compute ssh` finisce con `< /dev/null`:** senza, Git Bash può stampare «Segmentation fault» alla chiusura (plink, sul PC; la VM non c'entra) e il codice d'uscita non è 0.
+**Ogni `gcloud compute ssh` finisce con `< /dev/null`:** rende più raro il «Segmentation fault» che Git Bash può stampare alla chiusura (viene da plink, sul PC; la VM non c'entra), ma non lo toglie sempre. Se compare **dopo** l'uscita attesa è innocuo: conta il testo uscito prima.
 
 ## I0. Prerequisiti (sola lettura)
 
