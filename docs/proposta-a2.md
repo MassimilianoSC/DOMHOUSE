@@ -2,7 +2,7 @@
 
 | Stato | Scritto da | Basato su | Prossimo passo |
 |---|---|---|---|
-| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1161–1168 del 19 novembre nel §9). Nessun codice | o1 | `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §3 (`crea_motore`), §4, §5, §6, §7; registro, pacchetto A2 e D-232; documento interno dell'Autonomia, §2 passo 4; il codice di A1 e la PR #17 (catalogo vuoto, `ce31e08`) | revisione di sicurezza; schermate di o2 (`docs/proposta-a2-sito.md`); R8 e l'ordine fra A2 e A3; poi il codice |
+| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1161–1168 del 19 novembre nel §9). Nessun codice | o1 | `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §3 (`crea_motore`), §4, §5, §6, §7; registro, pacchetto A2 e D-232; documento interno dell'Autonomia, §2 passo 4; il codice di A1 e la PR #17 (catalogo vuoto, `ce31e08`) | revisione di sicurezza del 19 novembre: «eseguibile dopo correzioni», correzioni scritte qui (§11); A3 prima (porta le firme e l'unità dell'esecutore); poi il codice |
 
 **Cosa copre:** creare dall'app il «posto» di un appartamento: id, porta libera, i due segreti, il motore con l'elenco dei dispositivi vuoto, l'account del connector sul broker, il collegamento del motore all'appartamento. Le rotte del server, l'ordine `crea_motore` passo per passo con il ritorno indietro, stati ed errori, cosa mostra il sito.
 
@@ -39,7 +39,7 @@
 
 | Campo | Tipo | Note |
 |---|---|---|
-| `stato` | `in_preparazione` · `pronto` · `non_creato` · `annullato` | §6 |
+| `stato` | `in_preparazione` · `pronto` · `non_creato` · `annullamento_in_corso` · `annullato` | §6 |
 | `passo` | `riserva` · `segreti` · `capienza` · `motore` · `collegamento` | l'ultimo raggiunto: il sito lo mostra come avanzamento |
 | `version` | intero | per il blocco, come in A3 |
 | `porta` | intero | quella riservata |
@@ -81,12 +81,12 @@
 | Segreto | Cosa contiene | Chi lo crea | Chi lo legge |
 |---|---|---|---|
 | `langbrain-api-key-<apt>` | la chiave del motore: `secrets.token_urlsafe(32)` | il server | il server (per chiamare il motore) e la VM (`write_key`) |
-| `langbrain-shelly-<apt>` | la password del connector sul broker: `secrets.token_urlsafe(24)` | il server | **solo** la VM: il server può aggiungere la versione ma non leggerla (condizione «lettura» del progetto §2.3) |
+| `langbrain-shelly-<apt>` | la password del connector sul broker: `secrets.token_urlsafe(24)` | il server | **solo** la VM: il server può aggiungere la versione ma non leggerla (condizione «lettura» del progetto §2.3). Il server però la **genera**: «non la legge» vuol dire che dopo la creazione non la può più riavere, non che non l'abbia mai vista (revisione, punto 13) |
 
 - **Parametri fissi** (progetto §2.2): replica `user-managed` in `europe-west8`; nessun `expireTime`, `topics`, CMEK; etichette `domhouse-env`, `domhouse-apt`, `domhouse-op`; ritardo di distruzione 7 giorni.
 - **Prima** di creare: l'intenzione in Firestore (op_id e nome). Un segreto che esiste già si riusa solo se quel Firestore l'ha creato (stesso op_id) **e** i metadati coincidono; altrimenti 409 `secret_conflict` e allarme, nessuna versione aggiunta.
 - Le password generate non passano per i log, né per l'ordine, né per Firestore: vanno solo in `versions.add`.
-- **Permessi del server** (progetto §4.1): i ruoli «creazione» e «versioni» con le condizioni del §2.3, e la lettura delle sole chiavi dei motori. La prova 1125 è riuscita il 16 novembre; i ruoli veri si danno con i comandi del committente nella procedura di A2 (§7).
+- **Permessi del server** (progetto §4.1): i ruoli «creazione» e «versioni» con le condizioni del §2.3, e la lettura delle sole chiavi dei motori. **I segreti fatti a mano di `lab-01` restano fuori** (revisione, punto 13): il prefisso `langbrain-shelly-lab-` copre anche `langbrain-shelly-lab-01` e `langbrain-shelly-lab-01-devices`, e `langbrain-api-key-lab-` copre `langbrain-api-key-lab-01`. Le condizioni «creazione» e «versioni» li escludono per nome esatto, nelle due forme (`…/secrets/NOME` e `…/secrets/NOME/`, per le versioni), così il server non può mai cambiare una password di `lab-01`. La prova 1125 è riuscita il 16 novembre; i ruoli veri si danno con i comandi del committente nella procedura di A2 (§7).
 
 ## 4. L'ordine `crea_motore`, passo per passo
 
@@ -104,13 +104,15 @@
 
 | Passo | Cosa | Se fallisce | Ritorno indietro del passo |
 |---|---|---|---|
-| 0 | controlli comuni (id, ambiente della sottoscrizione e di `ENV`, `seq`, `dev` escluso) e di `crea_motore`: porta nella fascia, libera; immagine **non** dall'ordine ma quella approvata nella configurazione dell'agente, per digest, con la regola ancorata (progetto §3); capienza ricontrollata | rifiuto con il suo codice; niente scritto | — |
-| 1 | se l'appartamento c'è già **con gli stessi parametri** (porta, immagine, `ENV`): riuscito senza rifare niente; con parametri diversi: rifiuto `gia_esiste_diverso` | — | — |
+| 0 | la firma dell'ordine (proposta A3, §6.3); controlli comuni (id, ambiente della sottoscrizione e di `ENV`, `seq`, `dev` escluso) e di `crea_motore`: porta nella fascia, libera; immagine **non** dall'ordine ma quella approvata, **solo per digest** (`@sha256:`), dal file di root riletto a ogni ordine (§4.3); capienza ricontrollata; `/data/<apt>` assente o vuota (revisione, punto 14), altrimenti rifiuto `dati_presenti` | rifiuto con il suo codice; niente scritto | — |
+| 1 | se l'appartamento c'è già **e ha il segno di creazione dell'agente** (`/var/lib/domhouse-executor/creati/<apt>`, root) **con gli stessi parametri** (porta, immagine, `ENV`): riuscito senza rifare niente; senza il segno (per esempio `lab-01`) o con parametri diversi: rifiuto `gia_esiste_diverso` | — | — |
+| 1b | il segno di creazione, **prima** di scrivere qualsiasi altra cosa (revisione, punto 8): da qui `togli_motore` può togliere quello che questo ordine crea | `errore_interno` | il segno si toglie per ultimo |
 | 2 | **prima** il catalogo vuoto, `rooms: []` e `devices: []`, in `/etc/domhouse/<apt>.catalog.yaml` (root, 644): se mancasse, al `compose up` Docker creerebbe una cartella al suo posto | `errore_interno` | il file si toglie |
-| 3 | `engine-vm.sh install <apt> <porta> <immagine> shelly` con `ENV` e `CATALOG_PATH`: impostazioni, cartella dei dati, `write_key` (chiave del motore e conto del connector dai due segreti), `compose up`, attesa di `/health` 200 | `segreto_illeggibile` (permessi appena dati, ritardo di IAM), `motore_non_sano` | `compose down`, via impostazioni, file della chiave e cartella dei dati **vuota** (un motore appena nato non ha storico) |
+| 3 | `engine-vm.sh install --da-agente <apt> <porta> <immagine> shelly <ENV> <CATALOG_PATH>`: impostazioni, cartella dei dati, `write_key` (chiave del motore e conto del connector dai due segreti), `compose up`, attesa di `/health` 200. **`ENV` e `CATALOG_PATH` come argomenti**: l'esecutore pulisce l'ambiente lasciando solo `PATH`, una variabile non arriverebbe (revisione, punto 14). `--da-agente` non tocca systemd né l'Ops Agent (punto 4: timer e configurazione dei log restano dell'installazione a mano) | `segreto_illeggibile` (permessi appena dati, ritardo di IAM), `motore_non_sano` | `compose down`, via impostazioni, file della chiave e la cartella dei dati **di questo appartamento con il segno di creazione**: il motore crea il suo database all'avvio, quindi non è vuota (punto 14), ma è nata con questo ordine |
 | 4 | `broker-vm.sh add-apartment <apt>`: l'account del connector `<apt>.connector` dal segreto, nessun dispositivo (arrivano con A3) | `broker_fallito` | `remove-apartment` |
 | 5 | risultato riuscito con `{porta, immagine}` | — | — |
 
+- **L'unità dell'esecutore** (revisione, punto 4), in più di quello che apre A3: `ReadWritePaths=/opt/domhouse /etc/domhouse /data`, `CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER` (la cartella dei dati all'utente 10001), e la porta libera letta da `/proc/net/tcp` e `/proc/net/tcp6` invece di `ss` (così niente `AF_NETLINK`; da verificare sulla VM che basti). Provata sulla VM con `systemd-run` e le stesse impostazioni prima dell'installazione.
 - **Ripetibile:** ogni passo controlla se è già fatto. «Riprova» manda un ordine nuovo (`seq` nuova) che completa i passi mancanti; un ordine identico già finito ripubblica il suo esito (giornale di A1).
 - **Il motore con il catalogo vuoto** parte e risponde `/health` 200 con 0 dispositivi: PR #17 (`ce31e08`), provato dal revisore della memoria storica e nelle prove del connector. Il catalogo vero arriva con A4 (`applica_catalogo`, che riavvia il motore).
 - **Sul broker:** il connector del motore nuovo si collega alla porta interna `172.30.83.2:1883` (rete interna del broker, `compose.broker.yaml`), come `lab-01`.
@@ -120,8 +122,12 @@
 - `crea_motore` eseguito (oggi `non_disponibile`), con i codici del §4.2;
 - `engine-vm.sh` (progetto §9.2): `ENV` nelle impostazioni (`dev` e `lab-01` aggiornati una volta, a mano), catalogo in `/etc/domhouse` montato in sola lettura, regola dell'immagine e `registry_login` ancorati, porte normalizzate;
 - `broker-vm.sh`: lo stesso blocco della VM, `add-apartment` e `remove-apartment` ripetibili;
-- la configurazione dell'agente: l'**immagine approvata per ambiente** (digest), di root. La aggiorna `publish-all.sh` da solo quando installa il motore nuovo sulla VM (risposta 5 = a): un passo in più, con il digest letto dal registro e controllato dopo la scrittura;
-- **R8, i risultati firmati** (progetto §3.2): necessari prima di A2 se A3 non li ha già portati (proposta A3, §6.3).
+- **l'immagine approvata, solo per digest** (revisione, punto 6): oggi `comune.IMAGE_RE` accetta anche un'etichetta (`engine:<commit>`) e `publish-all.sh` installa per etichetta, che chi scrive sul registro può spostare. Quindi:
+  1. un file di root `/etc/domhouse/agent-immagine-<ambiente>` con una riga `…/engine@sha256:<64>`, **riletto a ogni ordine** (oggi `agent.conf` si legge solo all'avvio);
+  2. `crea_motore` e `aggiorna_motore` accettano solo `@sha256:`: lo controllano l'agente **e** `engine-vm.sh`;
+  3. `publish-all.sh` (risposta 5 = a) scrive il file con il digest letto dal registro dopo la spinta, e lo rilegge per controllo;
+  4. un comando del committente rende immutabili le etichette del repository `domotica`. **Da verificare** che un rilancio di `publish-all.sh` sullo stesso commit (stesso digest sulla stessa etichetta) passi;
+- **le firme nei due sensi e l'unità dell'esecutore** arrivano con A3 (proposta A3, §6.1 e §6.3), che va prima; se l'ordine cambiasse, entrano qui.
 
 ## 5. Ritorno indietro di tutta la creazione
 
@@ -134,9 +140,10 @@ Lo stato è `non_creato` con il passo raggiunto e `fatti` (§2.1). **Id e porta 
 
 ### 5.2 «Annulla», in ordine
 
-1. `togli_motore` all'agente (progetto §8.2): `compose down`, impostazioni, chiave, catalogo, cartella dei dati, `remove-apartment`; «già tolto» vale come riuscito. La `seq` dell'appartamento resta (lapide, progetto §6.4).
-2. Distruzione con ritardo delle versioni dei due segreti (7 giorni per riattivarle).
-3. L'appartamento esce da Firestore; l'id resta usato (D-67), la porta si libera.
+1. Il server, in una transazione con `version`: stato **`annullamento_in_corso`** (revisione, punto 7), poi l'ordine `togli_motore`. In quello stato «Riprova» e un secondo «Annulla» rispondono 409 `invalid_state`.
+2. L'agente (progetto §8.2), **solo se c'è il segno di creazione** (§4.2, passo 1b; revisione, punto 8; altrimenti rifiuto `non_creato_da_agente`, e così `lab-01` e `dev` non si toccano mai fino ad A6): `compose down`, impostazioni, chiave, catalogo, cartella dei dati, `remove-apartment`, per ultimo il segno; «già tolto» vale come riuscito. La `seq` dell'appartamento resta (lapide, progetto §6.4).
+3. **Solo nel ricevitore, dopo `togli_motore` riuscito:** distruzione con ritardo delle versioni dei due segreti (7 giorni per riattivarle), poi l'appartamento esce da Firestore; l'id resta usato (D-67), la porta si libera.
+4. `togli_motore` rifiutato o fallito: di nuovo `non_creato`, con «Annulla» possibile; segreti e porta restano.
 
 ### 5.3 «Annulla» e A6
 
@@ -151,7 +158,8 @@ Lo stato è `non_creato` con il passo raggiunto e `fatti` (§2.1). **Id e porta 
 | `in_preparazione` | «In preparazione» | dalla riserva al collegamento | — (il sito rilegge ogni 4 s, al massimo 20 minuti) |
 | `pronto` | «Pronto» | motore sano e collegato | quelle di un appartamento normale |
 | `non_creato` | «Creazione rimasta a metà» | un passo rifiutato o fallito, o 20 minuti senza esito | «Riprova», «Annulla»; id e porta restano riservati fino a una delle due (risposta 7) |
-| `annullato` | — | dopo «Annulla» riuscito | l'appartamento non c'è più |
+| `annullamento_in_corso` | «Annullamento in corso» | da «Annulla» all'esito di `togli_motore` | — (il sito rilegge ogni 4 s); «Riprova» e «Annulla» 409 `invalid_state` |
+| `annullato` | — | dopo `togli_motore` riuscito | l'appartamento non c'è più |
 
 ### 6.2 Errori della chiamata
 
@@ -164,7 +172,7 @@ Lo stato è `non_creato` con il passo raggiunto e `fatti` (§2.1). **Id e porta 
 | 409 | `external_id_in_use` | codice Italianway già usato | come oggi |
 | 409 | `no_free_port` | fascia piena | «Non c'è più posto per un motore nuovo in questo ambiente.» |
 | 409 | `version_changed` | blocco (Riprova, Annulla) | «Qualcuno ha appena cambiato questa creazione: ricarica.» |
-| 409 | `invalid_state` | Riprova o Annulla fuori da `non_creato` | «Con lo stato di adesso questa azione non si può fare.» |
+| 409 | `invalid_state` | Riprova o Annulla fuori da `non_creato` (anche durante `annullamento_in_corso`) | «Con lo stato di adesso questa azione non si può fare.» |
 | 409 | `secret_conflict` | un segreto con quel nome c'è e non è nostro | «C'è già un segreto con questo nome: serve un controllo (ID richiesta).» Con allarme |
 | 429 | `rate_limited` | 5 creazioni avviate negli ultimi 60 minuti nell'organizzazione (risposta 9 = a, vedi sotto) | «Si possono creare al massimo 5 appartamenti l'ora per organizzazione. Il prossimo si può creare dalle HH:MM.» |
 | 503 | `agent_not_configured` | agente non configurato, o produzione prima di A10 | come oggi |
@@ -184,7 +192,7 @@ Lo stato è `non_creato` con il passo raggiunto e `fatti` (§2.1). **Id e porta 
 | `capienza_insufficiente` | «La VM non ha memoria per un motore in più.» |
 | `staging_pieno` | «Lo staging ha già il numero massimo di motori.» |
 | `porta_occupata` | «La porta scelta è occupata sulla VM: «Riprova» ne prende un'altra.» |
-| `porta_fuori_fascia`, `immagine_non_approvata`, `gia_esiste_diverso` | «Richiesta rifiutata dal sistema: serve un controllo (ID richiesta).» |
+| `porta_fuori_fascia`, `immagine_non_approvata`, `gia_esiste_diverso`, `dati_presenti`, `non_creato_da_agente`, `firma_non_valida` | «Richiesta rifiutata dal sistema: serve un controllo (ID richiesta).» |
 | `segreto_illeggibile` | «I permessi sui segreti non sono ancora attivi: riprova fra qualche minuto.» |
 | `motore_non_sano` | «Il motore non è partito: «Riprova», e se succede ancora serve un controllo.» |
 | `broker_fallito` | «Il broker non ha accettato l'appartamento: «Riprova».» |
@@ -235,13 +243,29 @@ Ore di lavoro, prove comprese, senza le attese.
 | Server: segreti | o1 | creazione con parametri fissi, intenzione in Firestore, riuso solo se nostro, distruzione con ritardo per «Annulla», prove con un Secret Manager finto | 5–7 |
 | Server: creazione | o1 | rotte, stati, porta libera atomica, flusso capienza → `crea_motore` → collegamento e verifica, «Riprova», «Annulla», errori, registro, `bff/API.md`; `fatti` e il limite di frequenza con `riprova_dal` (risposte 7 e 9); i campi per il sito del §2.2 e l'esclusione degli appartamenti non pronti dalle rotte dell'organizzazione (domanda 25 di o2) | 9–12 |
 | Server: prove | o1 | prove delle rotte, delle corse sulla porta, dei 20 minuti, dei passi ripresi | 4–6 |
-| Agente: `crea_motore` | o1 | esecutore, passi ripetibili, codici, catalogo vuoto, ritorno indietro del passo 3, prove | 5–7 |
-| `engine-vm.sh` e `broker-vm.sh` | o1 | progetto §9.2 e §9.3 (ENV, catalogo in `/etc`, immagine ancorata, blocco, `add-apartment` ripetibile), prove | 5–7 |
-| `togli_motore` per «Annulla» | o1 | il pezzo che A6 riusa | 3–4 |
-| `publish-all.sh` | o1 | l'immagine approvata aggiornata sulla VM quando si installa il motore nuovo (risposta 5), con il controllo dopo la scrittura e le prove | 1–2 |
-| Procedura e permessi | o1 | ruoli di Secret Manager con le condizioni, immagine approvata, `ENV` a `lab-01`, installazione; correzioni dopo la revisione di sicurezza | 4–6 |
+| Agente: `crea_motore` | o1 | esecutore, passi ripetibili, codici, catalogo vuoto, segno di creazione, cartella dei dati controllata, argomenti al posto dell'ambiente, ritorno indietro del passo 3, unità allargata e prova sulla VM, prove | 8–11 |
+| `engine-vm.sh` e `broker-vm.sh` | o1 | progetto §9.2 e §9.3 (ENV, catalogo in `/etc`, immagine solo per digest, blocco, `add-apartment` ripetibile), `install --da-agente`, prove | 6–8 |
+| `togli_motore` per «Annulla» | o1 | il pezzo che A6 riusa, solo con il segno; `annullamento_in_corso`, segreti e Firestore solo dopo l'esito | 4–6 |
+| `publish-all.sh` | o1 | il digest approvato scritto sulla VM quando si installa il motore nuovo (risposta 5), con il controllo dopo la scrittura e le prove; comando per le etichette immutabili | 2–3 |
+| Procedura e permessi | o1 | ruoli di Secret Manager con le condizioni (segreti di `lab-01` esclusi per nome), permesso condizionato della VM (§7), immagine approvata, `ENV` a `lab-01`, installazione | 4–6 |
 | Sito | o2 | modulo, riga con i passi, rilettura, «Riprova» e «Annulla» | 6–9 |
-| **Totale** | | | **42–60** |
-| R8, se non arriva con A3 | o1 | firma dei risultati (proposta A3, §6.3) | +5–7 |
+| **Totale** | | | **48–68** |
+| Firme e unità di base dell'esecutore, se A3 non va prima | o1 | proposta A3, §6.1 e §6.3 | +10–14 |
 
-**Probabile:** circa **34–45 ore** (o1 circa 28–36, o2 6–9). Come per A3, la voce che può crescere è la revisione di sicurezza: A2 è il primo pacchetto in cui il server crea segreti e l'agente installa motori.
+**Probabile:** circa **40–50 ore** (o1 circa 34–41, o2 6–9), dopo le correzioni della revisione di sicurezza (§11), con A3 fatto prima. Come per A3, la voce che può crescere è la revisione di sicurezza: A2 è il primo pacchetto in cui il server crea segreti e l'agente installa motori.
+
+## 11. Correzioni dopo la revisione di sicurezza (19 novembre)
+
+Revisione indipendente (`revisione-a2-a3/REVISIONE-SICUREZZA-A2-A3.md`, fuori dal repository): A2 «eseguibile dopo correzioni». Valutazione di o1 verificata sul codice: d'accordo su tutti i punti.
+
+| Punto | Che cosa | Dove è corretto |
+|---|---|---|
+| 1 | ordini firmati dal server, risultati con l'impronta dell'ordine | proposta A3, §6.3 (A3 va prima); qui il passo 0 del §4.2 verifica la firma |
+| 4 | l'unità dell'esecutore: cosa apre A2 in più di A3; `install --da-agente` che non tocca systemd né l'Ops Agent | §4.2 |
+| 6 | immagine approvata solo per digest, file di root riletto a ogni ordine, controllo anche in `engine-vm.sh`, etichette immutabili | §4.3 |
+| 7 | `annullamento_in_corso` che blocca «Riprova»; segreti e Firestore solo dopo `togli_motore` riuscito | §5.2, §6.1 |
+| 8 | segno di creazione dell'agente; `togli_motore` e «c'è già» solo con il segno: mai `lab-01` né `dev` fino ad A6 | §4.2 (passi 1 e 1b), §5.2 |
+| 13 | i segreti fatti a mano di `lab-01` esclusi per nome dalle condizioni; «solo la VM» precisato | §3.3 |
+| 14 | `/data/<apt>` controllata al passo 0; il ritorno indietro toglie la cartella creata da questo ordine; `ENV` e `CATALOG_PATH` come argomenti | §4.2 |
+
+I punti 2, 3, 5, 9–12, 15 e 16 sono di A3 (proposta A3, §12).
