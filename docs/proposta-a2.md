@@ -2,7 +2,7 @@
 
 | Stato | Scritto da | Basato su | Prossimo passo |
 |---|---|---|---|
-| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1161–1168 del 19 novembre nel §9). Nessun codice | o1 | `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §3 (`crea_motore`), §4, §5, §6, §7; registro, pacchetto A2 e D-232; documento interno dell'Autonomia, §2 passo 4; il codice di A1 e la PR #17 (catalogo vuoto, `ce31e08`) | la domanda del committente sul codice Italianway (§9, risposta 8); revisione di sicurezza; schermate di o2; poi il codice |
+| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1161–1168 del 19 novembre nel §9). Nessun codice | o1 | `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §3 (`crea_motore`), §4, §5, §6, §7; registro, pacchetto A2 e D-232; documento interno dell'Autonomia, §2 passo 4; il codice di A1 e la PR #17 (catalogo vuoto, `ce31e08`) | revisione di sicurezza; schermate di o2 (`docs/proposta-a2-sito.md`); R8 e l'ordine fra A2 e A3; poi il codice |
 
 **Cosa copre:** creare dall'app il «posto» di un appartamento: id, porta libera, i due segreti, il motore con l'elenco dei dispositivi vuoto, l'account del connector sul broker, il collegamento del motore all'appartamento. Le rotte del server, l'ordine `crea_motore` passo per passo con il ritorno indietro, stati ed errori, cosa mostra il sito.
 
@@ -12,7 +12,7 @@
 
 1. **Solo nello staging fino alla seconda VM** (progetto §5.4): la produzione non manda ordini alla VM condivisa. In produzione la rotta risponde 503 finché A10 non c'è.
 2. **Chi crea:** solo il gestore della piattaforma (D-64, D-77; risposta 1 = a). Il permesso sta in un punto solo, così cambia con una riga. In futuro creerà L (Leonardo, Italianway), che con Scarantino è il cliente: il suo ruolo si decide con D-232.
-3. **Codice:** A1 è installato sulla VM e la finestra del passo 3 è chiusa (19 novembre): i due vincoli di prima non valgono più. Il codice parte dopo la domanda sul codice Italianway e la revisione di sicurezza (§9).
+3. **Codice:** A1 è installato sulla VM e la finestra del passo 3 è chiusa (19 novembre): i due vincoli di prima non valgono più. Il codice parte dopo la revisione di sicurezza, le schermate di o2 e la decisione su R8 (§4.3).
 
 ## 1. In breve
 
@@ -43,9 +43,22 @@
 | `passo` | `riserva` · `segreti` · `capienza` · `motore` · `collegamento` | l'ultimo raggiunto: il sito lo mostra come avanzamento |
 | `version` | intero | per il blocco, come in A3 |
 | `porta` | intero | quella riservata |
-| `op` | `{op_id, stato, messaggio}` o null | l'ultimo ordine all'agente; `op_id` è l'«ID richiesta» |
+| `op` | `{op_id, stato, codice, messaggio}` o null | l'ultimo ordine all'agente; `op_id` è l'«ID richiesta»; `codice` quello del §6.3 (il sito ha i suoi testi per codice, `messaggio` è la riserva) |
 | `fatti` | elenco fra `id`, `porta`, `segreti`, `motore`, `broker` | quello che esiste già: con `non_creato` il sito dice che cosa è rimasto a metà (risposta 7) |
 | `updated_at`, `updated_by` | | nome visibile, mai l'email |
+
+### 2.2 Cosa legge il sito (domande 19–26 di o2, 19 novembre; schermate in `docs/proposta-a2-sito.md`)
+
+| N. | Richiesta di o2 | Risposta del server |
+|---|---|---|
+| 19 | il 429 con limite e ora | corpo `{error: "rate_limited", message, limite: 5, riprova_dal}` (`riprova_dal` ora UTC, ISO 8601) più l'intestazione `Retry-After` in secondi (§6.2) |
+| 20 | il conto dell'ultima ora prima di aprire il modulo | in `GET /app/platform/tenants/{tenant_id}` (la scheda dell'organizzazione, da cui si apre il modulo) il campo `creazioni_ultima_ora: {usate, limite, libera_dal}`; `libera_dal` è null finché `usate < limite`. Nessuna rotta nuova |
+| 21 | «Riprova» e «Annulla» non contano | sì (§6.2) |
+| 22 | i conteggi per organizzazione | in `GET /app/platform/tenants` ogni riga ha `appartamenti_non_creati` e `appartamenti_in_preparazione` (0 se nessuno) |
+| 23 | `creazione` in ogni appartamento | in `GET /app/platform/tenants/{tenant_id}/apartments` ogni appartamento ha `creazione` (§2.1, tutti i campi); `null` per gli appartamenti collegati a mano (`dev`, `lab-01`, i dimostrativi) |
+| 24 | sapere prima del clic se la creazione c'è | in `GET /app/me`, nel blocco dell'ambiente, `creazione_disponibile`: `true` solo nello staging con l'agente configurato; `false` in produzione (fino ad A10) e senza agente. Il sito nasconde o disattiva «Nuovo appartamento»; il 503 resta come riserva |
+| 25 | un appartamento non «Pronto» non compare nelle pagine dell'organizzazione | **sì, lo esclude il server**, in un punto solo: l'elenco degli appartamenti dell'organizzazione (`GET /app/apartments`, `GET /app/admin/apartments`, il selettore) non lo contiene, e ogni rotta per appartamento dell'organizzazione (dettaglio, proxy verso il motore, stream, riepiloghi, energia, permessi degli utenti) risponde 404 come per un id che non c'è. Lo vedono solo le rotte della piattaforma. Vale per `in_preparazione` e `non_creato`; un appartamento `pronto` e poi disattivato (D-201) resta com'è oggi |
+| 26 | i testi per codice | li tiene il sito, per `op.codice` (§6.3); il `messaggio` del server resta come riserva |
 
 ## 3. Id, porta, segreti
 
@@ -161,7 +174,7 @@ Lo stato è `non_creato` con il passo raggiunto e `fatti` (§2.1). **Id e porta 
 
 - conta ogni `POST …/nuovo` accettato (202), riuscito o no, negli ultimi 60 minuti; «Riprova» e «Annulla» non contano;
 - il conto sta in Firestore, per organizzazione, aggiornato nella transazione della riserva (§4.1): vale con più istanze del server;
-- la risposta 429 porta `retry_after` (ora UTC, ISO 8601: la creazione più vecchia delle cinque più 60 minuti) e l'intestazione `Retry-After` in secondi; il sito mostra l'ora locale;
+- la risposta 429 porta `limite` (5) e `riprova_dal` (ora UTC, ISO 8601: la creazione più vecchia delle cinque più 60 minuti) e l'intestazione `Retry-After` in secondi; il sito mostra l'ora locale; lo stesso conto è leggibile prima, in `creazioni_ultima_ora` (§2.2);
 - il modulo dice il limite prima di «Crea» (§8).
 
 ### 6.3 Esiti dell'agente (codici, tradotti dal server)
@@ -185,33 +198,33 @@ Lo stato è `non_creato` con il passo raggiunto e `fatti` (§2.1). **Id e porta 
 ## 7. Cosa serve fuori dal codice (comandi del committente, in una procedura)
 
 1. I ruoli del server su Secret Manager con le condizioni del progetto §2.3 (staging), più la lettura delle sole chiavi dei motori.
-2. Il permesso della VM sui due prefissi (progetto §4.3): c'è già per la lettura? Da controllare in sola lettura prima della procedura.
+2. Il permesso della VM sui due prefissi (progetto §4.3). **Controllato in sola lettura il 19 novembre: non c'è.** Nessun ruolo di Secret Manager a livello di progetto; `langbrain-vm@` legge solo i quattro segreti di oggi, uno per uno (`langbrain-api-key-dev`, `langbrain-api-key-lab-01`, `langbrain-shelly-lab-01`, `langbrain-shelly-lab-01-devices`). Senza il permesso, il motore nuovo si fermerebbe al passo 3 con `segreto_illeggibile`. Serve un comando del committente: `secretAccessor` a `langbrain-vm@` a livello di progetto, con la condizione sui quattro prefissi dello staging (`langbrain-api-key-lab-`, `langbrain-api-key-test-`, `langbrain-shelly-lab-`, `langbrain-shelly-test-`, scritti con il numero del progetto, §2.3 del progetto). Anche `domotica-bff-staging@` non ha ancora i ruoli «creazione», «versioni» e «lettura»: atteso, è il punto 1.
 3. L'immagine approvata nella configurazione dell'agente sulla VM.
 4. `ENV=staging` nelle impostazioni di `lab-01` (e `dev`), a mano, una volta.
 
 ## 8. Cosa mostra il sito (in breve; le schermate le fa o2)
 
 1. **Dove:** pagina della piattaforma, nell'organizzazione, «Appartamenti» → pulsante «Nuovo appartamento» accanto a quello di oggi («Collega un motore esistente», da rinominare).
-2. **Il modulo:** id (solo nello staging, con il controllo mentre si scrive), nome, fuso orario, codice Italianway facoltativo (risposta 8, in attesa della domanda del committente); una riga con il limite: «Al massimo 5 appartamenti nuovi l'ora per organizzazione».
+2. **Il modulo:** id (solo nello staging, con il controllo mentre si scrive), nome, fuso orario, codice Italianway facoltativo (risposta 8); una riga con il limite: «Al massimo 5 appartamenti nuovi l'ora per organizzazione».
 3. **Dopo «Crea»:** la riga dell'appartamento con «In preparazione» e i passi (riserva, segreti, capienza, motore, collegamento), riletta ogni 4 secondi per al massimo 20 minuti, come «Prova l'agente».
 4. **«Creazione rimasta a metà»:** il messaggio del §6.3; che cosa esiste già (`fatti`: id e porta riservati, segreti, motore, broker) e che resta così finché non si sceglie; l'«ID richiesta» da copiare; «Riprova» e «Annulla» (con conferma).
-5. **Limite superato (429):** il messaggio con il perché e l'ora da cui si può rifare (`retry_after`, in ora locale).
+5. **Limite superato (429):** il messaggio con il perché e l'ora da cui si può rifare (`riprova_dal`, in ora locale). Prima del clic, il conto di `creazioni_ultima_ora` (§2.2).
 6. **«Pronto»:** l'appartamento come gli altri; un invito a registrare gli Shelly (A3) e a scrivere l'elenco dei dispositivi (A4).
 7. Se D-232 passa: lo stesso nell'area dell'amministratore, con il contatore «N di M appartamenti».
 
 ## 9. Risposte del committente (19 novembre, registro 1161–1168)
 
-| N. | Domanda | Risposta | Dove nel documento |
-|---|---|---|---|
-| 1 | Chi crea | **a:** per ora solo il gestore della piattaforma, permesso in un punto solo. In futuro L (Leonardo), con il ruolo deciso da D-232 | vincolo 2 |
-| 2 | Numero massimo per organizzazione | **rimandata a D-232** (serve solo se crea l'amministratore) | §2 |
-| 3 | Produzione | **a:** solo staging fino alla seconda VM (A10), in produzione 503. Non esistono ancora appartamenti veri | vincolo 1 |
-| 4 | Id in produzione | **a:** `a-` più 8 caratteri casuali | §3.1 |
-| 5 | Immagine approvata | **a:** la aggiorna `publish-all.sh` da solo quando installa il motore nuovo | §4.3 |
-| 6 | «Annulla» | **a:** solo prima di «Pronto»; l'eliminazione vera resta di A6 | §5.3 |
-| 7 | Creazione non riuscita | **a:** id e porta riservati finché «Riprova» o «Annulla», nessun annullamento automatico. **Condizione:** per l'utente dev'essere chiaro che la creazione è rimasta a metà | §2.1 `fatti`, §5.1, §6.1, §8 |
-| 8 | Codice Italianway | **a:** nel modulo, facoltativo. **Aperta:** una domanda del committente sul codice Italianway, raccolta dalla memoria storica, può cambiare questo punto | §8 |
-| 9 | Limite di frequenza | **a:** 5 l'ora per organizzazione. **Condizione:** il limite detto nel modulo; al superamento un messaggio semplice con il perché e l'ora da cui si può rifare, che il server restituisce | §6.2, §8 |
+| N. | Registro | Domanda | Risposta | Dove nel documento |
+|---|---|---|---|---|
+| 1 | 1161 | Chi crea | **a:** per ora solo il gestore della piattaforma, permesso in un punto solo. In futuro L (Leonardo), con il ruolo deciso da D-232 | vincolo 2 |
+| 2 | — | Numero massimo per organizzazione | **rimandata a D-232** (serve solo se crea l'amministratore) | §2 |
+| 3 | 1162 | Produzione | **a:** solo staging fino alla seconda VM (A10), in produzione 503. Non esistono ancora appartamenti veri | vincolo 1 |
+| 4 | 1163 | Id in produzione | **a:** `a-` più 8 caratteri casuali | §3.1 |
+| 5 | 1164 | Immagine approvata | **a:** la aggiorna `publish-all.sh` da solo quando installa il motore nuovo | §4.3 |
+| 6 | 1165 | «Annulla» | **a:** solo prima di «Pronto»; l'eliminazione vera resta di A6 | §5.3 |
+| 7 | 1166 | Creazione non riuscita | **a:** id e porta riservati finché «Riprova» o «Annulla», nessun annullamento automatico. **Condizione:** per l'utente dev'essere chiaro che la creazione è rimasta a metà | §2.1 `fatti`, §5.1, §6.1, §8 |
+| 8 | 1167 | Codice Italianway | **a:** nel modulo, facoltativo. Confermata dopo la domanda del committente su Italianway (19 novembre: non cambia A2) | §8 |
+| 9 | 1168 | Limite di frequenza | **a:** 5 l'ora per organizzazione. **Condizione:** il limite detto nel modulo; al superamento un messaggio semplice con il perché e l'ora da cui si può rifare, che il server restituisce | §6.2, §8 |
 
 ## 10. Stima in ore di A2
 
@@ -220,7 +233,7 @@ Ore di lavoro, prove comprese, senza le attese.
 | Pezzo | Chi | Cosa | Ore |
 |---|---|---|---|
 | Server: segreti | o1 | creazione con parametri fissi, intenzione in Firestore, riuso solo se nostro, distruzione con ritardo per «Annulla», prove con un Secret Manager finto | 5–7 |
-| Server: creazione | o1 | rotte, stati, porta libera atomica, flusso capienza → `crea_motore` → collegamento e verifica, «Riprova», «Annulla», errori, registro, `bff/API.md`; `fatti` e il limite di frequenza con `retry_after` (risposte 7 e 9) | 7–9 |
+| Server: creazione | o1 | rotte, stati, porta libera atomica, flusso capienza → `crea_motore` → collegamento e verifica, «Riprova», «Annulla», errori, registro, `bff/API.md`; `fatti` e il limite di frequenza con `riprova_dal` (risposte 7 e 9); i campi per il sito del §2.2 e l'esclusione degli appartamenti non pronti dalle rotte dell'organizzazione (domanda 25 di o2) | 9–12 |
 | Server: prove | o1 | prove delle rotte, delle corse sulla porta, dei 20 minuti, dei passi ripresi | 4–6 |
 | Agente: `crea_motore` | o1 | esecutore, passi ripetibili, codici, catalogo vuoto, ritorno indietro del passo 3, prove | 5–7 |
 | `engine-vm.sh` e `broker-vm.sh` | o1 | progetto §9.2 e §9.3 (ENV, catalogo in `/etc`, immagine ancorata, blocco, `add-apartment` ripetibile), prove | 5–7 |
@@ -228,7 +241,7 @@ Ore di lavoro, prove comprese, senza le attese.
 | `publish-all.sh` | o1 | l'immagine approvata aggiornata sulla VM quando si installa il motore nuovo (risposta 5), con il controllo dopo la scrittura e le prove | 1–2 |
 | Procedura e permessi | o1 | ruoli di Secret Manager con le condizioni, immagine approvata, `ENV` a `lab-01`, installazione; correzioni dopo la revisione di sicurezza | 4–6 |
 | Sito | o2 | modulo, riga con i passi, rilettura, «Riprova» e «Annulla» | 6–9 |
-| **Totale** | | | **40–57** |
+| **Totale** | | | **42–60** |
 | R8, se non arriva con A3 | o1 | firma dei risultati (proposta A3, §6.3) | +5–7 |
 
-**Probabile:** circa **32–42 ore** (o1 circa 26–33, o2 6–9). Come per A3, la voce che può crescere è la revisione di sicurezza: A2 è il primo pacchetto in cui il server crea segreti e l'agente installa motori.
+**Probabile:** circa **34–45 ore** (o1 circa 28–36, o2 6–9). Come per A3, la voce che può crescere è la revisione di sicurezza: A2 è il primo pacchetto in cui il server crea segreti e l'agente installa motori.
