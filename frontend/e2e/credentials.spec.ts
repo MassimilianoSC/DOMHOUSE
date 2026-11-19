@@ -66,8 +66,7 @@ test.describe("credenziali dei dispositivi", () => {
       await page.getByTestId("credential-register-save").click();
       const dialog = page.getByTestId("credential-password-dialog");
       await expect(dialog.getByTestId("credential-value-password")).toHaveText(PASSWORD);
-      // measured once the opening animation is over: while it runs the animation's transform replaces the one that
-      // centres the window, so for a moment it sits further right (every window of the site does that)
+      // measured once the opening animation (fade and zoom) is over; where the window starts is dialog-open.spec.ts
       await page.waitForFunction(() => document.querySelector('[data-testid="credential-password-dialog"]')?.getAnimations().every((a) => a.playState === "finished") ?? false);
       // the window scrolls inside itself; every value and every «Copia» stays within the screen
       for (const key of ["topic_prefix", "server", "client_id", "user", "password"]) {
