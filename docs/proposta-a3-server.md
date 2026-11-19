@@ -2,7 +2,7 @@
 
 | Stato | Scritto da | Basato su | Prossimo passo |
 |---|---|---|---|
-| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1170–1177 del 19 novembre nel §9). Nessun codice | o1 | `docs/proposta-a3-sito.md` (o2, `f607187`, `4cb6bab`); `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §2.5, §3, §3.2, §4, §6, §8.1, §8.3, §9 (D-233); il codice di A1 (`bff/agent.py`, `scripts/agent/`) | revisione di sicurezza del 19 novembre, seconda e terza lettura: **eseguibile** con la condizione N9 (§6.1), da verificare con `systemd-run` prima di installare; le misure delle prove `a3_` sul broker (con il via); poi il codice. **A3 prima di A2** (risposta 10: R8 entra qui) |
+| **Codice fatto** (19 novembre, notte, via 1184: `1061f96`, `a362438`, `25c97cf`, `547ffce`, `c4daea3`, `fb5fa2a`; installazione in `docs/procedura-installazione-a3.md`). Scritta il 17 novembre; risposte 1170–1177 nel §9, 1185 sotto | o1 | `docs/proposta-a3-sito.md` (o2, `f607187`, `4cb6bab`); `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §2.5, §3, §3.2, §4, §6, §8.1, §8.3, §9 (D-233); il codice di A1 (`bff/agent.py`, `scripts/agent/`) | revisione di sicurezza del 19 novembre, seconda e terza lettura: **eseguibile** con la condizione N9 (§6.1), da verificare con `systemd-run` prima di installare; le misure delle prove `a3_` sul broker (con il via); poi il codice. **A3 prima di A2** (risposta 10: R8 entra qui) |
 
 **Cosa copre:** le chiamate del server per «Registra», «Rigenera», «Revoca», «Riprova» e l'elenco; i dati in Firestore; gli stati e come cambiano con gli esiti dell'agente; errori, permessi, blocco, registro attività; cosa fa l'agente sulla VM (`aggiorna_broker`); le risposte tecniche alle domande di o2; la stima.
 
@@ -144,8 +144,8 @@ Come «Registra» sul dispositivo che c'è: impronta nuova al posto della vecchi
 
 1. Nella transazione: l'impronta si toglie dal documento (resta il documento, `stato_salvato` `revocato`, per l'elenco e il registro), `azione` `revoca`.
 2. L'ordine porta l'elenco **senza** quel dispositivo.
-3. Al risultato riuscito il broker ha tolto l'utente **e chiuso il suo collegamento già aperto** (revisione, punto 5). `mosquitto.conf` dice che la ricarica rilegge utenti e permessi «senza far cadere chi è collegato»; lo stesso vale per **«Rigenera»**: una password uscita resterebbe dentro sul collegamento aperto. Quindi l'esecutore, dopo il `sync`, **riavvia il broker** quando l'elenco nuovo toglie un utente o gli cambia l'impronta, e l'esito è «riuscito» solo dopo il riavvio e `wait_healthy` (§6.2).
-4. Le prove sul broker vero, in container (`tests/broker_container_test.py`, `-k a3_ -s`, **solo con il via del committente**) **misurano senza presupporre**: il 16 novembre, dal vivo, il cambio della password della Plug con una ricarica aveva fatto cadere la Plug, contro quello che dice `mosquitto.conf`. Le prime due stampano una riga «MISURA A3 …» (dopo il solo `sync`: riceve, pubblica, resta collegato, si ricollega) per «Revoca» e per «Rigenera»; la terza controlla che dopo il riavvio la password vecchia sia fuori e misura in quanti secondi gli altri tornano. **Decide la misura:** se dopo il solo `sync` un collegamento aperto non riceve né pubblica più, per quel caso il riavvio si toglie.
+3. Al risultato riuscito il broker ha tolto l'utente **e chiuso il suo collegamento già aperto** (revisione, punto 5). **Misurato sul broker vero il 19 novembre** (prove `a3_`, via 1184): con la sola ricarica del `sync` un dispositivo revocato già collegato non riceve, non pubblica ed è staccato; con una password nuova il collegamento con la vecchia è staccato allo stesso modo (come la Plug dal vivo il 16 novembre). **Quindi nessun riavvio del broker**, né dopo una revoca né dopo una «Rigenera» (un riavvio avrebbe fatto tornare gli altri dispositivi in circa 15 secondi).
+4. Le righe misurate: «revoca-solo-sync: riceve=False pubblica=False ricevitore_collegato=False si_ricollega=False», «rigenera-solo-sync: riceve=False pubblica=False ricevitore_collegato=False vecchia_rifiutata=True nuova_accettata=True», «riavvio: secondi_per_tornare=14.6». Le prove restano nel giro completo (`tests/broker_container_test.py -k a3_`): se un Mosquitto futuro cambiasse comportamento, lo direbbero.
 
 ### 5.5 «Riprova»
 
@@ -162,7 +162,7 @@ Una transazione con `version` e una `seq` nuova che rilegge l'elenco completo; n
 Oggi l'elenco chiuso lo accetta già nei controlli (`scripts/agent/comune.py`: al massimo 200, id con la regola, impronte nel formato `$7$`, mai una password) ma risponde «non_disponibile». In A3 l'esecutore lo **esegue**, dopo aver verificato la firma dell'ordine (§6.3):
 
 1. sotto il blocco della VM, scrive in modo atomico `/etc/domhouse/_broker/devices/<apt>` (root, 600): una riga `<device_id> <impronta>` per dispositivo dell'elenco;
-2. lancia il `sync` del broker per quell'appartamento (isolato, E-33), poi il riavvio del broker se qualcuno è stato tolto o ha cambiato impronta (§5.4);
+2. lancia il `sync` del broker (isolato per appartamento, E-33): la ricarica basta, nessun riavvio (§5.4, misura del 19 novembre);
 3. esiti, con codici di un elenco chiuso:
 
 | Esito | Codice | Quando |
@@ -171,7 +171,6 @@ Oggi l'elenco chiuso lo accetta già nei controlli (`scripts/agent/comune.py`: a
 | rifiutato | `appartamento_sconosciuto` | il broker non ha l'appartamento (`add-apartment` non fatto: arriva con A2) |
 | rifiutato | i codici dei controlli di oggi | `troppi_dispositivi`, `id_non_valido`, `impronta_non_valida`, `parametri_non_validi` |
 | fallito | `sync_fallito` | il `sync` ha tenuto le righe di prima per quell'appartamento («kept») o non è riuscito |
-| fallito | `riavvio_fallito` | il broker non è tornato sano dopo il riavvio |
 | rifiutato | `migrazione_non_fatta` | `lab-01` prima della migrazione (§6.4) |
 | rifiutato | `firma_non_valida` | ordine senza la firma del server, o con una firma sbagliata (§6.3), con un allarme |
 | fallito | `errore_interno` | come oggi |
@@ -192,8 +191,9 @@ Il `sync` gira con l'ambiente ripulito (solo `PATH`): quello che gli serve passa
 
 - `broker_accounts.py` (§9.4 del progetto): i dispositivi di un appartamento dal file delle impronte, prese così come sono; il conto del connector da Secret Manager come oggi. **Il ripiego sul segreto vecchio `-devices` vale solo per un elenco esplicito, `lab-01`** (revisione, punto 12); per ogni altro appartamento senza file: nessun dispositivo. Il file (anche vuoto) si crea prima di `add-apartment`.
 - `broker-vm.sh`: la cartella `devices/` (root, 700), `remove-apartment` toglie anche il file.
-- Dopo il `sync`, se l'elenco nuovo ha **tolto** qualcuno o gli ha **cambiato l'impronta**: `broker-vm.sh restart` (tutti si ricollegano: pochi secondi; i numeri veri dalla prova del §5.4), salvo che la misura dica che il solo `sync` basta. Nello staging è la scelta tecnica.
-- **Vincolo aperto per la produzione** (seconda lettura, N4): il broker è uno solo per tutti gli appartamenti, e un amministratore può fare fino a 30 azioni l'ora (§8.3), cioè fino a 30 ondate di ricollegamento per tutti. **Prima della produzione si decide** fra: raccogliere i riavvii (al massimo uno ogni N minuti; le revoche in attesa restano «revoca in corso» fino al riavvio), oppure staccare il singolo client (il plugin di sicurezza dinamica di Mosquitto, un cambio più grande del broker). Da portare al committente con i numeri della prova.
+- **Nessun riavvio** dopo il `sync`: la misura del 19 novembre (§5.4) dice che la ricarica stacca già il dispositivo tolto o con l'impronta cambiata.
+- **N4 chiuso dalla misura:** senza riavvii non ci sono ondate di ricollegamento per gli altri appartamenti; il vincolo aperto per la produzione non serve più.
+- **Rischio accettato nello staging (risposta 1185):** Youssouf ha verificato che la password della pagina locale è attiva (`auth_en`) sui tre Shelly del banco, tutti alla 2.2.0, con Matter e chiamate via Bluetooth spenti; il committente accetta il rischio residuo della Wi-Fi del laboratorio nello staging fino al pezzo «pagina locale». In produzione A3 non si apre prima di quel pezzo.
 
 ### 6.3 Condizione di sicurezza: i risultati firmati (R8) prima di A3
 
@@ -356,7 +356,7 @@ Revisione indipendente (`revisione-a2-a3/REVISIONE-SICUREZZA-A2-A3.md`, fuori da
 | 2, N1 | nessuna scrittura a ventaglio: `ultima_seq_riuscita` in transazione, solo dagli esiti riusciti di `aggiorna_broker`; `seq` dall'operazione salvata | §4.2 |
 | 3, N2 | riga e allarme per una revoca non applicata anche senza nessuno sulla pagina: nel ricevitore e nella rotta su 502; due allarmi nuovi (log di Cloud Run, età dei messaggi degli ordini); il giro orario di riserva | §4.1, §8.4 |
 | 4, N3, N9 | l'unità dell'esecutore: l'elenco esatto di cosa si apre; `auth/` a `root:1883` 750, i file a `1883:1883` 640, `SupplementaryGroups=1883`, solo `CAP_CHOWN`; verifica con `systemd-run` prima di installare | §6.1 |
-| 5, N4 | il collegamento già aperto: riavvio del broker dopo una revoca **e** dopo una «Rigenera», salvo che la misura dica che basta il `sync`; tre prove sul broker in container che misurano senza presupporre; per la produzione un vincolo aperto (raccogliere i riavvii o staccare il singolo client) | §5.4, §6.2 |
+| 5, N4 | il collegamento già aperto: **misurato**, la ricarica del `sync` lo stacca dopo una revoca e dopo una «Rigenera»; nessun riavvio, quindi N4 non serve più | §5.4, §6.2 |
 | 9, N5 | R8 completo: JSON canonico, `compare_digest`, risultati del lettore mai «riuscito», chiavi mai leggibili dalla VM, cambio della chiave; cosa copre la firma degli ordini e dove viaggia, `firmato_at` controllato dall'esecutore, doppia chiave degli ordini nell'esecutore | §6.3 |
 | 10 | regole sullo stato calcolato; una revoca non applicata solo con «Riprova» | §4.3 |
 | 11 | `connector` rifiutato come id | §5.1 |

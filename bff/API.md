@@ -905,3 +905,30 @@ written»).
 | `stream opened` | `boot_id`, `stream_id`, `apartment_id` |
 | `stream closed` | `boot_id`, `stream_id`, `apartment_id`, `seconds`, `reason`: `max_duration`, `client_disconnect`, `queue_full`, `apartment_removed`, `access_ended`, `error` |
 | `process status`, ogni `STATUS_LOG_S` (60) | `boot_id`, `streams_open`, `requests_active` (stream compresi, non le chiamate interne al motore integrato), `queue_max` (la coda di stream più lunga), `loop_lag_ms` (il ritardo peggiore dell'event loop nel periodo) |
+
+
+## Credenziali dei dispositivi (strumento A, A3; `docs/proposta-a3-server.md`)
+
+Due prefissi con le stesse chiamate (risposta 1170):
+
+- `/app/apartments/{apt}/device-credentials`: solo gli amministratori dell'organizzazione (`require_admin`). Un operatore, anche un gestore della piattaforma entrato con l'accesso di assistenza, riceve 403; l'appartamento di un'altra organizzazione 404.
+- `/app/platform/apartments/{apt}/device-credentials`: i gestori della piattaforma, solo con `APP_ENV` dev o staging e solo per gli appartamenti `lab-…` e `test-…`; altrimenti 404.
+
+| Chiamata | Corpo | Risposta |
+|---|---|---|
+| `GET …` | — | 200 `{items: [DeviceCredential]}`, per `device_id`, anche i revocati |
+| `POST …` | `{device_id}` | **201** `{credential, password}`: «Registra» (anche «Registra di nuovo» di un revocato) |
+| `POST …/{device_id}/rigenera` | `{version}` | **200** `{credential, password}` |
+| `POST …/{device_id}/revoca` | `{version}` | **202** `{credential}` |
+| `POST …/{device_id}/riprova` | `{version}` | **202** `{credential}`: rimanda l'elenco completo, nessuna password nuova |
+
+- Tutte con `Cache-Control: no-store`; con la password anche `Pragma: no-cache`. La password (32 caratteri) compare **solo** nella risposta di «Registra» e «Rigenera»: mai in un `GET`, nei log, negli errori o nell'ordine.
+- **`DeviceCredential`:** `{device_id, name (null fino ad A4), stato, version, updated_at, updated_by (nome visibile o null, mai l'email), azione, engine_device_id (null fino ad A4), op: {op_id, stato, codice, messaggio} | null, connection: {server, ssl_ca: "ca.pem", client_id, user, topic_prefix}}`. `connection.server` è `DEVICE_BROKER_ADDRESS`, `null` quando è vuota (la produzione fino alla seconda VM).
+- **`stato`** (calcolato alla lettura): `in_attesa`, `pronto`, `cambio_in_corso`, `revoca_in_corso`, `revocato`, `non_applicato`. **`azione`**: quella in attesa di conferma (`registra`, `rigenera`, `revoca`), `null` quando non aspetta niente; con `non_applicato` dice che cosa manca. Un ordine senza risposta da 20 minuti si legge `non_applicato` (`op.codice` `tempo_scaduto`).
+- **Azioni ammesse:** la tabella del §4.3 della proposta, sullo stato calcolato. Una revoca non applicata si chiude **solo** con «Riprova».
+- **Ordine dei controlli** (tutti prima di generare la password): 422 `invalid_device_id` (regola `^[a-z0-9][a-z0-9-]{0,63}$`, mai convertita; `connector` riservato), 422 `invalid_version`, 422 `invalid_apartment` (un appartamento che l'agente rifiuterebbe: mai `dev`, nello staging solo `lab-…`/`test-…`), 429 `rate_limited` (30 azioni l'ora per organizzazione), 503 `agent_not_configured`, 503 `broker_address_missing` (solo «Registra» e «Rigenera»).
+- **Dentro la transazione:** 404 `not_found`, 409 `already_registered`, `version_changed`, `operation_in_progress`, `invalid_state`, `too_many_devices` (200 dispositivi non revocati).
+- **Pubblicazione fallita:** «Registra» e «Rigenera» rispondono lo stesso 201/200 con la password, `stato` `non_applicato` e `op.messaggio` «Ordine non inviato al sistema domotico: copia comunque la password, poi usa «Riprova»»; «Revoca» e «Riprova» rispondono 502 `agent_publish_failed` con `details.op`.
+- **Registro attività:** `device_credential_registered`, `…_regenerated`, `…_revoked`, `…_retried`, con bersaglio l'appartamento e `details.device_id`; `device_credential_revoke_not_applied` scritta dal sistema (risposta 1175), una volta per ordine, con `details.seq` e `details.op_id`, insieme a una riga di log `agent alarm codice=revoca_non_applicata` (allarme email).
+
+**Ordini e risultati firmati (A3 §6.3).** Ogni ordine verso la VM porta `firmato_at` e `firma` (HMAC-SHA256 con `AGENT_ORDINI_KEY` sulla forma canonica senza `firma`); l'operazione tiene lo SHA-256 dell'ordine (`AgentOp.ordine_sha256`). Un risultato «riuscito» vale solo firmato con `AGENT_RISULTATI_KEY` (o `AGENT_RISULTATI_KEY_PREV` durante un cambio) e con lo SHA-256 dell'ordine pubblicato; altrimenti è ignorato con una riga `agent alarm`. Senza le due chiavi l'agente è «non configurato» (503), anche per «Prova l'agente».
