@@ -59,6 +59,7 @@ def world(monkeypatch):
                                             instance_url="mock://builtin")
     repo.device_creds.clear()
     repo.mail_counts.clear()
+    repo.audit.pop(DEMO_TENANT, None)                # each test reads only its own rows
 
     def configure(**changes):
         state.settings = dataclasses.replace(state.settings, **changes)
@@ -247,3 +248,74 @@ def test_a_failed_publish_of_a_revocation_is_a_502_with_a_system_line(world):
     entries = run(get_repository().list_audit(DEMO_TENANT, limit=20))
     line = next(e for e in entries if e.action == "device_credential_revoke_not_applied")
     assert line.actor.kind == "system" and line.details["device_id"] == "shelly-1"
+
+
+# ---- piece 4 (§8.4, answer 1175, review point 3, N2): the row and the alarm without anyone on the page ------------
+def _system_rows():
+    entries = run(get_repository().list_audit(DEMO_TENANT, limit=50))
+    return [e for e in entries if e.action == "device_credential_revoke_not_applied"]
+
+
+@pytest.fixture
+def alarms(monkeypatch):
+    from bff import device_alarms
+    seen = []
+    monkeypatch.setattr(device_alarms, "warn", lambda msg, **fields: seen.append((msg, fields)))
+    return seen
+
+
+def test_a_revocation_refused_by_the_agent_writes_the_row_and_the_alarm_at_once(world, alarms):
+    register()
+    push_result(world.published[-1])
+    call("POST", f"{BASE}/shelly-1/revoca", json={"version": 1})
+    revoke = world.published[-1]
+    push_result(revoke, esito="fallito", codice="errore_interno")
+    [row] = _system_rows()
+    assert row.details["device_id"] == "shelly-1" and row.details["seq"] == revoke["seq"]
+    assert [m for m, _ in alarms] == ["agent alarm codice=revoca_non_applicata"]
+    push_result(revoke, esito="fallito", codice="errore_interno")            # the same result again: nothing more
+    assert len(_system_rows()) == 1
+
+
+def test_a_new_password_not_applied_raises_the_alarm_but_writes_no_row(world, alarms):
+    register()
+    push_result(world.published[-1])
+    call("POST", f"{BASE}/shelly-1/rigenera", json={"version": 1})
+    push_result(world.published[-1], esito="rifiutato", codice="parametri_non_validi")
+    assert _system_rows() == [] and [m for m, _ in alarms] == ["agent alarm codice=rigenera_non_applicata"]
+
+
+def test_the_hourly_round_finds_an_order_without_answer_once(world, alarms, monkeypatch):
+    from datetime import UTC, datetime, timedelta
+    from bff import device_alarms
+    register()
+    push_result(world.published[-1])
+    call("POST", f"{BASE}/shelly-1/revoca", json={"version": 1})
+    later = datetime.now(UTC) + timedelta(minutes=25)
+    assert run(device_alarms.round_once(now=later)) == 1
+    assert run(device_alarms.round_once(now=later)) == 0
+    assert len(_system_rows()) == 1
+
+
+def test_a_revocation_not_published_is_not_counted_twice_by_the_round(world, alarms):
+    from datetime import UTC, datetime, timedelta
+    from bff import device_alarms
+    register()
+    push_result(world.published[-1])
+    world.fail = True
+    assert call("POST", f"{BASE}/shelly-1/revoca", json={"version": 1}).status_code == 502
+    assert run(device_alarms.round_once(now=datetime.now(UTC) + timedelta(minutes=25))) == 0
+    assert len(_system_rows()) == 1
+
+
+def test_the_two_new_alarms_of_a1():
+    from pathlib import Path
+    folder = Path(__file__).resolve().parent.parent / "scripts" / "agent" / "allarmi"
+    server = json.loads((folder / "server-allarme.json").read_text(encoding="utf-8"))
+    log_filter = server["conditions"][0]["conditionMatchedLog"]["filter"]
+    assert 'resource.type="cloud_run_revision"' in log_filter and "domotica-bff-staging" in log_filter
+    assert "agent alarm" in log_filter and server["notificationChannels"] == ["__CHANNEL__"]
+    unread = json.loads((folder / "ordini-non-letti.json").read_text(encoding="utf-8"))
+    threshold = unread["conditions"][0]["conditionThreshold"]
+    assert "subscription/oldest_unacked_message_age" in threshold["filter"]
+    assert "domhouse-staging-ordini-vm" in threshold["filter"] and threshold["thresholdValue"] == 1200

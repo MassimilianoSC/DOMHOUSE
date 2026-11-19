@@ -213,12 +213,14 @@ def test_who_may_do_what(gcp):
     assert not any("domhouse-prod" in c or "projects add-iam-policy-binding" in c for c in made)  # never project-wide
 
 
-def test_two_alarms_on_the_existing_channel(gcp):
+def test_four_alarms_on_the_existing_channel(gcp):
+    """A1's two, and A3's two (§8.4, N2): the server's «agent alarm» and the age of the unread orders."""
     _, calls = gcp("staging")
     policies = [c for c in creates(calls) if "policies create" in c]
-    assert len(policies) == 2
+    assert len(policies) == 4
     files = sorted((ROOT / "scripts" / "agent" / "allarmi").glob("*.json"))
-    assert [f.name for f in files] == ["agente-allarme.json", "scarti-non-vuoti.json"]
+    assert [f.name for f in files] == ["agente-allarme.json", "ordini-non-letti.json", "scarti-non-vuoti.json",
+                                       "server-allarme.json"]
 
 
 def test_a_second_run_changes_nothing(gcp):

@@ -15,10 +15,9 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Body, Depends, Request
 from fastapi.responses import JSONResponse
 
-from .. import agent, audit
+from .. import agent, audit, device_alarms
 from .. import device_credentials as dc
 from ..auth import CurrentUser, Identity, get_tenant_apartment, require_admin, require_platform
-from ..logs import warn
 from ..repository import AgentOp, get_repository
 
 tenant = APIRouter(prefix="/app/apartments/{apartment_id}/device-credentials")
@@ -141,11 +140,8 @@ async def _act(action: str, apt, device_id, version, uid: str, who) -> JSONRespo
 
 
 async def revoke_not_applied(apt, device_id: str, op: AgentOp) -> None:
-    """§8.4 (answer 1175, review point 3): the system's line, once per order, and a log line for the alarm."""
-    warn("agent alarm codice=revoca_non_applicata", apartment_id=apt.apartment_id, op_id=op.op_id, seq=op.seq)
-    await audit.record("device_credential_revoke_not_applied", audit.SYSTEM, apt.tenant_id,
-                       audit.apartment_target(apt.apartment_id, apt.name), device_id=device_id, seq=op.seq,
-                       op_id=op.op_id)
+    """§8.4 (answer 1175, N2): the system's row and the alarm, once per order (bff/device_alarms.py)."""
+    await device_alarms.not_applied(apt, device_id, "revoca", op.seq, op.op_id)
 
 
 def _payload(payload) -> dict:

@@ -379,7 +379,16 @@ async def receive(body) -> str:
     if op is not None and _too_old(op):
         await _expire(op)
         return "tardi"
-    return await get_repository().finish_agent_op(
+    outcome = await get_repository().finish_agent_op(
         result["op_id"], result["ambiente"], result.get("apartment_id"), result.get("operazione"),
         {"stato": result["esito"], "codice": result["codice"], "dati": dati}, MAX_WAIT.total_seconds(),
         seq=result.get("seq"))
+    if outcome == "chiuso" and result["esito"] != "riuscito" and result.get("operazione") == "aggiorna_broker":
+        # A3 §8.4: the row and the alarm at once; a failure here is left to the hourly round (never a 503: the
+        # result is saved, and Pub/Sub would only bring it back as «gia_chiuso»)
+        from . import device_alarms
+        try:
+            await device_alarms.after_result(result["op_id"])
+        except Exception as exc:                                 # noqa: BLE001 - the round catches it within the hour
+            warn("device credentials alarm not written", op_id=result["op_id"], error=type(exc).__name__)
+    return outcome

@@ -144,6 +144,11 @@ async def _loop() -> None:
             await round_once()
         except Exception as exc:
             warn("weekly summary round failed", error=type(exc).__name__)
+        try:                                       # A3 §8.4: the reserve for a revocation not applied
+            from . import device_alarms
+            await device_alarms.round_once()
+        except Exception as exc:
+            warn("device credentials round failed", error=type(exc).__name__)
         await asyncio.sleep(ROUND_S)
 
 

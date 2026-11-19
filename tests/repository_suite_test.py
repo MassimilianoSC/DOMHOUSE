@@ -791,3 +791,13 @@ def test_a3_n1_only_a_successful_aggiorna_broker_raises_ultima_and_the_seq_must_
     assert run(repo.device_credentials_view("lab-01"))[1] == sent.seq
     run(repo.create_agent_op(_a3_op(9, operazione="stato")))              # a new order keeps ultima
     assert run(repo.device_credentials_view("lab-01"))[1] == sent.seq
+
+
+def test_a3_one_alarm_per_order(repo):
+    from bff import device_credentials as dc
+    assert run(repo.mark_device_alerted("lab-01", "shelly-a", 3)) is False          # no such device
+    run(repo.device_credential_change(
+        "lab-01", "shelly-a", dc.decide("registra", "shelly-a", None, "$7$a", "uid1"), _a3_op(10), _a3_build([])))
+    assert run(repo.mark_device_alerted("lab-01", "shelly-a", 3)) is True
+    assert run(repo.mark_device_alerted("lab-01", "shelly-a", 3)) is False
+    assert run(repo.mark_device_alerted("lab-01", "shelly-a", 4)) is True

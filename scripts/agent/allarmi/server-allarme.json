@@ -1,0 +1,26 @@
+{
+  "displayName": "Agente: allarme dal server dello staging",
+  "documentation": {
+    "content": "Il server dello staging ha scritto «agent alarm»: una revoca o una password nuova di un dispositivo non applicata (codice revoca_non_applicata o rigenera_non_applicata: il dispositivo può ancora collegarsi con la password di prima; «Riprova» nella pagina delle credenziali), oppure un risultato dell'agente con una firma sbagliata o per un ordine diverso (firma_risultato_non_valida, firma_risultato_assente, ordine_diverso: possibile manomissione). Primo passo: i log di Cloud Run di domotica-bff-staging con «agent alarm». Avvisa o1.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Riga «agent alarm» nei log del server dello staging",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"domotica-bff-staging\" AND jsonPayload.msg=~\"^agent alarm\""
+      }
+    }
+  ],
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "3600s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "ERROR"
+}

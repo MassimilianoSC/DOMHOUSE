@@ -1,0 +1,32 @@
+{
+  "displayName": "Agente: ordini non letti da oltre 20 minuti (staging)",
+  "documentation": {
+    "content": "Un ordine dello strumento A aspetta nella sottoscrizione della VM da oltre 20 minuti: il lettore sulla VM è fermo o la VM è spenta. Una revoca o una password nuova di un dispositivo resta così non applicata. La sottoscrizione tiene i messaggi un'ora. Primo passo: «sudo bash agent-vm.sh status» sulla VM. Avvisa o1.",
+    "mimeType": "text/markdown"
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Messaggio più vecchio non letto oltre 20 minuti",
+      "conditionThreshold": {
+        "filter": "resource.type=\"pubsub_subscription\" AND resource.label.subscription_id=\"domhouse-staging-ordini-vm\" AND metric.type=\"pubsub.googleapis.com/subscription/oldest_unacked_message_age\"",
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 1200,
+        "duration": "60s",
+        "aggregations": [
+          {
+            "alignmentPeriod": "60s",
+            "perSeriesAligner": "ALIGN_MAX"
+          }
+        ]
+      }
+    }
+  ],
+  "alertStrategy": {
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "ERROR"
+}

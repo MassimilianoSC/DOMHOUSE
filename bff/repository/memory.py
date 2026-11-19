@@ -82,6 +82,13 @@ class InMemoryRepository:
                if d.get("op_id") in self.agent_ops}
         return docs, self.agent_ultima.get(apartment_id, 0), ops
 
+    async def mark_device_alerted(self, apartment_id, device_id, seq):
+        doc = self.device_creds.get(apartment_id, {}).get(device_id)
+        if doc is None or doc.get("allarme_seq") == seq:
+            return False
+        doc["allarme_seq"] = seq
+        return True
+
     # no await between the reads and the writes: atomic within the (single) process, like create_agent_op
     async def device_credential_change(self, apartment_id, device_id, change, op, build):
         docs = self.device_creds.get(apartment_id, {})

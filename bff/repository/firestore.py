@@ -301,6 +301,18 @@ class FirestoreRepository:
                     ops[op.op_id] = op
         return docs, ultima, ops
 
+    async def mark_device_alerted(self, apartment_id, device_id, seq):
+        ref = self._creds(apartment_id).document(device_id)
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            if not snap.exists or (snap.to_dict() or {}).get("allarme_seq") == seq:
+                return False
+            tx.update(ref, {"allarme_seq": seq})
+            return True
+        return await txn(self.db.transaction())
+
     async def device_credential_change(self, apartment_id, device_id, change, op, build):
         col = self._creds(apartment_id)
         dev_ref, seq_ref = col.document(device_id), self._col("agent_seq").document(apartment_id)
