@@ -45,7 +45,7 @@
 | Id | `^(lab\|test)-[a-z0-9]([a-z0-9-]*[a-z0-9])?$`, al massimo 64 caratteri, non `-devices` alla fine (proposta A2, §3.1); controllo mentre si scrive | «Nello staging comincia con lab- o test-; lettere minuscole, cifre e trattini. Non si cambia più.» |
 | Nome | 1–80 caratteri | — |
 | Fuso orario | già scritto `Europe/Rome` | come oggi |
-| Codice Italianway | facoltativo | **aperto:** il committente ha una domanda su Italianway in corso (registro, 19 novembre, 16:38). Fino alla risposta il campo resta come nel modulo di oggi, facoltativo (risposta 1167) |
+| Codice Italianway | facoltativo (risposta 1167, confermata dopo la domanda del committente su Italianway, 19 novembre) | «Si può aggiungere anche dopo.» |
 
 - Sotto il titolo, una riga che dice cosa aspettarsi: «Ci vogliono alcuni minuti. Se la creazione si ferma a metà, l'appartamento resta nell'elenco come «Non creato» finché non premi «Riprova» o «Annulla».»
 - «Crea» è acceso solo con id valido e nome scritto.
@@ -191,5 +191,6 @@ Nomi e organizzazioni di prova, nessuna email vera. Sono un'anteprima: colori e 
 
 ## 10. Aperto
 
-1. **Codice Italianway nel modulo:** la domanda del committente su Italianway (registro, 19 novembre, 16:38).
-2. I punti 1, 2, 4–8 del §7, con o1.
+1. I punti 1, 2, 4–8 del §7, con o1.
+
+Il codice Italianway nel modulo non è più aperto: la domanda del committente è chiusa e la risposta 1167 resta (facoltativo, si può aggiungere anche dopo).
