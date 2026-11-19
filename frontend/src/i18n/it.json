@@ -565,6 +565,75 @@
       "revoca": "Revoca",
       "registra": "Registra di nuovo",
       "connection": "Dati di collegamento"
+    },
+    "registerDialog": {
+      "title": "Registra un dispositivo",
+      "hint": "Il codice è scritto sullo Shelly o nella sua pagina, per esempio shellyplugmg3-9070695cb0d0.",
+      "label": "Codice del dispositivo",
+      "placeholder": "shellyplugmg3-9070695cb0d0",
+      "invalid": "Solo lettere minuscole, cifre e trattini, fino a 64 caratteri.",
+      "reserved": "Questo codice è riservato al sistema domotico: scegline un altro.",
+      "save": "Registra"
+    },
+    "password": {
+      "title": "Password di {name}",
+      "onlyNow": "La vedi solo ora.",
+      "onlyNowText": "Copiala nella pagina dello Shelly prima di chiudere: dopo non si può più leggere, né qui né altrove. Se la perdi, usa «Rigenera».",
+      "intro": "Nella pagina MQTT dello Shelly compila i campi così, nell'ordine:",
+      "clipboard": "Se il tuo PC sincronizza gli appunti con altri dispositivi, dopo la copia svuotali.",
+      "copied": "Ho copiato la password nello Shelly",
+      "close": "Chiudi"
+    },
+    "fields": {
+      "site": "Nel sito",
+      "shelly": "Campo nello Shelly",
+      "value": "Valore",
+      "type": "Tipo di collegamento",
+      "typeShelly": "«Connection type»",
+      "typeValue": "scegli Default TLS",
+      "prefix": "Prefisso",
+      "prefixShelly": "«MQTT prefix»",
+      "server": "Server",
+      "serverShelly": "«Server»",
+      "serverMissing": "Non configurato in questo ambiente",
+      "clientId": "Client ID",
+      "clientIdShelly": "«Client ID»",
+      "user": "Utente",
+      "userShelly": "«Username»",
+      "password": "Password",
+      "passwordShelly": "«Password»",
+      "passwordGone": "Password: non si può più leggere. Se è persa o l'ha vista chi non doveva, usa «Rigenera».",
+      "passwordRevoked": "Password: nessuna, il dispositivo è revocato.",
+      "other": "Altre impostazioni",
+      "otherShelly": "le caselle delle notifiche",
+      "otherValue": "Notifiche RPC: sì · Stato generico: no · Controllo: no"
+    },
+    "connectionDialog": {
+      "title": "Dati di collegamento di {name}"
+    },
+    "regenerateDialog": {
+      "title": "Nuova password per {name}?",
+      "text": "Creiamo una password nuova. Quella di adesso smette di valere appena il sistema domotico conferma il cambio: da quel momento lo Shelly si scollega, finché non ci copi la password nuova (sul posto o in sede).",
+      "once": "La password nuova la vedi una volta sola, nella finestra che si apre dopo.",
+      "confirm": "Crea la password nuova"
+    },
+    "revokeDialog": {
+      "title": "Revocare {name}?",
+      "warningStrong": "Il dispositivo smette subito di funzionare:",
+      "warning": "non potrà più collegarsi al sistema domotico.",
+      "comeBackStrong": "Per riattivarlo bisogna andare sul posto:",
+      "comeBack": "riportarlo alle impostazioni di fabbrica e registrarlo di nuovo, con una password nuova.",
+      "when": "Usalo se il dispositivo è stato perso, rubato o tolto dall'impianto.",
+      "label": "Per confermare, scrivi il codice del dispositivo: {code}",
+      "hint": "Il pulsante si accende quando il codice è uguale.",
+      "confirm": "Revoca",
+      "sent": "Revoca inviata: finché il sistema domotico non conferma, il dispositivo può ancora collegarsi."
+    },
+    "retrySent": "Credenziali rimandate al sistema domotico.",
+    "errors": {
+      "versionChanged": "Elenco aggiornato: controlla lo stato prima di riprovare.",
+      "invalidState": "Elenco aggiornato: questa azione non c'è più per lo stato di adesso.",
+      "networkPassword": "Non sappiamo se la password è stata creata. Ricarica l'elenco: se il dispositivo risulta registrato, usa «Rigenera»."
     }
   },
   "deviceStatus": {

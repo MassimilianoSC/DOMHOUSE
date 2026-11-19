@@ -72,7 +72,8 @@ export const Dialog = DialogPrimitive.Root;
 export const DialogTrigger = DialogPrimitive.Trigger;
 export const DialogClose = DialogPrimitive.Close;
 
-export const DialogContent = ({ className, children, ...p }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>) => (
+/** hideClose: no «×» in the corner, for a window that may close only through its own button (the password of A3). */
+export const DialogContent = ({ className, children, hideClose = false, ...p }: React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { hideClose?: boolean }) => (
   <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/30 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
     <DialogPrimitive.Content
@@ -83,9 +84,11 @@ export const DialogContent = ({ className, children, ...p }: React.ComponentProp
       {...p}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-1 opacity-70 hover:opacity-100 focus-ring" aria-label={t("common.close")}>
-        <X className="h-4 w-4" />
-      </DialogPrimitive.Close>
+      {!hideClose && (
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-full p-1 opacity-70 hover:opacity-100 focus-ring" aria-label={t("common.close")}>
+          <X className="h-4 w-4" />
+        </DialogPrimitive.Close>
+      )}
     </DialogPrimitive.Content>
   </DialogPrimitive.Portal>
 );
