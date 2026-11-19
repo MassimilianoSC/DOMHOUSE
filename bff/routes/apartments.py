@@ -133,7 +133,6 @@ async def get_apartment_summary(apartment_id: str, user: CurrentUser = Depends(r
     return await actors.rewrite(out, user.tenant_id)
 
 
-@router.api_route("/apartments/{apartment_id}/instance/{path:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"])
 async def proxy(apartment_id: str, path: str, request: Request, user: CurrentUser = Depends(resolve_user)):
     apt = await get_tenant_apartment(user, apartment_id)
     ctx_apartment.set(apartment_id)
@@ -188,6 +187,13 @@ async def proxy(apartment_id: str, path: str, request: Request, user: CurrentUse
     if "content-type" in resp.headers:
         headers["Content-Type"] = resp.headers["content-type"]
     return Response(content=await _shown(resp, user.tenant_id, path), status_code=resp.status_code, headers=headers)
+
+
+# one route per method (19 November): with the five methods on one route FastAPI gave the five one operationId, taken
+# from whichever method came first, and every build of the generated OpenAPI warned «Duplicate Operation ID». Same
+# place in the router as before, so the matching order of the routes does not change
+for _method in ("GET", "POST", "PUT", "PATCH", "DELETE"):
+    router.add_api_route("/apartments/{apartment_id}/instance/{path:path}", proxy, methods=[_method])
 
 
 async def _engine_params(request: Request, tenant_id: str) -> list[tuple[str, str]]:

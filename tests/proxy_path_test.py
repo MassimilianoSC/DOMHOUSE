@@ -68,3 +68,20 @@ def test_clean_paths_still_work(calls):
     assert request("GET", BASE + "/devices", READER).status_code == 200
     assert request("GET", BASE + "/devices/dev-1/commands", READER).status_code in (200, 501)
     assert calls[0] == ("apt-rimini-01", "GET", "devices")
+
+
+def test_every_method_of_the_proxy_has_its_own_operation_id():
+    """19 November: the proxy was one route with five methods, so the five shared one operationId (taken from whichever
+    method came first) and every build of the BFF's OpenAPI warned «Duplicate Operation ID» (CI and local runs). The
+    site reads contract/openapi.yaml, not this generated document."""
+    import warnings
+
+    from bff.main import create_app
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
+        spec = create_app().openapi()
+    assert not [str(w.message) for w in seen if "Duplicate Operation ID" in str(w.message)]
+    item = spec["paths"]["/app/apartments/{apartment_id}/instance/{path}"]
+    assert sorted(item) == ["delete", "get", "patch", "post", "put"]
+    assert {m: op["operationId"] for m, op in item.items()} == {
+        m: f"proxy_app_apartments__apartment_id__instance__path__{m}" for m in item}
