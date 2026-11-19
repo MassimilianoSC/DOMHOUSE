@@ -328,6 +328,7 @@
 <li><a href="#registro-dell-organizzazione-0698e175">Registro dell&#x27;organizzazione</a></li>
 <li><a href="#copiare-le-regole-su-altri-appartamenti-c3f16daf">Copiare le regole su altri appartamenti</a></li>
 <li><a href="#stato-dei-dispositivi-63cd6ec4">Stato dei dispositivi</a></li>
+<li><a href="#credenziali-dei-dispositivi-b8bca4a8">Credenziali dei dispositivi</a></li>
 <li><a href="#simulatore-finestre-movimento-connettivita-approvazione-a36cdab5">Simulatore: finestre, movimento, connettività, approvazione</a></li>
 <li><a href="#simulatore-evento-prenotazione-e-ripristino-65ced25d">Simulatore: evento prenotazione e ripristino</a></li>
 <li><a href="#l-avviso-di-assistenza-hqe-327ab47a">L&#x27;avviso di assistenza HQE</a></li>
@@ -2879,6 +2880,85 @@ tutti risultano offline: finché non riparte, lo stato dei singoli dispositivi n
 </li>
 <li>
 <p><strong>La batteria</strong> arriva dai sensori Shelly BLU; con un sistema domotico non ancora aggiornato compare «non nota».</p>
+</li>
+</ul>
+</blockquote>
+<h3 id="credenziali-dei-dispositivi-b8bca4a8">Credenziali dei dispositivi</h3>
+<p class="lead"><strong>Le password con cui gli Shelly dell&#x27;appartamento si collegano al sistema domotico.</strong></p>
+<ul>
+<li>
+<p><strong>Dove</strong>: menu dell&#x27;appartamento, «Credenziali dei dispositivi». Solo l&#x27;Amministratore.</p>
+</li>
+<li>
+<p><strong>Nello staging</strong> anche il Gestore della piattaforma: Organizzazioni › Appartamenti, sotto gli appartamenti <code>lab-…</code> e
+<code>test-…</code>.</p>
+</li>
+<li>
+<p><strong>Per ora solo nello staging</strong>: in produzione arriva con la seconda macchina virtuale.</p>
+</li>
+</ul>
+<p><strong>Registrare uno Shelly, prima di montarlo:</strong></p>
+<ol>
+<li>
+<p>«Registra un dispositivo».</p>
+</li>
+<li>
+<p>Scrivi il codice dello Shelly: lettere minuscole, cifre e trattini.</p>
+</li>
+<li>
+<p>«Registra»: si apre la finestra della password.</p>
+</li>
+</ol>
+<p><strong>La password si vede una volta sola.</strong> Copiala nella pagina MQTT dello Shelly, campo per campo:</p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Campo nella pagina dello Shelly</th><th scope="col" class="align-left">Cosa scrivere</th></tr></thead>
+<tbody>
+<tr><td data-label="Campo nella pagina dello Shelly" class="align-left">«Connection type»</td><td data-label="Cosa scrivere" class="align-left">scegli «Default TLS»</td></tr>
+<tr><td data-label="Campo nella pagina dello Shelly" class="align-left">«MQTT prefix», «Server», «Client ID», «Username», «Password»</td><td data-label="Cosa scrivere" class="align-left">il valore della finestra, con il suo «Copia»</td></tr>
+</tbody></table></div>
+<ul>
+<li>
+<p>Poi spunta «Ho copiato la password nello Shelly» e premi «Chiudi»: prima della spunta la finestra non si chiude.</p>
+</li>
+<li>
+<p>Se il PC sincronizza gli appunti con altri dispositivi, svuotali dopo la copia.</p>
+</li>
+<li>
+<p>«Dati di collegamento» mostra di nuovo tutto <strong>tranne</strong> la password.</p>
+</li>
+</ul>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Stato</th><th scope="col" class="align-left">Cosa vuol dire</th></tr></thead>
+<tbody>
+<tr><td data-label="Stato" class="align-left">«In preparazione»</td><td data-label="Cosa vuol dire" class="align-left">Registrato: il sistema domotico lo sta abilitando</td></tr>
+<tr><td data-label="Stato" class="align-left">«Pronto»</td><td data-label="Cosa vuol dire" class="align-left">Può collegarsi. Se è davvero in linea lo dice «Stato dei dispositivi»</td></tr>
+<tr><td data-label="Stato" class="align-left">«Cambio password in corso»</td><td data-label="Cosa vuol dire" class="align-left">Vale ancora la password vecchia</td></tr>
+<tr><td data-label="Stato" class="align-left">«Revoca in corso»</td><td data-label="Cosa vuol dire" class="align-left">Può ancora collegarsi</td></tr>
+<tr><td data-label="Stato" class="align-left">«Revocato»</td><td data-label="Cosa vuol dire" class="align-left">Non può più collegarsi. I revocati stanno in fondo, nella sezione chiusa «Revocati»</td></tr>
+<tr><td data-label="Stato" class="align-left">«Non applicato»</td><td data-label="Cosa vuol dire" class="align-left">L&#x27;ordine non è arrivato al sistema domotico: la riga dice cosa manca</td></tr>
+</tbody></table></div>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Azione</th><th scope="col" class="align-left">Quando usarla</th></tr></thead>
+<tbody>
+<tr><td data-label="Azione" class="align-left">«Rigenera»</td><td data-label="Quando usarla" class="align-left">La password è persa o l&#x27;ha vista chi non doveva. Lo Shelly si scollega finché non ci copi la nuova</td></tr>
+<tr><td data-label="Azione" class="align-left">«Revoca»</td><td data-label="Quando usarla" class="align-left">Lo Shelly è perso, rubato o tolto. Si conferma riscrivendo il codice. Smette subito di funzionare; per riattivarlo bisogna andare sul posto</td></tr>
+<tr><td data-label="Azione" class="align-left">«Riprova»</td><td data-label="Quando usarla" class="align-left">Lo stato è «Non applicato»</td></tr>
+<tr><td data-label="Azione" class="align-left">«Registra di nuovo»</td><td data-label="Quando usarla" class="align-left">Nella sezione «Revocati», per uno Shelly rimontato</td></tr>
+</tbody></table></div>
+<blockquote class="note-info">
+<p><strong>Da sapere</strong></p>
+<ul>
+<li>
+<p><strong>Revoca non applicata</strong>: il dispositivo può ancora collegarsi. Si chiude solo con «Riprova» e compare anche nel
+Registro attività, come riga di «Sistema». Parte anche un avviso per email.</p>
+</li>
+<li>
+<p><strong>«Elenco aggiornato: …»</strong>: qualcuno ha cambiato il dispositivo nel frattempo. Guarda lo stato nuovo prima di
+riprovare.</p>
+</li>
+<li>
+<p><strong>«Non sappiamo se la password è stata creata…»</strong>: rileggi l&#x27;elenco. Se il dispositivo risulta registrato, usa
+«Rigenera».</p>
 </li>
 </ul>
 </blockquote>

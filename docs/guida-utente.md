@@ -1660,6 +1660,58 @@ in ciascuno, poi confermi.».
 > - **Senza dispositivi** leggi «Nessun dispositivo in questo appartamento.»
 > - **La batteria** arriva dai sensori Shelly BLU; con un sistema domotico non ancora aggiornato compare «non nota».
 
+### Credenziali dei dispositivi
+
+**Le password con cui gli Shelly dell'appartamento si collegano al sistema domotico.**
+
+- **Dove**: menu dell'appartamento, «Credenziali dei dispositivi». Solo l'Amministratore.
+- **Nello staging** anche il Gestore della piattaforma: Organizzazioni › Appartamenti, sotto gli appartamenti `lab-…` e
+  `test-…`.
+- **Per ora solo nello staging**: in produzione arriva con la seconda macchina virtuale.
+
+**Registrare uno Shelly, prima di montarlo:**
+
+1. «Registra un dispositivo».
+2. Scrivi il codice dello Shelly: lettere minuscole, cifre e trattini.
+3. «Registra»: si apre la finestra della password.
+
+**La password si vede una volta sola.** Copiala nella pagina MQTT dello Shelly, campo per campo:
+
+| Campo nella pagina dello Shelly | Cosa scrivere |
+|---|---|
+| «Connection type» | scegli «Default TLS» |
+| «MQTT prefix», «Server», «Client ID», «Username», «Password» | il valore della finestra, con il suo «Copia» |
+
+- Poi spunta «Ho copiato la password nello Shelly» e premi «Chiudi»: prima della spunta la finestra non si chiude.
+- Se il PC sincronizza gli appunti con altri dispositivi, svuotali dopo la copia.
+- «Dati di collegamento» mostra di nuovo tutto **tranne** la password.
+
+| Stato | Cosa vuol dire |
+|---|---|
+| «In preparazione» | Registrato: il sistema domotico lo sta abilitando |
+| «Pronto» | Può collegarsi. Se è davvero in linea lo dice «Stato dei dispositivi» |
+| «Cambio password in corso» | Vale ancora la password vecchia |
+| «Revoca in corso» | Può ancora collegarsi |
+| «Revocato» | Non può più collegarsi. I revocati stanno in fondo, nella sezione chiusa «Revocati» |
+| «Non applicato» | L'ordine non è arrivato al sistema domotico: la riga dice cosa manca |
+
+| Azione | Quando usarla |
+|---|---|
+| «Rigenera» | La password è persa o l'ha vista chi non doveva. Lo Shelly si scollega finché non ci copi la nuova |
+| «Revoca» | Lo Shelly è perso, rubato o tolto. Si conferma riscrivendo il codice. Smette subito di funzionare; per riattivarlo bisogna andare sul posto |
+| «Riprova» | Lo stato è «Non applicato» |
+| «Registra di nuovo» | Nella sezione «Revocati», per uno Shelly rimontato |
+
+> **Da sapere**
+>
+> - **Revoca non applicata**: il dispositivo può ancora collegarsi. Si chiude solo con «Riprova» e compare anche nel
+>   Registro attività, come riga di «Sistema». Parte anche un avviso per email.
+> - **«Elenco aggiornato: …»**: qualcuno ha cambiato il dispositivo nel frattempo. Guarda lo stato nuovo prima di
+>   riprovare.
+> - **«Non sappiamo se la password è stata creata…»**: rileggi l'elenco. Se il dispositivo risulta registrato, usa
+>   «Rigenera».
+
+
 ### Simulatore: finestre, movimento, connettività, approvazione
 
 **Provocare eventi su un appartamento dimostrativo.**
