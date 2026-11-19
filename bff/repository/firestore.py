@@ -13,7 +13,7 @@ from google.cloud import firestore
 
 from .. import retention
 
-from .base import (EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (SEQ_UNCHECKED, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email, now_iso)
 
 
@@ -234,7 +234,8 @@ class FirestoreRepository:
             if seq_ref is not None:
                 snap = await seq_ref.get(transaction=tx)
                 op.seq = ((snap.to_dict() or {}).get("seq", 0) if snap.exists else 0) + 1
-                tx.set(seq_ref, {"seq": op.seq, "updated_at": now_iso()})
+                # merge: the same document keeps A3's ultima_seq_riuscita
+                tx.set(seq_ref, {"seq": op.seq, "updated_at": now_iso()}, merge=True)
             doc = op.model_dump()
             tx.create(op_ref, {**doc, retention.FIELD: retention.agent_op(doc)})
         async with self._lock(f"agent_seq:{op.apartment_id}"):
@@ -249,7 +250,7 @@ class FirestoreRepository:
         doc.pop(retention.FIELD, None)
         return AgentOp(**doc)
 
-    async def finish_agent_op(self, op_id, ambiente, apartment_id, operazione, outcome, max_age_s):
+    async def finish_agent_op(self, op_id, ambiente, apartment_id, operazione, outcome, max_age_s, seq=SEQ_UNCHECKED):
         ref = self._col("agent_ops").document(op_id)
 
         @firestore.async_transactional
@@ -262,15 +263,78 @@ class FirestoreRepository:
             op = AgentOp(**doc)
             if (op.ambiente, op.apartment_id, op.operazione) != (ambiente, apartment_id, operazione):
                 return "diverso"
+            if seq is not SEQ_UNCHECKED and seq != op.seq:
+                return "diverso"
             if op.stato != "inviato":
                 return "gia_chiuso"
             age = time.time() - retention.parse(op.creato_at).timestamp()
             if age > max_age_s and outcome.get("stato") != "fallito":
                 return "tardi"
+            raise_ultima = (op.operazione == "aggiorna_broker" and outcome.get("stato") == "riuscito"
+                            and op.apartment_id is not None)
+            if raise_ultima:                                 # A3 §4.2, N1: read before any write
+                seq_ref = self._col("agent_seq").document(op.apartment_id)
+                seq_snap = await seq_ref.get(transaction=tx)
+                ultima = (seq_snap.to_dict() or {}).get("ultima_seq_riuscita", 0) if seq_snap.exists else 0
             tx.update(ref, {**outcome, "finito_at": now_iso()})
+            if raise_ultima and (op.seq or 0) > ultima:
+                tx.set(seq_ref, {"ultima_seq_riuscita": op.seq}, merge=True)
             return "chiuso"
         async with self._lock(f"agent_op:{op_id}"):
             return await txn(self.db.transaction())
+
+    def _creds(self, apartment_id: str):
+        return self._col("apartments").document(apartment_id).collection("device_credentials")
+
+    async def device_credentials_view(self, apartment_id):
+        docs = [d.to_dict() async for d in self._creds(apartment_id).stream()]
+        docs.sort(key=lambda d: d["device_id"])
+        seq_snap = await self._col("agent_seq").document(apartment_id).get()
+        ultima = (seq_snap.to_dict() or {}).get("ultima_seq_riuscita", 0) if seq_snap.exists else 0
+        ops = {}
+        for d in docs:
+            if d.get("op_id"):
+                op = await self.get_agent_op(d["op_id"])
+                if op is not None:
+                    ops[op.op_id] = op
+        return docs, ultima, ops
+
+    async def device_credential_change(self, apartment_id, device_id, change, op, build):
+        col = self._creds(apartment_id)
+        dev_ref, seq_ref = col.document(device_id), self._col("agent_seq").document(apartment_id)
+        op_ref = self._col("agent_ops").document(op.op_id)
+        out = {}
+
+        @firestore.async_transactional
+        async def txn(tx):
+            # every read before any write (Firestore)
+            snaps = [s async for s in col.stream(transaction=tx)]
+            seq_snap = await seq_ref.get(transaction=tx)
+            docs = {s.id: s.to_dict() for s in snaps}
+            current = docs.get(device_id)
+            current_op = None
+            if current and current.get("op_id"):
+                op_snap = await self._col("agent_ops").document(current["op_id"]).get(transaction=tx)
+                if op_snap.exists:
+                    found = op_snap.to_dict()
+                    found.pop(retention.FIELD, None)
+                    current_op = AgentOp(**found)
+            seq_doc = (seq_snap.to_dict() or {}) if seq_snap.exists else {}
+            new = change(current, current_op, seq_doc.get("ultima_seq_riuscita", 0))
+            after = [d for k, d in docs.items() if k != device_id] + [new]
+            sent = op.model_copy(deep=True)
+            sent.seq = seq_doc.get("seq", 0) + 1
+            order, sha = build(sent, after)
+            sent.ordine_sha256 = sha
+            new = {**new, "pending_seq": sent.seq, "op_id": sent.op_id}
+            tx.set(seq_ref, {"seq": sent.seq, "updated_at": now_iso()}, merge=True)
+            dumped = sent.model_dump()
+            tx.create(op_ref, {**dumped, retention.FIELD: retention.agent_op(dumped)})
+            tx.set(dev_ref, new)
+            out.update(doc=new, op=sent, order=order)
+        async with self._lock(f"agent_seq:{apartment_id}"):
+            await txn(self.db.transaction())
+        return out["doc"], out["op"], out["order"]
 
     async def take_mail_quota(self, buckets):
         refs = [(self._col("mail_limits").document(key), limit) for key, limit in buckets]

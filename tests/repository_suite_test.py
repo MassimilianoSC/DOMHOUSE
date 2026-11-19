@@ -728,3 +728,66 @@ def test_agent_operations_sequence_and_closing_once(repo):
                                     1200)) == "sconosciuto"
     assert run(repo.get_agent_op("00000000-0000-4000-8000-000000000009")) is None
     assert run(repo.finish_agent_op(op(2).op_id, "staging", "lab-01", "stato", outcome, -1)) == "tardi"
+
+
+# ---- A3 (docs/proposta-a3-server.md §3, §4.2, N1): the devices' credentials ---------------------------------------
+def _a3_op(n, apt="lab-01", operazione="aggiorna_broker"):
+    from bff.repository.base import AgentOp
+    return AgentOp(op_id=f"00000000-0000-4000-8000-0000000003{n:02d}", operazione=operazione, apartment_id=apt,
+                   ambiente="staging", richiesto_da="Uk9TgS2vLmQ1")
+
+
+def _a3_build(seen):
+    """The order the repository asks for: records what it was given, returns bytes and a fingerprint."""
+    def build(op, docs):
+        from bff import device_credentials as dc
+        seen.append((op.seq, dc.broker_list(docs)))
+        return dc.canonical({"seq": op.seq, "dispositivi": dc.broker_list(docs)}), f"sha-{op.seq}"
+    return build
+
+
+def test_a3_a_change_takes_the_next_seq_and_the_complete_list_in_one_transaction(repo):
+    from bff import device_credentials as dc
+    run(repo.create_agent_op(_a3_op(1, operazione="stato")))                      # seq 1: the sequence is shared
+    seen = []
+    doc, op, order = run(repo.device_credential_change(
+        "lab-01", "shelly-a", dc.decide("registra", "shelly-a", None, "$7$a", "uid1"), _a3_op(2), _a3_build(seen)))
+    assert (op.seq, op.ordine_sha256, op.stato) == (2, "sha-2", "inviato")
+    assert (doc["pending_seq"], doc["op_id"], doc["version"], doc["azione"]) == (2, op.op_id, 1, "registra")
+    assert seen == [(2, [{"id": "shelly-a", "impronta": "$7$a"}])] and b'"seq":2' in order
+    run(repo.device_credential_change(
+        "lab-01", "shelly-b", dc.decide("registra", "shelly-b", None, "$7$b", "uid1"), _a3_op(3), _a3_build(seen)))
+    assert seen[-1] == (3, [{"id": "shelly-a", "impronta": "$7$a"}, {"id": "shelly-b", "impronta": "$7$b"}])
+    docs, ultima, ops = run(repo.device_credentials_view("lab-01"))
+    assert [d["device_id"] for d in docs] == ["shelly-a", "shelly-b"] and ultima == 0
+    assert set(ops) == {_a3_op(2).op_id, _a3_op(3).op_id} and run(repo.get_agent_op(_a3_op(3).op_id)).seq == 3
+
+
+def test_a3_a_refused_change_writes_nothing(repo):
+    from bff import device_credentials as dc
+    run(repo.device_credential_change(
+        "lab-01", "shelly-a", dc.decide("registra", "shelly-a", None, "$7$a", "uid1"), _a3_op(4), _a3_build([])))
+    with pytest.raises(dc.DeviceError) as e:
+        run(repo.device_credential_change(
+            "lab-01", "shelly-a", dc.decide("rigenera", "shelly-a", 7, "$7$x", "uid1"), _a3_op(5), _a3_build([])))
+    assert e.value.error == "version_changed"
+    assert run(repo.get_agent_op(_a3_op(5).op_id)) is None
+    docs, _, _ = run(repo.device_credentials_view("lab-01"))
+    assert docs[0]["impronta"] == "$7$a" and docs[0]["version"] == 1
+    assert run(repo.create_agent_op(_a3_op(6, operazione="stato"))).seq == 2      # the refused change took no seq
+
+
+def test_a3_n1_only_a_successful_aggiorna_broker_raises_ultima_and_the_seq_must_match(repo):
+    from bff import device_credentials as dc
+    _, sent, _ = run(repo.device_credential_change(
+        "lab-01", "shelly-a", dc.decide("registra", "shelly-a", None, "$7$a", "uid1"), _a3_op(7), _a3_build([])))
+    probe = run(repo.create_agent_op(_a3_op(8, operazione="stato")))
+    ok = {"stato": "riuscito", "codice": "ok"}
+    assert run(repo.finish_agent_op(probe.op_id, "staging", "lab-01", "stato", ok, 1200, seq=probe.seq)) == "chiuso"
+    assert run(repo.device_credentials_view("lab-01"))[1] == 0             # «Prova l'agente» confirms nothing
+    assert run(repo.finish_agent_op(sent.op_id, "staging", "lab-01", "aggiorna_broker", ok, 1200, seq=99)) == "diverso"
+    assert run(repo.finish_agent_op(sent.op_id, "staging", "lab-01", "aggiorna_broker", ok, 1200, seq=sent.seq)) \
+        == "chiuso"
+    assert run(repo.device_credentials_view("lab-01"))[1] == sent.seq
+    run(repo.create_agent_op(_a3_op(9, operazione="stato")))              # a new order keeps ultima
+    assert run(repo.device_credentials_view("lab-01"))[1] == sent.seq

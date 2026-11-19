@@ -260,6 +260,9 @@ class ActorRecord(BaseModel):
     email: str
 
 
+SEQ_UNCHECKED = object()        # finish_agent_op without a result's seq (the server's own closings)
+
+
 class AgentOp(BaseModel):
     """Tool A, A1 (docs/progetto-strumento-a-base.md §3, §6): an order sent to the receiver on the VM and its outcome.
     seq is the apartment's sequence number, given by the repository in the same transaction that saves the order;
@@ -275,6 +278,7 @@ class AgentOp(BaseModel):
     dati: dict = Field(default_factory=dict)
     creato_at: str = Field(default_factory=now_iso)
     finito_at: str | None = None
+    ordine_sha256: str | None = None        # A3 §6.3: the fingerprint of the order published (signed results carry it)
 
 
 class SupportAccess(BaseModel):
@@ -362,7 +366,20 @@ class Repository(Protocol):
     async def create_agent_op(self, op: "AgentOp") -> "AgentOp": ...
     async def get_agent_op(self, op_id: str) -> "AgentOp | None": ...
     async def finish_agent_op(self, op_id: str, ambiente: str, apartment_id: str | None, operazione: str,
-                              outcome: dict, max_age_s: float) -> str: ...
+                              outcome: dict, max_age_s: float, seq=SEQ_UNCHECKED) -> str: ...
+    # A3 (docs/proposta-a3-server.md §4.2, N1): with `seq` given, a result whose seq is not the saved operation's is
+    # «diverso»; a SUCCESSFUL aggiorna_broker raises the apartment's ultima_seq_riuscita to its seq in the same
+    # transaction (only aggiorna_broker: stato, crea_motore, applica_catalogo share the sequence).
+
+    # A3, the devices' credentials (plain dicts, bff/device_credentials.py): device_credentials_view gives the
+    # documents of an apartment, its ultima_seq_riuscita and the operation of each document's order;
+    # device_credential_change runs, in ONE transaction: change(document or None, its operation, ultima) -> the new
+    # document (raises to refuse), the complete list of the apartment after the change, the next seq, build(op with
+    # its seq, the documents after the change) -> (order bytes, sha256), the operation «inviato» with that sha, and the
+    # document with pending_seq and op_id. Returns (document, operation, order bytes).
+    async def device_credentials_view(self, apartment_id: str) -> tuple[list[dict], int, dict]: ...
+    async def device_credential_change(self, apartment_id: str, device_id: str, change, op: "AgentOp",
+                                       build) -> tuple[dict, "AgentOp", bytes]: ...
 
     # P-60 step 9 (D-132, D-143): the assistant's spending of a month (UTC, "YYYY-MM") for the whole project:
     # {cost_eur, calls, input_tokens, output_tokens, alerted}; add is atomic and returns the totals after it;

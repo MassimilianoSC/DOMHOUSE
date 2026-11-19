@@ -1,6 +1,7 @@
+import copy
 import time
 
-from .base import (EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (SEQ_UNCHECKED, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
 
 
@@ -39,6 +40,8 @@ class InMemoryRepository:
         self.actors: dict[str, ActorRecord] = {}         # pseudonym -> who
         self.agent_ops: dict[str, AgentOp] = {}           # tool A, A1: op_id -> order and outcome
         self.agent_seq: dict[str, int] = {}               # apartment -> last sequence number given (never removed)
+        self.agent_ultima: dict[str, int] = {}            # A3: apartment -> ultima_seq_riuscita of aggiorna_broker
+        self.device_creds: dict[str, dict[str, dict]] = {}   # A3: apartment -> device_id -> document
 
     # tool A, A1: no await between the reads and the writes, so atomic within the (single) process
     async def create_agent_op(self, op):
@@ -53,18 +56,46 @@ class InMemoryRepository:
         op = self.agent_ops.get(op_id)
         return op.model_copy(deep=True) if op else None
 
-    async def finish_agent_op(self, op_id, ambiente, apartment_id, operazione, outcome, max_age_s):
+    async def finish_agent_op(self, op_id, ambiente, apartment_id, operazione, outcome, max_age_s, seq=SEQ_UNCHECKED):
         op = self.agent_ops.get(op_id)
         if op is None:
             return "sconosciuto"
         if (op.ambiente, op.apartment_id, op.operazione) != (ambiente, apartment_id, operazione):
+            return "diverso"
+        if seq is not SEQ_UNCHECKED and seq != op.seq:
             return "diverso"
         if op.stato != "inviato":
             return "gia_chiuso"
         if _agent_age_s(op) > max_age_s and outcome.get("stato") != "fallito":
             return "tardi"
         self.agent_ops[op_id] = op.model_copy(update={**outcome, "finito_at": now_iso_()}, deep=True)
+        if op.operazione == "aggiorna_broker" and outcome.get("stato") == "riuscito" and op.apartment_id is not None:
+            self.agent_ultima[op.apartment_id] = max(self.agent_ultima.get(op.apartment_id, 0), op.seq or 0)
         return "chiuso"
+
+    async def device_credentials_view(self, apartment_id):
+        docs = [copy.deepcopy(d) for _, d in sorted(self.device_creds.get(apartment_id, {}).items())]
+        ops = {d["op_id"]: self.agent_ops[d["op_id"]].model_copy(deep=True) for d in docs
+               if d.get("op_id") in self.agent_ops}
+        return docs, self.agent_ultima.get(apartment_id, 0), ops
+
+    # no await between the reads and the writes: atomic within the (single) process, like create_agent_op
+    async def device_credential_change(self, apartment_id, device_id, change, op, build):
+        docs = self.device_creds.get(apartment_id, {})
+        current = copy.deepcopy(docs.get(device_id))
+        current_op = self.agent_ops.get(current["op_id"]) if current and current.get("op_id") else None
+        new = change(current, current_op.model_copy(deep=True) if current_op else None,
+                     self.agent_ultima.get(apartment_id, 0))
+        after = [copy.deepcopy(d) for k, d in docs.items() if k != device_id] + [new]
+        op = op.model_copy(deep=True)
+        op.seq = self.agent_seq.get(apartment_id, 0) + 1
+        order, sha = build(op, after)
+        op.ordine_sha256 = sha
+        new = {**new, "pending_seq": op.seq, "op_id": op.op_id}
+        self.agent_seq[apartment_id] = op.seq
+        self.agent_ops[op.op_id] = op
+        self.device_creds.setdefault(apartment_id, {})[device_id] = copy.deepcopy(new)
+        return new, op.model_copy(deep=True), order
 
     async def get_tenant(self, tenant_id):
         t = self.tenants.get(tenant_id)
