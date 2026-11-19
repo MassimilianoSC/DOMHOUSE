@@ -19,7 +19,8 @@
 #   sudo bash /opt/domhouse/broker-vm.sh sync                          # rereads the secrets of every apartment
 #   sudo bash /opt/domhouse/broker-vm.sh check                         # one line for the 5-minute watch
 #   sudo bash /opt/domhouse/broker-vm.sh limit                         # (re)applies the limit on new connections
-#   sudo bash /opt/domhouse/broker-vm.sh network                       # the broker's network on its subnet (C2)
+#   sudo bash /opt/domhouse/broker-vm.sh network                       # the broker's networks as compose.yaml says
+#                                                                      # (C2 subnet, E-38 range of the internal one)
 #
 # Folders: /opt/domhouse/_broker (compose, configuration, settings), /etc/domhouse/_broker (auth, the list of
 # apartments, acme.settings), /data/_broker (the broker's persistence). The underscore on purpose: an apartment_id
@@ -57,6 +58,10 @@
 # network, BROKER_SUBNET, both forwarded and to the VM itself; the answers of the connections that came in are not new.
 # The subnet is fixed in engine/broker/compose.yaml; compose does not move an existing network, so install (and
 # network) make it again, with the broker stopped for a moment, when Docker had given it another one.
+# Internal network (E-38, 19 November): the broker listens for the engines on its fixed 172.30.83.2; the dynamic
+# addresses come only from INTERNAL_IPAM's range, so no container started before the broker can take it. The same
+# way: install (and network) make the network again when its range differs, the engines on it detached and attached
+# again after the broker, which takes .2 first.
 set -euo pipefail
 set +x                                   # never trace
 
@@ -94,6 +99,8 @@ LIMIT_RATE="30/minute"                   # per source address, after the first L
 LIMIT_BURST=60                           # an apartment's relays reconnecting together after a power cut
 BROKER_SUBNET=172.30.84.0/24             # C2: the default network of engine/broker/compose.yaml (the same subnet)
 BRIDGE_NETWORK=domhouse-broker_default
+INTERNAL_NETWORK=domhouse-broker-internal
+INTERNAL_IPAM="172.30.83.0/24 172.30.83.128/25"   # E-38: subnet and ip_range of the internal network (compose.yaml)
 AUTH_ALERT_PER_HOUR="${DOMHOUSE_AUTH_ALERT_PER_HOUR:-100}"   # one relay with a wrong password retrying alone stays under
 KEPT=""                                  # E-33: the apartments the last sync kept as they were (sync_accounts)
 
@@ -404,6 +411,43 @@ ensure_network() {
   docker network rm "${BRIDGE_NETWORK}" > /dev/null
 }
 
+attach_engines() {   # attach_engines <name>...: the engines back on the internal network (dynamic address)
+  local c
+  for c in "$@"; do
+    docker network connect "${INTERNAL_NETWORK}" "${c}"
+    echo "${c}: di nuovo sulla rete interna"
+  done
+}
+
+ensure_internal_network() {
+  # E-38: the internal network with the range of INTERNAL_IPAM. Compose keeps an existing network as it is: the
+  # broker stops, every container on the network is detached (the engines, and a probe of engine-vm.sh if one is
+  # running), the network goes, compose makes it with the broker on .2, then the engines are attached again. A
+  # network that cannot go (a container arrived meanwhile) puts everything back as it was
+  local current names=() engines=() c
+  current="$(docker network inspect -f '{{range .IPAM.Config}}{{.Subnet}} {{.IPRange}}{{end}}' "${INTERNAL_NETWORK}" \
+    2>/dev/null | awk '{$1 = $1; print}' || true)"
+  if [ -z "${current}" ]; then echo "rete ${INTERNAL_NETWORK}: la crea compose (${INTERNAL_IPAM})"; return 0; fi
+  if [ "${current}" = "${INTERNAL_IPAM}" ]; then echo "rete ${INTERNAL_NETWORK}: già ${INTERNAL_IPAM}"; return 0; fi
+  echo "rete ${INTERNAL_NETWORK}: «${current}» -> «${INTERNAL_IPAM}» (E-38); il broker si ferma un momento"
+  mapfile -t names < <(docker ps -a --filter "network=${INTERNAL_NETWORK}" --format '{{.Names}}' \
+    | grep -v -x -e "${CONTAINER}" -e '' || true)
+  for c in "${names[@]}"; do
+    case "${c}" in engine-*) engines+=("${c}") ;; esac
+  done
+  echo "motori sulla rete: ${engines[*]:-nessuno}"
+  compose stop broker
+  compose rm -f broker
+  for c in "${names[@]}"; do docker network disconnect -f "${INTERNAL_NETWORK}" "${c}"; done
+  if ! docker network rm "${INTERNAL_NETWORK}" > /dev/null; then
+    compose up -d
+    attach_engines "${engines[@]}"
+    die "rete ${INTERNAL_NETWORK} non tolta (un container arrivato nel frattempo?): broker e motori rimessi com'erano; rilancia broker-vm.sh network"
+  fi
+  compose up -d                            # the network again, the broker on .2 before any engine
+  attach_engines "${engines[@]}"
+}
+
 limit_active() { nft list table inet "${LIMIT_TABLE}" > /dev/null 2>&1; }
 
 auth_refused_report() {
@@ -530,6 +574,7 @@ case "${cmd}" in
     step "Avvio di ${CONTAINER} con ${image}"
     compose pull --quiet
     ensure_network
+    ensure_internal_network
     compose up -d
     # mosquitto.conf is mounted as a single file and put_files replaces it with a new one: a broker already running
     # keeps reading the old one, also after a reload, and compose does not recreate it for a change of content. When
@@ -670,6 +715,7 @@ case "${cmd}" in
     need_installed
     need_tls_disk
     ensure_network
+    ensure_internal_network
     compose up -d
     wait_healthy
     ;;

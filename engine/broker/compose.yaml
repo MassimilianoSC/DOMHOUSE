@@ -66,4 +66,8 @@ networks:
     internal: true
     ipam:
       config:
+        # E-38 (19 November): the dynamic addresses (engines, the hourly probe of engine-vm.sh) only from .128 on, so
+        # the broker's fixed 172.30.83.2 is never given to a container started before it (at the VM's restart
+        # engine-lab-01 took it and the broker did not start). scripts/broker-vm.sh network makes the network again
         - subnet: 172.30.83.0/24
+          ip_range: 172.30.83.128/25

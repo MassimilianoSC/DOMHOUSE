@@ -41,10 +41,16 @@ STUBS = {
     "nft": ('#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/nft.log"\n'
             'if [ "$1" = -f ]; then cp "$2" "$STUB_DIR/applied.nft"; exit 0; fi\n'
             'if [ "$1" = list ]; then cat "$STUB_DIR/net-current.nft" 2>/dev/null; exit 0; fi\nexit 0\n'),
-    # docker: network inspect answers with the file subnet (absent: no network); compose and the rest are recorded
+    # docker: network inspect answers with the file subnet (absent: no network), the internal network with the file
+    # internal; ps -a --filter network= lists the file attached; network rm of the internal network fails with
+    # rm-fails; compose and the rest are recorded
     "docker": ('#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/docker.log"\n'
                'case "$*" in\n'
+               '  "network inspect"*domhouse-broker-internal*) [ -f "$STUB_DIR/internal" ] || exit 1; '
+               'cat "$STUB_DIR/internal"; exit 0 ;;\n'
                '  "network inspect"*) [ -f "$STUB_DIR/subnet" ] || exit 1; cat "$STUB_DIR/subnet"; exit 0 ;;\n'
+               '  "ps -a --filter network=domhouse-broker-internal"*) cat "$STUB_DIR/attached" 2>/dev/null; exit 0 ;;\n'
+               '  "network rm domhouse-broker-internal"*) [ -f "$STUB_DIR/rm-fails" ] && exit 1; exit 0 ;;\n'
                '  "compose version"*) exit 0 ;;\n'
                '  inspect*) echo healthy; exit 0 ;;\n'
                'esac\nexit 0\n'),
@@ -144,3 +150,69 @@ def test_c5_tls_1_2_written_on_the_tls_listener():
     conf = (ROOT / "engine/broker/mosquitto.conf").read_text(encoding="utf-8")
     tls = conf[conf.index("listener 8883"):conf.index("listener 1883")]
     assert re.search(r"^tls_version tlsv1\.2$", tls, re.MULTILINE), tls
+
+
+# ---- E-38 (19 November): the broker's fixed address on the internal network is never given to anyone else ----------
+# At the VM's restart Docker started engine-lab-01 before the broker and gave it 172.30.83.2, the broker's fixed
+# address on domhouse-broker-internal: «Address already in use», broker down, lab-01 without devices. The network's
+# dynamic addresses now come only from an ip_range that leaves the fixed one out; compose does not change an existing
+# network, so broker-vm.sh network (and install) makes it again: the broker stops, the engines on it are detached,
+# the network goes, compose makes it with the broker on .2, the engines are attached again (from .128 on).
+INTERNAL = "domhouse-broker-internal"
+INTERNAL_SUBNET, INTERNAL_RANGE, BROKER_IP = "172.30.83.0/24", "172.30.83.128/25", "172.30.83.2"
+
+
+def test_e38_the_broker_fixed_address_is_out_of_the_dynamic_range_everywhere():
+    import ipaddress
+    compose = (ROOT / "engine/broker/compose.yaml").read_text(encoding="utf-8")
+    internal = compose[compose.index("\nnetworks:"):]
+    internal = internal[internal.index("  internal:"):]
+    assert f"- subnet: {INTERNAL_SUBNET}" in internal and f"ip_range: {INTERNAL_RANGE}" in internal, internal
+    assert f"ipv4_address: {BROKER_IP}" in compose
+    ip = ipaddress.ip_address(BROKER_IP)
+    assert ip in ipaddress.ip_network(INTERNAL_SUBNET) and ip not in ipaddress.ip_network(INTERNAL_RANGE)
+    assert ipaddress.ip_network(INTERNAL_RANGE).subnet_of(ipaddress.ip_network(INTERNAL_SUBNET))
+    conf = (ROOT / "engine/broker/mosquitto.conf").read_text(encoding="utf-8")
+    assert re.search(rf"^listener 1883 {re.escape(BROKER_IP)}$", conf, re.MULTILINE)
+    engine_vm = (ROOT / "scripts/engine-vm.sh").read_text(encoding="utf-8")
+    assert re.search(rf"^BROKER_INTERNAL_HOST={re.escape(BROKER_IP)}\b", engine_vm, re.MULTILINE)
+    assert f'INTERNAL_IPAM="{INTERNAL_SUBNET} {INTERNAL_RANGE}"' in SCRIPT.read_text(encoding="utf-8")
+
+
+def test_e38_an_internal_network_without_the_range_is_made_again_with_the_engines_attached_after(vm):
+    (vm.stubs / "subnet").write_text(f"{SUBNET}\n", encoding="utf-8")
+    (vm.stubs / "internal").write_text(f"{INTERNAL_SUBNET} \n", encoding="utf-8")       # Docker: no IPRange
+    (vm.stubs / "attached").write_text("domhouse-broker\nengine-lab-01\nnifty_probe\n", encoding="utf-8")
+    r = vm("network")
+    assert r.returncode == 0, r.stdout + r.stderr
+    log = read(vm.stubs, "docker.log")
+    steps = ["stop broker", "rm -f broker", f"network disconnect -f {INTERNAL} engine-lab-01", f"network rm {INTERNAL}",
+             "up -d", f"network connect {INTERNAL} engine-lab-01"]
+    at = [log.find(k) for k in steps]
+    assert -1 not in at and at == sorted(at), log
+    assert f"network disconnect -f {INTERNAL} nifty_probe" in log                       # a probe: detached ...
+    assert f"network connect {INTERNAL} nifty_probe" not in log                         # ... and not attached again
+    assert f"network disconnect -f {INTERNAL} domhouse-broker" not in log
+    assert "network rm domhouse-broker_default" not in log                             # the default one is right
+    assert INTERNAL_RANGE in r.stdout and "engine-lab-01" in r.stdout
+
+
+def test_e38_an_internal_network_with_its_range_is_left_alone(vm):
+    (vm.stubs / "subnet").write_text(f"{SUBNET}\n", encoding="utf-8")
+    (vm.stubs / "internal").write_text(f"{INTERNAL_SUBNET} {INTERNAL_RANGE}\n", encoding="utf-8")
+    (vm.stubs / "attached").write_text("domhouse-broker\nengine-lab-01\n", encoding="utf-8")
+    r = vm("network")
+    assert r.returncode == 0, r.stdout + r.stderr
+    log = read(vm.stubs, "docker.log")
+    assert "network rm" not in log and "disconnect" not in log and "stop broker" not in log, log
+
+
+def test_e38_if_the_network_cannot_go_the_broker_and_the_engines_are_put_back(vm):
+    (vm.stubs / "subnet").write_text(f"{SUBNET}\n", encoding="utf-8")
+    (vm.stubs / "internal").write_text(f"{INTERNAL_SUBNET} \n", encoding="utf-8")
+    (vm.stubs / "attached").write_text("domhouse-broker\nengine-lab-01\n", encoding="utf-8")
+    (vm.stubs / "rm-fails").write_text("", encoding="utf-8")
+    r = vm("network")
+    assert r.returncode != 0 and "rimessi com'erano" in r.stderr, r.stdout + r.stderr
+    log = read(vm.stubs, "docker.log")
+    assert log.index(f"network rm {INTERNAL}") < log.index("up -d") < log.index(f"network connect {INTERNAL} engine-lab-01")
