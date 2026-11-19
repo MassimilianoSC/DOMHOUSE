@@ -218,7 +218,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh status; ls -ld /run/domhouse-agent /run/domhouse-agent/esecutore.sock /var/lib/domhouse-agent /var/lib/domhouse-executor' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh status; sudo ls -ld /run/domhouse-agent /run/domhouse-agent/esecutore.sock /var/lib/domhouse-agent /var/lib/domhouse-executor' < /dev/null
 ```
 
 - **Atteso:**
