@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Pronta, da rileggere.** Nessun passo provato sul vero | o1, 19 novembre 2026 (notte, via 1184) | file della VM uguali a `fb5fa2a`; server da `fb5fa2a` più il commit del manifesto (Q3.1) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | Q0–Q8 |
+| **Pronta, corretta dopo la revisione del codice** (19 novembre, «installabile dopo correzioni», tutte fatte). Nessun passo provato sul vero | o1, 19 novembre 2026 (notte, via 1184) | file della VM uguali a `f54a222`; server da `f54a222` più il commit del manifesto (Q3.1) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | Q0–Q8 |
 
 **Cosa si installa** (`docs/proposta-a3-server.md`):
 
@@ -28,11 +28,11 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git merge-base --is-ancestor fb5fa2a origin/main && git diff --quiet fb5fa2a HEAD -- scripts/agent scripts/agent-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py && echo "file della VM uguali a fb5fa2a, già su GitHub"
+git fetch -q origin && git merge-base --is-ancestor f54a222 origin/main && git diff --quiet f54a222 HEAD -- scripts/agent scripts/agent-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py && echo "file della VM uguali a f54a222, già su GitHub"
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/agent/../agent-vm.sh status 2>/dev/null | head -2; systemctl is-active domhouse-agent-esecutore domhouse-agent-lettore; ls -ld /etc/domhouse/_broker/auth; sudo ls -l /etc/domhouse/_broker/auth' < /dev/null
 ```
 
-- **Atteso:** «file della VM uguali a fb5fa2a, già su GitHub»; i due servizi `active`; `auth/` di `1883 1883` con i quattro file `1883 1883` (`-rw-r-----`). Altrimenti fermati.
+- **Atteso:** «file della VM uguali a f54a222, già su GitHub»; i due servizi `active`; `auth/` di `1883 1883` con i quattro file `1883 1883` (`-rw-r-----`). Altrimenti fermati.
 
 ## Q1. Le due chiavi delle firme (scrive sulla VM e su Google Cloud)
 
@@ -79,6 +79,15 @@ for n in ordini risultati; do echo "== $n"; gcloud secrets get-iam-policy "domho
 ```
 
 - **Atteso:** per ciascuno **una sola** riga, `roles/secretmanager.secretAccessor serviceAccount:domotica-bff-staging@…`. Nessun `langbrain-vm@`: la VM ha le chiavi nei suoi file e non deve poterle leggere da Secret Manager (vincolo della revisione, punto 9).
+- **E a livello di progetto** (revisione del codice, punto 8), sola lettura:
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud projects get-iam-policy domotica-poc-511707 --account=m.scardovellicrac@gmail.com --flatten="bindings[].members" --filter="bindings.role~secretmanager" --format="table[no-heading](bindings.role,bindings.members,bindings.condition.title)"
+```
+
+- **Atteso:** nessuna riga con `langbrain-vm@` senza condizione. Il 19 novembre non c'era nessun ruolo di Secret Manager a livello di progetto; dopo A2 ci sarà quello condizionato sui prefissi `langbrain-…`, che non copre `domhouse-agent-…`.
 - **Ritorno indietro:** `gcloud secrets remove-iam-policy-binding` con gli stessi argomenti.
 
 ## Q2. La VM: codice dell'agente e del broker (scrive sulla VM; il broker non si riavvia)
@@ -94,7 +103,7 @@ gcloud compute scp scripts/agent/comune.py scripts/agent/lettore.py scripts/agen
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a3 && sed -i "s/\r*$//" agent-vm.sh broker-vm.sh broker_accounts.py agent/*.py agent/*.service && sha256sum agent-vm.sh broker-vm.sh broker_accounts.py agent/* | cut -c1-16,65-' < /dev/null
 ```
 
-- **Atteso:** otto file copiati, poi otto impronte. La memoria storica le confronta con quelle di `fb5fa2a` (calcolate sul PC senza i ritorni a capo). Una diversa: fermati.
+- **Atteso:** otto file copiati, poi otto impronte. La memoria storica le confronta con quelle di `f54a222` (calcolate sul PC senza i ritorni a capo). Una diversa: fermati.
 
 **Q2.2 Broker: `auth/` a `root:1883`, la cartella `devices/`, il codice nuovo** (N9). Copia di prima in `/opt/domhouse/prima-a3`.
 
@@ -112,11 +121,15 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='P="-p User=root -p Group=domhouse-agent -p SupplementaryGroups=1883 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p ReadWritePaths=/etc/domhouse/_broker -p CapabilityBoundingSet=CAP_CHOWN -p RestrictAddressFamilies=AF_UNIX -p RestrictAddressFamilies=AF_INET"; sudo systemd-run --quiet --pipe --wait $P /bin/sh -c "id; head -c 0 /etc/domhouse/_broker/auth/devices.passwd && echo lettura-ok; f=/etc/domhouse/_broker/auth/.prova-a3; touch \$f && chown 1883:1883 \$f && echo scrittura-ok; rm -f \$f"; sudo systemd-run --quiet --pipe --wait -E PATH=/usr/sbin:/usr/bin:/sbin:/bin $P /bin/bash /opt/domhouse/broker-vm.sh sync | tail -1' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='P="-p User=root -p Group=domhouse-agent -p SupplementaryGroups=1883 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p ReadWritePaths=/etc/domhouse/_broker -p CapabilityBoundingSet=CAP_CHOWN -p RestrictAddressFamilies=AF_UNIX -p RestrictAddressFamilies=AF_INET -p MemoryMax=128M -p UMask=0077"; sudo systemd-run --quiet --pipe --wait $P /bin/sh -c "id; head -c 0 /etc/domhouse/_broker/auth/devices.passwd && echo lettura-ok; f=/etc/domhouse/_broker/auth/.prova-a3; touch \$f && chown 1883:1883 \$f && echo scrittura-ok; rm -f \$f"; sudo systemd-run --quiet --pipe --wait -E PATH=/usr/sbin:/usr/bin:/sbin:/bin $P /bin/bash /opt/domhouse/broker-vm.sh sync | tail -1' < /dev/null
 ```
 
 - **Atteso:** `uid=0(root) gid=…(domhouse-agent) groups=…,1883…`; «lettura-ok»; «scrittura-ok»; dal sync «unchanged».
-- **Da verificare** (non provabile sul PC): che `CAP_CHOWN` basti e che `docker` e il token della VM funzionino con queste restrizioni. Un «Permission denied» o un errore del sync: **fermati** e incolla; non si installa l'unità (si decide con o1 cosa aprire).
+- **Da verificare** (non provabile sul PC; revisione del codice, «da verificare» 1), tutto in questo blocco:
+  1. `SupplementaryGroups=1883` numerico accettato e visibile in `id`;
+  2. lettura di un file 640 di `auth/` dal gruppo 1883, scrittura e `chown` a 1883;
+  3. il `sync` sotto le stesse restrizioni: token della VM (rete `AF_INET`) e `docker` (socket `AF_UNIX`), con `MemoryMax=128M` e `UMask=0077` come nell'unità (`write_files` mette comunque 640).
+- Un «Permission denied», un errore del sync o un processo fermato per memoria: **fermati** e incolla; non si installa l'unità (si decide con o1 cosa aprire).
 
 **Q2.4 L'agente nuovo** (come I7 di A1: rilanciare `install` aggiorna codice e unità e riavvia).
 
@@ -127,7 +140,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```
 
 - **Atteso:** «agente installato: ambiente staging»; i due servizi `active`; le tre righe dell'unità.
-- **Ritorno indietro:** lo stesso comando dalla copia di A1 (`~/agente`, I6 di A1), poi `sudo systemctl restart domhouse-agent-esecutore domhouse-agent-lettore`.
+- **Ritorno indietro:** lo stesso comando dalla copia di A1 (`~/agente`, I6 di A1), poi `sudo systemctl restart domhouse-agent-esecutore domhouse-agent-lettore`. **Dopo Q3** l'agente di A1 rifiuta gli ordini firmati del server nuovo (`campo_non_valido`): tornare ad A1 sulla VM vuol dire tornare **anche** al server di prima (ritorno indietro di Q3.2), e viceversa (revisione del codice, punto 6).
 
 ## Q3. Il server dello staging (o1 committa, il committente spinge e pubblica)
 
@@ -186,7 +199,7 @@ Nell'app dello staging, pagina della piattaforma → «Prova l'agente» su `lab-
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/broker-vm.sh devices-from-auth lab-01 | grep -v "\$7\$"; sudo wc -l /etc/domhouse/_broker/devices/lab-01' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/broker-vm.sh devices-from-auth lab-01 | grep -vF "\$7\$"; sudo wc -l /etc/domhouse/_broker/devices/lab-01' < /dev/null
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo cat /etc/domhouse/_broker/devices/lab-01' < /dev/null > impronte-lab-01.txt; wc -l impronte-lab-01.txt
 ```
 
@@ -204,7 +217,7 @@ cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 
 - **Atteso:** «N impronte nel file; N dispositivi da scrivere …», poi «… scritti» con gli stessi nomi.
 - **Da verificare:** lo script scrive con le credenziali predefinite del PC (Application Default Credentials). Se risponde «permission denied», incolla: si sceglie con la memoria storica l'account giusto.
-- **Ritorno indietro:** lo stesso comando con `--annulla --applica` al posto di `--file …`: toglie solo i documenti «migrato».
+- **Ritorno indietro:** lo stesso comando con `--annulla --applica` al posto di `--file …`: toglie solo i documenti «migrato» (una «Rigenera» o una «Revoca» fatta dall'app toglie il segno «migrato» a quel documento, che quindi resta). **Solo dopo aver tolto il segno di Q6.3** (il suo ritorno indietro): altrimenti il primo `aggiorna_broker` di `lab-01` manderebbe al broker un elenco senza gli Shelly veri (revisione del codice, punto 5).
 
 **Q6.3 Controllo nell'app**, poi il segno che apre `aggiorna_broker` su `lab-01`.
 
@@ -221,6 +234,16 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 - **Ritorno indietro:** `sudo rm -f /var/lib/domhouse-executor/migrati/lab-01`.
 
 ## Q7. La prova vera: un dispositivo finto registrato e revocato (scrive: due ordini)
+
+**Prima, sola lettura:** il broker della VM è la stessa immagine del banco della misura del 19 novembre (revisione del codice, «da verificare» 2).
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo docker inspect -f "{{.Config.Image}}" domhouse-broker; sudo docker image inspect -f "{{join .RepoDigests \" \"}}" "$(sudo docker inspect -f "{{.Image}}" domhouse-broker)"' < /dev/null
+```
+
+- **Atteso:** fra i digest, `eclipse-mosquitto@sha256:75d6662dee52c947dc9dd9c29f1d8d7ffef78ddaf38001caa09755681e8bbc98` (quello di `tests/broker_container_test.py`). **Diverso:** fermati prima del punto 3: la misura non vale per quella versione, e la prova della revoca si fa con un client MQTT vero, preparato con o1.
 
 Nell'app dello staging, credenziali di `lab-01`:
 

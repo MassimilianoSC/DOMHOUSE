@@ -264,7 +264,7 @@ Rispetto a o2: `version_changed`, `invalid_state` e `broker_address_missing` in 
 
 ### 8.3 Limiti di frequenza
 
-- Per organizzazione: **30 azioni l'ora** fra «Registra», «Rigenera», «Revoca», «Riprova» (ognuna fa un `sync`, e una revoca o una password nuova anche un riavvio del broker). Un contatore **suo**, separato da quello delle email (revisione, punto 15), con la stessa transazione di `take_mail_quota`.
+- Per organizzazione: **30 azioni l'ora** fra «Registra», «Rigenera», «Revoca», «Riprova» (ognuna fa un `sync` con la ricarica del broker; nessun riavvio, §5.4). Un contatore **suo**, separato da quello delle email (revisione, punto 15), con la stessa transazione di `take_mail_quota`.
 - Per appartamento: **nessun limite a parte e nessuna coda**: le azioni ravvicinate si accettano, ognuna con la sua `seq`, e l'ordine riuscito più recente conferma i precedenti (§4.2).
 - Un kit da 10 Shelly in una volta resta sotto il limite.
 
