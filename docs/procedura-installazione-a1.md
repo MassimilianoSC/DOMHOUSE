@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Pronta, da rileggere.** Nessun passo provato sul vero | o1, 16 novembre 2026 | `ee59625` (codice di A1 dopo quattro letture di sicurezza) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | 15 blocchi (I0–I14) |
+| **I0–I5 fatti il 17 novembre; I6–I14 riletti il 19 novembre** rispetto alla VM dopo il passo 3 | o1, 16 novembre 2026 | `ee59625` (codice di A1 dopo quattro letture di sicurezza); `scripts/agent-gcp.sh` a `7b22a3a` (correzioni di I2) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | 15 blocchi (I0–I14) |
 
 **Cosa si installa** (progetto `docs/progetto-strumento-a-base.md` §1, §3, §4, §6):
 
@@ -21,7 +21,9 @@
 3. Ogni passo che scrive ha accanto il ritorno indietro. Il ritorno completo è in I14.
 4. Solo lo **staging**: sulla VM condivisa la produzione non manda ordini (§5.4).
 
-**Quando:** dopo il passo 2 del piano (correzioni sulla VM, `docs/procedura-difetti-vm.md`). Il giorno lo decide il committente.
+**Quando:** dopo il passo 3 del piano, a finestra chiusa (controllo di sicurezza della VM, `docs/procedura-passo3-vm.md`). Il giorno lo decide il committente.
+
+**Ogni `gcloud compute ssh` finisce con `< /dev/null`:** senza, Git Bash può stampare «Segmentation fault» alla chiusura (plink, sul PC; la VM non c'entra) e il codice d'uscita non è 0.
 
 ## I0. Prerequisiti (sola lettura)
 
@@ -30,11 +32,11 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git log --oneline -1 ee59625 && git diff --quiet ee59625 HEAD -- scripts/agent scripts/agent-vm.sh scripts/agent-gcp.sh bff/agent.py bff/routes/agent.py && echo "agente uguale a ee59625"; gcloud services list --enabled --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --filter="config.name=cloudasset.googleapis.com" --format="value(config.name)"
+git log --oneline -1 ee59625 && git diff --quiet ee59625 HEAD -- scripts/agent scripts/agent-vm.sh bff/agent.py bff/routes/agent.py && git diff --quiet 7b22a3a HEAD -- scripts/agent-gcp.sh && echo "agente uguale a ee59625, agent-gcp.sh a 7b22a3a"; gcloud services list --enabled --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --filter="config.name=cloudasset.googleapis.com" --format="value(config.name)"
 ```
 
 - **Atteso:**
-  1. la riga del commit `ee59625` e «agente uguale a ee59625». Se manca la seconda riga, fermati: qualcuno ha cambiato i file dell'agente dopo le letture;
+  1. la riga del commit `ee59625` e «agente uguale a ee59625, agent-gcp.sh a 7b22a3a» (`agent-gcp.sh` è cambiato dopo le letture solo per le correzioni di I2, fino a `7b22a3a`). Se manca la seconda riga, fermati: qualcuno ha cambiato i file dell'agente;
   2. `cloudasset.googleapis.com` se l'API è già attiva; **nessuna riga** se manca: allora c'è I1.
 
 **I0.2 Sulla VM: E-31 attiva** (i container non raggiungono i metadati: rilievo R8 della revisione).
@@ -42,7 +44,7 @@ git log --oneline -1 ee59625 && git diff --quiet ee59625 HEAD -- scripts/agent s
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo nft list table inet domhouse_metadata > /dev/null && echo "tabella domhouse_metadata presente"; for c in engine-dev engine-lab-01; do echo "$c:"; sudo docker exec "$c" python -c "import urllib.request as u; print(u.urlopen(u.Request(\"http://169.254.169.254/computeMetadata/v1/instance/zone\", headers={\"Metadata-Flavor\": \"Google\"}), timeout=3).read().decode())" 2>&1 | tail -1; done; sudo journalctl -t domhouse-check --since "-2h" --no-pager | grep -E " metadata (blocked|OPEN)" | tail -1'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo nft list table inet domhouse_metadata > /dev/null && echo "tabella domhouse_metadata presente"; for c in engine-dev engine-lab-01; do echo "$c:"; sudo docker exec "$c" python -c "import urllib.request as u; print(u.urlopen(u.Request(\"http://169.254.169.254/computeMetadata/v1/instance/zone\", headers={\"Metadata-Flavor\": \"Google\"}), timeout=3).read().decode())" 2>&1 | tail -1; done; sudo journalctl -t domhouse-check --since "-2h" --no-pager | grep -E " metadata (blocked|OPEN)" | tail -1' < /dev/null
 ```
 
 | Riga | Atteso |
@@ -180,20 +182,31 @@ gcloud run services describe domotica-bff-staging --region=europe-west8 --projec
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command="mkdir -p ~/agente/agent"
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command="mkdir -p ~/agente/agent" < /dev/null
 gcloud compute scp scripts/agent-vm.sh langbrain-dev:agente/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
 gcloud compute scp scripts/agent/comune.py scripts/agent/lettore.py scripts/agent/esecutore.py scripts/agent/domhouse-agent-esecutore.service scripts/agent/domhouse-agent-lettore.service langbrain-dev:agente/agent/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/agente && sed -i "s/\r*$//" agent-vm.sh agent/*.py agent/*.service && sha256sum agent-vm.sh agent/*'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/agente && sed -i "s/\r*$//" agent-vm.sh agent/*.py agent/*.service && sha256sum agent-vm.sh agent/*' < /dev/null
 ```
 
-- **Atteso:** sei file copiati al 100 %, poi sei impronte. `sed` toglie i ritorni a capo di Windows, come V2 della procedura dei difetti.
+- **Atteso:** sei file copiati al 100 %, poi sei impronte. `sed` toglie i ritorni a capo di Windows, come V2 della procedura dei difetti. Le impronte cominciano così (file di `ee59625`, uguali in HEAD):
+
+| File | Impronta (primi 16 caratteri) |
+|---|---|
+| `agent-vm.sh` | `418e35e4deffa51c` |
+| `agent/comune.py` | `37fe88955f9e4ff9` |
+| `agent/domhouse-agent-esecutore.service` | `f7bbef01c0c251c6` |
+| `agent/domhouse-agent-lettore.service` | `9824996a467272be` |
+| `agent/esecutore.py` | `d6741e5f15dba299` |
+| `agent/lettore.py` | `33a5f85ddeba5b43` |
+
+- **Un'impronta diversa:** fermati e incolla. Non lanciare I7.
 
 ## I7. L'installazione (scrive sulla VM)
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo AMBIENTE=staging SOTTOSCRIZIONE=projects/domotica-poc-511707/subscriptions/domhouse-staging-ordini-vm RISULTATI=projects/domotica-poc-511707/topics/domhouse-staging-risultati bash ~/agente/agent-vm.sh install'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo AMBIENTE=staging SOTTOSCRIZIONE=projects/domotica-poc-511707/subscriptions/domhouse-staging-ordini-vm RISULTATI=projects/domotica-poc-511707/topics/domhouse-staging-risultati bash ~/agente/agent-vm.sh install' < /dev/null
 ```
 
 - **Atteso:** «== Utente domhouse-agent» e «creato», «== Codice in /opt/domhouse/agent», «== Configurazione», «== Servizi», «agente installato: ambiente staging».
@@ -205,7 +218,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh status; ls -ld /run/domhouse-agent /run/domhouse-agent/esecutore.sock /var/lib/domhouse-agent /var/lib/domhouse-executor'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh status; ls -ld /run/domhouse-agent /run/domhouse-agent/esecutore.sock /var/lib/domhouse-agent /var/lib/domhouse-executor' < /dev/null
 ```
 
 - **Atteso:**
@@ -221,7 +234,7 @@ L'esecutore gira con `ProtectSystem=strict` e nessuna capacità. Si prova che `d
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo systemd-run --quiet --pipe --wait -p User=root -p Group=domhouse-agent -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p CapabilityBoundingSet= -p Environment=DOCKER_CONFIG=/var/lib/domhouse-executor/docker /usr/bin/docker inspect -f "{{.Config.Image}}" engine-lab-01'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo systemd-run --quiet --pipe --wait -p User=root -p Group=domhouse-agent -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p CapabilityBoundingSet= -p Environment=DOCKER_CONFIG=/var/lib/domhouse-executor/docker /usr/bin/docker inspect -f "{{.Config.Image}}" engine-lab-01' < /dev/null
 ```
 
 - **Atteso:** una riga `europe-west8-docker.pkg.dev/domotica-poc-511707/domotica/engine:<tag>`.
@@ -241,7 +254,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo journalctl -u domhouse-agent-lettore -u domhouse-agent-esecutore --since "-15min" --no-pager | grep "agent "'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo journalctl -u domhouse-agent-lettore -u domhouse-agent-esecutore --since "-15min" --no-pager | grep "agent "' < /dev/null
 ```
 
 - **Atteso:** «agent exec … operazione=stato apartment=lab-01 ambiente=staging esito=riuscito codice=ok» e «agent order … esito=riuscito codice=ok». Nessuna riga con un indirizzo email.
@@ -266,7 +279,7 @@ for n in 1 2; do gcloud pubsub topics publish domhouse-staging-ordini --project=
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo systemctl stop domhouse-agent-lettore && systemctl is-active domhouse-agent-lettore || true'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo systemctl stop domhouse-agent-lettore && systemctl is-active domhouse-agent-lettore || true' < /dev/null
 gcloud pubsub topics publish domhouse-staging-ordini --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --message='{"op_id":"1a6d4d9f-3c2e-4d8b-8f40-6b7c8d9e0f12","operazione":"capienza","apartment_id":null,"seq":null,"parametri":{},"ambiente":"staging","richiesto_da":"provaManuale1"}'
 ```
 
@@ -276,7 +289,7 @@ gcloud pubsub topics publish domhouse-staging-ordini --project=domotica-poc-5117
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo systemctl start domhouse-agent-lettore && sleep 20 && sudo journalctl -u domhouse-agent-lettore --since "-2min" --no-pager | grep "agent "'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo systemctl start domhouse-agent-lettore && sleep 20 && sudo journalctl -u domhouse-agent-lettore --since "-2min" --no-pager | grep "agent "' < /dev/null
 ```
 
 - **Atteso:** «agent order op_id=1a6d4d9f-3c2e-4d8b-8f40-6b7c8d9e0f12 operazione=capienza … esito=scartato codice=scaduto».
@@ -287,10 +300,10 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh status | head -2; sudo bash /opt/domhouse/engine-vm.sh check-all | grep -E "engine|metadata"'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh status | head -2; sudo rm -f /opt/domhouse/.metadata-checked; sudo bash /opt/domhouse/engine-vm.sh check-all | grep -E "engine|metadata"' < /dev/null
 ```
 
-- **Atteso:** i due servizi `active`; «engine ok dev», «engine ok lab-01», «metadata blocked».
+- **Atteso:** i due servizi `active`; «engine ok dev», «engine ok lab-01», «metadata blocked reti=N» con lo stesso N di P11 della procedura del passo 3. `rm` toglie il segno dell'ultima prova dei metadati: `engine-vm.sh` la fa una volta l'ora, e senza `rm` la riga di solito non c'è.
 - La cartella `~/agente` resta: serve al ritorno indietro (I14.1). Si toglie dopo una settimana senza problemi.
 
 ## I14. Ritorno indietro
@@ -300,7 +313,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh uninstall'
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh uninstall' < /dev/null
 ```
 
 - **Atteso:** «agente tolto; restano i giornali e le lapidi …».
