@@ -2,7 +2,7 @@
 
 | Stato | Scritto da | Basato su | Prossimo passo |
 |---|---|---|---|
-| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1161–1168 del 19 novembre nel §9). Nessun codice | o1 | `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §3 (`crea_motore`), §4, §5, §6, §7; registro, pacchetto A2 e D-232; documento interno dell'Autonomia, §2 passo 4; il codice di A1 e la PR #17 (catalogo vuoto, `ce31e08`) | revisione di sicurezza del 19 novembre e la sua seconda lettura (N3, N6, N7): correzioni scritte qui (§11); A3 prima (porta le firme e l'unità dell'esecutore); poi il codice |
+| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1161–1168 del 19 novembre nel §9). Nessun codice | o1 | `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §3 (`crea_motore`), §4, §5, §6, §7; registro, pacchetto A2 e D-232; documento interno dell'Autonomia, §2 passo 4; il codice di A1 e la PR #17 (catalogo vuoto, `ce31e08`) | revisione di sicurezza del 19 novembre, seconda e terza lettura: **eseguibile** dopo N8, scritto qui (§5.2, §11); A3 prima (porta le firme e l'unità dell'esecutore); poi il codice |
 
 **Cosa copre:** creare dall'app il «posto» di un appartamento: id, porta libera, i due segreti, il motore con l'elenco dei dispositivi vuoto, l'account del connector sul broker, il collegamento del motore all'appartamento. Le rotte del server, l'ordine `crea_motore` passo per passo con il ritorno indietro, stati ed errori, cosa mostra il sito.
 
@@ -143,7 +143,7 @@ Lo stato è `non_creato` con il passo raggiunto e `fatti` (§2.1). **Id e porta 
 1. Il server, in una transazione con `version`: stato **`annullamento_in_corso`** (revisione, punto 7), poi l'ordine `togli_motore`. In quello stato «Riprova» e un secondo «Annulla» rispondono 409 `invalid_state`.
 2. L'agente (progetto §8.2), **solo se c'è il segno di creazione** (§4.2, passo 1b; revisione, punto 8; altrimenti rifiuto `non_creato_da_agente`, e così `lab-01` e `dev` non si toccano mai fino ad A6): `compose down`, impostazioni, chiave, catalogo, cartella dei dati, `remove-apartment`, per ultimo il segno; «già tolto» vale come riuscito. La `seq` dell'appartamento resta (lapide, progetto §6.4).
 3. **Solo nel ricevitore, dopo `togli_motore` riuscito:** distruzione con ritardo delle versioni dei due segreti (7 giorni per riattivarle), poi l'appartamento esce da Firestore; l'id resta usato (D-67), la porta si libera.
-4. `togli_motore` rifiutato o fallito, **o 20 minuti senza esito** (N7): di nuovo `non_creato`, con «Annulla» possibile; segreti e porta restano. Un esito riuscito che arriva dopo i 20 minuti chiude lo stesso l'annullamento (segreti, Firestore), perché il motore è già stato tolto.
+4. `togli_motore` rifiutato o fallito, **o 20 minuti senza esito** (N7): di nuovo `non_creato`, con «Annulla» possibile; segreti e porta restano. Un esito riuscito che arriva dopo i 20 minuti chiude lo stesso l'annullamento (segreti, Firestore), perché il motore è già stato tolto, **ma solo se dopo quel `togli_motore` non è partito nessun altro ordine per l'appartamento** (terza lettura, N8: altrimenti un «Riprova» fatto nel frattempo avrebbe già lanciato un `crea_motore` nuovo, e chiudere distruggerebbe segreti e documento del motore che gira). In quel caso l'esito si ignora, con una riga nel log (`agent result ignored`, motivo `ordine_successivo`).
 
 ### 5.3 «Annulla» e A6
 
@@ -236,6 +236,8 @@ Lo stato è `non_creato` con il passo raggiunto e `fatti` (§2.1). **Id e porta 
 
 ## 10. Stima in ore di A2
 
+**Le ore valgono solo come grandezza relativa fra i pezzi** (19 novembre): misurate sul lavoro fatto, le stime di o1 sono state da 7 a 15 volte più alte del tempo reale (`stime/confronto-stime-reali.md`, fuori dal repository). Non sono una previsione da dare al committente.
+
 Ore di lavoro, prove comprese, senza le attese.
 
 | Pezzo | Chi | Cosa | Ore |
@@ -263,7 +265,7 @@ Revisione indipendente (`revisione-a2-a3/REVISIONE-SICUREZZA-A2-A3.md`, fuori da
 | 1 | ordini firmati dal server, risultati con l'impronta dell'ordine | proposta A3, §6.3 (A3 va prima); qui il passo 0 del §4.2 verifica la firma |
 | 4, N3 | l'unità dell'esecutore: cosa apre A2 in più di A3 (`CAP_DAC_OVERRIDE` dichiarata per `/data/<apt>`); `install --da-agente` che non tocca systemd né l'Ops Agent | §4.2 |
 | 6 | immagine approvata solo per digest, file di root riletto a ogni ordine, controllo anche in `engine-vm.sh`, etichette immutabili | §4.3 |
-| 7, N7 | `annullamento_in_corso` che blocca «Riprova», al massimo 20 minuti; segreti e Firestore solo dopo `togli_motore` riuscito | §5.2, §6.1 |
+| 7, N7, N8 | `annullamento_in_corso` che blocca «Riprova», al massimo 20 minuti; segreti e Firestore solo dopo `togli_motore` riuscito, e un esito in ritardo solo se nessun ordine è partito dopo | §5.2, §6.1 |
 | 8 | segno di creazione dell'agente; `togli_motore` e «c'è già» solo con il segno: mai `lab-01` né `dev` fino ad A6 | §4.2 (passi 1 e 1b), §5.2 |
 | 13 | i segreti fatti a mano di `lab-01` esclusi per nome dalle condizioni; «solo la VM» precisato | §3.3 |
 | 14, N6 | `/data/<apt>` controllata al passo 0 (assente, vuota o con il segno di creazione); il ritorno indietro toglie la cartella creata da questo ordine; `ENV` e `CATALOG_PATH` come argomenti | §4.2 |

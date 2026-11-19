@@ -2,7 +2,7 @@
 
 | Stato | Scritto da | Basato su | Prossimo passo |
 |---|---|---|---|
-| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1170–1177 del 19 novembre nel §9). Nessun codice | o1 | `docs/proposta-a3-sito.md` (o2, `f607187`, `4cb6bab`); `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §2.5, §3, §3.2, §4, §6, §8.1, §8.3, §9 (D-233); il codice di A1 (`bff/agent.py`, `scripts/agent/`) | revisione di sicurezza del 19 novembre e la sua seconda lettura (N1–N5): correzioni scritte qui (§12); le misure delle prove `a3_` sul broker (con il via); conferma della memoria storica; poi il codice. **A3 prima di A2** (risposta 10: R8 entra qui) |
+| **Proposta con le risposte del committente** (scritta il 17 novembre 2026; risposte 1170–1177 del 19 novembre nel §9). Nessun codice | o1 | `docs/proposta-a3-sito.md` (o2, `f607187`, `4cb6bab`); `docs/progetto-strumento-a-base.md` §2.1, §2.2, §2.3, §2.5, §3, §3.2, §4, §6, §8.1, §8.3, §9 (D-233); il codice di A1 (`bff/agent.py`, `scripts/agent/`) | revisione di sicurezza del 19 novembre, seconda e terza lettura: **eseguibile** con la condizione N9 (§6.1), da verificare con `systemd-run` prima di installare; le misure delle prove `a3_` sul broker (con il via); poi il codice. **A3 prima di A2** (risposta 10: R8 entra qui) |
 
 **Cosa copre:** le chiamate del server per «Registra», «Rigenera», «Revoca», «Riprova» e l'elenco; i dati in Firestore; gli stati e come cambiano con gli esiti dell'agente; errori, permessi, blocco, registro attività; cosa fa l'agente sulla VM (`aggiorna_broker`); le risposte tecniche alle domande di o2; la stima.
 
@@ -183,7 +183,7 @@ Oggi l'elenco chiuso lo accetta già nei controlli (`scripts/agent/comune.py`: a
 | Cosa | Perché |
 |---|---|
 | `ReadWritePaths=/etc/domhouse/_broker` | il file delle impronte e i file `auth/` scritti dal `sync` |
-| `CapabilityBoundingSet=CAP_CHOWN` | oggi `auth/` è `1883:1883` 750 (`broker-vm.sh:566`): root senza `CAP_DAC_OVERRIDE` non ci legge né scrive, e `CAP_FOWNER` non aiuta (seconda lettura, N3). Quindi la cartella cambia: `auth/` **`root:1883` 750**, i file **`1883:root` 640**. Root scrive nella cartella da proprietario e legge i file dal gruppo (il `sync` rilegge le righe tenute, E-33); il broker (utente e gruppo 1883) attraversa la cartella dal gruppo e legge i file da proprietario. `CAP_CHOWN` serve solo per dare i file nuovi a 1883. Rispetto alla proposta del revisore (file `root:1883`): i file restano dell'utente del broker perché Mosquitto avvisa quando i file di utenti e permessi non sono suoi (**da verificare** con le prove sul broker in container). Il cambio di proprietario si fa una volta con `broker-vm.sh install` della versione di A3 |
+| `CapabilityBoundingSet=CAP_CHOWN` e `SupplementaryGroups=1883` | oggi `auth/` è `1883:1883` 750 (`broker-vm.sh:566`): root senza `CAP_DAC_OVERRIDE` non ci legge né scrive, e `CAP_FOWNER` non aiuta (seconda lettura, N3). **Condizione N9** (terza lettura): l'unità gira con `User=root` e `Group=domhouse-agent`, quindi il gruppo 0 **non** è fra i suoi gruppi e i permessi «di gruppo root» non le servono a niente (la mia variante `1883:root` non rileggeva i file vecchi: `EACCES` sui confronti «unchanged» e sulle righe tenute, E-33). Quindi: cartella `auth/` **`root:1883` 750**, file **`1883:1883` 640** (come i file di oggi: proprietario e gruppo del broker, nessun avviso di Mosquitto atteso), e nell'unità **`SupplementaryGroups=1883`**. Root scrive nella cartella da proprietario, rilegge i file dal gruppo 1883, e dà i file nuovi a `1883:1883` con `CAP_CHOWN` (`write_files` fa `chown(1883, 1883)`); il broker attraversa la cartella dal gruppo e legge i file da proprietario. Il cambio della cartella si fa una volta con `broker-vm.sh install` della versione di A3. **Prima di installare**, sulla VM: `systemd-run` con le stesse impostazioni dell'unità, `id` (deve mostrare il gruppo 1883) e la lettura di un file di `auth/` già esistente |
 | nessuna famiglia di indirizzi nuova | `sync` e `restart` passano dal socket di Docker (`AF_UNIX`) e da Secret Manager (`AF_INET`) |
 
 Il `sync` gira con l'ambiente ripulito (solo `PATH`): quello che gli serve passa come argomento, mai per variabile d'ambiente. Prima dell'installazione si prova sulla VM con `systemd-run` e le stesse impostazioni, come I9 di A1.
@@ -312,6 +312,8 @@ Le domande 6, 9 e 11 di o2 (maiuscole, PC senza internet, etichette della pagina
 
 ## 10. Stima in ore di A3
 
+**Le ore valgono solo come grandezza relativa fra i pezzi** (19 novembre): misurate sul lavoro fatto, le stime di o1 sono state da 7 a 15 volte più alte del tempo reale (`stime/confronto-stime-reali.md`, fuori dal repository). Non sono una previsione da dare al committente.
+
 Ore di lavoro, prove comprese, senza le attese (revisioni, via, finestre sulla VM). Prima la stima per pezzo, poi quella che ritengo probabile.
 
 | Pezzo | Chi | Cosa | Ore |
@@ -322,7 +324,7 @@ Ore di lavoro, prove comprese, senza le attese (revisioni, via, finestre sulla V
 | Allarmi | o1 | due allarmi nuovi in `scripts/agent/allarmi/` (log di Cloud Run, età dei messaggi degli ordini), `agent-gcp.sh`, prove | 1–2 |
 | Server: prove | o1 | prove delle rotte, degli stati, delle corse fra azioni, dei 20 minuti, della password mai salvata | 5–7 |
 | Agente: `aggiorna_broker` | o1 | esecutore, file atomico, `sync`, riavvio, codici, segno di `lab-01`, unità allargata e prova sulla VM, prove | 6–8 |
-| Broker | o1 | `broker_accounts.py` dal file con il ripiego solo per `lab-01`, `broker-vm.sh` (cartella, `remove-apartment`, `auth/` a `root:1883` e i file a `1883:root`), prove; le prove `a3_` sul broker in container (scritte; lanciate con il via) | 4–6 |
+| Broker | o1 | `broker_accounts.py` dal file con il ripiego solo per `lab-01`, `broker-vm.sh` (cartella, `remove-apartment`, `auth/` a `root:1883`, i file a `1883:1883`), prove; le prove `a3_` sul broker in container (scritte; lanciate con il via) | 4–6 |
 | R8 firme nei due sensi | o1 | ordini firmati dal server con `firmato_at` e verificati dall'esecutore (orario compreso, doppia chiave nel cambio), risultati firmati con l'impronta dell'ordine, JSON canonico, due segreti, `agent-gcp.sh`, prove | 8–12 |
 | `lab-01` | o1 | migrazione delle impronte (VM e Firestore), lo script e il suo ritorno indietro, procedura | 3–4 |
 | Installazione | o1 | procedura di A3 (segreto, chiave, file sulla VM, variabile del server), correzioni dopo la revisione di sicurezza | 4–6 |
@@ -353,7 +355,7 @@ Revisione indipendente (`revisione-a2-a3/REVISIONE-SICUREZZA-A2-A3.md`, fuori da
 | 1 | ordini non firmati fra lettore ed esecutore: firme nei due sensi, l'impronta dell'ordine nella firma del risultato | §6.3 |
 | 2, N1 | nessuna scrittura a ventaglio: `ultima_seq_riuscita` in transazione, solo dagli esiti riusciti di `aggiorna_broker`; `seq` dall'operazione salvata | §4.2 |
 | 3, N2 | riga e allarme per una revoca non applicata anche senza nessuno sulla pagina: nel ricevitore e nella rotta su 502; due allarmi nuovi (log di Cloud Run, età dei messaggi degli ordini); il giro orario di riserva | §4.1, §8.4 |
-| 4, N3 | l'unità dell'esecutore: l'elenco esatto di cosa si apre; `auth/` a `root:1883`, i file a `1883:root`, solo `CAP_CHOWN` | §6.1 |
+| 4, N3, N9 | l'unità dell'esecutore: l'elenco esatto di cosa si apre; `auth/` a `root:1883` 750, i file a `1883:1883` 640, `SupplementaryGroups=1883`, solo `CAP_CHOWN`; verifica con `systemd-run` prima di installare | §6.1 |
 | 5, N4 | il collegamento già aperto: riavvio del broker dopo una revoca **e** dopo una «Rigenera», salvo che la misura dica che basta il `sync`; tre prove sul broker in container che misurano senza presupporre; per la produzione un vincolo aperto (raccogliere i riavvii o staccare il singolo client) | §5.4, §6.2 |
 | 9, N5 | R8 completo: JSON canonico, `compare_digest`, risultati del lettore mai «riuscito», chiavi mai leggibili dalla VM, cambio della chiave; cosa copre la firma degli ordini e dove viaggia, `firmato_at` controllato dall'esecutore, doppia chiave degli ordini nell'esecutore | §6.3 |
 | 10 | regole sullo stato calcolato; una revoca non applicata solo con «Riprova» | §4.3 |
