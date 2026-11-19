@@ -509,12 +509,12 @@ def test_after_a_restart_clients_reconnect_and_nothing_queued_is_lost(bench, sub
 
 
 # ---- A3 (security review of 19 November, point 5): what happens to a connection ALREADY OPEN ------------------------
-# The reload (sync, SIGHUP) re-reads users and permissions «without dropping anyone» (mosquitto.conf). A3 «Revoca» and
-# «Rigenera» must leave a stolen password with no way in, also on a connection opened before. These three measure it
-# on the real broker: the first two with the reload alone, the third with the restart A3 would add. Proposal of
-# o1 (19 November): run only with the committente's go (Docker, heavy). Their outcome decides A3 §5.4: if the first
-# is green, a revocation needs no restart; the second is written as the fact that makes the restart necessary for
-# «Rigenera» (if it goes red, Mosquitto drops the old connection by itself and the restart can go).
+# The reload (sync, SIGHUP) re-reads users and permissions; mosquitto.conf says «without dropping anyone», but on
+# 16 November, live, changing the Plug's password with a reload dropped the Plug. So the first two MEASURE, without
+# presuming either way: they print one line «MISURA A3 …» each (run with -s) and fail only if the bench itself does
+# not work. The third checks what A3 relies on whatever the first two say: after a restart an old password is out and
+# the others come back. Proposal of o1 (19 November): run only with the committente's go (Docker, heavy); the lines go
+# to the memoria storica and decide A3 §5.4 (restart after «Revoca» and «Rigenera», or not).
 class OpenPublisher:
     """A mosquitto_pub -l left connected: every line written is published on the SAME connection."""
 
@@ -548,7 +548,13 @@ def _restore_devices_of_a():
     vm("sync")
 
 
-def test_a3_a_revoked_device_already_connected_can_neither_receive_nor_publish(bench, sub):
+def _measure(record_property, name, **facts):
+    for key, value in facts.items():
+        record_property(f"{name}.{key}", value)
+    print("MISURA A3 " + name + ": " + " ".join(f"{k}={v}" for k, v in facts.items()))
+
+
+def test_a3_measure_a_revoked_device_already_connected(bench, sub, record_property):
     """One connection of the device at a time: on 8883 the Client ID is the user (use_username_as_clientid), so a
     receiver and a publisher of the same device would take each other's place (D38)."""
     pw = "device-a5-password-lunga-000005"
@@ -563,10 +569,8 @@ def test_a3_a_revoked_device_already_connected_can_neither_receive_nor_publish(b
         vm("sync")
         time.sleep(1.5)
         pub("internal", f"{A}.connector", PW["connA"], f"{A}/a5/rpc", "dopo-la-revoca")
-        time.sleep(2)
-        print(f"a5 dopo la revoca: ricevitore ancora collegato={device.running()}")
-        assert not any("dopo-la-revoca" in line for line in device.lines()), \
-            "il collegamento aperto di un dispositivo revocato riceve ancora: serve il riavvio (A3 §5.4)"
+        receives = device.wait_for("dopo-la-revoca", seconds=3)
+        still_running = device.running()
         device.close()
         put_devices(A, with_a5)                                   # publishing side
         vm("sync")
@@ -579,29 +583,31 @@ def test_a3_a_revoked_device_already_connected_can_neither_receive_nor_publish(b
             vm("sync")
             time.sleep(1.5)
             talker.send("pubblicato-dopo-la-revoca")
-            time.sleep(2)
-            assert not any("pubblicato-dopo-la-revoca" in line for line in connector.lines()), \
-                "il collegamento aperto di un dispositivo revocato pubblica ancora: serve il riavvio (A3 §5.4)"
+            publishes = connector.wait_for("pubblicato-dopo-la-revoca", seconds=3)
         finally:
             talker.close()
-        assert not can_connect("tls", f"{A}.a5", pw)
+        reconnects = can_connect("tls", f"{A}.a5", pw)
+        _measure(record_property, "revoca-solo-sync", riceve=receives, pubblica=publishes,
+                 ricevitore_collegato=still_running, si_ricollega=reconnects)
+        assert not reconnects, "un dispositivo revocato entra di nuovo dopo il sync: il sync non funziona"
     finally:
         _restore_devices_of_a()
 
 
-def test_a3_after_a_new_password_the_old_open_connection_stays_until_a_restart(bench, sub):
-    """The fact that makes the restart necessary for «Rigenera»: the user is still there and its permissions too, so
-    the reload alone does not touch a connection opened with the old password. One connection of a1 at a time."""
+def test_a3_measure_an_open_connection_after_a_new_password(bench, sub, record_property):
+    """«Rigenera»: the user stays and its permissions too. One connection of a1 at a time."""
     new_pw = "device-a1-password-nuova-000011"
     try:
         old = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/rpc")      # receiving side
         put_devices(A, {"a1": new_pw, "a2": PW["a2"]})            # «Rigenera»
         vm("sync")
         time.sleep(1.5)
-        assert not can_connect("tls", f"{A}.a2", "password-sbagliata") and can_connect("tls", f"{A}.a2", PW["a2"])
         pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "dopo-la-rigenerazione")
-        still_receives = old.wait_for("dopo-la-rigenerazione", seconds=3)
+        receives = old.wait_for("dopo-la-rigenerazione", seconds=3)
+        still_running = old.running()
         old.close()
+        old_refused = not can_connect("tls", f"{A}.a1", PW["a1"])
+        new_accepted = can_connect("tls", f"{A}.a1", new_pw)
         _restore_devices_of_a()
         connector = sub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/events/#")   # publishing side
         talker = OpenPublisher("tls", f"{A}.a1", PW["a1"], f"{A}/a1/events/rpc")
@@ -610,17 +616,17 @@ def test_a3_after_a_new_password_the_old_open_connection_stays_until_a_restart(b
             vm("sync")
             time.sleep(1.5)
             talker.send("vecchia-password-dopo-il-sync")
-            still_publishes = connector.wait_for("vecchia-password-dopo-il-sync", seconds=3)
+            publishes = connector.wait_for("vecchia-password-dopo-il-sync", seconds=3)
         finally:
             talker.close()
-        print(f"vecchia password dopo il solo sync: riceve={still_receives} pubblica={still_publishes}")
-        assert still_receives and still_publishes, \
-            "il broker ha già staccato da solo la password vecchia: il riavvio per «Rigenera» si può togliere (A3 §5.4)"
+        _measure(record_property, "rigenera-solo-sync", riceve=receives, pubblica=publishes,
+                 ricevitore_collegato=still_running, vecchia_rifiutata=old_refused, nuova_accettata=new_accepted)
+        assert old_refused and new_accepted, "dopo il sync le password nuove non valgono: il sync non funziona"
     finally:
         _restore_devices_of_a()
 
 
-def test_a3_after_the_restart_an_old_password_is_out_and_the_others_come_back(bench, sub):
+def test_a3_after_the_restart_an_old_password_is_out_and_the_others_come_back(bench, sub, record_property):
     new_pw = "device-a1-password-nuova-000012"
     other = sub("tls", f"{A}.a2", PW["a2"], f"{A}/a2/rpc")
     old = sub("tls", f"{A}.a1", PW["a1"], f"{A}/a1/rpc")
@@ -635,7 +641,7 @@ def test_a3_after_the_restart_an_old_password_is_out_and_the_others_come_back(be
             if other.wait_for("di-nuovo", seconds=1):
                 back = time.time() - started
                 break
-        print(f"dopo il riavvio: l'altro dispositivo riceve di nuovo dopo {back} s")
+        _measure(record_property, "riavvio", secondi_per_tornare=back)
         assert back is not None and back <= 30, "dopo il riavvio un dispositivo non è tornato entro 30 s"
         pub("internal", f"{A}.connector", PW["connA"], f"{A}/a1/rpc", "per-la-vecchia")
         time.sleep(3)
