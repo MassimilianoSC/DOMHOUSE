@@ -350,6 +350,13 @@ else
       [[ "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || stop "Non leggo dal registro il digest di ${RUNNING_IMAGE}: il motore è a posto, manca solo l'immagine approvata dell'agente. Rilancia lo stesso comando."
       APPROVED="${RUNNING_IMAGE%:*}@${digest}" ;;
   esac
+  # code review A2, point 6: approved only if the engine's container really runs it (the RepoDigests of its image on
+  # the VM): a tag moved (before the tags were immutable) is never approved
+  RUNNING_DIGESTS="$(on_vm "sudo docker image inspect -f '{{join .RepoDigests \" \"}}' \"\$(sudo docker inspect -f '{{.Image}}' engine-${ENGINE_APARTMENT})\"" | tail -1)" || RUNNING_DIGESTS=""
+  case " ${RUNNING_DIGESTS} " in
+    *" ${APPROVED} "*) ;;
+    *) stop "Il motore ${ENGINE_APARTMENT} non gira sull'immagine ${APPROVED} (sulla VM: ${RUNNING_DIGESTS:-niente letto}): l'immagine approvata dell'agente non si scrive. Guarda engine-vm.sh status ${ENGINE_APARTMENT}." ;;
+  esac
   VM_APPROVED="$(on_vm "sudo cat ${APPROVED_FILE} 2>/dev/null" | tail -1)" || VM_APPROVED=""
   if [ "${VM_APPROVED}" = "${APPROVED}" ]; then
     note "immagine approvata dello staging già ${APPROVED##*@sha256:}"

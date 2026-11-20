@@ -44,6 +44,10 @@ case "$*" in
     [ -f "$STUB_DIR/ssh-fails" ] && { echo "ssh: connect to host: Connection timed out" >&2; exit 255; }
     cmd="${*#*--command }"
     case "$cmd" in
+      *RepoDigests*)
+        [ -f "$STUB_DIR/repodigests-other" ] && { echo "europe-west8-docker.pkg.dev/altro/x/engine@sha256:$(printf '0%.0s' $(seq 1 64))"; exit 0; }
+        d="$(cat "$STUB_DIR/digest" 2>/dev/null || echo "sha256:$(printf 'c%.0s' $(seq 1 64))")"
+        img="$(cat "$STUB_DIR/vm-image")"; echo "${img%:*}@$d" ;;
       *"agent-immagine-staging.nuovo"*)
         echo "$cmd" | grep -oE "[a-z0-9./-]+@sha256:[0-9a-f]{64}" | head -1 > "$STUB_DIR/vm-approved"
         cat "$STUB_DIR/vm-approved" ;;
@@ -405,3 +409,14 @@ def test_a2_a_new_catalog_compose_file_is_copied_without_recreating_the_engine(p
     assert "scp" in steps(calls) and "install -m 644 ~/compose.catalog.yaml" in calls
     assert "update" not in steps(calls) and "timers" not in steps(calls)
     assert "compose.catalog.yaml aggiornato sulla VM" in done.stdout.split("Riepilogo", 1)[1]
+
+
+
+def test_review6_the_approved_image_must_be_the_one_the_engine_runs(pub):
+    """Code review A2, point 6: the digest of the registry is approved only if the engine's container runs it
+    (RepoDigests of its image on the VM): a tag moved before the tags were immutable is not approved."""
+    (pub.stubs / "repodigests-other").write_text("", encoding="utf-8")
+    done, calls = pub()
+    out = done.stdout + done.stderr
+    assert done.returncode == 1 and "non gira sull'immagine" in out, out
+    assert "RepoDigests" in calls and not (pub.stubs / "vm-approved").exists()
