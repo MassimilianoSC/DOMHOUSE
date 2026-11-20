@@ -105,8 +105,10 @@ spec:
               value: domhouse-push-staging@your-gcp-project-id.iam.gserviceaccount.com
             - name: AGENT_PUSH_SUBSCRIPTION
               value: projects/your-gcp-project-id/subscriptions/domhouse-staging-risultati-push
-            - name: AGENT_ORDINI_KEY       # tool A, A3 (docs/procedura-installazione-a3.md Q3.1): the server signs the
-              valueFrom:                # orders with it and checks the results with the second; without them 503
+            # tool A, A3 (docs/procedura-installazione-a3.md Q3.1): the server signs the orders with the first key and
+            # checks the results with the second; without them the agent is «not configured» (503)
+            - name: AGENT_ORDINI_KEY
+              valueFrom:
                 secretKeyRef:
                   name: domhouse-agent-ordini-staging
                   key: latest
