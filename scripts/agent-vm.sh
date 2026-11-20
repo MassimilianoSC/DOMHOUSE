@@ -62,6 +62,8 @@ case "${cmd}" in
     work="$(mktemp -d)"
     trap 'rm -rf "${work}"' EXIT
     printf 'AMBIENTE=%s\nCONDIVISA=1\nLETTORE=%s\nMAX_MOTORI_STAGING=4\n' "${AMBIENTE}" "${USER_NAME}" > "${work}/agent.conf"
+    # A7 (answer 1197): the staging's budget of engine memory, written here; production's comes with the second VM
+    if [ "${AMBIENTE}" = "staging" ]; then printf 'BUDGET_MB_STAGING=500\n' >> "${work}/agent.conf"; fi
     printf 'AMBIENTE=%s\nSOTTOSCRIZIONE=%s\nRISULTATI=%s\n' "${AMBIENTE}" "${SOTTOSCRIZIONE}" "${RISULTATI}" \
       > "${work}/agent-lettore.conf"
     check_configs "${work}/agent.conf" "${work}/agent-lettore.conf" || die "SOTTOSCRIZIONE o RISULTATI non validi: niente installato"

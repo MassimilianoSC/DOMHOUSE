@@ -93,7 +93,8 @@ def test_install_puts_the_code_the_configuration_and_the_units_and_starts_them(v
     for name in ("comune.py", "lettore.py", "esecutore.py"):
         assert (vm.opt / "agent" / name).read_bytes() == (AGENT / name).read_bytes()
     assert (vm.etc / "agent.conf").read_text(encoding="utf-8") == (
-        "AMBIENTE=staging\nCONDIVISA=1\nLETTORE=domhouse-agent\nMAX_MOTORI_STAGING=4\n")
+        "AMBIENTE=staging\nCONDIVISA=1\nLETTORE=domhouse-agent\nMAX_MOTORI_STAGING=4\n"
+        "BUDGET_MB_STAGING=500\n")                           # A7, answer 1197: written, not only a default
     assert (vm.etc / "agent-lettore.conf").read_text(encoding="utf-8") == (
         f"AMBIENTE=staging\nSOTTOSCRIZIONE={SUB}\nRISULTATI={TOPIC}\n")
     for unit in ("domhouse-agent-esecutore.service", "domhouse-agent-lettore.service"):
