@@ -588,5 +588,24 @@
       "rules_changed": "{actor} ha modificato le regole dell'appartamento {target}",
       "timezone_changed": "Fuso orario dell'appartamento {target} cambiato sul motore: {from} → {to}"
     }
+  },
+  "capacity": {
+    "places": "Posti liberi {env}: {count} ({when})",
+    "zero": "Nessun posto libero: serve una VM più grande o la seconda VM ({when})",
+    "unread": "Capienza non ancora letta",
+    "envStaging": "nello staging",
+    "envProd": "in produzione",
+    "readAt": "letto alle {time}",
+    "readAtDay": "letto il {date} alle {time}",
+    "readMinuteAgo": "letto 1 minuto fa",
+    "readMinutesAgo": "letto {n} minuti fa",
+    "readHourAgo": "letto 1 ora fa",
+    "readHoursAgo": "letto {n} ore fa",
+    "refresh": "Aggiorna",
+    "refreshSoon": "Di nuovo fra pochi secondi",
+    "running": "Lettura in corso…",
+    "failed": "Lettura non riuscita: {message}",
+    "failedPlain": "Lettura non riuscita.",
+    "timeout": "Lettura non riuscita: nessuna risposta dalla macchina virtuale in 20 minuti."
   }
 }

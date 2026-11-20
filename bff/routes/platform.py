@@ -13,7 +13,7 @@ from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, EmailStr, Field
 
-from .. import actors, agent, audit, creation, instances, support
+from .. import actors, agent, audit, capacity, creation, instances, support
 from ..auth import Identity, forget_tenant, require_platform
 from ..config import get_settings
 from ..invites import InviteRefused, create_invitation, send_invitation, shown
@@ -502,6 +502,34 @@ async def _created_apartment(tenant_id: str, apartment_id: str) -> Apartment | J
     if apt.creazione is None:
         return err(404, "not_found", "Questo appartamento non è stato creato dall'app")
     return apt
+
+
+# ---------- A7: the VM's capacity (docs/proposta-a7.md; answers 1200, 1201) ----------
+@router.get("/capienza")
+async def get_capacity():
+    if not creation.available():
+        return err(503, "agent_not_configured", "La creazione degli appartamenti non è disponibile in questo ambiente")
+    return await capacity.view()
+
+
+@router.post("/capienza/aggiorna")
+async def refresh_capacity(identity: Identity = Depends(require_platform)):
+    """A new capienza from the agent, at most one every 30 s per environment; the reading arrives with its result."""
+    if not creation.available():
+        return err(503, "agent_not_configured", "La creazione degli appartamenti non è disponibile in questo ambiente")
+    try:
+        body = await capacity.refresh(identity.uid)
+    except capacity.RefreshTooSoon as exc:
+        response = err(429, "rate_limited", "La capienza è appena stata chiesta: riprova fra qualche secondo.",
+                       riprova_dal=exc.free_from)
+        from datetime import datetime
+        seconds = datetime.fromisoformat(exc.free_from.replace("Z", "+00:00")).timestamp() \
+            - creation.utcnow().timestamp()
+        response.headers["Retry-After"] = str(max(1, int(seconds + 0.999)))
+        return response
+    except agent.AgentError as exc:
+        return _publish_failed(exc)
+    return JSONResponse(status_code=202, content=body)
 
 
 @router.get("/tenants/{tenant_id}/apartments/{apartment_id}/creazione")

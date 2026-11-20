@@ -12,7 +12,8 @@
 # mancato» (every 12 hours), «Motori: disco della VM oltre l'80 %», «Motori: broker MQTT giù», «Motori: certificato del broker in scadenza» and «Motori: broker, troppi accessi
 # rifiutati» (D-209, at most one email an hour); and, from 15 November, «Motori: metadati raggiungibili dai container» (E-31),
 # «Motori: rinnovo del certificato del broker non riuscito», «Motori: broker, un appartamento non aggiornato» (E-33) and
-# «Motori: dati di un appartamento oltre 500 MB» (decision 1128). They read the lines of engine-vm.sh check-all and
+# «Motori: dati di un appartamento oltre 500 MB» (decision 1128); from A7 (answer 1199) «Motori: memoria della VM sotto
+# 500 MB» (the line "vm mem low", at least 10 minutes) and «Motori: 8 motori o più sulla VM» ("vm engines many"). They read the lines of engine-vm.sh check-all and
 # backup in the VM's syslog and the engines' logs from the Ops Agent (engine-vm.sh logs-agent): before those run on the
 # VM the policies wait, nothing breaks. Messages in plain Italian: run by the project owner.
 set -euo pipefail

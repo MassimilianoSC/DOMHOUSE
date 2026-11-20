@@ -123,7 +123,10 @@ def test_stato_of_dev_is_allowed_and_of_a_missing_engine_is_motore_assente(w):
 def test_capienza_reads_memory_and_counts_the_engines(w):
     r = w.ex.handle(order(operazione="capienza", apartment_id=None, seq=None), READER_UID)
     assert (r["esito"], r["codice"]) == ("riuscito", "ok")
-    assert r["dati"] == {"mem_available_mb": 793, "motori": 2, "motori_staging": 2, "massimo_staging": 4}
+    # A7: also the environment's engines, the new engine's cap, the sum of the caps (dev and lab-01: 120 MB each) and
+    # the budget of the staging
+    assert r["dati"] == {"mem_available_mb": 793, "motori": 2, "motori_staging": 2, "massimo_staging": 4,
+                         "motori_ambiente": 2, "tetto_nuovo_mb": 120, "somma_tetti_mb": 240, "budget_mb": 500}
     assert w.runs == [] and w.gets == []
 
 

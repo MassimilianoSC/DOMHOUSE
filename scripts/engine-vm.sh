@@ -86,6 +86,12 @@ BROKER_NETWORKS=(domhouse-broker_default domhouse-broker-internal)   # C8: probe
 KEEP_PREVIOUS=2                          # prune-images: the engine's images kept besides those in use, to go back
 HOURLY_S=3600                            # the metadata probe and the data sizes, once an hour
 DATA_ALERT_MB="${DOMHOUSE_DATA_ALERT_MB:-500}"   # an apartment's /data above this: "data large" (decision 1128)
+# A7 (answer 1199): available memory under MEM_LOW_MB for MEM_LOW_S -> "vm mem low"; ENGINES_ALERT engines or more
+# (every environment, the load test's engines left out) -> "vm engines many". The two alarms read those lines
+MEM_LOW_MB=500
+MEM_LOW_S=600
+MEM_GAP_S=900                            # A7 review, point 3: a last low sample older than this starts the count again
+ENGINES_ALERT=8
 JOURNALD_DIR="${DOMHOUSE_JOURNALD_DIR:-/etc/systemd/journald.conf.d}"
 ENGINE_CPUS=1.0                          # decision 1128: every engine's share of the VM's two CPUs, at most
 ENGINE_PIDS_LIMIT=128
@@ -657,6 +663,41 @@ vm_line() {
   mem="$(awk '/^MemTotal:/ {t = $2} /^MemAvailable:/ {a = $2} END {if (t > 0 && a != "") printf "%d", (t - a) * 100 / t; else print "?"}' "${MEMINFO}" 2>/dev/null || true)"
   disk="$(df --output=pcent / 2>/dev/null | tail -1 | tr -dc '0-9' || true)"
   watch_line "vm mem_used_pct=${mem:-?} disk_used_pct=${disk:-?}"
+  vm_capacity_lines
+}
+
+vm_capacity_lines() {
+  # A7: the available memory every 5 minutes, "vm mem low" once it has stayed under MEM_LOW_MB for MEM_LOW_S (the
+  # first time under is kept in ${OPT}/.mem-low-since), and "vm engines many" from ENGINES_ALERT engines
+  local avail since last now n settings apt port
+  avail="$(awk '/^MemAvailable:/ {printf "%d", $2 / 1024}' "${MEMINFO}" 2>/dev/null || true)"
+  if [[ "${avail}" =~ ^[0-9]+$ ]]; then
+    watch_line "vm mem_available_mb=${avail}"
+    if [ "${avail}" -lt "${MEM_LOW_MB}" ]; then
+      # the file keeps «first low sample, last low sample»; a gap (VM off, timer stopped) starts the count again
+      now="$(date +%s)"
+      if [ -f "${OPT}/.mem-low-since" ]; then read -r since last < "${OPT}/.mem-low-since" || true; fi
+      if [[ ! "${since:-}" =~ ^[0-9]+$ ]] || [[ ! "${last:-}" =~ ^[0-9]+$ ]] || [ $((now - last)) -gt "${MEM_GAP_S}" ]; then
+        since="${now}"
+      fi
+      printf '%s %s\n' "${since}" "${now}" > "${OPT}/.mem-low-since"
+      if [ $((now - since)) -ge "${MEM_LOW_S}" ]; then
+        watch_line "vm mem low available_mb=${avail} minutes=$(((now - since) / 60))"
+      fi
+    else
+      rm -f "${OPT}/.mem-low-since"
+    fi
+  fi
+  n=0
+  for settings in "${OPT}"/*.settings; do
+    [ -e "${settings}" ] || continue        # no shopt here: check-all's own nullglob must stay as the caller set it
+    apt="$(basename "${settings}" .settings)"
+    port="$(sed -n 's/^PORT=//p' "${settings}" | head -1)"
+    # the load test is told by its ports only (A7 review, point 1): a name can be chosen
+    if [[ "${port}" =~ ^[0-9]+$ ]] && [ "${port}" -ge 8170 ] && [ "${port}" -le 8199 ]; then continue; fi   # load test
+    n=$((n + 1))
+  done
+  if [ "${n}" -ge "${ENGINES_ALERT}" ]; then watch_line "vm engines many count=${n}"; fi
 }
 
 probe_code() { curl -s -o /dev/null -m 10 -w '%{http_code}' "$1" 2>/dev/null || true; }

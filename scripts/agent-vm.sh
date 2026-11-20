@@ -61,6 +61,8 @@ case "${cmd}" in
     [ -n "${RISULTATI:-}" ] || die "manca RISULTATI (projects/<p>/topics/<t>)"
     work="$(mktemp -d)"
     trap 'rm -rf "${work}"' EXIT
+    # A7 code review, point 4: no BUDGET_MB_STAGING line here. The executor's default is 500 (answer 1197), and an
+    # agent of A2 refuses a key it does not know: going back to it would leave an executor that does not start
     printf 'AMBIENTE=%s\nCONDIVISA=1\nLETTORE=%s\nMAX_MOTORI_STAGING=4\n' "${AMBIENTE}" "${USER_NAME}" > "${work}/agent.conf"
     printf 'AMBIENTE=%s\nSOTTOSCRIZIONE=%s\nRISULTATI=%s\n' "${AMBIENTE}" "${SOTTOSCRIZIONE}" "${RISULTATI}" \
       > "${work}/agent-lettore.conf"

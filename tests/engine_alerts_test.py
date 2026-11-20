@@ -26,12 +26,14 @@ def regex_of(flt: str) -> str:
     return re.search(r'=~"((?:[^"\\]|\\.)*)"', flt).group(1).replace("\\\\", "\\")
 
 
-def test_twelve_policies_on_the_bff_channel():
+def test_fourteen_policies_on_the_bff_channel():
     found = policies()
     assert set(found) == {"vm-muta.json", "motore-muto.json", "motore-errori.json", "backup-mancato.json", "disco-vm.json",
                           "broker-giu.json", "broker-certificato.json", "broker-accessi-rifiutati.json",
                           "metadati-aperti.json", "broker-rinnovo-fallito.json", "broker-sync-tenuto.json",
-                          "dati-appartamento.json"}
+                          "dati-appartamento.json",
+                          # A7 (answer 1199): the VM's memory and the number of its engines
+                          "memoria-vm.json", "motori-troppi.json"}
     for name, p in found.items():
         assert p["displayName"].startswith("Motori: ") and p["notificationChannels"] == ["__CHANNEL__"], name
         assert p["severity"] in ("CRITICAL", "ERROR", "WARNING") and p["documentation"]["content"], name
@@ -158,12 +160,12 @@ def alerts(tmp_path):
 def test_dry_run_creates_nothing_and_the_real_run_creates_what_is_missing(alerts):
     out, calls, created = alerts(dry=True)
     assert out.returncode == 0, out.stderr
-    assert "create" not in calls and created == "" and out.stdout.count("(prova a secco) la creerei da") == 12
+    assert "create" not in calls and created == "" and out.stdout.count("(prova a secco) la creerei da") == 14
     out, calls, created = alerts()
     assert out.returncode == 0, out.stderr
-    assert "logging metrics create domhouse_check_runs" in calls and calls.count("policies create") == 12
-    assert "__CHANNEL__" not in created and created.count("notificationChannels/9514864875489091801") == 12
+    assert "logging metrics create domhouse_check_runs" in calls and calls.count("policies create") == 14
+    assert "__CHANNEL__" not in created and created.count("notificationChannels/9514864875489091801") == 14
     (alerts.stubs / "metric-exists").write_text("", encoding="utf-8")
     (alerts.stubs / "policies-exist").write_text("", encoding="utf-8")
     out, calls, created = alerts()                                      # again: everything exists, nothing changes
-    assert out.returncode == 0 and "create" not in calls and out.stdout.count("esiste già") == 13
+    assert out.returncode == 0 and "create" not in calls and out.stdout.count("esiste già") == 15

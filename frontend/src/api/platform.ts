@@ -178,7 +178,48 @@ export const platformApi = {
     bffFetch<AgentOp>("/app/platform/agent/prova", { method: "POST", body: { apartment_id: apartmentId }, correlationId }),
   /** The operation, to read again while it is «inviato»; after 20 minutes the server gives it «fallito/tempo_scaduto». */
   agentOp: (opId: string) => bffFetch<AgentOp>(`/app/platform/agent/ops/${enc(opId)}`),
+  /** A7: the last reading of the VM's capacity the server keeps; no order to the agent. 503 agent_not_configured where
+   *  the creation is not available. */
+  capacity: () => bffFetch<CapienzaView>("/app/platform/capienza"),
+  /** A7 «Aggiorna»: a new capienza order; 202 with aggiornamento «inviato», 429 rate_limited (details.riprova_dal) within
+   *  30 s of the last one, 502 agent_publish_failed (details.op). */
+  refreshCapacity: (correlationId: string) => bffFetch<CapienzaView>("/app/platform/capienza/aggiorna", { method: "POST", correlationId }),
 };
+
+/** A7, the last successful reading of the VM's capacity (bff/API.md «Capienza della VM»); letta_at in UTC. */
+export interface Capienza {
+  ambiente: string;
+  letta_at: string;
+  /** More than 10 minutes old when the server answered. */
+  vecchia: boolean;
+  posti_liberi: number;
+  /** Why the places are 0: staging_pieno, capienza_insufficiente (null with places). */
+  motivo: string | null;
+  // for the support only, not shown (answer 1203)
+  motori_ambiente: number | null;
+  massimo_motori: number | null;
+  mem_available_mb: number | null;
+  tetto_nuovo_mb: number | null;
+  somma_tetti_mb: number | null;
+  budget_mb: number | null;
+}
+
+/** The last «Aggiorna» order. */
+export interface CapienzaAggiornamento {
+  op_id: string;
+  stato: "inviato" | "riuscito" | "rifiutato" | "fallito";
+  codice: string | null;
+  messaggio: string | null;
+  creato_at: string;
+}
+
+export interface CapienzaView {
+  /** null without any reading: no number is invented. */
+  capienza: Capienza | null;
+  aggiornamento: CapienzaAggiornamento | null;
+  /** Until when «Aggiorna» stays off (one every 30 s per environment), UTC; null when it is free. */
+  aggiornabile_dal: string | null;
+}
 
 /** An order to the agent on the VM and its outcome (bff/agent.py describe). */
 export interface AgentOp {

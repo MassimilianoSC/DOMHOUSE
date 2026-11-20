@@ -951,3 +951,17 @@ Solo i gestori della piattaforma, solo nello staging con l'agente configurato (f
 - **Il limite:** 5 creazioni avviate (202) negli ultimi 60 minuti per organizzazione, contate in Firestore nella stessa transazione della riserva (id, porta, codice Italianway, documento); «Riprova» e «Annulla» non contano.
 - **«Riprova» e «Annulla»:** solo da `non_creato`; 409 `version_changed` con una `version` vecchia, 409 `invalid_state` in ogni altro stato (anche durante `annullamento_in_corso`). «Riprova» completa i passi mancanti (dopo `porta_occupata` prende la porta libera successiva; con il motore già installato rifà solo la verifica). «Annulla» manda `togli_motore` solo se un `crea_motore` era partito; dopo il suo esito riuscito distrugge con ritardo (7 giorni) le versioni dei due segreti, libera porta e codice e toglie l'appartamento; l'id resta usato. Un esito riuscito di `togli_motore` arrivato dopo i 20 minuti chiude lo stesso, ma solo se dopo di lui non è partito nessun altro ordine per l'appartamento (N8).
 - **Registro attività:** `apartment_created` (con chi l'ha avviata) quando arriva a `pronto`; `apartment_creation_retried` e `apartment_creation_cancelled` al clic.
+
+## Capienza della VM (strumento A, A7; `docs/proposta-a7.md`)
+
+Solo i gestori della piattaforma, solo dove la creazione è disponibile (altrove 503 `agent_not_configured`, come «Nuovo appartamento»).
+
+| Chiamata | Risposta |
+|---|---|
+| `GET /app/platform/capienza` | 200 `{capienza, aggiornamento, aggiornabile_dal}` |
+| `POST /app/platform/capienza/aggiorna` | **202** con lo stesso corpo e `aggiornamento` sul nuovo ordine «inviato»; 429 `rate_limited` con `details.riprova_dal` e `Retry-After` se c'è già stato un «Aggiorna» negli ultimi 30 s (risposta 1200); 502 `agent_publish_failed` con `details.op` |
+
+- **`capienza`:** `null` senza nessuna lettura (nessun numero inventato). Altrimenti `{ambiente, letta_at, vecchia (più di 10 minuti), posti_liberi, motivo (null, staging_pieno, capienza_insufficiente: perché i posti sono 0), motori_ambiente, massimo_motori, mem_available_mb, tetto_nuovo_mb, somma_tetti_mb, budget_mb}`.
+- **La regola** (risposta 1196, la stessa dell'agente): al massimo `massimo_motori` motori nello staging; dopo il motore nuovo, con il suo tetto vero, almeno 400 MB disponibili; la somma dei tetti dell'ambiente più il nuovo entro il budget (staging 500 MB, risposta 1197; produzione: con la seconda VM, 1202). `posti_liberi` è quanti motori nuovi ci stanno ancora con la stessa regola.
+- **L'ultima lettura** si aggiorna con ogni `capienza` riuscita: quella di «Aggiorna» e quella di ogni creazione. Il sito rilegge la `GET` ogni 4 s finché `aggiornamento.stato` è «inviato».
+- **Una lettura con i numeri illeggibili non si salva:** `capienza` resta l'ultima buona (o `null`), e l'«Aggiorna» che l'ha chiesta risulta `aggiornamento: {stato: "fallito", codice: "errore_interno", messaggio: "La capienza letta non è valida: riprova"}`. `motivo` è quindi solo `null`, `staging_pieno` o `capienza_insufficiente`.

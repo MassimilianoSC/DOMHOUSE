@@ -1,0 +1,26 @@
+{
+  "displayName": "Motori: 8 motori o più sulla VM",
+  "documentation": {
+    "content": "La VM ha 8 motori o più, contando tutti gli ambienti e lasciando fuori la prova di carico (A7, risposta 1199). Il numero è nel testo della riga. Primo passo: SSH alla VM via IAP e «ls /opt/domhouse/*.settings». Con la seconda VM i motori di produzione vanno lì. Avvisa o1.",
+    "mimeType": "text/markdown"
+  },
+  "conditions": [
+    {
+      "displayName": "Riga «vm engines many» del controllo ogni 5 minuti",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\[[0-9]+\\])?: vm engines many\""
+      }
+    }
+  ],
+  "combiner": "OR",
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "43200s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "WARNING"
+}

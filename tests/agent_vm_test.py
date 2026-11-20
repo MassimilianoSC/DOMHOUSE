@@ -94,6 +94,7 @@ def test_install_puts_the_code_the_configuration_and_the_units_and_starts_them(v
         assert (vm.opt / "agent" / name).read_bytes() == (AGENT / name).read_bytes()
     assert (vm.etc / "agent.conf").read_text(encoding="utf-8") == (
         "AMBIENTE=staging\nCONDIVISA=1\nLETTORE=domhouse-agent\nMAX_MOTORI_STAGING=4\n")
+    # A7 code review, point 4: no budget line (the default 500 is enough; an agent of A2 would not start with it)
     assert (vm.etc / "agent-lettore.conf").read_text(encoding="utf-8") == (
         f"AMBIENTE=staging\nSOTTOSCRIZIONE={SUB}\nRISULTATI={TOPIC}\n")
     for unit in ("domhouse-agent-esecutore.service", "domhouse-agent-lettore.service"):
