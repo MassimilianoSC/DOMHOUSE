@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { KeyRound, Link2, PlugZap, Plus, Trash2, Waypoints } from "lucide-react";
 import { toast } from "sonner";
@@ -8,6 +8,7 @@ import { APARTMENT_ID_RE, DemoBadge, defaultInstanceUrl, Field, isBuiltinMock, L
 import { useAuth } from "@/auth/AuthProvider";
 import { CredentialsWorkspace } from "@/components/credentials/CredentialsWorkspace";
 import { AgentTest, agentTestable } from "@/components/platform/AgentTest";
+import { CancelCreationDialog, CreationRow, creationRowClass, ReadyInvite, showCreationError } from "@/components/platform/CreationRow";
 import { NewApartmentDialog, tenantKey } from "@/components/platform/NewApartmentDialog";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
@@ -15,7 +16,10 @@ import { CopyableId } from "@/components/ui/CopyableId";
 import { Badge, Dialog, DialogContent, DialogDescription, DialogTitle, Label, Skeleton, Switch } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
+import { creationSignature, isUsable, MAX_POLL_MS, POLL_MS, sortForPlatform } from "@/lib/apartmentCreation";
+import { pollWindow } from "@/lib/pollWindow";
 import { instanceAddress } from "@/lib/instanceAddress";
+import { cn, newCorrelationId } from "@/lib/utils";
 
 const key = (tenantId: string) => ["platform", "apartments", tenantId];
 /** A3, answer 1170: the platform manager opens the device credentials of a staging apartment (lab-…, test-…; never dev,
@@ -121,7 +125,15 @@ function ConnectionDialog({ tenantId, apt, onClose, onSaved }: { tenantId: strin
  */
 export function PlatformApartments({ tenantId, tenantName }: { tenantId: string; tenantName: string }) {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: key(tenantId), queryFn: () => platformApi.apartments(tenantId) });
+  // A2: read again every 4 s while a creation or a cancellation is on its way, for at most 20 minutes (§3.3)
+  const pollOpen = useRef(pollWindow(MAX_POLL_MS));
+  const q = useQuery({
+    queryKey: key(tenantId),
+    queryFn: () => platformApi.apartments(tenantId),
+    refetchInterval: (query) => (pollOpen.current(creationSignature(query.state.data), Date.now()) ? POLL_MS : false),
+  });
+  const [cancelOf, setCancelOf] = useState<PlatformApartment | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
   const [editing, setEditing] = useState<PlatformApartment | null>(null);
@@ -133,6 +145,46 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
   const newOff = env?.creazione_disponibile === false;
   const [credentialsOf, setCredentialsOf] = useState<string | null>(null);
   const refresh = () => void qc.invalidateQueries({ queryKey: key(tenantId) });
+  /** The organization's card counts the creations too (§4). */
+  const refreshCounts = () => void qc.invalidateQueries({ queryKey: ["platform", "tenants"] });
+
+  // A2: the notices at the end (§3.2, §3.4): ready after «In preparazione», gone after «Annullamento in corso»
+  const seen = useRef<Map<string, { stato: string | undefined; name: string }> | null>(null);
+  useEffect(() => {
+    if (!q.data) return;
+    const now = new Map(q.data.map((a) => [a.apartment_id, { stato: a.creazione?.stato, name: a.name }]));
+    const before = seen.current;
+    if (before) {
+      let changed = false;
+      for (const [id, was] of before) {
+        const is = now.get(id);
+        if (was.stato === "in_preparazione" && is?.stato === "pronto") toast.success(t("platform.creation.ready", { name: is.name }));
+        if (was.stato === "annullamento_in_corso" && !is) toast.success(t("platform.creation.cancelled", { name: was.name }));
+        if (was.stato !== is?.stato) changed = true;
+      }
+      if (changed) refreshCounts();
+    }
+    seen.current = now;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new list matters
+  }, [q.data]);
+
+  /** «Riprova» and «Annulla» (§3.2): never repeated by the site; every outcome ends with the list read again. */
+  const creationAction = async (a: PlatformApartment, kind: "riprova" | "annulla") => {
+    const c = a.creazione;
+    if (!c) return;
+    const correlationId = newCorrelationId();
+    setBusyId(a.apartment_id);
+    try {
+      if (kind === "riprova") await platformApi.retryCreation(tenantId, a.apartment_id, c.version, correlationId);
+      else await platformApi.cancelCreation(tenantId, a.apartment_id, c.version, correlationId);
+    } catch (err) {
+      showCreationError(err, correlationId);
+    } finally {
+      setBusyId(null);
+      refresh();
+      refreshCounts();
+    }
+  };
 
   const check = async (id: string) => {
     setVerify((s) => ({ ...s, [id]: "loading" }));
@@ -178,10 +230,16 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
         <p className="text-sm text-muted-foreground" data-testid={`platform-apartments-empty-${tenantId}`}>{t("platform.aptEmpty")}</p>
       ) : (
         <ul className="divide-y rounded-2xl border">
-          {q.data?.map((a) => {
+          {sortForPlatform(q.data ?? []).map((a) => {
             const v = verify[a.apartment_id];
+            if (!isUsable(a))
+              return (
+                <li key={a.apartment_id} className={cn("p-3", creationRowClass(a.creazione))} data-testid={`platform-apt-${a.apartment_id}`} data-creation={a.creazione?.stato}>
+                  <CreationRow a={a} busy={busyId === a.apartment_id} onRetry={() => void creationAction(a, "riprova")} onCancel={() => setCancelOf(a)} />
+                </li>
+              );
             return (
-              <li key={a.apartment_id} className="space-y-2 p-3" data-testid={`platform-apt-${a.apartment_id}`}>
+              <li key={a.apartment_id} className="space-y-2 p-3" data-testid={`platform-apt-${a.apartment_id}`} data-creation={a.creazione?.stato ?? "manuale"}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0 text-sm">
                     <div className="flex flex-wrap items-center gap-2">
@@ -219,6 +277,7 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
                     )}
                   </div>
                 )}
+                {a.creazione?.stato === "pronto" && notProd && <ReadyInvite apartmentId={a.apartment_id} />}
                 {credentialsOf === a.apartment_id && (
                   <div className="border-t pt-3">
                     <CredentialsWorkspace apartmentId={a.apartment_id} scope="platform" />
@@ -228,6 +287,17 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
             );
           })}
         </ul>
+      )}
+      {cancelOf && (
+        <CancelCreationDialog
+          a={cancelOf}
+          onClose={() => setCancelOf(null)}
+          onConfirm={() => {
+            const a = cancelOf;
+            setCancelOf(null);
+            void creationAction(a, "annulla");
+          }}
+        />
       )}
       {creatingNew && (
         <NewApartmentDialog

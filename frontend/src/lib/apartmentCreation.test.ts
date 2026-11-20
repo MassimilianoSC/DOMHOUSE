@@ -2,7 +2,7 @@ import { ApiError } from "@/api/bff";
 import type { Creazione, PlatformApartment } from "@/api/platform";
 import {
   CREATION_STEPS,
-  creationRefetch,
+  creationSignature,
   freeFromText,
   isUsable,
   MAX_POLL_MS,
@@ -99,17 +99,17 @@ describe("chi è usabile e l'ordine nell'elenco della piattaforma (§3.1)", () =
 });
 
 describe("rilettura ogni 4 secondi, al massimo 20 minuti (§3.3)", () => {
-  const start = 1_000_000;
-  it("con una creazione in preparazione o un annullamento in corso", () => {
-    expect(creationRefetch([apt("a", creazione())], start, start + 1000)).toBe(POLL_MS);
-    expect(creationRefetch([apt("a", creazione({ stato: "annullamento_in_corso" }))], start, start + 1000)).toBe(POLL_MS);
+  it("ogni 4 secondi, per 20 minuti", () => {
     expect(POLL_MS).toBe(4000);
-  });
-  it("si ferma senza niente in corso, o dopo 20 minuti", () => {
-    expect(creationRefetch([apt("a", null), apt("b", creazione({ stato: "non_creato" }))], start, start)).toBe(false);
-    expect(creationRefetch(undefined, start, start)).toBe(false);
-    expect(creationRefetch([apt("a", creazione())], start, start + MAX_POLL_MS)).toBe(false);
     expect(MAX_POLL_MS).toBe(20 * 60_000);
+  });
+  it("il segno di cosa è in corso: creazioni in preparazione e annullamenti, con stato e version", () => {
+    const list = [apt("a", creazione({ version: 2 })), apt("b", null), apt("c", creazione({ stato: "non_creato" })), apt("d", creazione({ stato: "annullamento_in_corso", version: 9 })), apt("e", creazione({ stato: "pronto" }))];
+    expect(creationSignature(list)).toBe("a:in_preparazione:2|d:annullamento_in_corso:9");
+  });
+  it("niente in corso: segno vuoto", () => {
+    expect(creationSignature([apt("b", null), apt("c", creazione({ stato: "non_creato" }))])).toBe("");
+    expect(creationSignature(undefined)).toBe("");
   });
 });
 

@@ -59,10 +59,10 @@ export const MAX_POLL_MS = 20 * 60_000;
 
 const moving = (a: PlatformApartment) => a.creazione?.stato === "in_preparazione" || a.creazione?.stato === "annullamento_in_corso";
 
-/** React Query's refetchInterval: every 4 s while a creation or a cancellation is on its way, for at most 20 minutes. */
-export function creationRefetch(items: PlatformApartment[] | undefined, startedAt: number, now: number): number | false {
-  if (!items?.some(moving)) return false;
-  return now - startedAt < MAX_POLL_MS ? POLL_MS : false;
+/** What is on its way, for pollWindow: each creation or cancellation with its state and version; "" for nothing. A
+ *  «Riprova» changes the version, so it opens another 20 minutes. */
+export function creationSignature(items: PlatformApartment[] | undefined): string {
+  return (items ?? []).filter(moving).map((a) => `${a.apartment_id}:${a.creazione!.stato}:${a.creazione!.version}`).join("|");
 }
 
 /** The site's sentence for each outcome code (§6.2); the codes that need a person all say the same thing. */

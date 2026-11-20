@@ -8,7 +8,7 @@ import { BOOKING_TYPES, type OutcomeKind } from "@/lib/bookingLog";
 import type { SummaryStatus } from "@/api/summaries";
 import type { CredentialState, PendingAction } from "@/api/deviceCredentials";
 import type { CreazionePasso, CreazioneStato } from "@/api/platform";
-import { WHAT_TEXTS } from "@/lib/apartmentCreation";
+import { WHAT_TEXTS, type StepState } from "@/lib/apartmentCreation";
 import * as ts from "typescript";
 import italian from "./it.json";
 
@@ -61,6 +61,7 @@ const FORMS: Record<string, string[]> = Object.fromEntries([
   form("platform.creation.steps.${}", all<CreazionePasso>({ riserva: true, segreti: true, capienza: true, motore: true, collegamento: true })),
   form("platform.creation.states.${}", all<Exclude<CreazioneStato, "pronto" | "annullato">>({ in_preparazione: true, non_creato: true, annullamento_in_corso: true })),
   form("platform.creation.what.${}", WHAT_TEXTS),
+  form("platform.creation.stepState.${}", all<StepState>({ fatto: true, in_corso: true, da_fare: true, fallito: true })),
   form("decisions.outcome.${}", all<Decision["outcome"]>({ applied: true, rejected: true, pending_approval: true, failed: true, informational: true })),
   form("decisions.target.${}", all<Decision["target"]["type"]>({ device: true, apartment: true, rules: true, schedule: true })),
   form("energy.${}", ["hour", "day"]),
