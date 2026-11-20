@@ -187,7 +187,7 @@ describe("gli altri rifiuti di «Crea» restano nel modulo (§6.1)", () => {
 
   it("secret_conflict: il testo del sito con l'ID richiesta da copiare", async () => {
     await refuse(new ApiError(409, "secret_conflict", "segreto", "corr-77"));
-    expect(screen.getByTestId("new-apt-error")).toHaveTextContent("C'è già una chiave con questo nome: serve un controllo.");
+    expect(screen.getByTestId("new-apt-error")).toHaveTextContent("C'è già una chiave con questo nome, creata fuori dall'app: scegli un altro ID.");
     expect(screen.getByTestId("new-apt-error-id")).toHaveTextContent("corr-77");
   });
 

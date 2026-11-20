@@ -131,7 +131,9 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
     expect(steps.map((el) => el.getAttribute("data-state"))).toEqual(["fatto", "fatto", "fatto", "in_corso", "da_fare"]);
     expect(steps[3]).toHaveTextContent("4 · installazione del sistema domotico");
     expect(r).toHaveTextContent("Avviata il 19 nov 2026, 17:21 da Giulia Rossi · porta 8153");
-    expect(r).toHaveTextContent("Puoi chiudere la pagina: la creazione va avanti anche senza di te.");
+    // 1209: how long it takes, under the steps, said once
+    expect(within(r).getByTestId("creation-duration-lab-giardino")).toHaveTextContent("Di solito ci vogliono da 1 a 5 minuti; la prima volta può volerci di più. Puoi chiudere la pagina: la creazione continua.");
+    expect(r).not.toHaveTextContent("va avanti anche senza di te");
     for (const b of NOT_FOR_UNREADY) expect(screen.queryByTestId(`platform-apt-${b}-lab-giardino`)).toBeNull();
     expect(within(r).queryByRole("button", { name: /Riprova|Annulla/ })).toBeNull();
   });
@@ -146,7 +148,7 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
     expect(box).toHaveTextContent("Il sistema domotico non è partito: «Riprova», e se succede ancora serve un controllo.");
     expect(box).not.toHaveTextContent("Motore non sano");
     expect(box).toHaveTextContent("Si è fermata a: installazione del sistema domotico (passo 4 di 5)");
-    expect(box).toHaveTextContent("L'id lab-ponte e la porta 8152 restano riservati finché non premi «Riprova» o «Annulla».");
+    expect(box).toHaveTextContent("L'id lab-ponte e la porta 8152 restano riservati finché non premi «Riprova» o «Annulla creazione».");
     expect(box).toHaveTextContent("Ultimo tentativo: 19 nov 2026, 17:05, Giulia Rossi");
     expect(within(box).getByTestId("creation-op-lab-ponte")).toHaveTextContent("3f9c2a71");
     expect(within(r).getByTestId("creation-retry-lab-ponte")).toHaveTextContent("Riprova");
@@ -173,6 +175,8 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
     const r = row("lab-via");
     expect(within(r).getByTestId("creation-state-lab-via")).toHaveTextContent("Annullamento in corso");
     expect(r).toHaveTextContent("Si sta togliendo quello che era stato preparato; poi l'appartamento sparisce dall'elenco.");
+    expect(within(r).queryByTestId("creation-duration-lab-via")).toBeNull();
+    expect(r).not.toHaveTextContent("Di solito ci vogliono");
     expect(within(r).queryByTestId("creation-retry-lab-via")).toBeNull();
     expect(within(r).queryByTestId("creation-cancel-lab-via")).toBeNull();
     for (const b of NOT_FOR_UNREADY) expect(screen.queryByTestId(`platform-apt-${b}-lab-via`)).toBeNull();

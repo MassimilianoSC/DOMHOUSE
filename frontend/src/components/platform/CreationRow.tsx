@@ -112,9 +112,11 @@ export function CreationRow({ a, busy, onRetry, onCancel }: { a: PlatformApartme
       {stato === "in_preparazione" && (
         <>
           <StepStrip id={a.apartment_id} c={c} />
+          {/* 1209: how long it takes, only while «In preparazione» */}
+          <p className="text-sm" data-testid={`creation-duration-${a.apartment_id}`}>{t("platform.creation.duration")}</p>
           <p className="text-xs text-muted-foreground">
             {started}
-            {c.porta ? ` · ${t("platform.creation.port", { port: c.porta })}` : ""} · {t("platform.creation.canClose")}
+            {c.porta ? ` · ${t("platform.creation.port", { port: c.porta })}` : ""}
           </p>
         </>
       )}
