@@ -147,15 +147,17 @@ async def last_hour(tenant_id: str) -> dict:
 
 # ---- saving ------------------------------------------------------------------------------------------------------
 async def _save(apartment_id: str, uid: str | None = None, expect_op: str | None = None,
-                expect_version: int | None = None, **changes) -> Apartment | None:
-    """The creation changed in one transaction, version + 1; with expect_op / expect_version only if the creation
-    is still at that order / version (a newer action wins). Fields of the apartment go in `apartment`."""
+                expect_version: int | None = None, expect_stato: str | None = None, **changes) -> Apartment | None:
+    """The creation changed in one transaction, version + 1; with expect_op / expect_version / expect_stato only if
+    the creation is still at that order / version / state (a newer action wins: None, nothing written). Fields of the
+    apartment go in `apartment`."""
     apartment_fields = changes.pop("apartment", {})
 
     def change(apt: Apartment):
         c = apt.creazione
         if c is None or (expect_op is not None and (c.op or {}).get("op_id") != expect_op) \
-                or (expect_version is not None and c.version != expect_version):
+                or (expect_version is not None and c.version != expect_version) \
+                or (expect_stato is not None and c.stato != expect_stato):
             return None
         for k, v in changes.items():
             setattr(c, k, v)
@@ -169,8 +171,10 @@ async def _save(apartment_id: str, uid: str | None = None, expect_op: str | None
     return await get_repository().change_apartment(apartment_id, change)
 
 
-async def _fail(apartment_id: str, code: str | None, expect_op: str | None = None) -> None:
-    await _save(apartment_id, expect_op=expect_op, stato="non_creato", codice=code or "errore_interno")
+async def _fail(apartment_id: str, code: str | None, expect_op: str | None = None,
+                expect_stato: str | None = None) -> None:
+    await _save(apartment_id, expect_op=expect_op, expect_stato=expect_stato, stato="non_creato",
+                codice=code or "errore_interno")
 
 
 def _added(c: Creazione, *items: str) -> list[str]:
@@ -183,11 +187,15 @@ async def _send(apt: Apartment, operazione: str, passo: str, parametri: dict) ->
     the AgentError (502) goes up to the route."""
     c = apt.creazione
     capacity = operazione == "capienza"
+    # code review A2, point 1: an order only in the state it belongs to (a «Annulla» in between wins)
+    wanted = "annullamento_in_corso" if operazione == "togli_motore" else "in_preparazione"
     op, body = await agent.new_order(operazione, None if capacity else apt.apartment_id, c.updated_by, parametri,
                                      per_appartamento=apt.apartment_id if capacity else None)
     extra = {"crea_inviato": True} if operazione == "crea_motore" else {}
-    await _save(apt.apartment_id, op={"op_id": op.op_id, "operazione": operazione}, passo=passo, codice=None,
-                **extra)
+    if await _save(apt.apartment_id, expect_stato=wanted, op={"op_id": op.op_id, "operazione": operazione},
+                   passo=passo, codice=None, **extra) is None:
+        warn("creation order not sent", apartment_id=apt.apartment_id, operazione=operazione, motivo="stato_cambiato")
+        raise CreationRefused(409, "invalid_state", "Con lo stato di adesso questa azione non si può fare.")
     try:
         await agent.publish_op(op, body)
     except agent.AgentError:
@@ -200,20 +208,24 @@ async def _advance(apartment_id: str) -> None:
     apt = await get_repository().get_apartment(apartment_id)
     c = apt.creazione
     if "segreti" not in c.fatti:
-        apt = await _save(apartment_id, passo="segreti")
+        apt = await _save(apartment_id, expect_stato="in_preparazione", passo="segreti")
+        if apt is None:
+            return                                     # the state changed meanwhile: nothing more to do here
         try:
             await secret_admin.ensure_pair(secret_admin.get_secret_admin(), agent.get_settings().agent_ambiente,
                                            apartment_id, c.segreti_op)
         except secret_admin.SecretConflict as exc:
             warn("agent alarm codice=secret_conflict", apartment_id=apartment_id, secret=exc.name)
-            await _fail(apartment_id, "secret_conflict")
+            await _fail(apartment_id, "secret_conflict", expect_stato="in_preparazione")
             raise CreationRefused(409, "secret_conflict", OWN_MESSAGES["secret_conflict"],
                                   apartment_id=apartment_id) from None
         except secret_admin.SecretError as exc:
             warn("creation secrets failed", apartment_id=apartment_id, error=str(exc))
-            await _fail(apartment_id, "segreti_non_creati")
+            await _fail(apartment_id, "segreti_non_creati", expect_stato="in_preparazione")
             return
-        apt = await _save(apartment_id, fatti=_added(apt.creazione, "segreti"))
+        apt = await _save(apartment_id, expect_stato="in_preparazione", fatti=_added(apt.creazione, "segreti"))
+        if apt is None:
+            return
     if "motore" in apt.creazione.fatti and "broker" in apt.creazione.fatti:
         await _link(apartment_id)
         return
@@ -223,14 +235,18 @@ async def _advance(apartment_id: str) -> None:
 async def _link(apartment_id: str) -> None:
     """The engine answered: linked, enabled, verified; «pronto» or «non_creato: collegamento_fallito»."""
     apt = await get_repository().get_apartment(apartment_id)
-    apt = await _save(apartment_id, passo="collegamento", apartment={
+    apt = await _save(apartment_id, expect_stato="in_preparazione", passo="collegamento", apartment={
         "instance_url": f"http://{VM_HOST}", "port": apt.creazione.porta, "enabled": True})
+    if apt is None:
+        return
     full = await instances.verify(apt, "system")
     if not full.get("ok"):
         warn("creation link failed", apartment_id=apartment_id, error=full.get("error"))
-        await _fail(apartment_id, "collegamento_fallito")
+        await _fail(apartment_id, "collegamento_fallito", expect_stato="in_preparazione")
         return
-    saved = await _save(apartment_id, stato="pronto", codice=None)
+    saved = await _save(apartment_id, expect_stato="in_preparazione", stato="pronto", codice=None)
+    if saved is None:
+        return
     instances.invalidate_version(apartment_id)
     c = saved.creazione
     who = audit.Who(audit.AuditActor(kind="platform", ref=c.avviata_da))
@@ -331,8 +347,10 @@ async def retry(apt: Apartment, version, identity) -> Apartment:
         await repo.release_external_id("link", link_key(c.porta), apt.apartment_id)
         await repo.claim_external_id("link", link_key(c.porta), OCCUPIED_OWNER)
         changes["porta"] = new
+    # code review A2, point 1: «in_preparazione» and no order together, so that until the new order is saved the
+    # state read is «in preparazione» (not the old order's failure, which would allow «Annulla» at once)
     saved = await _save(apt.apartment_id, uid=identity.uid, expect_version=c.version, stato="in_preparazione",
-                        codice=None, **changes)
+                        codice=None, op=None, **changes)
     if saved is None:
         raise CreationRefused(409, "version_changed", "Qualcuno ha appena cambiato questa creazione: ricarica.")
     await repo.put_audit_person(AuditPerson(ref=identity.uid, email=identity.email,
@@ -372,8 +390,9 @@ async def after_result(op, esito: str, codice: str, dati: dict, late: bool = Fal
     c = apt.creazione if apt else None
     if c is None or (c.op or {}).get("op_id") != op.op_id:
         return "ordine_successivo"                     # another order since: this result changes nothing
-    if c.stato not in ("in_preparazione", "annullamento_in_corso"):
-        return "gia_fatto"
+    # code review A2, point 1: capienza and crea_motore count only «in preparazione», togli_motore only «annullamento»
+    if c.stato != ("annullamento_in_corso" if op.operazione == "togli_motore" else "in_preparazione"):
+        return "stato_diverso"
     if not late:
         stored = await repo.get_agent_op(op.op_id)
         if stored is None or stored.stato != esito:
@@ -394,6 +413,8 @@ async def after_result(op, esito: str, codice: str, dati: dict, late: bool = Fal
                 await _send(apt, "crea_motore", "motore", {"porta": c.porta})
             except agent.AgentError:
                 pass                                   # saved «non_creato: non_inviato»
+            except CreationRefused:
+                return "stato_diverso"
             return "crea_motore"
         return "non_creato"
     if op.operazione == "crea_motore":

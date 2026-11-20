@@ -417,3 +417,47 @@ def test_a_late_togli_motore_success_closes_only_without_a_later_order(world):
     assert c != 404 and c["stato"] == "in_preparazione"                      # ignored: secrets and record stay
     key, _ = sa.names("lab-a2-02")
     assert world.secrets.versions[key][0][1] == "ENABLED"
+
+
+# ---- code review of A2 (20 November), point 1: «Riprova» and «Annulla» never cross; point 5: the old routes ------------
+def test_review1_annulla_is_refused_while_riprova_has_not_sent_its_order_yet(world, monkeypatch):
+    import types
+    new()
+    push(world.published[-1], esito="rifiutato", codice="capienza_insufficiente")
+    who = types.SimpleNamespace(uid="dev-platform", email="piattaforma@demo.it", display_name=None)
+    real = agent.new_order
+    seen = {}
+
+    async def in_the_window(*args, **kwargs):              # «Riprova» saved, its order not yet
+        apt = get_repository().apartments["lab-a2-01"]
+        try:
+            await creation.cancel(apt, apt.creazione.version, who)
+            seen["annulla"] = "accettato"
+        except creation.CreationRefused as exc:
+            seen["annulla"] = exc.error
+        return await real(*args, **kwargs)
+    monkeypatch.setattr(agent, "new_order", in_the_window)
+    assert act("riprova").status_code == 202
+    assert seen["annulla"] == "invalid_state"
+    assert creazione()["stato"] == "in_preparazione"
+
+
+def test_review1_a_capienza_result_after_annulla_starts_nothing(world):
+    new()
+    capienza = world.published[-1]
+    apt = get_repository().apartments["lab-a2-01"]
+    apt.creazione.stato = "annullamento_in_corso"           # as if «Annulla» had won the race
+    sent = len(world.published)
+    push(capienza, dati=ROOM)
+    assert len(world.published) == sent                     # no crea_motore
+    assert get_repository().apartments["lab-a2-01"].creazione.stato == "annullamento_in_corso"
+
+
+def test_review5_the_old_link_and_delete_refuse_an_apartment_created_from_the_app(world):
+    new()
+    base = f"/app/platform/tenants/{DEMO_TENANT}/apartments/lab-a2-01"
+    r = call("PATCH", base, json={"port": 8199})
+    assert (r.status_code, r.json()["error"]) == (409, "created_from_app")
+    r = call("DELETE", base)
+    assert (r.status_code, r.json()["error"]) == (409, "created_from_app")
+    assert "lab-a2-01" in get_repository().apartments

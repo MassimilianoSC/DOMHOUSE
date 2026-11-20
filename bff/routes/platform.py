@@ -430,6 +430,16 @@ async def create_tenant_apartment(tenant_id: str, body: ApartmentCreate, identit
 
 
 # ---------- A2: an apartment created from the app (docs/proposta-a2.md §2) ----------
+def _made_by_the_app(apt: Apartment) -> JSONResponse | None:
+    """Code review A2, point 5: the old link and delete would leave engine, broker and secrets behind and free the
+    port: an apartment created from the app changes only through its creation («Riprova», «Annulla»), until A6."""
+    if apt.creazione is None:
+        return None
+    return err(409, "created_from_app", "Questo appartamento è stato creato dall'app: si gestisce dalla sua "
+               "creazione («Riprova», «Annulla»); l'eliminazione arriverà con A6.")
+
+
+
 class ApartmentNew(BaseModel):
     apartment_id: str = Field(max_length=200)
     name: str = Field(max_length=500)
@@ -531,6 +541,8 @@ async def relink_tenant_apartment(tenant_id: str, apartment_id: str, body: Apart
     apt = await _tenant_apartment(tenant_id, apartment_id)
     if isinstance(apt, JSONResponse):
         return apt
+    if refused := _made_by_the_app(apt):
+        return refused
     repo = get_repository()
     old_url, old_port, old_code, old_sim = apt.instance_url, apt.port, apt.external_ids.italianway, apt.simulated
     if body.instance_url is not None:
@@ -595,6 +607,8 @@ async def delete_tenant_apartment(tenant_id: str, apartment_id: str, identity: I
     apt = await _tenant_apartment(tenant_id, apartment_id)
     if isinstance(apt, JSONResponse):
         return apt
+    if refused := _made_by_the_app(apt):
+        return refused
     await remove_apartment(apt)
     await audit.record("apartment_deleted", audit.by_platform(identity), tenant_id,
                        audit.apartment_target(apt.apartment_id, apt.name))
