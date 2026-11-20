@@ -33,6 +33,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```
 
 - `agent-vm.sh` non è installato in `/opt/domhouse` (`install` copia solo `comune.py`, `lettore.py`, `esecutore.py`): lo status si chiama dalla copia di A1 in `~/agente`, come in I13.
+- Q0 è stato fatto il 20 novembre su `f54a222`. Da `7952a68` cambiano solo `agent-vm.sh` e l'unità dell'esecutore (il gruppo del broker): li ricopia Q2.3a. A un rilancio di Q0 il confronto va fatto con `7952a68`.
 - **Atteso:** «file della VM uguali a f54a222, già su GitHub»; i due servizi `active`; `auth/` di `1883 1883` con i quattro file `1883 1883` (`-rw-r-----`). Altrimenti fermati.
 
 ## Q1. Le due chiavi delle firme (scrive sulla VM e su Google Cloud)
@@ -117,17 +118,45 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 - **Atteso:** `drwxr-x--- root 1883 … auth`, `drwx------ root root … devices`; dal sync «lab-01: connector e N dispositivi» (N come oggi) e **«unchanged»**: `lab-01` legge ancora il suo segreto vecchio, niente cambia.
 - **Ritorno indietro:** `sudo install -m 755 /opt/domhouse/prima-a3/broker-vm.sh /opt/domhouse/broker-vm.sh; sudo install -m 644 /opt/domhouse/prima-a3/broker_accounts.py /opt/domhouse/broker_accounts.py; sudo chown 1883:1883 /etc/domhouse/_broker/auth`.
 
-**Q2.3 Prova dell'unità allargata, prima di installarla** (N9: `id` con il gruppo 1883, lettura di un file vecchio di `auth/`, il sync con le stesse restrizioni).
+**Q2.3 Il gruppo del broker, poi la prova dell'unità allargata, prima di installarla** (N9).
+
+Il 20 novembre la prima prova si è fermata: con `SupplementaryGroups=1883` systemd non avvia niente (stato 216, EXIT_GROUP), perché sull'host **nessun gruppo ha il gid 1883** (è solo l'utente del contenitore di Mosquitto). Correzione `7952a68`: un gruppo di sistema `domhouse-broker` con gid 1883, e l'unità lo nomina (`SupplementaryGroups=domhouse-broker`). Da `7952a68` lo crea anche `agent-vm.sh install`, che si ferma se il gid 1883 è già di un altro gruppo.
+
+**Q2.3a I due file cambiati da ricopiare** (`agent-vm.sh` e l'unità dell'esecutore; gli altri sei di Q2.1 restano).
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='P="-p User=root -p Group=domhouse-agent -p SupplementaryGroups=1883 -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p ReadWritePaths=/etc/domhouse/_broker -p CapabilityBoundingSet=CAP_CHOWN -p RestrictAddressFamilies=AF_UNIX -p RestrictAddressFamilies=AF_INET -p MemoryMax=128M -p UMask=0077"; sudo systemd-run --quiet --pipe --wait $P /bin/sh -c "id; head -c 0 /etc/domhouse/_broker/auth/devices.passwd && echo lettura-ok; f=/etc/domhouse/_broker/auth/.prova-a3; touch \$f && chown 1883:1883 \$f && echo scrittura-ok; rm -f \$f"; sudo systemd-run --quiet --pipe --wait -E PATH=/usr/sbin:/usr/bin:/sbin:/bin $P /bin/bash /opt/domhouse/broker-vm.sh sync | tail -1' < /dev/null
+gcloud compute scp scripts/agent-vm.sh langbrain-dev:a3/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud compute scp scripts/agent/domhouse-agent-esecutore.service langbrain-dev:a3/agent/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a3 && sed -i "s/\r*$//" agent-vm.sh agent/domhouse-agent-esecutore.service && sha256sum agent-vm.sh agent/domhouse-agent-esecutore.service | cut -c1-16,65-; grep -n "^SupplementaryGroups" agent/domhouse-agent-esecutore.service' < /dev/null
 ```
 
-- **Atteso:** `uid=0(root) gid=…(domhouse-agent) groups=…,1883…`; «lettura-ok»; «scrittura-ok»; dal sync «unchanged».
+- **Atteso:** le due impronte di `7952a68` (le calcola la memoria storica) e `SupplementaryGroups=domhouse-broker`.
+
+**Q2.3b Il gruppo** (scrive sulla VM: un gruppo di sistema, nessun utente dentro).
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='n="$(getent group domhouse-broker || true)"; g="$(getent group 1883 || true)"; if [ -n "$n" ]; then echo "esiste: $n"; elif [ -n "$g" ]; then echo "FERMATI: il gid 1883 è già del gruppo: $g"; else sudo groupadd --system --gid 1883 domhouse-broker && echo "creato"; fi; getent group domhouse-broker; sudo ls -ln /etc/domhouse/_broker/auth | head -3' < /dev/null
+```
+
+- **Atteso:** «creato» (a un rilancio «esiste: domhouse-broker:x:1883:»), poi `domhouse-broker:x:1883:`; i file di `auth/` restano `1883 1883`.
+- **«FERMATI»:** il gid 1883 è di un altro gruppo; non si tocca niente, si decide con o1.
+- **Ritorno indietro:** `sudo groupdel domhouse-broker` (solo prima di Q2.4, o dopo il ritorno indietro di Q2.4).
+
+**Q2.3c La prova dell'unità** (sola lettura, salvo un file di prova in `auth/` tolto subito).
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='P="-p User=root -p Group=domhouse-agent -p SupplementaryGroups=domhouse-broker -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p ReadWritePaths=/etc/domhouse/_broker -p CapabilityBoundingSet=CAP_CHOWN -p RestrictAddressFamilies=AF_UNIX -p RestrictAddressFamilies=AF_INET -p MemoryMax=128M -p UMask=0077"; sudo systemd-run --quiet --pipe --wait $P /bin/sh -c "id; head -c 0 /etc/domhouse/_broker/auth/devices.passwd && echo lettura-ok; f=/etc/domhouse/_broker/auth/.prova-a3; touch \$f && chown 1883:1883 \$f && echo scrittura-ok; rm -f \$f"; sudo systemd-run --quiet --pipe --wait -E PATH=/usr/sbin:/usr/bin:/sbin:/bin $P /bin/bash /opt/domhouse/broker-vm.sh sync | tail -1' < /dev/null
+```
+
+- **Atteso:** `uid=0(root) gid=…(domhouse-agent) groups=…(domhouse-agent),1883(domhouse-broker)`; «lettura-ok»; «scrittura-ok»; dal sync «unchanged».
 - **Da verificare** (non provabile sul PC; revisione del codice, «da verificare» 1), tutto in questo blocco:
-  1. `SupplementaryGroups=1883` numerico accettato e visibile in `id`;
+  1. `SupplementaryGroups=domhouse-broker` accettato e visibile in `id`;
   2. lettura di un file 640 di `auth/` dal gruppo 1883, scrittura e `chown` a 1883;
   3. il `sync` sotto le stesse restrizioni: token della VM (rete `AF_INET`) e `docker` (socket `AF_UNIX`), con `MemoryMax=128M` e `UMask=0077` come nell'unità (`write_files` mette comunque 640).
 - Un «Permission denied», un errore del sync o un processo fermato per memoria: **fermati** e incolla; non si installa l'unità (si decide con o1 cosa aprire).
@@ -140,7 +169,7 @@ cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo AMBIENTE=staging SOTTOSCRIZIONE=projects/domotica-poc-511707/subscriptions/domhouse-staging-ordini-vm RISULTATI=projects/domotica-poc-511707/topics/domhouse-staging-risultati bash ~/a3/agent-vm.sh install; sudo bash ~/a3/agent-vm.sh status | head -2; grep -E "^(ReadWritePaths|CapabilityBoundingSet|SupplementaryGroups)" /etc/systemd/system/domhouse-agent-esecutore.service' < /dev/null
 ```
 
-- **Atteso:** «agente installato: ambiente staging»; i due servizi `active`; le tre righe dell'unità.
+- **Atteso:** «== Gruppo domhouse-broker (gid 1883)» e «esiste già» (da Q2.3b), «agente installato: ambiente staging»; i due servizi `active`; le tre righe dell'unità, con `SupplementaryGroups=domhouse-broker`.
 - **Ritorno indietro:** lo stesso comando dalla copia di A1 (`~/agente`, I6 di A1), poi `sudo systemctl restart domhouse-agent-esecutore domhouse-agent-lettore`. **Dopo Q3** l'agente di A1 rifiuta gli ordini firmati del server nuovo (`campo_non_valido`): tornare ad A1 sulla VM vuol dire tornare **anche** al server di prima (ritorno indietro di Q3.2), e viceversa (revisione del codice, punto 6).
 
 ## Q3. Il server dello staging (o1 committa, il committente spinge e pubblica)
