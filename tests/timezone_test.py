@@ -98,12 +98,12 @@ def test_the_admins_patch_accepts_the_time_zone_and_ignores_it():
 def test_two_instances_that_read_a_new_time_zone_write_one_entry(monkeypatch):
     """D-201: each instance has read the apartment with the old zone; the save takes time, so the two overlap."""
     repo = get_repository()
-    real = repo.upsert_apartment
+    real = repo.change_apartment     # A6 review, point 2: the zone is saved in the apartment's transaction
 
-    async def slow(apt):
+    async def slow(apartment_id, change):
         await asyncio.sleep(0)
-        return await real(apt)
-    monkeypatch.setattr(repo, "upsert_apartment", slow)
+        return await real(apartment_id, change)
+    monkeypatch.setattr(repo, "change_apartment", slow)
 
     async def main():
         one = await repo.get_apartment(APT)

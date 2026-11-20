@@ -1016,7 +1016,7 @@ Un appartamento creato dall'app **non ancora pronto** non si elimina: si usa «A
 |---|---|---|
 | `POST /app/platform/tenants/{tid}/apartments/{aid}/disattiva` | — | 200 riga; 409 `already_disabled` (già spento con l'ora); 409 `deletion_in_progress` |
 | `POST …/{aid}/riattiva` | — | 200 riga; 409 `not_disabled`; 409 `deletion_in_progress` |
-| `POST …/{aid}/elimina` | `{nome}` | **202** `{eliminazione}` per `origine` `app`; **200** `{eliminazione: {stato: "eliminato", …}}` per `a_mano` e `dimostrativo` (solo il documento, subito) |
+| `POST …/{aid}/elimina` | `{nome}` | **202** `{eliminazione}` per `origine` `app`; **200** `{eliminazione: {stato: "eliminato", …}}` per `a_mano` e `dimostrativo` (solo il documento, subito); se la rimozione del documento fallisce, **202** con `non_riuscita` al passo `database` (`errore_database`) e «Riprova» toglie di nuovo **solo** il documento: i segreti di un appartamento collegato a mano non si toccano mai |
 | `GET …/{aid}/eliminazione` | — | 200 `{eliminazione}`; 404 se non è partita |
 | `POST …/{aid}/eliminazione/riprova` | `{version}` | riprende dal passo fermo; solo con `non_riuscita`. Passo `motore`: **202** `{eliminazione}` (un nuovo `togli_motore`). Passi `segreti` e `database` (niente VM): **200** `{eliminazione: {stato: "eliminato"}}` quando finisce, altrimenti 202 con il passo fermo |
 | `DELETE /app/platform/tenants/{tid}/apartments/{aid}` (di oggi) | — | **409 `use_elimina`** «Per eliminare: Disattiva, poi Elimina dopo 7 giorni»: nessuna strada che salti l'attesa e la conferma |
