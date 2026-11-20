@@ -968,7 +968,7 @@ Solo i gestori della piattaforma, solo dove la creazione è disponibile (altrove
 
 ## Eliminazione di un appartamento (strumento A, A6; `docs/proposta-a6.md`)
 
-**Forma concordata con o2 prima del codice (20 novembre); il codice segue sul ramo `o1-a6-eliminazione`.** Risposte del committente 1210: §8 punti 2–8 come proposti; punto 1 provvisorio.
+**Forma concordata con o2 prima del codice (20 novembre); il codice è sul ramo `o1-a6-eliminazione` (`bff/deletion.py`).** Risposte del committente 1210: §8 punti 2–8 come proposti; punto 1 provvisorio.
 
 **Chi.** Disattiva e riattiva: il gestore della piattaforma con le rotte qui sotto, l'amministratore con l'interruttore «Attivo» di oggi (`PATCH /app/admin/apartments/{aid}` `{enabled}`). Elimina: **solo il gestore della piattaforma** (risposta 1210, punto 1 provvisorio), con il permesso in una funzione sola (`bff/deletion.py`, `can_delete`): con D-232 passa all'amministratore cambiando quella.
 
@@ -1005,7 +1005,7 @@ Un appartamento creato dall'app **non ancora pronto** non si elimina: si usa «A
 
 - `stato`: `in_corso` (dal clic all'ultimo passo), `non_riuscita` (calcolato alla lettura: 20 minuti senza avanzare, o l'ultimo ordine chiuso senza successo), `eliminato` (solo nella risposta che chiude: dopo, la riga non c'è più).
 - `passo`: `motore`, `segreti`, `database` (in quest'ordine: mai un documento tolto con il motore acceso).
-- `codice`/`messaggio`: perché si è fermata, solo con `non_riuscita`. I codici dell'agente per `togli_motore` (`bff/agent.py` CODES, per esempio `non_creato_da_agente`) e quelli del server: `chiavi_non_distrutte`, `non_inviato`, `tempo_scaduto`, `errore_interno`.
+- `codice`/`messaggio`: perché si è fermata, solo con `non_riuscita`. I codici dell'agente per `togli_motore` (`bff/agent.py` CODES, per esempio `non_creato_da_agente`) e quelli del server: `chiavi_non_distrutte` (passo `segreti`), `errore_database` (passo `database`), `non_inviato`, `tempo_scaduto`, `errore_interno`.
 - `op`: `{op_id, operazione, stato, codice, messaggio}` dell'ultimo ordine all'agente, o `null`.
 - `updated_by`: nome visibile, mai l'email.
 - Mentre `eliminazione` non è `null` l'appartamento resta in elenco («Eliminazione in corso» / «Eliminazione non riuscita»), non si riattiva e non si modifica.
@@ -1018,8 +1018,10 @@ Un appartamento creato dall'app **non ancora pronto** non si elimina: si usa «A
 | `POST …/{aid}/riattiva` | — | 200 riga; 409 `not_disabled`; 409 `deletion_in_progress` |
 | `POST …/{aid}/elimina` | `{nome}` | **202** `{eliminazione}` per `origine` `app`; **200** `{eliminazione: {stato: "eliminato", …}}` per `a_mano` e `dimostrativo` (solo il documento, subito) |
 | `GET …/{aid}/eliminazione` | — | 200 `{eliminazione}`; 404 se non è partita |
-| `POST …/{aid}/eliminazione/riprova` | `{version}` | **202** `{eliminazione}`: riprende dal passo fermo; solo con `non_riuscita` |
+| `POST …/{aid}/eliminazione/riprova` | `{version}` | riprende dal passo fermo; solo con `non_riuscita`. Passo `motore`: **202** `{eliminazione}` (un nuovo `togli_motore`). Passi `segreti` e `database` (niente VM): **200** `{eliminazione: {stato: "eliminato"}}` quando finisce, altrimenti 202 con il passo fermo |
 | `DELETE /app/platform/tenants/{tid}/apartments/{aid}` (di oggi) | — | **409 `use_elimina`** «Per eliminare: Disattiva, poi Elimina dopo 7 giorni»: nessuna strada che salti l'attesa e la conferma |
+
+Mentre un'eliminazione è in corso anche il `PATCH` dell'amministratore risponde 409 `deletion_in_progress`.
 
 **Ordine dei controlli di «Elimina»** (tutti prima di toccare qualcosa): 404 `not_found` (anche un `aid` di un'altra organizzazione); 409 `not_deletable` (`dev`); 409 `creation_not_ready`; 409 `not_disabled`; 409 `too_early` con `details.eliminabile_dal` (anche per gli spenti prima di A6, con `null`); 422 `name_mismatch` «Il nome non corrisponde» (confronto esatto con il nome salvato, dopo aver tolto gli spazi all'inizio e alla fine; niente maiuscole ignorate); 409 `deletion_in_progress`; 429 `rate_limited` con `details.riprova_dal` e `Retry-After` (2 eliminazioni al giorno per organizzazione, risposta 1210 punto 6; «Riprova» non conta); 503 `agent_not_configured` (solo `origine` `app`); 502 `agent_publish_failed` con `details.op`: l'eliminazione è comunque partita e si legge `non_riuscita` con `codice` `non_inviato` («Riprova»).
 
