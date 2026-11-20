@@ -2,7 +2,7 @@
 
 | Stato | Scritto da | Basato su | Prossimo passo |
 |---|---|---|---|
-| **Proposta, nessun codice** (19 novembre 2026, 16:43); **schermate approvate dal committente così come sono** (risposta 1178 = a, 19 novembre) | o2 | `docs/proposta-a2.md` (o1, `c7d85a8`) §2, §5, §6, §8; registro, risposte 1161–1168 e le due condizioni del committente sulle schermate (19 novembre, 16:37 e 16:39); le pagine di oggi: Organizzazioni, scheda dell'organizzazione, «Appartamenti» (`PlatformTenants.tsx`, `PlatformApartments.tsx`) | o1 risponde ai punti del §7; revisione di sicurezza di A2 e A3 insieme; poi il via al codice |
+| **Codice fatto** (20 novembre 2026, via 1190 = a; nello stile di Luca, 1189): `59aabf5`, `f0091c4`, `a31e89f`, `3dc67a0`, `0333045`, `b03db5f`, `f5cf0c5`; prima: proposta del 19 novembre, schermate approvate (1178 = a) | o2 | `docs/proposta-a2.md` (o1, `c7d85a8`) §2, §5, §6, §8; registro, risposte 1161–1168 e le due condizioni del committente sulle schermate (19 novembre, 16:37 e 16:39); le pagine di oggi: Organizzazioni, scheda dell'organizzazione, «Appartamenti» (`PlatformTenants.tsx`, `PlatformApartments.tsx`) | prova contro le rotte di o1 (`cb3ee25`) nello staging, quando ci sono l'agente e la procedura del committente; decisioni del §11 |
 
 **Termini:** quelli di `docs/guida-utente.md`: «sistema domotico», «gestore della piattaforma», «ID richiesta». Nei testi per chi usa l'app non compaiono «broker», «catalogo», «segreti» né «VM»: si dice «macchina virtuale» e «chiavi».
 
@@ -191,8 +191,24 @@ Nomi e organizzazioni di prova, nessuna email vera. Sono un'anteprima: colori e 
 
 **Approvate dal committente così come sono** (risposta 1178 = a, 19 novembre).
 
-## 10. Aperto
+## 10. Risposte del server (o1, `docs/proposta-a2.md` §2.2 e `cb3ee25`)
 
-1. I punti 1, 2, 4–8 del §7, con o1.
+Tutti i punti del §7 hanno risposta e il sito li usa:
 
-Il codice Italianway nel modulo non è più aperto: la domanda del committente è chiusa e la risposta 1167 resta (facoltativo, si può aggiungere anche dopo).
+1. 429: `limite` e `riprova_dal` **dentro `details`**, come `details.op` del 502.
+2. `creazioni_ultima_ora` in `GET /app/platform/tenants/{t}`, riletto a ogni apertura del modulo.
+3. «Riprova» e «Annulla» non contano nel limite.
+4. `appartamenti_non_creati` e `appartamenti_in_preparazione` in ogni organizzazione.
+5. `creazione` in ogni appartamento della piattaforma (`null` per quelli collegati a mano).
+6. `env.creazione_disponibile` in `/app/me`.
+7. Il server esclude dalle pagine dell'organizzazione gli appartamenti non «Pronto».
+8. `annullamento_in_corso` è uno stato; un «Annulla» senza niente sulla macchina virtuale risponde subito `annullato`.
+
+In più (`cb3ee25`): il perché di «Non creato» sta in `creazione.codice` e `creazione.messaggio`, anche senza un ordine dietro; codici del server `segreti_non_creati`, `secret_conflict`, `collegamento_fallito`, `chiavi_non_distrutte`, `non_inviato`, `tempo_scaduto`, con i loro testi nel sito.
+
+## 11. Decisioni prese da o2 nel codice, da confermare
+
+1. Nello staging senza agente (e nel server di sviluppo) «Nuovo appartamento» è spento con la riga «Non disponibile in questo ambiente: manca il collegamento con la macchina virtuale.». La proposta copriva solo la produzione.
+2. Testo di `non_inviato`: «L'ordine non è partito verso la macchina virtuale: «Riprova».» (o1 d'accordo).
+3. Dopo «Riprova» nessun avviso: la riga torna «In preparazione» e basta. Dopo «Crea» l'avviso «Creazione di ‹nome› avviata: ci vogliono alcuni minuti.».
+4. La rilettura ogni 4 secondi dura al massimo 20 minuti **da quando la creazione è avanzata l'ultima volta**: ogni passo cambia la `version` e riapre i 20 minuti, come fa il server.
