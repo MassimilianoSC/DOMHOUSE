@@ -192,7 +192,7 @@ def test_a_bad_file_keeps_the_apartments_lines(broker, monkeypatch, capsys, line
 def test_the_executor_unit_opens_exactly_what_a3_needs():
     unit = (AGENT / "domhouse-agent-esecutore.service").read_text(encoding="utf-8")
     for line in ("ProtectSystem=strict\n", "ReadWritePaths=/etc/domhouse/_broker\n", "CapabilityBoundingSet=CAP_CHOWN\n",
-                 "SupplementaryGroups=1883\n", "RestrictAddressFamilies=AF_UNIX AF_INET\n", "NoNewPrivileges=yes\n"):
+                 "SupplementaryGroups=domhouse-broker\n", "RestrictAddressFamilies=AF_UNIX AF_INET\n", "NoNewPrivileges=yes\n"):
         assert line in unit, line
     assert "CAP_DAC_OVERRIDE" not in unit and "CAP_FOWNER" not in unit
 

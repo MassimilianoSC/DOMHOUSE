@@ -24,6 +24,11 @@ LIB="${DOMHOUSE_LIB:-/var/lib}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SRC="${HERE}/agent"
 USER_NAME="domhouse-agent"
+# A3 (20 November, Q2.3 stopped): the executor's unit has SupplementaryGroups=domhouse-broker to re-read the broker's
+# auth/ files (1883:1883 640); systemd refuses a gid no group has (status 216, EXIT_GROUP), and on the VM 1883 is only
+# the user of Mosquitto's container: install makes a system group with that gid and this name
+BROKER_GROUP="domhouse-broker"
+BROKER_GID=1883
 SERVICES=(domhouse-agent-esecutore.service domhouse-agent-lettore.service)
 FILES=(comune.py lettore.py esecutore.py)
 
@@ -60,6 +65,19 @@ case "${cmd}" in
     printf 'AMBIENTE=%s\nSOTTOSCRIZIONE=%s\nRISULTATI=%s\n' "${AMBIENTE}" "${SOTTOSCRIZIONE}" "${RISULTATI}" \
       > "${work}/agent-lettore.conf"
     check_configs "${work}/agent.conf" "${work}/agent-lettore.conf" || die "SOTTOSCRIZIONE o RISULTATI non validi: niente installato"
+    say "Gruppo ${BROKER_GROUP} (gid ${BROKER_GID})"
+    by_name="$(getent group "${BROKER_GROUP}" || true)"
+    by_gid="$(getent group "${BROKER_GID}" || true)"
+    if [ -n "${by_name}" ]; then
+      [ "$(printf '%s' "${by_name}" | cut -d: -f3)" = "${BROKER_GID}" ] \
+        || die "il gruppo ${BROKER_GROUP} esiste con un gid diverso da ${BROKER_GID}: niente installato (si decide con o1)"
+      echo "esiste già"
+    elif [ -n "${by_gid}" ]; then
+      die "il gid ${BROKER_GID} è già del gruppo «${by_gid%%:*}»: niente installato (si decide con o1)"
+    else
+      groupadd --system --gid "${BROKER_GID}" "${BROKER_GROUP}"
+      echo "creato"
+    fi
     say "Utente ${USER_NAME}"
     if getent passwd "${USER_NAME}" > /dev/null; then
       echo "esiste già"

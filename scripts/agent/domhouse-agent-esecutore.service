@@ -29,7 +29,8 @@ ProtectSystem=strict
 ReadWritePaths=/etc/domhouse/_broker
 CapabilityBoundingSet=CAP_CHOWN
 AmbientCapabilities=
-SupplementaryGroups=1883
+# the group by name (systemd refuses a gid no group has: 20 November); agent-vm.sh install makes it with gid 1883
+SupplementaryGroups=domhouse-broker
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes

@@ -32,7 +32,13 @@ def posix(path: Path) -> str:
 
 STUBS = {
     "id": '#!/usr/bin/env bash\n[ -f "$STUB_DIR/not-root" ] && echo 1000 || echo 0\n',
-    "getent": '#!/usr/bin/env bash\n[ -f "$STUB_DIR/user-exists" ] && { echo "domhouse-agent:x:996:996::/nonexistent:/usr/sbin/nologin"; exit 0; }; exit 2\n',
+    # getent passwd domhouse-agent | group domhouse-broker | group 1883, from the files the tests put
+    "getent": ('#!/usr/bin/env bash\ncase "$1 $2" in\n'
+               '  "passwd domhouse-agent") [ -f "$STUB_DIR/user-exists" ] && { echo "domhouse-agent:x:996:996::/nonexistent:/usr/sbin/nologin"; exit 0; } ;;\n'
+               '  "group domhouse-broker") [ -f "$STUB_DIR/group-broker" ] && { cat "$STUB_DIR/group-broker"; exit 0; } ;;\n'
+               '  "group 1883") for f in group-1883 group-broker; do [ -f "$STUB_DIR/$f" ] && grep -q ":1883:" "$STUB_DIR/$f" && { cat "$STUB_DIR/$f"; exit 0; }; done ;;\n'
+               'esac\nexit 2\n'),
+    "groupadd": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/groupadd.log"\necho "domhouse-broker:x:1883:" > "$STUB_DIR/group-broker"\n',
     "useradd": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/useradd.log"\ntouch "$STUB_DIR/user-exists"\n',
     "chown": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/chown.log"\nexit 0\n',
     "systemctl": ('#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/systemctl.log"\n'
@@ -165,3 +171,28 @@ def test_r17_installing_again_restarts_both_services_executor_first(vm):
     first, second = (systemctl.index("restart domhouse-agent-esecutore.service"),
                      systemctl.index("restart domhouse-agent-lettore.service"))
     assert systemctl.index("enable --now domhouse-agent-lettore.service") < first < second
+
+
+
+# ---- A3, 20 November (Q2.3 stopped): the broker's group for the executor's unit ------------------------------------
+# systemd refuses SupplementaryGroups=1883 when no group has that gid (status 216, EXIT_GROUP: seen on the VM, where
+# 1883 is only the user of Mosquitto's container). install makes a system group domhouse-broker with gid 1883, the
+# unit names it; a gid 1883 already used by another group, or domhouse-broker with another gid, stops before anything.
+def test_install_makes_the_brokers_group_with_gid_1883(vm):
+    r = vm("install", env=GOOD)
+    assert r.returncode == 0, r.stderr + r.stdout
+    assert log(vm, "groupadd").split() == ["--system", "--gid", "1883", "domhouse-broker"]
+
+
+def test_install_again_keeps_the_brokers_group(vm):
+    (vm.stubs / "group-broker").write_text("domhouse-broker:x:1883:\n", encoding="utf-8")
+    assert vm("install", env=GOOD).returncode == 0
+    assert log(vm, "groupadd") == ""
+
+
+@pytest.mark.parametrize("name, line", [("group-1883", "altro:x:1883:\n"), ("group-broker", "domhouse-broker:x:1500:\n")])
+def test_install_stops_if_gid_1883_or_the_name_is_taken_otherwise(vm, name, line):
+    (vm.stubs / name).write_text(line, encoding="utf-8")
+    r = vm("install", env=GOOD)
+    assert r.returncode != 0 and "1883" in r.stderr
+    assert log(vm, "groupadd") == "" and log(vm, "useradd") == "" and not list(vm.units.iterdir())
