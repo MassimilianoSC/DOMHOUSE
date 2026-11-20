@@ -434,3 +434,31 @@ def test_review_7_annulla_removes_the_devices_credentials_too(world, mails):
     r = act("annulla", apt=APT)
     assert r.status_code == 202, r.text
     assert APT not in get_repository().apartments and not get_repository().device_creds.get(APT)
+
+
+def test_second_reading_a_hand_linked_apartment_never_loses_its_secrets(world, mails, monkeypatch):
+    """Second reading of A6: «a mano: solo il documento». A removal that fails is «non_riuscita» at the database step
+    (never a 500), and «Riprova» removes only the document: the secrets of a lab- apartment linked by hand stay."""
+    hand_linked("lab-a2-m1")
+    key, conn = sa.names("lab-a2-m1")
+    for name in (key, conn):
+        world.secrets.secrets[name] = {}
+        world.secrets.versions[name] = [(f"{name}/versions/1", "ENABLED")]
+    disattiva("lab-a2-m1")
+    later(world, days=7, seconds=1)
+    repo = get_repository()
+    real = repo.delete_device_credentials
+
+    async def broken(apartment_id):
+        raise OSError("firestore non risponde")
+    monkeypatch.setattr(repo, "delete_device_credentials", broken)
+    r = elimina("lab-a2-m1")
+    assert r.status_code == 202, r.text
+    e = r.json()["eliminazione"]
+    assert (e["stato"], e["passo"], e["codice"]) == ("non_riuscita", "database", "errore_database")
+    monkeypatch.setattr(repo, "delete_device_credentials", real)
+    world.secrets.fail = "permesso negato"                            # as IAM answers for lab-01: never asked
+    r = call("POST", f"{BASE}/lab-a2-m1/eliminazione/riprova", json={"version": e["version"]})
+    assert r.status_code == 200 and r.json()["eliminazione"]["stato"] == "eliminato", r.text
+    assert "lab-a2-m1" not in repo.apartments
+    assert all(state == "ENABLED" for _, state in world.secrets.versions[key] + world.secrets.versions[conn])

@@ -347,7 +347,12 @@ async def start(apt: Apartment, nome, identity) -> tuple[int, dict]:
         await audit.record("apartment_deletion_started", audit.by_platform(identity), apt.tenant_id, target,
                            origine=kind)
         await notify(saved, "eliminazione", identity.display_name or None)
-        await _remove(saved)
+        try:
+            await _remove(saved)
+        except Exception as exc:                                 # noqa: BLE001 - second reading: «Riprova», never a 500
+            warn("deletion database step failed", apartment_id=apt.apartment_id, error=type(exc).__name__)
+            await _fail(apt.apartment_id, "database", "errore_database")
+            return 202, {"eliminazione": await eliminazione_view(await get_repository().get_apartment(apt.apartment_id))}
         await audit.record("apartment_deleted", audit.by_platform(identity), apt.tenant_id, target)
         return 200, {"eliminazione": {"stato": "eliminato"}}
     await audit.record("apartment_deletion_started", audit.by_platform(identity), apt.tenant_id, target, origine=kind)
@@ -407,16 +412,20 @@ async def _finish(apartment_id: str) -> str:
     if apt is None or apt.eliminazione is None:
         return "gia_eliminato"
     e = apt.eliminazione
-    apt = await _save(apartment_id, expect_version=e.version, stato="in_corso", passo="segreti", codice=None)
-    if apt is None:
-        return "stato_diverso"
-    try:
-        await secret_admin.destroy_pair(secret_admin.get_secret_admin(), apartment_id)
-    except secret_admin.SecretError as exc:
-        warn("deletion secrets not destroyed", apartment_id=apartment_id, error=str(exc))
-        await _fail(apartment_id, "segreti", "chiavi_non_distrutte")
-        return "non_riuscita"
-    apt = await _save(apartment_id, expect_version=apt.eliminazione.version, passo="database")
+    if origine(apt) == "app":
+        # second reading of A6: only an apartment made from the app loses its secrets; one linked by hand (lab-01, a
+        # demonstration) loses only its record (answer 1210, point 4), also through «Riprova»
+        apt = await _save(apartment_id, expect_version=e.version, stato="in_corso", passo="segreti", codice=None)
+        if apt is None:
+            return "stato_diverso"
+        try:
+            await secret_admin.destroy_pair(secret_admin.get_secret_admin(), apartment_id)
+        except secret_admin.SecretError as exc:
+            warn("deletion secrets not destroyed", apartment_id=apartment_id, error=str(exc))
+            await _fail(apartment_id, "segreti", "chiavi_non_distrutte")
+            return "non_riuscita"
+    apt = await _save(apartment_id, expect_version=apt.eliminazione.version, stato="in_corso", passo="database",
+                      codice=None)
     if apt is None:
         return "stato_diverso"
     try:
