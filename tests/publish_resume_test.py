@@ -21,10 +21,19 @@ case "$*" in
   *"services describe domotica-bff-staging "*containers*) cat "$STUB_DIR/state-staging" 2>/dev/null ;;
   *"services describe domotica-bff "*containers*) cat "$STUB_DIR/state-prod" 2>/dev/null ;;
   *"services describe domotica-bff "*minScale*) cat "$STUB_DIR/values-prod" 2>/dev/null ;;
+  *"artifacts docker images describe"*)
+    [ -f "$STUB_DIR/digest-fails" ] && exit 1
+    cat "$STUB_DIR/digest" 2>/dev/null || echo "sha256:$(printf 'c%.0s' $(seq 1 64))" ;;
   *"compute scp"*) : ;;
   *"compute ssh"*)
     cmd="${*#*--command }"
     case "$cmd" in
+      *"agent-immagine-staging.nuovo"*)
+        echo "$cmd" | grep -oE "[a-z0-9./-]+@sha256:[0-9a-f]{64}" | head -1 > "$STUB_DIR/vm-approved"
+        cat "$STUB_DIR/vm-approved" ;;
+      *"cat /etc/domhouse/agent-immagine-staging"*) cat "$STUB_DIR/vm-approved" 2>/dev/null ;;
+      *compose.catalog.yaml*sha256sum*) cat "$STUB_DIR/vm-catalog-hash" 2>/dev/null ;;
+      *"install -m 644 ~/compose.catalog.yaml"*) cp "$STUB_DIR/wanted-catalog-hash" "$STUB_DIR/vm-catalog-hash"; echo catalog-ok ;;
       *"docker inspect"*) cat "$STUB_DIR/vm-running" 2>/dev/null ;;
       *ENGINE_IMAGE*) cat "$STUB_DIR/vm-image" ;;
       *engine-vm.sh*sha256sum*) cat "$STUB_DIR/vm-script-hash" ;;

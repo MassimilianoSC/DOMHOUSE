@@ -36,11 +36,20 @@ case "$*" in
   *"services describe domotica-bff-staging "*containers*) cat "$STUB_DIR/state-staging" 2>/dev/null ;;
   *"services describe domotica-bff "*containers*) cat "$STUB_DIR/state-prod" 2>/dev/null ;;
   *"services describe domotica-bff "*minScale*) cat "$STUB_DIR/values-prod" 2>/dev/null ;;
+  *"artifacts docker images describe"*)
+    [ -f "$STUB_DIR/digest-fails" ] && exit 1
+    cat "$STUB_DIR/digest" 2>/dev/null || echo "sha256:$(printf 'c%.0s' $(seq 1 64))" ;;
   *"compute scp"*) : ;;
   *"compute ssh"*)
     [ -f "$STUB_DIR/ssh-fails" ] && { echo "ssh: connect to host: Connection timed out" >&2; exit 255; }
     cmd="${*#*--command }"
     case "$cmd" in
+      *"agent-immagine-staging.nuovo"*)
+        echo "$cmd" | grep -oE "[a-z0-9./-]+@sha256:[0-9a-f]{64}" | head -1 > "$STUB_DIR/vm-approved"
+        cat "$STUB_DIR/vm-approved" ;;
+      *"cat /etc/domhouse/agent-immagine-staging"*) cat "$STUB_DIR/vm-approved" 2>/dev/null ;;
+      *compose.catalog.yaml*sha256sum*) cat "$STUB_DIR/vm-catalog-hash" 2>/dev/null ;;
+      *"install -m 644 ~/compose.catalog.yaml"*) cp "$STUB_DIR/wanted-catalog-hash" "$STUB_DIR/vm-catalog-hash"; echo catalog-ok ;;
       *"docker inspect"*) [ -f "$STUB_DIR/no-container" ] && exit 1; cat "$STUB_DIR/vm-running" 2>/dev/null ;;
       *ENGINE_IMAGE*) cat "$STUB_DIR/vm-image" ;;
       *engine-vm.sh*sha256sum*) cat "$STUB_DIR/vm-script-hash" ;;
@@ -79,7 +88,7 @@ def pub(tmp_path):
     if not bash or not shutil.which("git"):
         pytest.skip("bash o git non disponibili")
     r = tmp_path / "app"
-    for rel in ("scripts/publish-all.sh", "bff/cloudrun.yaml", "engine/compose.yaml"):
+    for rel in ("scripts/publish-all.sh", "bff/cloudrun.yaml", "engine/compose.yaml", "engine/compose.catalog.yaml"):
         (r / rel).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(ROOT / rel, r / rel)
     (r / "scripts" / "publish-settings.conf").write_text(
@@ -124,6 +133,10 @@ def pub(tmp_path):
     (stubs / "vm-image").write_text(f"{ENGINE}{on_vm}\n", encoding="utf-8")
     (stubs / "vm-script-hash").write_text("diverso  -\n", encoding="utf-8")
     (stubs / "vm-compose-hash").write_text("diverso  -\n", encoding="utf-8")
+    # A2: the VM has the commit's compose.catalog.yaml, unless a test says otherwise
+    catalog = hashlib.sha256((r / "engine" / "compose.catalog.yaml").read_bytes().replace(b"\r", b"")).hexdigest()
+    for name in ("vm-catalog-hash", "wanted-catalog-hash"):
+        (stubs / name).write_text(f"{catalog}  -\n", encoding="utf-8")
 
     def run(commit=None, answer="pubblica\n", env=""):
         (stubs / "calls.log").unlink(missing_ok=True)
@@ -337,3 +350,58 @@ def test_the_real_settings_have_every_name_and_no_secret():
     assert names == set(known)
     values = " ".join(line for line in text.splitlines() if line and not line.startswith("#"))
     assert not re.search(r"(?i)password|secret|token|key", values)          # the comments may name them, never a value
+
+
+
+# ---- A2 (proposta §4.3, answer 1164): the agent's approved image, by digest -------------------------------------
+DIGEST = "sha256:" + "d" * 64
+REPO_ENGINE = ENGINE[:-1]
+
+
+def test_a2_the_approved_image_is_the_digest_of_the_engine_installed(pub):
+    (pub.stubs / "digest").write_text(DIGEST + "\n", encoding="utf-8")
+    done, calls = pub()
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert f"artifacts docker images describe {ENGINE}{pub.lot}" in calls
+    assert (pub.stubs / "vm-approved").read_text(encoding="utf-8").strip() == f"{REPO_ENGINE}@{DIGEST}"
+    assert calls.index("engine-vm.sh update") < calls.index("agent-immagine-staging.nuovo")   # after the engine
+    summary = done.stdout.split("Riepilogo", 1)[1]
+    assert f"immagine approvata dello staging: scritta ({DIGEST[7:19]})" in summary
+
+
+def test_a2_an_engine_unchanged_approves_the_image_it_runs_and_twice_writes_once(pub):
+    (pub.stubs / "vm-image").write_text(f"{ENGINE}{pub.lot}\n", encoding="utf-8")
+    same_on_vm(pub)
+    (pub.stubs / "digest").write_text(DIGEST + "\n", encoding="utf-8")
+    done, calls = pub()
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert f"artifacts docker images describe {ENGINE}{pub.lot}" in calls and "agent-immagine-staging.nuovo" in calls
+    done, calls = pub()
+    assert done.returncode == 0 and "agent-immagine-staging.nuovo" not in calls
+    assert "immagine approvata dello staging: invariata" in done.stdout
+
+
+def test_a2_the_dry_run_says_what_it_would_write(pub):
+    done, calls = pub(answer="", env="DRY_RUN=1")
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "agent-immagine-staging.nuovo" not in calls and not (pub.stubs / "vm-approved").exists()
+    assert "immagine approvata dello staging" in done.stdout.split("Riepilogo", 1)[1]
+
+
+def test_a2_a_digest_that_cannot_be_read_is_a_fermo_after_the_engine(pub):
+    (pub.stubs / "digest-fails").write_text("", encoding="utf-8")
+    done, calls = pub()
+    out = done.stdout + done.stderr
+    assert done.returncode == 1 and "FERMO: Non leggo dal registro il digest" in out, out
+    assert "update" in steps(calls) and not (pub.stubs / "vm-approved").exists()
+
+
+def test_a2_a_new_catalog_compose_file_is_copied_without_recreating_the_engine(pub):
+    (pub.stubs / "vm-image").write_text(f"{ENGINE}{pub.lot}\n", encoding="utf-8")
+    same_on_vm(pub)
+    (pub.stubs / "vm-catalog-hash").write_text("diverso  -\n", encoding="utf-8")
+    done, calls = pub()
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "scp" in steps(calls) and "install -m 644 ~/compose.catalog.yaml" in calls
+    assert "update" not in steps(calls) and "timers" not in steps(calls)
+    assert "compose.catalog.yaml aggiornato sulla VM" in done.stdout.split("Riepilogo", 1)[1]

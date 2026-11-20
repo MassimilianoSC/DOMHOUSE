@@ -930,7 +930,7 @@ case "${cmd}" in
     for settings in "${OPT}"/*.settings; do in_use+=("$(sed -n 's/^ENGINE_IMAGE=//p' "${settings}")"); done
     shopt -u nullglob
     [ "${#in_use[@]}" -gt 0 ] || die "nessun motore installato: niente da pulire"
-    repo="${in_use[0]%:*}"
+    repo="${in_use[0]%@*}"; repo="${repo%:*}"    # A2: an engine by digest (…/engine@sha256:…) or by commit
     while IFS= read -r image; do [ -n "${image}" ] && in_use+=("${image}"); done < <(docker ps --format '{{.Image}}')
     kept=0
     # docker images lists the newest first

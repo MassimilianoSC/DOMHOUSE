@@ -18,7 +18,11 @@
 #                  one (engine/ without tests/ and *.md, cloudbuild.engine.yaml): the image (built once), then
 #                  engine-vm.sh update <apartment> <image>, which waits for /health 200; engine-vm.sh itself is copied
 #                  and its timers reinstalled whenever the VM's copy differs from the commit's; so is engine/compose.yaml
-#                  (D-218: install copies it once), and then the engine is recreated, with the same image if need be
+#                  (D-218: install copies it once), and then the engine is recreated, with the same image if need be;
+#                  engine/compose.catalog.yaml (A2) is copied when it differs, without recreating anything
+#   3b approved    A2 (proposta §4.3, answer 1164): the digest of the image the engine now runs, read from the registry,
+#                  written to /etc/domhouse/agent-immagine-staging on the VM (root's, 644) and read back: the only image
+#                  the agent's crea_motore installs. Harmless where A2 is not installed (nobody reads the file)
 #   4 summary      what was done, how long it took, and the commands to go back (never run by this script)
 # It stops at the first error with FERMO and what to do; production never starts if staging is not healthy. Every line
 # goes also to logs/publish-<date>-<commit>.log (not in Git); the state of a commit is logs/publish-state-<commit>.txt.
@@ -155,8 +159,14 @@ VM_SCRIPT="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/engine-vm.sh | sha256sum" |
 WANTED_COMPOSE="$(git -C "${ROOT}" show "${SHA}:engine/compose.yaml" | tr -d '\r' | sha256sum | cut -d' ' -f1)"
 VM_COMPOSE="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/compose.yaml | sha256sum" | cut -d' ' -f1)" \
   || stop "La VM ${VM_NAME} non risponde più (gcloud compute ssh via IAP) mentre leggo compose.yaml: rilancia lo stesso comando."
+# A2: the catalog's compose file (an older commit without it: nothing to copy)
+WANTED_CATALOG="$( { git -C "${ROOT}" show "${SHA}:engine/compose.catalog.yaml" 2>/dev/null || true; } | tr -d '\r' | sha256sum | cut -d' ' -f1)"
+EMPTY_HASH="$(printf '' | sha256sum | cut -d' ' -f1)"
+VM_CATALOG="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/compose.catalog.yaml 2>/dev/null | sha256sum" | cut -d' ' -f1)" \
+  || stop "La VM ${VM_NAME} non risponde più (gcloud compute ssh via IAP) mentre leggo compose.catalog.yaml: rilancia lo stesso comando."
 if pending motore; then ENGINE_CHANGES="aggiornamento del motore non concluso al giro precedente: lo rifaccio"; fi
-SCRIPT_NEW=""; COMPOSE_NEW=""
+SCRIPT_NEW=""; COMPOSE_NEW=""; CATALOG_NEW=""
+if [ "${WANTED_CATALOG}" != "${EMPTY_HASH}" ] && [ "${WANTED_CATALOG}" != "${VM_CATALOG}" ]; then CATALOG_NEW=1; fi
 [ "${WANTED_SCRIPT}" = "${VM_SCRIPT}" ] || SCRIPT_NEW=1
 [ "${WANTED_COMPOSE}" = "${VM_COMPOSE}" ] || COMPOSE_NEW=1
 if pending timer; then SCRIPT_NEW=1; fi           # D25: installed but its timers not, at the previous run
@@ -258,16 +268,26 @@ if [ -n "${ENGINE_NEEDED}" ]; then
 fi
 if [ -n "${SCRIPT_NEW}" ]; then todo timer; fi
 if [ -n "${COMPOSE_NEW}" ]; then todo compose; fi
-if [ -n "${SCRIPT_NEW}${COMPOSE_NEW}" ]; then
+if [ -n "${SCRIPT_NEW}${COMPOSE_NEW}${CATALOG_NEW}" ]; then
   if [ -n "${DRY_RUN}" ]; then
-    note "prova a secco: copierei$([ -n "${SCRIPT_NEW}" ] && echo ' engine-vm.sh (poi engine-vm.sh timers)')$([ -n "${COMPOSE_NEW}" ] && echo ' compose.yaml (poi il motore ricreato)') del commit"
+    note "prova a secco: copierei$([ -n "${SCRIPT_NEW}" ] && echo ' engine-vm.sh (poi engine-vm.sh timers)')$([ -n "${COMPOSE_NEW}" ] && echo ' compose.yaml (poi il motore ricreato)')$([ -n "${CATALOG_NEW}" ] && echo ' compose.catalog.yaml') del commit"
   else
     COPIES="$(mktemp -d)"
     git -C "${ROOT}" show "${SHA}:scripts/engine-vm.sh" | tr -d '\r' > "${COPIES}/engine-vm.sh"
     git -C "${ROOT}" show "${SHA}:engine/compose.yaml" | tr -d '\r' > "${COPIES}/compose.yaml"
-    gc compute scp "${COPIES}/engine-vm.sh" "${COPIES}/compose.yaml" "${VM_NAME}:" --zone "${VM_ZONE}" --tunnel-through-iap \
+    TO_COPY=("${COPIES}/engine-vm.sh" "${COPIES}/compose.yaml")
+    if [ -n "${CATALOG_NEW}" ]; then
+      git -C "${ROOT}" show "${SHA}:engine/compose.catalog.yaml" | tr -d '\r' > "${COPIES}/compose.catalog.yaml"
+      TO_COPY+=("${COPIES}/compose.catalog.yaml")
+    fi
+    gc compute scp "${TO_COPY[@]}" "${VM_NAME}:" --zone "${VM_ZONE}" --tunnel-through-iap \
       || stop "La copia dei file del motore sulla VM non è riuscita: rilancia lo stesso comando."
     rm -rf "${COPIES}"
+    if [ -n "${CATALOG_NEW}" ]; then
+      on_vm "sudo install -m 644 ~/compose.catalog.yaml /opt/domhouse/compose.catalog.yaml && echo catalog-ok" \
+        | grep -q catalog-ok || stop "L'installazione di compose.catalog.yaml sulla VM non è riuscita: rilancia lo stesso comando."
+      note "compose.catalog.yaml copiato"
+    fi
     if [ -n "${COMPOSE_NEW}" ]; then
       on_vm "sudo install -m 644 ~/compose.yaml /opt/domhouse/compose.yaml && echo compose-ok" \
         | grep -q compose-ok || stop "L'installazione di compose.yaml sulla VM non è riuscita: rilancia lo stesso comando."
@@ -313,6 +333,37 @@ Per tornare all'immagine di prima (lo decidi tu):
   if [ -n "${DRY_RUN}" ]; then ENGINE_DONE="da aggiornare, da ${VM_TAG} a ${SHORT}"; else ENGINE_DONE="da ${VM_TAG} a ${SHORT}"; fi
 fi
 
+# ---- 3b: the agent's approved image (A2, answer 1164) -----------------------------------------------------------
+APPROVED_FILE=/etc/domhouse/agent-immagine-staging
+APPROVED_DONE="invariata"
+RUNNING_IMAGE="${VM_IMAGE}"
+[ -z "${ENGINE_NEEDED}" ] || RUNNING_IMAGE="${ENGINE_IMAGE}"
+if [ -n "${DRY_RUN}" ] && [ -n "${ENGINE_NEEDED}" ]; then
+  note "prova a secco: poi scriverei in ${APPROVED_FILE} il digest di ${RUNNING_IMAGE} (l'immagine non è ancora costruita)"
+  APPROVED_DONE="da scrivere dopo la costruzione"
+else
+  case "${RUNNING_IMAGE}" in
+    *@sha256:*) APPROVED="${RUNNING_IMAGE}" ;;
+    *)
+      digest="$(gc artifacts docker images describe "${RUNNING_IMAGE}" --format='value(image_summary.digest)' 2>/dev/null \
+        | tr -d '\r' | tail -1)" || digest=""
+      [[ "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || stop "Non leggo dal registro il digest di ${RUNNING_IMAGE}: il motore è a posto, manca solo l'immagine approvata dell'agente. Rilancia lo stesso comando."
+      APPROVED="${RUNNING_IMAGE%:*}@${digest}" ;;
+  esac
+  VM_APPROVED="$(on_vm "sudo cat ${APPROVED_FILE} 2>/dev/null" | tail -1)" || VM_APPROVED=""
+  if [ "${VM_APPROVED}" = "${APPROVED}" ]; then
+    note "immagine approvata dello staging già ${APPROVED##*@sha256:}"
+  elif [ -n "${DRY_RUN}" ]; then
+    note "prova a secco: scriverei ${APPROVED} in ${APPROVED_FILE}"
+    APPROVED_DONE="da scrivere"
+  else
+    written="$(on_vm "echo '${APPROVED}' | sudo tee ${APPROVED_FILE}.nuovo > /dev/null && sudo chmod 644 ${APPROVED_FILE}.nuovo && sudo mv -f ${APPROVED_FILE}.nuovo ${APPROVED_FILE} && sudo cat ${APPROVED_FILE}" | tail -1)" || written=""
+    [ "${written}" = "${APPROVED}" ] || stop "L'immagine approvata dell'agente non risulta scritta in ${APPROVED_FILE} sulla VM: rilancia lo stesso comando."
+    note "immagine approvata dello staging: ${APPROVED}"
+    APPROVED_DONE="scritta ($(printf '%s' "${APPROVED##*@sha256:}" | cut -c1-12))"
+  fi
+fi
+
 # ---- 4: the summary -------------------------------------------------------------------------------------------------
 ELAPSED=$(( $(date +%s) - STARTED_S ))
 say "Riepilogo da incollare alla memoria storica$([ -n "${DRY_RUN}" ] && echo ' (prova a secco: niente è stato pubblicato)')"
@@ -324,7 +375,8 @@ for service in domotica-bff-staging domotica-bff; do
 done
 # a dry run has changed nothing: the summary says what is to be done, never «aggiornato» (lot 38 dry run, 10 November)
 if [ -n "${DRY_RUN}" ]; then DONE_WORD="da aggiornare"; else DONE_WORD="aggiornato"; fi   # never $(... && ...): set -e
-echo "motore ${ENGINE_APARTMENT}: ${ENGINE_DONE}$([ -n "${SCRIPT_NEW}" ] && echo "; engine-vm.sh ${DONE_WORD} sulla VM")$([ -n "${COMPOSE_NEW}" ] && echo "; compose.yaml ${DONE_WORD} sulla VM")"
+echo "motore ${ENGINE_APARTMENT}: ${ENGINE_DONE}$([ -n "${SCRIPT_NEW}" ] && echo "; engine-vm.sh ${DONE_WORD} sulla VM")$([ -n "${COMPOSE_NEW}" ] && echo "; compose.yaml ${DONE_WORD} sulla VM")$([ -n "${CATALOG_NEW}" ] && echo "; compose.catalog.yaml ${DONE_WORD} sulla VM")"
+echo "immagine approvata dello staging: ${APPROVED_DONE}"
 for target in staging prod; do
   before="$(recall "prima-${target}")"
   [ -z "${before}" ] || echo "per tornare indietro (${target}): gcloud run services update-traffic $([ "${target}" = prod ] && echo domotica-bff || echo domotica-bff-staging) --to-revisions=${before}=100 --region ${GCP_REGION} --project ${GCP_PROJECT_ID}"

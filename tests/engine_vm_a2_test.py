@@ -148,3 +148,12 @@ def test_env_writes_the_line_once(vm):
     vm("env", "apt-prova-01", "staging")
     assert (vm.opt / "apt-prova-01.settings").read_text(encoding="utf-8").count("ENV=staging\n") == 1
     assert vm("env", "apt-prova-01", "lab").returncode == 1
+
+
+def test_prune_images_finds_the_repository_also_from_an_engine_by_digest(vm):
+    (vm.opt / "aaa-01.settings").write_text(f"APARTMENT_ID=aaa-01\nPORT=8150\nCONNECTOR=shelly\nENGINE_IMAGE={DIGEST}\n",
+                                            encoding="utf-8")
+    r = vm("prune-images")
+    assert r.returncode == 0, r.stderr
+    images = [line for line in log(vm, "docker").splitlines() if line.startswith("images")]
+    assert images and images[0].split(" [")[0].endswith(f" {REPO}"), images
