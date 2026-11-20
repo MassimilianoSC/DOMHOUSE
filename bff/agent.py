@@ -44,6 +44,9 @@ CODES = (
     "prod_non_ammesso", "seq_vecchia", "non_disponibile", "motore_assente", "chiamante_non_ammesso",
     "scaduto", "interrotto", "errore_interno", "firma_non_valida",
     "appartamento_sconosciuto", "sync_fallito", "migrazione_non_fatta",
+    # A2 (docs/proposta-a2.md §6.3): crea_motore and togli_motore
+    "capienza_insufficiente", "staging_pieno", "porta_occupata", "immagine_non_approvata", "gia_esiste_diverso",
+    "dati_presenti", "non_creato_da_agente", "segreto_illeggibile", "motore_non_sano", "broker_fallito",
     "non_inviato", "tempo_scaduto",
 )
 MESSAGES = {
@@ -74,6 +77,16 @@ MESSAGES = {
     "appartamento_sconosciuto": "Il sistema domotico non conosce ancora questo appartamento",
     "sync_fallito": "Il sistema domotico non ha potuto aggiornare gli accessi: riprova",
     "migrazione_non_fatta": "Le credenziali di questo appartamento non sono ancora passate all'app",
+    "capienza_insufficiente": "La VM non ha memoria per un motore in più.",
+    "staging_pieno": "Lo staging ha già il numero massimo di motori.",
+    "porta_occupata": "La porta scelta è occupata sulla VM: «Riprova» ne prende un'altra.",
+    "immagine_non_approvata": "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta).",
+    "gia_esiste_diverso": "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta).",
+    "dati_presenti": "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta).",
+    "non_creato_da_agente": "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta).",
+    "segreto_illeggibile": "I permessi sui segreti non sono ancora attivi: riprova fra qualche minuto.",
+    "motore_non_sano": "Il motore non è partito: «Riprova», e se succede ancora serve un controllo.",
+    "broker_fallito": "Il broker non ha accettato l'appartamento: «Riprova».",
     "non_inviato": "Non è stato possibile mandare l'ordine: riprova",
     "tempo_scaduto": "Nessuna risposta dall'agente entro 20 minuti: riprova",
 }
@@ -265,15 +278,25 @@ async def send(operazione: str, apartment_id: str | None, uid: str) -> AgentOp:
         raise AgentError(422, "operation_not_available", "Operazione non disponibile")
     if not apartment_allowed(apartment_id, s.agent_ambiente):
         raise AgentError(422, "invalid_apartment", "Nome dell'appartamento non valido per questo ambiente")
+    op, body = await new_order(operazione, apartment_id, uid, {})
+    return await publish_op(op, body)
+
+
+async def new_order(operazione: str, apartment_id: str | None, uid: str, parametri: dict,
+                    per_appartamento: str | None = None) -> tuple[AgentOp, bytes]:
+    """An order saved as «inviato» with the apartment's next seq, signed; the caller publishes it (publish_op).
+    A2: capienza, crea_motore and togli_motore of a creation (bff/creation.py) come here too."""
     built = {}
 
     def build(sent: AgentOp) -> str:                             # inside the transaction: the seq is known
-        built["body"], sha = signed_order(sent, {})
+        built["body"], sha = signed_order(sent, parametri)
         return sha
     op = await get_repository().create_agent_op(AgentOp(
-        op_id=str(uuid.uuid4()), operazione=operazione, apartment_id=apartment_id, ambiente=s.agent_ambiente,
-        richiesto_da=uid, creato_at=utcnow().isoformat(timespec="milliseconds").replace("+00:00", "Z")), build=build)
-    return await publish_op(op, built["body"])
+        op_id=str(uuid.uuid4()), operazione=operazione, apartment_id=apartment_id,
+        ambiente=get_settings().agent_ambiente, richiesto_da=uid,
+        creato_at=utcnow().isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+        per_appartamento=per_appartamento), build=build)
+    return op, built["body"]
 
 
 async def publish_op(op: AgentOp, body: bytes) -> AgentOp:
@@ -290,6 +313,12 @@ async def publish_op(op: AgentOp, body: bytes) -> AgentOp:
                          await get_repository().get_agent_op(op.op_id)) from None
     warn("agent order sent", op_id=op.op_id, operazione=op.operazione, apartment_id=op.apartment_id, seq=op.seq)
     return op
+
+
+def _creation_op(op: AgentOp) -> bool:
+    """A2: an order of a creation (a capienza asked for an apartment, crea_motore, togli_motore)."""
+    return op.operazione in ("crea_motore", "togli_motore") or (op.operazione == "capienza"
+                                                              and op.per_appartamento is not None)
 
 
 def _too_old(op: AgentOp) -> bool:
@@ -380,6 +409,17 @@ async def receive(body) -> str:
         if op is None or not op.ordine_sha256 or result.get("ordine_sha256") != op.ordine_sha256:
             warn("agent alarm codice=ordine_diverso", op_id=result["op_id"])
             return "ordine_diverso"
+    if op is not None and op.operazione == "togli_motore" and result["esito"] == "riuscito":
+        # A2 §5.2 point 4 (N8): the engine is gone, so a late success still closes the cancellation, if no other
+        # order was sent for the apartment after it (bff/creation.py checks)
+        outcome = await get_repository().finish_agent_op(
+            result["op_id"], result["ambiente"], result.get("apartment_id"), result.get("operazione"),
+            {"stato": "riuscito", "codice": result["codice"], "dati": dati}, 10**9, seq=result.get("seq"))
+        if outcome in ("chiuso", "gia_chiuso"):
+            from . import creation
+            done = await creation.after_result(op, "riuscito", result["codice"], dati, late=True)
+            warn("creation result", op_id=op.op_id, esito=done)
+        return outcome
     if op is not None and _too_old(op):
         await _expire(op)
         return "tardi"
@@ -387,6 +427,12 @@ async def receive(body) -> str:
         result["op_id"], result["ambiente"], result.get("apartment_id"), result.get("operazione"),
         {"stato": result["esito"], "codice": result["codice"], "dati": dati}, MAX_WAIT.total_seconds(),
         seq=result.get("seq"))
+    if outcome in ("chiuso", "gia_chiuso") and op is not None and _creation_op(op):
+        # A2: the next step of the creation; a failure of the repository raises (503: Pub/Sub delivers again, and
+        # after_result is safe to run twice)
+        from . import creation
+        done = await creation.after_result(op, result["esito"], result["codice"], dati)
+        warn("creation result", op_id=op.op_id, esito=done)
     if outcome == "chiuso" and result["esito"] != "riuscito" and result.get("operazione") == "aggiorna_broker":
         # A3 §8.4: the row and the alarm at once; a failure here is left to the hourly round (never a 503: the
         # result is saved, and Pub/Sub would only bring it back as «gia_chiuso»)

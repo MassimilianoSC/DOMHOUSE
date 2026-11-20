@@ -67,7 +67,9 @@ class TestTenants:
     def test_list_and_get_show_only_the_registry(self):
         rows = P("GET", "/tenants").json()
         assert all(set(r) == {"tenant_id", "name", "created_at", "first_admin", "suspended", "suspended_at",
-                              "suspended_reason", "support_access"} for r in rows)
+                              "suspended_reason", "support_access",
+                              # A2 §2.2 point 22: counts of the creations, no organisation data
+                              "appartamenti_non_creati", "appartamenti_in_preparazione"} for r in rows)
         assert {"t-flatsharing-demo", "t-altra-demo", STATE["tid"]} <= {r["tenant_id"] for r in rows}
         legacy = next(r for r in rows if r["tenant_id"] == "t-flatsharing-demo")
         assert legacy["first_admin"] is None
@@ -95,7 +97,8 @@ class TestTenants:
 
 class TestApartments:
     def row_keys(self):
-        return {"apartment_id", "name", "instance_url", "port", "enabled", "timezone", "italianway_id", "simulated", "last_check"}
+        return {"apartment_id", "name", "instance_url", "port", "enabled", "timezone", "italianway_id", "simulated", "last_check",
+                "creazione"}                                         # A2 §2.2 point 23: null when linked by hand
 
     def test_create_link_verify(self):
         aid = STATE["aid"] = f"apt-plat-{RUN}"

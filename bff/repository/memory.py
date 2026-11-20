@@ -1,7 +1,7 @@
 import copy
 import time
 
-from .base import (SEQ_UNCHECKED, migrated_document, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (SEQ_UNCHECKED, iso_seconds, migrated_document, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
 
 
@@ -42,6 +42,7 @@ class InMemoryRepository:
         self.agent_seq: dict[str, int] = {}               # apartment -> last sequence number given (never removed)
         self.agent_ultima: dict[str, int] = {}            # A3: apartment -> ultima_seq_riuscita of aggiorna_broker
         self.device_creds: dict[str, dict[str, dict]] = {}   # A3: apartment -> device_id -> document
+        self.creation_stamps: dict[str, list[str]] = {}      # A2: organisation -> stamps of the creations started
 
     # tool A, A1: no await between the reads and the writes, so atomic within the (single) process
     async def create_agent_op(self, op, build=None):
@@ -417,6 +418,46 @@ class InMemoryRepository:
     async def release_tenant_name(self, name_key, tenant_id):
         if self.tenant_names.get(name_key) == tenant_id:
             del self.tenant_names[name_key]
+
+    # A2: no await between the reads and the writes, so atomic within the (single) process
+    async def reserve_creation(self, apartment, ports, code, stamp, limit, window_s):
+        a = apartment
+        if a.apartment_id in self.used_apartment_ids or a.apartment_id in self.apartments:
+            return {"esito": "exists"}
+        now = iso_seconds(stamp)
+        times = sorted(t for t in self.creation_stamps.get(a.tenant_id, []) if now - iso_seconds(t) < window_s)
+        if len(times) >= limit:
+            return {"esito": "rate", "times": times}
+        if code and self.external_id_owners.get(f"italianway:{code}") not in (None, a.apartment_id):
+            return {"esito": "external"}
+        chosen = next(((p, key) for p, key in ports if f"link:{key}" not in self.external_id_owners), None)
+        if chosen is None:
+            return {"esito": "no_port"}
+        self.used_apartment_ids.add(a.apartment_id)
+        self.external_id_owners[f"link:{chosen[1]}"] = a.apartment_id
+        if code:
+            self.external_id_owners[f"italianway:{code}"] = a.apartment_id
+        self.creation_stamps[a.tenant_id] = times + [stamp]
+        saved = a.model_copy(deep=True)
+        saved.creazione.porta = chosen[0]
+        self.apartments[a.apartment_id] = saved
+        return {"esito": "ok", "porta": chosen[0]}
+
+    async def apartment_seq(self, apartment_id):
+        return self.agent_seq.get(apartment_id, 0)
+
+    async def creation_times(self, tenant_id):
+        return list(self.creation_stamps.get(tenant_id, []))
+
+    async def change_apartment(self, apartment_id, change):
+        current = self.apartments.get(apartment_id)
+        if current is None:
+            return None
+        new = change(current.model_copy(deep=True))
+        if new is None:
+            return None
+        self.apartments[apartment_id] = new.model_copy(deep=True)
+        return new
 
     async def reserve_apartment_id(self, apartment_id):
         if apartment_id in self.used_apartment_ids:

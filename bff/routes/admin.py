@@ -12,6 +12,7 @@ from ..logs import warn
 from ..features import APP_FEATURES
 from ..invites import InviteRefused, create_invitation, send_invitation, shown
 from ..repository import Apartment, Tenant, User, get_repository
+from ..creation import usable
 from ..sse_hub import hub_manager
 
 router = APIRouter(prefix="/app/admin", dependencies=[Depends(require_admin)])
@@ -53,7 +54,7 @@ async def _scope_in(value: ApartmentScope, role: str, tenant_id: str) -> tuple[l
     if role == "admin":
         return None, err(422, "admin_all_apartments", "Gli amministratori vedono sempre tutti gli appartamenti")
     ids = list(dict.fromkeys(value))
-    known = {a.apartment_id for a in await get_repository().list_apartments(tenant_id)}
+    known = {a.apartment_id for a in await get_repository().list_apartments(tenant_id) if usable(a)}
     unknown = [i for i in ids if i not in known]
     if unknown:
         return None, JSONResponse(status_code=422, content={
@@ -249,7 +250,7 @@ def _check_features(features: list[str] | None) -> bool:
 
 @router.get("/apartments")
 async def list_apartments(user: CurrentUser = Depends(require_admin)):
-    return [apt_out(a) for a in await get_repository().list_apartments(user.tenant_id)]
+    return [apt_out(a) for a in await get_repository().list_apartments(user.tenant_id) if usable(a)]
 
 
 @router.get("/assistant-stats")
@@ -258,7 +259,7 @@ async def assistant_stats(weeks: str = "8", user: CurrentUser = Depends(require_
     zeros included, and the threshold (bff/ai_stats.py). weeks from 1 to 26."""
     if not weeks.isdigit() or not 1 <= int(weeks) <= ai_stats.MAX_WEEKS:
         return err(422, "bad_request", f"weeks deve essere un numero fra 1 e {ai_stats.MAX_WEEKS}")
-    apartments = await get_repository().list_apartments(user.tenant_id)
+    apartments = [a for a in await get_repository().list_apartments(user.tenant_id) if usable(a)]
     return await ai_stats.report([a.apartment_id for a in apartments], int(weeks))
 
 
@@ -272,7 +273,7 @@ async def create_apartment(user: CurrentUser = Depends(require_admin)):
 async def patch_apartment(apartment_id: str, body: ApartmentPatch, user: CurrentUser = Depends(require_admin)):
     repo = get_repository()
     apt = await repo.get_apartment(apartment_id)
-    if not apt or apt.tenant_id != user.tenant_id:
+    if not apt or apt.tenant_id != user.tenant_id or not usable(apt):     # A2 §2.2 point 25
         return err(404, "not_found", "Appartamento inesistente")
     if not _check_features(body.enabled_features):
         return err(422, "invalid_feature", "Funzione sconosciuta")
@@ -344,7 +345,7 @@ async def verify_apartment(apartment_id: str, user: CurrentUser = Depends(requir
     """'Verifica connessione': calls /health and /version on the instance and reports both."""
     repo = get_repository()
     apt = await repo.get_apartment(apartment_id)
-    if not apt or apt.tenant_id != user.tenant_id:
+    if not apt or apt.tenant_id != user.tenant_id or not usable(apt):     # A2 §2.2 point 25
         return err(404, "not_found", "Appartamento inesistente")
     # also stores last_check (D-64), stays with the admin in real mode; X-Actor is the pseudonym (P-48)
     return instances.for_admin(await instances.verify(apt, await actors.actor_for(user.uid, user.email)))

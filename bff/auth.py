@@ -460,8 +460,9 @@ async def _support_still_open(repo, user: CurrentUser) -> bool:
 async def get_tenant_apartment(user: CurrentUser, apartment_id: str):
     """Single gate of every /app/apartments/{id}/... route: another tenant's apartment and one outside the user's list
     (P-18) get the same 404, so the answer does not reveal that the apartment exists."""
+    from .creation import usable                         # A2 §2.2 point 25: not «pronto» = not there
     apt = await get_repository().get_apartment(apartment_id)
-    if not apt or apt.tenant_id != user.tenant_id or not user.can_see(apt.apartment_id):
+    if not apt or apt.tenant_id != user.tenant_id or not user.can_see(apt.apartment_id) or not usable(apt):
         raise _err(404, "not_found", "Appartamento inesistente")
     if instances.demo_refused(apt.instance_url):       # D-202: a record left from before, until it is removed
         raise _err(409, "demo_not_available", instances.MSG_NO_DEMO)

@@ -801,3 +801,49 @@ def test_a3_one_alarm_per_order(repo):
     assert run(repo.mark_device_alerted("lab-01", "shelly-a", 3)) is True
     assert run(repo.mark_device_alerted("lab-01", "shelly-a", 3)) is False
     assert run(repo.mark_device_alerted("lab-01", "shelly-a", 4)) is True
+
+
+# ---- A2 (docs/proposta-a2.md §4.1 step 2): the reservation in one transaction ----------------------------------------
+def _new(apt_id, tenant="t-a2"):
+    from bff.repository.base import Creazione
+    return Apartment(apartment_id=apt_id, tenant_id=tenant, name=apt_id, instance_url="", enabled=False,
+                     creazione=Creazione(porta=0, fatti=["id", "porta"], segreti_op="op-1", avviata_da="u1",
+                                         updated_by="u1"))
+
+
+PORTS = [(8150, "10.198.0.2:8150"), (8151, "10.198.0.2:8151")]
+
+
+def test_a2_reserve_creation_takes_id_port_code_and_a_place_in_the_hour(repo):
+    got = run(repo.reserve_creation(_new("lab-a2-01"), PORTS, "IW-1", "2026-11-20T10:00:00.000Z", 2, 3600))
+    assert got == {"esito": "ok", "porta": 8150}
+    saved = run(repo.get_apartment("lab-a2-01"))
+    assert saved.creazione.porta == 8150 and run(repo.claim_external_id("italianway", "IW-1", "x")) == "lab-a2-01"
+    assert run(repo.reserve_creation(_new("lab-a2-01"), PORTS, None, "2026-11-20T10:01:00.000Z", 2, 3600)) \
+        == {"esito": "exists"}
+    assert run(repo.reserve_creation(_new("lab-a2-02"), PORTS, "IW-1", "2026-11-20T10:01:00.000Z", 2, 3600)) \
+        == {"esito": "external"}
+    assert run(repo.reserve_creation(_new("lab-a2-02"), PORTS, None, "2026-11-20T10:02:00.000Z", 2, 3600)) \
+        == {"esito": "ok", "porta": 8151}
+    rate = run(repo.reserve_creation(_new("lab-a2-03"), PORTS, None, "2026-11-20T10:03:00.000Z", 2, 3600))
+    assert rate == {"esito": "rate", "times": ["2026-11-20T10:00:00.000Z", "2026-11-20T10:02:00.000Z"]}
+    assert run(repo.reserve_creation(_new("lab-a2-03"), PORTS, None, "2026-11-20T11:00:01.000Z", 2, 3600)) \
+        == {"esito": "no_port"}
+    assert run(repo.get_apartment("lab-a2-03")) is None and run(repo.reserve_apartment_id("lab-a2-03")) is True
+    assert sorted(run(repo.creation_times("t-a2"))) == ["2026-11-20T10:00:00.000Z", "2026-11-20T10:02:00.000Z"]
+    assert run(repo.claim_external_id("link", "10.198.0.2:8150", "altro")) == "lab-a2-01"
+
+
+def test_a2_change_apartment_and_the_apartment_seq(repo):
+    run(repo.reserve_creation(_new("lab-a2-05"), PORTS, None, "2026-11-20T10:00:00.000Z", 5, 3600))
+
+    def to_ready(apt):
+        apt.creazione.stato = "pronto"
+        apt.creazione.version += 1
+        return apt
+    saved = run(repo.change_apartment("lab-a2-05", to_ready))
+    assert saved.creazione.stato == "pronto" and run(repo.get_apartment("lab-a2-05")).creazione.version == 2
+    assert run(repo.change_apartment("lab-a2-05", lambda apt: None)) is None
+    assert run(repo.get_apartment("lab-a2-05")).creazione.version == 2
+    assert run(repo.change_apartment("nessuno", to_ready)) is None
+    assert run(repo.apartment_seq("lab-a2-05")) == 0

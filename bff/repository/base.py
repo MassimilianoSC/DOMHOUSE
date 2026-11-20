@@ -10,6 +10,11 @@ def now_iso() -> str:
     return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
+def iso_seconds(value: str) -> float:
+    """An ISO 8601 UTC time ("…Z") as seconds since the epoch."""
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+
+
 class Tenant(BaseModel):
     tenant_id: str
     name: str
@@ -69,6 +74,29 @@ class LastCheck(BaseModel):
     secret_problem: bool = False   # D-90: the error names a secret; the admin reads a generic message instead
 
 
+CreazioneStato = Literal["in_preparazione", "pronto", "non_creato", "annullamento_in_corso"]
+CreazionePasso = Literal["riserva", "segreti", "capienza", "motore", "collegamento"]
+
+
+class Creazione(BaseModel):
+    """A2 (docs/proposta-a2.md §2.1, §6.1): an apartment created from the app, from the reservation to «pronto».
+    `op` is the last order to the agent ({op_id, operazione}); its outcome is read from agent_ops. `segreti_op` is the
+    label domhouse-op of the two secrets, written here BEFORE they are created (§3.3). `codice` is why it stopped.
+    The state shown is computed at read time (bff/creation.py: 20 minutes without progress -> non_creato)."""
+    stato: CreazioneStato = "in_preparazione"
+    passo: CreazionePasso = "riserva"
+    version: int = 1
+    porta: int
+    op: dict | None = None
+    fatti: list[str] = Field(default_factory=list)
+    codice: str | None = None
+    segreti_op: str
+    avviata_da: str                          # a Firebase uid (its name from the activity log's people), never an email
+    crea_inviato: bool = False               # a crea_motore was published once: «Annulla» needs togli_motore
+    updated_at: str = Field(default_factory=now_iso)
+    updated_by: str
+
+
 class Apartment(BaseModel):
     apartment_id: str
     tenant_id: str
@@ -89,6 +117,8 @@ class Apartment(BaseModel):
     # D-97: a demonstration apartment, where admins may use the simulator. Set by the platform; always true on the
     # built-in mock (also for records saved before the field existed); a real engine in simulated mode can be marked too
     simulated: bool = False
+    # A2: set only for an apartment created from the app; None for those linked by hand (dev, lab-01, demonstrations)
+    creazione: Creazione | None = None
 
     @model_validator(mode="after")
     def _mock_is_simulated(self):
@@ -213,6 +243,8 @@ AuditAction = Literal[
     # A3 (docs/proposta-a3-server.md §8.4): the devices' credentials; the last one written by the system (answer 1175)
     "device_credential_registered", "device_credential_regenerated", "device_credential_revoked",
     "device_credential_retried", "device_credential_revoke_not_applied",
+    # A2 (docs/proposta-a2.md §6.4): «Riprova» and «Annulla» of a creation; apartment_created when it is «pronto»
+    "apartment_creation_retried", "apartment_creation_cancelled",
 ]
 
 
@@ -289,6 +321,7 @@ class AgentOp(BaseModel):
     creato_at: str = Field(default_factory=now_iso)
     finito_at: str | None = None
     ordine_sha256: str | None = None        # A3 §6.3: the fingerprint of the order published (signed results carry it)
+    per_appartamento: str | None = None     # A2: the apartment a «capienza» is asked for (the order itself has none)
 
 
 class SupportAccess(BaseModel):
@@ -350,6 +383,17 @@ class Repository(Protocol):
     async def claim_tenant_name(self, name_key: str, tenant_id: str) -> str | None: ...   # None = claimed
     async def release_tenant_name(self, name_key: str, tenant_id: str) -> None: ...
     async def reserve_apartment_id(self, apartment_id: str) -> bool: ...   # never released (D-67)
+    # A2 (docs/proposta-a2.md §4.1 step 2, §6.2): ONE transaction: the id (never used, D-67), the lowest free port of
+    # `ports` [(port, claim key)], the Italianway code if any, the organisation's count of the last `window_s` seconds
+    # (at most `limit`, `stamp` added), the apartment saved. Answers {"esito": "ok", "porta"} | {"esito": "exists"} |
+    # {"esito": "rate", "times": [...]} | {"esito": "no_port"} | {"esito": "external"}; nothing is written unless ok
+    async def reserve_creation(self, apartment: "Apartment", ports: list, code: str | None, stamp: str, limit: int,
+                               window_s: float) -> dict: ...
+    async def creation_times(self, tenant_id: str) -> list[str]: ...      # the stamps kept (the caller keeps the window)
+    # A2: change(apartment) -> the apartment to save, or None to leave it; in one transaction; returns what was saved
+    # (None when absent or unchanged). change may raise to refuse: nothing is written
+    async def change_apartment(self, apartment_id: str, change) -> "Apartment | None": ...
+    async def apartment_seq(self, apartment_id: str) -> int: ...          # A2 N8: the last seq given (0 = none)
     async def claim_external_id(self, source: str, code: str, apartment_id: str) -> str | None: ...   # None = claimed
     async def release_external_id(self, source: str, code: str, apartment_id: str) -> None: ...
     # P-36 point 14: "at least one admin" / "at least one platform manager", checked and written in ONE transaction,

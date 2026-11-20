@@ -13,7 +13,7 @@ from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, EmailStr, Field
 
-from .. import actors, audit, instances, support
+from .. import actors, agent, audit, creation, instances, support
 from ..auth import Identity, forget_tenant, require_platform
 from ..config import get_settings
 from ..invites import InviteRefused, create_invitation, send_invitation, shown
@@ -56,7 +56,8 @@ async def _first_admin(t: Tenant) -> dict | None:
 async def tenant_row(t: Tenant, viewer_uid: str | None = None) -> dict:
     return {"tenant_id": t.tenant_id, "name": t.name, "created_at": t.created_at, "first_admin": await _first_admin(t),
             "suspended": t.status == "suspended", "suspended_at": t.suspended_at, "suspended_reason": t.suspended_reason,
-            "support_access": await _support_summary(t.tenant_id, viewer_uid)}
+            "support_access": await _support_summary(t.tenant_id, viewer_uid),
+            **await creation.counts(t.tenant_id)}          # A2 §2.2 point 22
 
 
 async def _support_summary(tenant_id: str, viewer_uid: str | None) -> dict | None:
@@ -124,7 +125,10 @@ async def create_tenant(body: TenantCreate, identity: Identity = Depends(require
 @router.get("/tenants/{tenant_id}")
 async def get_tenant(tenant_id: str, identity: Identity = Depends(require_platform)):
     t = await _get_tenant(tenant_id)
-    return t if isinstance(t, JSONResponse) else await tenant_row(t, identity.uid)
+    if isinstance(t, JSONResponse):
+        return t
+    # A2 §2.2 point 20: the count of the last hour, read before the form opens
+    return {**await tenant_row(t, identity.uid), "creazioni_ultima_ora": await creation.last_hour(tenant_id)}
 
 
 @router.patch("/tenants/{tenant_id}")
@@ -350,10 +354,11 @@ def _demo_code_refused(url: str, code: str | None) -> JSONResponse | None:
     return None
 
 
-def apartment_row(a: Apartment) -> dict:
+def apartment_row(a: Apartment, creazione: dict | None = None) -> dict:
     return {"apartment_id": a.apartment_id, "name": a.name, "instance_url": a.instance_url, "port": a.port,
             "enabled": a.enabled, "timezone": a.timezone, "italianway_id": a.external_ids.italianway,
-            "simulated": a.simulated, "last_check": a.last_check.model_dump() if a.last_check else None}
+            "simulated": a.simulated, "last_check": a.last_check.model_dump() if a.last_check else None,
+            "creazione": creazione}                           # A2 §2.2 point 23: null when linked by hand
 
 
 def _code(value: str | None) -> str | None:
@@ -383,7 +388,9 @@ async def list_tenant_apartments(tenant_id: str):
     t = await _get_tenant(tenant_id)
     if isinstance(t, JSONResponse):
         return t
-    return [apartment_row(a) for a in await get_repository().list_apartments(tenant_id)]
+    apartments = await get_repository().list_apartments(tenant_id)
+    made = await creation.views(apartments)
+    return [apartment_row(a, made[a.apartment_id]) for a in apartments]
 
 
 @router.post("/tenants/{tenant_id}/apartments", status_code=201)
@@ -420,6 +427,99 @@ async def create_tenant_apartment(tenant_id: str, body: ApartmentCreate, identit
     if code:
         await audit.record("italianway_changed", who, tenant_id, target, **{"from": None, "to": code})
     return apartment_row(saved)
+
+
+# ---------- A2: an apartment created from the app (docs/proposta-a2.md §2) ----------
+class ApartmentNew(BaseModel):
+    apartment_id: str = Field(max_length=200)
+    name: str = Field(max_length=500)
+    timezone: str = "Europe/Rome"
+    italianway_id: str | None = Field(default=None, max_length=120)
+
+
+class CreationAction(BaseModel):
+    version: int | None = None
+
+
+def _refused(exc: "creation.CreationRefused") -> JSONResponse:
+    response = err(exc.status, exc.error, exc.message, **exc.details)
+    if exc.status == 429 and exc.details.get("riprova_dal"):
+        from datetime import datetime
+        seconds = datetime.fromisoformat(exc.details["riprova_dal"].replace("Z", "+00:00")).timestamp() \
+            - creation.utcnow().timestamp()
+        response.headers["Retry-After"] = str(max(1, int(seconds + 0.999)))
+    return response
+
+
+def _publish_failed(exc: "agent.AgentError") -> JSONResponse:
+    return err(exc.status, exc.error, exc.message, **({"op": agent.describe(exc.op)} if exc.op else {}))
+
+
+async def _created_reply(apt: Apartment | None, status: int = 202) -> JSONResponse:
+    if apt is None:
+        return JSONResponse(status_code=status, content={"apartment": None, "creazione": {"stato": "annullato"}})
+    made = await creation.view(apt)
+    return JSONResponse(status_code=status, content={"apartment": apartment_row(apt, made), "creazione": made})
+
+
+@router.post("/tenants/{tenant_id}/apartments/nuovo")
+async def new_tenant_apartment(tenant_id: str, body: ApartmentNew, identity: Identity = Depends(require_platform)):
+    """A2 §4.1: reservation, secrets, capienza; then the agent's results carry it to «pronto» (bff/creation.py)."""
+    t = await _get_tenant(tenant_id)
+    if isinstance(t, JSONResponse):
+        return t
+    name = body.name.strip()
+    if not 1 <= len(name) <= 80:
+        return err(422, "invalid_name", "Il nome va da 1 a 80 caratteri")
+    if not _check_tz(body.timezone):
+        return err(422, "invalid_timezone", "Fuso orario non valido")
+    if refused := _demo_code_refused("http://" + creation.VM_HOST, _code(body.italianway_id)):
+        return refused
+    try:
+        apt = await creation.create(tenant_id, body.apartment_id, name, body.timezone, _code(body.italianway_id),
+                                    identity)
+    except creation.CreationRefused as exc:
+        return _refused(exc)
+    except agent.AgentError as exc:
+        return _publish_failed(exc)
+    return await _created_reply(apt)
+
+
+async def _created_apartment(tenant_id: str, apartment_id: str) -> Apartment | JSONResponse:
+    apt = await _tenant_apartment(tenant_id, apartment_id)
+    if isinstance(apt, JSONResponse):
+        return apt
+    if apt.creazione is None:
+        return err(404, "not_found", "Questo appartamento non è stato creato dall'app")
+    return apt
+
+
+@router.get("/tenants/{tenant_id}/apartments/{apartment_id}/creazione")
+async def get_creation(tenant_id: str, apartment_id: str):
+    apt = await _created_apartment(tenant_id, apartment_id)
+    return apt if isinstance(apt, JSONResponse) else {"creazione": await creation.view(apt)}
+
+
+@router.post("/tenants/{tenant_id}/apartments/{apartment_id}/creazione/{action}")
+async def act_on_creation(tenant_id: str, apartment_id: str, action: Literal["riprova", "annulla"],
+                          body: CreationAction = Body(default_factory=CreationAction),
+                          identity: Identity = Depends(require_platform)):
+    """«Riprova» and «Annulla» (§5), only from «non_creato», with the version read."""
+    apt = await _created_apartment(tenant_id, apartment_id)
+    if isinstance(apt, JSONResponse):
+        return apt
+    try:
+        if action == "riprova":
+            done = await creation.retry(apt, body.version, identity)
+        else:
+            done = await creation.cancel(apt, body.version, identity)
+    except creation.CreationRefused as exc:
+        return _refused(exc)
+    except agent.AgentError as exc:
+        return _publish_failed(exc)
+    if done is None:
+        return JSONResponse(status_code=202, content={"creazione": {"stato": "annullato"}})
+    return JSONResponse(status_code=202, content={"creazione": await creation.view(done)})
 
 
 @router.patch("/tenants/{tenant_id}/apartments/{apartment_id}")

@@ -13,6 +13,7 @@ from .. import actors, ai_stats, audit, energy_report, energy_since, instances, 
 from ..auth import CurrentUser, Identity, get_tenant_apartment, resolve_identity, resolve_user, scope_out, still_sees
 from ..bookings import ForwardError, SimulatorTranslator, TranslationError, forward
 from ..config import get_settings
+from ..creation import available as creation_available, usable
 from ..features import configured_features, feature_for
 from .admin import tenant_out
 from ..logs import ctx_apartment, ctx_correlation, info
@@ -54,7 +55,8 @@ async def me(identity: Identity = Depends(resolve_identity)):
     repo = get_repository()
     s = get_settings()
     env = {"app_env": s.app_env, "auth_mode": s.auth_mode, "fcm_enabled": s.fcm_enabled,
-           "instance_mode": s.instance_mode}   # D-97: the simulator is per apartment (summary.simulated), not per env
+           "instance_mode": s.instance_mode,   # D-97: the simulator is per apartment (summary.simulated), not per env
+           "creazione_disponibile": creation_available()}   # A2 §2.2 point 24: «Nuovo appartamento» usable
     user = identity.user
     if user is None:
         return {
@@ -120,7 +122,8 @@ async def dev_users():
 
 @router.get("/apartments")
 async def list_apartments(user: CurrentUser = Depends(resolve_user)):
-    apts = [a for a in await get_repository().list_apartments(user.tenant_id) if user.can_see(a.apartment_id)]
+    apts = [a for a in await get_repository().list_apartments(user.tenant_id)
+            if user.can_see(a.apartment_id) and usable(a)]               # A2 §2.2 point 25
     actor = await actors.actor_for(user.uid, user.email)   # P-48 (D-87): the engine never gets the email
     out = await asyncio.gather(*(instances.summary(a, actor, local_midnight_utc(a.timezone)) for a in apts))
     return await actors.rewrite(list(out), user.tenant_id)

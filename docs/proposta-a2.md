@@ -51,7 +51,7 @@
 
 | N. | Richiesta di o2 | Risposta del server |
 |---|---|---|
-| 19 | il 429 con limite e ora | corpo `{error: "rate_limited", message, limite: 5, riprova_dal}` (`riprova_dal` ora UTC, ISO 8601) più l'intestazione `Retry-After` in secondi (§6.2) |
+| 19 | il 429 con limite e ora | corpo `{error: "rate_limited", message, details: {limite: 5, riprova_dal}}` (`riprova_dal` ora UTC, ISO 8601; dentro `details` come gli altri campi in più del server, per esempio `details.op` del 502: corretto il 20 novembre, d'accordo con o2) più l'intestazione `Retry-After` in secondi (§6.2) |
 | 20 | il conto dell'ultima ora prima di aprire il modulo | in `GET /app/platform/tenants/{tenant_id}` (la scheda dell'organizzazione, da cui si apre il modulo) il campo `creazioni_ultima_ora: {usate, limite, libera_dal}`; `libera_dal` è null finché `usate < limite`. Nessuna rotta nuova |
 | 21 | «Riprova» e «Annulla» non contano | sì (§6.2) |
 | 22 | i conteggi per organizzazione | in `GET /app/platform/tenants` ogni riga ha `appartamenti_non_creati` e `appartamenti_in_preparazione` (0 se nessuno) |

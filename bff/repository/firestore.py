@@ -13,7 +13,7 @@ from google.cloud import firestore
 
 from .. import retention
 
-from .base import (SEQ_UNCHECKED, migrated_document, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
+from .base import (SEQ_UNCHECKED, iso_seconds, migrated_document, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email, now_iso)
 
 
@@ -675,6 +675,74 @@ class FirestoreRepository:
         snap = await ref.get()
         if snap.exists and snap.get("tenant_id") == tenant_id:
             await ref.delete()
+
+    # A2 (docs/proposta-a2.md §4.1 step 2): every read first, then every write, in one transaction
+    async def reserve_creation(self, apartment, ports, code, stamp, limit, window_s):
+        a = apartment
+        used_ref = self._col("apartment_ids_used").document(a.apartment_id)
+        apt_ref = self._col("apartments").document(a.apartment_id)
+        rate_ref = self._col("creation_rate").document(a.tenant_id)
+        code_ref = self._external_ref("italianway", code) if code else None
+        port_refs = [(p, self._external_ref("link", key), key) for p, key in ports]
+
+        @firestore.async_transactional
+        async def txn(tx):
+            if (await used_ref.get(transaction=tx)).exists or (await apt_ref.get(transaction=tx)).exists:
+                return {"esito": "exists"}
+            rate = await rate_ref.get(transaction=tx)
+            now = iso_seconds(stamp)
+            kept = (rate.to_dict() or {}).get("times", []) if rate.exists else []
+            times = sorted(t for t in kept if now - iso_seconds(t) < window_s)
+            if len(times) >= limit:
+                return {"esito": "rate", "times": times}
+            code_free = True
+            if code_ref is not None:
+                snap = await code_ref.get(transaction=tx)
+                if snap.exists and snap.get("apartment_id") != a.apartment_id:
+                    return {"esito": "external"}
+                code_free = not snap.exists
+            chosen = None
+            for p, ref, key in port_refs:
+                if not (await ref.get(transaction=tx)).exists:
+                    chosen = (p, ref, key)
+                    break
+            if chosen is None:
+                return {"esito": "no_port"}
+            saved = a.model_copy(deep=True)
+            saved.creazione.porta = chosen[0]
+            tx.create(used_ref, {"reserved_at": now_iso()})
+            tx.create(chosen[1], {"source": "link", "code": chosen[2], "apartment_id": a.apartment_id})
+            if code_ref is not None and code_free:
+                tx.create(code_ref, {"source": "italianway", "code": code, "apartment_id": a.apartment_id})
+            tx.set(rate_ref, {"times": times + [stamp]})
+            tx.set(apt_ref, saved.model_dump())
+            return {"esito": "ok", "porta": chosen[0]}
+        async with self._lock(f"creation:{a.tenant_id}"):
+            return await txn(self.db.transaction())
+
+    async def apartment_seq(self, apartment_id):
+        snap = await self._col("agent_seq").document(apartment_id).get()
+        return (snap.to_dict() or {}).get("seq", 0) if snap.exists else 0
+
+    async def creation_times(self, tenant_id):
+        snap = await self._col("creation_rate").document(tenant_id).get()
+        return list((snap.to_dict() or {}).get("times", [])) if snap.exists else []
+
+    async def change_apartment(self, apartment_id, change):
+        ref = self._col("apartments").document(apartment_id)
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            if not snap.exists:
+                return None
+            new = change(Apartment(**snap.to_dict()))
+            if new is None:
+                return None
+            tx.set(ref, new.model_dump())
+            return new
+        async with self._lock(f"apartment:{apartment_id}"):
+            return await txn(self.db.transaction())
 
     async def reserve_apartment_id(self, apartment_id):
         try:
