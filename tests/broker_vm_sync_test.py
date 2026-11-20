@@ -171,6 +171,12 @@ def _broker_log(*events: tuple[str, str, str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _registered(etc, *users: str) -> None:
+    """The broker's users (A3), as broker_accounts.py writes them: «<apt>.<device>:<fingerprint>»."""
+    (etc / "_broker" / "auth" / "devices.passwd").write_text("".join(f"{u}:{H1}\n" for u in users), encoding="utf-8",
+                                                              newline="\n")
+
+
 def _with_log(stubs, text: str) -> None:
     (stubs / "broker.log").write_text(text, encoding="utf-8", newline="\n")
     (stubs / "docker").write_text('#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/docker.log"\n'
@@ -179,7 +185,8 @@ def _with_log(stubs, text: str) -> None:
 
 
 def test_a5_one_line_per_device_and_slot_without_addresses(vm):
-    run, stubs, _ = vm
+    run, stubs, etc = vm
+    _registered(etc, "apt-a.plug", "apt-a.shelly-1")
     _with_log(stubs, _broker_log(("17:06:10", "apt-a.plug", "out"), ("17:08:20", "apt-a.plug", "out"),
                                  ("17:01:00", "apt-a.plug", "out"), ("17:03:00", "apt-a.shelly-1", "out"),
                                  ("17:11:00", "apt-a.plug", "out"),          # current slot: next round
@@ -201,7 +208,8 @@ def test_a5_one_line_per_device_and_slot_without_addresses(vm):
 @pytest.mark.parametrize("client", ["apt-z.plug", "<script>x", "apt-a", "apt-a.Plug", "apt-a.a.b", "apt-a." + "x" * 65,
                                     ".plug"])
 def test_a5_a_name_that_is_no_device_only_counts_as_other(vm, client):
-    run, stubs, _ = vm
+    run, stubs, etc = vm
+    _registered(etc, "apt-a.plug")
     _with_log(stubs, _broker_log(("17:06:10", client, "out"), ("17:06:20", client, "out")))
     r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW}")
     assert r.returncode == 0, r.stderr
@@ -210,7 +218,8 @@ def test_a5_a_name_that_is_no_device_only_counts_as_other(vm, client):
 
 
 def test_a5_lines_are_capped_and_the_rest_goes_to_other(vm):
-    run, stubs, _ = vm
+    run, stubs, etc = vm
+    _registered(etc, "apt-a.d1", "apt-a.d2")
     _with_log(stubs, _broker_log(("17:06:10", "apt-a.d1", "out"), ("17:06:20", "apt-a.d2", "out"),
                                  ("17:06:30", "apt-a.d2", "out"), ("17:06:40", "apt-z.x", "out")))
     r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW} DOMHOUSE_AUTH_DEVICE_LINES=1")
@@ -228,7 +237,7 @@ def test_a5_check_writes_the_device_lines_to_the_watch(vm):
     text = (ROOT / "scripts" / "broker-vm.sh").read_text(encoding="utf-8")
     body = text[text.index("\ncheck() {"):]
     body = body[:body.index("\n}\n")]
-    assert "auth_refused_devices_report" in body
+    assert 'auth_refused_devices_report || watch_line "broker device refused error"' in body   # review A5, point 2
     assert 'watch_line "${line}"' in text[text.index("auth_refused_devices_report() {"):]
 
 
@@ -244,3 +253,43 @@ def test_a5_device_lines_do_not_fire_the_alert_of_many_refusals():
                  "broker device refused other slot=2026-11-20T17:05:00Z count=2"):
         assert not _re.search(pattern, f"domhouse-check[42]: {line}"), line
     assert _re.search(pattern, "domhouse-check[42]: broker auth refused hour=101 top_ip=x(1) top_client=y(1)")
+
+
+def test_a5_review_1_an_invented_device_of_a_listed_apartment_is_not_named(vm):
+    """Review A5, point 1: only the broker's registered users are named; lab-01.x1…x500 cannot fill the 50 lines."""
+    run, stubs, etc = vm
+    _registered(etc, "apt-a.plug")
+    _with_log(stubs, _broker_log(("17:06:10", "apt-a.plug", "out"),
+                                 *((f"17:06:{20 + i:02d}", f"apt-a.x{i}", "out") for i in range(5))))
+    r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW} DOMHOUSE_AUTH_DEVICE_LINES=1")
+    assert r.returncode == 0, r.stderr
+    assert sorted(r.stdout.splitlines()) == [
+        "broker device refused apt=apt-a device=plug slot=2026-11-20T17:05:00Z count=1 last=2026-11-20T17:06:10Z",
+        "broker device refused other slot=2026-11-20T17:05:00Z count=5"], r.stdout
+    assert "fingerprint" not in r.stdout and H1 not in r.stdout
+
+
+def test_a5_review_1_without_the_users_file_nobody_is_named(vm):
+    run, stubs, _ = vm
+    _with_log(stubs, _broker_log(("17:06:10", "apt-a.plug", "out")))
+    r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW}")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == ["broker device refused other slot=2026-11-20T17:05:00Z count=1"]
+
+
+def test_a5_review_2_a_failure_of_the_reading_is_an_exit_code_that_check_turns_into_one_line(vm):
+    """Review A5, point 2: «rifiuti» fails when docker logs fails; check catches it with «broker device refused error»
+    (never «broker down», never a line the sink keeps)."""
+    run, stubs, etc = vm
+    _registered(etc, "apt-a.plug")
+    (stubs / "docker").write_text('#!/usr/bin/env bash\nif [ "$1" = logs ]; then echo boom >&2; exit 1; fi\nexit 0\n',
+                                  encoding="utf-8", newline="\n")
+    r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW}")
+    assert r.returncode != 0
+    assert "broker device refused apt=" not in r.stdout
+
+
+def test_a5_review_6_the_apartments_reach_awk_as_a_variable_not_through_filename(vm):
+    text = (ROOT / "scripts" / "broker-vm.sh").read_text(encoding="utf-8")
+    body = text[text.index("auth_refused_devices() {"):text.index("auth_refused_devices_report() {")]
+    assert "FILENAME" not in body and '-v apts=' in body and '-v users=' in body

@@ -478,18 +478,24 @@ auth_refused_devices() {
   # slot, "broker device refused apt=<apt> device=<device> slot=<start, UTC> count=<n> last=<UTC>", for the two last
   # COMPLETE slots: each slot is written by two rounds of check (a round late or missing loses nothing) and the server
   # counts a slot once. No address, no password. The client id is chosen by whoever connects: only <apt>.<device> with
-  # the id rule and an apartment of the broker's list is named; everything else is one "other" line per slot, without
-  # names. Not «broker auth refused»: that is the alert of over 100 refusals an hour (broker-accessi-rifiutati.json),
+  # the id rule, an apartment of the broker's list AND a user registered on the broker (auth/devices.passwd, its first
+  # column only, never a fingerprint) is named; everything else is one "other" line per slot, without names (review A5,
+  # point 1: invented names of a listed apartment, lab-01.x1…x500, would take the 50 lines and hide the real ones). Not «broker auth refused»: that is the alert of over 100 refusals an hour (broker-accessi-rifiutati.json),
   # which must not fire for one device. At most AUTH_DEVICE_LINES device lines per round, the rest added to "other" (a burst of invented names cannot
-  # fill the logs). awk without intervals nor mktime: the VM's awk may be mawk
-  local now slot s1 s2
+  # fill the logs). awk without intervals nor mktime, and the lists as variables, not files (review A5, point 6: never the
+  # name of the input file): the VM's awk may be mawk
+  local now slot s1 s2 apts users
   now="${DOMHOUSE_NOW_EPOCH:-$(date +%s)}"
   slot=$(( now / 300 * 300 ))
   s1="$(date -u -d "@$(( slot - 300 ))" +%Y-%m-%dT%H:%M:00Z)"
   s2="$(date -u -d "@$(( slot - 600 ))" +%Y-%m-%dT%H:%M:00Z)"
-  docker logs -t --since 20m "${CONTAINER}" 2>&1 | awk -v s1="${s1}" -v s2="${s2}" -v cap="${AUTH_DEVICE_LINES}" '
+  apts="$(tr '\n' ' ' < "${APARTMENTS}")"
+  users="$(cut -d: -f1 "${AUTH}/devices.passwd" 2>/dev/null | tr '\n' ' ' || true)"
+  docker logs -t --since 20m "${CONTAINER}" 2>&1 | awk -v s1="${s1}" -v s2="${s2}" -v cap="${AUTH_DEVICE_LINES}" \
+      -v apts="${apts}" -v users="${users}" '
     function ok(x) { return length(x) <= 64 && x ~ /^[a-z0-9][a-z0-9-]*$/ }
-    FILENAME != "-" { known[$0] = 1; next }
+    BEGIN { n_a = split(apts, a, " "); for (i = 1; i <= n_a; i++) known[a[i]] = 1
+            n_u = split(users, u, " "); for (i = 1; i <= n_u; i++) user[u[i]] = 1 }
     / New connection from .* on port 8883\.$/ { for (i = 1; i < NF; i++) if ($i == "from") outside[$(i + 1)] = 1; next }
     / disconnected: not authorised\.$/ {
       ts = $1
@@ -502,7 +508,7 @@ auth_refused_devices() {
       if (s != s1 && s != s2) next
       dot = index(client, ".")
       apt = substr(client, 1, dot - 1); dev = substr(client, dot + 1)
-      if (dot > 1 && ok(apt) && ok(dev) && (apt in known)) {
+      if (dot > 1 && ok(apt) && ok(dev) && (apt in known) && (client in user)) {
         k = s " " apt " " dev; n[k]++; t = substr(ts, 1, 19) "Z"; if (t > last[k]) last[k] = t
       } else other[s]++
     }
@@ -514,7 +520,7 @@ auth_refused_devices() {
         else other[f[1]] += n[k]
       }
       for (s in other) print "broker device refused other slot=" s " count=" other[s]
-    }' "${APARTMENTS}" -
+    }'
 }
 
 auth_refused_devices_report() {
@@ -602,7 +608,9 @@ check() {
   # D-210: when the container last started; the run-in report counts the different values as restarts
   watch_line "broker started_at=$(docker inspect -f '{{.State.StartedAt}}' "${CONTAINER}" 2>/dev/null || echo '?')"
   auth_refused_report
-  auth_refused_devices_report
+  # review A5, point 2: a failure of the new part never fails check (check-all would write «broker down»); this line
+  # matches neither the alert of «broker auth refused» nor the sink («broker device refused apt=»)
+  auth_refused_devices_report || watch_line "broker device refused error"
 }
 
 cmd="${1:-}"; shift || true
