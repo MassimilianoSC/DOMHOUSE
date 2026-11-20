@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Da rileggere**; si usa solo **dopo** l'installazione di A2 (C0–C9), la revisione del codice di A7 e l'unione del ramo `o1-a7-capienza` in `main`. Nessun passo provato sul vero | o1, 20 novembre 2026, 16:10 | il commit dell'unione di A7 in `main` (le impronte si calcolano da lì, D1) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | D0–D6 |
+| **Da rileggere**; si usa solo **dopo** l'installazione di A2 (C0–C9, fatta il 20 novembre). A7 è unito in `main` con `8c9b5d9` (20 novembre, 17:56), insieme alle correzioni di A2 (`c6ed88f`, `d6ea4a0`). Nessun passo provato sul vero | o1, 20 novembre 2026, 16:10; unione 17:56 | `8c9b5d9`, l'unione di A7 in `main` (le impronte si calcolano da `origin/main`, D1) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | D0–D6 |
 
 **Cosa si installa** (`docs/proposta-a7.md`, risposte 1196–1202):
 
@@ -26,12 +26,12 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor 243fd6a origin/main && echo "A7 è in main, su GitHub"
+git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor 8c9b5d9 origin/main && echo "A7 è in main, su GitHub"
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='systemctl is-active domhouse-agent-esecutore domhouse-agent-lettore; sudo cat /etc/domhouse/agent.conf; sudo ls /opt/domhouse/*.settings; free -m | head -2' < /dev/null
 ```
 
 - **Atteso:**
-  1. l'ultimo commit di `main` e «A7 è in main, su GitHub». `243fd6a` è l'ultimo commit di A7 con le correzioni della revisione; se dopo questa procedura ne arrivano altri, la memoria storica mette qui il più recente;
+  1. l'ultimo commit di `main` e «A7 è in main, su GitHub». `8c9b5d9` è l'unione di A7 in `main` (A7 con le correzioni della revisione, più le correzioni di A2 trovate nello staging); se dopo questa procedura arrivano altre correzioni, la memoria storica mette qui il commit più recente. Senza quella riga: `main` non è ancora su GitHub, il committente fa il push prima;
   2. i due servizi `active`;
   3. `agent.conf` con `AMBIENTE=staging`, `CONDIVISA=1`, `LETTORE=domhouse-agent`, `MAX_MOTORI_STAGING=4` (ancora senza `BUDGET_MB_STAGING`: vale 500 per difetto);
   4. le impostazioni dei motori (`dev`, `lab-01` e quelli creati con A2) e la memoria: **annota il numero della colonna «available»** di `free -m`, serve a D6.1.
