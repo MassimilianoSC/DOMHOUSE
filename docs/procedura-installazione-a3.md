@@ -29,7 +29,7 @@
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 git fetch -q origin && git merge-base --is-ancestor f54a222 origin/main && git diff --quiet f54a222 HEAD -- scripts/agent scripts/agent-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py && echo "file della VM uguali a f54a222, già su GitHub"
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh status | head -2; systemctl is-active domhouse-agent-esecutore domhouse-agent-lettore; ls -ld /etc/domhouse/_broker/auth; sudo ls -l /etc/domhouse/_broker/auth' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh status | head -2; systemctl is-active domhouse-agent-esecutore domhouse-agent-lettore; sudo ls -ld /etc/domhouse/_broker/auth; sudo ls -l /etc/domhouse/_broker/auth' < /dev/null
 ```
 
 - `agent-vm.sh` non è installato in `/opt/domhouse` (`install` copia solo `comune.py`, `lettore.py`, `esecutore.py`): lo status si chiama dalla copia di A1 in `~/agente`, come in I13.
