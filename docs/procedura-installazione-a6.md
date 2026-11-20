@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A6 e l'unione del ramo `o1-a6-eliminazione` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `7f471c8` (ramo `o1-a6-eliminazione`, con le correzioni della revisione di sicurezza); G0 controlla il commit della procedura e la confronta con quella su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | G0–G5, R1–R6 |
+| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A6 e l'unione del ramo `o1-a6-eliminazione` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `7f471c8` (ramo `o1-a6-eliminazione`, con le correzioni della revisione di sicurezza); G0 controlla `8460d42`, l'ultimo commit della procedura con le correzioni (revisione, punto 12), e confronta il testo con quello su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | G0–G5, R1–R6 |
 
 **Cosa si installa** (`docs/proposta-a6.md`, risposte 1210: §8 punti 2–8 come proposti, punto 1 provvisorio):
 
@@ -25,12 +25,12 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor d72892d origin/main && echo "A6 è in main, su GitHub" && git diff --quiet origin/main -- docs/procedura-installazione-a6.md && echo "procedura uguale a quella su GitHub"
+git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor 8460d42 origin/main && echo "A6 è in main, su GitHub" && git diff --quiet origin/main -- docs/procedura-installazione-a6.md && echo "procedura uguale a quella su GitHub"
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='systemctl is-active domhouse-agent-esecutore; sudo ls /opt/domhouse/*.settings; sudo ls /var/lib/domhouse-executor/ 2>/dev/null | head; sudo cat /etc/domhouse/_broker/apartments' < /dev/null
 ```
 
 - **Atteso:**
-  1. l'ultimo commit di `main`, «A6 è in main, su GitHub» e «procedura uguale a quella su GitHub»;
+  1. l'ultimo commit di `main`, «A6 è in main, su GitHub» (`main` contiene `8460d42`, codice e procedura corretti) e «procedura uguale a quella su GitHub» (si segue la versione su GitHub, non una copia vecchia). Se arriva un'altra correzione, la memoria storica mette qui il suo commit;
   2. `active`;
   3. fra le impostazioni `test-a2-02.settings` (l'appartamento di laboratorio, risposta 1205);
   4. `test-a2-02` nell'elenco del broker.
