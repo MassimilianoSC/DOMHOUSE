@@ -304,7 +304,10 @@ class Esecutore:
         except OSError as exc:
             output.append(f"scrittura di devices/{apartment}: {type(exc).__name__}")
             return comune.result(order, "fallito", "errore_interno")
-        code, text = self.run(["/bin/bash", str(self.config.opt / "broker-vm.sh"), "sync"], dict(CLEAN_ENV),
+        # 20 November (Q2.3c on the VM): ProtectHome hides /root/.docker; without DOCKER_CONFIG «docker compose» is not
+        # found and the sync stops («manca docker compose»): the same DOCKER_CONFIG as docker inspect (_state)
+        sync_env = {**CLEAN_ENV, "DOCKER_CONFIG": str(self.config.state / "docker")}
+        code, text = self.run(["/bin/bash", str(self.config.opt / "broker-vm.sh"), "sync"], sync_env,
                               RUN_TIMEOUT_S * 4)
         output.append(text)
         if code != 0 or f"kept {apartment}" in text.split("\n"):

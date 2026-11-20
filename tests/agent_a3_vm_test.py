@@ -89,7 +89,10 @@ def test_aggiorna_broker_writes_the_list_then_runs_the_sync(vm):
     written = (vm.broker_etc / "devices" / "lab-07").read_text(encoding="utf-8")
     assert written == f"shelly-1 {H1}\nshelly-2 {H2}\n"
     [(argv, env)] = vm.runs
-    assert argv == ["/bin/bash", str(vm.opt / "broker-vm.sh"), "sync"] and set(env) == {"PATH"}
+    assert argv == ["/bin/bash", str(vm.opt / "broker-vm.sh"), "sync"]
+    # 20 November, Q2.3c on the VM: under the unit ProtectHome hides /root/.docker, and without DOCKER_CONFIG
+    # «docker compose» is not found: the sync gets the same DOCKER_CONFIG as docker inspect (state/docker)
+    assert env == {"PATH": esecutore.CLEAN_ENV["PATH"], "DOCKER_CONFIG": str(vm.state / "docker")}
     if sys.platform.startswith("linux"):
         assert (vm.broker_etc / "devices" / "lab-07").stat().st_mode & 0o777 == 0o600
 
