@@ -258,7 +258,11 @@ def sync(apartments_file: Path, auth_dir: Path) -> int:
                 print(f"errore: {exc}; {apartment}: tenuti gli utenti di prima", file=sys.stderr)
     changed = write_files(render(loaded, auth_dir, tuple(kept)), auth_dir)
     for apartment in ids:
-        print(f"kept {apartment}" if apartment in kept else f"{apartment}: connector e {len(loaded[apartment][1])} dispositivi")
+        if apartment in kept:
+            print(f"kept {apartment}")
+        else:                                    # the devices that go to the broker: from the file (A3) or the old secret
+            devices_count = len(loaded[apartment][2]) if len(loaded[apartment]) > 2 else len(loaded[apartment][1])
+            print(f"{apartment}: connector e {devices_count} dispositivi")
     print("changed" if changed else "unchanged")
     return 0
 

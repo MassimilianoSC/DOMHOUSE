@@ -167,7 +167,12 @@ def test_the_devices_come_from_the_file_as_they_are(broker, monkeypatch, capsys)
     assert "lab-07.vecchio" not in devices                               # the old secret is never read for lab-07
     assert ba.hash_matches(devices["lab-01.plug"], PASSWORD)             # lab-01: the old secret, until its migration
     assert not [u for u in devices if u.startswith("lab-08.")]           # no file: no devices
-    assert "kept" not in capsys.readouterr().out
+    out = capsys.readouterr().out.splitlines()
+    assert not [line for line in out if line.startswith("kept")]
+    # 20 November, Q6.1 on the VM: lab-01 with its file said «connector e 0 dispositivi» while it kept 3: the line
+    # counts the devices that go to the broker, from the file or from the old secret
+    assert "lab-07: connector e 1 dispositivi" in out and "lab-01: connector e 1 dispositivi" in out
+    assert "lab-08: connector e 0 dispositivi" in out
 
 
 def test_lab_01_with_its_file_leaves_the_old_secret(broker, monkeypatch):
