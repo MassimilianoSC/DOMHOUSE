@@ -154,6 +154,15 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
     for (const b of NOT_FOR_UNREADY) expect(screen.queryByTestId(`platform-apt-${b}-lab-ponte`)).toBeNull();
   });
 
+  it("l'id dell'appartamento intero e chiamato «ID», nelle righe in creazione e in quelle pronte", async () => {
+    await open([STOPPED, apt("lab-giardino-panoramico", "Giardino", null)]);
+    for (const id of ["lab-ponte", "lab-giardino-panoramico"]) {
+      const el = screen.getByTestId(`platform-apt-id-${id}`);
+      expect(el).toHaveTextContent(id);
+      expect(el).toHaveAttribute("title", `ID: ${id}`);
+    }
+  });
+
   it("non creato con un codice che il sito non conosce: la frase del server", async () => {
     await open([apt("lab-x", "X", creazione({ stato: "non_creato", codice: "nuovo", messaggio: "Frase del server", op: { op_id: "op-1", operazione: "crea_motore", stato: "rifiutato", codice: "nuovo", messaggio: "Frase del server" } }))]);
     expect(screen.getByTestId("creation-what-lab-x")).toHaveTextContent("Frase del server");

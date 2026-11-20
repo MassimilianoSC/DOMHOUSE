@@ -186,21 +186,24 @@ function CreationsLine({ tenant, onSee }: { tenant: PlatformTenant; onSee: () =>
   if (!line) return null;
   const stopped = line.tone === "negative";
   return (
+    // icon and text side by side; «Vedi» after the text, or under it when the phone has no room
     <div
       className={cn(
-        "mt-2 flex w-fit max-w-full flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border px-3 py-1.5 text-sm",
+        "mt-2 flex w-fit max-w-full items-start gap-2 rounded-xl border px-3 py-1.5 text-sm",
         stopped ? "border-negative-border bg-negative-bg text-negative-fg" : "border-neutral-border bg-neutral-bg text-neutral-fg",
       )}
       data-testid={`tenant-creations-${tenant.tenant_id}`}
       data-tone={line.tone}
     >
-      {stopped ? <TriangleAlert className="size-4 shrink-0" aria-hidden /> : <Loader2 className="size-4 shrink-0 motion-safe:animate-spin" aria-hidden />}
-      <span>{line.text}</span>
-      {stopped && (
-        <Button size="sm" variant="outline" className="bg-card text-negative-fg" onClick={onSee} data-testid={`tenant-creations-see-${tenant.tenant_id}`}>
-          {t("platform.creation.see")} <ArrowRight />
-        </Button>
-      )}
+      {stopped ? <TriangleAlert className="mt-1.5 size-4 shrink-0" aria-hidden /> : <Loader2 className="mt-0.5 size-4 shrink-0 motion-safe:animate-spin" aria-hidden />}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className={stopped ? "py-1" : undefined}>{line.text}</span>
+        {stopped && (
+          <Button size="sm" variant="outline" className="bg-card text-negative-fg" onClick={onSee} data-testid={`tenant-creations-see-${tenant.tenant_id}`}>
+            {t("platform.creation.see")} <ArrowRight />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

@@ -268,7 +268,7 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
                       <span className="font-semibold [overflow-wrap:anywhere]">{a.name}</span>
                       {a.simulated && <DemoBadge testId={`platform-apt-demo-${a.apartment_id}`} />}
                       {!a.enabled && <Badge className="border-neutral-border bg-neutral-bg text-neutral-fg">{t("admin.apartments.disabled")}</Badge>}
-                      <CopyableId id={a.apartment_id} testId={`platform-apt-id-${a.apartment_id}`} />
+                      <CopyableId id={a.apartment_id} full label={t("admin.apartments.id")} testId={`platform-apt-id-${a.apartment_id}`} />
                     </div>
                     <div className="tabular text-xs text-muted-foreground [overflow-wrap:anywhere]">{instanceAddress(a.instance_url, a.port)} · {a.timezone}{a.italianway_id ? ` · IW ${a.italianway_id}` : ""}</div>
                     <div className="text-xs">{t("admin.apartments.lastCheck")}: <LastCheck check={a.last_check} testId={`platform-apt-check-${a.apartment_id}`} /></div>

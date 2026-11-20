@@ -93,6 +93,8 @@ describe.each(["mock", "real"])("Amministrazione > Appartamenti, ambiente %s: li
     expect(details).toHaveTextContent("IW-7");
     expect(details).toHaveTextContent("Europe/Rome");
     expect(screen.getByTestId("admin-apartment-id-apt-001")).toBeInTheDocument();
+    // the apartment's id, named as such: never «ID richiesta», the name of the errors' code
+    expect(screen.getByTestId("admin-apartment-id-apt-001")).toHaveAttribute("title", "ID: apt-001");
   });
 
   it("modifica: collegamento e codice Italianway in sola lettura con la nota; si salvano solo nome, indirizzo, fuso e attivo", async () => {

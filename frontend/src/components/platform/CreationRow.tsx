@@ -83,14 +83,14 @@ function WhatHappened({ a, c }: { a: PlatformApartment; c: Creazione }) {
       <p className="[overflow-wrap:anywhere]">
         {c.porta ? t("platform.creation.reserved", { id: a.apartment_id, port: c.porta }) : t("platform.creation.reservedNoPort", { id: a.apartment_id })}
       </p>
-      <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+      {/* «ID richiesta» and its code go to a new line together on a phone */}
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>{c.updated_by ? t("platform.creation.lastAttempt", { when, name: c.updated_by }) : t("platform.creation.lastAttemptNoName", { when })}</span>
         {c.op && (
-          <>
-            <span aria-hidden>·</span>
-            <span>{t("credentials.requestId")}</span>
+          <span className="inline-flex items-center gap-1.5">
+            {t("credentials.requestId")}
             <CopyableId id={c.op.op_id} testId={`creation-op-${a.apartment_id}`} label={t("credentials.requestId")} />
-          </>
+          </span>
         )}
       </p>
     </div>
@@ -107,7 +107,7 @@ export function CreationRow({ a, busy, onRetry, onCancel }: { a: PlatformApartme
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <span className="font-semibold [overflow-wrap:anywhere]">{a.name}</span>
         <StateBadge id={a.apartment_id} stato={stato} />
-        <CopyableId id={a.apartment_id} testId={`platform-apt-id-${a.apartment_id}`} />
+        <CopyableId id={a.apartment_id} full label={t("admin.apartments.id")} testId={`platform-apt-id-${a.apartment_id}`} />
       </div>
       {stato === "in_preparazione" && (
         <>

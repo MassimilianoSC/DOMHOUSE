@@ -166,7 +166,7 @@ function ApartmentRow({ a, orgPrice, verify, onVerify, onToggle, onEdit }: { a: 
       {open && (
         <dl className="grid gap-x-4 gap-y-1 text-xs text-muted-foreground sm:grid-cols-[auto_1fr]" data-testid={`admin-apartment-details-${a.apartment_id}`}>
           <dt className="font-medium">{t("admin.apartments.code")}</dt>
-          <dd><CopyableId id={a.apartment_id} testId={`admin-apartment-id-${a.apartment_id}`} /></dd>
+          <dd><CopyableId id={a.apartment_id} full label={t("admin.apartments.id")} testId={`admin-apartment-id-${a.apartment_id}`} /></dd>
           <dt className="font-medium">{t("admin.apartments.timezone")}</dt>
           <dd>{a.timezone}</dd>
           <dt className="font-medium">{t("admin.apartments.connection")}</dt>
