@@ -87,3 +87,41 @@ test.describe("credenziali dei dispositivi", () => {
     });
   }
 });
+
+// Luca's style (1189): at 1280 px one table, its columns in the same place on every row (the red line of «Non
+// applicato» and the different buttons used to move them); on a phone one card per device, as the apartments' cards.
+test.describe("credenziali dei dispositivi nello stile delle altre pagine", () => {
+  async function open(page: Page, width: number) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.route("**/device-credentials", (route) => route.fulfill({ json: { items: ITEMS } }));
+    await signIn(page);
+    const apt = await firstApartment(page);
+    await page.goto(`/a/${apt}/credenziali`);
+    await settle(page);
+    await expect(page.getByTestId("credential-row-shellyplusi4-0a1b2c3d4e5f")).toBeVisible({ timeout: 15_000 });
+    await page.getByTestId("credentials-revoked-toggle").click();
+  }
+
+  test("a 1280 px le colonne di tutte le righe, revocati compresi, stanno allo stesso posto", async ({ page }) => {
+    await open(page, 1280);
+    const lefts = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-testid^="credential-state-"]')].map((b) => Math.round(b.getBoundingClientRect().left)),
+    );
+    expect(lefts.length).toBe(ITEMS.length);
+    expect(new Set(lefts).size, `inizio della colonna «Stato»: ${lefts.join(", ")}`).toBe(1);
+  });
+
+  test("a 390 px ogni dispositivo è una scheda a sé, e «Revocati (1)» sta su una riga", async ({ page }) => {
+    await open(page, 390);
+    const gaps = await page.evaluate(() => {
+      const rows = [...document.querySelectorAll('ul > [data-testid^="credential-row-"]')].map((r) => r.getBoundingClientRect());
+      return rows.slice(1).map((r, i) => Math.round(r.top - rows[i].bottom));
+    });
+    expect(gaps.length).toBeGreaterThan(0);
+    expect(gaps.every((g) => g >= 8), `spazio fra le schede: ${gaps.join(", ")}`).toBe(true);
+    const title = page.getByTestId("credentials-revoked-title");
+    const lines = await title.evaluate((el) => new Set([...el.getClientRects()].map((r) => Math.round(r.top))).size);
+    expect(lines).toBe(1);
+    expect(await overflowing(page)).toEqual([]);
+  });
+});

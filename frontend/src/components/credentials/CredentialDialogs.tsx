@@ -6,6 +6,7 @@ import { CopyableId } from "@/components/ui/CopyableId";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, Input, Label } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { deviceIdProblem } from "@/lib/deviceCredentials";
+import { BreakableCode } from "@/lib/breakableCode";
 import { cn } from "@/lib/utils";
 
 // A3, the windows of «Credenziali dei dispositivi» (docs/proposta-a3-sito.md §2; screens approved by the committente,
@@ -71,8 +72,8 @@ function ConnectionTable({ c, password }: { c: DeviceCredential; password: { val
               <span className="ml-1.5 text-xs font-normal text-muted-foreground sm:hidden">{r.shelly}</span>
             </dt>
             <div className="hidden text-muted-foreground sm:block">{r.shelly}</div>
-            <dd className={cn("min-w-0 [overflow-wrap:anywhere]", r.plain ? "" : "font-mono", r.strong && "text-[15px] font-bold tracking-wide")} data-testid={`credential-value-${r.key}`}>
-              {r.value}
+            <dd className={cn("min-w-0", r.plain ? "[overflow-wrap:anywhere]" : "font-mono [overflow-wrap:break-word]", r.strong && "text-[15px] font-bold tracking-wide")} data-testid={`credential-value-${r.key}`}>
+              {r.plain ? r.value : <BreakableCode value={r.value} />}
             </dd>
             <div className="justify-self-end">{r.copy && <CopyButton value={r.value} testId={`credential-copy-${r.key}`} />}</div>
           </div>

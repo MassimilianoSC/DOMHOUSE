@@ -61,36 +61,45 @@ function StateLine({ c }: { c: DeviceCredential }) {
   return <p className="text-sm">{t(`credentials.lines.${c.stato}`)}</p>;
 }
 
-const GRID = "md:grid md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.7fr)_minmax(0,0.9fr)_auto] md:items-start md:gap-4";
+// From 1024 px one table, as the other lists of the site; the date and the buttons have fixed widths, so every column
+// starts in the same place on every row whatever its buttons. Below, one card per device, as the apartments' cards.
+const GRID = "lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.7fr)_9.5rem_19rem] lg:items-start lg:gap-4";
+const CARD = "rounded-2xl border border-border/80 bg-card lg:rounded-none lg:border-0 lg:bg-transparent";
+const LIST = "space-y-3 lg:space-y-0 lg:divide-y";
+const TABLE = "lg:overflow-hidden lg:rounded-2xl lg:border lg:border-border/80 lg:bg-card";
 
 function Row({ c, onRequest }: { c: DeviceCredential; onRequest: (r: RowRequest) => void }) {
   const actions = allowedActions(c);
   const menu = actions.filter((a) => a === "rigenera" || a === "revoca");
-  const label = (text: string) => <span className="mb-0.5 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground md:hidden">{text}</span>;
   return (
     <li
-      className={cn("space-y-3 px-4 py-3.5 md:space-y-0", GRID, c.stato === "non_applicato" && "border-l-4 border-l-negative bg-negative-bg/45")}
+      // the red line of «Non applicato» drawn inside the row (a shadow), so it moves nothing
+      className={cn("space-y-2.5 p-4 lg:space-y-0 lg:py-3.5", CARD, GRID, c.stato === "non_applicato" && "border-negative-border bg-negative-bg/45 shadow-[inset_4px_0_0_0_hsl(var(--negative))] lg:bg-negative-bg/45")}
       data-testid={`credential-row-${c.device_id}`}
       data-state={c.stato}
     >
       <div className="min-w-0">
-        {label(t("credentials.colDevice"))}
         {c.name && <div className="text-sm font-semibold [overflow-wrap:anywhere]">{c.name}</div>}
-        <div className="font-mono text-[13px] font-semibold [overflow-wrap:anywhere]">{c.device_id}</div>
+        <div className="font-mono text-[13px] font-bold tracking-tight [overflow-wrap:anywhere]">{c.device_id}</div>
       </div>
       <div className="min-w-0 space-y-1">
-        {label(t("credentials.colState"))}
         <Badge className={TONE[c.stato]} data-testid={`credential-state-${c.device_id}`}>
           <StateIcon stato={c.stato} /> {t(`credentials.states.${c.stato}`)}
         </Badge>
         <StateLine c={c} />
       </div>
-      <div className="min-w-0 text-sm">
-        {label(t("credentials.colUpdated"))}
-        <div className="tabular">{fmtDateTime(c.updated_at)}</div>
-        {c.updated_by && <div className="text-xs text-muted-foreground">{c.updated_by}</div>}
+      {/* on a card one quiet line, «Ultima modifica: 19 nov 2026, 16:12 · Giulia Rossi»; in the table its own column */}
+      <div className="min-w-0 text-xs text-muted-foreground lg:text-sm lg:text-foreground">
+        <span className="lg:hidden">{t("credentials.colUpdated")}: </span>
+        <span className="tabular">{fmtDateTime(c.updated_at)}</span>
+        {c.updated_by && (
+          <>
+            <span className="lg:hidden"> · </span>
+            <span className="lg:block lg:text-xs lg:text-muted-foreground">{c.updated_by}</span>
+          </>
+        )}
       </div>
-      <div className="flex flex-wrap items-center gap-2 md:justify-end">
+      <div className="flex flex-wrap items-center gap-2 lg:justify-end">
         {actions.includes("riprova") && (
           <Button size="sm" onClick={() => onRequest({ kind: "riprova", credential: c })} data-testid={`credential-retry-${c.device_id}`}>
             <RotateCcw /> {t("credentials.actions.riprova")}
@@ -127,7 +136,7 @@ function Row({ c, onRequest }: { c: DeviceCredential; onRequest: (r: RowRequest)
 
 function Header() {
   return (
-    <div className={cn("hidden rounded-t-2xl bg-secondary/50 px-4 py-2.5 text-xs font-semibold text-muted-foreground", GRID)} aria-hidden>
+    <div className={cn("hidden bg-secondary/50 px-4 py-2.5 text-xs font-semibold text-muted-foreground", GRID)} aria-hidden>
       <div>{t("credentials.colDevice")}</div>
       <div>{t("credentials.colState")}</div>
       <div>{t("credentials.colUpdated")}</div>
@@ -158,7 +167,10 @@ export function CredentialsPanel({ apartmentId, scope, onRequest, onRegister }: 
 
   return (
     <div className="space-y-4" data-testid={`credentials-panel-${apartmentId}`}>
-      <div className="flex flex-wrap justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground" data-testid="credentials-count">
+          {q.data ? t("credentials.count", { active: active.length, revoked: revoked.length }) : null}
+        </p>
         <Button onClick={onRegister} data-testid="credentials-register-btn">
           <Plus /> {t("credentials.register")}
         </Button>
@@ -172,7 +184,7 @@ export function CredentialsPanel({ apartmentId, scope, onRequest, onRegister }: 
       {q.isLoading ? (
         <Skeleton className="h-40 rounded-2xl" />
       ) : q.data && active.length === 0 && revoked.length === 0 ? (
-        <div className="rounded-2xl border bg-card p-8 text-center" data-testid="credentials-empty">
+        <div className="rounded-2xl border border-border/80 bg-card p-8 text-center" data-testid="credentials-empty">
           <p className="font-semibold">{t("credentials.empty")}</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">{t("credentials.emptyHint")}</p>
         </div>
@@ -180,28 +192,28 @@ export function CredentialsPanel({ apartmentId, scope, onRequest, onRegister }: 
         q.data && (
           <>
             {active.length > 0 && (
-              <div className="overflow-hidden rounded-2xl border bg-card">
+              <div className={TABLE}>
                 <Header />
-                <ul className="divide-y">
+                <ul className={LIST}>
                   {active.map((c) => <Row key={c.device_id} c={c} onRequest={onRequest} />)}
                 </ul>
               </div>
             )}
             {revoked.length > 0 && (
-              <div className="overflow-hidden rounded-2xl border bg-card">
+              <div className={cn("space-y-3 lg:space-y-0", TABLE)}>
                 <button
                   type="button"
-                  className="flex w-full items-center gap-2 px-4 py-3.5 text-left text-sm font-semibold focus-ring"
+                  className={cn("flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 px-4 py-3.5 text-left text-sm font-semibold focus-ring", CARD)}
                   aria-expanded={showRevoked}
                   onClick={() => setShowRevoked((v) => !v)}
                   data-testid="credentials-revoked-toggle"
                 >
                   <ChevronRight className={cn("size-4 transition-transform motion-reduce:transition-none", showRevoked && "rotate-90")} aria-hidden />
-                  {t("credentials.revoked", { count: revoked.length })}
-                  <span className="text-xs font-normal text-muted-foreground">· {t("credentials.revokedHint")}</span>
+                  <span className="whitespace-nowrap" data-testid="credentials-revoked-title">{t("credentials.revoked", { count: revoked.length })}</span>
+                  <span className="basis-full pl-6 text-xs font-normal text-muted-foreground sm:basis-auto sm:pl-0">{t("credentials.revokedHint")}</span>
                 </button>
                 {showRevoked && (
-                  <ul className="divide-y border-t">
+                  <ul className={cn(LIST, "lg:border-t")}>
                     {revoked.map((c) => <Row key={c.device_id} c={c} onRequest={onRequest} />)}
                   </ul>
                 )}
