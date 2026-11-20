@@ -239,6 +239,7 @@ a sinistra e il contenuto a destra.
 
 | Riquadro | Cosa vedi | Cosa puoi fare |
 |---|---|---|
+| «Aspetto» | «Palette colori»: Sorgente, Aria, Bosco; «Modalità di visualizzazione»: «Come il telefono o il computer», «Chiara», «Scura»; «Ripristina predefiniti» | Scegliere i colori dell'app |
 | «Profilo» | «Email», «Ruolo», «Piattaforma» (solo se sei gestore della piattaforma), «Organizzazione», «Appartamenti», «Lingua» («Italiano») | Solo leggere |
 | «Profilo», sotto una riga | «Nome visualizzato» e «Salva» | Cambiare il nome che vedono i colleghi |
 | «Password ed email» | Solo per chi entra con email e password | Cambiare password ed email di accesso |
@@ -246,6 +247,24 @@ a sinistra e il contenuto a destra.
 | «Notifiche» | Quattro interruttori per categoria e l'attivazione sul dispositivo | Scegliere quali avvisi ricevere sul telefono |
 | «Installa l'app» | Le istruzioni per iPhone, Android e computer (vedi sopra) | Installare l'app |
 | «Esci», in fondo, dopo una riga | Il pulsante per uscire | Tornare alla pagina «Accedi» |
+
+**«Aspetto»:**
+
+| Palette | Com'è |
+|---|---|
+| Sorgente (all'inizio) | «Verde petrolio, ciano e superfici luminose.» |
+| Aria | «Blu e ciano, con un tono più tecnico.» |
+| Bosco | «Salvia, avorio e toni naturali.» |
+
+- **«Come il telefono o il computer»** segue l'impostazione chiara o scura del telefono o del computer; «Chiara» e
+  «Scura» la fissano.
+- **La palette vale per tutte le schermate.** I colori degli stati (verde «Pronto» e «Online», giallo per ciò che è
+  in corso, rosso per «Non applicato» e gli errori) e delle modalità restano gli stessi in tutte le palette.
+- **La scelta resta solo in questo browser**: un altro telefono o computer parte da Sorgente, «Come il telefono o il
+  computer».
+- **Gli esiti**: «Aspetto aggiornato e salvato in questo browser.»; «Aspetto aggiornato per questa sessione; il
+  browser non ha consentito il salvataggio.» (navigazione privata o memoria del browser bloccata); «Preferenze visive
+  ripristinate.» dopo «Ripristina predefiniti».
 
 **«Profilo»:**
 
@@ -459,15 +478,34 @@ Chi ha il ruolo «Sola lettura» vede le stesse pagine dell'operatore.
 
 **La prima schermata: una scheda per ogni appartamento, con stato e dati.**
 
-La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda per appartamento.
+La prima schermata, «Appartamenti», ha in alto una fascia con una foto e sotto una scheda per appartamento.
+
+**La fascia in alto:**
 
 | Cosa vedi | Cosa vuol dire |
 |---|---|
-| In alto: nome e indirizzo; a destra la pillola dello stato | «Online» (verde), «Non raggiungibile» oppure «Disattivato» (tortora) |
+| Una foto di un ambiente di casa | Solo decorativa; cambia ogni 30 minuti |
+| Sulla foto: «Appartamenti» e «… appartamenti» | Quanti appartamenti vedi |
+| Sulla foto: «Spunto del giorno» e una frase tra virgolette | Una frase diversa ogni giorno, la stessa per tutto il giorno |
+| Solo per l'Amministratore: «Consumo registrato oggi», con i kWh | La somma dei kWh di oggi degli appartamenti che hanno il dato |
+| Sotto, «Dato disponibile per … di … appartamenti» | Quanti appartamenti hanno il dato di oggi |
+| «Escluso 1 appartamento dimostrativo» o «Esclusi … appartamenti dimostrativi» | I dimostrativi non entrano nel totale accanto a quelli veri: i loro numeri sono simulati |
+| «Dati simulati degli appartamenti dimostrativi» | Ci sono solo appartamenti dimostrativi: il totale è il loro |
+| «Nessun dato di consumo disponibile» | Nessun appartamento ha il dato di oggi |
+| «Dato temporaneamente non disponibile» | L'elenco degli appartamenti non è arrivato; riprova fra poco |
+
+- **Sul telefono** il riquadro del consumo sta sotto la foto; **su computer** sulla foto, a destra.
+- **Un gestore della piattaforma** con una propria organizzazione vede al suo posto il pulsante «Appartamento».
+
+**Le schede degli appartamenti:**
+
+| Cosa vedi | Cosa vuol dire |
+|---|---|
+| In alto: nome e indirizzo; a destra la pillola dello stato | «Online» (verde), «Non raggiungibile» oppure «Disattivato» (grigio) |
 | «Dimostrativo» accanto al nome | Un appartamento finto usato per le prove |
 | La striscia dei dati: «Modalità», nel colore della modalità | Comfort (arancione chiaro), Eco (verde salvia) o Casa vuota (azzurro ardesia) |
-| «Occupazione», a fondo pieno | «Vuoto» (tortora: nessuno, anche prima dell'orario di check-in di una prenotazione), «Occupato» (verde: ospiti dentro, dopo il check-in effettivo), «Prenotato» (ambra: è l'orario della prenotazione, ma non è stato comunicato l'arrivo) |
-| «Consumo di oggi», con il numero in arancione | Il consumo di oggi in kWh, non un importo |
+| «Occupazione», a fondo pieno | «Vuoto» (grigio: nessuno, anche prima dell'orario di check-in di una prenotazione), «Occupato» (verde: ospiti dentro, dopo il check-in effettivo), «Prenotato» (ambra: è l'orario della prenotazione, ma non è stato comunicato l'arrivo) |
+| «Consumo di oggi» | Il consumo di oggi in kWh, non un importo |
 | «Prossimo check-in», «Prossimo check-out» | I prossimi arrivo e partenza; «Prossimo check-out» occupa tutta la larghezza |
 | In fondo, «1 approvazione in attesa» o «… approvazioni in attesa» con una freccia | Le richieste che aspettano una risposta; la riga non c'è se non ce ne sono |
 
@@ -509,10 +547,10 @@ La prima schermata, «Appartamenti», mostra «… appartamenti» e una scheda p
 | Casella | Cosa vedi | Di che colore è |
 |---|---|---|
 | «Modalità» | Comfort, Eco o Casa vuota; durante una forzatura, sotto, «forzata fino alle …» | Il colore della modalità: Comfort arancione chiaro, Eco verde salvia, Casa vuota azzurro ardesia |
-| «Occupazione» | «Vuoto», «Occupato» o «Prenotato» | «Occupato» verde, «Prenotato» ambra, «Vuoto» tortora |
+| «Occupazione» | «Vuoto», «Occupato» o «Prenotato» | «Occupato» verde, «Prenotato» ambra, «Vuoto» grigio |
 | «Prossimo check-in» o «Prossimo check-out» | Il primo fra arrivo e partenza; senza nessuno dei due, «Prossimo evento» con un trattino | Bianca |
 | «Finestre» | «Tutte chiuse», «1 aperta» o «… aperte» con le stanze sotto; senza sensori, un trattino e «Nessun sensore». Dal lotto 40, se un sensore è senza segnale: «Stato non noto» (o «Nessuna aperta» se gli altri sono chiusi) con la riga «Senza segnale: …» e le stanze | Verde se sono tutte chiuse, ambra se una è aperta; bianca senza sensori; neutra se un sensore è senza segnale, perché di quella finestra non si sa nulla |
-| «Consumo di oggi» | I kWh di oggi; un trattino se la funzione Consumi è spenta | Bianca, con il numero in arancione |
+| «Consumo di oggi» | I kWh di oggi; un trattino se la funzione Consumi è spenta | Bianca, con il numero nel colore principale dell'app |
 | «Dispositivi online» | Quanti rispondono, per esempio 5/6; sotto, «… offline» se qualcuno manca | Verde se rispondono tutti, ambra se qualcuno è offline |
 
 > **Da sapere**
@@ -613,7 +651,7 @@ per 24 mesi.
 | Prima linea, in nero: il tipo di azione e i valori prima → dopo | Per esempio «Modalità» con «comfort → casa vuota» |
 | Il tipo di azione, in italiano | Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata» |
 | Altri esempi di tipo | «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo»; dal lotto 40 «Modalità: comando in sospeso» (un dispositivo non raggiungibile durante il cambio di modalità: il comando parte quando torna raggiungibile) |
-| A destra della prima linea: l'esito, in un badge colorato | «Applicata» verde; «Respinta» e «Non riuscita» rosso mattone; «in attesa di approvazione» ambra; «Informativa» tortora |
+| A destra della prima linea: l'esito, in un badge colorato | «Applicata» verde; «Respinta» e «Non riuscita» rosso mattone; «in attesa di approvazione» ambra; «Informativa» grigio |
 | Seconda linea, in grigio: la data · chi ha deciso · su cosa | «Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; «appartamento», «dispositivo», «regole», «programmazione» |
 | Chi ha deciso, se ha eliminato l'account | «utente rimosso» |
 | Sotto: il motivo | Perché è successo |
@@ -688,7 +726,7 @@ per 24 mesi.
 | Cosa vedi | Cosa puoi fare | Cosa succede |
 |---|---|---|
 | Il periodo: «Oggi» (da mezzanotte), «7 giorni», «30 giorni» (compreso oggi) oppure «Soggiorno in corso» | Toccare una delle pillole: la scelta è scritta in scuro | «Soggiorno in corso» compare durante una prenotazione conosciuta dall'app; dal lotto 40 anche se il check-in non è stato registrato, e sparisce al check-out |
-| La casella «Totale periodo» in «kWh», con il numero in arancione | Leggere il totale | I numeri si aggiornano ogni minuto |
+| La casella «Totale periodo» in «kWh», con il numero nel colore principale dell'app | Leggere il totale | I numeri si aggiornano ogni minuto |
 | La casella «Ora con più consumo» (oggi) o «Giorno con più consumo» (periodi più lunghi) | Leggere il picco | Sotto il valore, «ore …» oppure la data |
 | La casella «Ore di clima evitate» | Leggere le ore | Compare solo quando il motore le calcola; oggi non compare |
 | Il grafico «Consumo per ora (kWh)» (oggi) o «Consumo per giorno (kWh)» (periodi più lunghi) | Passare con il puntatore: leggi «ore …» e i kWh | Le ore senza letture contano zero. Senza dati: «Nessun dato nel periodo» |
@@ -1685,6 +1723,8 @@ in ciascuno, poi confermi.».
 - Poi spunta «Ho copiato la password nello Shelly» e premi «Chiudi»: prima della spunta la finestra non si chiude.
 - Se il PC sincronizza gli appunti con altri dispositivi, svuotali dopo la copia.
 - «Dati di collegamento» mostra di nuovo tutto **tranne** la password.
+- **In alto** il conteggio «Attivi: … · Revocati: …»; **sul telefono** una scheda per dispositivo, con «Ultima
+  modifica: … · nome».
 
 | Stato | Cosa vuol dire |
 |---|---|
