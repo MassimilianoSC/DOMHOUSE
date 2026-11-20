@@ -19,7 +19,16 @@ export interface PlatformTenant {
   suspended_reason?: string | null;
   /** The active assistance access (P-50, D-86): the manager's own when there is one (mine), else someone else's. */
   support_access?: (SupportAccess & { mine: boolean }) | null;
+  /** A2 (docs/proposta-a2.md §2.2, n. 22): creations stopped half-way and creations on their way; absent = 0. */
+  appartamenti_non_creati?: number;
+  appartamenti_in_preparazione?: number;
 }
+
+/** One organization read alone (GET /app/platform/tenants/{id}): the list's row plus the count of the last hour. */
+export type PlatformTenantDetail = PlatformTenant & {
+  /** A2 (n. 20): creations started in the last 60 minutes; libera_dal (UTC) only when usate has reached limite. */
+  creazioni_ultima_ora?: { usate: number; limite: number; libera_dal: string | null };
+};
 
 /** Answer of the creation: the organization plus the outcome of the invitation email. */
 export type CreatedTenant = PlatformTenant & { email_status?: EmailStatus };
@@ -48,6 +57,35 @@ export interface PlatformApartment {
   simulated?: boolean;
   /** Outcome of the last "Verifica connessione", whoever ran it; null if never verified. */
   last_check: { ok: boolean; checked_at: string; error: string | null } | null;
+  /** A2 (n. 23): the creation from the app; null (or absent) for an apartment connected by hand (dev, lab-01, demos). */
+  creazione?: Creazione | null;
+}
+
+export type CreazioneStato = "in_preparazione" | "pronto" | "non_creato" | "annullamento_in_corso" | "annullato";
+export type CreazionePasso = "riserva" | "segreti" | "capienza" | "motore" | "collegamento";
+
+/** The creation of an apartment from the app (docs/proposta-a2.md §2.1). */
+export interface Creazione {
+  stato: CreazioneStato;
+  /** The last step reached: in progress while in_preparazione, the one that failed when non_creato. */
+  passo: CreazionePasso;
+  version: number;
+  porta: number | null;
+  /** The last order to the agent; op_id is the «ID richiesta», codice the one of §6.3, messaggio the server's fallback. */
+  op: { op_id: string; stato: string; codice: string | null; messaggio: string } | null;
+  /** What exists already (id, porta, segreti, motore, broker). */
+  fatti: string[];
+  updated_at: string;
+  /** Visible name, never the email. */
+  updated_by: string | null;
+}
+
+/** «Nuovo appartamento» (A2): the server chooses address and port. */
+export interface NewCreatedApartment {
+  apartment_id: string;
+  name: string;
+  timezone: string;
+  italianway_id?: string | null;
 }
 
 export interface NewPlatformApartment {
@@ -74,6 +112,8 @@ export const platformApi = {
   audit: (scope: string, before?: string) =>
     bffFetch<AuditPage>("/app/platform/audit", { query: { ...(scope === PLATFORM_SCOPE ? { scope: PLATFORM_SCOPE } : { tenant_id: scope }), limit: AUDIT_PAGE, before } }),
   tenants: () => bffFetch<PlatformTenant[]>("/app/platform/tenants"),
+  /** One organization, with the creations of the last hour (A2, before opening «Nuovo appartamento»). */
+  tenant: (tenantId: string) => bffFetch<PlatformTenantDetail>(`/app/platform/tenants/${enc(tenantId)}`),
   /** One call: the BFF checks name and email first, then creates organization and invitation, then sends the email. */
   createTenant: (body: { name: string; admin_email: string; admin_display_name?: string }, correlationId: string) =>
     bffFetch<CreatedTenant>("/app/platform/tenants", { method: "POST", body, correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
@@ -104,6 +144,18 @@ export const platformApi = {
   /** Id unique on the whole platform (409); 422 for an instance URL that cannot work (D-28). */
   createApartment: (tenantId: string, body: NewPlatformApartment, correlationId: string) =>
     bffFetch<PlatformApartment>(apts(tenantId), { method: "POST", body, correlationId }),
+  /** A2: creates the apartment and its home automation system on the VM (staging only until the second VM). 202; 429
+   *  rate_limited with details {limite, riprova_dal}; 503 agent_not_configured; 502 agent_publish_failed. */
+  createNew: (tenantId: string, body: NewCreatedApartment, correlationId: string) =>
+    bffFetch<{ apartment: PlatformApartment; creazione: Creazione }>(`${apts(tenantId)}/nuovo`, { method: "POST", body, correlationId }),
+  /** 404 once the creation has been cancelled: the apartment no longer exists. */
+  creation: (tenantId: string, aptId: string) => bffFetch<{ creazione: Creazione }>(`${apts(tenantId)}/${enc(aptId)}/creazione`),
+  /** Only from non_creato; 409 version_changed or invalid_state otherwise. Not counted in the hourly limit. */
+  retryCreation: (tenantId: string, aptId: string, version: number, correlationId: string) =>
+    bffFetch<{ creazione: Creazione }>(`${apts(tenantId)}/${enc(aptId)}/creazione/riprova`, { method: "POST", body: { version }, correlationId }),
+  /** Removes what was prepared; the apartment stays as annullamento_in_corso until the agent's outcome, then disappears. */
+  cancelCreation: (tenantId: string, aptId: string, version: number, correlationId: string) =>
+    bffFetch<{ creazione: Creazione }>(`${apts(tenantId)}/${enc(aptId)}/creazione/annulla`, { method: "POST", body: { version }, correlationId }),
   /** Connection and Italianway code (D-66, D-72); name and enabled stay with the organization admin. Absent = no
    *  change; italianway_id null (or "") = remove the code. */
   patchConnection: (tenantId: string, aptId: string, body: { instance_url?: string; port?: number | null; italianway_id?: string | null; simulated?: boolean }, correlationId: string) =>

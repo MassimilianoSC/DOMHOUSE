@@ -23,3 +23,34 @@ describe("gestori della piattaforma: rimozione", () => {
     expect(JSON.parse(String(init.body))).toEqual({ email: "sol@hqe.it" });
   });
 });
+
+// A2 (docs/proposta-a2.md §2): the routes of the creation from the app, with the correlation id of each action.
+describe("creazione di un appartamento dall'app", () => {
+  const last = () => ({ path: new URL(calls[calls.length - 1].url).pathname, init: calls[calls.length - 1].init });
+
+  it("Crea: POST …/apartments/nuovo con id, nome, fuso e codice Italianway; nessun indirizzo né porta", async () => {
+    await platformApi.createNew("t 1", { apartment_id: "lab-prova", name: "Prova", timezone: "Europe/Rome", italianway_id: null }, "corr-2");
+    const { path, init } = last();
+    expect(path).toBe("/app/platform/tenants/t%201/apartments/nuovo");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({ apartment_id: "lab-prova", name: "Prova", timezone: "Europe/Rome", italianway_id: null });
+    expect((init.headers as Record<string, string>)["X-Correlation-Id"]).toBe("corr-2");
+  });
+
+  it("Riprova e Annulla: POST …/creazione/riprova e …/annulla con la version", async () => {
+    await platformApi.retryCreation("t-1", "lab-prova", 4, "corr-3");
+    expect(last().path).toBe("/app/platform/tenants/t-1/apartments/lab-prova/creazione/riprova");
+    expect(JSON.parse(String(last().init.body))).toEqual({ version: 4 });
+    await platformApi.cancelCreation("t-1", "lab-prova", 5, "corr-4");
+    expect(last().path).toBe("/app/platform/tenants/t-1/apartments/lab-prova/creazione/annulla");
+    expect(JSON.parse(String(last().init.body))).toEqual({ version: 5 });
+  });
+
+  it("letture: l'organizzazione da sola (il conto dell'ultima ora) e la creazione di un appartamento", async () => {
+    await platformApi.tenant("t-1");
+    expect(last().path).toBe("/app/platform/tenants/t-1");
+    expect(last().init.method).toBe("GET");
+    await platformApi.creation("t-1", "lab-prova");
+    expect(last().path).toBe("/app/platform/tenants/t-1/apartments/lab-prova/creazione");
+  });
+});

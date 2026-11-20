@@ -7,6 +7,8 @@ import { AUDIT_ACTIONS } from "@/lib/auditLog";
 import { BOOKING_TYPES, type OutcomeKind } from "@/lib/bookingLog";
 import type { SummaryStatus } from "@/api/summaries";
 import type { CredentialState, PendingAction } from "@/api/deviceCredentials";
+import type { CreazionePasso, CreazioneStato } from "@/api/platform";
+import { WHAT_TEXTS } from "@/lib/apartmentCreation";
 import * as ts from "typescript";
 import italian from "./it.json";
 
@@ -55,6 +57,10 @@ const FORMS: Record<string, string[]> = Object.fromEntries([
   form("credentials.states.${}", all<CredentialState>({ in_attesa: true, pronto: true, cambio_in_corso: true, revoca_in_corso: true, revocato: true, non_applicato: true })),
   form("credentials.lines.${}", all<Exclude<CredentialState, "non_applicato">>({ in_attesa: true, pronto: true, cambio_in_corso: true, revoca_in_corso: true, revocato: true })),
   form("credentials.notApplied.${}", all<NonNullable<PendingAction>>({ registra: true, rigenera: true, revoca: true })),
+  // A2 (src/lib/apartmentCreation.ts, src/components/platform): the steps, the states of a creation not ready, «Cosa è successo»
+  form("platform.creation.steps.${}", all<CreazionePasso>({ riserva: true, segreti: true, capienza: true, motore: true, collegamento: true })),
+  form("platform.creation.states.${}", all<Exclude<CreazioneStato, "pronto" | "annullato">>({ in_preparazione: true, non_creato: true, annullamento_in_corso: true })),
+  form("platform.creation.what.${}", WHAT_TEXTS),
   form("decisions.outcome.${}", all<Decision["outcome"]>({ applied: true, rejected: true, pending_approval: true, failed: true, informational: true })),
   form("decisions.target.${}", all<Decision["target"]["type"]>({ device: true, apartment: true, rules: true, schedule: true })),
   form("energy.${}", ["hour", "day"]),

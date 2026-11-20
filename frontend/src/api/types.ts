@@ -96,8 +96,10 @@ export interface Me {
   /** Assistance accesses open on the organization: filled for admins only, [] otherwise. */
   support_access?: SupportAccess[];
   role: Role | null;
-  /** simulator: no longer sent (D-97): the Simulatore follows the apartment's `simulated`, not the environment. */
-  env: { app_env: string; auth_mode: string; fcm_enabled: boolean; simulator?: boolean; instance_mode: string };
+  /** simulator: no longer sent (D-97): the Simulatore follows the apartment's `simulated`, not the environment.
+   *  creazione_disponibile (A2, docs/proposta-a2.md §2.2 n. 24): true only in staging with the agent configured;
+   *  false in production until the second VM, and without the agent. Absent from an older server. */
+  env: { app_env: string; auth_mode: string; fcm_enabled: boolean; simulator?: boolean; instance_mode: string; creazione_disponibile?: boolean };
 }
 
 export interface DevUser {
