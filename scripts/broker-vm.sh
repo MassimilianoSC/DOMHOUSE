@@ -491,6 +491,12 @@ auth_refused_devices() {
   s2="$(date -u -d "@$(( slot - 600 ))" +%Y-%m-%dT%H:%M:00Z)"
   apts="$(tr '\n' ' ' < "${APARTMENTS}")"
   users="$(cut -d: -f1 "${AUTH}/devices.passwd" 2>/dev/null | tr '\n' ' ' || true)"
+  # second reading of A5, point 2: without users nobody can be named, and the page would show 0 unnoticed: a failure,
+  # which check turns into «broker device refused error»
+  if [ -z "${users// /}" ]; then
+    echo "errore: elenco degli utenti del broker vuoto o illeggibile (${AUTH}/devices.passwd)" >&2
+    return 1
+  fi
   docker logs -t --since 20m "${CONTAINER}" 2>&1 | awk -v s1="${s1}" -v s2="${s2}" -v cap="${AUTH_DEVICE_LINES}" \
       -v apts="${apts}" -v users="${users}" '
     function ok(x) { return length(x) <= 64 && x ~ /^[a-z0-9][a-z0-9-]*$/ }

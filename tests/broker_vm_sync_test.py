@@ -269,12 +269,17 @@ def test_a5_review_1_an_invented_device_of_a_listed_apartment_is_not_named(vm):
     assert "fingerprint" not in r.stdout and H1 not in r.stdout
 
 
-def test_a5_review_1_without_the_users_file_nobody_is_named(vm):
-    run, stubs, _ = vm
+@pytest.mark.parametrize("users", [None, ""])
+def test_a5_review_1_without_users_nobody_is_named_and_it_is_an_error(vm, users):
+    """Second reading of A5, point 2: no users file (or an empty one) is a failure, which check turns into «broker
+    device refused error»: never a silent 0 on the page."""
+    run, stubs, etc = vm
+    if users is not None:
+        (etc / "_broker" / "auth" / "devices.passwd").write_text(users, encoding="utf-8")
     _with_log(stubs, _broker_log(("17:06:10", "apt-a.plug", "out")))
     r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW}")
-    assert r.returncode == 0, r.stderr
-    assert r.stdout.splitlines() == ["broker device refused other slot=2026-11-20T17:05:00Z count=1"]
+    assert r.returncode != 0 and "utenti" in r.stderr
+    assert "broker device refused apt=" not in r.stdout
 
 
 def test_a5_review_2_a_failure_of_the_reading_is_an_exit_code_that_check_turns_into_one_line(vm):
