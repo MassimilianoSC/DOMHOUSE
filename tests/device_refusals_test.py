@@ -128,3 +128,47 @@ def test_a_failed_read_is_null_and_is_not_retried_at_once(logs):
 def test_an_id_out_of_the_rule_never_reaches_the_filter(logs, apt):
     assert read(apt) is None
     assert logs.calls == []
+
+
+REAL_ENTRIES = dr._entries
+
+
+def test_review_1_pages_that_end_before_the_data_are_null_not_a_partial_count(logs, monkeypatch):
+    """Review A5, point 1: with nextPageToken still there after the last page read, the count would be cut silently."""
+    monkeypatch.setattr(dr, "_entries", REAL_ENTRIES)
+    monkeypatch.setattr(dr, "_token", lambda: "t")
+    pages = []
+
+    async def page(client, body, token):
+        pages.append(dict(body))
+        return {"entries": [{"jsonPayload": {"message": line("lab-07", "plug", "2026-11-20T17:05:00Z", 1,
+                                                             "2026-11-20T17:06:00Z")}}], "nextPageToken": "again"}
+    monkeypatch.setattr(dr, "_page", page)
+    assert read() is None
+    assert len(pages) == dr.MAX_PAGES
+
+
+def test_review_1_a_complete_reading_over_two_pages_counts(logs, monkeypatch):
+    monkeypatch.setattr(dr, "_entries", REAL_ENTRIES)
+    monkeypatch.setattr(dr, "_token", lambda: "t")
+    answers = [
+        {"entries": [{"jsonPayload": {"message": line("lab-07", "plug", "2026-11-20T17:05:00Z", 2,
+                                                      "2026-11-20T17:06:00Z")}}], "nextPageToken": "p2"},
+        {"entries": [{"jsonPayload": {"message": line("lab-07", "plug", "2026-11-20T17:00:00Z", 1,
+                                                      "2026-11-20T17:01:00Z")}}]},
+    ]
+
+    async def page(client, body, token):
+        return answers.pop(0)
+    monkeypatch.setattr(dr, "_page", page)
+    assert read() == {"plug": {"conteggio_24h": 3, "ultimo": "2026-11-20T17:06:00Z"}}
+
+
+def test_review_5_a_slow_reading_stops_at_the_total_limit_and_is_null(logs, monkeypatch):
+    async def slow(view, flt):
+        await asyncio.sleep(2)
+        return []
+    monkeypatch.setattr(dr, "_entries", slow)
+    monkeypatch.setattr(dr, "READ_TIMEOUT_S", 0.05)
+    assert read() is None
+    assert dr.READ_TIMEOUT_S <= 8

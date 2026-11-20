@@ -10,7 +10,8 @@ docs/procedura-installazione-a5.md). Here:
 
 - each slot counts once (two rounds write it: the larger count wins), the slots of the last 24 hours are summed;
 - the filter is built only from an apartment id that follows the rule, never from a user's text;
-- read at most once every 5 minutes per apartment, a copy in memory (a failed read: null for a minute);
+- read at most once every 5 minutes per apartment, a copy in memory (a failed read: null for a minute); the whole
+  reading within READ_TIMEOUT_S, and pages that end before the data are null, never a partial count;
 - null means «not known» (no view configured, as production until the second VM; a read that failed), never 0.
 
 No address and no password ever reach these lines (D-231): the VM never writes them.
@@ -29,6 +30,7 @@ FAILED_COPY_S = 60                  # a failed read is not retried at every page
 WINDOW = timedelta(hours=24)        # answer 1210, point 3
 PAGE_SIZE = 1000
 MAX_PAGES = 5                       # two lines per slot and device: 576 a day for one device always refused
+READ_TIMEOUT_S = 8                  # review A5, point 5: the whole reading, every page; then null (the page waits no more)
 ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
 TIME = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"
 LINE_RE = re.compile(rf"broker device refused apt=(\S+) device=(\S+) slot=({TIME}) count=(\d+) last=({TIME})$")
@@ -62,16 +64,26 @@ def _token() -> str:
     return _credentials.token
 
 
+class Truncated(Exception):
+    """More entries than MAX_PAGES pages: a count cut silently would be shown as true (review A5, point 1)."""
+
+
+async def _page(client: httpx.AsyncClient, body: dict, token: str) -> dict:
+    """One page of entries:list. Replaced in the tests."""
+    r = await client.post(URL, json=body, headers={"Authorization": f"Bearer {token}"})
+    r.raise_for_status()
+    return r.json()
+
+
 async def _entries(view: str, flt: str) -> list[str]:
-    """The messages of the entries of the view that match the filter. Replaced in the tests."""
+    """The messages of the entries of the view that match the filter; Truncated when the pages end before the data.
+    Replaced in the tests."""
     token = await asyncio.to_thread(_token)
     out: list[str] = []
     body = {"resourceNames": [view], "filter": flt, "orderBy": "timestamp desc", "pageSize": PAGE_SIZE}
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=READ_TIMEOUT_S) as client:
         for _ in range(MAX_PAGES):
-            r = await client.post(URL, json=body, headers={"Authorization": f"Bearer {token}"})
-            r.raise_for_status()
-            data = r.json()
+            data = await _page(client, body, token)
             for e in data.get("entries", []):
                 payload = e.get("jsonPayload") or {}
                 message = payload.get("message") if isinstance(payload, dict) else None
@@ -80,9 +92,9 @@ async def _entries(view: str, flt: str) -> list[str]:
                 elif isinstance(e.get("textPayload"), str):
                     out.append(e["textPayload"])
             if not data.get("nextPageToken"):
-                break
+                return out
             body["pageToken"] = data["nextPageToken"]
-    return out
+    raise Truncated(f"oltre {MAX_PAGES} pagine")
 
 
 def count(apartment_id: str, messages: list[str], now: datetime) -> dict:
@@ -122,7 +134,7 @@ async def for_apartment(apartment_id: str) -> dict | None:
     flt = (f'timestamp>="{_iso(now - WINDOW - timedelta(minutes=10))}" '
            f'AND jsonPayload.message:"broker device refused apt={apartment_id} "')
     try:
-        value = count(apartment_id, await _entries(view, flt), now)
+        value = count(apartment_id, await asyncio.wait_for(_entries(view, flt), READ_TIMEOUT_S), now)
     except Exception as exc:                                     # noqa: BLE001 - the page works without the column
         warn("device refusals not read", apartment_id=apartment_id, error=type(exc).__name__)
         value = None
