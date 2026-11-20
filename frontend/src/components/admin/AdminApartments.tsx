@@ -12,6 +12,7 @@ import { RowsSkeleton } from "@/components/ui/Skeletons";
 import { Badge, Card, Dialog, DialogContent, DialogTitle, Input, Label, Switch } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
+import { fmtDateTime } from "@/lib/format";
 import { fmtPrice, parsePrice, priceInput } from "@/lib/price";
 import { instanceAddress } from "@/lib/instanceAddress";
 
@@ -137,6 +138,14 @@ function ApartmentRow({ a, orgPrice, verify, onVerify, onToggle, onEdit }: { a: 
             {!a.enabled && <Badge className="border-neutral-border bg-neutral-bg text-neutral-fg">{t("admin.apartments.disabled")}</Badge>}
           </div>
           <p className="text-sm text-muted-foreground [overflow-wrap:anywhere]">{a.address || "—"}</p>
+          {/* A6: since when and by whom; from when it can be deleted is the platform manager's (D-232) */}
+          {!a.enabled && a.disattivato_at && (
+            <p className="text-xs text-muted-foreground" data-testid={`admin-apartment-disabled-${a.apartment_id}`}>
+              {a.disattivato_da?.nome
+                ? t("platform.deletion.disabledBy", { when: fmtDateTime(a.disattivato_at), name: a.disattivato_da.nome, role: t(`platform.deletion.roles.${a.disattivato_da.ruolo}`) })
+                : t("platform.deletion.disabledAt", { when: fmtDateTime(a.disattivato_at) })}
+            </p>
+          )}
           <p className="text-xs text-muted-foreground" data-testid={`admin-apartment-price-${a.apartment_id}`}>
             {a.energy_price_eur_kwh != null ? t("admin.price.lineApt", { price: priceText(a.energy_price_eur_kwh) }) : t("admin.price.lineOrg", { price: priceText(orgPrice) })}
           </p>

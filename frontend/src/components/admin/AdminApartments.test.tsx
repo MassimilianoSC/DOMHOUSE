@@ -354,3 +354,27 @@ describe("disattivare un appartamento chiede conferma, riattivarlo no (P-90 T2, 
     expect(state.patchApartment).toHaveBeenCalled();
   });
 });
+
+// A6 (bff/API.md «Eliminazione di un appartamento»): one disabled state, whoever disabled it; the admin sees when and by
+// whom. «Si potrà eliminare dal …» is the platform manager's only: the admin does not delete until D-232.
+describe("A6: da quando e da chi è disattivato", () => {
+  it("disattivato con l'ora: la data e chi l'ha fatto, nient'altro", async () => {
+    state.apartments = [
+      { ...APT, enabled: false, disattivato_at: "2026-11-20T15:05:00Z", disattivato_da: { ruolo: "gestore", nome: "Giulia Rossi" } },
+      { ...APT, apartment_id: "apt-002", name: "Rimini Mare", enabled: false, disattivato_at: "2026-11-18T08:30:00Z", disattivato_da: { ruolo: "amministratore", nome: null } },
+    ];
+    renderAdmin();
+    const line = await screen.findByTestId("admin-apartment-disabled-apt-001");
+    expect(line).toHaveTextContent(/^Disattivato il 20 nov 2026, 16:05 da Giulia Rossi \(gestore della piattaforma\)$/);
+    expect(screen.getByTestId("admin-apartment-disabled-apt-002")).toHaveTextContent(/^Disattivato il 18 nov 2026, 09:30$/);
+    expect(screen.queryByText(/Si potrà eliminare/)).toBeNull();
+  });
+
+  it("attivo, o spento prima di A6 (senza ora): nessuna riga", async () => {
+    state.apartments = [APT, { ...APT, apartment_id: "apt-002", name: "Rimini Mare", enabled: false, disattivato_at: null, disattivato_da: null }];
+    renderAdmin();
+    await screen.findByTestId("admin-apartment-apt-002");
+    expect(screen.queryByTestId("admin-apartment-disabled-apt-001")).toBeNull();
+    expect(screen.queryByTestId("admin-apartment-disabled-apt-002")).toBeNull();
+  });
+});

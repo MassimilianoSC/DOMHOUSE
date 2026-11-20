@@ -40,6 +40,10 @@ export interface AdminApartment {
   energy_price_eur_kwh?: number | null;
   /** Outcome of the last "Verifica connessione" (D-66); absent from a BFF older than D-64. Never sent back. */
   last_check?: { ok: boolean; checked_at: string; error: string | null } | null;
+  /** A6: when and by whom it was disabled, whoever did it (one state with the platform's «Disattiva»); null if active
+   *  or disabled before A6. Never sent back. */
+  disattivato_at?: string | null;
+  disattivato_da?: { ruolo: "gestore" | "amministratore"; nome: string | null } | null;
 }
 
 export interface AdminTenant {
