@@ -45,3 +45,60 @@ def test_dry_run_apply_and_undo():
     assert asyncio.run(mc.undo(repo, "lab-01", apply=True)) == ["plug", "shelly-1"]
     docs, _, _ = asyncio.run(repo.device_credentials_view("lab-01"))
     assert [d["device_id"] for d in docs] == ["nuovo"]                                # the app's own stays
+
+
+# 20 November, Q6.2 dry run: the PC's ADC had expired; google-api-core kept retrying the «503 Reauthentication is needed»
+# until Ctrl+C. Now one check of the credentials before any database call, and a deadline on the database calls.
+class _Expired:
+    def refresh(self, request):
+        from google.auth import exceptions
+        raise exceptions.RefreshError("Reauthentication is needed. Please run `gcloud auth application-default login`")
+
+
+def _no_database(*a, **k):
+    raise AssertionError("the database must not be touched")
+
+
+def _run_main(monkeypatch, tmp_path, capsys, *extra):
+    f = tmp_path / "impronte.txt"
+    f.write_text(f"plug {H1}\n", encoding="utf-8")
+    code = mc.main(["--progetto", "p", "--database", "staging", "--appartamento", "lab-01", "--file", str(f), *extra])
+    return code, capsys.readouterr().err
+
+
+def test_expired_pc_credentials_stop_at_once_with_the_command_to_log_in_again(monkeypatch, tmp_path, capsys):
+    import google.auth
+    from bff.repository import firestore as fs
+    monkeypatch.setattr(google.auth, "default", lambda **k: (_Expired(), "p"))
+    monkeypatch.setattr(fs, "FirestoreRepository", _no_database)
+    code, err = _run_main(monkeypatch, tmp_path, capsys, "--applica")
+    assert code == 3 and "gcloud auth application-default login" in err and "scadute" in err
+
+
+def test_no_pc_credentials_at_all_say_the_same(monkeypatch, tmp_path, capsys):
+    import google.auth
+    from google.auth import exceptions
+    from bff.repository import firestore as fs
+
+    def missing(**k):
+        raise exceptions.DefaultCredentialsError("no ADC")
+    monkeypatch.setattr(google.auth, "default", missing)
+    monkeypatch.setattr(fs, "FirestoreRepository", _no_database)
+    code, err = _run_main(monkeypatch, tmp_path, capsys)
+    assert code == 3 and "gcloud auth application-default login" in err
+
+
+def test_a_database_call_that_never_answers_stops_at_the_deadline(monkeypatch, tmp_path, capsys):
+    from bff.repository import firestore as fs
+
+    class Stuck:
+        def __init__(self, **k):
+            pass
+
+        async def device_credentials_view(self, apartment_id):
+            await asyncio.sleep(3600)
+    monkeypatch.setattr(mc, "check_credentials", lambda: None)
+    monkeypatch.setattr(mc, "DEADLINE_SECONDS", 0.2)
+    monkeypatch.setattr(fs, "FirestoreRepository", Stuck)
+    code, err = _run_main(monkeypatch, tmp_path, capsys)
+    assert code == 3 and "nessuna risposta da Firestore" in err and "gcloud auth application-default login" in err

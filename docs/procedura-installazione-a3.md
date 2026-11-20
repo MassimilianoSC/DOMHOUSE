@@ -252,6 +252,10 @@ cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 
 - **Atteso:** «N impronte nel file; N dispositivi da scrivere …», poi «… scritti» con gli stessi nomi.
 - **Da verificare:** lo script scrive con le credenziali predefinite del PC (Application Default Credentials). Se risponde «permission denied», incolla: si sceglie con la memoria storica l'account giusto.
+- **«credenziali del PC scadute o assenti» o «nessuna risposta da Firestore»** (codice 3; il 20 novembre la prova a secco sembrava bloccata: le credenziali del 19 erano scadute e la libreria riprovava all'infinito):
+  1. `gcloud auth application-default login` (Git Bash, nella cartella `app`), con l'account del progetto;
+  2. poi rifai la prova a secco.
+  - Con `--applica` interrotto: la prova a secco dice cosa manca; rilanciare `--applica` scrive solo quelli (i documenti già scritti restano).
 - **Ritorno indietro:** lo stesso comando con `--annulla --applica` al posto di `--file …`: toglie solo i documenti «migrato» (una «Rigenera» o una «Revoca» fatta dall'app toglie il segno «migrato» a quel documento, che quindi resta). **Solo dopo aver tolto il segno di Q6.3** (il suo ritorno indietro): altrimenti il primo `aggiorna_broker` di `lab-01` manderebbe al broker un elenco senza gli Shelly veri (revisione del codice, punto 5).
 
 **Q6.3 Controllo nell'app**, poi il segno che apre `aggiorna_broker` su `lab-01`.
