@@ -52,8 +52,32 @@ def put_secret(name, value):
     rig(f"cat > {BENCH}/secrets/{name}", input_text=value)
 
 
+_ACCOUNTS = None
+_FINGERPRINTS: dict[tuple[str, str], str] = {}
+
+
+def fingerprint_of(device: str, password: str) -> str:
+    """The broker's «$7$» fingerprint of a password, the same string for the same pair (a sync that changes nothing
+    stays «unchanged»): computed with the repository's own scripts/broker_accounts.py."""
+    global _ACCOUNTS
+    if _ACCOUNTS is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("bench_broker_accounts", ROOT / "scripts" / "broker_accounts.py")
+        _ACCOUNTS = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(_ACCOUNTS)
+    key = (device, password)
+    if key not in _FINGERPRINTS:
+        _FINGERPRINTS[key] = _ACCOUNTS.hash_password(password)
+    return _FINGERPRINTS[key]
+
+
 def put_devices(apartment, devices):
-    put_secret(f"langbrain-shelly-{apartment}-devices", json.dumps(devices))
+    """A3 (docs/proposta-a3-server.md §6.2): an apartment's devices are the file of fingerprints devices/<apt> that the
+    agent's executor writes; the old «-devices» secret is read only for lab-01. The bench writes the file the same way
+    (root, 600), never a password."""
+    lines = "".join(f"{d} {fingerprint_of(d, pw)}\n" for d, pw in sorted(devices.items()))
+    rig(f"umask 077; mkdir -p {BENCH}/etc/_broker/devices; cat > {BENCH}/etc/_broker/devices/{apartment}",
+        input_text=lines)
 
 
 def make_cert(name, host=HOST, days=30, ca="ca"):
@@ -411,12 +435,15 @@ def test_a_second_sync_with_the_same_secrets_changes_nothing(bench):
     assert rig(f"stat -c %Y:%i {BENCH}/etc/_broker/auth/devices.passwd").stdout == before
 
 
-def test_a_broken_secret_takes_nothing_away(bench):
+def test_a_broken_file_of_fingerprints_takes_nothing_away(bench):
+    """A3 (§6.2, E-33): a file of fingerprints with a bad line (here a password in clear) keeps the apartment's lines
+    as they are («kept»), the others are updated; nothing of it reaches the broker. Before A3 the same for a broken
+    «-devices» secret, which since A3 only lab-01 reads (tests/broker_accounts_test.py covers it)."""
     before = rig(f"cat {BENCH}/etc/_broker/auth/devices.passwd").stdout
-    put_secret(f"langbrain-shelly-{A}-devices", "{non e' json")
+    rig(f"umask 077; cat > {BENCH}/etc/_broker/devices/{A}", input_text=f"a1 {PW['a1']}\n")
     done = vm("sync", check=False)
     put_devices(A, {"a1": PW["a1"], "a2": PW["a2"]})
-    assert done.returncode != 0 and "JSON" in done.stderr
+    assert f"kept {A}" in done.stdout.splitlines() and PW["a1"] not in done.stdout + done.stderr
     assert rig(f"cat {BENCH}/etc/_broker/auth/devices.passwd").stdout == before
     assert can_connect("tls", f"{A}.a1", PW["a1"])
 
