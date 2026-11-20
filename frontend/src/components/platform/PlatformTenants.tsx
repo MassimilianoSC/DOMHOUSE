@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, ChevronDown, ChevronUp, LifeBuoy, LogIn, Mail, Pause, Pencil, Play, Plus } from "lucide-react";
+import { ArrowRight, Building2, ChevronDown, ChevronUp, LifeBuoy, Loader2, LogIn, Mail, Pause, Pencil, Play, Plus, TriangleAlert } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import type { EmailStatus } from "@/api/admin";
@@ -13,7 +13,9 @@ import { Badge, Card, Dialog, DialogContent, DialogDescription, DialogTitle, Inp
 import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
+import { tenantCreationLine } from "@/lib/apartmentCreation";
 import { fmtDateTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 const KEY = ["platform", "tenants"];
 const isEmail = (s: string) => /^\S+@\S+\.\S+$/.test(s.trim());
@@ -178,6 +180,31 @@ function SupportDialog({ tenant, onClose, onDone }: { tenant: PlatformTenant; on
   );
 }
 
+/** A2 §4: creations stopped half-way (red, with «Vedi») or on their way (neutral), in sight with the list closed too. */
+function CreationsLine({ tenant, onSee }: { tenant: PlatformTenant; onSee: () => void }) {
+  const line = tenantCreationLine(tenant);
+  if (!line) return null;
+  const stopped = line.tone === "negative";
+  return (
+    <div
+      className={cn(
+        "mt-2 flex w-fit max-w-full flex-wrap items-center gap-x-2 gap-y-1.5 rounded-xl border px-3 py-1.5 text-sm",
+        stopped ? "border-negative-border bg-negative-bg text-negative-fg" : "border-neutral-border bg-neutral-bg text-neutral-fg",
+      )}
+      data-testid={`tenant-creations-${tenant.tenant_id}`}
+      data-tone={line.tone}
+    >
+      {stopped ? <TriangleAlert className="size-4 shrink-0" aria-hidden /> : <Loader2 className="size-4 shrink-0 motion-safe:animate-spin" aria-hidden />}
+      <span>{line.text}</span>
+      {stopped && (
+        <Button size="sm" variant="outline" className="bg-card text-negative-fg" onClick={onSee} data-testid={`tenant-creations-see-${tenant.tenant_id}`}>
+          {t("platform.creation.see")} <ArrowRight />
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function AdminState({ tenant }: { tenant: PlatformTenant }) {
   const a = tenant.first_admin;
   if (!a) return <span className="text-muted-foreground" data-testid={`tenant-admin-${tenant.tenant_id}`}>{t("platform.noAdmin")}</span>;
@@ -203,6 +230,8 @@ export function PlatformTenants({ openTenant = null }: { openTenant?: string | n
   const [renaming, setRenaming] = useState<PlatformTenant | null>(null);
   const [resending, setResending] = useState<string | null>(null);
   const [openApts, setOpenApts] = useState<string | null>(openTenant);
+  // «Vedi» (A2 §4): opens the list and asks it to bring the stopped creation into view; a new number at every press
+  const [seeStopped, setSeeStopped] = useState(0);
   const refresh = () => void qc.invalidateQueries({ queryKey: KEY });
   /** After suspending or reactivating: the list, and the manager's own profile when it is their organization. */
   const changed = (tn: PlatformTenant) => {
@@ -263,6 +292,13 @@ export function PlatformTenants({ openTenant = null }: { openTenant?: string | n
                   {tn.suspended && <Badge className="border-negative-border bg-negative-bg text-negative-fg" data-testid={`tenant-suspended-${tn.tenant_id}`}>{t("platform.suspendedBadge")}</Badge>}
                 </div>
                 <p className="text-xs text-muted-foreground">{t("platform.createdAt", { when: fmtDateTime(tn.created_at) })}</p>
+                <CreationsLine
+                  tenant={tn}
+                  onSee={() => {
+                    setOpenApts(tn.tenant_id);
+                    setSeeStopped((n) => n + 1);
+                  }}
+                />
                 {tn.support_access && (
                   <p className="text-xs font-medium text-warning-fg" data-testid={`tenant-support-info-${tn.tenant_id}`}>
                     {tn.support_access.mine
@@ -309,7 +345,7 @@ export function PlatformTenants({ openTenant = null }: { openTenant?: string | n
             </div>
             {openApts === tn.tenant_id && (
               <div className="border-t pt-3">
-                <PlatformApartments tenantId={tn.tenant_id} tenantName={tn.name} />
+                <PlatformApartments tenantId={tn.tenant_id} tenantName={tn.name} showStopped={seeStopped} />
               </div>
             )}
           </Card>

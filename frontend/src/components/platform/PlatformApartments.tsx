@@ -123,7 +123,7 @@ function ConnectionDialog({ tenantId, apt, onClose, onSaved }: { tenantId: strin
  * the id, connection, verification and deletion. No link to the apartment's own pages: those belong to the
  * organization.
  */
-export function PlatformApartments({ tenantId, tenantName }: { tenantId: string; tenantName: string }) {
+export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { tenantId: string; tenantName: string; showStopped?: number }) {
   const qc = useQueryClient();
   // A2: read again every 4 s while a creation or a cancellation is on its way, for at most 20 minutes (§3.3)
   const pollOpen = useRef(pollWindow(MAX_POLL_MS));
@@ -167,6 +167,18 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
     seen.current = now;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new list matters
   }, [q.data]);
+
+  // «Vedi» on the organization's card (§4): the first stopped creation into view, with the focus on its row
+  const shown = useRef(0);
+  useEffect(() => {
+    if (!showStopped || showStopped === shown.current || !q.data) return;
+    shown.current = showStopped;
+    const first = sortForPlatform(q.data).find((a) => a.creazione?.stato === "non_creato");
+    const el = first && document.querySelector<HTMLElement>(`[data-testid="platform-apt-${CSS.escape(first.apartment_id)}"]`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    el.focus({ preventScroll: true });
+  }, [showStopped, q.data]);
 
   /** «Riprova» and «Annulla» (§3.2): never repeated by the site; every outcome ends with the list read again. */
   const creationAction = async (a: PlatformApartment, kind: "riprova" | "annulla") => {
@@ -234,7 +246,13 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
             const v = verify[a.apartment_id];
             if (!isUsable(a))
               return (
-                <li key={a.apartment_id} className={cn("p-3", creationRowClass(a.creazione))} data-testid={`platform-apt-${a.apartment_id}`} data-creation={a.creazione?.stato}>
+                <li
+                  key={a.apartment_id}
+                  tabIndex={a.creazione?.stato === "non_creato" ? -1 : undefined}
+                  className={cn("p-3 outline-none focus-visible:ring-2 focus-visible:ring-ring", creationRowClass(a.creazione))}
+                  data-testid={`platform-apt-${a.apartment_id}`}
+                  data-creation={a.creazione?.stato}
+                >
                   <CreationRow a={a} busy={busyId === a.apartment_id} onRetry={() => void creationAction(a, "riprova")} onCancel={() => setCancelOf(a)} />
                 </li>
               );
