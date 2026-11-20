@@ -4,6 +4,10 @@
 # commands to launch it from the PC: docs/motore-vm.md).
 #
 #   sudo bash engine-vm.sh install <apartment_id> <port> <image> <connector>   # first time; connector: simulated
+#   bash /opt/domhouse/engine-vm.sh install --da-agente <apartment_id> <port> <image@sha256> <connector> <ENV> <catalog>
+#                                    # A2: the agent's crea_motore (no timers, no Ops Agent; the caller holds the lock)
+#   sudo bash /opt/domhouse/engine-vm.sh remove <apartment_id>                  # A2/A6: engine, files and data away
+#   sudo bash /opt/domhouse/engine-vm.sh env <apartment_id> staging|prod        # A2: the ENV line, once, by hand
 #   sudo bash /opt/domhouse/engine-vm.sh update <apartment_id> <image>          # new image, same data
 #   sudo bash /opt/domhouse/engine-vm.sh key <apartment_id>                     # rewrite the key file, restart
 #   sudo bash /opt/domhouse/engine-vm.sh status <apartment_id>
@@ -85,16 +89,43 @@ DATA_ALERT_MB="${DOMHOUSE_DATA_ALERT_MB:-500}"   # an apartment's /data above th
 JOURNALD_DIR="${DOMHOUSE_JOURNALD_DIR:-/etc/systemd/journald.conf.d}"
 ENGINE_CPUS=1.0                          # decision 1128: every engine's share of the VM's two CPUs, at most
 ENGINE_PIDS_LIMIT=128
+# A2 (project §3, proposta A2 §4.3, review point 6): the engine's image only from our repository, by commit or digest;
+# from the agent only by digest (a tag can be moved by whoever writes to the registry)
+REGISTRY_HOST=europe-west8-docker.pkg.dev
+IMAGE_RE='^europe-west8-docker\.pkg\.dev/domotica-poc-511707/domotica/engine(:[0-9a-f]{7,40}|@sha256:[0-9a-f]{64})$'
+DIGEST_RE='^europe-west8-docker\.pkg\.dev/domotica-poc-511707/domotica/engine@sha256:[0-9a-f]{64}$'
 
 die() { echo "errore: $*" >&2; exit 1; }
+die_with() { local code="$1"; shift; echo "errore: $*" >&2; exit "${code}"; }
 step() { printf '\n== %s\n' "$*"; }
 
 [ "$(id -u)" -eq 0 ] || die "lancialo con sudo"
 for tool in curl python3 docker; do command -v "$tool" > /dev/null || die "manca $tool sulla VM"; done
 docker compose version > /dev/null 2>&1 || die "manca docker compose sulla VM"
 
-valid_id() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]] || die "apartment_id non valido: $1"; }
-valid_port() { [[ "$1" =~ ^[0-9]+$ ]] && [ "$1" -ge 1 ] && [ "$1" -le 65535 ] || die "porta non valida: $1"; }
+# project §2.1: lower case, digits and dashes only (no «_», no «.»: the dot separates apartment and device on the broker)
+valid_id() { [[ "$1" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || die "apartment_id non valido: $1"; }
+# A2: a normalised port (no leading zero, no sign), so that two spellings of one port can never pass as two
+valid_port() { [[ "$1" =~ ^[1-9][0-9]{3,4}$ ]] && [ "$1" -le 65535 ] || die "porta non valida: $1"; }
+valid_image() {
+  # valid_image <image> [digest]: the anchored rule; with «digest» only @sha256:
+  if [ "${2:-}" = "digest" ]; then
+    [[ "$1" =~ ${DIGEST_RE} ]] || die "immagine non ammessa (solo per digest, dal nostro repository): $1"
+  else
+    [[ "$1" =~ ${IMAGE_RE} ]] || die "immagine non ammessa (solo dal nostro repository, per commit o digest): $1"
+  fi
+}
+port_taken_by() {
+  # port_taken_by <port> <apartment_id>: the other apartment whose settings already have that port, if any
+  local settings
+  shopt -s nullglob
+  for settings in "${OPT}"/*.settings; do
+    [ "$(basename "${settings}" .settings)" = "$2" ] && continue
+    if [ "$(sed -n 's/^PORT=//p' "${settings}")" = "$1" ]; then basename "${settings}" .settings; shopt -u nullglob; return 0; fi
+  done
+  shopt -u nullglob
+  return 1
+}
 
 token() {
   # an access token of the VM's service account (langbrain-vm@), from the metadata server
@@ -127,13 +158,14 @@ write_key() {
   # (engine/broker/mosquitto.conf, compose.broker.yaml), the user is <apartment_id>.connector (broker_accounts.py)
   local apt="$1" secret="${SECRET_PREFIX}$1" key connector mqtt=""
   step "Chiave dal segreto ${secret} -> ${ETC}/${apt}.env (permessi 600)"
+  # exit 3: the agent's «segreto_illeggibile» (A2 §4.2 step 3)
   key="$(read_secret "${secret}")" ||
-    die "segreto ${secret} non leggibile dalla VM (esiste? langbrain-vm@ ha Secret Accessor su di lui?)"
+    die_with 3 "segreto ${secret} non leggibile dalla VM (esiste? langbrain-vm@ ha Secret Accessor su di lui?)"
   connector="$(sed -n 's/^CONNECTOR=//p' "$(settings_file "${apt}")" 2>/dev/null || true)"
   if [ "${connector}" = "shelly" ]; then
     step "Conto del connector sul broker dal segreto ${MQTT_SECRET_PREFIX}${apt}"
     mqtt="$(read_secret "${MQTT_SECRET_PREFIX}${apt}")" ||
-      die "segreto ${MQTT_SECRET_PREFIX}${apt} non leggibile dalla VM (broker-secrets.sh add-apartment ${apt} fatto?)"
+      die_with 3 "segreto ${MQTT_SECRET_PREFIX}${apt} non leggibile dalla VM (broker-secrets.sh add-apartment ${apt} fatto?)"
     # what compose reads from an env file must be one plain word: the passwords of broker-secrets.sh are token_urlsafe
     [[ "${mqtt}" =~ ^[A-Za-z0-9_-]{24,}$ ]] || die "la password del connector in ${MQTT_SECRET_PREFIX}${apt} non ha la forma prevista"
   fi
@@ -157,6 +189,8 @@ write_key() {
 registry_login() {
   local image="$1" host
   host="${image%%/*}"
+  # project §3: the VM's token goes to our registry only
+  [ "${host}" = "${REGISTRY_HOST}" ] || die "registro non ammesso: ${host} (solo ${REGISTRY_HOST})"
   step "Accesso ad Artifact Registry (${host}) con l'identità della VM"
   token | docker login -u oauth2accesstoken --password-stdin "https://${host}" > /dev/null ||
     die "login rifiutato: langbrain-vm@ ha Artifact Registry Reader sul repository?"
@@ -166,6 +200,9 @@ registry_login() {
 lock_engines() {
   # one change to the engines at a time: install, update, key, restore, set, unset and start-all wait here; the
   # 5-minute watch never waits, it skips its restart while someone holds the lock (a restore stops an engine on purpose)
+  # A2 (project §6.1): the agent's executor takes this same lock for the whole order and runs the script with
+  # DOMHOUSE_LOCK_HELD=1; taking it again here would wait for itself
+  if [ "${DOMHOUSE_LOCK_HELD:-}" = "1" ]; then return 0; fi
   install -d -m 755 "${OPT}"
   exec 9> "${OPT}/.engines.lock"
   # D51 (P-83): never waits for ever behind a command that hangs
@@ -244,6 +281,11 @@ compose() {
   if [ "$(sed -n 's/^CONNECTOR=//p' "$(settings_file "${apt}")")" != "simulated" ] && [ -f "${OPT}/compose.broker.yaml" ]; then
     files+=(-f "${OPT}/compose.broker.yaml")
   fi
+  # A2 (project §3.1): the catalog lives in /etc/domhouse, root's, mounted read only; only when it exists (a missing
+  # file would become a folder at «compose up»)
+  if [ -f "${ETC}/${apt}.catalog.yaml" ] && [ ! -L "${ETC}/${apt}.catalog.yaml" ]; then
+    files+=(-f "${OPT}/compose.catalog.yaml")
+  fi
   ENGINE_BIND_IP="${BIND_IP:?}" ENGINE_MEM_LIMIT="$(mem_limit_of "${apt}")" ENGINE_CPUS="${ENGINE_CPUS}" \
     ENGINE_PIDS_LIMIT="${ENGINE_PIDS_LIMIT}" docker compose --env-file "$(settings_file "${apt}")" "${files[@]}" "$@"
 }
@@ -263,7 +305,7 @@ wait_healthy() {
   done
   echo "health non risponde 200 (ultimo codice: ${code:-nessuno}); ultime righe del log:" >&2
   docker logs --tail 20 "engine-${apt}" >&2 || true
-  exit 1
+  exit 4                                 # A2: the agent's «motore_non_sano»
 }
 
 db_of() { echo "${DATA}/$1/engine.db"; }
@@ -677,18 +719,48 @@ cmd="${1:-}"; shift || true
 case "${cmd}" in backup|backup-all|timers|logs-agent|metadata-block|limits|prune-images|"") ;; *) resolve_bind_ip ;; esac
 case "${cmd}" in
   install)
+    if [ "${1:-}" = "--da-agente" ]; then
+      # A2 §4.2 step 3: the agent's crea_motore. ENV and the catalog as arguments (the executor's environment has only
+      # PATH); the image only by digest; no timers and no Ops Agent (they stay with the installation by hand); the
+      # script runs from /opt/domhouse, next to compose.yaml and compose.catalog.yaml. Exit 3: a secret not readable;
+      # exit 4: the engine not healthy; 1: anything else
+      shift
+      [ $# -eq 6 ] || die "uso: install --da-agente <apartment_id> <port> <image@sha256> <connector> <ENV> <catalogo>"
+      apt="$1"; port="$2"; image="$3"; connector="$4"; env_name="$5"; catalog="$6"
+      valid_id "${apt}"; valid_port "${port}"; valid_image "${image}" digest
+      [[ "${connector}" =~ ^[a-z][a-z0-9_]*$ ]] || die "connector non valido: ${connector}"
+      [ "${env_name}" = "staging" ] || [ "${env_name}" = "prod" ] || die "ENV non valido: ${env_name}"
+      [ "${catalog}" = "${ETC}/${apt}.catalog.yaml" ] || die "catalogo non valido: ${catalog} (deve essere ${ETC}/${apt}.catalog.yaml)"
+      [ -f "${catalog}" ] && [ ! -L "${catalog}" ] || die "catalogo assente: ${catalog}"
+      lock_engines
+      [ -f "${OPT}/compose.yaml" ] && [ -f "${OPT}/compose.catalog.yaml" ] || die "compose.yaml e compose.catalog.yaml devono stare in ${OPT}"
+      if other="$(port_taken_by "${port}" "${apt}")"; then die "porta ${port} già di ${other}"; fi
+      printf 'APARTMENT_ID=%s\nPORT=%s\nCONNECTOR=%s\nENGINE_IMAGE=%s\nENV=%s\nINSTALLED_AT=%s\n' "${apt}" "${port}" \
+        "${connector}" "${image}" "${env_name}" "$(date +%s)" > "$(settings_file "${apt}").new"
+      chmod 644 "$(settings_file "${apt}").new"
+      mv -f "$(settings_file "${apt}").new" "$(settings_file "${apt}")"
+      step "Dati in ${DATA}/${apt} (proprietario ${ENGINE_UID})"
+      install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${DATA}/${apt}" "${DATA}/${apt}/backup"
+      write_key "${apt}"
+      start "${apt}" "${image}"
+      exit 0
+    fi
     # D62 (P-83): the connector is always said (simulated or shelly): it was simulated when forgotten
     [ $# -eq 4 ] || die "uso: install <apartment_id> <port> <image> <connector> (simulated per le prove, shelly per un appartamento vero)"
     apt="$1"; port="$2"; image="$3"; connector="$4"
-    valid_id "${apt}"; valid_port "${port}"
+    valid_id "${apt}"; valid_port "${port}"; valid_image "${image}"
     [[ "${connector}" =~ ^[a-z][a-z0-9_]*$ ]] || die "connector non valido: ${connector}"
     lock_engines
+    if other="$(port_taken_by "${port}" "${apt}")"; then die "porta ${port} già di ${other}"; fi
     here="$(cd "$(dirname "$0")" && pwd)"
     [ -f "${here}/compose.yaml" ] || die "compose.yaml deve stare accanto a questo script"
     step "File del motore in ${OPT}"
     install -d -m 755 "${OPT}"
     [ "${here}" = "${OPT}" ] || install -m 755 "$0" "${OPT}/engine-vm.sh"
     [ "${here}" = "${OPT}" ] || install -m 644 "${here}/compose.yaml" "${OPT}/compose.yaml"
+    if [ "${here}" != "${OPT}" ] && [ -f "${here}/compose.catalog.yaml" ]; then
+      install -m 644 "${here}/compose.catalog.yaml" "${OPT}/compose.catalog.yaml"
+    fi
     # D52 (P-83): INSTALLED_AT, the time the watch counts from while the engine has no backup yet
     printf 'APARTMENT_ID=%s\nPORT=%s\nCONNECTOR=%s\nENGINE_IMAGE=%s\nINSTALLED_AT=%s\n' "${apt}" "${port}" "${connector}" \
       "${image}" "$(date +%s)" > "$(settings_file "${apt}")"
@@ -702,11 +774,11 @@ case "${cmd}" in
     ;;
   update)
     [ $# -eq 2 ] || die "uso: update <apartment_id> <image>"
-    apt="$1"; image="$2"; valid_id "${apt}"
+    apt="$1"; image="$2"; valid_id "${apt}"; valid_image "${image}"
     lock_engines
     [ -f "$(settings_file "${apt}")" ] || die "${apt} non è installato (manca $(settings_file "${apt}"))"
     previous="$(sed -n 's/^ENGINE_IMAGE=//p' "$(settings_file "${apt}")")"
-    sed -i "s#^ENGINE_IMAGE=.*#ENGINE_IMAGE=${image}#" "$(settings_file "${apt}")"
+    put_setting "$(settings_file "${apt}")" ENGINE_IMAGE "${image}"   # project §3: never the image inside a sed
     echo "immagine: ${previous} -> ${image} (per tornare indietro: update ${apt} ${previous})"
     start "${apt}" "${image}"
     ;;
@@ -801,6 +873,37 @@ case "${cmd}" in
     docker ps --filter "name=engine-${apt}" --format '{{.Names}}  {{.Image}}  {{.Status}}'
     wait_healthy "${apt}"
     ;;
+  remove)
+    # A2/A6 (project §8.2 point 5): every step skipped when already done; «dev» never (D-118). The checks of who may
+    # remove what (the agent's mark of creation) are the caller's
+    [ $# -eq 1 ] || die "uso: remove <apartment_id>"
+    apt="$1"; valid_id "${apt}"
+    [ "${apt}" != "dev" ] || die "dev non si toglie (D-118)"
+    lock_engines
+    if [ -f "$(settings_file "${apt}")" ]; then
+      step "Fermo engine-${apt}"
+      compose "${apt}" down --remove-orphans || die "compose down di ${apt} fallito"
+    elif [ -n "$(container_state "${apt}")" ]; then
+      docker rm -f "engine-${apt}" > /dev/null || die "engine-${apt} non tolto"
+    fi
+    rm -f "$(settings_file "${apt}")" "${ETC}/${apt}.env" "${ETC}/${apt}.settings.env" "${ETC}/${apt}.catalog.yaml"
+    if [ -L "${DATA}/${apt}" ]; then
+      rm -f "${DATA}/${apt}"             # a link is removed as a link: what it points to is never touched
+    elif [ -e "${DATA}/${apt}" ]; then
+      rm -rf --one-file-system -- "${DATA:?}/${apt}"
+    fi
+    echo "tolto ${apt}"
+    ;;
+  env)
+    # A2 (project §3 point 3): the environment in the settings of an engine installed by hand (dev, lab-01), once
+    [ $# -eq 2 ] || die "uso: env <apartment_id> staging|prod"
+    apt="$1"; valid_id "${apt}"
+    [ "$2" = "staging" ] || [ "$2" = "prod" ] || die "ENV non valido: $2"
+    lock_engines
+    [ -f "$(settings_file "${apt}")" ] || die "${apt} non è installato (manca $(settings_file "${apt}"))"
+    put_setting "$(settings_file "${apt}")" ENV "$2"
+    cat "$(settings_file "${apt}")"
+    ;;
   metadata-block)
     [ $# -eq 0 ] || die "uso: metadata-block"
     apply_metadata_block
@@ -846,6 +949,6 @@ case "${cmd}" in
     [ "${1:-}" = "apply" ] || echo "prova a secco: niente tolto (per togliere: prune-images apply)"
     ;;
   *)
-    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | start-all | timers | logs-agent | metadata-block | limits | prune-images (vedi l'intestazione)"
+    die "uso: install | update | key | set | unset | status | backup | backup-all | restore | api | check-all | start-all | timers | logs-agent | metadata-block | limits | prune-images | remove | env (vedi l'intestazione)"
     ;;
 esac

@@ -1,0 +1,11 @@
+# A2 (docs/progetto-strumento-a-base.md §3.1): the devices' catalog of an apartment lives OUTSIDE the engine's folder,
+# in /etc/domhouse/<apartment_id>.catalog.yaml (root's, 644), mounted read only: a compromised engine cannot change it
+# nor put links where the agent writes. scripts/engine-vm.sh adds this file to compose.yaml only when the catalog
+# exists (a missing file would become a folder at «compose up»). The agent writes it with crea_motore and
+# applica_catalogo; the engine reads it at CATALOG_PATH.
+services:
+  engine:
+    environment:
+      CATALOG_PATH: /etc/domhouse/catalog.yaml
+    volumes:
+      - /etc/domhouse/${APARTMENT_ID}.catalog.yaml:/etc/domhouse/catalog.yaml:ro

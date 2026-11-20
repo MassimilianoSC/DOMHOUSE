@@ -88,6 +88,11 @@ STUBS = {
 
 @pytest.fixture
 def vm(tmp_path):
+    return make_vm(tmp_path)
+
+
+def make_vm(tmp_path):
+    """The harness, also for tests/engine_vm_a2_test.py."""
     bash = _bash()
     if not bash:
         pytest.skip("bash non disponibile")

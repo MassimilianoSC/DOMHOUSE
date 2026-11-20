@@ -112,7 +112,16 @@ step() { printf '\n== %s\n' "$*"; }
 for tool in python3 openssl docker; do command -v "$tool" > /dev/null || die "manca $tool sulla VM"; done
 docker compose version > /dev/null 2>&1 || die "manca docker compose sulla VM"
 
-valid_id() { [[ "$1" =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$ ]] || die "apartment_id non valido: $1"; }
+# project §2.1: lower case, digits and dashes only (the dot separates apartment and device in the broker's users)
+valid_id() { [[ "$1" =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || die "apartment_id non valido: $1"; }
+lock_vm() {
+  # A2 (project §6.1): one change at a time on the VM, the same lock as engine-vm.sh; the agent's executor holds it
+  # for the whole order and says so with DOMHOUSE_LOCK_HELD=1 (taking it again here would wait for itself)
+  if [ "${DOMHOUSE_LOCK_HELD:-}" = "1" ]; then return 0; fi
+  install -d -m 755 "${OPT}"
+  exec 8> "${OPT}/.engines.lock"
+  flock -w 600 8 || die "un altro comando tiene il blocco della VM da oltre 10 minuti (${OPT}/.engines.lock): riprova più tardi"
+}
 installed() { [ -f "${SETTINGS}" ]; }
 need_installed() { installed || die "il broker non è installato (manca ${SETTINGS})"; }
 setting() { sed -n "s/^$1=//p" "${SETTINGS}"; }
@@ -688,6 +697,7 @@ case "${cmd}" in
     [ $# -eq 1 ] || die "uso: add-apartment <apartment_id>"
     need_installed
     valid_id "$1"
+    lock_vm
     # A3 §6.2: the file of fingerprints (empty) before the sync: an apartment of the app never reads an old secret
     ( umask 077; mkdir -p "${DEVICES}" )                  # 700 from the umask: no separate chmod
     [ -e "${DEVICES}/$1" ] || [ "$1" = "lab-01" ] || ( umask 077; : > "${DEVICES}/$1" )
@@ -701,7 +711,9 @@ case "${cmd}" in
     [ $# -eq 1 ] || die "uso: remove-apartment <apartment_id>"
     need_installed
     valid_id "$1"
-    grep -qx "$1" "${APARTMENTS}" || die "$1 non è nell'elenco"
+    lock_vm
+    # A2 (project §6.9): repeatable, «already removed» is a success; the file of fingerprints goes in any case
+    if ! grep -qx "$1" "${APARTMENTS}"; then rm -f "${DEVICES}/$1"; echo "$1 non è nell'elenco: già tolto"; exit 0; fi
     grep -vx "$1" "${APARTMENTS}" > "${APARTMENTS}.new" || true
     mv -f "${APARTMENTS}.new" "${APARTMENTS}"
     rm -f "${DEVICES}/$1"
@@ -714,6 +726,7 @@ case "${cmd}" in
     [ $# -eq 1 ] || die "uso: devices-from-auth <apartment_id>"
     need_installed
     valid_id "$1"
+    lock_vm
     [ ! -e "${DEVICES}/$1" ] || die "${DEVICES}/$1 c'è già: niente da fare"
     ( umask 077; mkdir -p "${DEVICES}" )
     from_auth="${DEVICES}/.$1.nuovo"
@@ -726,6 +739,7 @@ case "${cmd}" in
     ;;
   sync)
     need_installed
+    lock_vm
     sync_accounts
     ;;
   check)

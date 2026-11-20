@@ -35,6 +35,8 @@ STUBS = {
     # broker_accounts.py sync: prints the file sync-out and exits with sync-code (0 if missing)
     "python3": ('#!/usr/bin/env bash\ncat "$STUB_DIR/sync-out"\n'
                 'exit "$(cat "$STUB_DIR/sync-code" 2>/dev/null || echo 0)"\n'),
+    # A2: the VM's lock (this PC has no flock); refuses when the test put a file "locked"
+    "flock": '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/flock.log"\n[ ! -f "$STUB_DIR/locked" ]\n',
 }
 
 
@@ -54,9 +56,9 @@ def vm(tmp_path):
     (opt / "_broker" / "broker.settings").write_text("BROKER_TLS_PORT=8883\n", encoding="utf-8", newline="\n")
     (etc / "_broker" / "apartments").write_text("apt-a\n", encoding="utf-8", newline="\n")
 
-    def run(*args):
+    def run(*args, env=""):
         env_line = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}" DOMHOUSE_OPT="{posix(opt)}" '
-                    f'DOMHOUSE_ETC="{posix(etc)}" DOMHOUSE_DATA="{posix(data)}"; ')
+                    f'DOMHOUSE_ETC="{posix(etc)}" DOMHOUSE_DATA="{posix(data)}" {env}; ')
         return subprocess.run([bash, "-c", env_line + f'bash "{posix(SCRIPT)}" ' + " ".join(args)],
                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
 
@@ -118,3 +120,35 @@ def test_devices_from_auth_refuses_an_apartment_without_devices(vm):
     r = run("devices-from-auth", "apt-a")
     assert r.returncode != 0 and "nessun dispositivo" in r.stderr
     assert not (etc / "_broker" / "devices" / "apt-a").exists()
+
+
+# ---- A2 (project §2.1, §6.1, §6.9): the lock of the VM, repeatable remove-apartment, the id's rule -----------------
+def test_a2_remove_apartment_of_one_not_in_the_list_is_already_removed(vm):
+    run, stubs, etc = vm
+    devices = etc / "_broker" / "devices"
+    devices.mkdir()
+    (devices / "lab-09").write_text("", encoding="utf-8")
+    r = run("remove-apartment", "lab-09")
+    assert r.returncode == 0 and "già tolto" in r.stdout, r.stderr
+    assert not (devices / "lab-09").exists()
+
+
+def test_a2_changes_take_the_vms_lock_unless_the_executor_holds_it(vm):
+    run, stubs, etc = vm
+    (stubs / "sync-out").write_text("unchanged\n", encoding="utf-8")
+    assert run("sync").returncode == 0
+    assert "-w 600 8" in (stubs / "flock.log").read_text(encoding="utf-8")
+    (stubs / "flock.log").unlink()
+    assert run("sync", env="DOMHOUSE_LOCK_HELD=1").returncode == 0
+    assert not (stubs / "flock.log").exists()
+    (stubs / "locked").write_text("", encoding="utf-8")
+    r = run("remove-apartment", "apt-a")
+    assert r.returncode == 1 and "blocco della VM" in r.stderr
+    assert (etc / "_broker" / "apartments").read_text(encoding="utf-8") == "apt-a\n"
+
+
+@pytest.mark.parametrize("bad", ["Apt-A", "apt_a", "apt.a"])
+def test_a2_an_id_out_of_the_rule_is_refused(vm, bad):
+    run, _, _ = vm
+    r = run("add-apartment", bad)
+    assert r.returncode == 1 and "apartment_id non valido" in r.stderr
