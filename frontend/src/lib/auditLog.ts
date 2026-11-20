@@ -16,6 +16,8 @@ export const AUDIT_ACTIONS = [
   "energy_price_changed", "apartment_simulated_changed", "simulator_reset", "rules_changed", "timezone_changed",
   // A3 (o1 25c97cf): target the apartment, the device in details.device_id; the last one is written by the system
   "device_credential_registered", "device_credential_regenerated", "device_credential_revoked", "device_credential_retried", "device_credential_revoke_not_applied",
+  // A2 (o1 cb3ee25): target the apartment; apartment_created is written when the creation reaches «pronto»
+  "apartment_creation_retried", "apartment_creation_cancelled",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 

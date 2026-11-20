@@ -80,16 +80,23 @@ const WHAT: Record<string, string> = {
   motore_non_sano: "motore_non_sano",
   broker_fallito: "broker_fallito",
   tempo_scaduto: "tempo_scaduto",
+  // the server's own (o1 cb3ee25), some with no order to the agent behind them
+  segreti_non_creati: "segreti_non_creati",
+  secret_conflict: "secret_conflict",
+  collegamento_fallito: "collegamento_fallito",
+  chiavi_non_distrutte: "chiavi_non_distrutte",
+  non_inviato: "non_inviato",
 };
 
 /** Every text of WHAT, for the check of it.json. */
 export const WHAT_TEXTS = [...new Set(Object.values(WHAT))];
 
-/** «Cosa è successo»: the site's text for a known code, else the server's sentence, else a plain one. */
+/** «Cosa è successo»: the site's text for the creation's code (or, from an older answer, the last order's), else the
+ *  server's sentence, else a plain one. */
 export function whatHappened(c: Creazione): string {
-  const code = c.op?.codice;
+  const code = c.codice ?? c.op?.codice;
   if (code && WHAT[code]) return t(`platform.creation.what.${WHAT[code]}`);
-  return c.op?.messaggio?.trim() || t("platform.creation.what.generic");
+  return c.messaggio?.trim() || c.op?.messaggio?.trim() || t("platform.creation.what.generic");
 }
 
 const romeDay = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: DEFAULT_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);

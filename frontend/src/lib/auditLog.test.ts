@@ -205,6 +205,17 @@ describe("fuso orario cambiato sul motore (D-183)", () => {
   });
 });
 
+describe("registro attività: creazione dall'app (A2, o1 cb3ee25)", () => {
+  const apt = { type: "apartment" as const, id: "lab-ponte", label: "Bilocale Ponte" };
+  it.each([
+    ["apartment_creation_retried", "Anna Rossi ha fatto ripartire la creazione dell'appartamento «Bilocale Ponte»"],
+    ["apartment_creation_cancelled", "Anna Rossi ha annullato la creazione dell'appartamento «Bilocale Ponte»"],
+  ])("%s", (action, text) => {
+    expect(AUDIT_ACTIONS).toContain(action);
+    expect(sentence({ action, target: apt, details: { passo: "motore", codice: "motore_non_sano" } })).toBe(text);
+  });
+});
+
 describe("registro attività: credenziali dei dispositivi (A3)", () => {
   // o1, 25c97cf: target the apartment, the device in details.device_id; never a password nor its hash
   const apt = { type: "apartment" as const, id: "lab-prova", label: "Laboratorio" };

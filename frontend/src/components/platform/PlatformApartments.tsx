@@ -188,7 +188,11 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
     setBusyId(a.apartment_id);
     try {
       if (kind === "riprova") await platformApi.retryCreation(tenantId, a.apartment_id, c.version, correlationId);
-      else await platformApi.cancelCreation(tenantId, a.apartment_id, c.version, correlationId);
+      else {
+        const res = await platformApi.cancelCreation(tenantId, a.apartment_id, c.version, correlationId);
+        // nothing had reached the VM: closed at once, without «Annullamento in corso» (o1 cb3ee25)
+        if (res?.creazione?.stato === "annullato") toast.success(t("platform.creation.cancelled", { name: a.name }));
+      }
     } catch (err) {
       showCreationError(err, correlationId);
     } finally {

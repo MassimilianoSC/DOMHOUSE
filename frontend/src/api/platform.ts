@@ -71,8 +71,13 @@ export interface Creazione {
   passo: CreazionePasso;
   version: number;
   porta: number | null;
-  /** The last order to the agent; op_id is the «ID richiesta», codice the one of §6.3, messaggio the server's fallback. */
-  op: { op_id: string; stato: string; codice: string | null; messaggio: string } | null;
+  /** The last order to the agent; op_id is the «ID richiesta». */
+  op: { op_id: string; operazione?: string; stato: string; codice: string | null; messaggio: string } | null;
+  /** Why it stopped, only with non_creato (o1 cb3ee25): the codes of §6.3 and the server's own, which may have no order
+   *  behind them (segreti_non_creati, secret_conflict, collegamento_fallito, chiavi_non_distrutte, non_inviato,
+   *  tempo_scaduto). messaggio is the server's sentence, the fallback for a code the site does not know. */
+  codice?: string | null;
+  messaggio?: string | null;
   /** What exists already (id, porta, segreti, motore, broker). */
   fatti: string[];
   updated_at: string;
@@ -153,9 +158,10 @@ export const platformApi = {
   /** Only from non_creato; 409 version_changed or invalid_state otherwise. Not counted in the hourly limit. */
   retryCreation: (tenantId: string, aptId: string, version: number, correlationId: string) =>
     bffFetch<{ creazione: Creazione }>(`${apts(tenantId)}/${enc(aptId)}/creazione/riprova`, { method: "POST", body: { version }, correlationId }),
-  /** Removes what was prepared; the apartment stays as annullamento_in_corso until the agent's outcome, then disappears. */
+  /** Removes what was prepared; the apartment stays as annullamento_in_corso until the agent's outcome, then disappears.
+   *  {creazione: {stato: "annullato"}} at once when nothing had been sent to the VM. */
   cancelCreation: (tenantId: string, aptId: string, version: number, correlationId: string) =>
-    bffFetch<{ creazione: Creazione }>(`${apts(tenantId)}/${enc(aptId)}/creazione/annulla`, { method: "POST", body: { version }, correlationId }),
+    bffFetch<{ creazione: Pick<Creazione, "stato"> & Partial<Creazione> }>(`${apts(tenantId)}/${enc(aptId)}/creazione/annulla`, { method: "POST", body: { version }, correlationId }),
   /** Connection and Italianway code (D-66, D-72); name and enabled stay with the organization admin. Absent = no
    *  change; italianway_id null (or "") = remove the code. */
   patchConnection: (tenantId: string, aptId: string, body: { instance_url?: string; port?: number | null; italianway_id?: string | null; simulated?: boolean }, correlationId: string) =>

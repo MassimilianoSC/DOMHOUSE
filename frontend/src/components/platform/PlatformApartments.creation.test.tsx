@@ -106,10 +106,10 @@ describe("dove si crea (§1)", () => {
 });
 
 const creazione = (over: Partial<Creazione> = {}): Creazione => ({
-  stato: "in_preparazione", passo: "motore", version: 3, porta: 8153, op: null, fatti: ["id", "porta", "segreti"], updated_at: "2026-11-19T16:21:00Z", updated_by: "Giulia Rossi", ...over,
+  stato: "in_preparazione", passo: "motore", version: 3, porta: 8153, op: null, codice: null, messaggio: null, fatti: ["id", "porta", "segreti"], updated_at: "2026-11-19T16:21:00Z", updated_by: "Giulia Rossi", ...over,
 });
 const apt = (apartment_id: string, name: string, c: Creazione | null): PlatformApartment => ({ ...READY, apartment_id, name, instance_url: c ? "" : READY.instance_url, creazione: c });
-const STOPPED = apt("lab-ponte", "Bilocale Ponte", creazione({ stato: "non_creato", passo: "motore", porta: 8152, version: 7, updated_at: "2026-11-19T16:05:00Z", op: { op_id: "3f9c2a71-0000-4000-8000-000000000001", stato: "fallito", codice: "motore_non_sano", messaggio: "Motore non sano" } }));
+const STOPPED = apt("lab-ponte", "Bilocale Ponte", creazione({ stato: "non_creato", passo: "motore", porta: 8152, version: 7, updated_at: "2026-11-19T16:05:00Z", codice: "motore_non_sano", messaggio: "Motore non sano", op: { op_id: "3f9c2a71-0000-4000-8000-000000000001", operazione: "crea_motore", stato: "fallito", codice: "motore_non_sano", messaggio: "Motore non sano" } }));
 const PREPARING = apt("lab-giardino", "Trilocale Giardino", creazione());
 const CANCELLING = apt("lab-via", "Bilocale Via", creazione({ stato: "annullamento_in_corso" }));
 const CREATED = apt("lab-corte", "Monolocale Corte", creazione({ stato: "pronto", passo: "collegamento" }));
@@ -155,7 +155,7 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
   });
 
   it("non creato con un codice che il sito non conosce: la frase del server", async () => {
-    await open([apt("lab-x", "X", creazione({ stato: "non_creato", op: { op_id: "op-1", stato: "rifiutato", codice: "nuovo", messaggio: "Frase del server" } }))]);
+    await open([apt("lab-x", "X", creazione({ stato: "non_creato", codice: "nuovo", messaggio: "Frase del server", op: { op_id: "op-1", operazione: "crea_motore", stato: "rifiutato", codice: "nuovo", messaggio: "Frase del server" } }))]);
     expect(screen.getByTestId("creation-what-lab-x")).toHaveTextContent("Frase del server");
   });
 
@@ -190,6 +190,24 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
     expect(s.cancelCreation).toHaveBeenCalledWith("t-1", "lab-ponte", 7, expect.any(String));
     expect(screen.queryByTestId("creation-cancel-dialog")).toBeNull();
     await waitFor(() => expect(s.apartments).toHaveBeenCalledTimes(2));
+  });
+
+  it("Annulla quando sulla macchina virtuale non c'era niente: chiuso subito, l'avviso «annullata» una volta sola", async () => {
+    s.cancelCreation.mockResolvedValue({ creazione: { stato: "annullato" } });
+    await open([READY, STOPPED]);
+    s.apartments.mockResolvedValue([READY]);
+    await click(screen.getByTestId("creation-cancel-lab-ponte"));
+    await click(screen.getByTestId("creation-cancel-confirm"));
+    await waitFor(() => expect(screen.queryByTestId("platform-apt-lab-ponte")).toBeNull());
+    expect(vi.mocked(toast.success).mock.calls.filter(([m]) => m === "Creazione di Bilocale Ponte annullata.")).toHaveLength(1);
+  });
+
+  it("Annulla che passa per «Annullamento in corso»: nessun avviso finché non sparisce", async () => {
+    s.cancelCreation.mockResolvedValue({ creazione: creazione({ stato: "annullamento_in_corso", version: 8 }) });
+    await open([STOPPED]);
+    await click(screen.getByTestId("creation-cancel-lab-ponte"));
+    await click(screen.getByTestId("creation-cancel-confirm"));
+    expect(toast.success).not.toHaveBeenCalled();
   });
 
   it.each(["version_changed", "invalid_state"])("%s: «qualcuno ha appena cambiato» e l'elenco si rilegge da solo", async (code) => {

@@ -20,7 +20,7 @@ import {
 // §4; server shapes in docs/proposta-a2.md §2.1, §2.2, §6).
 
 const creazione = (over: Partial<Creazione> = {}): Creazione => ({
-  stato: "in_preparazione", passo: "segreti", version: 3, porta: 8153, op: null, fatti: ["id", "porta"], updated_at: "2026-11-20T10:00:00Z", updated_by: "Giulia Rossi", ...over,
+  stato: "in_preparazione", passo: "segreti", version: 3, porta: 8153, op: null, codice: null, messaggio: null, fatti: ["id", "porta"], updated_at: "2026-11-20T10:00:00Z", updated_by: "Giulia Rossi", ...over,
 });
 const apt = (apartment_id: string, c: Creazione | null): PlatformApartment => ({
   apartment_id, name: apartment_id, instance_url: "", port: null, enabled: true, timezone: "Europe/Rome", italianway_id: null, last_check: null, creazione: c,
@@ -113,8 +113,8 @@ describe("rilettura ogni 4 secondi, al massimo 20 minuti (§3.3)", () => {
   });
 });
 
-describe("«Cosa è successo» (§6.2)", () => {
-  const op = (codice: string | null, messaggio = "Frase del server") => ({ op_id: "op-1", stato: "fallito", codice, messaggio });
+describe("«Cosa è successo» (§6.2; o1 cb3ee25: il perché sta in creazione.codice, anche senza un ordine dietro)", () => {
+  const op = (codice: string | null, messaggio = "Frase del server") => ({ op_id: "op-1", operazione: "crea_motore", stato: "fallito", codice, messaggio });
   it.each([
     ["capienza_insufficiente", "La macchina virtuale non ha memoria per un sistema domotico in più."],
     ["staging_pieno", "Lo staging ha già il numero massimo di sistemi domotici."],
@@ -129,15 +129,27 @@ describe("«Cosa è successo» (§6.2)", () => {
     ["motore_non_sano", "Il sistema domotico non è partito: «Riprova», e se succede ancora serve un controllo."],
     ["broker_fallito", "L'accesso dei dispositivi non è stato preparato: «Riprova»."],
     ["tempo_scaduto", "Nessuna risposta dalla macchina virtuale in 20 minuti: «Riprova»."],
+    ["segreti_non_creati", "Le chiavi non sono state create: «Riprova»."],
+    ["secret_conflict", "C'è già una chiave con questo nome: serve un controllo."],
+    ["collegamento_fallito", "Il sistema domotico è installato ma l'app non lo raggiunge: «Riprova»."],
+    ["chiavi_non_distrutte", "Il sistema domotico è stato tolto, ma le chiavi no: «Annulla» di nuovo."],
+    ["non_inviato", "L'ordine non è partito verso la macchina virtuale: «Riprova»."],
   ])("%s", (codice, text) => {
-    expect(whatHappened(creazione({ stato: "non_creato", op: op(codice) }))).toBe(text);
+    expect(whatHappened(creazione({ stato: "non_creato", codice, messaggio: "Frase del server" }))).toBe(text);
   });
-  it("un codice che il sito non conosce: la frase del server", () => {
+  it("il codice della creazione conta più di quello dell'ultimo ordine", () => {
+    expect(whatHappened(creazione({ stato: "non_creato", codice: "collegamento_fallito", op: op("motore_non_sano") }))).toBe("Il sistema domotico è installato ma l'app non lo raggiunge: «Riprova».");
+  });
+  it("una risposta senza codice della creazione: quello dell'ordine", () => {
+    expect(whatHappened(creazione({ stato: "non_creato", op: op("staging_pieno") }))).toBe("Lo staging ha già il numero massimo di sistemi domotici.");
+  });
+  it("un codice che il sito non conosce: la frase del server, prima quella della creazione", () => {
+    expect(whatHappened(creazione({ stato: "non_creato", codice: "nuovo_codice", messaggio: "Frase della creazione", op: op("altro", "Frase dell'ordine") }))).toBe("Frase della creazione");
     expect(whatHappened(creazione({ stato: "non_creato", op: op("nuovo_codice", "Frase nuova del server") }))).toBe("Frase nuova del server");
   });
-  it("senza ordine né frase: una frase generica, mai vuota", () => {
+  it("senza codice né frase: una frase generica, mai vuota", () => {
     expect(whatHappened(creazione({ stato: "non_creato", op: null }))).toBe("La creazione si è fermata prima della fine.");
-    expect(whatHappened(creazione({ stato: "non_creato", op: op(null, "") }))).toBe("La creazione si è fermata prima della fine.");
+    expect(whatHappened(creazione({ stato: "non_creato", messaggio: " ", op: op(null, "") }))).toBe("La creazione si è fermata prima della fine.");
   });
 });
 
