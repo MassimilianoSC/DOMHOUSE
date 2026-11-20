@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A5 e l'unione del ramo `o1-a5-rifiuti` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `b10f8bc` (ramo `o1-a5-rifiuti`, con le correzioni della revisione di sicurezza) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | E0–E6 |
+| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A5 e l'unione del ramo `o1-a5-rifiuti` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `99ac0ae` (ramo `o1-a5-rifiuti`, con le correzioni delle due letture della revisione di sicurezza); la procedura stessa si controlla in E0 confrontandola con quella su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | E0–E6 |
 
 **Cosa si installa** (`docs/proposta-a5.md`, risposte 1210, §6 punti 1–6):
 
@@ -28,12 +28,12 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor b10f8bc origin/main && echo "A5 è in main, su GitHub"
+git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor 99ac0ae origin/main && echo "A5 è in main, su GitHub" && git diff --quiet origin/main -- docs/procedura-installazione-a5.md && echo "procedura uguale a quella su GitHub"
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='systemctl is-active domhouse-agent-esecutore; sudo bash /opt/domhouse/broker-vm.sh check | head -2; sudo cat /etc/domhouse/_broker/apartments; readlink -f "$(command -v awk)"; docker logs -t --tail 2 domhouse-broker 2>&1 | cut -c1-40' < /dev/null
 ```
 
 - **Atteso:**
-  1. l'ultimo commit di `main` e «A5 è in main, su GitHub». Se dopo questa procedura arrivano correzioni, la memoria storica mette qui il commit più recente;
+  1. l'ultimo commit di `main`, «A5 è in main, su GitHub» e «procedura uguale a quella su GitHub» (seconda lettura, punto 3: si segue la versione corretta della procedura, non una copia vecchia). Se dopo questa procedura arriva una correzione del codice, la memoria storica mette qui il suo commit;
   2. `active`;
   3. «broker ok cert_days=…» e «broker started_at=…»;
   4. l'elenco degli appartamenti del broker (`dev`, `lab-01` e quelli creati con A2);
