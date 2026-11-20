@@ -170,6 +170,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 | `agent/lettore.py` | `69511594f1e8aa35` |
 
 - Una diversa: fermati.
+- **20 novembre:** C2 e C3 erano già fatti con `engine-vm.sh` di `bd4a8bf` quando C4 ha trovato il difetto di `chown` e `chmod` (`31eec34`): si sono rifatti **solo per `engine-vm.sh`** (copia, impronta `20c57efc4be4d090`, `install -m 755` e `timers`); la copia di prima resta quella di `prima-a2`, `ENV` non si rifà.
 
 ## C3. `engine-vm.sh` e il compose del catalogo; `ENV` su `dev` e `lab-01` (scrive sulla VM; nessun motore si riavvia)
 
