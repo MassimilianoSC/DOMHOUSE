@@ -22,7 +22,9 @@
 #                  engine/compose.catalog.yaml (A2) is copied when it differs, without recreating anything
 #   3b approved    A2 (proposta §4.3, answer 1164): the digest of the image the engine now runs, read from the registry,
 #                  written to /etc/domhouse/agent-immagine-staging on the VM (root's, 644) and read back: the only image
-#                  the agent's crea_motore installs. Harmless where A2 is not installed (nobody reads the file)
+#                  the agent's crea_motore installs. Harmless where A2 is not installed (nobody reads the file).
+#                  After any file replaced on the VM (script, compose, approved image) the agent's executor restarts
+#                  under the VM's lock: its ReadOnlyPaths cover a replaced file only after a restart (code review N1)
 #   4 summary      what was done, how long it took, and the commands to go back (never run by this script)
 # It stops at the first error with FERMO and what to do; production never starts if staging is not healthy. Every line
 # goes also to logs/publish-<date>-<commit>.log (not in Git); the state of a commit is logs/publish-state-<commit>.txt.
@@ -165,7 +167,7 @@ EMPTY_HASH="$(printf '' | sha256sum | cut -d' ' -f1)"
 VM_CATALOG="$(on_vm "sudo tr -d '\\r' < /opt/domhouse/compose.catalog.yaml 2>/dev/null | sha256sum" | cut -d' ' -f1)" \
   || stop "La VM ${VM_NAME} non risponde più (gcloud compute ssh via IAP) mentre leggo compose.catalog.yaml: rilancia lo stesso comando."
 if pending motore; then ENGINE_CHANGES="aggiornamento del motore non concluso al giro precedente: lo rifaccio"; fi
-SCRIPT_NEW=""; COMPOSE_NEW=""; CATALOG_NEW=""
+SCRIPT_NEW=""; COMPOSE_NEW=""; CATALOG_NEW=""; VM_CHANGED=""
 if [ "${WANTED_CATALOG}" != "${EMPTY_HASH}" ] && [ "${WANTED_CATALOG}" != "${VM_CATALOG}" ]; then CATALOG_NEW=1; fi
 [ "${WANTED_SCRIPT}" = "${VM_SCRIPT}" ] || SCRIPT_NEW=1
 [ "${WANTED_COMPOSE}" = "${VM_COMPOSE}" ] || COMPOSE_NEW=1
@@ -283,6 +285,7 @@ if [ -n "${SCRIPT_NEW}${COMPOSE_NEW}${CATALOG_NEW}" ]; then
     gc compute scp "${TO_COPY[@]}" "${VM_NAME}:" --zone "${VM_ZONE}" --tunnel-through-iap \
       || stop "La copia dei file del motore sulla VM non è riuscita: rilancia lo stesso comando."
     rm -rf "${COPIES}"
+    VM_CHANGED=1
     if [ -n "${CATALOG_NEW}" ]; then
       on_vm "sudo install -m 644 ~/compose.catalog.yaml /opt/domhouse/compose.catalog.yaml && echo catalog-ok" \
         | grep -q catalog-ok || stop "L'installazione di compose.catalog.yaml sulla VM non è riuscita: rilancia lo stesso comando."
@@ -368,7 +371,20 @@ else
     [ "${written}" = "${APPROVED}" ] || stop "L'immagine approvata dell'agente non risulta scritta in ${APPROVED_FILE} sulla VM: rilancia lo stesso comando."
     note "immagine approvata dello staging: ${APPROVED}"
     APPROVED_DONE="scritta ($(printf '%s' "${APPROVED##*@sha256:}" | cut -c1-12))"
+    VM_CHANGED=1
   fi
+fi
+# code review N1: the executor's ReadOnlyPaths cover a file replaced on the host only after a restart; under the lock,
+# so no order of the agent is cut in half. Where the agent is not installed there is nothing to restart
+if [ -n "${VM_CHANGED}" ]; then
+  restarted="$(on_vm "if systemctl cat domhouse-agent-esecutore > /dev/null 2>&1; then sudo flock -w 300 /opt/domhouse/.engines.lock systemctl restart domhouse-agent-esecutore && echo esecutore-riavviato; else echo esecutore-assente; fi" | tail -1)" || restarted=""
+  case "${restarted}" in
+    esecutore-riavviato) note "esecutore dell'agente riavviato sotto il blocco (i file nuovi tornano in sola lettura per lui)" ;;
+    esecutore-assente) note "esecutore dell'agente non installato: niente da riavviare" ;;
+    *) stop "Il riavvio dell'esecutore dell'agente non è riuscito: finché non riparte rifiuta gli ordini che cambiano la VM. Rilancia lo stesso comando, o sulla VM: sudo systemctl restart domhouse-agent-esecutore" ;;
+  esac
+elif [ -n "${DRY_RUN}" ] && [ -n "${SCRIPT_NEW}${COMPOSE_NEW}${CATALOG_NEW}" ]; then
+  note "prova a secco: poi riavvierei l'esecutore dell'agente sotto il blocco"
 fi
 
 # ---- 4: the summary -------------------------------------------------------------------------------------------------

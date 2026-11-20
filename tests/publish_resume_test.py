@@ -28,6 +28,10 @@ case "$*" in
   *"compute ssh"*)
     cmd="${*#*--command }"
     case "$cmd" in
+      *"restart domhouse-agent-esecutore"*)
+        echo "riavvio" >> "$STUB_DIR/restarts"
+        [ -f "$STUB_DIR/no-executor" ] && { echo esecutore-assente; exit 0; }
+        echo esecutore-riavviato ;;
       *RepoDigests*)
         [ -f "$STUB_DIR/repodigests-other" ] && { echo "europe-west8-docker.pkg.dev/altro/x/engine@sha256:$(printf '0%.0s' $(seq 1 64))"; exit 0; }
         d="$(cat "$STUB_DIR/digest" 2>/dev/null || echo "sha256:$(printf 'c%.0s' $(seq 1 64))")"

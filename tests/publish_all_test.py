@@ -44,6 +44,10 @@ case "$*" in
     [ -f "$STUB_DIR/ssh-fails" ] && { echo "ssh: connect to host: Connection timed out" >&2; exit 255; }
     cmd="${*#*--command }"
     case "$cmd" in
+      *"restart domhouse-agent-esecutore"*)
+        echo "riavvio" >> "$STUB_DIR/restarts"
+        [ -f "$STUB_DIR/no-executor" ] && { echo esecutore-assente; exit 0; }
+        echo esecutore-riavviato ;;
       *RepoDigests*)
         [ -f "$STUB_DIR/repodigests-other" ] && { echo "europe-west8-docker.pkg.dev/altro/x/engine@sha256:$(printf '0%.0s' $(seq 1 64))"; exit 0; }
         d="$(cat "$STUB_DIR/digest" 2>/dev/null || echo "sha256:$(printf 'c%.0s' $(seq 1 64))")"
@@ -420,3 +424,26 @@ def test_review6_the_approved_image_must_be_the_one_the_engine_runs(pub):
     out = done.stdout + done.stderr
     assert done.returncode == 1 and "non gira sull'immagine" in out, out
     assert "RepoDigests" in calls and not (pub.stubs / "vm-approved").exists()
+
+
+
+def test_review_n1_after_replacing_files_on_the_vm_the_executor_restarts_under_the_lock(pub):
+    """Second reading of the code review, N1: a file replaced on the host is no longer covered by the executor's
+    ReadOnlyPaths until the service restarts: publish-all restarts it, under the VM's lock, after its changes."""
+    done, calls = pub()
+    assert done.returncode == 0, done.stdout + done.stderr
+    restart = next(line for line in calls.splitlines() if "restart domhouse-agent-esecutore" in line)
+    assert "flock -w 300 /opt/domhouse/.engines.lock" in restart
+    assert calls.index("agent-immagine-staging.nuovo") < calls.index("restart domhouse-agent-esecutore")
+    assert "esecutore dell'agente riavviato" in done.stdout
+    (pub.stubs / "restarts").unlink()
+    same_on_vm(pub)                                       # the VM has the commit's files now (the stand-in copies none)
+    done, calls = pub()                                   # nothing replaced this time: no restart
+    assert done.returncode == 0 and "restart domhouse-agent-esecutore" not in calls
+
+
+def test_review_n1_without_the_agent_there_is_nothing_to_restart(pub):
+    (pub.stubs / "no-executor").write_text("", encoding="utf-8")
+    done, calls = pub()
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert "esecutore dell'agente non installato" in done.stdout

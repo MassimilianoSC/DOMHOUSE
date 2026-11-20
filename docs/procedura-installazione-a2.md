@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Corretta dopo la revisione del codice** (20 novembre, «installabile dopo correzioni»: punti 1–9 fatti); da rileggere. Nessun passo provato sul vero | o1, 20 novembre 2026, 13:46; corretta nel pomeriggio | file della VM e server da `3641d19` (impronte in C2) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | C0–C9 |
+| **Corretta dopo la revisione del codice** (20 novembre: punti 1–9 fatti; seconda lettura «installabile», poi N1, N2 e C1.4b corretti); da rileggere. Nessun passo provato sul vero | o1, 20 novembre 2026, 13:46; corretta nel pomeriggio | file della VM e server da `bd4a8bf` (impronte in C2) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | C0–C9 |
 
 **Cosa si installa** (`docs/proposta-a2.md`, §7):
 
@@ -32,14 +32,14 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git merge-base --is-ancestor 3641d19 origin/main && git diff --quiet 3641d19 HEAD -- scripts/agent scripts/agent-vm.sh scripts/engine-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py engine/compose.catalog.yaml bff && echo "file uguali a 3641d19, già su GitHub"
+git fetch -q origin && git merge-base --is-ancestor bd4a8bf origin/main && git diff --quiet bd4a8bf HEAD -- scripts/agent scripts/agent-vm.sh scripts/engine-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py engine/compose.catalog.yaml bff && echo "file uguali a bd4a8bf, già su GitHub"
 gcloud iam roles list --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="value(name)" | grep -E "dhA2" || echo "nessun ruolo dhA2"
 gcloud projects get-iam-policy domotica-poc-511707 --account=m.scardovellicrac@gmail.com --flatten="bindings[].members" --filter="bindings.role~secretmanager OR bindings.role~dhA2" --format="table[no-heading](bindings.role,bindings.members,bindings.condition.title)"
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='systemctl is-active domhouse-agent-esecutore domhouse-agent-lettore; sudo ls /opt/domhouse/*.settings; sudo ss -ltn | grep -E ":81(5[0-9]) " || echo "porte 8150-8159 libere"; sudo ls /etc/domhouse/agent-immagine-staging 2>&1 | tail -1; sudo ls -d /data' < /dev/null
 ```
 
 - **Atteso:**
-  1. «file uguali a 3641d19, già su GitHub»;
+  1. «file uguali a bd4a8bf, già su GitHub»;
   2. «nessun ruolo dhA2»;
   3. nessuna riga di Secret Manager a livello di progetto (il 19 novembre non ce n'erano; i permessi di oggi sono segreto per segreto);
   4. i due servizi `active`; `dev.settings` e `lab-01.settings`; «porte 8150-8159 libere»; «No such file» per `agent-immagine-staging`; `/data`.
@@ -104,19 +104,20 @@ gcloud projects get-iam-policy domotica-poc-511707 --account=m.scardovellicrac@g
 - **Atteso:** esattamente quattro righe, ciascuna con il suo titolo: `dhA2CreaSegreti` e `dhA2VersioniSegreti` a `domotica-bff-staging@` (`a2-creazione-staging`, `a2-versioni-staging`), `secretAccessor` a `domotica-bff-staging@` (`a2-lettura-staging`) e a `langbrain-vm@` (`a2-vm-staging`). Nessuna riga senza titolo: un permesso senza condizione aprirebbe tutti i segreti.
 - I permessi nuovi di IAM possono metterci qualche minuto ad arrivare: C9 lo tiene in conto.
 
-**C1.5a Le esclusioni, provate** (revisione del codice, punto 9; sola lettura: lo strumento di Google che spiega se un permesso è concesso, senza toccare niente).
+**C1.4b Le esclusioni, provate** (revisione del codice, punto 9, e seconda lettura; sola lettura: lo strumento di Google che spiega se un permesso è concesso, senza toccare niente). Le condizioni guardano il nome del segreto: lo strumento lo deve ricevere (`--resource-name`, `--resource-service`, `--resource-type`), altrimenti non le sa valutare.
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-for c in "domotica-bff-staging secretmanager.versions.add langbrain-shelly-lab-01" "domotica-bff-staging secretmanager.versions.add langbrain-shelly-test-x" "langbrain-vm secretmanager.versions.access domhouse-agent-ordini-staging"; do set -- $c; echo "== $1 $2 $3"; gcloud policy-intelligence troubleshoot-policy iam "//secretmanager.googleapis.com/projects/444239063209/secrets/$3" --principal-email="$1@domotica-poc-511707.iam.gserviceaccount.com" --permission="$2" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com 2>&1 | grep -iE "access|state" | head -3; done
+for c in "domotica-bff-staging secretmanager.versions.add langbrain-shelly-lab-01" "domotica-bff-staging secretmanager.versions.add langbrain-shelly-test-x" "langbrain-vm secretmanager.versions.access domhouse-agent-ordini-staging"; do set -- $c; echo "== $1 $2 $3"; gcloud policy-intelligence troubleshoot-policy iam "//secretmanager.googleapis.com/projects/444239063209/secrets/$3" --principal-email="$1@domotica-poc-511707.iam.gserviceaccount.com" --permission="$2" --resource-name="projects/444239063209/secrets/$3" --resource-service=secretmanager.googleapis.com --resource-type=secretmanager.googleapis.com/Secret --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com 2>&1 | grep -iE "access|state|condition|unknown" | head -4; done
 ```
 
 - **Atteso**, nell'ordine:
   1. il server su `langbrain-shelly-lab-01`: **negato** (escluso per nome);
   2. il server su `langbrain-shelly-test-x`: **concesso** (anche se il segreto non esiste: si valuta la condizione sul nome);
   3. la VM su `domhouse-agent-ordini-staging`: **negato** (la chiave delle firme non è nei suoi prefissi).
-- La parola esatta dipende dalla versione di `gcloud` (per esempio `CAN_ACCESS` / `CANNOT_ACCESS`, o `GRANTED` / `NOT_GRANTED`): incolla l'uscita, la legge la memoria storica. Un esito diverso dall'atteso: fermati prima di C2.
+- La parola esatta dipende dalla versione di `gcloud` (per esempio `CAN_ACCESS` / `CANNOT_ACCESS`, o `GRANTED` / `NOT_GRANTED`): incolla l'uscita, la legge la memoria storica.
+- **Fermati** davanti a un esito diverso dall'atteso **o** a un esito condizionale sconosciuto (`UNKNOWN_CONDITIONAL`, «unknown» accanto a una condizione): vuol dire che lo strumento non ha valutato la condizione, quindi la prova non vale. Non si va a C2 finché la memoria storica non lo ha guardato con o1.
 
 **C1.5 Le etichette del repository del motore non si spostano più** (proposta §4.3 punto 4, revisione punto 6).
 
@@ -141,7 +142,7 @@ gcloud compute scp scripts/agent/comune.py scripts/agent/lettore.py scripts/agen
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a2 && sed -i "s/\r*$//" *.sh *.py *.yaml agent/*.py agent/*.service && sha256sum *.sh *.py *.yaml agent/* | cut -c1-16,65-' < /dev/null
 ```
 
-- **Atteso:** dieci file, poi dieci impronte che cominciano così (calcolate da o1 su `3641d19`, senza i ritorni a capo):
+- **Atteso:** dieci file, poi dieci impronte che cominciano così (calcolate da o1 su `bd4a8bf`, senza i ritorni a capo):
 
 | File | Impronta |
 |---|---|
@@ -153,7 +154,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 | `agent/comune.py` | `a576ed9ab186d810` |
 | `agent/domhouse-agent-esecutore.service` | `d17f567cf8cfaca2` |
 | `agent/domhouse-agent-lettore.service` | `9824996a467272be` |
-| `agent/esecutore.py` | `92db39ffba47dba0` |
+| `agent/esecutore.py` | `f7e3f2948d96e401` |
 | `agent/lettore.py` | `69511594f1e8aa35` |
 
 - Una diversa: fermati.
@@ -206,6 +207,7 @@ I="$(gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap
 
 - **Atteso:** l'immagine di `dev` (`…/engine:<commit>`), il suo digest (`sha256:` e 64 cifre), i `RepoDigests` del contenitore (fra loro `…/engine@` e lo stesso digest), poi il file `-rw-r--r-- root root` con una riga `…/engine@sha256:…`.
 - **Ritorno indietro:** `sudo rm -f /etc/domhouse/agent-immagine-staging` (senza il file, `crea_motore` rifiuta «immagine non approvata»).
+- Il file c'è **prima** di C6: l'esecutore nuovo, all'avvio, lo trova e lo tiene in sola lettura (seconda lettura della revisione, N2).
 
 ## C6. L'agente nuovo e `broker-vm.sh` nuovo, insieme (scrive sulla VM; il broker non si riavvia)
 
@@ -297,6 +299,14 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 **C9.3 Dopo:** `test-a2-02` resta un motore dello staging (tre su quattro, con `dev` e `lab-01`). «Annulla» non c'è più dopo «Pronto» (risposta 1165): l'eliminazione vera è di A6. Se il committente lo vuole togliere prima, la memoria storica prepara i comandi a mano (`engine-vm.sh remove`, `broker-vm.sh remove-apartment`, il segno, i segreti, il documento in Firestore).
 
+## Dopo l'installazione: quando si sostituisce un file protetto
+
+L'unità tiene in sola lettura per l'esecutore `agent.conf`, le due chiavi, l'immagine approvata, gli script e i compose. Un file **sostituito** sull'host dopo l'avvio dell'esecutore non è più coperto finché l'esecutore non riparte (seconda lettura della revisione, N1). Per questo:
+
+1. `publish-all.sh` riavvia l'esecutore, sotto il blocco della VM, dopo ogni file che sostituisce sulla VM;
+2. chi sostituisce a mano una chiave o `agent.conf` lancia subito dopo, sulla VM: `sudo flock -w 300 /opt/domhouse/.engines.lock systemctl restart domhouse-agent-esecutore`;
+3. finché non riparte, l'esecutore rifiuta gli ordini che cambiano la VM («fallito», con l'allarme `protezione_persa` nel giornale): nessun danno, solo «Riprova» dopo il riavvio.
+
 ## Da verificare sulla VM (revisione del codice, 20 novembre)
 
 | N. | Che cosa | Dove si vede |
@@ -306,6 +316,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 | 3 | il ritardo di IAM dopo C1 | C9.1 (almeno cinque minuti dopo) |
 | 4 | `add-apartment` di un appartamento nuovo crea il file dei dispositivi vuoto | C9.2 (punto 7) |
 | 5 | i `ReadOnlyPaths` vincono sui `ReadWritePaths` più larghi | C4 (punto 4), C6 (punto 2) |
+| 6 | dopo C6 nessun `protezione_persa` nel giornale dell'esecutore (i file protetti c'erano tutti all'avvio) | C9.2: `sudo journalctl -u domhouse-agent-esecutore --no-pager \| grep -c protezione_persa` deve dire 0 |
 
 ## Decisioni per il committente (non di o1)
 
