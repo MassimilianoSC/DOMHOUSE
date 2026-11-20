@@ -137,7 +137,7 @@ export default function LoginPage() {
       <section className="flex flex-col items-center justify-center gap-6 p-5">
         {/* the mark and the name above the card at every width (design review c.14, lot 2) */}
         <div className="flex items-center gap-3" data-testid="login-brand">
-          <img src="/favicon.svg" alt="" className="h-10 w-10" />
+          <img src="/brand/domhouse-mark.svg" alt="" className="h-10 w-10" />
           <span className="font-heading text-2xl font-extrabold">{env.appName}</span>
         </div>
         <Card className="w-full max-w-md p-5 sm:p-8">

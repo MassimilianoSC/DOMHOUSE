@@ -73,7 +73,7 @@ function MenuContent({ prefix, onNavigate }: { prefix: "sidebar" | "drawer"; onN
   return (
     <>
       <div className="mb-6 flex items-center gap-2 px-2" data-testid={prefix === "drawer" ? "mobile-menu-logo" : undefined}>
-        <img src="/favicon.svg" alt="" className="h-8 w-8" />
+        <img src="/brand/domhouse-mark.svg" alt="" className="h-8 w-8" />
         <span className="font-heading text-base font-bold leading-tight">{env.appName}</span>
       </div>
       <nav className="space-y-1" data-testid={`${prefix}-global`}>
@@ -151,7 +151,7 @@ function MobileMenu() {
               <Menu />
             </Button>
           </DialogPrimitive.Trigger>
-          <img src="/favicon.svg" alt="" className="h-7 w-7" />
+          <img src="/brand/domhouse-mark.svg" alt="" className="h-7 w-7" />
           <span className="font-heading text-base font-bold leading-tight">{env.appName}</span>
         </div>
         {/* P-67: inside the sticky header, so it stays in sight while scrolling, below the notch */}

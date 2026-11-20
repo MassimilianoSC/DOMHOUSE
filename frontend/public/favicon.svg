@@ -1,1 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#c4541f"/><path d="M13 33 32 15l19 18v17H13z" fill="#faf6f0"/><circle cx="32" cy="40" r="5" fill="#1f7d5e"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">DOMHOUSE</title>
+  <desc id="desc">Icona DOMHOUSE: un unico tracciato unisce il profilo di una casa alla lettera D.</desc>
+  <rect width="100" height="100" fill="#0D6B61"/>
+  <defs>
+    <linearGradient id="domhouse-line" gradientUnits="userSpaceOnUse" x1="22" y1="84" x2="78" y2="84">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset=".52" stop-color="#A3F0E3"/>
+      <stop offset="1" stop-color="#54D1BE"/>
+    </linearGradient>
+  </defs>
+  <path d="M22 84V43L50 19 78 43V84H66V66C66 56 59 49 50 49H38V84H22Z" fill="none" stroke="url(#domhouse-line)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

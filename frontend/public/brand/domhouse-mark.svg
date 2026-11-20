@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-labelledby="title desc">
+  <title id="title">Simbolo DOMHOUSE</title>
+  <desc id="desc">Un solo tracciato continuo sale come parete, disegna il tetto e prosegue nella curva della D.</desc>
+  <defs>
+    <linearGradient id="domhouse-line" gradientUnits="userSpaceOnUse" x1="22" y1="84" x2="78" y2="84">
+      <stop offset="0" stop-color="#0D6B61"/>
+      <stop offset=".52" stop-color="#168F88"/>
+      <stop offset="1" stop-color="#31B8C3"/>
+    </linearGradient>
+  </defs>
+  <path d="M22 84V43L50 19 78 43V84H66V66C66 56 59 49 50 49H38V84H22Z" fill="none" stroke="url(#domhouse-line)" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
