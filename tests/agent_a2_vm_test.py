@@ -367,3 +367,23 @@ def test_review2_8_the_unit_keeps_code_keys_and_configuration_read_only_and_has_
                  "-/etc/domhouse/agent-immagine-prod", "-/data/_broker"):
         assert path in line.split("=", 1)[1].split(), path
     assert "\nMemoryMax=512M\n" in unit
+
+
+# ---- second reading of the code review (N1, N2): a protected file replaced after the start --------------------------
+def test_review_n1_a_protected_file_writable_for_the_executor_stops_every_change(vm):
+    vm.ex.config = vm.ex.config._replace(check_protection=True)
+    out = vm.send(order())
+    assert (out["esito"], out["codice"]) == ("riuscito", "ok")               # nothing protected there: fine
+    (vm.opt / "engine-vm.sh").write_text("# sostituito dopo l'avvio\n", encoding="utf-8")   # writable here
+    vm.runs.clear()
+    out = vm.send(order("togli_motore", seq=2))
+    assert (out["esito"], out["codice"]) == ("fallito", "errore_interno") and vm.runs == []
+    assert any("agent alarm codice=protezione_persa" in line and "engine-vm.sh" in line for line in vm.logs)
+
+
+def test_review_n1_the_check_is_off_unless_the_service_turns_it_on(vm):
+    (vm.opt / "engine-vm.sh").write_text("#\n", encoding="utf-8")
+    assert vm.ex.config.check_protection is False
+    assert vm.send(order())["codice"] == "ok"
+    main = (AGENT / "esecutore.py").read_text(encoding="utf-8").split("def main()", 1)[1]
+    assert "check_protection=True" in main

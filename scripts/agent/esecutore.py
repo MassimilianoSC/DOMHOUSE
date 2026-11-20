@@ -90,6 +90,8 @@ class Config(NamedTuple):
     etc: Path = Path("/etc/domhouse")          # A2: the catalogs, the keys' files of the engines, agent-immagine-<env>
     data: Path = Path("/data")                 # A2: the engines' data
     proc_net: Path = Path("/proc/net")         # A2: tcp and tcp6, the ports listening (no AF_NETLINK needed)
+    # second reading of the code review (N1, N2): on the VM the service checks that its ReadOnlyPaths still hold
+    check_protection: bool = False
 
 
 def read_config(path: Path, uid_of: Callable[[str], int], check_owner: bool = True) -> Config:
@@ -345,6 +347,11 @@ class Esecutore:
         if not fresh:
             return comune.result(order, "rifiutato", "seq_vecchia")
         if order.operazione in ("aggiorna_broker", "crea_motore", "togli_motore"):
+            lost = self._protection_lost() if self.config.check_protection else []
+            if lost:
+                self.log(f"agent alarm codice=protezione_persa percorsi={','.join(lost)}")
+                output.append("file protetto scrivibile: riavviare l'esecutore")
+                return comune.result(order, "fallito", "errore_interno")
             try:
                 with self.lock():                                    # one change at a time on the VM (§6.1)
                     if order.operazione == "aggiorna_broker":
@@ -399,6 +406,17 @@ class Esecutore:
         if code != 0 or f"kept {apartment}" in text.split("\n"):
             return comune.result(order, "fallito", "sync_fallito")
         return comune.result(order, "riuscito", "ok", {"dispositivi": len(devices)})
+
+    def _protection_lost(self) -> list[str]:
+        """Second reading of the code review, N1 and N2: a ReadOnlyPaths entry on a single file is a bind mount that
+        no longer covers a file REPLACED on the host after the start (publish-all, a new key), nor one created after
+        it. Such a file is writable again for this service: every order that changes the VM is refused, with an
+        alarm, until the service restarts (publish-all restarts it under the lock after each replacement)."""
+        c = self.config
+        paths = [c.etc / "agent.conf", c.keys_dir / "agent-ordini.key", c.keys_dir / "agent-risultati.key",
+                 c.etc / f"agent-immagine-{c.ambiente}", c.opt / "engine-vm.sh", c.opt / "broker-vm.sh",
+                 c.opt / "broker_accounts.py", c.opt / "compose.yaml", c.opt / "compose.catalog.yaml", c.opt / "agent"]
+        return [str(p) for p in paths if p.exists() and os.access(p, os.W_OK)]
 
     def _script_env(self) -> dict:
         """The scripts' environment: PATH, docker's folder (ProtectHome hides /root/.docker) and the lock held."""
@@ -708,7 +726,7 @@ def make_server(path: Path, executor: Esecutore) -> socketserver.UnixStreamServe
 def main() -> int:
     import pwd
     import syslog
-    config = read_config(CONFIG_PATH, uid_of=lambda name: pwd.getpwnam(name).pw_uid)
+    config = read_config(CONFIG_PATH, uid_of=lambda name: pwd.getpwnam(name).pw_uid)._replace(check_protection=True)
     syslog.openlog("domhouse-agent-esecutore")
     executor = Esecutore(config, log=lambda line: syslog.syslog(syslog.LOG_INFO, line))
     server = make_server(SOCKET_PATH, executor)
