@@ -157,3 +157,21 @@ def test_prune_images_finds_the_repository_also_from_an_engine_by_digest(vm):
     assert r.returncode == 0, r.stderr
     images = [line for line in log(vm, "docker").splitlines() if line.startswith("images")]
     assert images and images[0].split(" [")[0].endswith(f" {REPO}"), images
+
+
+# ---- 20 November, A2 C4 on the VM: the mode first, then the owner -----------------------------------------------------
+def test_c4_the_data_folders_get_their_mode_while_root_s_and_then_the_owner(vm):
+    """Under the executor's unit (CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE, no CAP_FOWNER) a chmod of a folder
+    that is no longer root's is refused: «install -d -m 750 -o 10001» does chown, then chmod, and stopped crea_motore
+    at /data/<apt>. Now install -d -m 750 (root's), then chown -h (never following a link)."""
+    assert agent_install(vm).returncode == 0
+    chown = log(vm, "chown")
+    data = base.posix(vm.data / APT)
+    assert f"-h 10001:10001 {data} {data}/backup" in chown, chown
+
+
+def test_c4_nothing_in_engine_vm_changes_a_mode_after_giving_the_file_away():
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert '-o "${ENGINE_UID}"' not in text                        # install -o: chown, then chmod
+    backup = text[text.index("backup() {"):text.index("install_timer() {")]
+    assert backup.index('chmod 640 "${tmp}"') < backup.index('chown -h "${ENGINE_UID}:${ENGINE_UID}" "${tmp}"')

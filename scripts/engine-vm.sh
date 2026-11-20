@@ -315,6 +315,19 @@ real_dir() {
   [ -d "$1" ] && [ ! -L "$1" ] && [ "$(realpath -e -- "$1" 2>/dev/null)" = "$1" ]
 }
 
+data_dirs() {
+  # data_dirs <apartment_id>: /data/<apt> and its backup folder, 750, the engine's user's. 20 November (A2, C4 on the
+  # VM): the MODE FIRST, while the folder is root's, THEN the owner. «install -d -m 750 -o 10001» does chown and then
+  # chmod, and a chmod of a folder that is no longer root's wants CAP_FOWNER, which the agent's executor does not have:
+  # crea_motore stopped there. A folder already there keeps its mode (750, made so here); chown -h never follows a link
+  local apt="$1" d
+  [ ! -L "${DATA}/${apt}" ] || die "${DATA}/${apt} è un collegamento: niente installato"
+  for d in "${DATA}/${apt}" "${DATA}/${apt}/backup"; do
+    [ -d "${d}" ] || install -d -m 750 "${d}"
+  done
+  chown -h "${ENGINE_UID}:${ENGINE_UID}" "${DATA}/${apt}" "${DATA}/${apt}/backup"
+}
+
 backup_refused() {
   watch_line "backup refused $1 ($2)"
   die "backup di $1 rifiutato: $2"
@@ -334,7 +347,10 @@ backup() {
     [ ! -L "${p}" ] || backup_refused "${apt}" "$(basename "${p}") è un link"
   done
   [ -f "${db}" ] || die "${db} non esiste (motore mai avviato?)"
-  [ -e "${dir}" ] || [ -L "${dir}" ] || install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${dir}"
+  if [ ! -e "${dir}" ] && [ ! -L "${dir}" ]; then           # the mode first, then the owner (data_dirs)
+    install -d -m 750 "${dir}"
+    chown -h "${ENGINE_UID}:${ENGINE_UID}" "${dir}"
+  fi
   real_dir "${dir}" || backup_refused "${apt}" "${dir} non è una cartella vera"
   staging="${DATA}/_backup.tmp"         # an apartment_id cannot start with «_» (valid_id): never an apartment's
   install -d -m 700 -o root -g root "${staging}"
@@ -356,8 +372,8 @@ PY
     rm -f "${tmp}"
     die "backup di ${apt} non riuscito"
   fi
-  chown "${ENGINE_UID}:${ENGINE_UID}" "${tmp}"
-  chmod 640 "${tmp}"
+  chmod 640 "${tmp}"                     # the mode first, while root's; then the owner (data_dirs)
+  chown -h "${ENGINE_UID}:${ENGINE_UID}" "${tmp}"
   mv -f "${tmp}" "${file}"
   # the daily copies and, P-71 (D-142), the databases set aside by restore (before-restore-*.db and their -wal, -shm)
   find "${dir}" -maxdepth 1 \( -name 'engine-*.db' -o -name 'before-restore-*.db*' \) -mtime "+$((BACKUP_DAYS - 1))"     -print -delete | sed 's/^/tolto (oltre 7 giorni): /'
@@ -740,7 +756,7 @@ case "${cmd}" in
       chmod 644 "$(settings_file "${apt}").new"
       mv -f "$(settings_file "${apt}").new" "$(settings_file "${apt}")"
       step "Dati in ${DATA}/${apt} (proprietario ${ENGINE_UID})"
-      install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${DATA}/${apt}" "${DATA}/${apt}/backup"
+      data_dirs "${apt}"
       write_key "${apt}"
       start "${apt}" "${image}"
       exit 0
@@ -766,7 +782,7 @@ case "${cmd}" in
       "${image}" "$(date +%s)" > "$(settings_file "${apt}")"
     cat "$(settings_file "${apt}")"
     step "Dati in ${DATA}/${apt} (proprietario ${ENGINE_UID})"
-    install -d -m 750 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${DATA}/${apt}" "${DATA}/${apt}/backup"
+    data_dirs "${apt}"
     ls -ld "${DATA}/${apt}"
     write_key "${apt}"
     install_timer
@@ -820,7 +836,8 @@ case "${cmd}" in
       [ -f "${db}${ext}" ] && mv -f "${db}${ext}" "${keep}${ext}"
     done
     echo "il database di prima resta in ${keep}"
-    install -m 640 -o "${ENGINE_UID}" -g "${ENGINE_UID}" "${src}" "${db}"
+    install -m 640 "${src}" "${db}"          # the mode first, while root's; then the owner (data_dirs)
+    chown -h "${ENGINE_UID}:${ENGINE_UID}" "${db}"
     compose "${apt}" up -d
     wait_healthy "${apt}"
     ;;
