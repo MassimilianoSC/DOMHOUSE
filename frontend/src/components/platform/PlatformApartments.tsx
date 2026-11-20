@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, PlugZap, Plus, Trash2, Waypoints } from "lucide-react";
+import { KeyRound, Link2, PlugZap, Plus, Trash2, Waypoints } from "lucide-react";
 import { toast } from "sonner";
 import type { VerifyResult } from "@/api/admin";
 import { platformApi, type PlatformApartment } from "@/api/platform";
@@ -8,6 +8,7 @@ import { APARTMENT_ID_RE, DemoBadge, defaultInstanceUrl, Field, isBuiltinMock, L
 import { useAuth } from "@/auth/AuthProvider";
 import { CredentialsWorkspace } from "@/components/credentials/CredentialsWorkspace";
 import { AgentTest, agentTestable } from "@/components/platform/AgentTest";
+import { NewApartmentDialog, tenantKey } from "@/components/platform/NewApartmentDialog";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
 import { CopyableId } from "@/components/ui/CopyableId";
@@ -122,9 +123,14 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
   const qc = useQueryClient();
   const q = useQuery({ queryKey: key(tenantId), queryFn: () => platformApi.apartments(tenantId) });
   const [creating, setCreating] = useState(false);
+  const [creatingNew, setCreatingNew] = useState(false);
   const [editing, setEditing] = useState<PlatformApartment | null>(null);
   const [verify, setVerify] = useState<Record<string, VerifyResult | "loading">>({});
-  const notProd = useAuth().me?.env.app_env !== "prod";
+  const env = useAuth().me?.env;
+  const notProd = env?.app_env !== "prod";
+  // A2 §1: off before the click where the server says the creation is not there (absent = an older server: on, and its
+  // 503 shows inside the form)
+  const newOff = env?.creazione_disponibile === false;
   const [credentialsOf, setCredentialsOf] = useState<string | null>(null);
   const refresh = () => void qc.invalidateQueries({ queryKey: key(tenantId) });
 
@@ -151,9 +157,19 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
 
   return (
     <div className="space-y-3" data-testid={`platform-apartments-${tenantId}`}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-bold">{t("platform.apartments")}</h4>
-        <Button size="sm" onClick={() => setCreating(true)} data-testid={`platform-apt-add-btn-${tenantId}`}><Plus /> {t("platform.aptAdd")}</Button>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h4 className="pt-1.5 text-sm font-bold">{t("platform.apartments")}</h4>
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button size="sm" variant="outline" onClick={() => setCreating(true)} data-testid={`platform-apt-add-btn-${tenantId}`}><Link2 /> {t("platform.aptAdd")}</Button>
+            <Button size="sm" onClick={() => setCreatingNew(true)} disabled={newOff} data-testid={`platform-apt-new-btn-${tenantId}`}><Plus /> {t("platform.creation.newButton")}</Button>
+          </div>
+          {newOff && (
+            <p className="max-w-xs text-right text-xs text-muted-foreground" data-testid={`platform-apt-new-unavailable-${tenantId}`}>
+              {t(notProd ? "platform.creation.notAvailable" : "platform.creation.notInProd")}
+            </p>
+          )}
+        </div>
       </div>
       {q.error && <PlatformError error={q.error} onRetry={() => void q.refetch()} testId={`platform-apartments-error-${tenantId}`} />}
       {q.isLoading ? (
@@ -212,6 +228,18 @@ export function PlatformApartments({ tenantId, tenantName }: { tenantId: string;
             );
           })}
         </ul>
+      )}
+      {creatingNew && (
+        <NewApartmentDialog
+          tenantId={tenantId}
+          tenantName={tenantName}
+          onClose={() => setCreatingNew(false)}
+          onCreated={() => {
+            refresh();
+            void qc.invalidateQueries({ queryKey: tenantKey(tenantId) });
+            void qc.invalidateQueries({ queryKey: ["platform", "tenants"] });
+          }}
+        />
       )}
       {creating && <CreateDialog tenantId={tenantId} tenantName={tenantName} onClose={() => setCreating(false)} onCreated={refresh} />}
       {editing && <ConnectionDialog key={editing.apartment_id} tenantId={tenantId} apt={editing} onClose={() => setEditing(null)} onSaved={refresh} />}
