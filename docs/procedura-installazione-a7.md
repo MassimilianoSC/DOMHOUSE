@@ -26,15 +26,15 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor c73931b origin/main && echo "A7 è in main, su GitHub"
+git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor 243fd6a origin/main && echo "A7 è in main, su GitHub"
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='systemctl is-active domhouse-agent-esecutore domhouse-agent-lettore; sudo cat /etc/domhouse/agent.conf; sudo ls /opt/domhouse/*.settings; free -m | head -2' < /dev/null
 ```
 
 - **Atteso:**
-  1. l'ultimo commit di `main` e «A7 è in main, su GitHub»;
+  1. l'ultimo commit di `main` e «A7 è in main, su GitHub». `243fd6a` è l'ultimo commit di A7 con le correzioni della revisione; se dopo questa procedura ne arrivano altri, la memoria storica mette qui il più recente;
   2. i due servizi `active`;
   3. `agent.conf` con `AMBIENTE=staging`, `CONDIVISA=1`, `LETTORE=domhouse-agent`, `MAX_MOTORI_STAGING=4` (ancora senza `BUDGET_MB_STAGING`: vale 500 per difetto);
-  4. le impostazioni dei motori (`dev`, `lab-01` e quelli creati con A2) e la memoria.
+  4. le impostazioni dei motori (`dev`, `lab-01` e quelli creati con A2) e la memoria: **annota il numero della colonna «available»** di `free -m`, serve a D6.1.
 - `agent.conf` non contiene segreti.
 
 ## D1. I file sulla VM (nella cartella di chi si collega)
@@ -106,7 +106,10 @@ DRY_RUN=1 GCP_PROJECT_ID=domotica-poc-511707 CLOUDSDK_CORE_ACCOUNT=m.scardovelli
 
 1. Nell'app dello staging: Organizzazioni → un'organizzazione di prova → «Nuovo appartamento»: la riga della capienza dice «Capienza non ancora letta» oppure l'ultima lettura con la sua ora.
 2. «Aggiorna»: entro qualche secondo «Posti liberi: N (letto alle …)».
-3. **Atteso:** con `dev`, `lab-01` e `test-a2-02` (tre motori di prova da 120 MB): **1** posto (il numero massimo 4 lascia un posto, il budget di 500 MB ne lascia uno). Un altro numero: incolla la schermata della riga alla memoria storica.
+3. **Atteso**, con `dev`, `lab-01` e `test-a2-02` (tre motori di prova da 120 MB), secondo la memoria disponibile annotata in D0 (seconda lettura della revisione, nota 3):
+   - **520 MB o più:** **1** posto (il numero massimo 4 lascia un posto, il budget di 500 MB ne lascia uno, la memoria almeno uno);
+   - **meno di 520 MB:** **0** posti, «Nessun posto libero», con motivo `capienza_insufficiente`: dopo un motore nuovo da 120 MB resterebbero meno di 400 MB.
+   - Un altro esito: incolla la schermata della riga alla memoria storica.
 4. I tetti contati dall'agente sono quelli veri dei contenitori (revisione del codice di A7, «da verificare» 1), sola lettura:
 
 ```bash
@@ -141,13 +144,16 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 **D6.3 Gli allarmi arrivano** (due righe di prova, scritte come le scrive il controllo).
 
+- **Prima di lanciarlo:** ogni allarme manda al massimo una email per periodo (memoria: 1 ora; 8 motori: 12 ore). Le due righe di prova consumano quel periodo: fino alla sua fine un allarme **vero** dello stesso tipo non manderebbe un'altra email. Per questo, subito dopo, si chiudono a mano gli incidenti di prova (punto qui sotto), e D6.3 si fa in un momento tranquillo, non durante una creazione.
+
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='logger -t domhouse-check "vm mem low available_mb=1 minutes=10 (prova di A7)"; logger -t domhouse-check "vm engines many count=8 (prova di A7)"; echo scritte' < /dev/null
 ```
 
-- **Atteso:** «scritte»; entro qualche minuto due email: «Motori: memoria della VM sotto 500 MB» e «Motori: 8 motori o più sulla VM». Gli allarmi si chiudono da soli dopo un giorno.
+- **Atteso:** «scritte»; entro qualche minuto due email: «Motori: memoria della VM sotto 500 MB» e «Motori: 8 motori o più sulla VM».
+- **Subito dopo le due email:** nella console di Google Cloud, Monitoring → Avvisi → Incidenti, i due incidenti aperti con quei nomi → «Chiudi incidente». Così il prossimo allarme vero apre un incidente nuovo. Il periodo di una email resta comunque quello dell'allarme (1 ora, 12 ore): se in quelle ore la memoria scende davvero, l'avviso si vede comunque fra gli incidenti nella console, anche senza email.
 - La riga «vm mem low» vera nasce solo dopo tre controlli sotto 500 MB (10 minuti): la sua logica è provata sul PC (`tests/engine_vm_a2_test.py`); qui si prova la strada riga → allarme → email. In alternativa (revisione, «da verificare» 2) si può lanciare `check-all` a mano tre volte a 5 minuti di distanza con `DOMHOUSE_MEMINFO` puntato a un file finto.
 
 **D6.4 La riga vera del controllo** (sola lettura, almeno 5 minuti dopo D2).
