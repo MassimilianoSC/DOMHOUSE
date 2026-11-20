@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A5 e l'unione del ramo `o1-a5-rifiuti` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `c5241d2` (ramo `o1-a5-rifiuti`) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | E0–E6 |
+| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A5 e l'unione del ramo `o1-a5-rifiuti` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `b10f8bc` (ramo `o1-a5-rifiuti`, con le correzioni della revisione di sicurezza) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | E0–E6 |
 
 **Cosa si installa** (`docs/proposta-a5.md`, risposte 1210, §6 punti 1–6):
 
@@ -28,7 +28,7 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor c5241d2 origin/main && echo "A5 è in main, su GitHub"
+git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor b10f8bc origin/main && echo "A5 è in main, su GitHub"
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='systemctl is-active domhouse-agent-esecutore; sudo bash /opt/domhouse/broker-vm.sh check | head -2; sudo cat /etc/domhouse/_broker/apartments; readlink -f "$(command -v awk)"; docker logs -t --tail 2 domhouse-broker 2>&1 | cut -c1-40' < /dev/null
 ```
 
@@ -37,7 +37,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
   2. `active`;
   3. «broker ok cert_days=…» e «broker started_at=…»;
   4. l'elenco degli appartamenti del broker (`dev`, `lab-01` e quelli creati con A2);
-  5. il programma `awk` della VM (per esempio `/usr/bin/mawk` o `/usr/bin/gawk`): **da verificare**, lo script è scritto per tutti e due;
+  5. il programma `awk` della VM (per esempio `/usr/bin/mawk` o `/usr/bin/gawk`): lo script è scritto per tutti e due (niente intervalli, niente `mktime`, gli elenchi passati come variabili: revisione, punto 6);
   6. due righe che cominciano con un'ora come `2026-11-…T…Z`: **da verificare**, è la forma che lo script legge.
 
 ## E1. Il file sulla VM (nella cartella di chi si collega)
@@ -71,15 +71,31 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 gcloud logging buckets create domhouse-rifiuti --location=global --retention-days=2 --description="A5: solo le righe broker device refused" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
-gcloud logging sinks create domhouse-rifiuti-dispositivi logging.googleapis.com/projects/domotica-poc-511707/locations/global/buckets/domhouse-rifiuti --log-filter='resource.type="gce_instance" AND log_id("syslog") AND jsonPayload.message:"broker device refused "' --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+VM_ID="$(gcloud compute instances describe langbrain-dev --zone=europe-west8-a --format='value(id)' --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com)" && echo "id della VM: $VM_ID" && gcloud logging sinks create domhouse-rifiuti-dispositivi logging.googleapis.com/projects/domotica-poc-511707/locations/global/buckets/domhouse-rifiuti --log-filter="resource.type=\"gce_instance\" AND resource.labels.instance_id=\"${VM_ID}\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\\\[[0-9]+\\\\])?: broker device refused apt=\"" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud logging sinks describe domhouse-rifiuti-dispositivi --format="value(filter)" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
 ```
 
-- **Atteso:** «Created bucket [domhouse-rifiuti]» e «Created [….sinks/domhouse-rifiuti-dispositivi]».
+- **Atteso:** «Created bucket [domhouse-rifiuti]», «id della VM: » con un numero, «Created [….sinks/domhouse-rifiuti-dispositivi]», poi il filtro letto da Google Cloud: `resource.type="gce_instance" AND resource.labels.instance_id="<lo stesso numero>" AND log_id("syslog") AND jsonPayload.message=~"domhouse-check(\\[[0-9]+\\])?: broker device refused apt="`.
+- **Il filtro** (revisione, punto 4) prende solo le righe del controllo (`domhouse-check`) di **questa** VM, e non la riga «other» né «broker device refused error»: il bucket tiene solo quello che il server legge. Con la seconda VM (A10) il filtro si rifà con il suo id.
 - **Da verificare:** per un bucket dello stesso progetto il sink non dovrebbe chiedere permessi. Se l'uscita chiede di dare un ruolo a un `serviceAccount:…`, **fermati** e incollala: la memoria storica prepara il comando con quell'account.
 - 2 giorni bastano: il server legge solo le ultime 24 ore. Le stesse righe restano anche nel bucket `_Default` (30 giorni, come oggi).
 - **Ritorno indietro:** `gcloud logging sinks delete domhouse-rifiuti-dispositivi --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --quiet` e poi `gcloud logging buckets delete domhouse-rifiuti --location=global --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --quiet`.
 
 ## E4. Il permesso del server, solo su quella vista (scrive su Google Cloud)
+
+**E4.1, prima, in sola lettura** (revisione, punto 3): se il server leggesse già tutti i registri, la condizione non servirebbe a niente.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud projects get-iam-policy domotica-poc-511707 --flatten="bindings[].members" --filter="bindings.members:domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com" --format="table(bindings.role,bindings.condition.title)" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud policy-intelligence troubleshoot-policy iam //cloudresourcemanager.googleapis.com/projects/domotica-poc-511707 --principal-email=domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com --permission=logging.logEntries.list --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format=json 2>&1 | grep -iE "overallAccessState" | head -1
+```
+
+- **Atteso:** l'elenco dei ruoli del server **senza** `roles/logging.viewer`, `roles/logging.privateLogViewer`, `roles/editor`, `roles/owner` né `roles/viewer` senza condizione; poi **`CANNOT_ACCESS`**.
+- **Fermati** se compare uno di quei ruoli o `CAN_ACCESS`: la memoria storica decide con il committente se toglierlo prima di andare avanti.
+
+**E4.2, il permesso** (scrive):
 
 ```bash
 # Git Bash
@@ -89,6 +105,7 @@ for b in domhouse-rifiuti _Default; do echo "== $b"; gcloud policy-intelligence 
 ```
 
 - **Atteso:** un `etag`; poi `domhouse-rifiuti` **`CAN_ACCESS`** e `_Default` **`CANNOT_ACCESS`** (il server non legge il registro di sistema intero, proposta §4 punto 1).
+- **Da verificare: id o numero del progetto nella condizione.** Per i segreti era servito il **numero** (prova 1125); per le viste dei registri la documentazione usa l'id. Se `domhouse-rifiuti` risulta `CANNOT_ACCESS`: ritorno indietro di E4.2 (sotto), poi lo stesso comando con `projects/444239063209/locations/global/buckets/domhouse-rifiuti/views/_AllLogs` nella condizione, e di nuovo il controllo.
 - **Da verificare:** la forma del nome della risorsa per il controllo (C1.4b di A2 ha richiesto `--resource-name` e `--resource-type` per i segreti). Se il controllo risponde con un errore sul nome, incolla l'uscita: la memoria storica aggiunge `--resource-name="projects/domotica-poc-511707/locations/global/buckets/$b/views/_AllLogs" --resource-service=logging.googleapis.com --resource-type=logging.googleapis.com/LogView`.
 - **Ritorno indietro:** `gcloud projects remove-iam-policy-binding domotica-poc-511707 --member=serviceAccount:domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com --role=roles/logging.viewAccessor --condition='expression=resource.name == "projects/domotica-poc-511707/locations/global/buckets/domhouse-rifiuti/views/_AllLogs",title=a5-rifiuti-dispositivi,description=A5: solo la vista del bucket domhouse-rifiuti' --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com`.
 
