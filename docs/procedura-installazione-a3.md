@@ -132,7 +132,7 @@ gcloud compute scp scripts/agent/domhouse-agent-esecutore.service scripts/agent/
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a3 && sed -i "s/\r*$//" agent-vm.sh agent/domhouse-agent-esecutore.service agent/esecutore.py && sha256sum agent-vm.sh agent/domhouse-agent-esecutore.service agent/esecutore.py | cut -c1-16,65-; grep -n "^SupplementaryGroups" agent/domhouse-agent-esecutore.service; grep -c "DOCKER_CONFIG" agent/esecutore.py' < /dev/null
 ```
 
-- **Atteso:** tre impronte che cominciano così: `agent-vm.sh` `b013386278381469`, `agent/domhouse-agent-esecutore.service` `dc24e3330fe99266`, `agent/esecutore.py` `c60dff3fdd600f86`; poi `SupplementaryGroups=domhouse-broker` e **3** (le righe con `DOCKER_CONFIG` in `esecutore.py`).
+- **Atteso:** tre impronte che cominciano così: `agent-vm.sh` `b013386278381469`, `agent/domhouse-agent-esecutore.service` `dc24e3330fe99266`, `agent/esecutore.py` `c60dff3fdd600f86`; poi `SupplementaryGroups=domhouse-broker` e **4** (le righe con `DOCKER_CONFIG` in `esecutore.py`).
 
 **Q2.3b Il gruppo** (scrive sulla VM: un gruppo di sistema, nessun utente dentro).
 
