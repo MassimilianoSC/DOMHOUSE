@@ -169,7 +169,10 @@ write_key() {
     # what compose reads from an env file must be one plain word: the passwords of broker-secrets.sh are token_urlsafe
     [[ "${mqtt}" =~ ^[A-Za-z0-9_-]{24,}$ ]] || die "la password del connector in ${MQTT_SECRET_PREFIX}${apt} non ha la forma prevista"
   fi
-  install -d -m 700 -o root -g root "${ETC}"
+  # 20 November (A2 C9.2): /etc/domhouse only made when missing, 755 root:root like agent-vm.sh. «install -d -m 700» on
+  # the existing folder set 700, and the agent's reader (domhouse-agent) could no longer reach agent-lettore.conf at its
+  # next start. The files inside keep their own modes (.env and keys 600, agent.conf 600, _broker 750)
+  [ -d "${ETC}" ] || install -d -m 755 -o root -g root "${ETC}"
   (
     umask 077                            # before the file exists: it is never readable by others, not even for a moment
     {
@@ -225,7 +228,7 @@ valid_setting_name() {
 put_setting() {
   # put_setting <file> <name> [value]: the line NAME=value in the file, or no line for the name without a value
   local file="$1" name="$2" value="${3-}" tmp="$1.new"
-  [ -d "$(dirname "${file}")" ] || install -d -m 700 "$(dirname "${file}")"   # made by install; 700 if missing
+  [ -d "$(dirname "${file}")" ] || install -d -m 755 "$(dirname "${file}")"   # made by install; 755 if missing (A2 C9.2)
   touch "${file}"
   grep -v "^${name}=" "${file}" > "${tmp}" || true
   if [ -n "${value}" ]; then

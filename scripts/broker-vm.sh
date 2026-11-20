@@ -571,7 +571,10 @@ case "${cmd}" in
       "${image}" "${DOMHOUSE_BROKER_PORT:-8883}" "${TLS_DIR}" "${AUTH}" "${BROKER_DATA}" > "${SETTINGS}"
     cat "${SETTINGS}"
     step "Cartelle"
-    install -d -m 700 "${ETC}"
+    # 20 November (A2 C9.2): /etc/domhouse only made when missing, 755 root:root like agent-vm.sh. «install -d -m 700» on
+    # the existing folder set 700, and the agent's reader (domhouse-agent) could no longer reach agent-lettore.conf at its
+    # next start. The files inside keep their own modes (.env and keys 600, agent.conf 600, _broker 750)
+    [ -d "${ETC}" ] || install -d -m 755 -o root -g root "${ETC}"
     install -d -m 750 "${BROKER_ETC}"
     install -d -m 750 -o "${BROKER_UID}" -g "${BROKER_UID}" "${BROKER_DATA}"
     # A3 N9: auth/ is root's with the broker's group: the agent's executor (root without CAP_DAC_OVERRIDE, group 1883)
@@ -639,7 +642,7 @@ case "${cmd}" in
     [[ "$2" =~ ^[a-z][a-z0-9-]{0,62}$ ]] || die "zona Cloud DNS non valida: $2"
     [[ "$3" =~ ^[a-z][a-z0-9-]{4,28}[a-z0-9]@[a-z0-9-]+\.iam\.gserviceaccount\.com$ ]] || die "account DNS non valido: $3"
     need_tls_disk
-    install -d -m 700 "${ETC}"
+    [ -d "${ETC}" ] || install -d -m 755 -o root -g root "${ETC}"   # never another mode on it (A2 C9.2: the reader)
     install -d -m 750 "${BROKER_ETC}"
     printf 'ACME_DOMAIN=%s\nACME_DNS_ZONE=%s\nACME_DNS_ACCOUNT=%s\nACME_SERVER=%s\nACME_KEY_TYPE=%s\n' \
       "$1" "$2" "$3" "${DOMHOUSE_ACME_SERVER:-${LETS_ENCRYPT}}" "${key_type}" > "${ACME_SETTINGS}.new"
