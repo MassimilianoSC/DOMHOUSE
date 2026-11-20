@@ -847,3 +847,19 @@ def test_a2_change_apartment_and_the_apartment_seq(repo):
     assert run(repo.get_apartment("lab-a2-05")).creazione.version == 2
     assert run(repo.change_apartment("nessuno", to_ready)) is None
     assert run(repo.apartment_seq("lab-a2-05")) == 0
+
+
+# ---- A7: the capacity of one environment, changed in one transaction ------------------------------------------------
+def test_a7_capacity_is_kept_per_environment_and_a_refusing_change_writes_nothing(repo):
+    assert run(repo.get_capacity("staging")) is None
+    run(repo.change_capacity("staging", lambda doc: {**doc, "aggiornato_at": "2026-11-20T15:00:00.000Z"}))
+    run(repo.change_capacity("staging", lambda doc: {**doc, "lettura": {"op_id": "o1", "dati": {"motori": 2}}}))
+    assert run(repo.get_capacity("staging")) == {"aggiornato_at": "2026-11-20T15:00:00.000Z",
+                                                 "lettura": {"op_id": "o1", "dati": {"motori": 2}}}
+
+    def refuse(doc):
+        raise RuntimeError("troppo presto")
+    with pytest.raises(RuntimeError):
+        run(repo.change_capacity("staging", refuse))
+    assert run(repo.get_capacity("staging"))["aggiornato_at"] == "2026-11-20T15:00:00.000Z"
+    assert run(repo.get_capacity("prod")) is None

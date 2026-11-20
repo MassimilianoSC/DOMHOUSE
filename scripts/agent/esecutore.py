@@ -61,7 +61,11 @@ NORMAL_REFUSALS = {"seq_vecchia", "non_disponibile", "motore_assente", "errore_i
                    "capienza_insufficiente", "staging_pieno", "porta_occupata"}
 # A2 (proposta §4.3, review point 6): the approved image, only by digest, from our repository
 DIGEST_RE = re.compile(r"^europe-west8-docker\.pkg\.dev/domotica-poc-511707/domotica/engine@sha256:[0-9a-f]{64}$")
-NEW_ENGINE_MB, MIN_FREE_MB = 150, 400        # §7 of the project: room for one engine more
+# A7: the caps of engine-vm.sh mem_limit_of (decision 1128): ENGINE_MEM_LIMIT in the settings, else 120 MB for the
+# test engines and 256 MB for the others; the load test's engines (scripts/load: ports 8170-8199) stay out (§5.6)
+MEM_LIMIT_RE = re.compile(r"^ENGINE_MEM_LIMIT=([0-9]{2,5})m$", re.M)
+TEST_CAP_MB, OTHER_CAP_MB = 120, 256
+LOAD_PORTS = range(8170, 8200)
 EMPTY_CATALOG = "rooms: []\ndevices: []\n"
 # A2: the worst case of one crea_motore (lock, install, broker refused, both taken back) stays well under the time
 # the reader waits for an answer (lettore.EXECUTOR_TIMEOUT_S; a test keeps it so)
@@ -73,7 +77,8 @@ WORST_CREATE_S = LOCK_WAIT_S + INSTALL_TIMEOUT_S + 2 * BROKER_TIMEOUT_S + REMOVE
 PORT_RE = re.compile(r"^PORT=([0-9]{4,5})$", re.M)
 ENV_RE = re.compile(r"^ENV=(staging|prod)$", re.M)
 METADATA_IP = "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip"
-CONFIG_KEYS = {"AMBIENTE", "CONDIVISA", "LETTORE", "MAX_MOTORI_STAGING", "BIND_IP"}
+CONFIG_KEYS = {"AMBIENTE", "CONDIVISA", "LETTORE", "MAX_MOTORI_STAGING", "BIND_IP", "BUDGET_MB_STAGING",
+               "BUDGET_MB_PROD"}
 
 
 class Config(NamedTuple):
@@ -84,6 +89,8 @@ class Config(NamedTuple):
     state: Path = Path("/var/lib/domhouse-executor")
     bind_ip: str | None = None
     max_staging: int = 4
+    budget_staging: int | None = 500           # A7 (answer 1197): the sum of the staging engines' caps, at most
+    budget_prod: int | None = None             # A7 (answer 1202): set with the second VM (A10); none = no room
     meminfo: Path = Path("/proc/meminfo")
     keys_dir: Path = Path("/etc/domhouse")     # A3 §6.3: agent-ordini.key and agent-risultati.key, root's, 600
     broker_etc: Path = Path("/etc/domhouse/_broker")   # A3 §6.1: the broker's list of apartments and devices/
@@ -120,11 +127,18 @@ def read_config(path: Path, uid_of: Callable[[str], int], check_owner: bool = Tr
     max_staging = values.get("MAX_MOTORI_STAGING", "4")
     if not re.fullmatch(r"[1-9][0-9]?", max_staging):
         raise ValueError("MAX_MOTORI_STAGING non valido")
+    budgets = {}
+    for key, default in (("BUDGET_MB_STAGING", "500"), ("BUDGET_MB_PROD", None)):
+        value = values.get(key, default)
+        if value is not None and not re.fullmatch(r"[1-9][0-9]{1,5}", value):
+            raise ValueError(f"{key} non valido")
+        budgets[key] = int(value) if value is not None else None
     bind_ip = values.get("BIND_IP")
     if bind_ip is not None and not re.fullmatch(r"[0-9]{1,3}(\.[0-9]{1,3}){3}", bind_ip):
         raise ValueError("BIND_IP non valido")
     return Config(ambiente=values["AMBIENTE"], condivisa=values.get("CONDIVISA", "1") == "1",
-                  reader_uid=uid_of(lettore), bind_ip=bind_ip, max_staging=int(max_staging))
+                  reader_uid=uid_of(lettore), bind_ip=bind_ip, max_staging=int(max_staging),
+                  budget_staging=budgets["BUDGET_MB_STAGING"], budget_prod=budgets["BUDGET_MB_PROD"])
 
 
 def read_keys(path: Path, check_owner: bool = True) -> list[bytes]:
@@ -509,11 +523,9 @@ class Esecutore:
                 return comune.result(order, "rifiutato", "gia_esiste_diverso")    # lab-01, made by hand
             if self._port_taken(port, apartment):
                 return comune.result(order, "rifiutato", "porta_occupata")
-            room = self._capacity()
-            if room["motori_staging"] >= room["massimo_staging"]:
-                return comune.result(order, "rifiutato", "staging_pieno")
-            if room["mem_available_mb"] - NEW_ENGINE_MB < MIN_FREE_MB:
-                return comune.result(order, "rifiutato", "capienza_insufficiente")
+            problem = comune.room_problem(self._capacity(), self.config.ambiente)    # A7: the server's rule
+            if problem is not None:
+                return comune.result(order, "rifiutato", problem)
             folder = self.config.data / apartment
             if folder.is_symlink() or (folder.exists() and (not folder.is_dir() or any(folder.iterdir()))):
                 return comune.result(order, "rifiutato", "dati_presenti")
@@ -611,15 +623,33 @@ class Esecutore:
         for line in self.config.meminfo.read_text(encoding="utf-8").splitlines():
             if line.startswith("MemAvailable:"):
                 available_kb = int(line.split()[1])
-        engines = staging = 0
+        engines = 0
+        by_env = {"staging": [0, 0], "prod": [0, 0]}         # engines, sum of their caps (MB)
         for settings in sorted(self.config.opt.glob("*.settings")):
             text = settings.read_text(encoding="utf-8", errors="replace")
+            apartment = settings.stem
+            port = PORT_RE.search(text)
+            if apartment.startswith(("test-carico-", "carico-")) or (port and int(port.group(1)) in LOAD_PORTS):
+                continue                                         # the load test stays out (§5.6)
             engines += 1
             env = ENV_RE.search(text)
-            if env is None or env.group(1) == "staging":      # dev and lab-01 have no ENV yet: staging
-                staging += 1
-        return {"mem_available_mb": round(available_kb / 1024), "motori": engines, "motori_staging": staging,
-                "massimo_staging": self.config.max_staging}
+            env = env.group(1) if env else "staging"           # dev and lab-01 without ENV: staging
+            own = MEM_LIMIT_RE.search(text)
+            if own:
+                cap = int(own.group(1))
+            elif apartment == "dev" or apartment.startswith(("lab-", "test-")):
+                cap = TEST_CAP_MB
+            else:
+                cap = OTHER_CAP_MB
+            by_env[env][0] += 1
+            by_env[env][1] += cap
+        here = self.config.ambiente
+        return {"mem_available_mb": round(available_kb / 1024), "motori": engines,
+                "motori_staging": by_env["staging"][0], "massimo_staging": self.config.max_staging,
+                # A7: the environment of this executor, the cap the new engine would have, the sum and the budget
+                "motori_ambiente": by_env[here][0], "tetto_nuovo_mb": TEST_CAP_MB if here == "staging" else OTHER_CAP_MB,
+                "somma_tetti_mb": by_env[here][1],
+                "budget_mb": self.config.budget_staging if here == "staging" else self.config.budget_prod}
 
     # ---- state of the VM ---------------------------------------------------------------------------------------
     def _port(self, apartment_id: str) -> int | None:

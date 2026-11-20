@@ -134,6 +134,30 @@ def _int(value) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
 
 
+# A7 (docs/proposta-a7.md, answer 1196): room for one engine more. The same rule in bff/capacity.py (a test keeps them
+# equal): at most massimo_staging engines in the staging; after the new engine (its real cap) at least MIN_FREE_MB
+# available; the caps of the environment plus the new one within its budget. Without a budget: no room (production
+# until the second VM, A10)
+MIN_FREE_MB = 400
+
+
+def room_problem(d: dict, ambiente: str) -> str | None:
+    def number(key):
+        value = d.get(key)
+        return value if _int(value) else None
+    mem, tetto, somma = number("mem_available_mb"), number("tetto_nuovo_mb"), number("somma_tetti_mb")
+    n, most, budget = number("motori_ambiente"), number("massimo_staging"), number("budget_mb")
+    if mem is None or tetto is None or somma is None or n is None:
+        return "errore_interno"
+    if ambiente == "staging" and most is not None and n >= most:
+        return "staging_pieno"
+    if mem - tetto < MIN_FREE_MB:
+        return "capienza_insufficiente"
+    if budget is None or somma + tetto > budget:
+        return "capienza_insufficiente"
+    return None
+
+
 def check_apartment(apartment_id, ambiente: str, operazione: str) -> None:
     """§2.1 and §5.2: the id's rule, then the prefix of the environment; «dev» only for stato and capienza."""
     if not isinstance(apartment_id, str):

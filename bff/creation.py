@@ -23,7 +23,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime, timedelta
 
-from . import agent, audit, instances
+from . import agent, audit, capacity, instances
 from . import secret_admin
 from .logs import warn
 from .repository import get_repository
@@ -34,7 +34,6 @@ BANDS = {"staging": (8150, 8159), "prod": (8101, 8149)}
 LIMIT = 5                                    # answer 1168: 5 creations started an hour per organisation
 WINDOW_S = 3600
 MAX_WAIT = agent.MAX_WAIT                    # 20 minutes (§6.8 of the project)
-NEW_ENGINE_MB, MIN_FREE_MB = 150, 400        # §7: room for one engine more
 OCCUPIED_OWNER = "_occupata_sulla_vm"        # the claim of a port the VM said busy: never chosen again
 OPERATIONS = ("capienza", "crea_motore", "togli_motore")
 OWN_MESSAGES = {
@@ -401,13 +400,9 @@ async def after_result(op, esito: str, codice: str, dati: dict, late: bool = Fal
         await _fail(apartment_id, codice, expect_op=op.op_id)
         return "non_creato"
     if op.operazione == "capienza":
-        mem, n, most = dati.get("mem_available_mb"), dati.get("motori_staging"), dati.get("massimo_staging", 4)
-        if not all(isinstance(x, int) and not isinstance(x, bool) for x in (mem, n, most)):
-            await _fail(apartment_id, "errore_interno", expect_op=op.op_id)
-        elif n >= most:
-            await _fail(apartment_id, "staging_pieno", expect_op=op.op_id)
-        elif mem - NEW_ENGINE_MB < MIN_FREE_MB:
-            await _fail(apartment_id, "capienza_insufficiente", expect_op=op.op_id)
+        problem = capacity.room_problem(dati, op.ambiente)           # A7: the VM's rule, the real caps (1196)
+        if problem is not None:
+            await _fail(apartment_id, problem, expect_op=op.op_id)
         else:
             try:
                 await _send(apt, "crea_motore", "motore", {"porta": c.porta})

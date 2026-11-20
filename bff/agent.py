@@ -427,6 +427,13 @@ async def receive(body) -> str:
         result["op_id"], result["ambiente"], result.get("apartment_id"), result.get("operazione"),
         {"stato": result["esito"], "codice": result["codice"], "dati": dati}, MAX_WAIT.total_seconds(),
         seq=result.get("seq"))
+    if outcome == "chiuso" and op is not None and op.operazione == "capienza" and result["esito"] == "riuscito":
+        # A7: every successful capienza is the environment's last reading (a creation's or «Aggiorna»)
+        from . import capacity
+        try:
+            await capacity.save(result["ambiente"], op.op_id, dati)
+        except Exception as exc:                                 # noqa: BLE001 - the reading only: the rest goes on
+            warn("capacity reading not saved", op_id=op.op_id, error=type(exc).__name__)
     if outcome in ("chiuso", "gia_chiuso") and op is not None and _creation_op(op):
         # A2: the next step of the creation; a failure of the repository raises (503: Pub/Sub delivers again, and
         # after_result is safe to run twice)

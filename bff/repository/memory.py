@@ -43,6 +43,7 @@ class InMemoryRepository:
         self.agent_ultima: dict[str, int] = {}            # A3: apartment -> ultima_seq_riuscita of aggiorna_broker
         self.device_creds: dict[str, dict[str, dict]] = {}   # A3: apartment -> device_id -> document
         self.creation_stamps: dict[str, list[str]] = {}      # A2: organisation -> stamps of the creations started
+        self.capacity: dict[str, dict] = {}                  # A7: environment -> last reading and refresh claim
 
     # tool A, A1: no await between the reads and the writes, so atomic within the (single) process
     async def create_agent_op(self, op, build=None):
@@ -442,6 +443,15 @@ class InMemoryRepository:
         saved.creazione.porta = chosen[0]
         self.apartments[a.apartment_id] = saved
         return {"esito": "ok", "porta": chosen[0]}
+
+    async def get_capacity(self, ambiente):
+        doc = self.capacity.get(ambiente)
+        return copy.deepcopy(doc) if doc is not None else None
+
+    async def change_capacity(self, ambiente, change):
+        new = change(copy.deepcopy(self.capacity.get(ambiente, {})))
+        self.capacity[ambiente] = copy.deepcopy(new)
+        return new
 
     async def apartment_seq(self, apartment_id):
         return self.agent_seq.get(apartment_id, 0)

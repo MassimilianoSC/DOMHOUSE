@@ -720,6 +720,22 @@ class FirestoreRepository:
         async with self._lock(f"creation:{a.tenant_id}"):
             return await txn(self.db.transaction())
 
+    async def get_capacity(self, ambiente):
+        snap = await self._col("capacity").document(ambiente).get()
+        return snap.to_dict() if snap.exists else None
+
+    async def change_capacity(self, ambiente, change):
+        ref = self._col("capacity").document(ambiente)
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            new = change(snap.to_dict() if snap.exists else {})
+            tx.set(ref, new)
+            return new
+        async with self._lock(f"capacity:{ambiente}"):
+            return await txn(self.db.transaction())
+
     async def apartment_seq(self, apartment_id):
         snap = await self._col("agent_seq").document(apartment_id).get()
         return (snap.to_dict() or {}).get("seq", 0) if snap.exists else 0
