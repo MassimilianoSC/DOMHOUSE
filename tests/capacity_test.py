@@ -203,3 +203,32 @@ def test_an_unreadable_capienza_is_not_saved_and_the_refresh_says_it_failed(worl
     assert c["capienza"]["posti_liberi"] == 2 and c["capienza"]["motivo"] is None   # the last good one stays
     assert (c["aggiornamento"]["stato"], c["aggiornamento"]["codice"]) == ("fallito", "errore_interno")
     assert c["aggiornamento"]["messaggio"] == "La capienza letta non è valida: riprova"
+
+
+# ---- code review of A7 (20 November): points 1 and 5 ----------------------------------------------------------------
+def test_review1_a_load_test_name_on_the_apps_ports_is_counted(tmp_path):
+    """Only the port (8170-8199) says «load test»: a test-carico-… made from the app on 8150-8159 counts."""
+    ex, opt = make_executor(tmp_path)
+    (opt / "test-carico-x.settings").write_text("APARTMENT_ID=test-carico-x\nPORT=8150\n", encoding="utf-8")
+    (opt / "test-carico-01.settings").write_text("APARTMENT_ID=test-carico-01\nPORT=8170\n", encoding="utf-8")
+    d = ex._capacity()
+    assert (d["motori"], d["motori_ambiente"], d["somma_tetti_mb"]) == (1, 1, 120)
+
+
+def test_review1_the_load_test_s_names_are_refused_by_the_creation_and_by_crea_motore(world):
+    for bad in ("test-carico-1", "carico-02"):
+        r = new(bad)
+        assert (r.status_code, r.json()["error"]) == (422, "invalid_apartment_id"), bad
+    source = (AGENT / "esecutore.py").read_text(encoding="utf-8")
+    create = source[source.index("def _create("):source.index("def _take_back(")]
+    assert 'LOAD_NAMES' in create
+
+
+def test_review5_the_cap_is_read_like_engine_vm_sh_first_line_then_its_form(tmp_path):
+    ex, opt = make_executor(tmp_path)
+    (opt / "lab-05.settings").write_text("APARTMENT_ID=lab-05\nPORT=8150\nENGINE_MEM_LIMIT=tanto\nENGINE_MEM_LIMIT=200m\n",
+                                         encoding="utf-8")
+    assert ex._capacity()["somma_tetti_mb"] == 120          # engine-vm.sh: the first line, not valid -> the default
+    (opt / "lab-05.settings").write_text("APARTMENT_ID=lab-05\nPORT=8150\nENGINE_MEM_LIMIT=200m\nENGINE_MEM_LIMIT=90m\n",
+                                         encoding="utf-8")
+    assert ex._capacity()["somma_tetti_mb"] == 200

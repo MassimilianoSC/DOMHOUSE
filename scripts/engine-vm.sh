@@ -90,6 +90,7 @@ DATA_ALERT_MB="${DOMHOUSE_DATA_ALERT_MB:-500}"   # an apartment's /data above th
 # (every environment, the load test's engines left out) -> "vm engines many". The two alarms read those lines
 MEM_LOW_MB=500
 MEM_LOW_S=600
+MEM_GAP_S=900                            # A7 review, point 3: a last low sample older than this starts the count again
 ENGINES_ALERT=8
 JOURNALD_DIR="${DOMHOUSE_JOURNALD_DIR:-/etc/systemd/journald.conf.d}"
 ENGINE_CPUS=1.0                          # decision 1128: every engine's share of the VM's two CPUs, at most
@@ -649,16 +650,19 @@ vm_line() {
 vm_capacity_lines() {
   # A7: the available memory every 5 minutes, "vm mem low" once it has stayed under MEM_LOW_MB for MEM_LOW_S (the
   # first time under is kept in ${OPT}/.mem-low-since), and "vm engines many" from ENGINES_ALERT engines
-  local avail since now n settings apt port
+  local avail since last now n settings apt port
   avail="$(awk '/^MemAvailable:/ {printf "%d", $2 / 1024}' "${MEMINFO}" 2>/dev/null || true)"
   if [[ "${avail}" =~ ^[0-9]+$ ]]; then
     watch_line "vm mem_available_mb=${avail}"
     if [ "${avail}" -lt "${MEM_LOW_MB}" ]; then
+      # the file keeps «first low sample, last low sample»; a gap (VM off, timer stopped) starts the count again
       now="$(date +%s)"
-      since="$(cat "${OPT}/.mem-low-since" 2>/dev/null || true)"
-      if [[ ! "${since}" =~ ^[0-9]+$ ]]; then
-        printf '%s\n' "${now}" > "${OPT}/.mem-low-since"
-      elif [ $((now - since)) -ge "${MEM_LOW_S}" ]; then
+      if [ -f "${OPT}/.mem-low-since" ]; then read -r since last < "${OPT}/.mem-low-since" || true; fi
+      if [[ ! "${since:-}" =~ ^[0-9]+$ ]] || [[ ! "${last:-}" =~ ^[0-9]+$ ]] || [ $((now - last)) -gt "${MEM_GAP_S}" ]; then
+        since="${now}"
+      fi
+      printf '%s %s\n' "${since}" "${now}" > "${OPT}/.mem-low-since"
+      if [ $((now - since)) -ge "${MEM_LOW_S}" ]; then
         watch_line "vm mem low available_mb=${avail} minutes=$(((now - since) / 60))"
       fi
     else
@@ -670,7 +674,7 @@ vm_capacity_lines() {
     [ -e "${settings}" ] || continue        # no shopt here: check-all's own nullglob must stay as the caller set it
     apt="$(basename "${settings}" .settings)"
     port="$(sed -n 's/^PORT=//p' "${settings}" | head -1)"
-    case "${apt}" in test-carico-*|carico-*) continue ;; esac
+    # the load test is told by its ports only (A7 review, point 1): a name can be chosen
     if [[ "${port}" =~ ^[0-9]+$ ]] && [ "${port}" -ge 8170 ] && [ "${port}" -le 8199 ]; then continue; fi   # load test
     n=$((n + 1))
   done

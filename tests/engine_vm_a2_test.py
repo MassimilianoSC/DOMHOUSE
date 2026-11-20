@@ -174,7 +174,9 @@ def test_a7_the_watch_writes_the_available_memory_and_the_low_line_only_after_10
     text = check_lines(vm)
     assert "-t domhouse-check vm mem_available_mb=400" in text
     assert "vm mem low" not in text                                         # below 500 MB, but only just now
-    (vm.opt / ".mem-low-since").write_text(str(int(time.time()) - 11 * 60), encoding="utf-8")
+    now = int(time.time())
+    (vm.opt / ".mem-low-since").write_text(f"{now - 11 * 60} {now - 5 * 60}\n", encoding="utf-8",
+                                           newline="\n")                # first, last; LF, as the script writes it
     text = check_lines(vm)
     assert "-t domhouse-check vm mem low available_mb=400 minutes=11" in text
     (vm.opt.parent / "meminfo").write_text("MemTotal: 2000000 kB\nMemAvailable: 1024000 kB\n", encoding="utf-8")
@@ -199,3 +201,20 @@ def test_a7_the_two_alarms_read_those_lines():
     assert "vm mem low" in memory and "vm engines many" in engines
     for text in (memory, engines):
         assert '"__CHANNEL__"' in text and "conditionMatchedLog" in text
+
+
+def test_a7_review1_a_load_test_name_outside_the_load_ports_counts(vm):
+    for i in range(6):
+        (vm.opt / f"lab-1{i}.settings").write_text(f"APARTMENT_ID=lab-1{i}\nPORT=815{i}\n", encoding="utf-8")
+    (vm.opt / "test-carico-x.settings").write_text("APARTMENT_ID=test-carico-x\nPORT=8157\n", encoding="utf-8")
+    assert "-t domhouse-check vm engines many count=8" in check_lines(vm)
+
+
+def test_a7_review3_a_mark_left_from_before_a_stop_starts_the_count_again(vm):
+    import time
+    (vm.opt.parent / "meminfo").write_text("MemTotal: 2000000 kB\nMemAvailable: 409600 kB\n", encoding="utf-8")
+    old = int(time.time()) - 60 * 60
+    (vm.opt / ".mem-low-since").write_text(f"{old} {old}\n", encoding="utf-8", newline="\n")   # an hour ago, then nothing
+    assert "vm mem low" not in check_lines(vm)                                       # the count starts again
+    since, last = (vm.opt / ".mem-low-since").read_text(encoding="utf-8").split()
+    assert int(since) > old + 50 * 60 and int(last) >= int(since)

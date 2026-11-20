@@ -63,7 +63,11 @@ NORMAL_REFUSALS = {"seq_vecchia", "non_disponibile", "motore_assente", "errore_i
 DIGEST_RE = re.compile(r"^europe-west8-docker\.pkg\.dev/domotica-poc-511707/domotica/engine@sha256:[0-9a-f]{64}$")
 # A7: the caps of engine-vm.sh mem_limit_of (decision 1128): ENGINE_MEM_LIMIT in the settings, else 120 MB for the
 # test engines and 256 MB for the others; the load test's engines (scripts/load: ports 8170-8199) stay out (§5.6)
-MEM_LIMIT_RE = re.compile(r"^ENGINE_MEM_LIMIT=([0-9]{2,5})m$", re.M)
+# code review A7, point 5: like mem_limit_of, the FIRST line ENGINE_MEM_LIMIT=, then its form (else the default)
+MEM_LIMIT_LINE_RE = re.compile(r"^ENGINE_MEM_LIMIT=(.*)$", re.M)
+MEM_LIMIT_RE = re.compile(r"[0-9]{2,5}m")
+# code review A7, point 1: the load test is told by its ports only; its names are refused to crea_motore
+LOAD_NAMES = ("test-carico-", "carico-")
 TEST_CAP_MB, OTHER_CAP_MB = 120, 256
 LOAD_PORTS = range(8170, 8200)
 EMPTY_CATALOG = "rooms: []\ndevices: []\n"
@@ -494,6 +498,8 @@ class Esecutore:
 
     def _create(self, order: comune.Order, output: list[str]) -> dict:
         apartment, port, env = order.apartment_id, order.parametri["porta"], self.config.ambiente
+        if apartment.startswith(LOAD_NAMES):                       # A7 review, point 1: never an app's engine
+            return comune.result(order, "rifiutato", "id_non_valido")
         try:
             image = self.image()
         except (OSError, ValueError) as exc:
@@ -629,14 +635,14 @@ class Esecutore:
             text = settings.read_text(encoding="utf-8", errors="replace")
             apartment = settings.stem
             port = PORT_RE.search(text)
-            if apartment.startswith(("test-carico-", "carico-")) or (port and int(port.group(1)) in LOAD_PORTS):
-                continue                                         # the load test stays out (§5.6)
+            if port and int(port.group(1)) in LOAD_PORTS:
+                continue                                         # the load test stays out (§5.6): by its ports only
             engines += 1
             env = ENV_RE.search(text)
             env = env.group(1) if env else "staging"           # dev and lab-01 without ENV: staging
-            own = MEM_LIMIT_RE.search(text)
-            if own:
-                cap = int(own.group(1))
+            first = MEM_LIMIT_LINE_RE.search(text)
+            if first and MEM_LIMIT_RE.fullmatch(first.group(1)):
+                cap = int(first.group(1)[:-1])
             elif apartment == "dev" or apartment.startswith(("lab-", "test-")):
                 cap = TEST_CAP_MB
             else:

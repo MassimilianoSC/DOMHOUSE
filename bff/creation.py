@@ -280,8 +280,12 @@ async def _ports(apartment_id: str, exclude: set[int] = frozenset()) -> list[tup
     return [(p, link_key(p)) for p in range(low, high + 1) if p not in exclude and link_key(p) not in used]
 
 
+LOAD_NAMES = ("test-carico-", "carico-")       # A7 review, point 1: the load test's names, never created here
+
+
 def _check_id(apartment_id: str) -> bool:
-    return agent.apartment_allowed(apartment_id, "staging") and apartment_id != "dev"
+    return agent.apartment_allowed(apartment_id, "staging") and apartment_id != "dev" \
+        and not apartment_id.startswith(LOAD_NAMES)
 
 
 async def create(tenant_id: str, apartment_id: str, name: str, timezone: str, code: str | None, identity) -> Apartment:
