@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { toast } from "sonner";
+import { ApiError } from "@/api/bff";
 import { t } from "@/i18n";
 import { platformApartmentsUrl } from "@/lib/routes";
 import ApartmentsPage from "@/pages/ApartmentsPage";
@@ -376,5 +378,49 @@ describe("A6: da quando e da chi è disattivato", () => {
     await screen.findByTestId("admin-apartment-apt-002");
     expect(screen.queryByTestId("admin-apartment-disabled-apt-001")).toBeNull();
     expect(screen.queryByTestId("admin-apartment-disabled-apt-002")).toBeNull();
+  });
+});
+
+// A6, review point 1 (o1 7f471c8): what the platform manager switched off, only the platform manager switches on again.
+// The admin's PATCH with enabled: true answers 409 disabled_by_platform and saves nothing of the body.
+describe("A6: spento dal gestore della piattaforma, lo riaccende solo lui", () => {
+  const LOCKED = "L'ha disattivato il gestore della piattaforma: solo lui può riattivarlo.";
+  const byPlatform = { ...APT, enabled: false, disattivato_at: "2026-11-20T15:05:00Z", disattivato_da: { ruolo: "gestore", nome: "Giulia Rossi" } };
+  const byAdmin = { ...APT, apartment_id: "apt-002", name: "Rimini Mare", enabled: false, disattivato_at: "2026-11-20T15:05:00Z", disattivato_da: { ruolo: "amministratore", nome: "Marco Bianchi" } };
+
+  it("nella riga: interruttore spento e non cliccabile, con la frase; spento dall'amministratore: come oggi", async () => {
+    state.apartments = [byPlatform, byAdmin];
+    renderAdmin();
+    const toggle = await screen.findByTestId("admin-apartment-enabled-apt-001");
+    expect(toggle).toBeDisabled();
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByTestId("admin-apartment-locked-apt-001")).toHaveTextContent(LOCKED);
+    await act(async () => { fireEvent.click(toggle); });
+    expect(state.patchApartment).not.toHaveBeenCalled();
+    expect(screen.getByTestId("admin-apartment-enabled-apt-002")).toBeEnabled();
+    expect(screen.queryByTestId("admin-apartment-locked-apt-002")).toBeNull();
+  });
+
+  it("in «Modifica»: «Attivo» spento e non cliccabile, con la frase; il salvataggio non manda «enabled»", async () => {
+    state.apartments = [byPlatform];
+    const dialog = await openEdit();
+    expect(field("enabled")).toBeDisabled();
+    expect(within(dialog).getByTestId("apt-form-enabled-locked")).toHaveTextContent(LOCKED);
+    fireEvent.change(field("name"), { target: { value: "Milano Centro 2" } });
+    await save();
+    expect(state.patchApartment).toHaveBeenCalledTimes(1);
+    const body = state.patchApartment.mock.calls[0][1];
+    expect(body).toEqual({ name: "Milano Centro 2", address: "Via Roma 1" });
+    expect(body).not.toHaveProperty("enabled");
+  });
+
+  it("se il 409 arriva lo stesso (spento dal gestore nel frattempo): il testo del server", async () => {
+    state.apartments = [byAdmin];
+    state.patchApartment.mockRejectedValueOnce(new ApiError(409, "disabled_by_platform", LOCKED, "c-9"));
+    renderAdmin();
+    const toggle = await screen.findByTestId("admin-apartment-enabled-apt-002");
+    await act(async () => { fireEvent.click(toggle); });
+    expect(state.patchApartment).toHaveBeenCalledWith("apt-002", { enabled: true }, expect.any(String));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LOCKED, expect.anything()));
   });
 });

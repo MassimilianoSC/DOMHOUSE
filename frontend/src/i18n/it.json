@@ -563,6 +563,7 @@
       "code": "Codice",
       "enabled": "Attivo",
       "disableConfirm": "Disattivare «{name}»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.",
+      "lockedByPlatform": "L'ha disattivato il gestore della piattaforma: solo lui può riattivarlo.",
       "disabled": "disattivato",
       "verify": "Verifica connessione",
       "verifyOk": "Connessione OK",

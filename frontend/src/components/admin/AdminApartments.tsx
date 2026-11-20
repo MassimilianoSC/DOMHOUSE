@@ -24,6 +24,9 @@ import { instanceAddress } from "@/lib/instanceAddress";
 /** P-90 T2 (1107 = a): switching an apartment off stops notifications, summaries, bookings and the Excel export, while
  *  the engine's automations go on; it is asked once. Switching it back on is one tap. */
 const confirmDisable = (name: string) => window.confirm(t("admin.apartments.disableConfirm", { name }));
+/** A6 (o1 7f471c8): what the platform manager switched off, only the platform manager switches on again; the server
+ *  answers 409 disabled_by_platform to the admin's enabled: true. */
+const lockedByPlatform = (a: AdminApartment) => !a.enabled && a.disattivato_da?.ruolo === "gestore";
 
 const priceText = (n: number | null | undefined) => (n === null || n === undefined ? t("admin.price.notSet") : t("admin.price.value", { price: fmtPrice(n) }));
 
@@ -34,11 +37,14 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
   const [saving, setSaving] = useState(false);
   const set = (k: "name" | "address") => (v: string) => setF((s) => ({ ...s, [k]: v }));
   const parsed = parsePrice(price);
+  const locked = lockedByPlatform(apt);
   const save = async () => {
     if (apt.enabled && !f.enabled && !confirmDisable(f.name || apt.name)) return;
     setSaving(true);
+    // A6: switched off by the platform manager, «enabled» is not sent at all (a 409 would save nothing of the body)
+    const fields = locked ? { name: f.name, address: f.address } : f;
     // The exception is sent only when it changed (empty = back to the organization's price).
-    const body = parsed !== undefined && parsed !== (apt.energy_price_eur_kwh ?? null) ? { ...f, energy_price_eur_kwh: parsed } : f;
+    const body = parsed !== undefined && parsed !== (apt.energy_price_eur_kwh ?? null) ? { ...fields, energy_price_eur_kwh: parsed } : fields;
     const res = await runAction((c) => adminApi.patchApartment(apt.apartment_id, body, c), { success: t("admin.apartments.saved") });
     setSaving(false);
     if (res) {
@@ -75,9 +81,12 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
               {parsed === undefined ? t("admin.price.invalid") : t("admin.price.aptHint", { price: priceText(orgPrice) })}
             </p>
           </div>
-          <div className="flex items-center justify-between rounded-xl bg-secondary/60 px-3 py-2 sm:col-span-2">
-            <Label htmlFor="apt-enabled">{t("admin.apartments.enabled")}</Label>
-            <Switch id="apt-enabled" checked={f.enabled} onCheckedChange={(v) => setF((s) => ({ ...s, enabled: v }))} data-testid="apt-form-enabled" />
+          <div className="space-y-1 rounded-xl bg-secondary/60 px-3 py-2 sm:col-span-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="apt-enabled">{t("admin.apartments.enabled")}</Label>
+              <Switch id="apt-enabled" checked={f.enabled} disabled={locked} aria-describedby={locked ? "apt-enabled-locked" : undefined} onCheckedChange={(v) => setF((s) => ({ ...s, enabled: v }))} data-testid="apt-form-enabled" />
+            </div>
+            {locked && <p id="apt-enabled-locked" className="text-xs text-muted-foreground" data-testid="apt-form-enabled-locked">{t("admin.apartments.lockedByPlatform")}</p>}
           </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
@@ -146,13 +155,14 @@ function ApartmentRow({ a, orgPrice, verify, onVerify, onToggle, onEdit }: { a: 
                 : t("platform.deletion.disabledAt", { when: fmtDateTime(a.disattivato_at) })}
             </p>
           )}
+          {lockedByPlatform(a) && <p className="text-xs font-medium text-foreground" data-testid={`admin-apartment-locked-${a.apartment_id}`}>{t("admin.apartments.lockedByPlatform")}</p>}
           <p className="text-xs text-muted-foreground" data-testid={`admin-apartment-price-${a.apartment_id}`}>
             {a.energy_price_eur_kwh != null ? t("admin.price.lineApt", { price: priceText(a.energy_price_eur_kwh) }) : t("admin.price.lineOrg", { price: priceText(orgPrice) })}
           </p>
           <p className="text-xs text-muted-foreground">{t("admin.apartments.lastCheck")}: <LastCheck check={a.last_check} testId={`admin-apartment-check-${a.apartment_id}`} /></p>
         </div>
         <div className="flex items-center gap-2">
-          <Switch checked={a.enabled} aria-label={t("admin.apartments.enabled")} onCheckedChange={onToggle} data-testid={`admin-apartment-enabled-${a.apartment_id}`} />
+          <Switch checked={a.enabled} disabled={lockedByPlatform(a)} aria-label={t("admin.apartments.enabled")} onCheckedChange={onToggle} data-testid={`admin-apartment-enabled-${a.apartment_id}`} />
           <Button variant="outline" size="sm" onClick={onEdit} data-testid={`admin-apartment-edit-${a.apartment_id}`}>{t("common.edit")}</Button>
         </div>
       </div>
