@@ -46,6 +46,9 @@
 | **Nessun backup del database** | Il database dello staging non ha backup pianificati: contiene solo dati di prova | Voluto |
 | **Stessa identità della produzione (D04)** | Lo staging gira con lo stesso account della produzione: potrebbe scrivere anche nel database della produzione e leggerne i segreti | In lavorazione: comandi pronti (o1, 11 nov), da lanciare prima del primo appartamento vero |
 | **Accessi condivisi** | Anche dopo D04, staging e produzione usano lo stesso Firebase Authentication: lo staging può ancora gestire gli account di accesso della produzione. Si separa solo con un secondo progetto Firebase | Accettato |
+| **Porta segnata occupata dopo «Riprova»** (A2, risposta 1208) | Se l'agente trova occupata la porta scelta per un appartamento nuovo e si preme «Riprova», l'app prende la porta libera successiva e segna quella vecchia come occupata: nessuna creazione la userà più finché il supporto non controlla chi la usa sulla VM e la libera a mano. «Annulla» invece la libera subito. Staging 10 porte, produzione 49 | Accettato; come liberarla: documento di o1 |
+| **Chiave con lo stesso nome creata fuori dall'app** (A2, risposte 1206 e 1207) | La creazione resta «a metà» e conta nel limite delle 5 l'ora; «Riprova» serve solo dopo che il supporto ha tolto quella chiave, altrimenti «Annulla» e un altro ID (lo dice il messaggio) | Accettato |
+| **Capienza: un motore senza «ENV» conta come staging** (A7, revisione del codice, 20 novembre) | Nella regola dei posti liberi un motore della VM senza la riga `ENV` nelle impostazioni conta come motore dello staging (oggi `dev` e `lab-01` hanno `ENV=staging` da C3 di A2, e i motori creati dall'app hanno sempre `ENV`). Sulla VM di sola produzione (A10) un motore installato a mano senza `ENV` verrebbe contato nel posto sbagliato | Da rivedere con A10; A7 non ancora installato |
 
 ## Aggiornamenti in diretta
 

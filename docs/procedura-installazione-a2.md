@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Corretta dopo la revisione del codice** (20 novembre: punti 1–9 fatti; seconda lettura «installabile», poi N1, N2 e C1.4b corretti); da rileggere. Nessun passo provato sul vero | o1, 20 novembre 2026, 13:46; corretta nel pomeriggio | file della VM e server da `bd4a8bf` (impronte in C2) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | C0–C9 |
+| **Installata nello staging il 20 novembre** (C0–C9, `test-a2-02` «Pronto»), con quattro correzioni trovate durante l'installazione e riportate qui (sezione «Cosa è successo»): **questa è la versione per la seconda VM** | o1, 20 novembre 2026, 13:46; corretta nel pomeriggio | file della VM e server da `c6ed88f` (impronte in C2) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | C0–C9 |
 
 **Cosa si installa** (`docs/proposta-a2.md`, §7):
 
@@ -32,14 +32,14 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git merge-base --is-ancestor bd4a8bf origin/main && git diff --quiet bd4a8bf HEAD -- scripts/agent scripts/agent-vm.sh scripts/engine-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py engine/compose.catalog.yaml bff && echo "file uguali a bd4a8bf, già su GitHub"
+git fetch -q origin && git merge-base --is-ancestor c6ed88f origin/main && git diff --quiet c6ed88f HEAD -- scripts/agent scripts/agent-vm.sh scripts/engine-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py engine/compose.catalog.yaml bff && echo "file uguali a c6ed88f, già su GitHub"
 gcloud iam roles list --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="value(name)" | grep -E "dhA2" || echo "nessun ruolo dhA2"
 gcloud projects get-iam-policy domotica-poc-511707 --account=m.scardovellicrac@gmail.com --flatten="bindings[].members" --filter="bindings.role~secretmanager OR bindings.role~dhA2" --format="table[no-heading](bindings.role,bindings.members,bindings.condition.title)"
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='systemctl is-active domhouse-agent-esecutore domhouse-agent-lettore; sudo ls /opt/domhouse/*.settings; sudo ss -ltn | grep -E ":81(5[0-9]) " || echo "porte 8150-8159 libere"; sudo ls /etc/domhouse/agent-immagine-staging 2>&1 | tail -1; sudo ls -d /data' < /dev/null
 ```
 
 - **Atteso:**
-  1. «file uguali a bd4a8bf, già su GitHub»;
+  1. «file uguali a c6ed88f, già su GitHub»;
   2. «nessun ruolo dhA2»;
   3. nessuna riga di Secret Manager a livello di progetto (il 19 novembre non ce n'erano; i permessi di oggi sono segreto per segreto);
   4. i due servizi `active`; `dev.settings` e `lab-01.settings`; «porte 8150-8159 libere»; «No such file» per `agent-immagine-staging`; `/data`.
@@ -104,6 +104,18 @@ gcloud projects get-iam-policy domotica-poc-511707 --account=m.scardovellicrac@g
 - **Atteso:** esattamente quattro righe, ciascuna con il suo titolo: `dhA2CreaSegreti` e `dhA2VersioniSegreti` a `domotica-bff-staging@` (`a2-creazione-staging`, `a2-versioni-staging`), `secretAccessor` a `domotica-bff-staging@` (`a2-lettura-staging`) e a `langbrain-vm@` (`a2-vm-staging`). Nessuna riga senza titolo: un permesso senza condizione aprirebbe tutti i segreti.
 - I permessi nuovi di IAM possono metterci qualche minuto ad arrivare: C9 lo tiene in conto.
 
+**C1.4a Lo strumento di verifica acceso** (aggiunto il 20 novembre durante l'installazione: senza, C1.4b risponde `SERVICE_DISABLED`, «Policy Troubleshooter API has not been used in project»). Scrive su Google Cloud ma accende solo uno strumento di lettura, gratuito.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud services enable policytroubleshooter.googleapis.com --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+```
+
+- **Atteso:** «Operation … finished successfully» (o niente, se era già acceso).
+- **Ritorno indietro:** lo stesso comando con `disable`.
+- Il 20 novembre l'esito di C1.4b si è letto meglio con `--format=json`: per ogni permesso con condizione, `conditionExplanation.value` (`True`/`False`) e `allowAccessState`; in cima `overallAccessState` (`CAN_ACCESS` / `CANNOT_ACCESS`).
+
 **C1.4b Le esclusioni, provate** (revisione del codice, punto 9, e seconda lettura; sola lettura: lo strumento di Google che spiega se un permesso è concesso, senza toccare niente). Le condizioni guardano il nome del segreto: lo strumento lo deve ricevere (`--resource-name`, `--resource-service`, `--resource-type`), altrimenti non le sa valutare.
 
 ```bash
@@ -142,22 +154,23 @@ gcloud compute scp scripts/agent/comune.py scripts/agent/lettore.py scripts/agen
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a2 && sed -i "s/\r*$//" *.sh *.py *.yaml agent/*.py agent/*.service && sha256sum *.sh *.py *.yaml agent/* | cut -c1-16,65-' < /dev/null
 ```
 
-- **Atteso:** dieci file, poi dieci impronte che cominciano così (calcolate da o1 su `bd4a8bf`, senza i ritorni a capo):
+- **Atteso:** dieci file, poi dieci impronte che cominciano così (calcolate da o1 su `c6ed88f`, senza i ritorni a capo):
 
 | File | Impronta |
 |---|---|
 | `agent-vm.sh` | `b013386278381469` |
-| `broker-vm.sh` | `6a853a834686660b` |
+| `broker-vm.sh` | `6044621450f726ef` (da `d6ea4a0`: `/etc/domhouse` non cambia modo) |
 | `broker_accounts.py` | `8eaec49d1866ac0a` |
 | `compose.catalog.yaml` | `ba1ecece9b543add` |
-| `engine-vm.sh` | `057406a726a30a4a` |
+| `engine-vm.sh` | `ba4375a78bd9f296` (da `d6ea4a0`: le cartelle dei dati con il modo prima del proprietario, `31eec34`; `/etc/domhouse` non cambia modo, `d6ea4a0`) |
 | `agent/comune.py` | `a576ed9ab186d810` |
 | `agent/domhouse-agent-esecutore.service` | `d17f567cf8cfaca2` |
 | `agent/domhouse-agent-lettore.service` | `9824996a467272be` |
-| `agent/esecutore.py` | `f7e3f2948d96e401` |
+| `agent/esecutore.py` | `d159472870821f41` (da `c6ed88f`: il broker prima del motore, le righe del motore nel giornale) |
 | `agent/lettore.py` | `69511594f1e8aa35` |
 
 - Una diversa: fermati.
+- **20 novembre:** C2 e C3 erano già fatti con `engine-vm.sh` di `bd4a8bf` quando C4 ha trovato il difetto di `chown` e `chmod` (`31eec34`): si sono rifatti **solo per `engine-vm.sh`** (copia, impronta `20c57efc4be4d090`, `install -m 755` e `timers`); la copia di prima resta quella di `prima-a2`, `ENV` non si rifà.
 
 ## C3. `engine-vm.sh` e il compose del catalogo; `ENV` su `dev` e `lab-01` (scrive sulla VM; nessun motore si riavvia)
 
@@ -175,18 +188,22 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 ## C4. La prova dell'unità allargata e dell'ambiente dei comandi, prima di installarla (sola lettura, salvo file di prova tolti subito)
 
-Le stesse restrizioni dell'unità nuova (`ReadWritePaths=/opt/domhouse /etc/domhouse /data`, i `ReadOnlyPaths` dentro di loro, `CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE`, `MemoryMax=512M`; nei `-p` di `systemd-run` un'impostazione ripetuta si somma) e lo stesso ambiente che l'esecutore dà agli script (`PATH`, `DOCKER_CONFIG`, `DOMHOUSE_LOCK_HELD=1`).
+Le stesse restrizioni dell'unità nuova (`ReadWritePaths=/opt/domhouse /etc/domhouse /data`, i `ReadOnlyPaths` dentro di loro, `CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE`, `MemoryMax=512M`) e lo stesso ambiente che l'esecutore dà agli script (`PATH`, `DOCKER_CONFIG`, `DOMHOUSE_LOCK_HELD=1`).
+
+- **20 novembre, primo giro di C4:** nei `-p` di `systemd-run` (systemd 252) due `CapabilityBoundingSet=` **non** si sommano: vince l'ultimo (`CapBnd` 0x2). Le restrizioni ora stanno in un array (`P=(…)`, `"${P[@]}"`) con **una sola** voce per `CapabilityBoundingSet` e una per `RestrictAddressFamilies`, fra virgolette; si sommano solo le liste di percorsi (`ReadWritePaths`, `ReadOnlyPaths`).
+- **Lo stesso giro ha trovato un difetto vero** (`engine-vm.sh` fino a `bd4a8bf`): `install -d -m 750 -o 10001` fa prima `chown`, poi `chmod`, e il `chmod` di una cartella non più di root vuole `CAP_FOWNER`, che l'unità non ha: `crea_motore` si sarebbe fermato a `/data/<apt>`. Corretto in `engine-vm.sh` (funzione `data_dirs`: prima il modo, poi il proprietario). La prova qui sotto usa gli stessi due comandi.
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='P="-p User=root -p Group=domhouse-agent -p SupplementaryGroups=domhouse-broker -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p ReadWritePaths=/opt/domhouse -p ReadWritePaths=/etc/domhouse -p ReadWritePaths=/data -p ReadOnlyPaths=/opt/domhouse/agent -p ReadOnlyPaths=/opt/domhouse/engine-vm.sh -p ReadOnlyPaths=/opt/domhouse/broker-vm.sh -p ReadOnlyPaths=/opt/domhouse/broker_accounts.py -p ReadOnlyPaths=-/opt/domhouse/compose.yaml -p ReadOnlyPaths=-/opt/domhouse/compose.catalog.yaml -p ReadOnlyPaths=-/opt/domhouse/compose.broker.yaml -p ReadOnlyPaths=-/opt/domhouse/_broker -p ReadOnlyPaths=/etc/domhouse/agent.conf -p ReadOnlyPaths=-/etc/domhouse/agent-ordini.key -p ReadOnlyPaths=-/etc/domhouse/agent-risultati.key -p ReadOnlyPaths=-/etc/domhouse/agent-immagine-staging -p ReadOnlyPaths=-/etc/domhouse/agent-immagine-prod -p ReadOnlyPaths=-/data/_broker -p CapabilityBoundingSet=CAP_CHOWN -p CapabilityBoundingSet=CAP_DAC_OVERRIDE -p RestrictAddressFamilies=AF_UNIX -p RestrictAddressFamilies=AF_INET -p MemoryMax=512M -p UMask=0077"; E="-E PATH=/usr/sbin:/usr/bin:/sbin:/bin -E DOCKER_CONFIG=/var/lib/domhouse-executor/docker -E DOMHOUSE_LOCK_HELD=1"; sudo systemd-run --quiet --pipe --wait $P /bin/sh -c "id; for d in /opt/domhouse /etc/domhouse /data; do touch \$d/.prova-a2 && rm -f \$d/.prova-a2 && echo scrittura-ok \$d; done; mkdir /data/.prova-a2 && chown 10001:10001 /data/.prova-a2 && chmod 750 /data/.prova-a2 && touch /data/.prova-a2/x && rm -rf /data/.prova-a2 && echo dati-10001-ok; for f in /opt/domhouse/engine-vm.sh /etc/domhouse/agent.conf /opt/domhouse/agent/esecutore.py; do touch \$f 2>/dev/null && echo SCRIVIBILE \$f || echo sola-lettura-ok \$f; done; head -1 /proc/net/tcp > /dev/null && head -1 /proc/net/tcp6 > /dev/null && echo proc-net-ok; echo porta-8100-in-ascolto: \$(cat /proc/net/tcp /proc/net/tcp6 | grep -cE \":1FA4 [0-9A-F]+:[0-9A-F]+ 0A \")"; sudo systemd-run --quiet --pipe --wait $E $P /bin/sh -c "docker compose version && docker login --help > /dev/null && echo docker-login-ok"; sudo systemd-run --quiet --pipe --wait $E $P /bin/bash /opt/domhouse/engine-vm.sh status dev | tail -1; sudo systemd-run --quiet --pipe --wait $E $P /bin/bash /opt/domhouse/broker-vm.sh.a2 sync | tail -1' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='P=(-p User=root -p Group=domhouse-agent -p SupplementaryGroups=domhouse-broker -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p ReadWritePaths=/opt/domhouse -p ReadWritePaths=/etc/domhouse -p ReadWritePaths=/data -p ReadOnlyPaths=/opt/domhouse/agent -p ReadOnlyPaths=/opt/domhouse/engine-vm.sh -p ReadOnlyPaths=/opt/domhouse/broker-vm.sh -p ReadOnlyPaths=/opt/domhouse/broker_accounts.py -p ReadOnlyPaths=-/opt/domhouse/compose.yaml -p ReadOnlyPaths=-/opt/domhouse/compose.catalog.yaml -p ReadOnlyPaths=-/opt/domhouse/compose.broker.yaml -p ReadOnlyPaths=-/opt/domhouse/_broker -p ReadOnlyPaths=/etc/domhouse/agent.conf -p ReadOnlyPaths=-/etc/domhouse/agent-ordini.key -p ReadOnlyPaths=-/etc/domhouse/agent-risultati.key -p ReadOnlyPaths=-/etc/domhouse/agent-immagine-staging -p ReadOnlyPaths=-/etc/domhouse/agent-immagine-prod -p ReadOnlyPaths=-/data/_broker -p "CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE" -p "RestrictAddressFamilies=AF_UNIX AF_INET" -p MemoryMax=512M -p UMask=0077); E=(-E PATH=/usr/sbin:/usr/bin:/sbin:/bin -E DOCKER_CONFIG=/var/lib/domhouse-executor/docker -E DOMHOUSE_LOCK_HELD=1); sudo systemd-run --quiet --pipe --wait "${P[@]}" /bin/sh -c "id; grep CapBnd /proc/self/status; for d in /opt/domhouse /etc/domhouse /data; do touch \$d/.prova-a2 && rm -f \$d/.prova-a2 && echo scrittura-ok \$d; done; install -d -m 750 /data/.prova-a2 && chown -h 10001:10001 /data/.prova-a2 && stat -c \"dati %a %u\" /data/.prova-a2 && touch /data/.prova-a2/x && rm -rf /data/.prova-a2 && echo dati-10001-ok; mkdir /data/.prova-b && chown 10001:10001 /data/.prova-b && { chmod 750 /data/.prova-b 2>/dev/null && echo FOWNER-PRESENTE || echo senza-fowner-ok; }; rm -rf /data/.prova-b; for f in /opt/domhouse/engine-vm.sh /etc/domhouse/agent.conf /opt/domhouse/agent/esecutore.py; do touch \$f 2>/dev/null && echo SCRIVIBILE \$f || echo sola-lettura-ok \$f; done; head -1 /proc/net/tcp > /dev/null && head -1 /proc/net/tcp6 > /dev/null && echo proc-net-ok; echo porta-8100-in-ascolto: \$(cat /proc/net/tcp /proc/net/tcp6 | grep -cE \":1FA4 [0-9A-F]+:[0-9A-F]+ 0A \")"; sudo systemd-run --quiet --pipe --wait "${E[@]}" "${P[@]}" /bin/sh -c "docker compose version && docker login --help > /dev/null && echo docker-login-ok"; sudo systemd-run --quiet --pipe --wait "${E[@]}" "${P[@]}" /bin/bash /opt/domhouse/engine-vm.sh status dev | tail -1; sudo systemd-run --quiet --pipe --wait "${E[@]}" "${P[@]}" /bin/bash /opt/domhouse/broker-vm.sh.a2 sync | tail -1' < /dev/null
 ```
 
 - **Atteso:**
-  1. `uid=0(root) gid=…(domhouse-agent) groups=…(domhouse-agent),1883(domhouse-broker)`;
+  1. `uid=0(root) gid=…(domhouse-agent) groups=…(domhouse-agent),1883(domhouse-broker)` e `CapBnd: 0000000000000003` (`CAP_CHOWN` e `CAP_DAC_OVERRIDE`, nient'altro). Un altro valore: fermati;
   2. tre «scrittura-ok» (`/opt/domhouse`, `/etc/domhouse`, `/data`);
-  3. «dati-10001-ok»: una cartella data a 10001 e svuotata da root, quindi `CAP_CHOWN` e `CAP_DAC_OVERRIDE` funzionano (N3);
+  3. «dati 750 10001» e «dati-10001-ok»: la cartella fatta come `data_dirs` di `engine-vm.sh` (`install -d -m 750`, poi `chown -h`) ha il modo e il proprietario giusti, e root la svuota (`CAP_DAC_OVERRIDE`, N3);
+  3b. «senza-fowner-ok»: il vecchio ordine (prima `chown`, poi `chmod`) è rifiutato, quindi l'unità non ha `CAP_FOWNER`, come vuole la revisione. «FOWNER-PRESENTE»: fermati;
   4. tre «sola-lettura-ok» (lo script, la configurazione e il codice dell'agente restano in sola lettura; revisione, punto 2). Un «SCRIVIBILE»: fermati;
   5. «proc-net-ok» e «porta-8100-in-ascolto: 1» (o più): la porta di `dev`, pubblicata da Docker, si vede in `/proc/net/tcp*`. Con **0** Docker non usa il suo proxy: allora il controllo della porta libera resta solo sulle impostazioni dei motori (revisione, «da verificare» 2), e lo si scrive nel registro;
   6. la versione di `docker compose` e «docker-login-ok»: il client e il suo `login` partono sotto le restrizioni e con 512 MB (revisione, punto 8);
@@ -202,11 +219,13 @@ L'immagine su cui gira `dev` oggi, per digest: quella del registro **e** quella 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-I="$(gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo sed -n "s/^ENGINE_IMAGE=//p" /opt/domhouse/dev.settings' < /dev/null 2>/dev/null | tr -d '\r' | tail -1)"; D="$(gcloud artifacts docker images describe "$I" --format='value(image_summary.digest)' --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com | tr -d '\r')"; R="$(gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo docker image inspect -f "{{join .RepoDigests \" \"}}" "$(sudo docker inspect -f "{{.Image}}" engine-dev)"' < /dev/null 2>/dev/null | tr -d '\r' | tail -1)"; echo "$I"; echo "$D"; echo "$R"; A="${I%:*}@$D"; if [[ "$I" =~ ^europe-west8-docker\.pkg\.dev/domotica-poc-511707/domotica/engine:[0-9a-f]{7,40}$ && "$D" =~ ^sha256:[0-9a-f]{64}$ && " $R " == *" $A "* ]]; then gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command="echo '$A' | sudo tee /etc/domhouse/agent-immagine-staging.nuovo > /dev/null && sudo chmod 644 /etc/domhouse/agent-immagine-staging.nuovo && sudo mv -f /etc/domhouse/agent-immagine-staging.nuovo /etc/domhouse/agent-immagine-staging && sudo ls -l /etc/domhouse/agent-immagine-staging && sudo cat /etc/domhouse/agent-immagine-staging" < /dev/null; else echo "immagine o digest non letti, o il motore non gira su quel digest: fermati"; fi
+I="$(gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo sed -n "s/^ENGINE_IMAGE=//p" /opt/domhouse/dev.settings' < /dev/null 2>/dev/null | tr -d '\r' | tail -1)"; D="$(gcloud artifacts docker images describe "$I" --format='value(image_summary.digest)' --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com | tr -d '\r')"; R="$(gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo docker image inspect -f "{{join .RepoDigests \" \"}}" "$(sudo docker inspect -f "{{.Image}}" engine-dev)"' < /dev/null 2>/dev/null | tr -d '\r' | tail -1)"; echo "$I"; echo "$D"; echo "$R"; A="${I%:*}@$D"; if [[ "$I" =~ ^europe-west8-docker\.pkg\.dev/domotica-poc-511707/domotica/engine:[0-9a-f]{7,40}$ && "$D" =~ ^sha256:[0-9a-f]{64}$ && " $R " == *" $A "* ]] && git merge-base --is-ancestor ce31e08 "${I##*:}" 2>/dev/null; then gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command="echo '$A' | sudo tee /etc/domhouse/agent-immagine-staging.nuovo > /dev/null && sudo chmod 644 /etc/domhouse/agent-immagine-staging.nuovo && sudo mv -f /etc/domhouse/agent-immagine-staging.nuovo /etc/domhouse/agent-immagine-staging && sudo ls -l /etc/domhouse/agent-immagine-staging && sudo cat /etc/domhouse/agent-immagine-staging" < /dev/null; else echo "immagine o digest non letti, o il motore non gira su quel digest, o il suo commit non accetta il catalogo vuoto (manca ce31e08): fermati"; fi
 ```
 
 - **Atteso:** l'immagine di `dev` (`…/engine:<commit>`), il suo digest (`sha256:` e 64 cifre), i `RepoDigests` del contenitore (fra loro `…/engine@` e lo stesso digest), poi il file `-rw-r--r-- root root` con una riga `…/engine@sha256:…`.
 - **Ritorno indietro:** `sudo rm -f /etc/domhouse/agent-immagine-staging` (senza il file, `crea_motore` rifiuta «immagine non approvata»).
+- **20 novembre, C9.2:** la prima volta qui si è approvata `engine:f4c6a20`, l'immagine di `dev`, più vecchia della PR #17 (`ce31e08`, il catalogo vuoto è valido): ogni `crea_motore` si fermava con «motore non sano» (il motore usciva con 3, «catalog: rooms must be a non-empty list»). Ora il blocco controlla che il commit dell'immagine contenga `ce31e08` (lo stesso controllo in `publish-all.sh`, passo 3b).
+- **Se l'esecutore nuovo gira già** (C5 rifatto dopo C6): subito dopo, `sudo flock -w 300 /opt/domhouse/.engines.lock systemctl restart domhouse-agent-esecutore`, perché il file appena sostituito torni in sola lettura per lui (seconda lettura, N1).
 - Il file c'è **prima** di C6: l'esecutore nuovo, all'avvio, lo trova e lo tiene in sola lettura (seconda lettura della revisione, N2).
 
 ## C6. L'agente nuovo e `broker-vm.sh` nuovo, insieme (scrive sulla VM; il broker non si riavvia)
@@ -307,6 +326,23 @@ L'unità tiene in sola lettura per l'esecutore `agent.conf`, le due chiavi, l'im
 2. chi sostituisce a mano una chiave o `agent.conf` lancia subito dopo, sulla VM: `sudo flock -w 300 /opt/domhouse/.engines.lock systemctl restart domhouse-agent-esecutore`;
 3. finché non riparte, l'esecutore rifiuta gli ordini che cambiano la VM («fallito», con l'allarme `protezione_persa` nel giornale): nessun danno, solo «Riprova» dopo il riavvio.
 
+## Cosa è successo nello staging il 20 novembre (da sapere per la seconda VM)
+
+Quattro difetti trovati durante l'installazione, tutti corretti nel codice e in questa procedura. Con i file di `c6ed88f` non si ripresentano.
+
+| Dove si è fermata | Che cosa | Correzione |
+|---|---|---|
+| C4 | la prova sommava due `-p CapabilityBoundingSet=` (in `systemd-run` vince l'ultimo); e `engine-vm.sh` dava la cartella dei dati a 10001 prima di cambiarne il modo, che senza `CAP_FOWNER` è rifiutato | `31eec34`: `data_dirs`, prima il modo poi il proprietario; C4 con un array e una sola voce |
+| C9.2, primo giro | l'immagine approvata era quella di `dev`, `engine:f4c6a20`, più vecchia della PR #17 (`ce31e08`, il catalogo vuoto): il motore usciva con 3 | `b7d7098`: C5 e `publish-all` approvano solo un'immagine che contiene `ce31e08`. Nello staging: `dev` portato a `engine:feb483c`, C5 rifatto, l'esecutore riavviato sotto il blocco |
+| C9.2, secondo giro | `crea_motore` aggiungeva l'account del broker **dopo** la salute del motore, che è 503 finché il connector non entra | `c6ed88f`: catalogo, poi `add-apartment`, poi il motore; prima di togliere un motore fallito, le sue ultime righe nel giornale dell'esecutore |
+| C9.2, durante «Riprova» | `engine-vm.sh` (e `broker-vm.sh`) rimettevano `/etc/domhouse` a 700: il lettore, ripartendo, non leggeva più la sua configurazione | `d6ea4a0`: `/etc/domhouse` si crea solo se manca, 755; nessuno script ne cambia il modo |
+
+**Per la seconda VM** (script dell'installazione, risposta 1194):
+
+1. il motore di riferimento della VM (quello da cui C5 prende l'immagine approvata) deve contenere `ce31e08`: C5 lo controlla e si ferma;
+2. C5 fatto **dopo** C6 (con l'esecutore che gira) va seguito dal riavvio dell'esecutore sotto il blocco;
+3. dopo C9.2: `stat -c "%a %U" /etc/domhouse` dice «755 root».
+
 ## Da verificare sulla VM (revisione del codice, 20 novembre)
 
 | N. | Che cosa | Dove si vede |
@@ -318,12 +354,14 @@ L'unità tiene in sola lettura per l'esecutore `agent.conf`, le due chiavi, l'im
 | 5 | i `ReadOnlyPaths` vincono sui `ReadWritePaths` più larghi | C4 (punto 4), C6 (punto 2) |
 | 6 | dopo C6 nessun `protezione_persa` nel giornale dell'esecutore (i file protetti c'erano tutti all'avvio) | C9.2: `sudo journalctl -u domhouse-agent-esecutore --no-pager \| grep -c protezione_persa` deve dire 0 |
 
-## Decisioni per il committente (non di o1)
+## Decisioni del committente (20 novembre)
 
-1. **`test-a2-02` dopo la prova** (C9.3): resta come appartamento di laboratorio fino ad A6, oppure si toglie a mano.
-2. **Due scelte di o1 nel codice del server**, da confermare o cambiare:
-   - un segreto con il nome giusto ma non nostro (`secret_conflict`) lascia l'appartamento «rimasto a metà» (con «Riprova» e «Annulla») e la creazione conta nel limite delle 5 l'ora;
-   - una porta che la VM dice occupata (`porta_occupata`) resta segnata come tale finché qualcuno non la libera a mano: «Riprova» non la riprende mai.
+| Risposta | Decisione |
+|---|---|
+| 1205 = a | `test-a2-02` resta come appartamento di laboratorio fino ad A6 |
+| 1206 = a | `secret_conflict` lascia la creazione «a metà» e conta nel limite delle 5 l'ora |
+| 1207 = a | o2 cambia il testo di `secret_conflict` nel sito |
+| 1208 = a | una porta segnata occupata dopo «Riprova» resta segnata; come vederle e liberarne una: `docs/motore-vm.md`, sezione G3 |
 
 ## Da incollare alla memoria storica
 

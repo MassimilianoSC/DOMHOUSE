@@ -1924,7 +1924,51 @@ entrare, poi invita gli altri utenti.».
 
 ### Appartamenti di un'organizzazione: creare un appartamento
 
-**La parte tecnica: identificativo, collegamento, codice Italianway.**
+**Due pulsanti: «Nuovo appartamento» crea tutto dall'app; «Collega un sistema esistente» collega un sistema già installato.**
+
+**Creare un appartamento dall'app (per ora solo nello staging, dal 20 novembre 2026):**
+
+1. **Apri** «Organizzazioni», poi «Appartamenti» dell'organizzazione.
+2. **Premi «Nuovo appartamento»**: si apre «Nuovo appartamento in …».
+3. **Scrivi l'«ID»**: nello staging comincia con `lab-` o `test-`; lettere minuscole, cifre e trattini. Non si cambia più.
+4. **Scrivi il «Nome»**; il «Fuso orario» è già Europe/Rome.
+5. **L'«ID Italianway»** è facoltativo: si può aggiungere anche dopo.
+6. **Premi «Crea»**: ci vogliono alcuni minuti. In cima al modulo: «Se la creazione si ferma a metà, l'appartamento
+   resta nell'elenco come «Non creato» finché non premi «Riprova» o «Annulla creazione».»
+
+- **Limite:** al massimo 5 appartamenti all'ora per ogni organizzazione. Il riquadro sopra «Crea» dice quanti ne
+  sono stati creati nell'ultima ora; raggiunto il limite diventa giallo e dice da che ora si può creare di nuovo.
+- **In produzione** «Nuovo appartamento» è spento: arriverà con la seconda macchina virtuale.
+- **Nello staging senza agente** il pulsante è spento con «Non disponibile in questo ambiente: manca il collegamento
+  con la macchina virtuale.».
+
+**Gli stati della creazione:**
+
+| Stato | Cosa vedi | Cosa fai |
+|---|---|---|
+| In preparazione | I 5 passi: prenotazione di id e porta, chiavi, spazio sulla macchina virtuale, installazione del sistema domotico, collegamento all'app; sotto, «Di solito ci vogliono da 1 a 5 minuti; la prima volta può volerci di più. Puoi chiudere la pagina: la creazione continua.» | Niente: puoi chiudere la pagina |
+| Non creato | Riga rossa in cima, con «Cosa è successo», il passo a cui si è fermata e l'«ID richiesta» | «Riprova» oppure «Annulla creazione», secondo il messaggio |
+| Annullamento in corso | La riga resta finché tutto è tolto, poi sparisce con l'avviso | Niente |
+| Pronto | La riga come gli altri appartamenti, con l'invito a registrare gli Shelly | Credenziali dei dispositivi |
+
+- **Un appartamento creato dall'app** non ha «Modifica collegamento» né «Elimina»: l'eliminazione arriverà più
+  avanti (A6).
+- **«Non creato»** tiene riservati id e porta finché non premi «Riprova» o «Annulla creazione».
+- **«Annulla creazione»** chiede conferma: toglie sistema domotico, accesso dei dispositivi e chiavi. L'id non si
+  potrà più usare; le chiavi si recuperano per 7 giorni.
+- **Sulla scheda dell'organizzazione**, anche a elenco chiuso: riga rossa «1 appartamento non creato: serve
+  «Riprova» o «Annulla creazione»» con «Vedi»; riga grigia per quelli in preparazione.
+- **Il registro attività** scrive «ha fatto ripartire la creazione» e «ha annullato la creazione».
+
+**Messaggi di «Cosa è successo» da conoscere:**
+
+| Messaggio | Cosa fare |
+|---|---|
+| «La porta scelta è occupata sulla VM: «Riprova» ne prende un'altra.» | «Riprova» usa la porta libera successiva; quella occupata resta segnata finché il supporto non la controlla. «Annulla» invece la libera |
+| «C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla creazione» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che il supporto ha tolto quella chiave.» | «Annulla creazione» e un ID diverso. Nel modulo, prima di «Crea», lo stesso caso dice «C'è già una chiave con questo nome, creata fuori dall'app: scegli un altro ID.» |
+| «Il sistema domotico è stato tolto, ma le chiavi no: «Annulla creazione» di nuovo.» | Premi di nuovo «Annulla creazione» |
+
+**Collegare un sistema esistente (la parte tecnica: identificativo, collegamento, codice Italianway):**
 
 **L'elenco, una riga per appartamento:**
 
@@ -1934,7 +1978,7 @@ entrare, poi invita gli altri utenti.».
 - **Senza appartamenti** leggi «Nessun appartamento in questa organizzazione».
 - **Da qui** non si aprono Panoramica, dispositivi o consumi.
 
-**«Nuovo appartamento»** apre «Nuovo appartamento per …» («L'identificativo non si potrà più cambiare: usa minuscole,
+**«Collega un sistema esistente»** apre «Collega un sistema esistente a …» («L'identificativo non si potrà più cambiare: usa minuscole,
 numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l'amministratore
 dell'organizzazione.»).
 
@@ -2380,7 +2424,8 @@ Vedi la parte 5, «Approvazioni: approvare o respingere». In breve:
 1. **«Organizzazioni» › «Elenco organizzazioni» › «Nuova organizzazione»**: «Nome dell'organizzazione», «Email del
    primo amministratore», eventuale nome; «Crea». Leggi l'esito dell'invito.
 2. **Il primo amministratore entra** come nella parte 2. Finché non entra puoi usare «Reinvia invito».
-3. **Nella scheda dell'organizzazione** premi «Appartamenti» › «Nuovo appartamento».
+3. **Nella scheda dell'organizzazione** premi «Appartamenti» › «Collega un sistema esistente». Nello staging, per
+   un appartamento nuovo da zero, c'è anche «Nuovo appartamento» (parte 7).
 4. **Compila** «ID» definitivo, «Nome», «Indirizzo del sistema domotico», eventuale «Porta», «Fuso orario», «ID
    Italianway» (deve essere quello giusto: decide dove vanno le prenotazioni), «Attivo», «Appartamento dimostrativo»;
    «Salva».
@@ -2973,6 +3018,14 @@ Per ogni problema annota:
 ## 14. Novità
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
+
+### 20 novembre 2026 (staging)
+
+- **Gestore della piattaforma**: «Nuovo appartamento» crea un appartamento dall'app, dalle chiavi al sistema
+  domotico, in pochi minuti (parte 7). Il pulsante di prima si chiama ora «Collega un sistema esistente».
+- **Durante la creazione** una riga dice quanto ci vuole di solito; i messaggi nominano sempre il pulsante «Annulla
+  creazione».
+- **In produzione** «Nuovo appartamento» resta spento fino alla seconda macchina virtuale.
 
 ### 17 novembre 2026
 

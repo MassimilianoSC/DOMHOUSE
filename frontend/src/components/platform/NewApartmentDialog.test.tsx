@@ -73,7 +73,8 @@ describe("i campi (§2.1)", () => {
   it("titolo con l'organizzazione, riga su cosa aspettarsi, fuso già scritto, testi sotto id e codice Italianway", async () => {
     await open();
     expect(screen.getByText("Nuovo appartamento in Residenze Esempio")).toBeInTheDocument();
-    expect(screen.getByText(/Ci vogliono alcuni minuti/)).toBeInTheDocument();
+    // the row's button by its name: the form has an «Annulla» of its own
+    expect(screen.getByText(/Ci vogliono alcuni minuti/)).toHaveTextContent("finché non premi «Riprova» o «Annulla creazione».");
     expect(screen.getByTestId("apt-form-timezone")).toHaveValue("Europe/Rome");
     expect(screen.getByText("Nello staging comincia con lab- o test-; lettere minuscole, cifre e trattini. Non si cambia più.")).toBeInTheDocument();
     expect(screen.getByText("Si può aggiungere anche dopo.")).toBeInTheDocument();
@@ -202,7 +203,7 @@ describe("gli altri rifiuti di «Crea» restano nel modulo (§6.1)", () => {
 
   it("secret_conflict: il testo del sito con l'ID richiesta da copiare", async () => {
     await refuse(new ApiError(409, "secret_conflict", "segreto", "corr-77"));
-    expect(screen.getByTestId("new-apt-error")).toHaveTextContent("C'è già una chiave con questo nome: serve un controllo.");
+    expect(screen.getByTestId("new-apt-error")).toHaveTextContent("C'è già una chiave con questo nome, creata fuori dall'app: scegli un altro ID.");
     expect(screen.getByTestId("new-apt-error-id")).toHaveTextContent("corr-77");
   });
 

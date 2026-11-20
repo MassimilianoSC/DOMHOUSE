@@ -218,3 +218,44 @@ def test_a7_review3_a_mark_left_from_before_a_stop_starts_the_count_again(vm):
     assert "vm mem low" not in check_lines(vm)                                       # the count starts again
     since, last = (vm.opt / ".mem-low-since").read_text(encoding="utf-8").split()
     assert int(since) > old + 50 * 60 and int(last) >= int(since)
+# ---- 20 November, A2 C4 on the VM: the mode first, then the owner -----------------------------------------------------
+def test_c4_the_data_folders_get_their_mode_while_root_s_and_then_the_owner(vm):
+    """Under the executor's unit (CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE, no CAP_FOWNER) a chmod of a folder
+    that is no longer root's is refused: «install -d -m 750 -o 10001» does chown, then chmod, and stopped crea_motore
+    at /data/<apt>. Now install -d -m 750 (root's), then chown -h (never following a link)."""
+    assert agent_install(vm).returncode == 0
+    chown = log(vm, "chown")
+    data = base.posix(vm.data / APT)
+    assert f"-h 10001:10001 {data} {data}/backup" in chown, chown
+
+
+def test_c4_nothing_in_engine_vm_changes_a_mode_after_giving_the_file_away():
+    text = SCRIPT.read_text(encoding="utf-8")
+    assert '-o "${ENGINE_UID}"' not in text                        # install -o: chown, then chmod
+    backup = text[text.index("backup() {"):text.index("install_timer() {")]
+    assert backup.index('chmod 640 "${tmp}"') < backup.index('chown -h "${ENGINE_UID}:${ENGINE_UID}" "${tmp}"')
+
+
+# ---- 20 November, A2 C9.2: /etc/domhouse keeps its 755 (the agent's reader goes through it) -------------------------
+def test_c92_an_existing_etc_folder_never_gets_another_mode(vm):
+    """write_key did «install -d -m 700 -o root -g root /etc/domhouse» at every install, update, key and crea_motore:
+    on an existing folder that sets 700, and the agent's reader (user domhouse-agent) could no longer reach its
+    agent-lettore.conf: at its next start it looped on PermissionError. Now the folder is made only when it is missing,
+    755 like agent-vm.sh; the files inside keep their own modes (600)."""
+    install = vm.stubs / "install"
+    install.write_text(install.read_text(encoding="utf-8").replace(
+        "#!/usr/bin/env bash\n", '#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/install.log"\n', 1),
+        encoding="utf-8", newline="\n")
+    (vm.stubs / "secret-langbrain-api-key-apt-prova-01").write_text("chiave-di-prova-lunga", encoding="utf-8")
+    assert vm("key", "apt-prova-01").returncode == 0
+    assert agent_install(vm).returncode == 0
+    etc = base.posix(vm.etc)
+    assert not [line for line in log(vm, "install").splitlines() if line.split()[-1] == etc], log(vm, "install")
+
+
+def test_c92_no_script_sets_the_etc_folder_s_mode_unguarded():
+    for name in ("engine-vm.sh", "broker-vm.sh"):
+        text = (ROOT / "scripts" / name).read_text(encoding="utf-8")
+        for line in text.splitlines():
+            if 'install -d' in line and line.rstrip().endswith('"${ETC}"'):
+                assert '[ -d "${ETC}" ] ||' in line and "-m 755" in line, (name, line)

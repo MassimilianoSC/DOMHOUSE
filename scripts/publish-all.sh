@@ -339,6 +339,10 @@ fi
 # ---- 3b: the agent's approved image (A2, answer 1164) -----------------------------------------------------------
 APPROVED_FILE=/etc/domhouse/agent-immagine-staging
 APPROVED_DONE="invariata"
+# 20 November, A2 C9.2: the approved image was engine:f4c6a20, older than PR #17 (ce31e08, the empty catalog is
+# valid), and every crea_motore stopped («catalog: rooms must be a non-empty list», exit 3). Only an engine whose
+# commit contains this one is approved (moved only by the tests)
+MIN_ENGINE_COMMIT="${PUBLISH_MIN_ENGINE_COMMIT:-ce31e08}"
 RUNNING_IMAGE="${VM_IMAGE}"
 [ -z "${ENGINE_NEEDED}" ] || RUNNING_IMAGE="${ENGINE_IMAGE}"
 if [ -n "${DRY_RUN}" ] && [ -n "${ENGINE_NEEDED}" ]; then
@@ -346,8 +350,11 @@ if [ -n "${DRY_RUN}" ] && [ -n "${ENGINE_NEEDED}" ]; then
   APPROVED_DONE="da scrivere dopo la costruzione"
 else
   case "${RUNNING_IMAGE}" in
-    *@sha256:*) APPROVED="${RUNNING_IMAGE}" ;;
+    *@sha256:*)
+      stop "Il motore ${ENGINE_APARTMENT} gira su un'immagine per digest (${RUNNING_IMAGE}): non so di quale commit è, quindi non la approvo per l'agente. Riporta ${ENGINE_APARTMENT} su un'immagine per commit (engine-vm.sh update), poi rilancia." ;;
     *)
+      git -C "${ROOT}" merge-base --is-ancestor "${MIN_ENGINE_COMMIT}" "${RUNNING_IMAGE##*:}" 2>/dev/null \
+        || stop "Il motore ${ENGINE_APARTMENT} gira su ${RUNNING_IMAGE##*:}, che non accetta il catalogo vuoto (serve un commit che contenga ${MIN_ENGINE_COMMIT}, PR #17): l'immagine approvata dell'agente non si scrive. Il resto è pubblicato; serve un motore più recente."
       digest="$(gc artifacts docker images describe "${RUNNING_IMAGE}" --format='value(image_summary.digest)' 2>/dev/null \
         | tr -d '\r' | tail -1)" || digest=""
       [[ "${digest}" =~ ^sha256:[0-9a-f]{64}$ ]] || stop "Non leggo dal registro il digest di ${RUNNING_IMAGE}: il motore è a posto, manca solo l'immagine approvata dell'agente. Rilancia lo stesso comando."

@@ -148,8 +148,11 @@ def pub(tmp_path):
 
     def run(commit=None, answer="pubblica\n", env=""):
         (stubs / "calls.log").unlink(missing_ok=True)
+        # the engine commit from which the approved image is allowed (in the real repository ce31e08, PR #17): here the
+        # throwaway repository's first commit, unless the test says another
         cmd = (f'export PATH="{posix(stubs)}:$PATH" STUB_DIR="{posix(stubs)}"; cd "{posix(r)}" && '
-               f'{env} PUBLISH_SH="{posix(stubs / "publish.sh")}" DEPLOY_ENGINE_SH="{posix(stubs / "deploy-engine.sh")}" '
+               f'PUBLISH_MIN_ENGINE_COMMIT={on_vm} {env} PUBLISH_SH="{posix(stubs / "publish.sh")}" '
+               f'DEPLOY_ENGINE_SH="{posix(stubs / "deploy-engine.sh")}" '
                f'PUBLISH_HEALTH_TRIES=2 PUBLISH_HEALTH_WAIT_S=0 bash scripts/publish-all.sh {commit or lot}')
         done = subprocess.run([bash, "-c", cmd], capture_output=True, text=True, encoding="utf-8", errors="replace",
                               timeout=120, input=answer)
@@ -447,3 +450,16 @@ def test_review_n1_without_the_agent_there_is_nothing_to_restart(pub):
     done, calls = pub()
     assert done.returncode == 0, done.stdout + done.stderr
     assert "esecutore dell'agente non installato" in done.stdout
+
+
+
+def test_c92_an_image_older_than_the_empty_catalog_is_never_approved(pub):
+    """20 November, A2 C9.2: the approved image was dev's engine:f4c6a20, older than PR #17 (ce31e08, the empty catalog
+    is valid): every crea_motore failed («catalog: rooms must be a non-empty list», exit 3). publish-all approves only
+    an image whose commit contains that one: here the minimum is a commit the lot does not contain."""
+    later = pub.git("commit-tree", "HEAD^{tree}", "-p", pub.git("rev-parse", pub.lot), "-m", "dopo il lotto")
+    done, calls = pub(env=f"PUBLISH_MIN_ENGINE_COMMIT={later}")
+    out = done.stdout + done.stderr
+    assert done.returncode == 1 and "non accetta il catalogo vuoto" in out, out
+    assert "update" in steps(calls)                                     # the engine is published, then the stop
+    assert "agent-immagine-staging.nuovo" not in calls and not (pub.stubs / "vm-approved").exists()

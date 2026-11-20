@@ -394,6 +394,7 @@
 </li>
 <li><a href="#14-novita-710a48f5">14. Novità</a>
 <ol>
+<li><a href="#20-novembre-2026-staging-9db0d001">20 novembre 2026 (staging)</a></li>
 <li><a href="#17-novembre-2026-3f0416fc">17 novembre 2026</a></li>
 <li><a href="#13-novembre-2026-11e5f0c5">13 novembre 2026</a></li>
 <li><a href="#9-novembre-2026-lotti-35-e-36-fd660053">9 novembre 2026 (lotti 35 e 36)</a></li>
@@ -3260,7 +3261,80 @@ l&#x27;assistenza HQE.».</p>
 </li>
 </ul>
 <h3 id="appartamenti-di-un-organizzazione-creare-un-appartamento-2a84f51f">Appartamenti di un&#x27;organizzazione: creare un appartamento</h3>
-<p class="lead"><strong>La parte tecnica: identificativo, collegamento, codice Italianway.</strong></p>
+<p class="lead"><strong>Due pulsanti: «Nuovo appartamento» crea tutto dall&#x27;app; «Collega un sistema esistente» collega un sistema già installato.</strong></p>
+<p><strong>Creare un appartamento dall&#x27;app (per ora solo nello staging, dal 20 novembre 2026):</strong></p>
+<ol>
+<li>
+<p><strong>Apri</strong> «Organizzazioni», poi «Appartamenti» dell&#x27;organizzazione.</p>
+</li>
+<li>
+<p><strong>Premi «Nuovo appartamento»</strong>: si apre «Nuovo appartamento in …».</p>
+</li>
+<li>
+<p><strong>Scrivi l&#x27;«ID»</strong>: nello staging comincia con <code>lab-</code> o <code>test-</code>; lettere minuscole, cifre e trattini. Non si cambia più.</p>
+</li>
+<li>
+<p><strong>Scrivi il «Nome»</strong>; il «Fuso orario» è già Europe/Rome.</p>
+</li>
+<li>
+<p><strong>L&#x27;«ID Italianway»</strong> è facoltativo: si può aggiungere anche dopo.</p>
+</li>
+<li>
+<p><strong>Premi «Crea»</strong>: ci vogliono alcuni minuti. In cima al modulo: «Se la creazione si ferma a metà, l&#x27;appartamento
+resta nell&#x27;elenco come «Non creato» finché non premi «Riprova» o «Annulla creazione».»</p>
+</li>
+</ol>
+<ul>
+<li>
+<p><strong>Limite:</strong> al massimo 5 appartamenti all&#x27;ora per ogni organizzazione. Il riquadro sopra «Crea» dice quanti ne
+sono stati creati nell&#x27;ultima ora; raggiunto il limite diventa giallo e dice da che ora si può creare di nuovo.</p>
+</li>
+<li>
+<p><strong>In produzione</strong> «Nuovo appartamento» è spento: arriverà con la seconda macchina virtuale.</p>
+</li>
+<li>
+<p><strong>Nello staging senza agente</strong> il pulsante è spento con «Non disponibile in questo ambiente: manca il collegamento
+con la macchina virtuale.».</p>
+</li>
+</ul>
+<p><strong>Gli stati della creazione:</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Stato</th><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa fai</th></tr></thead>
+<tbody>
+<tr><td data-label="Stato" class="align-left">In preparazione</td><td data-label="Cosa vedi" class="align-left">I 5 passi: prenotazione di id e porta, chiavi, spazio sulla macchina virtuale, installazione del sistema domotico, collegamento all&#x27;app; sotto, «Di solito ci vogliono da 1 a 5 minuti; la prima volta può volerci di più. Puoi chiudere la pagina: la creazione continua.»</td><td data-label="Cosa fai" class="align-left">Niente: puoi chiudere la pagina</td></tr>
+<tr><td data-label="Stato" class="align-left">Non creato</td><td data-label="Cosa vedi" class="align-left">Riga rossa in cima, con «Cosa è successo», il passo a cui si è fermata e l&#x27;«ID richiesta»</td><td data-label="Cosa fai" class="align-left">«Riprova» oppure «Annulla creazione», secondo il messaggio</td></tr>
+<tr><td data-label="Stato" class="align-left">Annullamento in corso</td><td data-label="Cosa vedi" class="align-left">La riga resta finché tutto è tolto, poi sparisce con l&#x27;avviso</td><td data-label="Cosa fai" class="align-left">Niente</td></tr>
+<tr><td data-label="Stato" class="align-left">Pronto</td><td data-label="Cosa vedi" class="align-left">La riga come gli altri appartamenti, con l&#x27;invito a registrare gli Shelly</td><td data-label="Cosa fai" class="align-left">Credenziali dei dispositivi</td></tr>
+</tbody></table></div>
+<ul>
+<li>
+<p><strong>Un appartamento creato dall&#x27;app</strong> non ha «Modifica collegamento» né «Elimina»: l&#x27;eliminazione arriverà più
+avanti (A6).</p>
+</li>
+<li>
+<p><strong>«Non creato»</strong> tiene riservati id e porta finché non premi «Riprova» o «Annulla creazione».</p>
+</li>
+<li>
+<p><strong>«Annulla creazione»</strong> chiede conferma: toglie sistema domotico, accesso dei dispositivi e chiavi. L&#x27;id non si
+potrà più usare; le chiavi si recuperano per 7 giorni.</p>
+</li>
+<li>
+<p><strong>Sulla scheda dell&#x27;organizzazione</strong>, anche a elenco chiuso: riga rossa «1 appartamento non creato: serve
+«Riprova» o «Annulla creazione»» con «Vedi»; riga grigia per quelli in preparazione.</p>
+</li>
+<li>
+<p><strong>Il registro attività</strong> scrive «ha fatto ripartire la creazione» e «ha annullato la creazione».</p>
+</li>
+</ul>
+<p><strong>Messaggi di «Cosa è successo» da conoscere:</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Messaggio</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
+<tbody>
+<tr><td data-label="Messaggio" class="align-left">«La porta scelta è occupata sulla VM: «Riprova» ne prende un&#x27;altra.»</td><td data-label="Cosa fare" class="align-left">«Riprova» usa la porta libera successiva; quella occupata resta segnata finché il supporto non la controlla. «Annulla» invece la libera</td></tr>
+<tr><td data-label="Messaggio" class="align-left">«C&#x27;è già una chiave con questo nome, creata fuori dall&#x27;app. Premi «Annulla creazione» e crea l&#x27;appartamento con un altro ID; «Riprova» serve solo dopo che il supporto ha tolto quella chiave.»</td><td data-label="Cosa fare" class="align-left">«Annulla creazione» e un ID diverso. Nel modulo, prima di «Crea», lo stesso caso dice «C&#x27;è già una chiave con questo nome, creata fuori dall&#x27;app: scegli un altro ID.»</td></tr>
+<tr><td data-label="Messaggio" class="align-left">«Il sistema domotico è stato tolto, ma le chiavi no: «Annulla creazione» di nuovo.»</td><td data-label="Cosa fare" class="align-left">Premi di nuovo «Annulla creazione»</td></tr>
+</tbody></table></div>
+<p><strong>Collegare un sistema esistente (la parte tecnica: identificativo, collegamento, codice Italianway):</strong></p>
 <p><strong>L&#x27;elenco, una riga per appartamento:</strong></p>
 <ul>
 <li>
@@ -3279,7 +3353,7 @@ l&#x27;assistenza HQE.».</p>
 <p><strong>Da qui</strong> non si aprono Panoramica, dispositivi o consumi.</p>
 </li>
 </ul>
-<p><strong>«Nuovo appartamento»</strong> apre «Nuovo appartamento per …» («L&#x27;identificativo non si potrà più cambiare: usa minuscole,
+<p><strong>«Collega un sistema esistente»</strong> apre «Collega un sistema esistente a …» («L&#x27;identificativo non si potrà più cambiare: usa minuscole,
 numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l&#x27;amministratore
 dell&#x27;organizzazione.»).</p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
@@ -3987,7 +4061,8 @@ primo amministratore», eventuale nome; «Crea». Leggi l&#x27;esito dell&#x27;i
 <p><strong>Il primo amministratore entra</strong> come nella parte 2. Finché non entra puoi usare «Reinvia invito».</p>
 </li>
 <li>
-<p><strong>Nella scheda dell&#x27;organizzazione</strong> premi «Appartamenti» › «Nuovo appartamento».</p>
+<p><strong>Nella scheda dell&#x27;organizzazione</strong> premi «Appartamenti» › «Collega un sistema esistente». Nello staging, per
+un appartamento nuovo da zero, c&#x27;è anche «Nuovo appartamento» (parte 7).</p>
 </li>
 <li>
 <p><strong>Compila</strong> «ID» definitivo, «Nome», «Indirizzo del sistema domotico», eventuale «Porta», «Fuso orario», «ID
@@ -4831,6 +4906,20 @@ dell&#x27;email di chi comanda.</p>
 <section aria-labelledby="14-novita-710a48f5">
 <h2 id="14-novita-710a48f5">14. Novità</h2>
 <p class="lead"><strong>Che cosa è cambiato, aggiornamento per aggiornamento.</strong></p>
+<h3 id="20-novembre-2026-staging-9db0d001">20 novembre 2026 (staging)</h3>
+<ul>
+<li>
+<p><strong>Gestore della piattaforma</strong>: «Nuovo appartamento» crea un appartamento dall&#x27;app, dalle chiavi al sistema
+domotico, in pochi minuti (parte 7). Il pulsante di prima si chiama ora «Collega un sistema esistente».</p>
+</li>
+<li>
+<p><strong>Durante la creazione</strong> una riga dice quanto ci vuole di solito; i messaggi nominano sempre il pulsante «Annulla
+creazione».</p>
+</li>
+<li>
+<p><strong>In produzione</strong> «Nuovo appartamento» resta spento fino alla seconda macchina virtuale.</p>
+</li>
+</ul>
 <h3 id="17-novembre-2026-3f0416fc">17 novembre 2026</h3>
 <ul>
 <li>
