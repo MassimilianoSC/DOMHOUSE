@@ -157,3 +157,45 @@ def test_prune_images_finds_the_repository_also_from_an_engine_by_digest(vm):
     assert r.returncode == 0, r.stderr
     images = [line for line in log(vm, "docker").splitlines() if line.startswith("images")]
     assert images and images[0].split(" [")[0].endswith(f" {REPO}"), images
+
+
+# ---- A7 (answers 1199): the VM's memory and the number of its engines, for the two alarms --------------------------
+def check_lines(vm):
+    r = vm("check-all")
+    assert r.returncode == 0, r.stderr
+    text = (vm.stubs / "syslog.log").read_text(encoding="utf-8")
+    (vm.stubs / "syslog.log").unlink()
+    return text
+
+
+def test_a7_the_watch_writes_the_available_memory_and_the_low_line_only_after_10_minutes(vm):
+    import time
+    (vm.opt.parent / "meminfo").write_text("MemTotal: 2000000 kB\nMemAvailable: 409600 kB\n", encoding="utf-8")   # 400 MB
+    text = check_lines(vm)
+    assert "-t domhouse-check vm mem_available_mb=400" in text
+    assert "vm mem low" not in text                                         # below 500 MB, but only just now
+    (vm.opt / ".mem-low-since").write_text(str(int(time.time()) - 11 * 60), encoding="utf-8")
+    text = check_lines(vm)
+    assert "-t domhouse-check vm mem low available_mb=400 minutes=11" in text
+    (vm.opt.parent / "meminfo").write_text("MemTotal: 2000000 kB\nMemAvailable: 1024000 kB\n", encoding="utf-8")
+    text = check_lines(vm)
+    assert "vm mem low" not in text and not (vm.opt / ".mem-low-since").exists()
+
+
+def test_a7_eight_engines_or_more_without_the_load_test_is_one_line(vm):
+    for i in range(6):
+        (vm.opt / f"lab-1{i}.settings").write_text(f"APARTMENT_ID=lab-1{i}\nPORT=815{i}\n", encoding="utf-8")
+    (vm.opt / "test-carico-01.settings").write_text("APARTMENT_ID=test-carico-01\nPORT=8170\n", encoding="utf-8")
+    (vm.opt / "altro.settings").write_text("APARTMENT_ID=altro\nPORT=8199\n", encoding="utf-8")
+    assert "vm engines many" not in check_lines(vm)                         # 7 engines: apt-prova-01 and six
+    (vm.opt / "lab-16.settings").write_text("APARTMENT_ID=lab-16\nPORT=8156\n", encoding="utf-8")
+    assert "-t domhouse-check vm engines many count=8" in check_lines(vm)
+
+
+def test_a7_the_two_alarms_read_those_lines():
+    alerts = ROOT / "scripts" / "monitoring" / "engine-alerts"
+    memory = (alerts / "memoria-vm.json").read_text(encoding="utf-8")
+    engines = (alerts / "motori-troppi.json").read_text(encoding="utf-8")
+    assert "vm mem low" in memory and "vm engines many" in engines
+    for text in (memory, engines):
+        assert '"__CHANNEL__"' in text and "conditionMatchedLog" in text

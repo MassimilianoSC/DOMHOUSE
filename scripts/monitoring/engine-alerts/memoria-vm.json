@@ -1,0 +1,26 @@
+{
+  "displayName": "Motori: memoria della VM sotto 500 MB",
+  "documentation": {
+    "content": "La memoria disponibile della VM dei motori è sotto 500 MB da almeno 10 minuti (A7, risposta 1199): un motore in più, o uno che cresce, può far fermare dal kernel gli altri motori. Il valore e i minuti sono nel testo della riga. Primo passo: SSH alla VM via IAP, «free -m» e «sudo docker stats --no-stream». Le creazioni nuove si fermano da sole con la regola della capienza. Avvisa o1.",
+    "mimeType": "text/markdown"
+  },
+  "conditions": [
+    {
+      "displayName": "Riga «vm mem low» del controllo ogni 5 minuti",
+      "conditionMatchedLog": {
+        "filter": "resource.type=\"gce_instance\" AND log_id(\"syslog\") AND jsonPayload.message=~\"domhouse-check(\\[[0-9]+\\])?: vm mem low\""
+      }
+    }
+  ],
+  "combiner": "OR",
+  "alertStrategy": {
+    "notificationRateLimit": {
+      "period": "3600s"
+    },
+    "autoClose": "86400s"
+  },
+  "notificationChannels": [
+    "__CHANNEL__"
+  ],
+  "severity": "WARNING"
+}
