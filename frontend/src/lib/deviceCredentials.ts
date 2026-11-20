@@ -1,4 +1,6 @@
 import type { CredentialState, DeviceCredential } from "@/api/deviceCredentials";
+import { t } from "@/i18n";
+import { DEFAULT_TZ } from "@/lib/format";
 
 // A3: the rules of the page «Credenziali dei dispositivi» that do not depend on React (docs/proposta-a3-sito.md §3,
 // docs/proposta-a3-server.md §4.3), so each is proved on its own.
@@ -61,4 +63,27 @@ export const MAX_POLL_MS = 20 * 60_000;
  *  changes the version, so it opens another 20 minutes. */
 export function credentialsSignature(items: DeviceCredential[] | undefined): string {
   return (items ?? []).filter((c) => inProgress(c.stato)).map((c) => `${c.device_id}:${c.stato}:${c.version}`).join("|");
+}
+
+/**
+ * A5 (docs/proposta-a5.md): the refused connections of a device in the last 24 hours. warning: after the last change,
+ * with «Cosa fare»; past: all before the last change (a «Rigenera», a new registration), nothing to do if the Shelly
+ * has the new data; revoked: the Shelly still tries; plain: a revoke on its way, only the number. null = no line: the
+ * server does not know (null) or there are none.
+ */
+export type RefusalNote = { kind: "warning" | "past" | "revoked" | "plain"; text: string };
+
+const rome = (iso: string | number, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("it-IT", { ...opts, timeZone: DEFAULT_TZ }).format(new Date(iso));
+
+export function refusalNote(c: DeviceCredential, now: number): RefusalNote | null {
+  const r = c.rifiuti;
+  if (!r || !(r.conteggio_24h > 0) || !r.ultimo) return null;
+  const day = { day: "2-digit", month: "2-digit" } as const;
+  const time = rome(r.ultimo, { hour: "2-digit", minute: "2-digit" });
+  const when = rome(r.ultimo, day) === rome(now, day) ? t("credentials.refusals.whenToday", { time }) : t("credentials.refusals.whenDay", { date: rome(r.ultimo, day), time });
+  const text = r.conteggio_24h === 1 ? t("credentials.refusals.one", { when }) : t("credentials.refusals.many", { count: r.conteggio_24h, when });
+  if (c.stato === "revocato") return { kind: "revoked", text };
+  if (c.stato === "revoca_in_corso") return { kind: "plain", text };
+  if (new Date(r.ultimo).getTime() <= new Date(c.updated_at).getTime()) return { kind: "past", text };
+  return { kind: "warning", text };
 }

@@ -291,6 +291,16 @@
     }
   },
   "credentials": {
+    "refusals": {
+      "many": "Accessi rifiutati nelle ultime 24 ore: {count}, l'ultimo {when}.",
+      "one": "Un accesso rifiutato nelle ultime 24 ore, {when}.",
+      "whenToday": "alle {time}",
+      "whenDay": "il {date} alle {time}",
+      "todo": "Cosa fare: nello Shelly utente o password non corrispondono. Controlla l'utente in «Dati di collegamento»; la password non si può rivedere: se non l'hai più, «Rigenera» e scrivi la nuova nello Shelly.",
+      "delay": "I tentativi compaiono con circa 10 minuti di ritardo e restano contati per 24 ore.",
+      "past": "Tutti prima dell'ultima modifica: se lo Shelly ha i dati nuovi, non serve fare niente.",
+      "revoked": "Lo Shelly prova ancora a collegarsi: spegnilo, oppure «Registra di nuovo»."
+    },
     "title": "Credenziali dei dispositivi",
     "subtitle": "Le password con cui gli Shelly di questo appartamento si collegano al sistema domotico. Registra ogni Shelly prima di montarlo.",
     "register": "Registra un dispositivo",

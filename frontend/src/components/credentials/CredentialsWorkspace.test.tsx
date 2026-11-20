@@ -322,3 +322,43 @@ describe("rilettura mentre un ordine è in corso", () => {
     expect(reads()).toBe(n);
   });
 });
+
+describe("A5: gli accessi rifiutati nella riga (docs/proposta-a5.md)", () => {
+  it("con rifiuti dopo l'ultima modifica: il riquadro giallo con «Cosa fare» e il ritardo", async () => {
+    s.items = [
+      cred("presa-cucina", "pronto", null, { rifiuti: { conteggio_24h: 12, ultimo: new Date(Date.now() - 60_000).toISOString() } }),
+      cred("presa-bagno", "pronto", null, { rifiuti: null }),
+      cred("presa-sala", "pronto", null, { rifiuti: { conteggio_24h: 0, ultimo: null } }),
+    ];
+    open();
+    const box = await screen.findByTestId("credential-refusals-presa-cucina");
+    expect(box).toHaveAttribute("data-kind", "warning");
+    expect(box).toHaveTextContent(/^Accessi rifiutati nelle ultime 24 ore: 12, l'ultimo alle \d\d:\d\d\./);
+    expect(box).toHaveTextContent("Cosa fare: nello Shelly utente o password non corrispondono. Controlla l'utente in «Dati di collegamento»; la password non si può rivedere: se non l'hai più, «Rigenera» e scrivi la nuova nello Shelly.");
+    expect(box).toHaveTextContent("I tentativi compaiono con circa 10 minuti di ritardo e restano contati per 24 ore.");
+    // «non lo so» and zero: no line, never «0»
+    expect(screen.queryByTestId("credential-refusals-presa-bagno")).toBeNull();
+    expect(screen.queryByTestId("credential-refusals-presa-sala")).toBeNull();
+    expect(screen.getByTestId("credential-row-presa-bagno")).not.toHaveTextContent("Accessi rifiutati");
+  });
+
+  it("tutti prima dell'ultima modifica: in grigio, senza «Cosa fare»", async () => {
+    s.items = [cred("presa-cucina", "pronto", null, { rifiuti: { conteggio_24h: 4, ultimo: "2026-11-19T15:00:00Z" } })];
+    open();
+    const box = await screen.findByTestId("credential-refusals-presa-cucina");
+    expect(box).toHaveAttribute("data-kind", "past");
+    expect(box).toHaveTextContent("Tutti prima dell'ultima modifica: se lo Shelly ha i dati nuovi, non serve fare niente.");
+    expect(box).not.toHaveTextContent("Cosa fare");
+  });
+
+  it("revocato: lo Shelly prova ancora a collegarsi", async () => {
+    s.items = [cred("presa-cucina", "revocato", null, { rifiuti: { conteggio_24h: 3, ultimo: new Date(Date.now() - 60_000).toISOString() } })];
+    open();
+    const toggle = await screen.findByTestId("credentials-revoked-toggle");
+    fireEvent.click(toggle);
+    const box = await screen.findByTestId("credential-refusals-presa-cucina");
+    expect(box).toHaveAttribute("data-kind", "revoked");
+    expect(box).toHaveTextContent("Lo Shelly prova ancora a collegarsi: spegnilo, oppure «Registra di nuovo».");
+    expect(box).not.toHaveTextContent("Cosa fare");
+  });
+});
