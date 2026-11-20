@@ -34,7 +34,9 @@ ONLY_STAGING = {"INSTANCE_ALLOWED",      # D04 (P-83): the engines staging may r
                 # tool A, A1 (I5.1): the order receiver on the VM, staging only; without them production's agent is
                 # off (bff/agent.py: 503, and the results' route 401), until the second VM (§5.4)
                 "AGENT_AMBIENTE", "AGENT_ORDERS_TOPIC", "AGENT_PUSH_AUDIENCE", "AGENT_PUSH_EMAIL",
-                "AGENT_PUSH_SUBSCRIPTION"}
+                "AGENT_PUSH_SUBSCRIPTION",
+                # tool A, A3 (Q3.1): the two keys of the signatures and the broker's address of the devices
+                "AGENT_ORDINI_KEY", "AGENT_RISULTATI_KEY", "DEVICE_BROKER_ADDRESS"}
 
 
 def test_same_variables_and_secrets():
@@ -133,3 +135,14 @@ def test_d04_staging_and_production_run_as_different_accounts():
                 for name in ("cloudrun.yaml", "cloudrun.staging.yaml")}
     assert accounts == {"cloudrun.yaml": ["domotica-bff@your-gcp-project-id.iam.gserviceaccount.com"],
                         "cloudrun.staging.yaml": ["domotica-bff-staging@your-gcp-project-id.iam.gserviceaccount.com"]}
+
+
+def test_a3_staging_reads_the_two_keys_from_their_secrets_and_knows_the_brokers_address():
+    """A3 (docs/procedura-installazione-a3.md Q3.1): the orders' and the results' keys from Secret Manager (latest), the
+    broker's address the devices use; staging only (production: no agent, «broker_address_missing», until the second
+    VM). Written after the two secrets existed (Q1), so that no staging publish failed before."""
+    staging, prod = env(STAGING), env(PROD)
+    assert staging["AGENT_ORDINI_KEY"] == "secret:domhouse-agent-ordini-staging"
+    assert staging["AGENT_RISULTATI_KEY"] == "secret:domhouse-agent-risultati-staging"
+    assert staging["DEVICE_BROKER_ADDRESS"] == "mqtt.dh-lab.eu:8883"
+    assert not {"AGENT_ORDINI_KEY", "AGENT_RISULTATI_KEY", "DEVICE_BROKER_ADDRESS"} & set(prod)

@@ -105,6 +105,18 @@ spec:
               value: domhouse-push-staging@your-gcp-project-id.iam.gserviceaccount.com
             - name: AGENT_PUSH_SUBSCRIPTION
               value: projects/your-gcp-project-id/subscriptions/domhouse-staging-risultati-push
+            - name: AGENT_ORDINI_KEY       # tool A, A3 (docs/procedura-installazione-a3.md Q3.1): the server signs the
+              valueFrom:                # orders with it and checks the results with the second; without them 503
+                secretKeyRef:
+                  name: domhouse-agent-ordini-staging
+                  key: latest
+            - name: AGENT_RISULTATI_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: domhouse-agent-risultati-staging
+                  key: latest
+            - name: DEVICE_BROKER_ADDRESS  # A3: the broker's address the devices use (production: empty until the second VM)
+              value: mqtt.dh-lab.eu:8883
             - name: ITALIANWAY_SIGNATURE_HEADER
               value: X-Signature
             - name: ITALIANWAY_WEBHOOK_SECRET
