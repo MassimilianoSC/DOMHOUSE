@@ -104,6 +104,18 @@ gcloud projects get-iam-policy domotica-poc-511707 --account=m.scardovellicrac@g
 - **Atteso:** esattamente quattro righe, ciascuna con il suo titolo: `dhA2CreaSegreti` e `dhA2VersioniSegreti` a `domotica-bff-staging@` (`a2-creazione-staging`, `a2-versioni-staging`), `secretAccessor` a `domotica-bff-staging@` (`a2-lettura-staging`) e a `langbrain-vm@` (`a2-vm-staging`). Nessuna riga senza titolo: un permesso senza condizione aprirebbe tutti i segreti.
 - I permessi nuovi di IAM possono metterci qualche minuto ad arrivare: C9 lo tiene in conto.
 
+**C1.4a Lo strumento di verifica acceso** (aggiunto il 20 novembre durante l'installazione: senza, C1.4b risponde `SERVICE_DISABLED`, «Policy Troubleshooter API has not been used in project»). Scrive su Google Cloud ma accende solo uno strumento di lettura, gratuito.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud services enable policytroubleshooter.googleapis.com --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+```
+
+- **Atteso:** «Operation … finished successfully» (o niente, se era già acceso).
+- **Ritorno indietro:** lo stesso comando con `disable`.
+- Il 20 novembre l'esito di C1.4b si è letto meglio con `--format=json`: per ogni permesso con condizione, `conditionExplanation.value` (`True`/`False`) e `allowAccessState`; in cima `overallAccessState` (`CAN_ACCESS` / `CANNOT_ACCESS`).
+
 **C1.4b Le esclusioni, provate** (revisione del codice, punto 9, e seconda lettura; sola lettura: lo strumento di Google che spiega se un permesso è concesso, senza toccare niente). Le condizioni guardano il nome del segreto: lo strumento lo deve ricevere (`--resource-name`, `--resource-service`, `--resource-type`), altrimenti non le sa valutare.
 
 ```bash
