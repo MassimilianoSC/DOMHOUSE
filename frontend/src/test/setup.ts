@@ -1,4 +1,6 @@
 import "@testing-library/jest-dom/vitest";
+// The components are tested without their page: the texts of the pages loaded on demand are added here, as their page does.
+import "@/i18n/pages";
 
 // No test talks to the network: an un-mocked fetch is recorded and fails the test that made it, even when the code
 // under test swallows the error. A test that needs the BFF stubs fetch itself (vi.stubGlobal) for that test.

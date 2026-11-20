@@ -1,3 +1,4 @@
+import "@/i18n/pages";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ChevronDown, ChevronUp, Loader2, SendHorizontal, Trash2 } from "lucide-react";

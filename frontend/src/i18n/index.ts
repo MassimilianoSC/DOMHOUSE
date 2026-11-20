@@ -1,8 +1,17 @@
 import it from "./it.json";
 
+// The texts of the first screens (it.json) ship in the main block; those of the pages loaded on demand
+// (it.pages.json) come with them, through src/i18n/pages.ts (P-20: the main block stays under 400 kB).
+// src/i18n/split.test.ts checks that no file of the main block asks for a text of it.pages.json.
+
 type Dict = { [key: string]: string | Dict };
-const dictionaries: Record<string, Dict> = { it };
+const dictionaries: Record<string, Dict> = { it: { ...it } };
 let current: Dict = dictionaries.it;
+
+/** Adds whole sections to the Italian texts: called once by src/i18n/pages.ts. */
+export function addTexts(sections: Dict) {
+  Object.assign(dictionaries.it, sections);
+}
 
 export function setLanguage(lang: string) {
   current = dictionaries[lang] ?? dictionaries.it;

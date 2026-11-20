@@ -10,7 +10,8 @@ import type { CredentialState, PendingAction } from "@/api/deviceCredentials";
 import type { CreazionePasso, CreazioneStato } from "@/api/platform";
 import { WHAT_TEXTS, type StepState } from "@/lib/apartmentCreation";
 import * as ts from "typescript";
-import italian from "./it.json";
+import firstScreens from "./it.json";
+import pageTexts from "./it.pages.json";
 
 /**
  * Every t()/tOr() key the code asks for must exist in it.json.
@@ -247,7 +248,8 @@ const SOURCES = import.meta.glob<string>(["/src/**/*.{ts,tsx}", "!/src/**/*.test
   import: "default",
   eager: true,
 });
-const KEYS = new Set(leaves(italian as Dict));
+// both files of texts (src/i18n/split.test.ts)
+const KEYS = new Set([...leaves(firstScreens as Dict), ...leaves(pageTexts as Dict)]);
 const USES = Object.entries(SOURCES).flatMap(([file, src]) => scan(file, src));
 
 describe("chiavi di traduzione", () => {

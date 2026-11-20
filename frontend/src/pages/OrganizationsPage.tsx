@@ -1,3 +1,4 @@
+import "@/i18n/pages";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";

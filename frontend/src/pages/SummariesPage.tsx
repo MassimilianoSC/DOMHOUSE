@@ -1,3 +1,4 @@
+import "@/i18n/pages";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, CalendarRange, ChevronRight } from "lucide-react";

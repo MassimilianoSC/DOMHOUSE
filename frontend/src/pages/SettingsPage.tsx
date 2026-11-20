@@ -1,3 +1,4 @@
+import "@/i18n/pages";
 import { CheckCircle2, Download, LogOut } from "lucide-react";
 import { useAuth } from "@/auth/AuthProvider";
 import { isIos, useInstallPrompt } from "@/hooks/useInstallPrompt";

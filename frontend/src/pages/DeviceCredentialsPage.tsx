@@ -1,3 +1,4 @@
+import "@/i18n/pages";
 import { useParams } from "react-router-dom";
 import { CredentialsWorkspace } from "@/components/credentials/CredentialsWorkspace";
 import { PageHeader } from "@/components/layout/PageHeader";

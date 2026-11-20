@@ -1,3 +1,4 @@
+import "@/i18n/pages";
 import { useState } from "react";
 import { useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";

@@ -1,3 +1,4 @@
+import "@/i18n/pages";
 import { adminApi } from "@/api/admin";
 import { AdminApartments } from "@/components/admin/AdminApartments";
 import { AdminAssistant } from "@/components/admin/AdminAssistant";

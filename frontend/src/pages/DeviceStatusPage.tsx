@@ -1,3 +1,4 @@
+import "@/i18n/pages";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import type { Device } from "@/api/types";
 import { PageHeader } from "@/components/layout/PageHeader";
