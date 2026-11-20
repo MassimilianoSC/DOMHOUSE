@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Corretta dopo la revisione del codice** (20 novembre: punti 1–9 fatti; seconda lettura «installabile», poi N1, N2 e C1.4b corretti); da rileggere. Nessun passo provato sul vero | o1, 20 novembre 2026, 13:46; corretta nel pomeriggio | file della VM e server da `bd4a8bf` (impronte in C2) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | C0–C9 |
+| **Installata nello staging il 20 novembre** (C0–C9, `test-a2-02` «Pronto»), con quattro correzioni trovate durante l'installazione e riportate qui (sezione «Cosa è successo»): **questa è la versione per la seconda VM** | o1, 20 novembre 2026, 13:46; corretta nel pomeriggio | file della VM e server da `c6ed88f` (impronte in C2) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | C0–C9 |
 
 **Cosa si installa** (`docs/proposta-a2.md`, §7):
 
@@ -32,14 +32,14 @@
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git merge-base --is-ancestor bd4a8bf origin/main && git diff --quiet bd4a8bf HEAD -- scripts/agent scripts/agent-vm.sh scripts/engine-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py engine/compose.catalog.yaml bff && echo "file uguali a bd4a8bf, già su GitHub"
+git fetch -q origin && git merge-base --is-ancestor c6ed88f origin/main && git diff --quiet c6ed88f HEAD -- scripts/agent scripts/agent-vm.sh scripts/engine-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py engine/compose.catalog.yaml bff && echo "file uguali a c6ed88f, già su GitHub"
 gcloud iam roles list --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="value(name)" | grep -E "dhA2" || echo "nessun ruolo dhA2"
 gcloud projects get-iam-policy domotica-poc-511707 --account=m.scardovellicrac@gmail.com --flatten="bindings[].members" --filter="bindings.role~secretmanager OR bindings.role~dhA2" --format="table[no-heading](bindings.role,bindings.members,bindings.condition.title)"
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='systemctl is-active domhouse-agent-esecutore domhouse-agent-lettore; sudo ls /opt/domhouse/*.settings; sudo ss -ltn | grep -E ":81(5[0-9]) " || echo "porte 8150-8159 libere"; sudo ls /etc/domhouse/agent-immagine-staging 2>&1 | tail -1; sudo ls -d /data' < /dev/null
 ```
 
 - **Atteso:**
-  1. «file uguali a bd4a8bf, già su GitHub»;
+  1. «file uguali a c6ed88f, già su GitHub»;
   2. «nessun ruolo dhA2»;
   3. nessuna riga di Secret Manager a livello di progetto (il 19 novembre non ce n'erano; i permessi di oggi sono segreto per segreto);
   4. i due servizi `active`; `dev.settings` e `lab-01.settings`; «porte 8150-8159 libere»; «No such file» per `agent-immagine-staging`; `/data`.
@@ -154,19 +154,19 @@ gcloud compute scp scripts/agent/comune.py scripts/agent/lettore.py scripts/agen
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a2 && sed -i "s/\r*$//" *.sh *.py *.yaml agent/*.py agent/*.service && sha256sum *.sh *.py *.yaml agent/* | cut -c1-16,65-' < /dev/null
 ```
 
-- **Atteso:** dieci file, poi dieci impronte che cominciano così (calcolate da o1 su `bd4a8bf`, senza i ritorni a capo):
+- **Atteso:** dieci file, poi dieci impronte che cominciano così (calcolate da o1 su `c6ed88f`, senza i ritorni a capo):
 
 | File | Impronta |
 |---|---|
 | `agent-vm.sh` | `b013386278381469` |
-| `broker-vm.sh` | `6a853a834686660b` |
+| `broker-vm.sh` | `6044621450f726ef` (da `d6ea4a0`: `/etc/domhouse` non cambia modo) |
 | `broker_accounts.py` | `8eaec49d1866ac0a` |
 | `compose.catalog.yaml` | `ba1ecece9b543add` |
-| `engine-vm.sh` | `20c57efc4be4d090` (da `31eec34`: le cartelle dei dati con il modo prima del proprietario, C4; prima `057406a726a30a4a`) |
+| `engine-vm.sh` | `ba4375a78bd9f296` (da `d6ea4a0`: le cartelle dei dati con il modo prima del proprietario, `31eec34`; `/etc/domhouse` non cambia modo, `d6ea4a0`) |
 | `agent/comune.py` | `a576ed9ab186d810` |
 | `agent/domhouse-agent-esecutore.service` | `d17f567cf8cfaca2` |
 | `agent/domhouse-agent-lettore.service` | `9824996a467272be` |
-| `agent/esecutore.py` | `f7e3f2948d96e401` |
+| `agent/esecutore.py` | `d159472870821f41` (da `c6ed88f`: il broker prima del motore, le righe del motore nel giornale) |
 | `agent/lettore.py` | `69511594f1e8aa35` |
 
 - Una diversa: fermati.
@@ -326,6 +326,23 @@ L'unità tiene in sola lettura per l'esecutore `agent.conf`, le due chiavi, l'im
 2. chi sostituisce a mano una chiave o `agent.conf` lancia subito dopo, sulla VM: `sudo flock -w 300 /opt/domhouse/.engines.lock systemctl restart domhouse-agent-esecutore`;
 3. finché non riparte, l'esecutore rifiuta gli ordini che cambiano la VM («fallito», con l'allarme `protezione_persa` nel giornale): nessun danno, solo «Riprova» dopo il riavvio.
 
+## Cosa è successo nello staging il 20 novembre (da sapere per la seconda VM)
+
+Quattro difetti trovati durante l'installazione, tutti corretti nel codice e in questa procedura. Con i file di `c6ed88f` non si ripresentano.
+
+| Dove si è fermata | Che cosa | Correzione |
+|---|---|---|
+| C4 | la prova sommava due `-p CapabilityBoundingSet=` (in `systemd-run` vince l'ultimo); e `engine-vm.sh` dava la cartella dei dati a 10001 prima di cambiarne il modo, che senza `CAP_FOWNER` è rifiutato | `31eec34`: `data_dirs`, prima il modo poi il proprietario; C4 con un array e una sola voce |
+| C9.2, primo giro | l'immagine approvata era quella di `dev`, `engine:f4c6a20`, più vecchia della PR #17 (`ce31e08`, il catalogo vuoto): il motore usciva con 3 | `b7d7098`: C5 e `publish-all` approvano solo un'immagine che contiene `ce31e08`. Nello staging: `dev` portato a `engine:feb483c`, C5 rifatto, l'esecutore riavviato sotto il blocco |
+| C9.2, secondo giro | `crea_motore` aggiungeva l'account del broker **dopo** la salute del motore, che è 503 finché il connector non entra | `c6ed88f`: catalogo, poi `add-apartment`, poi il motore; prima di togliere un motore fallito, le sue ultime righe nel giornale dell'esecutore |
+| C9.2, durante «Riprova» | `engine-vm.sh` (e `broker-vm.sh`) rimettevano `/etc/domhouse` a 700: il lettore, ripartendo, non leggeva più la sua configurazione | `d6ea4a0`: `/etc/domhouse` si crea solo se manca, 755; nessuno script ne cambia il modo |
+
+**Per la seconda VM** (script dell'installazione, risposta 1194):
+
+1. il motore di riferimento della VM (quello da cui C5 prende l'immagine approvata) deve contenere `ce31e08`: C5 lo controlla e si ferma;
+2. C5 fatto **dopo** C6 (con l'esecutore che gira) va seguito dal riavvio dell'esecutore sotto il blocco;
+3. dopo C9.2: `stat -c "%a %U" /etc/domhouse` dice «755 root».
+
 ## Da verificare sulla VM (revisione del codice, 20 novembre)
 
 | N. | Che cosa | Dove si vede |
@@ -337,12 +354,14 @@ L'unità tiene in sola lettura per l'esecutore `agent.conf`, le due chiavi, l'im
 | 5 | i `ReadOnlyPaths` vincono sui `ReadWritePaths` più larghi | C4 (punto 4), C6 (punto 2) |
 | 6 | dopo C6 nessun `protezione_persa` nel giornale dell'esecutore (i file protetti c'erano tutti all'avvio) | C9.2: `sudo journalctl -u domhouse-agent-esecutore --no-pager \| grep -c protezione_persa` deve dire 0 |
 
-## Decisioni per il committente (non di o1)
+## Decisioni del committente (20 novembre)
 
-1. **`test-a2-02` dopo la prova** (C9.3): resta come appartamento di laboratorio fino ad A6, oppure si toglie a mano.
-2. **Due scelte di o1 nel codice del server**, da confermare o cambiare:
-   - un segreto con il nome giusto ma non nostro (`secret_conflict`) lascia l'appartamento «rimasto a metà» (con «Riprova» e «Annulla») e la creazione conta nel limite delle 5 l'ora;
-   - una porta che la VM dice occupata (`porta_occupata`) resta segnata come tale finché qualcuno non la libera a mano: «Riprova» non la riprende mai.
+| Risposta | Decisione |
+|---|---|
+| 1205 = a | `test-a2-02` resta come appartamento di laboratorio fino ad A6 |
+| 1206 = a | `secret_conflict` lascia la creazione «a metà» e conta nel limite delle 5 l'ora |
+| 1207 = a | o2 cambia il testo di `secret_conflict` nel sito |
+| 1208 = a | una porta segnata occupata dopo «Riprova» resta segnata; come vederle e liberarne una: `docs/motore-vm.md`, sezione G3 |
 
 ## Da incollare alla memoria storica
 

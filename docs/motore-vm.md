@@ -897,6 +897,53 @@ Il disco delle chiavi non ha snapshot: il certificato **non si ripristina, si ri
 2. **Certificato e conto ACME:** non si salvano, si rifanno (B3).
 3. **`/data/_broker`:** sessioni e messaggi conservati, già nello snapshot delle 23:00. Se si perde, i relè si ricollegano e il connector rilegge lo stato.
 
+## G3. Porte dei motori creati dall'app: quelle segnate «occupate» (A2, risposta 1208)
+
+**Cosa sono.** Quando l'app crea un appartamento (A2), il server riserva la porta più bassa libera della fascia (staging 8150–8159). Se l'agente sulla VM risponde `porta_occupata` (qualcosa ascolta già su quella porta) e il gestore preme «Riprova», il server prende la porta successiva e **segna la vecchia come occupata**, per sempre: non la riprende più (`bff/creation.py`, `OCCUPIED_OWNER`). La si libera solo a mano, dopo aver controllato sulla VM.
+
+**Dove stanno**, in Firestore:
+
+| Cosa | Valore |
+|---|---|
+| Database | `staging` per lo staging, `(default)` per la produzione (progetto `domotica-poc-511707`) |
+| Collezione | `external_ids` |
+| Id del documento | lo SHA-256 esadecimale di `link:10.198.0.2:<porta>` (`bff/repository/firestore.py`, `_external_ref`) |
+| Campi | `source` = `link`, `code` = `10.198.0.2:<porta>`, `apartment_id` = **`_occupata_sulla_vm`** |
+
+Un documento con lo stesso `code` ma un `apartment_id` vero è la porta di un appartamento: **non si tocca**.
+
+**1. Vederle** (sola lettura; dal PC, con le credenziali predefinite del committente: se scadute, `gcloud auth application-default login`).
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+.venv/Scripts/python.exe -c "from google.cloud import firestore; db = firestore.Client(project='domotica-poc-511707', database='staging'); [print(d.get('code')) for d in db.collection('external_ids').where(filter=firestore.FieldFilter('apartment_id', '==', '_occupata_sulla_vm')).stream()]; print('fine')"
+```
+
+- **Atteso:** una riga `10.198.0.2:<porta>` per ogni porta segnata, poi «fine». Solo «fine»: nessuna porta segnata.
+- Per la produzione: `database='(default)'`.
+
+**2. Chi la usa sulla VM** (sola lettura). Qui per la porta 8150: cambia il numero nelle due righe con quello visto al punto 1.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo ss -ltnp | grep ":8150 " || echo "nessuno ascolta su 8150"; sudo grep -l "^PORT=8150$" /opt/domhouse/*.settings 2>/dev/null || echo "nessun motore ha 8150"' < /dev/null
+```
+
+- **Si libera solo con** «nessuno ascolta su 8150» **e** «nessun motore ha 8150». Altrimenti: chi ascolta è nella colonna `users:(("…",pid=…))`; si decide con o1 se toglierlo, e la porta resta segnata.
+
+**3. Liberarla** (scrive in Firestore: la lancia il committente). Toglie il documento solo se è davvero quello di una porta segnata occupata; un documento di un appartamento non lo tocca.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+.venv/Scripts/python.exe -c "import hashlib; from google.cloud import firestore; db = firestore.Client(project='domotica-poc-511707', database='staging'); ref = db.collection('external_ids').document(hashlib.sha256(b'link:10.198.0.2:8150').hexdigest()); d = ref.get(); owner = d.get('apartment_id') if d.exists else None; print('documento:', d.to_dict() if d.exists else 'assente'); (ref.delete(), print('liberata')) if owner == '_occupata_sulla_vm' else print('non è una porta segnata occupata: niente fatto')"
+```
+
+- **Atteso:** la riga del documento, poi «liberata». La prossima creazione può prendere di nuovo quella porta (e l'agente la ricontrolla sulla VM prima di installare).
+- **Ritorno indietro:** non serve: se la porta torna occupata, la prossima creazione la trova con `porta_occupata` e «Riprova» la segna di nuovo.
+
 ## H. Non ancora qui
 
 - Righe di log del motore per i comandi riusciti (oggi solo avvio, avvisi ed errori): con gli allarmi, passo 10.
