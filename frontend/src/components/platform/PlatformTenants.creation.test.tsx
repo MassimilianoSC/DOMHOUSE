@@ -52,7 +52,7 @@ describe("la riga sulla scheda dell'organizzazione (§4)", () => {
   it("una creazione non riuscita: riga rossa con «Vedi», anche a elenco chiuso", async () => {
     await open([tenant("t-1", "Residenze Esempio", { appartamenti_non_creati: 1, appartamenti_in_preparazione: 1 })]);
     const line = screen.getByTestId("tenant-creations-t-1");
-    expect(line).toHaveTextContent("1 appartamento non creato: serve «Riprova» o «Annulla»");
+    expect(line).toHaveTextContent("1 appartamento non creato: serve «Riprova» o «Annulla creazione»");
     expect(line).toHaveAttribute("data-tone", "negative");
     expect(line.className).toMatch(/negative/);
     expect(screen.getByTestId("tenant-creations-see-t-1")).toHaveTextContent("Vedi");
@@ -61,7 +61,7 @@ describe("la riga sulla scheda dell'organizzazione (§4)", () => {
 
   it("più di una: al plurale", async () => {
     await open([tenant("t-1", "Residenze Esempio", { appartamenti_non_creati: 2 })]);
-    expect(screen.getByTestId("tenant-creations-t-1")).toHaveTextContent("2 appartamenti non creati: serve «Riprova» o «Annulla»");
+    expect(screen.getByTestId("tenant-creations-t-1")).toHaveTextContent("2 appartamenti non creati: serve «Riprova» o «Annulla creazione»");
   });
 
   it("solo creazioni in corso: riga neutra, senza «Vedi»", async () => {

@@ -751,7 +751,7 @@
       "notInProd": "Non disponibile in produzione: arriverà con la seconda macchina virtuale.",
       "notAvailable": "Non disponibile in questo ambiente: manca il collegamento con la macchina virtuale.",
       "formTitle": "Nuovo appartamento in {name}",
-      "formHint": "Ci vogliono alcuni minuti. Se la creazione si ferma a metà, l'appartamento resta nell'elenco come «Non creato» finché non premi «Riprova» o «Annulla».",
+      "formHint": "Ci vogliono alcuni minuti. Se la creazione si ferma a metà, l'appartamento resta nell'elenco come «Non creato» finché non premi «Riprova» o «Annulla creazione».",
       "idPlaceholder": "lab-…",
       "idHint": "Nello staging comincia con lab- o test-; lettere minuscole, cifre e trattini. Non si cambia più.",
       "idInvalid": "Id non valido: nello staging lab-… o test-…, lettere minuscole, cifre e trattini.",
@@ -803,7 +803,7 @@
         "segreti_non_creati": "Le chiavi non sono state create: «Riprova».",
         "secret_conflict": "C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla creazione» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che il supporto ha tolto quella chiave.",
         "collegamento_fallito": "Il sistema domotico è installato ma l'app non lo raggiunge: «Riprova».",
-        "chiavi_non_distrutte": "Il sistema domotico è stato tolto, ma le chiavi no: «Annulla» di nuovo.",
+        "chiavi_non_distrutte": "Il sistema domotico è stato tolto, ma le chiavi no: «Annulla creazione» di nuovo.",
         "non_inviato": "L'ordine non è partito verso la macchina virtuale: «Riprova».",
         "generic": "La creazione si è fermata prima della fine."
       },
@@ -822,8 +822,8 @@
       "readyLead": "Pronto.",
       "readyNext": "Prossimi passi: registra gli Shelly e scrivi l'elenco dei dispositivi.",
       "changed": "Qualcuno ha appena cambiato questa creazione: l'elenco è stato aggiornato.",
-      "tenantStoppedOne": "1 appartamento non creato: serve «Riprova» o «Annulla»",
-      "tenantStoppedMany": "{count} appartamenti non creati: serve «Riprova» o «Annulla»",
+      "tenantStoppedOne": "1 appartamento non creato: serve «Riprova» o «Annulla creazione»",
+      "tenantStoppedMany": "{count} appartamenti non creati: serve «Riprova» o «Annulla creazione»",
       "tenantPreparingOne": "1 appartamento in preparazione",
       "tenantPreparingMany": "{count} appartamenti in preparazione",
       "see": "Vedi"

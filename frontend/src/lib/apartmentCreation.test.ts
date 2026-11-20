@@ -132,7 +132,7 @@ describe("«Cosa è successo» (§6.2; o1 cb3ee25: il perché sta in creazione.c
     ["segreti_non_creati", "Le chiavi non sono state create: «Riprova»."],
     ["secret_conflict", "C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla creazione» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che il supporto ha tolto quella chiave."],
     ["collegamento_fallito", "Il sistema domotico è installato ma l'app non lo raggiunge: «Riprova»."],
-    ["chiavi_non_distrutte", "Il sistema domotico è stato tolto, ma le chiavi no: «Annulla» di nuovo."],
+    ["chiavi_non_distrutte", "Il sistema domotico è stato tolto, ma le chiavi no: «Annulla creazione» di nuovo."],
     ["non_inviato", "L'ordine non è partito verso la macchina virtuale: «Riprova»."],
   ])("%s", (codice, text) => {
     expect(whatHappened(creazione({ stato: "non_creato", codice, messaggio: "Frase del server" }))).toBe(text);
@@ -177,8 +177,8 @@ describe("il limite di 5 creazioni l'ora (§2.2)", () => {
 
 describe("la riga sotto il nome dell'organizzazione (§4)", () => {
   it("i non creati prima, in rosso, al singolare e al plurale", () => {
-    expect(tenantCreationLine({ appartamenti_non_creati: 1, appartamenti_in_preparazione: 2 })).toEqual({ tone: "negative", text: "1 appartamento non creato: serve «Riprova» o «Annulla»" });
-    expect(tenantCreationLine({ appartamenti_non_creati: 3 })).toEqual({ tone: "negative", text: "3 appartamenti non creati: serve «Riprova» o «Annulla»" });
+    expect(tenantCreationLine({ appartamenti_non_creati: 1, appartamenti_in_preparazione: 2 })).toEqual({ tone: "negative", text: "1 appartamento non creato: serve «Riprova» o «Annulla creazione»" });
+    expect(tenantCreationLine({ appartamenti_non_creati: 3 })).toEqual({ tone: "negative", text: "3 appartamenti non creati: serve «Riprova» o «Annulla creazione»" });
   });
   it("solo in preparazione: neutra", () => {
     expect(tenantCreationLine({ appartamenti_non_creati: 0, appartamenti_in_preparazione: 1 })).toEqual({ tone: "neutral", text: "1 appartamento in preparazione" });
