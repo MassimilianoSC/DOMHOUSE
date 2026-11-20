@@ -61,9 +61,9 @@ case "${cmd}" in
     [ -n "${RISULTATI:-}" ] || die "manca RISULTATI (projects/<p>/topics/<t>)"
     work="$(mktemp -d)"
     trap 'rm -rf "${work}"' EXIT
+    # A7 code review, point 4: no BUDGET_MB_STAGING line here. The executor's default is 500 (answer 1197), and an
+    # agent of A2 refuses a key it does not know: going back to it would leave an executor that does not start
     printf 'AMBIENTE=%s\nCONDIVISA=1\nLETTORE=%s\nMAX_MOTORI_STAGING=4\n' "${AMBIENTE}" "${USER_NAME}" > "${work}/agent.conf"
-    # A7 (answer 1197): the staging's budget of engine memory, written here; production's comes with the second VM
-    if [ "${AMBIENTE}" = "staging" ]; then printf 'BUDGET_MB_STAGING=500\n' >> "${work}/agent.conf"; fi
     printf 'AMBIENTE=%s\nSOTTOSCRIZIONE=%s\nRISULTATI=%s\n' "${AMBIENTE}" "${SOTTOSCRIZIONE}" "${RISULTATI}" \
       > "${work}/agent-lettore.conf"
     check_configs "${work}/agent.conf" "${work}/agent-lettore.conf" || die "SOTTOSCRIZIONE o RISULTATI non validi: niente installato"
