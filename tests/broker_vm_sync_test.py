@@ -152,3 +152,95 @@ def test_a2_an_id_out_of_the_rule_is_refused(vm, bad):
     run, _, _ = vm
     r = run("add-apartment", bad)
     assert r.returncode == 1 and "apartment_id non valido" in r.stderr
+
+
+# ---- A5 (docs/proposta-a5.md §2 steps 1-2, answers 1210): refused logins per device, for the server ----------------
+NOW = "1795194750"     # 2026-11-20T17:12:30Z: the current slot is 17:10 (not complete), the two reported 17:05 and 17:00
+
+
+def _broker_log(*events: tuple[str, str, str]) -> str:
+    """docker logs -t of the broker: for each (time, client id, door) a connection and its refusal. Door "out" is 8883,
+    "in" the internal one (the container's own health check)."""
+    lines, port = [], 40000
+    for at, client, door in events:
+        port += 1
+        ip = f"203.0.113.{port % 7 + 1}:{port}"
+        if door == "out":
+            lines.append(f"2026-11-20T{at}.000000001Z 1795194000: New connection from {ip} on port 8883.")
+        lines.append(f"2026-11-20T{at}.000000002Z 1795194000: Client {client} [{ip}] disconnected: not authorised.")
+    return "\n".join(lines) + "\n"
+
+
+def _with_log(stubs, text: str) -> None:
+    (stubs / "broker.log").write_text(text, encoding="utf-8", newline="\n")
+    (stubs / "docker").write_text('#!/usr/bin/env bash\necho "$*" >> "$STUB_DIR/docker.log"\n'
+                                  'if [ "$1" = logs ]; then cat "$STUB_DIR/broker.log"; fi\nexit 0\n',
+                                  encoding="utf-8", newline="\n")
+
+
+def test_a5_one_line_per_device_and_slot_without_addresses(vm):
+    run, stubs, _ = vm
+    _with_log(stubs, _broker_log(("17:06:10", "apt-a.plug", "out"), ("17:08:20", "apt-a.plug", "out"),
+                                 ("17:01:00", "apt-a.plug", "out"), ("17:03:00", "apt-a.shelly-1", "out"),
+                                 ("17:11:00", "apt-a.plug", "out"),          # current slot: next round
+                                 ("16:58:00", "apt-a.plug", "out"),          # older than the two slots
+                                 ("17:06:30", "apt-a.plug", "in"),           # the internal door
+                                 ("17:06:40", "domhouse-check", "out")))     # check's own probe
+    r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW}")
+    assert r.returncode == 0, r.stderr
+    got = sorted(r.stdout.splitlines())
+    assert got == sorted([
+        "broker device refused apt=apt-a device=plug slot=2026-11-20T17:05:00Z count=2 last=2026-11-20T17:08:20Z",
+        "broker device refused apt=apt-a device=plug slot=2026-11-20T17:00:00Z count=1 last=2026-11-20T17:01:00Z",
+        "broker device refused apt=apt-a device=shelly-1 slot=2026-11-20T17:00:00Z count=1 last=2026-11-20T17:03:00Z",
+    ]), r.stdout
+    assert "203.0.113." not in r.stdout
+    assert "--since" in (stubs / "docker.log").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("client", ["apt-z.plug", "<script>x", "apt-a", "apt-a.Plug", "apt-a.a.b", "apt-a." + "x" * 65,
+                                    ".plug"])
+def test_a5_a_name_that_is_no_device_only_counts_as_other(vm, client):
+    run, stubs, _ = vm
+    _with_log(stubs, _broker_log(("17:06:10", client, "out"), ("17:06:20", client, "out")))
+    r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW}")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == ["broker device refused other slot=2026-11-20T17:05:00Z count=2"], r.stdout
+    assert client not in r.stdout or client == "apt-a"
+
+
+def test_a5_lines_are_capped_and_the_rest_goes_to_other(vm):
+    run, stubs, _ = vm
+    _with_log(stubs, _broker_log(("17:06:10", "apt-a.d1", "out"), ("17:06:20", "apt-a.d2", "out"),
+                                 ("17:06:30", "apt-a.d2", "out"), ("17:06:40", "apt-z.x", "out")))
+    r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW} DOMHOUSE_AUTH_DEVICE_LINES=1")
+    assert r.returncode == 0, r.stderr
+    lines = r.stdout.splitlines()
+    devices = [x for x in lines if " device=" in x]
+    other = [x for x in lines if " other " in x]
+    assert len(devices) == 1 and len(other) == 1, lines
+    shown = int(devices[0].split("count=")[1].split()[0])
+    assert other[0] == f"broker device refused other slot=2026-11-20T17:05:00Z count={4 - shown}"
+
+
+def test_a5_check_writes_the_device_lines_to_the_watch(vm):
+    """check runs every 5 minutes: the lines go to syslog (tag domhouse-check), where the log view of A5 reads them."""
+    text = (ROOT / "scripts" / "broker-vm.sh").read_text(encoding="utf-8")
+    body = text[text.index("\ncheck() {"):]
+    body = body[:body.index("\n}\n")]
+    assert "auth_refused_devices_report" in body
+    assert 'watch_line "${line}"' in text[text.index("auth_refused_devices_report() {"):]
+
+
+def test_a5_device_lines_do_not_fire_the_alert_of_many_refusals():
+    """The alert «broker accessi rifiutati» (over 100 an hour on the whole VM) matches «broker auth refused»."""
+    import json
+    import re as _re
+    policy = json.loads((ROOT / "scripts" / "monitoring" / "engine-alerts" / "broker-accessi-rifiutati.json").read_text(
+        encoding="utf-8"))
+    flt = policy["conditions"][0]["conditionMatchedLog"]["filter"]
+    pattern = flt.split('jsonPayload.message=~"')[1].rsplit('"', 1)[0].replace("\\\\", "\\")
+    for line in ("broker device refused apt=apt-a device=plug slot=2026-11-20T17:05:00Z count=2 last=2026-11-20T17:08:20Z",
+                 "broker device refused other slot=2026-11-20T17:05:00Z count=2"):
+        assert not _re.search(pattern, f"domhouse-check[42]: {line}"), line
+    assert _re.search(pattern, "domhouse-check[42]: broker auth refused hour=101 top_ip=x(1) top_client=y(1)")

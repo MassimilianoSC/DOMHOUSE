@@ -18,6 +18,7 @@
 #   sudo bash /opt/domhouse/broker-vm.sh remove-apartment <apartment_id>
 #   sudo bash /opt/domhouse/broker-vm.sh sync                          # rereads the secrets of every apartment
 #   sudo bash /opt/domhouse/broker-vm.sh check                         # one line for the 5-minute watch
+#   sudo bash /opt/domhouse/broker-vm.sh rifiuti                       # A5: the refused logins per device (read only)
 #   sudo bash /opt/domhouse/broker-vm.sh limit                         # (re)applies the limit on new connections
 #   sudo bash /opt/domhouse/broker-vm.sh network                       # the broker's networks as compose.yaml says
 #                                                                      # (C2 subnet, E-38 range of the internal one)
@@ -102,6 +103,7 @@ BROKER_SUBNET=172.30.84.0/24             # C2: the default network of engine/bro
 BRIDGE_NETWORK=domhouse-broker_default
 INTERNAL_NETWORK=domhouse-broker-internal
 INTERNAL_IPAM="172.30.83.0/24 172.30.83.128/25"   # E-38: subnet and ip_range of the internal network (compose.yaml)
+AUTH_DEVICE_LINES="${DOMHOUSE_AUTH_DEVICE_LINES:-50}"    # A5: device lines per round at most; the rest in «other»
 AUTH_ALERT_PER_HOUR="${DOMHOUSE_AUTH_ALERT_PER_HOUR:-100}"   # one relay with a wrong password retrying alone stays under
 KEPT=""                                  # E-33: the apartments the last sync kept as they were (sync_accounts)
 
@@ -471,6 +473,56 @@ auth_refused_report() {
   watch_line "broker auth refused hour=${n} top_ip=${ip} top_client=${client}"
 }
 
+auth_refused_devices() {
+  # A5 (docs/proposta-a5.md §2, answers 1210): for each device whose logins on 8883 were refused, one line per 5-minute
+  # slot, "broker device refused apt=<apt> device=<device> slot=<start, UTC> count=<n> last=<UTC>", for the two last
+  # COMPLETE slots: each slot is written by two rounds of check (a round late or missing loses nothing) and the server
+  # counts a slot once. No address, no password. The client id is chosen by whoever connects: only <apt>.<device> with
+  # the id rule and an apartment of the broker's list is named; everything else is one "other" line per slot, without
+  # names. Not «broker auth refused»: that is the alert of over 100 refusals an hour (broker-accessi-rifiutati.json),
+  # which must not fire for one device. At most AUTH_DEVICE_LINES device lines per round, the rest added to "other" (a burst of invented names cannot
+  # fill the logs). awk without intervals nor mktime: the VM's awk may be mawk
+  local now slot s1 s2
+  now="${DOMHOUSE_NOW_EPOCH:-$(date +%s)}"
+  slot=$(( now / 300 * 300 ))
+  s1="$(date -u -d "@$(( slot - 300 ))" +%Y-%m-%dT%H:%M:00Z)"
+  s2="$(date -u -d "@$(( slot - 600 ))" +%Y-%m-%dT%H:%M:00Z)"
+  docker logs -t --since 20m "${CONTAINER}" 2>&1 | awk -v s1="${s1}" -v s2="${s2}" -v cap="${AUTH_DEVICE_LINES}" '
+    function ok(x) { return length(x) <= 64 && x ~ /^[a-z0-9][a-z0-9-]*$/ }
+    FILENAME != "-" { known[$0] = 1; next }
+    / New connection from .* on port 8883\.$/ { for (i = 1; i < NF; i++) if ($i == "from") outside[$(i + 1)] = 1; next }
+    / disconnected: not authorised\.$/ {
+      ts = $1
+      if (ts !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]/) next
+      at = substr($0, index($0, "[") + 1); at = substr(at, 1, index(at, "]") - 1)
+      client = $0; sub(/^.*Client /, "", client); sub(/ \[.*$/, "", client)
+      if (!(at in outside) || client == "domhouse-check") next
+      m = substr(ts, 15, 2) + 0
+      s = substr(ts, 1, 14) sprintf("%02d", m - m % 5) ":00Z"
+      if (s != s1 && s != s2) next
+      dot = index(client, ".")
+      apt = substr(client, 1, dot - 1); dev = substr(client, dot + 1)
+      if (dot > 1 && ok(apt) && ok(dev) && (apt in known)) {
+        k = s " " apt " " dev; n[k]++; t = substr(ts, 1, 19) "Z"; if (t > last[k]) last[k] = t
+      } else other[s]++
+    }
+    END {
+      lines = 0
+      for (k in n) {
+        split(k, f, " ")
+        if (lines < cap + 0) { print "broker device refused apt=" f[2] " device=" f[3] " slot=" f[1] " count=" n[k] " last=" last[k]; lines++ }
+        else other[f[1]] += n[k]
+      }
+      for (s in other) print "broker device refused other slot=" s " count=" other[s]
+    }' "${APARTMENTS}" -
+}
+
+auth_refused_devices_report() {
+  # A5: the lines above into syslog (tag domhouse-check): the log view of A5 holds only these, the server reads it
+  local line
+  auth_refused_devices | while IFS= read -r line; do watch_line "${line}"; done
+}
+
 auth_refused_pairs() {
   # "<ip> <client id>" for each refused login of the last hour that came in on 8883: the refusal line is matched to
   # its "New connection from <ip>:<port> on port 8883." line. Left out: the internal door (the container's own health
@@ -550,6 +602,7 @@ check() {
   # D-210: when the container last started; the run-in report counts the different values as restarts
   watch_line "broker started_at=$(docker inspect -f '{{.State.StartedAt}}' "${CONTAINER}" 2>/dev/null || echo '?')"
   auth_refused_report
+  auth_refused_devices_report
 }
 
 cmd="${1:-}"; shift || true
@@ -748,6 +801,11 @@ case "${cmd}" in
   check)
     need_installed
     check
+    ;;
+  rifiuti)
+    [ $# -eq 0 ] || die "uso: rifiuti"
+    need_installed
+    auth_refused_devices
     ;;
   limit)
     [ $# -eq 0 ] || die "uso: limit"
