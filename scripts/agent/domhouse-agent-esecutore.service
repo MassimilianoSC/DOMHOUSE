@@ -31,6 +31,10 @@ ProtectSystem=strict
 # engine back. Writes stay closed by ProtectSystem=strict and these three paths alone. Da verificare sulla VM con
 # systemd-run e le stesse impostazioni (procedura di installazione di A2) prima di installare
 ReadWritePaths=/opt/domhouse /etc/domhouse /data
+# code review A2, point 2: inside those paths, the agent's code, the scripts root runs, the compose files, the agent's
+# configuration and keys, the approved image and the broker's data stay read only (the most specific path wins;
+# «-» = no error when the file does not exist yet)
+ReadOnlyPaths=/opt/domhouse/agent /opt/domhouse/engine-vm.sh /opt/domhouse/broker-vm.sh /opt/domhouse/broker_accounts.py -/opt/domhouse/compose.yaml -/opt/domhouse/compose.catalog.yaml -/opt/domhouse/compose.broker.yaml -/opt/domhouse/_broker /etc/domhouse/agent.conf -/etc/domhouse/agent-ordini.key -/etc/domhouse/agent-risultati.key -/etc/domhouse/agent-immagine-staging -/etc/domhouse/agent-immagine-prod -/data/_broker
 CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE
 AmbientCapabilities=
 # the group by name (systemd refuses a gid no group has: 20 November); agent-vm.sh install makes it with gid 1883
@@ -41,7 +45,8 @@ ProtectControlGroups=yes
 RestrictAddressFamilies=AF_UNIX AF_INET
 RestrictNamespaces=yes
 LockPersonality=yes
-MemoryMax=128M
+# code review A2, point 8: crea_motore runs docker login, compose pull and up from here: room for them (C4, C9.2)
+MemoryMax=512M
 Restart=on-failure
 RestartSec=5
 

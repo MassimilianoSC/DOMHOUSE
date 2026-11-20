@@ -27,6 +27,7 @@ import contextlib
 import json
 import os
 import re
+import signal
 import socket
 import socketserver
 import struct
@@ -177,13 +178,30 @@ def vm_lock(path: Path):
 
 
 def run_program(argv: list[str], env: dict, timeout: float) -> tuple[int, str]:
-    """execve with a list of arguments: never a shell, never the caller's environment."""
+    """execve with a list of arguments: never a shell, never the caller's environment. Code review A2, point 3: the
+    program runs in a session of its own, and past its time the WHOLE group is killed (a «docker compose up» left
+    alive could recreate a container after the way back removed it), before the caller takes anything back."""
     try:
-        done = subprocess.run(argv, env=env, capture_output=True, text=True, timeout=timeout, shell=False,
-                              stdin=subprocess.DEVNULL)
-    except (OSError, subprocess.TimeoutExpired):
+        proc = subprocess.Popen(argv, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+                                shell=False, stdin=subprocess.DEVNULL, start_new_session=True)
+    except OSError:
         return 127, ""
-    return done.returncode, (done.stdout or "")[-4000:]
+    try:
+        out, _ = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        try:
+            if hasattr(os, "killpg"):
+                os.killpg(proc.pid, signal.SIGKILL)
+            else:                                   # Windows (the tests): no process groups
+                proc.kill()
+        except OSError:
+            pass
+        try:
+            proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+        return 127, ""
+    return proc.returncode, (out or "")[-4000:]
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -335,7 +353,7 @@ class Esecutore:
                         return self._create(order, output)
                     return self._remove(order, output)
             except TimeoutError:
-                output.append("blocco della VM occupato da oltre 10 minuti")
+                output.append(f"blocco della VM occupato da oltre {LOCK_WAIT_S} s")
                 return comune.result(order, "fallito", "errore_interno")
         port = self._port(order.apartment_id)
         if port is None:
@@ -455,9 +473,21 @@ class Esecutore:
         mark = self._read_mark(apartment)
         settings = self.config.opt / f"{apartment}.settings"
         if mark is not None and mark != wanted:
-            return comune.result(order, "rifiutato", "gia_esiste_diverso")
+            # code review A2, point 7: a «Riprova» after a new approved image, with no engine installed yet: the mark
+            # takes the new image; with the engine there, a different image is never changed silently
+            same_place = {k: mark.get(k) for k in ("porta", "env")} == {"porta": port, "env": env}
+            if not (same_place and not settings.exists()):
+                return comune.result(order, "rifiutato", "gia_esiste_diverso")
+            try:
+                self._write_atomic(self._mark(apartment), json.dumps(wanted, sort_keys=True), 0o600)
+            except OSError as exc:
+                output.append(f"segno di creazione: {type(exc).__name__}")
+                return comune.result(order, "fallito", "errore_interno")
         if mark is None:                                 # step 0 for a new apartment (step 1: ours with the same values)
-            if settings.exists():
+            # code review A2, point 4: any trace of an apartment the agent did not make (settings, key file, catalog,
+            # the broker's list) refuses: the way back would remove what someone made by hand. An empty data folder
+            # alone is allowed (N6), a non-empty one is dati_presenti below
+            if self._traces(apartment, data=False):
                 return comune.result(order, "rifiutato", "gia_esiste_diverso")    # lab-01, made by hand
             if self._port_taken(port, apartment):
                 return comune.result(order, "rifiutato", "porta_occupata")
@@ -508,14 +538,14 @@ class Esecutore:
         return ok
 
     # ---- A2 §5.2: togli_motore (the piece A6 reuses) --------------------------------------------------------------
-    def _traces(self, apartment: str) -> bool:
+    def _traces(self, apartment: str, data: bool = True) -> bool:
         try:
             known = (self.config.broker_etc / "apartments").read_text(encoding="utf-8").split()
         except OSError:
             known = []
-        return apartment in known or any(p.exists() or p.is_symlink() for p in (
-            self.config.opt / f"{apartment}.settings", self.config.etc / f"{apartment}.env",
-            self.config.etc / f"{apartment}.catalog.yaml", self.config.data / apartment))
+        paths = [self.config.opt / f"{apartment}.settings", self.config.etc / f"{apartment}.env",
+                 self.config.etc / f"{apartment}.catalog.yaml"] + ([self.config.data / apartment] if data else [])
+        return apartment in known or any(p.exists() or p.is_symlink() for p in paths)
 
     def _remove(self, order: comune.Order, output: list[str]) -> dict:
         apartment = order.apartment_id

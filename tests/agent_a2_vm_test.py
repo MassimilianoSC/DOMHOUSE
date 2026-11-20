@@ -290,3 +290,80 @@ def test_the_executors_unit_opens_what_a2_writes():
 def test_the_worst_crea_motore_ends_before_the_reader_stops_waiting():
     lettore = load("lettore", AGENT / "lettore.py")
     assert esecutore.WORST_CREATE_S + 60 < lettore.EXECUTOR_TIMEOUT_S
+
+
+# ---- code review of A2 (20 November): points 2, 3, 4, 7, 8, 9 ---------------------------------------------------
+@pytest.mark.parametrize("trace", ["broker", "env"])
+def test_review4_an_apartment_with_traces_but_no_mark_is_gia_esiste_diverso(vm, trace):
+    if trace == "broker":
+        (vm.broker_etc / "apartments").write_text(f"lab-01\n{APT}\n", encoding="utf-8")
+    else:
+        (vm.etc / f"{APT}.env").write_text("API_KEY=x\n", encoding="utf-8")
+    out = vm.send(order())
+    assert (out["esito"], out["codice"]) == ("rifiutato", "gia_esiste_diverso") and vm.runs == []
+
+
+def test_review4_an_empty_data_folder_alone_is_still_fine(vm):
+    (vm.data / APT).mkdir()
+    assert vm.send(order())["codice"] == "ok"
+
+
+def test_review7_riprova_after_a_new_approved_image_updates_the_mark_when_no_engine_is_there(vm):
+    vm.codes["install"] = 4
+    assert vm.send(order())["codice"] == "motore_non_sano"
+    vm.codes["install"], vm.codes["remove"] = 0, 0
+    (vm.state / "creati").mkdir(exist_ok=True)
+    old = f"{REPO}@sha256:{'e' * 64}"
+    (vm.state / "creati" / APT).write_text(json.dumps({"porta": 8150, "immagine": old, "env": "staging"}),
+                                           encoding="utf-8")         # left by an order with the image of before
+    out = vm.send(order(seq=2))
+    assert (out["esito"], out["codice"]) == ("riuscito", "ok")
+    assert json.loads((vm.state / "creati" / APT).read_text(encoding="utf-8"))["immagine"] == DIGEST
+    vm.approved = f"{REPO}@sha256:{'f' * 64}"                         # the engine is there now: no silent change
+    assert vm.send(order(seq=3))["codice"] == "gia_esiste_diverso"
+
+
+def test_review9_a_lock_that_does_not_come_is_a_failure_not_a_hang(vm):
+    class Busy:
+        def __enter__(self):
+            raise TimeoutError("blocco della VM occupato")
+
+        def __exit__(self, *exc):
+            return False
+    vm.ex.lock = lambda: Busy()
+    out = vm.send(order())
+    assert (out["esito"], out["codice"]) == ("fallito", "errore_interno") and vm.runs == []
+
+
+def test_review3_a_program_past_its_time_is_stopped_with_its_children(tmp_path):
+    import time as _time
+    started = _time.monotonic()
+    code, _ = esecutore.run_program([sys.executable, "-c", "import time; time.sleep(30)"], dict(esecutore.CLEAN_ENV),
+                                    0.5)
+    assert code == 127 and _time.monotonic() - started < 10
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="gruppi di processi: solo Linux (CI)")
+def test_review3_on_linux_the_whole_group_is_killed(tmp_path):
+    import os as _os
+    import time as _time
+    pid_file = tmp_path / "figlio"
+    script = f"sleep 30 & echo $! > {pid_file}; wait"
+    code, _ = esecutore.run_program(["/bin/bash", "-c", script], dict(esecutore.CLEAN_ENV), 1)
+    assert code == 127
+    child = int(pid_file.read_text().strip())
+    _time.sleep(0.5)
+    with pytest.raises(ProcessLookupError):
+        _os.kill(child, 0)
+
+
+def test_review2_8_the_unit_keeps_code_keys_and_configuration_read_only_and_has_room_for_docker():
+    unit = (AGENT / "domhouse-agent-esecutore.service").read_text(encoding="utf-8")
+    line = next(x for x in unit.splitlines() if x.startswith("ReadOnlyPaths="))
+    for path in ("/opt/domhouse/agent", "/opt/domhouse/engine-vm.sh", "/opt/domhouse/broker-vm.sh",
+                 "/opt/domhouse/broker_accounts.py", "-/opt/domhouse/compose.yaml", "-/opt/domhouse/compose.catalog.yaml",
+                 "-/opt/domhouse/_broker", "/etc/domhouse/agent.conf", "-/etc/domhouse/agent-ordini.key",
+                 "-/etc/domhouse/agent-risultati.key", "-/etc/domhouse/agent-immagine-staging",
+                 "-/etc/domhouse/agent-immagine-prod", "-/data/_broker"):
+        assert path in line.split("=", 1)[1].split(), path
+    assert "\nMemoryMax=512M\n" in unit
