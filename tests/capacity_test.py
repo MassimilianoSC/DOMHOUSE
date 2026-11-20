@@ -190,3 +190,16 @@ def no_reading_left():
     get_repository().capacity.clear()
     yield
     get_repository().capacity.clear()
+
+
+# ---- o2 (406e150): an unreadable capienza is not a full VM ------------------------------------------------------------
+def test_an_unreadable_capienza_is_not_saved_and_the_refresh_says_it_failed(world):
+    call("POST", "/app/platform/capienza/aggiorna")
+    push(world.published[-1], dati=A7)                                     # a good reading first
+    world.now += timedelta(seconds=31)
+    call("POST", "/app/platform/capienza/aggiorna")
+    push(world.published[-1], dati={"motori": 2})                          # then one without its numbers
+    c = call("GET", "/app/platform/capienza").json()
+    assert c["capienza"]["posti_liberi"] == 2 and c["capienza"]["motivo"] is None   # the last good one stays
+    assert (c["aggiornamento"]["stato"], c["aggiornamento"]["codice"]) == ("fallito", "errore_interno")
+    assert c["aggiornamento"]["messaggio"] == "La capienza letta non è valida: riprova"

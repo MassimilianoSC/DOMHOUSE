@@ -82,8 +82,17 @@ def _stamp(when: datetime) -> str:
     return when.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
+UNREADABLE = "La capienza letta non è valida: riprova"
+
+
 async def save(ambiente: str, op_id: str, dati: dict) -> None:
-    """A successful capienza of this environment: the new last reading."""
+    """A successful capienza of this environment: the new last reading. One whose numbers cannot be read is NOT a
+    reading (o2, 406e150: «Nessun posto libero» would be false): the last good one stays, and the refresh that asked
+    for it reads «fallito»."""
+    if room_problem(dati, ambiente) == "errore_interno":
+        warn("capacity reading refused", op_id=op_id, motivo="dati_illeggibili")
+        await get_repository().change_capacity(ambiente, lambda doc: {**doc, "scartata_op": op_id})
+        return
     reading = {"letta_at": _stamp(_now()), "op_id": op_id, "dati": dict(dati)}
 
     def change(doc: dict) -> dict:
@@ -111,6 +120,8 @@ async def view() -> dict:
         op = await agent.view(doc["op_id"])
         if op is not None:
             out["aggiornamento"] = {k: op[k] for k in ("op_id", "stato", "codice", "messaggio", "creato_at")}
+            if doc.get("scartata_op") == doc["op_id"]:          # its result came, but could not be read
+                out["aggiornamento"].update(stato="fallito", codice="errore_interno", messaggio=UNREADABLE)
     if doc.get("aggiornato_at"):
         free = datetime.fromtimestamp(iso_seconds(doc["aggiornato_at"]), UTC) + timedelta(seconds=REFRESH_S)
         if free > now:
