@@ -863,3 +863,14 @@ def test_a7_capacity_is_kept_per_environment_and_a_refusing_change_writes_nothin
         run(repo.change_capacity("staging", refuse))
     assert run(repo.get_capacity("staging"))["aggiornato_at"] == "2026-11-20T15:00:00.000Z"
     assert run(repo.get_capacity("prod")) is None
+
+
+def test_a6_every_credential_of_the_apartment_goes_and_only_its(repo):
+    from bff import device_credentials as dc
+    for apt, device, n in (("lab-01", "shelly-a", 20), ("lab-01", "shelly-b", 21), ("lab-02", "shelly-a", 22)):
+        run(repo.device_credential_change(apt, device, dc.decide("registra", device, None, "$7$a", "uid1"),
+                                          _a3_op(n, apt=apt), _a3_build([])))
+    run(repo.delete_device_credentials("lab-01"))
+    assert run(repo.device_credentials_view("lab-01"))[0] == []
+    assert [d["device_id"] for d in run(repo.device_credentials_view("lab-02"))[0]] == ["shelly-a"]
+    run(repo.delete_device_credentials("lab-01"))                           # again: nothing to do

@@ -388,6 +388,10 @@ async def after_result(op, esito: str, codice: str, dati: dict, late: bool = Fal
     """Called by the receiver for capienza (of a creation), crea_motore and togli_motore, after the operation was
     closed (or found closed: Pub/Sub delivers again after a 503). What it did, for the log line."""
     repo = get_repository()
+    if op.operazione == "togli_motore":
+        from . import deletion
+        if await deletion.owns(op):                    # A6: the togli_motore of a deletion, not of a cancellation
+            return await deletion.after_result(op, esito, codice, late)
     apartment_id = op.apartment_id or op.per_appartamento
     apt = await repo.get_apartment(apartment_id) if apartment_id else None
     c = apt.creazione if apt else None

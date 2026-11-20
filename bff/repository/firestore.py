@@ -308,6 +308,10 @@ class FirestoreRepository:
             except AlreadyExists:
                 pass                                      # the app's own document stays as it is
 
+    async def delete_device_credentials(self, apartment_id):
+        async for d in self._creds(apartment_id).stream():
+            await d.reference.delete()
+
     async def delete_migrated_credentials(self, apartment_id, device_ids):
         for device_id in device_ids:
             ref = self._creds(apartment_id).document(device_id)

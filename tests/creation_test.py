@@ -459,5 +459,5 @@ def test_review5_the_old_link_and_delete_refuse_an_apartment_created_from_the_ap
     r = call("PATCH", base, json={"port": 8199})
     assert (r.status_code, r.json()["error"]) == (409, "created_from_app")
     r = call("DELETE", base)
-    assert (r.status_code, r.json()["error"]) == (409, "created_from_app")
+    assert (r.status_code, r.json()["error"]) == (409, "use_elimina")      # A6: never the old way, for any apartment
     assert "lab-a2-01" in get_repository().apartments

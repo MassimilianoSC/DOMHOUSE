@@ -89,6 +89,9 @@ class InMemoryRepository:
         for device_id, impronta in fingerprints.items():
             docs.setdefault(device_id, migrated_document(device_id, impronta, at))
 
+    async def delete_device_credentials(self, apartment_id):
+        self.device_creds.pop(apartment_id, None)
+
     async def delete_migrated_credentials(self, apartment_id, device_ids):
         docs = self.device_creds.get(apartment_id, {})
         for device_id in device_ids:

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 
-from .. import accounts, actors, ai_stats, audit, instances, support
+from .. import accounts, actors, ai_stats, audit, deletion, instances, support
 from ..auth import CurrentUser, require_admin, scope_out
 from ..logs import warn
 from ..features import APP_FEATURES
@@ -204,11 +204,13 @@ class ApartmentPatch(BaseModel):
     energy_price_eur_kwh: float | None = None   # P-52: missing = no change; null = the organisation's price
 
 
-def apt_out(a: Apartment) -> dict:
+def apt_out(a: Apartment, names: dict | None = None) -> dict:
     # no instance_secret_name: the secret name is always derived from the apartment id (D-60); D-90: neither the fields
-    # nobody uses (tenant_id, created_at, external_ids) nor the name of a secret in last_check
-    out = {**a.model_dump(exclude={"instance_secret_name", "tenant_id", "created_at", "external_ids"}),
-           "italianway_id": a.external_ids.italianway}
+    # nobody uses (tenant_id, created_at, external_ids) nor the name of a secret in last_check. A6: who switched it off
+    # by role and visible name (never the uid), and nothing of a deletion (the platform's)
+    out = {**a.model_dump(exclude={"instance_secret_name", "tenant_id", "created_at", "external_ids",
+                                   "disattivato_da", "eliminazione"}),
+           "italianway_id": a.external_ids.italianway, "disattivato_da": deletion.who_view(a, names or {})}
     out["last_check"] = instances.for_admin(out.get("last_check"))
     return out
 
@@ -250,7 +252,9 @@ def _check_features(features: list[str] | None) -> bool:
 
 @router.get("/apartments")
 async def list_apartments(user: CurrentUser = Depends(require_admin)):
-    return [apt_out(a) for a in await get_repository().list_apartments(user.tenant_id) if usable(a)]
+    apartments = [a for a in await get_repository().list_apartments(user.tenant_id) if usable(a)]
+    names = await deletion.admin_names(apartments)
+    return [apt_out(a, names) for a in apartments]
 
 
 @router.get("/assistant-stats")
@@ -295,6 +299,14 @@ async def patch_apartment(apartment_id: str, body: ApartmentPatch, user: Current
     if "energy_price_eur_kwh" in body.model_fields_set:
         apt.energy_price_eur_kwh = body.energy_price_eur_kwh
     changed = [k for k, v in data.items() if getattr(apt, k) != v]   # P-47: only real changes reach the log
+    switched = None
+    if "enabled" in data and data["enabled"] is not None:
+        try:                                          # A6: the same state as the platform's «Disattiva»
+            switched = deletion.on_admin_enabled(apt, data["enabled"], user)
+        except deletion.DeletionRefused as exc:
+            return err(exc.status, exc.error, exc.message)
+    elif apt.eliminazione is not None:
+        return err(409, "deletion_in_progress", "L'eliminazione di questo appartamento è in corso.")
     features_before = apt.enabled_features
     for k, v in data.items():
         setattr(apt, k, v)
@@ -313,7 +325,8 @@ async def patch_apartment(apartment_id: str, body: ApartmentPatch, user: Current
     if saved.energy_price_eur_kwh != price_before:
         await audit.record("energy_price_changed", audit.by_user(user), user.tenant_id, target,
                            **{"from": price_before, "to": saved.energy_price_eur_kwh})
-    return apt_out(saved)
+    await deletion.after_admin_switch(saved, switched, user)
+    return apt_out(saved, await deletion.admin_names([saved]))
 
 
 @router.delete("/apartments/{apartment_id}", status_code=204)

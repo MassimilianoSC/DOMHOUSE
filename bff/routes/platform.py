@@ -13,7 +13,7 @@ from fastapi import APIRouter, Body, Depends, Query
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, EmailStr, Field
 
-from .. import actors, agent, audit, capacity, creation, instances, support
+from .. import actors, agent, audit, capacity, creation, deletion, instances, support
 from ..auth import Identity, forget_tenant, require_platform
 from ..config import get_settings
 from ..invites import InviteRefused, create_invitation, send_invitation, shown
@@ -354,11 +354,14 @@ def _demo_code_refused(url: str, code: str | None) -> JSONResponse | None:
     return None
 
 
-def apartment_row(a: Apartment, creazione: dict | None = None) -> dict:
+def apartment_row(a: Apartment, creazione: dict | None = None, gone: dict | None = None) -> dict:
+    gone = gone or {"disattivato_at": a.disattivato_at, "disattivato_da": deletion.who_view(a, {}),
+                    "eliminabile_dal": deletion.eliminabile_dal(a), "origine": deletion.origine(a), "eliminazione": None}
     return {"apartment_id": a.apartment_id, "name": a.name, "instance_url": a.instance_url, "port": a.port,
             "enabled": a.enabled, "timezone": a.timezone, "italianway_id": a.external_ids.italianway,
             "simulated": a.simulated, "last_check": a.last_check.model_dump() if a.last_check else None,
-            "creazione": creazione}                           # A2 §2.2 point 23: null when linked by hand
+            "creazione": creazione,                           # A2 §2.2 point 23: null when linked by hand
+            **gone}                                           # A6: disattivato_at/_da, eliminabile_dal, origine, eliminazione
 
 
 def _code(value: str | None) -> str | None:
@@ -389,8 +392,8 @@ async def list_tenant_apartments(tenant_id: str):
     if isinstance(t, JSONResponse):
         return t
     apartments = await get_repository().list_apartments(tenant_id)
-    made = await creation.views(apartments)
-    return [apartment_row(a, made[a.apartment_id]) for a in apartments]
+    made, gone = await creation.views(apartments), await deletion.views(apartments)
+    return [apartment_row(a, made[a.apartment_id], gone[a.apartment_id]) for a in apartments]
 
 
 @router.post("/tenants/{tenant_id}/apartments", status_code=201)
@@ -635,9 +638,97 @@ async def delete_tenant_apartment(tenant_id: str, apartment_id: str, identity: I
     apt = await _tenant_apartment(tenant_id, apartment_id)
     if isinstance(apt, JSONResponse):
         return apt
-    if refused := _made_by_the_app(apt):
-        return refused
-    await remove_apartment(apt)
-    await audit.record("apartment_deleted", audit.by_platform(identity), tenant_id,
-                       audit.apartment_target(apt.apartment_id, apt.name))
-    return Response(status_code=204)
+    # A6: no way around the wait and the name (bff/deletion.py, «Disattiva» then «Elimina»)
+    return err(409, "use_elimina", "Per eliminare: Disattiva, poi Elimina dopo 7 giorni")
+
+
+# ---------- A6: switching off, deleting (bff/deletion.py; bff/API.md «Eliminazione di un appartamento») ----------
+class DeletionStart(BaseModel):
+    nome: str | None = None
+
+
+class DeletionRetry(BaseModel):
+    version: int | None = None
+
+
+def _deletion_refused(exc: "deletion.DeletionRefused") -> JSONResponse:
+    response = err(exc.status, exc.error, exc.message, **exc.details)
+    if exc.status == 429 and exc.details.get("riprova_dal"):
+        seconds = deletion.parse(exc.details["riprova_dal"]).timestamp() - deletion.utcnow().timestamp()
+        response.headers["Retry-After"] = str(max(1, int(seconds + 0.999)))
+    return response
+
+
+async def _row_after(apartment_id: str) -> dict:
+    apt = await get_repository().get_apartment(apartment_id)
+    made, gone = await creation.view(apt), (await deletion.views([apt]))[apartment_id]
+    return apartment_row(apt, made, gone)
+
+
+@router.post("/tenants/{tenant_id}/apartments/{apartment_id}/disattiva")
+async def disable_apartment(tenant_id: str, apartment_id: str, identity: Identity = Depends(require_platform)):
+    return await _switch(tenant_id, apartment_id, "disattiva", identity)
+
+
+@router.post("/tenants/{tenant_id}/apartments/{apartment_id}/riattiva")
+async def enable_apartment(tenant_id: str, apartment_id: str, identity: Identity = Depends(require_platform)):
+    return await _switch(tenant_id, apartment_id, "riattiva", identity)
+
+
+async def _switch(tenant_id: str, apartment_id: str, action: str, identity: Identity):
+    apt = await _tenant_apartment(tenant_id, apartment_id)
+    if isinstance(apt, JSONResponse):
+        return apt
+    try:
+        if action == "disattiva":
+            await deletion.disable(apt, identity)
+        else:
+            await deletion.enable(apt, identity)
+    except deletion.DeletionRefused as exc:
+        return _deletion_refused(exc)
+    return await _row_after(apartment_id)
+
+
+@router.post("/tenants/{tenant_id}/apartments/{apartment_id}/elimina")
+async def delete_apartment_a6(tenant_id: str, apartment_id: str, body: DeletionStart = Body(default_factory=DeletionStart),
+                              identity: Identity = Depends(require_platform)):
+    if not deletion.can_delete(identity):                 # answer 1210, point 1: the one place (bff/deletion.py)
+        return err(403, "forbidden", "Operazione riservata ai gestori della piattaforma")
+    apt = await _tenant_apartment(tenant_id, apartment_id)
+    if isinstance(apt, JSONResponse):
+        return apt
+    try:
+        status, content = await deletion.start(apt, body.nome, identity)
+    except deletion.DeletionRefused as exc:
+        return _deletion_refused(exc)
+    except agent.AgentError as exc:
+        return _publish_failed(exc)
+    return JSONResponse(status_code=status, content=content)
+
+
+@router.get("/tenants/{tenant_id}/apartments/{apartment_id}/eliminazione")
+async def get_deletion(tenant_id: str, apartment_id: str):
+    apt = await _tenant_apartment(tenant_id, apartment_id)
+    if isinstance(apt, JSONResponse):
+        return apt
+    view = await deletion.eliminazione_view(apt)
+    if view is None:
+        return err(404, "not_found", "Nessuna eliminazione per questo appartamento")
+    return {"eliminazione": view}
+
+
+@router.post("/tenants/{tenant_id}/apartments/{apartment_id}/eliminazione/riprova")
+async def retry_deletion(tenant_id: str, apartment_id: str, body: DeletionRetry = Body(default_factory=DeletionRetry),
+                         identity: Identity = Depends(require_platform)):
+    if not deletion.can_delete(identity):
+        return err(403, "forbidden", "Operazione riservata ai gestori della piattaforma")
+    apt = await _tenant_apartment(tenant_id, apartment_id)
+    if isinstance(apt, JSONResponse):
+        return apt
+    try:
+        status, content = await deletion.retry(apt, body.version, identity)
+    except deletion.DeletionRefused as exc:
+        return _deletion_refused(exc)
+    except agent.AgentError as exc:
+        return _publish_failed(exc)
+    return JSONResponse(status_code=status, content=content)
