@@ -119,6 +119,8 @@ spec:
                   key: latest
             - name: DEVICE_BROKER_ADDRESS  # A3: the broker's address the devices use (production: empty until the second VM)
               value: mqtt.dh-lab.eu:8883
+            - name: DEVICE_REFUSALS_VIEW   # A5: the log view with only «broker device refused» (procedura A5); staging only
+              value: projects/your-gcp-project-id/locations/global/buckets/_Default/views/domhouse-rifiuti-dispositivi
             - name: ITALIANWAY_SIGNATURE_HEADER
               value: X-Signature
             - name: ITALIANWAY_WEBHOOK_SECRET

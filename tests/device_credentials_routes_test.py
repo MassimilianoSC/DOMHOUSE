@@ -335,3 +335,31 @@ def test_review_7_the_password_is_given_even_if_the_log_or_the_names_fail(world,
     world.fail = True
     r = call("POST", f"{BASE}/shelly-1/revoca", json={"version": 1})
     assert r.status_code == 502 and r.json()["error"] == "agent_publish_failed"       # not a 500
+
+
+# ---- A5: the refused logins of each device (docs/proposta-a5.md §2 step 5, bff/device_refusals.py) -----------------
+def test_a5_rifiuti_is_null_when_the_server_does_not_know(world):
+    register()
+    assert listed()["rifiuti"] is None
+    assert register("shelly-2").json()["credential"]["rifiuti"] is None
+
+
+def test_a5_rifiuti_per_device_in_the_list_and_the_copy_in_the_actions(world, monkeypatch):
+    from bff import device_refusals as dr
+    dr.clear()
+    asked = []
+
+    async def for_apartment(apartment_id):
+        asked.append(apartment_id)
+        return {"shelly-1": {"conteggio_24h": 12, "ultimo": "2026-11-20T14:05:00Z"}}
+    monkeypatch.setattr(dr, "for_apartment", for_apartment)
+    monkeypatch.setattr(dr, "cached", lambda apartment_id: {"shelly-1": {"conteggio_24h": 12, "ultimo": "x"}})
+    register()
+    register("shelly-2")
+    assert listed()["rifiuti"] == {"conteggio_24h": 12, "ultimo": "2026-11-20T14:05:00Z"}
+    assert listed("shelly-2")["rifiuti"] == {"conteggio_24h": 0, "ultimo": None}
+    assert asked and set(asked) == {APT}
+    r = call("POST", f"{BASE}/shelly-1/rigenera", json={"version": listed()["version"]})
+    assert r.status_code == 200 and r.json()["credential"]["rifiuti"] == {"conteggio_24h": 12, "ultimo": "x"}
+    platform_items = call("GET", PLATFORM, headers=ADMIN)
+    assert platform_items.status_code in (403, 404)          # the platform prefix keeps its own guard
