@@ -130,7 +130,7 @@ describe("«Cosa è successo» (§6.2; o1 cb3ee25: il perché sta in creazione.c
     ["broker_fallito", "L'accesso dei dispositivi non è stato preparato: «Riprova»."],
     ["tempo_scaduto", "Nessuna risposta dalla macchina virtuale in 20 minuti: «Riprova»."],
     ["segreti_non_creati", "Le chiavi non sono state create: «Riprova»."],
-    ["secret_conflict", "C'è già una chiave con questo nome: serve un controllo."],
+    ["secret_conflict", "C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che il supporto ha tolto quella chiave."],
     ["collegamento_fallito", "Il sistema domotico è installato ma l'app non lo raggiunge: «Riprova»."],
     ["chiavi_non_distrutte", "Il sistema domotico è stato tolto, ma le chiavi no: «Annulla» di nuovo."],
     ["non_inviato", "L'ordine non è partito verso la macchina virtuale: «Riprova»."],
