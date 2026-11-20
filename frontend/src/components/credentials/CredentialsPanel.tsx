@@ -8,7 +8,8 @@ import { CopyableId } from "@/components/ui/CopyableId";
 import { Badge, Skeleton } from "@/components/ui/primitives";
 import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { t } from "@/i18n";
-import { allowedActions, refetchEvery, splitCredentials, type CredentialAction } from "@/lib/deviceCredentials";
+import { allowedActions, credentialsSignature, MAX_POLL_MS, POLL_MS, splitCredentials, type CredentialAction } from "@/lib/deviceCredentials";
+import { pollWindow } from "@/lib/pollWindow";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -152,15 +153,11 @@ function Header() {
  */
 export function CredentialsPanel({ apartmentId, scope, onRequest, onRegister }: { apartmentId: string; scope: CredentialScope; onRequest: (r: RowRequest) => void; onRegister: () => void }) {
   const api = credentialsApi(apartmentId, scope);
-  const pollStart = useRef(Date.now());
+  const pollOpen = useRef(pollWindow(MAX_POLL_MS));
   const q = useQuery({
     queryKey: credentialsKey(apartmentId, scope),
     queryFn: async () => (await api.list()).items,
-    refetchInterval: (query) => {
-      const every = refetchEvery(query.state.data, pollStart.current, Date.now());
-      if (every === false) pollStart.current = Date.now(); // the next order starts its own 20 minutes
-      return every;
-    },
+    refetchInterval: (query) => (pollOpen.current(credentialsSignature(query.state.data), Date.now()) ? POLL_MS : false),
   });
   const [showRevoked, setShowRevoked] = useState(false);
   const { active, revoked } = splitCredentials(q.data ?? []);

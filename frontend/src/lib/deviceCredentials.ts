@@ -57,8 +57,8 @@ export const POLL_MS = 4_000;
 /** After 20 minutes the server itself gives «non applicato» (server §4.1): the page stops reading too. */
 export const MAX_POLL_MS = 20 * 60_000;
 
-/** React Query's refetchInterval: every 4 s while something is in progress, for at most 20 minutes. */
-export function refetchEvery(items: DeviceCredential[] | undefined, startedAt: number, now: number): number | false {
-  if (!items?.some((c) => inProgress(c.stato))) return false;
-  return now - startedAt < MAX_POLL_MS ? POLL_MS : false;
+/** What is on its way, for pollWindow: each device in progress with its state and version; "" for nothing. A new order
+ *  changes the version, so it opens another 20 minutes. */
+export function credentialsSignature(items: DeviceCredential[] | undefined): string {
+  return (items ?? []).filter((c) => inProgress(c.stato)).map((c) => `${c.device_id}:${c.stato}:${c.version}`).join("|");
 }

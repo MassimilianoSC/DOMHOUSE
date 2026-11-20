@@ -299,3 +299,26 @@ describe("«Dati di collegamento»", () => {
     expect(posts()).toEqual([]);
   });
 });
+
+// §3: while an order is on its way the list is read again every 4 s, for at most 20 minutes; then the page stops, even
+// though React Query asks again after every reading (found with A2: the 20 minutes restarted when they ended).
+describe("rilettura mentre un ordine è in corso", () => {
+  const wait = async (ms: number) => {
+    for (let left = ms; left > 0; left -= 1_000) await act(async () => { await vi.advanceTimersByTimeAsync(Math.min(1_000, left)); });
+  };
+  beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
+  afterEach(() => vi.useRealTimers());
+
+  it("ogni 4 secondi, e dopo 20 minuti si ferma davvero", async () => {
+    s.items = [cred("shellyplugmg3-3c4d5e6f7a8b", "in_attesa", "registra")];
+    open();
+    await screen.findByTestId("credential-row-shellyplugmg3-3c4d5e6f7a8b");
+    const first = reads();
+    await wait(4_000);
+    expect(reads()).toBe(first + 1);
+    await act(async () => { await vi.advanceTimersByTimeAsync(20 * 60_000 + 8_000); });
+    const n = reads();
+    await wait(12_000);
+    expect(reads()).toBe(n);
+  });
+});

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import type { DeviceCredential } from "@/api/deviceCredentials";
-import { allowedActions, deviceIdProblem, inProgress, POLL_MS, MAX_POLL_MS, refetchEvery, splitCredentials } from "./deviceCredentials";
+import { allowedActions, credentialsSignature, deviceIdProblem, inProgress, POLL_MS, MAX_POLL_MS, splitCredentials } from "./deviceCredentials";
 
 // A3, device credentials (docs/proposta-a3-sito.md §3, docs/proposta-a3-server.md §4.3): what the site may offer for
 // each state, how the list is ordered, the device code rule, and when the page reads the list again.
@@ -77,17 +77,15 @@ describe("codice del dispositivo (progetto §2.1)", () => {
 });
 
 describe("rilettura dell'elenco ogni 4 secondi, al massimo 20 minuti", () => {
-  const start = 1_000_000;
-  it("con un dispositivo in corso rilegge ogni 4 s", () => {
+  it("ogni 4 s, al massimo 20 minuti (la finestra è lib/pollWindow)", () => {
     expect(POLL_MS).toBe(4_000);
-    expect(refetchEvery([cred("d", "in_attesa", "registra")], start, start + 10_000)).toBe(POLL_MS);
-  });
-  it("senza nulla in corso non rilegge", () => {
-    expect(refetchEvery([cred("d", "pronto"), cred("e", "non_applicato", "revoca"), cred("f", "revocato")], start, start)).toBe(false);
-    expect(refetchEvery(undefined, start, start)).toBe(false);
-  });
-  it("dopo 20 minuti smette anche se è ancora in corso (il server lo darà non applicato)", () => {
     expect(MAX_POLL_MS).toBe(20 * 60_000);
-    expect(refetchEvery([cred("d", "revoca_in_corso", "revoca")], start, start + MAX_POLL_MS)).toBe(false);
+  });
+  it("il segno di cosa è in corso: i dispositivi in attesa, in cambio o in revoca, con stato e version", () => {
+    expect(credentialsSignature([cred("d", "in_attesa", "registra"), cred("e", "pronto"), cred("f", "revoca_in_corso", "revoca")])).toBe("d:in_attesa:1|f:revoca_in_corso:1");
+  });
+  it("senza nulla in corso: segno vuoto", () => {
+    expect(credentialsSignature([cred("d", "pronto"), cred("e", "non_applicato", "revoca"), cred("f", "revocato")])).toBe("");
+    expect(credentialsSignature(undefined)).toBe("");
   });
 });
