@@ -163,15 +163,13 @@ describe("Piattaforma > Appartamenti di un'organizzazione", () => {
     await waitFor(() => expect(s.apartments).toHaveBeenCalledTimes(2));
   });
 
-  it("eliminazione con conferma che nomina appartamento e organizzazione; annullando non si elimina", async () => {
-    confirm.mockReturnValueOnce(false);
+  it("A6: niente più «Elimina» con la conferma del browser; si passa da «Disattiva» e dai 7 giorni", async () => {
     await open();
-    await click(screen.getByTestId("platform-apt-delete-apt-002"));
-    expect(confirm).toHaveBeenCalledWith(t("platform.aptDeleteConfirm", { id: "apt-002", name: "Rimini Mare", tenant: "Flat Sharing" }));
+    expect(screen.getByTestId("platform-apt-disable-apt-001")).toBeInTheDocument();
+    // apt-002 is off without a date (before A6): «Elimina» is there but off
+    expect(screen.getByTestId("platform-apt-delete-apt-002")).toBeDisabled();
+    expect(confirm).not.toHaveBeenCalled();
     expect(s.deleteApartment).not.toHaveBeenCalled();
-    await click(screen.getByTestId("platform-apt-delete-apt-002"));
-    expect(s.deleteApartment).toHaveBeenCalledWith("t-1", "apt-002", expect.any(String));
-    expect(toast.success).toHaveBeenCalledWith(t("platform.aptDeleted", { id: "apt-002" }));
   });
 });
 

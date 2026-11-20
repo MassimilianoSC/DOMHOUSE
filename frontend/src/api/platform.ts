@@ -59,6 +59,35 @@ export interface PlatformApartment {
   last_check: { ok: boolean; checked_at: string; error: string | null } | null;
   /** A2 (n. 23): the creation from the app; null (or absent) for an apartment connected by hand (dev, lab-01, demos). */
   creazione?: Creazione | null;
+  /** A6 (bff/API.md «Eliminazione di un appartamento»): when and by whom it was disabled, whoever did it (one state for
+   *  «Disattiva» and the admin's «Attivo»); null if active, or disabled before A6. */
+  disattivato_at?: string | null;
+  disattivato_da?: { ruolo: "gestore" | "amministratore"; nome: string | null } | null;
+  /** From when «Elimina» is allowed (disattivato_at + 7 days, computed by the server); null: not possible now. */
+  eliminabile_dal?: string | null;
+  /** How «Elimina» works: app = engine, keys and data; a_mano / dimostrativo = only the record; dev = never. */
+  origine?: Origine;
+  /** null until someone presses «Elimina»; while it is there the row is the deletion's. */
+  eliminazione?: Eliminazione | null;
+}
+
+export type Origine = "app" | "a_mano" | "dimostrativo" | "dev";
+export type EliminazionePasso = "motore" | "segreti" | "database";
+
+/** A6: the deletion of an apartment (docs/proposta-a6.md §2). eliminato comes only in the answer that closes it. */
+export interface Eliminazione {
+  stato: "in_corso" | "non_riuscita" | "eliminato";
+  passo: EliminazionePasso;
+  /** Why it stopped, only with non_riuscita; messaggio is the server's sentence. */
+  codice: string | null;
+  messaggio: string | null;
+  /** The last order to the agent; op_id is the «ID richiesta». */
+  op: { op_id: string; operazione?: string; stato: string; codice: string | null; messaggio: string | null } | null;
+  version: number;
+  iniziata_at: string;
+  updated_at: string;
+  /** Visible name, never the email. */
+  updated_by: string | null;
 }
 
 export type CreazioneStato = "in_preparazione" | "pronto" | "non_creato" | "annullamento_in_corso" | "annullato";
@@ -168,9 +197,19 @@ export const platformApi = {
     bffFetch<PlatformApartment>(`${apts(tenantId)}/${enc(aptId)}`, { method: "PATCH", body, correlationId }),
   verifyApartment: (tenantId: string, aptId: string, correlationId: string) =>
     bffFetch<VerifyResult>(`${apts(tenantId)}/${enc(aptId)}/verify`, { method: "POST", correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
-  /** Only the platform deletes apartments, in every mode (D-65, D-77). */
-  deleteApartment: (tenantId: string, aptId: string, correlationId: string) =>
-    bffFetch<void>(`${apts(tenantId)}/${enc(aptId)}`, { method: "DELETE", correlationId }),
+  /** A6: «Disattiva» (the same state as the admin's «Attivo»; the 7 days start here) and «Riattiva». The row back. */
+  disable: (tenantId: string, aptId: string, correlationId: string) =>
+    bffFetch<PlatformApartment>(`${apts(tenantId)}/${enc(aptId)}/disattiva`, { method: "POST", correlationId }),
+  reenable: (tenantId: string, aptId: string, correlationId: string) =>
+    bffFetch<PlatformApartment>(`${apts(tenantId)}/${enc(aptId)}/riattiva`, { method: "POST", correlationId }),
+  /** A6 «Elimina», only the platform for now (answer 1210, point 1), with the name as written: the server compares it
+   *  again. 202 in_corso for an apartment created by the app; 200 eliminato for one connected by hand or a demo. The
+   *  route of before answers 409 use_elimina. */
+  deleteApartment: (tenantId: string, aptId: string, nome: string, correlationId: string) =>
+    bffFetch<{ eliminazione: Eliminazione }>(`${apts(tenantId)}/${enc(aptId)}/elimina`, { method: "POST", body: { nome }, correlationId }),
+  /** Takes a stopped deletion up again from its step; only with non_riuscita. */
+  retryDeletion: (tenantId: string, aptId: string, version: number, correlationId: string) =>
+    bffFetch<{ eliminazione: Eliminazione }>(`${apts(tenantId)}/${enc(aptId)}/eliminazione/riprova`, { method: "POST", body: { version }, correlationId }),
   /** «Prova l'agente» (strumento A, A1; o1 448a71a, bff/API.md): an order «stato» to the agent on the VM, for a staging
    *  apartment (lab-…, test-…) or dev. 202 with the operation; 422 invalid_apartment; 503 agent_not_configured;
    *  502 agent_publish_failed. */

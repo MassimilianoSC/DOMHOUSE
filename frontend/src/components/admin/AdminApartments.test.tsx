@@ -306,7 +306,7 @@ describe("appartamenti dimostrativi (D-97, D-98)", () => {
 });
 
 describe("disattivare un appartamento chiede conferma, riattivarlo no (P-90 T2, 1107 = a)", () => {
-  const CONFIRM = "Disattivare «Milano Centro»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi.";
+  const CONFIRM = "Disattivare «Milano Centro»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.";
   afterEach(() => vi.restoreAllMocks());
 
   it("interruttore della riga, confermato: si salva disattivato", async () => {
