@@ -162,7 +162,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 | `broker-vm.sh` | `6a853a834686660b` |
 | `broker_accounts.py` | `8eaec49d1866ac0a` |
 | `compose.catalog.yaml` | `ba1ecece9b543add` |
-| `engine-vm.sh` | `057406a726a30a4a` |
+| `engine-vm.sh` | `20c57efc4be4d090` (da `31eec34`: le cartelle dei dati con il modo prima del proprietario, C4; prima `057406a726a30a4a`) |
 | `agent/comune.py` | `a576ed9ab186d810` |
 | `agent/domhouse-agent-esecutore.service` | `d17f567cf8cfaca2` |
 | `agent/domhouse-agent-lettore.service` | `9824996a467272be` |
