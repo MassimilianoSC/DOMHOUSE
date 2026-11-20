@@ -122,17 +122,17 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 Il 20 novembre la prima prova si è fermata: con `SupplementaryGroups=1883` systemd non avvia niente (stato 216, EXIT_GROUP), perché sull'host **nessun gruppo ha il gid 1883** (è solo l'utente del contenitore di Mosquitto). Correzione `7952a68`: un gruppo di sistema `domhouse-broker` con gid 1883, e l'unità lo nomina (`SupplementaryGroups=domhouse-broker`). Da `7952a68` lo crea anche `agent-vm.sh install`, che si ferma se il gid 1883 è già di un altro gruppo.
 
-**Q2.3a I due file cambiati da ricopiare** (`agent-vm.sh` e l'unità dell'esecutore; gli altri sei di Q2.1 restano).
+**Q2.3a I tre file cambiati da ricopiare** (`agent-vm.sh` e l'unità dell'esecutore da `7952a68`, `esecutore.py` da `6af9f5c`: il sync con `DOCKER_CONFIG`, difetto trovato da Q2.3c il 20 novembre; gli altri cinque di Q2.1 restano).
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 gcloud compute scp scripts/agent-vm.sh langbrain-dev:a3/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
-gcloud compute scp scripts/agent/domhouse-agent-esecutore.service langbrain-dev:a3/agent/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a3 && sed -i "s/\r*$//" agent-vm.sh agent/domhouse-agent-esecutore.service && sha256sum agent-vm.sh agent/domhouse-agent-esecutore.service | cut -c1-16,65-; grep -n "^SupplementaryGroups" agent/domhouse-agent-esecutore.service' < /dev/null
+gcloud compute scp scripts/agent/domhouse-agent-esecutore.service scripts/agent/esecutore.py langbrain-dev:a3/agent/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a3 && sed -i "s/\r*$//" agent-vm.sh agent/domhouse-agent-esecutore.service agent/esecutore.py && sha256sum agent-vm.sh agent/domhouse-agent-esecutore.service agent/esecutore.py | cut -c1-16,65-; grep -n "^SupplementaryGroups" agent/domhouse-agent-esecutore.service; grep -c "DOCKER_CONFIG" agent/esecutore.py' < /dev/null
 ```
 
-- **Atteso:** le due impronte di `7952a68` (le calcola la memoria storica) e `SupplementaryGroups=domhouse-broker`.
+- **Atteso:** tre impronte che cominciano così: `agent-vm.sh` `b013386278381469`, `agent/domhouse-agent-esecutore.service` `dc24e3330fe99266`, `agent/esecutore.py` `c60dff3fdd600f86`; poi `SupplementaryGroups=domhouse-broker` e **3** (le righe con `DOCKER_CONFIG` in `esecutore.py`).
 
 **Q2.3b Il gruppo** (scrive sulla VM: un gruppo di sistema, nessun utente dentro).
 
@@ -151,14 +151,14 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='P="-p User=root -p Group=domhouse-agent -p SupplementaryGroups=domhouse-broker -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p ReadWritePaths=/etc/domhouse/_broker -p CapabilityBoundingSet=CAP_CHOWN -p RestrictAddressFamilies=AF_UNIX -p RestrictAddressFamilies=AF_INET -p MemoryMax=128M -p UMask=0077"; sudo systemd-run --quiet --pipe --wait $P /bin/sh -c "id; head -c 0 /etc/domhouse/_broker/auth/devices.passwd && echo lettura-ok; f=/etc/domhouse/_broker/auth/.prova-a3; touch \$f && chown 1883:1883 \$f && echo scrittura-ok; rm -f \$f"; sudo systemd-run --quiet --pipe --wait -E PATH=/usr/sbin:/usr/bin:/sbin:/bin $P /bin/bash /opt/domhouse/broker-vm.sh sync | tail -1' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='P="-p User=root -p Group=domhouse-agent -p SupplementaryGroups=domhouse-broker -p NoNewPrivileges=yes -p ProtectSystem=strict -p ProtectHome=yes -p PrivateTmp=yes -p ReadWritePaths=/etc/domhouse/_broker -p CapabilityBoundingSet=CAP_CHOWN -p RestrictAddressFamilies=AF_UNIX -p RestrictAddressFamilies=AF_INET -p MemoryMax=128M -p UMask=0077"; sudo systemd-run --quiet --pipe --wait $P /bin/sh -c "id; head -c 0 /etc/domhouse/_broker/auth/devices.passwd && echo lettura-ok; f=/etc/domhouse/_broker/auth/.prova-a3; touch \$f && chown 1883:1883 \$f && echo scrittura-ok; rm -f \$f"; sudo systemd-run --quiet --pipe --wait -E PATH=/usr/sbin:/usr/bin:/sbin:/bin -E DOCKER_CONFIG=/var/lib/domhouse-executor/docker $P /bin/bash /opt/domhouse/broker-vm.sh sync | tail -1' < /dev/null
 ```
 
 - **Atteso:** `uid=0(root) gid=…(domhouse-agent) groups=…(domhouse-agent),1883(domhouse-broker)`; «lettura-ok»; «scrittura-ok»; dal sync «unchanged».
 - **Da verificare** (non provabile sul PC; revisione del codice, «da verificare» 1), tutto in questo blocco:
   1. `SupplementaryGroups=domhouse-broker` accettato e visibile in `id`;
   2. lettura di un file 640 di `auth/` dal gruppo 1883, scrittura e `chown` a 1883;
-  3. il `sync` sotto le stesse restrizioni: token della VM (rete `AF_INET`) e `docker` (socket `AF_UNIX`), con `MemoryMax=128M` e `UMask=0077` come nell'unità (`write_files` mette comunque 640).
+  3. il `sync` sotto le stesse restrizioni e con lo stesso ambiente che gli dà l'esecutore (`PATH` e `DOCKER_CONFIG=/var/lib/domhouse-executor/docker`: `ProtectHome` nasconde `/root/.docker`, 20 novembre): token della VM (rete `AF_INET`, dal server dei metadati, senza gcloud) e `docker` (socket `AF_UNIX`), con `MemoryMax=128M` e `UMask=0077` come nell'unità (`write_files` mette comunque 640).
 - Un «Permission denied», un errore del sync o un processo fermato per memoria: **fermati** e incolla; non si installa l'unità (si decide con o1 cosa aprire).
 
 **Q2.4 L'agente nuovo** (come I7 di A1: rilanciare `install` aggiorna codice e unità e riavvia).
