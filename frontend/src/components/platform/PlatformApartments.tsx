@@ -274,11 +274,12 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
                     <div className="text-xs">{t("admin.apartments.lastCheck")}: <LastCheck check={a.last_check} testId={`platform-apt-check-${a.apartment_id}`} /></div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" variant="outline" onClick={() => setEditing(a)} data-testid={`platform-apt-edit-${a.apartment_id}`}><Waypoints /> {t("platform.aptEditConnection")}</Button>
+                    {/* created from the app (o1 1f7d4b0): connection and deletion belong to its creation, and to A6 */}
+                    {!a.creazione && <Button size="sm" variant="outline" onClick={() => setEditing(a)} data-testid={`platform-apt-edit-${a.apartment_id}`}><Waypoints /> {t("platform.aptEditConnection")}</Button>}
                     <Button size="sm" variant="outline" onClick={() => void check(a.apartment_id)} disabled={v === "loading"} data-testid={`platform-apt-verify-${a.apartment_id}`}>
                       <PlugZap /> {v === "loading" ? t("common.loading") : t("admin.apartments.verify")}
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => void remove(a)} data-testid={`platform-apt-delete-${a.apartment_id}`}><Trash2 /> {t("platform.aptDelete")}</Button>
+                    {!a.creazione && <Button size="sm" variant="destructive" onClick={() => void remove(a)} data-testid={`platform-apt-delete-${a.apartment_id}`}><Trash2 /> {t("platform.aptDelete")}</Button>}
                   </div>
                 </div>
                 {v && v !== "loading" && <VerifyBadge r={v} />}

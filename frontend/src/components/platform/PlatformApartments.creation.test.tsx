@@ -238,12 +238,26 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
 });
 
 describe("pronto (§3.4)", () => {
-  it("creato dall'app e nessuno Shelly registrato: la riga di sempre e l'invito", async () => {
+  it("creato dall'app e nessuno Shelly registrato: verifica, agente, credenziali e l'invito", async () => {
     await open([CREATED]);
     const r = row("lab-corte");
     expect(await within(r).findByTestId("creation-ready-lab-corte")).toHaveTextContent("Pronto. Prossimi passi: registra gli Shelly e scrivi l'elenco dei dispositivi.");
-    expect(within(r).getByTestId("platform-apt-edit-lab-corte")).toBeInTheDocument();
     expect(within(r).getByTestId("platform-apt-verify-lab-corte")).toBeInTheDocument();
+    expect(within(r).getByTestId("platform-apt-credentials-btn-lab-corte")).toBeInTheDocument();
+  });
+
+  it("creato dall'app, anche pronto: niente «Modifica collegamento» né «Elimina» (o1 1f7d4b0: 409 created_from_app; l'eliminazione con A6)", async () => {
+    await open([CREATED, READY]);
+    expect(screen.queryByTestId("platform-apt-edit-lab-corte")).toBeNull();
+    expect(screen.queryByTestId("platform-apt-delete-lab-corte")).toBeNull();
+    // an apartment connected by hand keeps them
+    expect(screen.getByTestId("platform-apt-edit-apt-001")).toBeInTheDocument();
+    expect(screen.getByTestId("platform-apt-delete-apt-001")).toBeInTheDocument();
+  });
+
+  it("in preparazione subito dopo «Riprova», senza ordine (op null): i passi giusti, nessun errore", async () => {
+    await open([apt("lab-r", "R", creazione({ passo: "capienza", op: null }))]);
+    expect(screen.getByTestId("creation-step-lab-r-capienza")).toHaveAttribute("data-state", "in_corso");
   });
 
   it("con almeno uno Shelly registrato: niente invito", async () => {
