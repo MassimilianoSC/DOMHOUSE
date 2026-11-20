@@ -87,10 +87,14 @@ class Vm:
     def run(self, argv, env, timeout):
         """What the scripts would do, in the temporary folders."""
         self.runs.append((list(argv), dict(env)))
+        if argv[0].endswith("docker"):                                   # C9.2: the engine's last lines
+            return 0, "connector setup failed: mqtt not authorised\n"
         what = argv[2]
         if what == "install":
             apt, port = argv[4], argv[5]
             assert (self.etc / f"{apt}.catalog.yaml").exists()            # step 2 before step 3
+            # 20 November, C9.2: the broker's account before the engine (its health wants the connector up)
+            assert apt in (self.broker_etc / "apartments").read_text(encoding="utf-8").split()
             if self.codes["install"] == 0:
                 (self.opt / f"{apt}.settings").write_text(f"APARTMENT_ID={apt}\nPORT={port}\nENV=staging\n",
                                                           encoding="utf-8")
@@ -120,7 +124,8 @@ class Vm:
         return self.ex.handle(data, READER_UID)
 
     def steps(self):
-        return [(argv[1].rsplit("/", 1)[-1].replace("\\", "/").rsplit("/", 1)[-1], argv[2]) for argv, _ in self.runs]
+        return [("docker", argv[1]) if argv[0].endswith("docker")
+                else (argv[1].rsplit("/", 1)[-1].replace("\\", "/").rsplit("/", 1)[-1], argv[2]) for argv, _ in self.runs]
 
 
 @pytest.fixture
@@ -135,12 +140,13 @@ def test_crea_motore_marks_writes_the_catalog_installs_and_adds_to_the_broker(vm
     mark = json.loads((vm.state / "creati" / APT).read_text(encoding="utf-8"))
     assert mark == {"porta": 8150, "immagine": DIGEST, "env": "staging"}
     assert (vm.etc / f"{APT}.catalog.yaml").read_text(encoding="utf-8") == "rooms: []\ndevices: []\n"
-    assert vm.steps() == [("engine-vm.sh", "install"), ("broker-vm.sh", "add-apartment")]
-    install, env = vm.runs[0]
+    # 20 November, C9.2: the broker's account first, then the engine (its health is 503 while the connector is down)
+    assert vm.steps() == [("broker-vm.sh", "add-apartment"), ("engine-vm.sh", "install")]
+    install, env = vm.runs[1]
     assert install[3:] == ["--da-agente", APT, "8150", DIGEST, "shelly", "staging", str(vm.etc / f"{APT}.catalog.yaml")]
     assert env == {"PATH": esecutore.CLEAN_ENV["PATH"], "DOCKER_CONFIG": str(vm.state / "docker"),
                    "DOMHOUSE_LOCK_HELD": "1"}
-    assert vm.runs[1][0][3] == APT and vm.runs[1][1]["DOMHOUSE_LOCK_HELD"] == "1"
+    assert vm.runs[0][0][3] == APT and vm.runs[0][1]["DOMHOUSE_LOCK_HELD"] == "1"
     assert vm.locks == 1
 
 
@@ -176,7 +182,7 @@ def test_a_port_of_another_engine_or_listening_is_porta_occupata(vm):
                                  "00000000000000000000000000000000:0000 01 00000000:00000000 00:00000000 00000000     0"
                                  "        0 1 1 0000000000000000 100 0 0 10 0\n", encoding="utf-8")
     assert vm.send(order(seq=4))["codice"] == "ok"                          # 01 = an established connection
-    assert vm.runs and vm.steps()[0] == ("engine-vm.sh", "install")
+    assert vm.runs and vm.steps()[0] == ("broker-vm.sh", "add-apartment")         # C9.2: the broker first
 
 
 def test_capacity_is_checked_again(vm):
@@ -209,16 +215,20 @@ def test_a_failed_install_takes_back_what_this_order_made(vm, code, says):
     vm.codes["install"] = code
     out = vm.send(order())
     assert (out["esito"], out["codice"]) == ("fallito", says)
-    assert vm.steps() == [("engine-vm.sh", "install"), ("engine-vm.sh", "remove")]
+    # C9.2: the engine's last lines into the executor's journal before anything is taken away, then back in reverse
+    assert vm.steps() == [("broker-vm.sh", "add-apartment"), ("engine-vm.sh", "install"), ("docker", "logs"),
+                          ("broker-vm.sh", "remove-apartment"), ("engine-vm.sh", "remove")]
     assert not (vm.state / "creati" / APT).exists() and not (vm.etc / f"{APT}.catalog.yaml").exists()
+    journal = "".join(f.read_text(encoding="utf-8") for f in (vm.state / "giornale").glob("*.jsonl"))
+    assert "mqtt not authorised" in journal
 
 
 def test_a_broker_that_refuses_takes_back_the_engine_too(vm):
     vm.codes["add-apartment"] = 1
     out = vm.send(order())
     assert (out["esito"], out["codice"]) == ("fallito", "broker_fallito")
-    assert vm.steps() == [("engine-vm.sh", "install"), ("broker-vm.sh", "add-apartment"),
-                          ("broker-vm.sh", "remove-apartment"), ("engine-vm.sh", "remove")]
+    assert vm.steps() == [("broker-vm.sh", "add-apartment"), ("broker-vm.sh", "remove-apartment"),
+                          ("engine-vm.sh", "remove")]                       # no engine started without its account
     assert not (vm.state / "creati" / APT).exists() and not (vm.opt / f"{APT}.settings").exists()
 
 
@@ -387,3 +397,11 @@ def test_review_n1_the_check_is_off_unless_the_service_turns_it_on(vm):
     assert vm.send(order())["codice"] == "ok"
     main = (AGENT / "esecutore.py").read_text(encoding="utf-8").split("def main()", 1)[1]
     assert "check_protection=True" in main
+
+
+def test_c92_the_scripts_messages_reach_the_journal(tmp_path):
+    """C9.2: engine-vm.sh writes its diagnosis (the engine's last log lines) on stderr: run_program keeps it with the
+    output, which goes only to the executor's journal (never to the result)."""
+    code, out = esecutore.run_program([sys.executable, "-c", "import sys; print('su stdout'); print('su stderr', file=sys.stderr)"],
+                                      dict(esecutore.CLEAN_ENV), 10)
+    assert code == 0 and "su stdout" in out and "su stderr" in out

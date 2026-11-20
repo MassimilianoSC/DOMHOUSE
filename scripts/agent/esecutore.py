@@ -184,7 +184,9 @@ def run_program(argv: list[str], env: dict, timeout: float) -> tuple[int, str]:
     program runs in a session of its own, and past its time the WHOLE group is killed (a «docker compose up» left
     alive could recreate a container after the way back removed it), before the caller takes anything back."""
     try:
-        proc = subprocess.Popen(argv, env=env, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        # 20 November (A2 C9.2): stderr with stdout: engine-vm.sh writes its diagnosis there (the engine's last log
+        # lines); the output goes only to the executor's journal, never to the result
+        proc = subprocess.Popen(argv, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
                                 shell=False, stdin=subprocess.DEVNULL, start_new_session=True)
     except OSError:
         return 127, ""
@@ -530,16 +532,27 @@ class Esecutore:
                 output.append(f"catalogo: {type(exc).__name__}")
                 self._take_back(apartment, broker=False, output=output)
                 return comune.result(order, "fallito", "errore_interno")
-        code = self._script("engine-vm.sh", "install", "--da-agente", apartment, str(port), image, "shelly", env,
-                            str(catalog), timeout=INSTALL_TIMEOUT_S, output=output)
-        if code != 0:                                    # 3: exit 3 a secret, 4 the engine's health
-            self._take_back(apartment, broker=False, output=output)
-            return comune.result(order, "fallito", {3: "segreto_illeggibile", 4: "motore_non_sano"}.get(
-                code, "errore_interno"))
+        # 20 November (A2 C9.2): the broker's account BEFORE the engine. The engine's health is 503 while its connector
+        # is down, and the connector cannot log in before add-apartment: with the engine first, every crea_motore of a
+        # real connector stopped at the health («motore_non_sano» after about 60 s)
         if self._script("broker-vm.sh", "add-apartment", apartment, timeout=BROKER_TIMEOUT_S, output=output) != 0:
             self._take_back(apartment, broker=True, output=output)
             return comune.result(order, "fallito", "broker_fallito")
+        code = self._script("engine-vm.sh", "install", "--da-agente", apartment, str(port), image, "shelly", env,
+                            str(catalog), timeout=INSTALL_TIMEOUT_S, output=output)
+        if code != 0:                                    # 3: exit 3 a secret, 4 the engine's health
+            self._engine_logs(apartment, output)         # before the container goes (A2 C9.2: the diagnosis was lost)
+            self._take_back(apartment, broker=True, output=output)
+            return comune.result(order, "fallito", {3: "segreto_illeggibile", 4: "motore_non_sano"}.get(
+                code, "errore_interno"))
         return comune.result(order, "riuscito", "ok", {"porta": port, "immagine": image})
+
+    def _engine_logs(self, apartment: str, output: list[str]) -> None:
+        """The engine's last log lines into the executor's journal (root's, 14 days), never into the result. The
+        engine writes no key nor password in its logs."""
+        code, text = self.run([DOCKER, "logs", "--tail", "40", f"engine-{apartment}"],
+                              {**CLEAN_ENV, "DOCKER_CONFIG": str(self.config.state / "docker")}, RUN_TIMEOUT_S)
+        output.append(f"docker logs engine-{apartment}: {code}\n{text}")
 
     def _take_back(self, apartment: str, broker: bool, output: list[str]) -> bool:
         """What this order made, in reverse; the mark goes last and only when everything went."""
