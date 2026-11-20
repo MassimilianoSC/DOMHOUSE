@@ -41,9 +41,9 @@ def stop(e) -> None:
             t.cancel()
 
 
-def started(store=None, connector=None) -> core.ApartmentEngine:
+def started(store=None, connector=None, settings=None) -> core.ApartmentEngine:
     e = core.ApartmentEngine("apt-prova-01", connector or SimulatedConnector(), seed=False,
-                             **({"store": store} if store else {}))
+                             **({"store": store} if store else {}), settings=settings)
     e.ensure_started()
     e.test_state({"device_id": SENSOR, "capability": "temperature", "state": {"celsius": 15}}, ACTOR, CORR)
     return e
@@ -269,11 +269,15 @@ def test_after_a_restart_a_start_that_waited_for_the_compressor_did_not_happen(t
     db, conn = tmp_path / "e.db", SimulatedConnector()
 
     async def first_life():
-        e = started(store=SqliteStore(db), connector=conn)
+        # the compressor's pause at its maximum (15 «minutes» = 15 s here): the boiler's command (about 1.5 s with the
+        # simulated connector) must end well before it, also on a loaded machine. With the 3 s of before, on the CI's
+        # Linux container under load the pause ended during settle and the climate started (20 November: 4 red in 10)
+        e = started(store=SqliteStore(db), connector=conn, settings={"COMPRESSOR_MIN_OFF_MINUTES": 15.0})
         await just_off(e)
         due(e, "prearrival", COMFORT)
         e.tick()
         await settle(e)                                              # the boiler is done, the climate waits
+        assert e.compressor_wait(CLIMA) > 0, "la pausa del compressore è finita prima del riavvio: prova senza senso"
         stop(e)
         e.store.close()
     asyncio.run(first_life())
