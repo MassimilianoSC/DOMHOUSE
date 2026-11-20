@@ -91,8 +91,8 @@ class Settings:
     # A3 §2.1: the broker's address the devices use (staging mqtt.dh-lab.eu:8883); empty in production until the second
     # VM: then «Registra» and «Rigenera» answer 503 broker_address_missing and the list shows server null
     device_broker_address: str = ""
-    # A5: the full name of the log view with only the lines «broker device refused» (projects/<p>/locations/global/
-    # buckets/_Default/views/<v>); empty (production until the second VM): the field «rifiuti» is null
+    # A5: the full name of the view of the bucket with only the lines «broker device refused» (projects/<p>/locations/
+    # global/buckets/domhouse-rifiuti/views/_AllLogs); empty (production until the second VM): «rifiuti» is null
     device_refusals_view: str = ""
 
     @property

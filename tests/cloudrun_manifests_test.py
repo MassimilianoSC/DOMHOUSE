@@ -154,6 +154,6 @@ def test_a5_staging_reads_the_refusals_from_its_log_view_only():
     """A5 (docs/proposta-a5.md §2 steps 3-4): the full name of the view, the one the server's permission names; not in
     production until the second VM (answer 1210, point 6)."""
     staging, prod = env(STAGING), env(PROD)
-    assert staging["DEVICE_REFUSALS_VIEW"] == ("projects/your-gcp-project-id/locations/global/buckets/_Default/views/"
-                                               "domhouse-rifiuti-dispositivi")
+    assert staging["DEVICE_REFUSALS_VIEW"] == ("projects/your-gcp-project-id/locations/global/buckets/domhouse-rifiuti/"
+                                               "views/_AllLogs")
     assert "DEVICE_REFUSALS_VIEW" not in prod

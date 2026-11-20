@@ -3,8 +3,10 @@ devices' credentials.
 
 broker-vm.sh check (every 5 minutes, on the VM) writes to syslog, for the two last complete 5-minute slots, one line
 per device whose logins on 8883 were refused: "broker device refused apt=<apt> device=<device> slot=<start> count=<n>
-last=<time>". The lines reach Cloud Logging (Ops Agent); a log VIEW holds only them, and the server's identity may read
-only that view (DEVICE_REFUSALS_VIEW, its full resource name). Here:
+last=<time>". The lines reach Cloud Logging (Ops Agent). A log view cannot filter on the text (only resource type, log
+name and source), so a sink copies only these lines into a bucket of their own, domhouse-rifiuti (2 days), and the
+server's identity may read only that bucket's view (DEVICE_REFUSALS_VIEW, its full resource name;
+docs/procedura-installazione-a5.md). Here:
 
 - each slot counts once (two rounds write it: the larger count wins), the slots of the last 24 hours are summed;
 - the filter is built only from an apartment id that follows the rule, never from a user's text;
