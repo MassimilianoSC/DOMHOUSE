@@ -1933,7 +1933,8 @@ entrare, poi invita gli altri utenti.».
 3. **Scrivi l'«ID»**: nello staging comincia con `lab-` o `test-`; lettere minuscole, cifre e trattini. Non si cambia più.
 4. **Scrivi il «Nome»**; il «Fuso orario» è già Europe/Rome.
 5. **L'«ID Italianway»** è facoltativo: si può aggiungere anche dopo.
-6. **Premi «Crea»**: ci vogliono alcuni minuti.
+6. **Premi «Crea»**: ci vogliono alcuni minuti. In cima al modulo: «Se la creazione si ferma a metà, l'appartamento
+   resta nell'elenco come «Non creato» finché non premi «Riprova» o «Annulla creazione».»
 
 - **Limite:** al massimo 5 appartamenti all'ora per ogni organizzazione. Il riquadro sopra «Crea» dice quanti ne
   sono stati creati nell'ultima ora; raggiunto il limite diventa giallo e dice da che ora si può creare di nuovo.
@@ -1945,7 +1946,7 @@ entrare, poi invita gli altri utenti.».
 
 | Stato | Cosa vedi | Cosa fai |
 |---|---|---|
-| In preparazione | I 5 passi: prenotazione di id e porta, chiavi, spazio sulla macchina virtuale, installazione del sistema domotico, collegamento all'app | Niente: puoi chiudere la pagina |
+| In preparazione | I 5 passi: prenotazione di id e porta, chiavi, spazio sulla macchina virtuale, installazione del sistema domotico, collegamento all'app; sotto, «Di solito ci vogliono da 1 a 5 minuti; la prima volta può volerci di più. Puoi chiudere la pagina: la creazione continua.» | Niente: puoi chiudere la pagina |
 | Non creato | Riga rossa in cima, con «Cosa è successo», il passo a cui si è fermata e l'«ID richiesta» | «Riprova» oppure «Annulla creazione», secondo il messaggio |
 | Annullamento in corso | La riga resta finché tutto è tolto, poi sparisce con l'avviso | Niente |
 | Pronto | La riga come gli altri appartamenti, con l'invito a registrare gli Shelly | Credenziali dei dispositivi |
@@ -1956,15 +1957,16 @@ entrare, poi invita gli altri utenti.».
 - **«Annulla creazione»** chiede conferma: toglie sistema domotico, accesso dei dispositivi e chiavi. L'id non si
   potrà più usare; le chiavi si recuperano per 7 giorni.
 - **Sulla scheda dell'organizzazione**, anche a elenco chiuso: riga rossa «1 appartamento non creato: serve
-  «Riprova» o «Annulla»» con «Vedi»; riga grigia per quelli in preparazione.
+  «Riprova» o «Annulla creazione»» con «Vedi»; riga grigia per quelli in preparazione.
 - **Il registro attività** scrive «ha fatto ripartire la creazione» e «ha annullato la creazione».
 
-**Due messaggi di «Cosa è successo» da conoscere:**
+**Messaggi di «Cosa è successo» da conoscere:**
 
 | Messaggio | Cosa fare |
 |---|---|
 | «La porta scelta è occupata sulla VM: «Riprova» ne prende un'altra.» | «Riprova» usa la porta libera successiva; quella occupata resta segnata finché il supporto non la controlla. «Annulla» invece la libera |
-| «C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che il supporto ha tolto quella chiave.» | «Annulla creazione» e un ID diverso |
+| «C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla creazione» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che il supporto ha tolto quella chiave.» | «Annulla creazione» e un ID diverso. Nel modulo, prima di «Crea», lo stesso caso dice «C'è già una chiave con questo nome, creata fuori dall'app: scegli un altro ID.» |
+| «Il sistema domotico è stato tolto, ma le chiavi no: «Annulla creazione» di nuovo.» | Premi di nuovo «Annulla creazione» |
 
 **Collegare un sistema esistente (la parte tecnica: identificativo, collegamento, codice Italianway):**
 
@@ -3021,6 +3023,8 @@ Per ogni problema annota:
 
 - **Gestore della piattaforma**: «Nuovo appartamento» crea un appartamento dall'app, dalle chiavi al sistema
   domotico, in pochi minuti (parte 7). Il pulsante di prima si chiama ora «Collega un sistema esistente».
+- **Durante la creazione** una riga dice quanto ci vuole di solito; i messaggi nominano sempre il pulsante «Annulla
+  creazione».
 - **In produzione** «Nuovo appartamento» resta spento fino alla seconda macchina virtuale.
 
 ### 17 novembre 2026
