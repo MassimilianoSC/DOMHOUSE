@@ -29,9 +29,10 @@
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 git fetch -q origin && git merge-base --is-ancestor f54a222 origin/main && git diff --quiet f54a222 HEAD -- scripts/agent scripts/agent-vm.sh scripts/broker-vm.sh scripts/broker_accounts.py && echo "file della VM uguali a f54a222, già su GitHub"
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/agent/../agent-vm.sh status 2>/dev/null | head -2; systemctl is-active domhouse-agent-esecutore domhouse-agent-lettore; ls -ld /etc/domhouse/_broker/auth; sudo ls -l /etc/domhouse/_broker/auth' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash ~/agente/agent-vm.sh status | head -2; systemctl is-active domhouse-agent-esecutore domhouse-agent-lettore; ls -ld /etc/domhouse/_broker/auth; sudo ls -l /etc/domhouse/_broker/auth' < /dev/null
 ```
 
+- `agent-vm.sh` non è installato in `/opt/domhouse` (`install` copia solo `comune.py`, `lettore.py`, `esecutore.py`): lo status si chiama dalla copia di A1 in `~/agente`, come in I13.
 - **Atteso:** «file della VM uguali a f54a222, già su GitHub»; i due servizi `active`; `auth/` di `1883 1883` con i quattro file `1883 1883` (`-rw-r-----`). Altrimenti fermati.
 
 ## Q1. Le due chiavi delle firme (scrive sulla VM e su Google Cloud)
@@ -163,15 +164,20 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 e i tre nomi in `ONLY_STAGING` di `tests/cloudrun_manifests_test.py`. Poi il push del committente.
 
-**Q3.2 La pubblicazione del solo staging** (come I5.2 di A1).
+**Q3.2 La pubblicazione dello staging: server E sito** (non come I5.2 di A1: con A1 il sito non cambiava, con A3 sì).
+
+- Senza il sito dello staging le pagine di A3 di o2 (Credenziali dei dispositivi, l'accesso da Organizzazioni) non ci sarebbero: Q5 andrebbe, Q6.3 e Q7 no. Quindi `TARGET=staging` **senza** `SKIP_HOSTING`: `publish.sh` pubblica anche il sito, su `STAGING_SITE` (`domhouse-staging`, da `scripts/publish-settings.conf`).
+- Il sito dello staging prende **tutte** le modifiche del sito da `f4c6a20` (l'ultima pubblicazione del sito) a HEAD, non solo A3.
+- La produzione non si tocca.
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git merge-base --is-ancestor HEAD origin/main && git log --oneline -1 && git show HEAD:bff/cloudrun.staging.yaml | grep -c -E "name: (AGENT_ORDINI_KEY|AGENT_RISULTATI_KEY|DEVICE_BROKER_ADDRESS)" && while IFS='=' read -r k v; do v="${v%$'\r'}"; case "$k" in ''|'#'*) ;; *) export "$k=$v" ;; esac; done < scripts/publish-settings.conf && TARGET=staging SKIP_HOSTING=1 bash scripts/publish.sh "$(git rev-parse --short HEAD)"
+git fetch -q origin && git merge-base --is-ancestor HEAD origin/main && git log --oneline -1 && git show HEAD:bff/cloudrun.staging.yaml | grep -c -E "name: (AGENT_ORDINI_KEY|AGENT_RISULTATI_KEY|DEVICE_BROKER_ADDRESS)" && while IFS='=' read -r k v; do v="${v%$'\r'}"; case "$k" in ''|'#'*) ;; *) export "$k=$v" ;; esac; done < scripts/publish-settings.conf && TARGET=staging bash scripts/publish.sh "$(git rev-parse --short HEAD)"
 ```
 
-- **Atteso:** la riga del commit, **3**, poi la pubblicazione dello staging riuscita, con la revisione nuova al 100 %.
+- **Atteso:** la riga del commit, **3**, poi la pubblicazione dello staging riuscita, con la revisione nuova al 100 %, e la riga «PWA: https://domhouse-staging.web.app» (non «non pubblicata (SKIP_HOSTING)»).
+- **Dopo:** nell'app dello staging **ricarica la pagina** (P-92: una scheda aperta tiene il sito di prima).
 - **Ritorno indietro:** `gcloud run services update-traffic domotica-bff-staging --to-revisions=<la revisione di prima>=100 --region=europe-west8 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com`; la revisione di prima la dice l'uscita di `publish.sh` (e la memoria storica la scrive qui prima di Q3.2).
 
 ## Q4. I due allarmi nuovi (scrive su Google Cloud)
