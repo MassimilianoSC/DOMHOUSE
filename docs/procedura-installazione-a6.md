@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A6 e l'unione del ramo `o1-a6-eliminazione` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `d72892d` (ramo `o1-a6-eliminazione`); la procedura si controlla in G0 confrontandola con quella su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | G0–G5, R1–R6 |
+| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A6 e l'unione del ramo `o1-a6-eliminazione` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `7f471c8` (ramo `o1-a6-eliminazione`, con le correzioni della revisione di sicurezza); G0 controlla il commit della procedura e la confronta con quella su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | G0–G5, R1–R6 |
 
 **Cosa si installa** (`docs/proposta-a6.md`, risposte 1210: §8 punti 2–8 come proposti, punto 1 provvisorio):
 
@@ -65,31 +65,46 @@ Prima, la fotografia di quello che c'è (sola lettura):
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='for f in /opt/domhouse/test-a2-02.settings /etc/domhouse/test-a2-02.env /etc/domhouse/test-a2-02.catalog.yaml /data/test-a2-02 /etc/domhouse/_broker/devices/test-a2-02; do sudo test -e $f && echo "c è $f" || echo "manca $f"; done; sudo grep -cx test-a2-02 /etc/domhouse/_broker/apartments; docker ps --filter name=engine-test-a2-02 --format "{{.Names}} {{.Status}}"' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='for f in /opt/domhouse/test-a2-02.settings /etc/domhouse/test-a2-02.env /etc/domhouse/test-a2-02.catalog.yaml /data/test-a2-02 /etc/domhouse/_broker/devices/test-a2-02; do sudo test -e $f && echo "c è $f" || echo "manca $f"; done; sudo grep -cx test-a2-02 /etc/domhouse/_broker/apartments; sudo docker ps --filter name=^engine-test-a2-02$ --format "{{.Names}} {{.Status}}" && echo "docker ha risposto"' < /dev/null
 for s in langbrain-api-key-test-a2-02 langbrain-shelly-test-a2-02; do echo "== $s"; gcloud secrets versions list $s --format="value(name,state)" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com; done
 ```
 
-- **Atteso:** «c'è …» per le impostazioni, la chiave, il catalogo e la cartella dei dati; `1`; il contenitore `engine-test-a2-02 Up …`; per ciascun segreto almeno una versione `enabled`.
+- **Atteso:** «c'è …» per le impostazioni, la chiave, il catalogo e la cartella dei dati; `1`; il contenitore `engine-test-a2-02 Up …` e «docker ha risposto»; per ciascun segreto almeno una versione `enabled`.
 - I due segreti sono la chiave del motore (`SECRET_MANAGER_PREFIX` dello staging, `langbrain-api-key-`) e la password del connector (`langbrain-shelly-`), come in `bff/secret_admin.py` `names`.
 
 Poi nell'app: `test-a2-02` → **«Elimina»** → la finestra mostra nome, id e indirizzo e cosa si perde → scrivi il nome esatto → conferma.
 
 - **Atteso:** «Eliminazione in corso», poi entro pochi minuti la riga sparisce dall'elenco. Una email «Eliminazione avviata: …». Nel registro attività «apartment_deletion_started» e «apartment_deleted».
 - **Se si ferma** («Eliminazione non riuscita» con il passo e il messaggio): incolla il messaggio alla memoria storica; «Riprova» riprende dal passo fermo.
+- **Se il codice è `non_creato_da_agente`** (il segno di creazione dell'agente non c'è più, per esempio dopo un ripristino della VM): «Riprova» lo ripeterebbe per sempre. La strada a mano è G3b.
+
+## G3b. Solo se si è fermata con `non_creato_da_agente`: togliere a mano (scrive sulla VM)
+
+L'agente non toglie un motore senza il suo segno (protegge `lab-01` e `dev`). Se il segno di un appartamento creato dall'app si è perso, si toglie a mano, poi «Riprova»: con niente sulla VM l'agente risponde «già tolto», e l'eliminazione va avanti con i segreti e il database.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo bash /opt/domhouse/engine-vm.sh remove test-a2-02; sudo bash /opt/domhouse/broker-vm.sh remove-apartment test-a2-02; sudo test -e /opt/domhouse/test-a2-02.settings && echo "RESTA il motore" || echo "motore tolto"' < /dev/null
+```
+
+- **Atteso:** «tolto test-a2-02», poi la riga del broker (o «già tolto»), poi «motore tolto». Poi nell'app «Riprova».
+- Il nome dell'appartamento va cambiato in tutte e tre le parti se non è `test-a2-02`. `dev` non si toglie mai (lo script si rifiuta).
+- **Ritorno indietro:** nessuno (è il passo che l'eliminazione avrebbe fatto).
 
 ## G4. Non è rimasto niente (sola lettura)
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='for f in /opt/domhouse/test-a2-02.settings /etc/domhouse/test-a2-02.env /etc/domhouse/test-a2-02.catalog.yaml /data/test-a2-02 /etc/domhouse/_broker/devices/test-a2-02; do sudo test -e $f && echo "RESTA $f" || echo "tolto $f"; done; sudo grep -cx test-a2-02 /etc/domhouse/_broker/apartments || true; docker ps -a --filter name=engine-test-a2-02 --format "{{.Names}}" | grep -c . || true' < /dev/null
-for s in langbrain-api-key-test-a2-02 langbrain-shelly-test-a2-02; do echo "== $s"; gcloud secrets versions list $s --format="value(name,state)" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com; done
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='for f in /opt/domhouse/test-a2-02.settings /etc/domhouse/test-a2-02.env /etc/domhouse/test-a2-02.catalog.yaml /data/test-a2-02 /etc/domhouse/_broker/devices/test-a2-02; do sudo test -e $f && echo "RESTA $f" || echo "tolto $f"; done; sudo grep -cx test-a2-02 /etc/domhouse/_broker/apartments || true; if out="$(sudo docker ps -a --filter name=^engine-test-a2-02$ --format "{{.Names}}")"; then echo "contenitori: $(printf "%s" "$out" | grep -c .)"; else echo "DOCKER NON HA RISPOSTO"; fi' < /dev/null
+for s in langbrain-api-key-test-a2-02 langbrain-shelly-test-a2-02; do echo "== $s"; gcloud secrets versions list "$s" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --format="table[no-heading](name,state,scheduledDestroyTime)"; done
 .venv/Scripts/python.exe -c "from google.cloud import firestore; db = firestore.Client(project='domotica-poc-511707', database='staging'); a = db.collection('apartments').document('test-a2-02'); print('documento:', a.get().exists); print('credenziali:', len(list(a.collection('device_credentials').stream()))); print('id riservato:', db.collection('apartment_ids_used').document('test-a2-02').get().exists)"
 ```
 
 - **Atteso:**
-  1. cinque «tolto …», poi `0` (non è più nell'elenco del broker) e `0` (nessun contenitore);
-  2. ogni versione dei due segreti `DESTROY_SCHEDULED` (si possono riattivare per 7 giorni) o `DESTROYED`;
+  1. cinque «tolto …», poi `0` (non è più nell'elenco del broker) e «contenitori: 0». **«DOCKER NON HA RISPOSTO» non è un esito buono:** fermati e incolla;
+  2. per ciascun segreto ogni versione `DISABLED` con una `scheduledDestroyTime` fra 7 giorni (la distruzione con ritardo, come visto in C9.1 di A2 il 20 novembre); passati i 7 giorni, `DESTROYED`;
   3. «documento: False», «credenziali: 0», «id riservato: True» (l'id resta usato, D-67).
 - La porta di `test-a2-02` torna libera per la prossima creazione (il collegamento in `external_ids` è tolto da `remove_apartment`).
 
@@ -127,7 +142,9 @@ La memoria storica prepara il comando con il nome dello snapshot scelto in R1: `
 
 - Montare il disco in sola lettura (`sudo mount -o ro,noload /dev/disk/by-id/google-recupero-a6-part1 /mnt/recupero`: **da verificare** il nome del dispositivo, `ls -l /dev/disk/by-id/ | grep recupero`).
 - Il file migliore è l'ultima copia notturna, coerente: `/mnt/recupero/data/<id vecchio>/backup/` (le copie delle 22:30, 7 giorni). Se non c'è, `engine.db` nella cartella dei dati.
-- Copiarlo in `/var/tmp/recupero-<id vecchio>.db` (cartella di root, 600) e controllarlo **come utente 10001**: `sudo -u '#10001' python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("PRAGMA integrity_check").fetchone()[0])' /var/tmp/recupero-<id vecchio>.db` → **Atteso:** `ok`.
+- Una cartella dell'utente del motore, 700: `sudo install -d -o 10001 -g 10001 -m 700 /var/tmp/recupero`.
+- Il file copiato **già suo** (altrimenti l'utente 10001 non lo legge): `sudo install -o 10001 -g 10001 -m 600 <file dal disco recuperato> /var/tmp/recupero/<id vecchio>.db`.
+- Il controllo **come utente 10001**: `sudo -u '#10001' python3 -c 'import sqlite3,sys; print(sqlite3.connect(sys.argv[1]).execute("PRAGMA integrity_check").fetchone()[0])' /var/tmp/recupero/<id vecchio>.db` → **Atteso:** `ok`.
 
 ## R4. L'appartamento nuovo (app)
 
@@ -135,14 +152,13 @@ Con A2, nell'organizzazione di prima: «Nuovo appartamento» con un id nuovo, fi
 
 ## R5. Lo storico dentro il motore nuovo (scrive sulla VM)
 
-- Copiare il file nella cartella delle copie del motore nuovo, con il proprietario del motore: `sudo install -o 10001 -g 10001 -m 600 /var/tmp/recupero-<id vecchio>.db /data/<id nuovo>/backup/recupero.db`.
-- `sudo bash /opt/domhouse/engine-vm.sh restore <id nuovo> recupero.db`: controlla l'integrità, ferma il motore, tiene una copia di prima, mette il file, riparte.
+- `sudo bash /opt/domhouse/engine-vm.sh restore <id nuovo> /var/tmp/recupero/<id vecchio>.db`. Gli argomenti (riletti in `scripts/engine-vm.sh`, `restore`): l'id del motore **nuovo** e il file, come percorso intero oppure come nome dentro `/data/<id nuovo>/backup/`. Lo script controlla l'integrità, ferma il motore, sposta il database di prima in `backup/before-restore-…`, mette il file con modo 640 e proprietario 10001, riparte e aspetta che sia sano.
 - **Atteso:** «Ripristino di …» e il motore di nuovo sano. Nell'app, le misure e le regole di prima nell'appartamento nuovo.
 - Poi nell'app, per ogni dispositivo: «Registra» e la password nuova copiata nello Shelly sul posto.
 
 ## R6. Pulizia (scrive su Google Cloud e sulla VM)
 
-- `sudo umount /mnt/recupero; sudo shred -u /var/tmp/recupero-<id vecchio>.db`.
+- `sudo umount /mnt/recupero; sudo shred -u /var/tmp/recupero/<id vecchio>.db; sudo rmdir /var/tmp/recupero`.
 - `gcloud compute instances detach-disk langbrain-dev --disk=recupero-a6 …` e `gcloud compute disks delete recupero-a6 …` (la memoria storica li prepara completi): un disco recuperato è una copia in più di dati personali, non resta.
 
 ## Dopo l'installazione
