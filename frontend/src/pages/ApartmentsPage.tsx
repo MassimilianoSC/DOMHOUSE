@@ -13,16 +13,18 @@ import { platformApartmentsUrl } from "@/lib/routes";
 import { MODE_BG, MODE_FG } from "@/lib/modeColours";
 import { HOME_IMAGES, HOME_IMAGE_ROTATION_MS } from "@/content/homeImages.it";
 import { getDailyHomeQuote } from "@/content/homeQuotes.it";
+import { energySummary } from "@/lib/energySummary";
 import { cn } from "@/lib/utils";
 
 function StateTile({ label, value, icon, muted, bg, fg, testId }: { label: string; value: string; icon: React.ReactNode; muted: boolean; bg: string; fg: string; testId: string }) {
   return (
     <div className={cn("min-w-0 rounded-xl border p-3", muted ? "border-border bg-background" : cn("border-transparent", bg, fg))} data-testid={testId}>
-      <div className="flex items-center gap-2 max-[360px]:flex-col max-[360px]:items-start max-[360px]:gap-1">
+      {/* icon and label side by side when they fit, the label under the icon when not: words are never split */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
         <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-lg max-[360px]:size-6", muted ? "bg-muted text-muted-foreground" : "bg-background/70")} aria-hidden="true">{icon}</span>
-        <span className={cn("min-w-0 break-words text-xs font-medium leading-4", muted ? "text-muted-foreground" : fg)}>{label}</span>
+        <span className={cn("min-w-0 text-xs font-medium leading-4", muted ? "text-muted-foreground" : fg)}>{label}</span>
       </div>
-      <div className={cn("mt-2 text-sm font-bold capitalize [overflow-wrap:anywhere]", muted ? "text-muted-foreground" : fg)}>{value}</div>
+      <div className={cn("mt-2 text-sm font-bold [overflow-wrap:anywhere]", muted ? "text-muted-foreground" : fg)}>{value}</div>
     </div>
   );
 }
@@ -30,9 +32,9 @@ function StateTile({ label, value, icon, muted, bg, fg, testId }: { label: strin
 function DetailMetric({ label, value, icon, muted, wide, testId }: { label: string; value: string; icon: React.ReactNode; muted: boolean; wide?: boolean; testId: string }) {
   return (
     <div className={cn("flex min-h-[68px] min-w-0 flex-col justify-between gap-2 bg-background/70 px-3 py-2.5", wide && "col-span-2 border-t border-border/80")} data-testid={testId}>
-      <div className={cn("flex min-w-0 items-start gap-2 text-xs font-medium", muted ? "text-muted-foreground/70" : "text-muted-foreground")}>
+      <div className={cn("flex min-w-0 flex-wrap items-start gap-x-2 gap-y-1 text-xs font-medium", muted ? "text-muted-foreground/70" : "text-muted-foreground")}>
         {icon}
-        <span className="min-w-0 break-words text-xs leading-4">{label}</span>
+        <span className="min-w-0 text-xs leading-4">{label}</span>
       </div>
       <div className={cn("text-sm font-semibold leading-snug tabular [overflow-wrap:anywhere]", muted && "text-muted-foreground")}>{value}</div>
     </div>
@@ -154,8 +156,8 @@ export default function ApartmentsPage() {
   const tenantId = me?.tenant?.tenant_id;
   const platformHere = isPlatform && Boolean(tenantId);
   const emptyHint = restricted ? t("apartments.emptyAssignedHint") : platformHere ? t("apartments.emptyHintPlatform") : isAdmin ? t("apartments.emptyHint") : t("apartments.emptyHintMember");
-  const apartmentsWithEnergy = data?.filter((apartment) => typeof apartment.kwh_today === "number" && Number.isFinite(apartment.kwh_today) && apartment.kwh_today >= 0) ?? [];
-  const totalEnergyToday = apartmentsWithEnergy.reduce((total, apartment) => total + (apartment.kwh_today ?? 0), 0);
+  // demonstration apartments stay out of the total next to real ones, or the total is said to be simulated (1187)
+  const energy = energySummary(data ?? []);
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <header
@@ -180,8 +182,8 @@ export default function ApartmentsPage() {
             <div className="apartments-hero-copy-content">
               <h1 className="text-[clamp(1.25rem,1.9vw,1.625rem)] font-bold leading-tight tracking-tight text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.42)] [overflow-wrap:anywhere]" data-testid="apartments-title">{t("apartments.title")}</h1>
               {data && <p className="mt-1 text-xs text-white/90 drop-shadow-[0_1px_2px_rgba(0,0,0,0.45)] sm:text-sm">{t("apartments.subtitle", { count: data.length })}</p>}
-              <p className="mt-2.5 max-w-xl border-l-2 border-accent/80 pl-2.5 text-[0.7rem] leading-[1.45] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)] sm:mt-4 sm:pl-3 sm:text-sm">
-                <span className="mb-1 block text-[0.625rem] font-bold uppercase tracking-[0.12em] text-white/85 sm:text-xs">{t("apartments.dailyQuote")}</span>
+              <p className="mt-2.5 max-w-xl border-l-2 border-accent/80 pl-2.5 text-xs leading-[1.4] text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)] sm:mt-4 sm:pl-3 sm:text-sm">
+                <span className="mb-1 block text-xs font-bold uppercase tracking-[0.08em] text-white/85">{t("apartments.dailyQuote")}</span>
                 <span className="italic">{"\u201C"}{homeQuote}{"\u201D"}</span>
               </p>
             </div>
@@ -204,16 +206,21 @@ export default function ApartmentsPage() {
                 </div>
               ) : (
                 <>
-                  <div className="flex min-w-0 items-center gap-1.5 text-[0.5625rem] font-semibold leading-tight sm:gap-2 sm:text-xs"><span className="flex size-[22px] shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent sm:size-[26px] sm:rounded-lg"><Zap className="size-3.5 sm:size-4" aria-hidden="true" /></span><span className="min-w-0 leading-snug">{t("apartments.energyToday")}</span></div>
+                  <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold leading-tight sm:gap-2"><span className="flex size-[22px] shrink-0 items-center justify-center rounded-lg bg-accent/15 text-accent sm:size-[26px] sm:rounded-lg"><Zap className="size-3.5 sm:size-4" aria-hidden="true" /></span><span className="min-w-0 leading-snug">{t("apartments.energyToday")}</span></div>
                   {isError && !data ? (
-                    <p className="m-0 text-[0.5625rem] leading-tight text-white/80 sm:mt-1 sm:text-[0.625rem]">{t("apartments.energyUnavailable")}</p>
+                    <p className="m-0 text-xs leading-tight text-white/80 sm:mt-1">{t("apartments.energyUnavailable")}</p>
                   ) : data && data.length > 0 ? (
                     <>
                       <p className="m-0 flex min-w-0 items-baseline gap-1 sm:mt-1.5 sm:gap-1.5">
-                        <span className="text-[1.3rem] font-bold tracking-tight tabular sm:text-2xl">{apartmentsWithEnergy.length ? fmtNumber(totalEnergyToday, 1) : "\u2014"}</span>
-                        <span className="text-[0.5625rem] font-medium text-white/80 sm:text-[0.625rem]">{t("energy.kwh")}</span>
+                        <span className="text-[1.3rem] font-bold tracking-tight tabular sm:text-2xl">{energy.total !== null ? fmtNumber(energy.total, 1) : "\u2014"}</span>
+                        <span className="text-xs font-medium text-white/80">{t("energy.kwh")}</span>
                       </p>
-                      <p className="m-0 min-w-0 text-[0.5625rem] leading-[1.25] text-white/75 sm:mt-0.5 sm:text-[0.625rem] sm:leading-snug">{apartmentsWithEnergy.length ? t("apartments.energyCoverage", { count: apartmentsWithEnergy.length, total: data.length }) : t("apartments.energyNoData")}</p>
+                      <p className="m-0 min-w-0 text-xs leading-snug text-white/80 sm:mt-0.5">{energy.total !== null ? t("apartments.energyCoverage", { count: energy.withData, total: energy.counted }) : t("apartments.energyNoData")}</p>
+                      {(energy.demosExcluded > 0 || energy.demoOnly) && (
+                        <p className="m-0 min-w-0 text-xs leading-snug text-white/80" data-testid="home-energy-demos">
+                          {energy.demoOnly ? t("apartments.energyDemoOnly") : energy.demosExcluded === 1 ? t("apartments.energyDemoExcludedOne") : t("apartments.energyDemoExcludedMany", { count: energy.demosExcluded })}
+                        </p>
+                      )}
                     </>
                   ) : null}
                 </>

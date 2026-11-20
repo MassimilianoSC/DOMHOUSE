@@ -716,6 +716,9 @@
     "energyToday": "Consumo registrato oggi",
     "energyCoverage": "Dato disponibile per {count} di {total} appartamenti",
     "energyNoData": "Nessun dato di consumo disponibile",
+    "energyDemoExcludedOne": "Escluso 1 appartamento dimostrativo",
+    "energyDemoExcludedMany": "Esclusi {count} appartamenti dimostrativi",
+    "energyDemoOnly": "Dati simulati degli appartamenti dimostrativi",
     "energyUnavailable": "Dato temporaneamente non disponibile",
     "add": "Appartamento",
     "demo": "Dimostrativo",
@@ -880,9 +883,9 @@
       "bosco": "Salvia, avorio e toni naturali."
     },
     "modeLegend": "Modalità di visualizzazione",
-    "modeHint": "Puoi seguire il dispositivo oppure scegliere un tema.",
+    "modeHint": "Puoi seguire il telefono o il computer, oppure scegliere un tema.",
     "modes": {
-      "system": "Come il dispositivo",
+      "system": "Come il telefono o il computer",
       "light": "Chiara",
       "dark": "Scura"
     },

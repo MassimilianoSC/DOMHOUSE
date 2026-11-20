@@ -88,7 +88,7 @@
     left: 0;
     z-index: 10;
     display: flex;
-    width: 50%;
+    width: 65%;
     align-items: center;
     padding: 0.625rem;
   }
@@ -104,19 +104,14 @@
     width: calc(100% - 1.5rem);
     margin: 0.75rem;
   }
+  /* On a phone the consumption box goes under the photo: over it, with text of at least 12 px, it ran past the photo
+     onto the cards (D-198, 20 November; e2e/apartments-page.spec.ts). The words on the photo take 65% of it. */
   .apartments-hero-layout > .apartments-hero-energy {
-    position: absolute;
-    top: 0.5625rem;
-    right: 0.5rem;
-    z-index: 20;
     grid-column: 1;
-    grid-row: 1;
-    justify-self: end;
-    align-self: start;
-    width: min(40%, 9.375rem);
-    min-width: 6.75rem;
-    margin: 0;
-    padding: 0.4375rem 0.5rem;
+    grid-row: 2;
+    width: 100%;
+    margin: 0.5rem 0 0;
+    padding: 0.625rem 0.75rem;
   }
   @media (min-width: 640px) {
     .apartments-hero-layout {
@@ -135,6 +130,11 @@
       width: 100%;
     }
     .apartments-hero-layout > .apartments-hero-energy {
+      position: absolute;
+      z-index: 20;
+      grid-row: 1;
+      justify-self: end;
+      align-self: start;
       top: 50%;
       right: clamp(1rem, 4%, 1.5rem);
       width: min(29%, 18rem);
