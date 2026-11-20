@@ -161,9 +161,9 @@ def test_the_sequence_per_apartment_only_grows_and_stays_as_a_tombstone(w):
 
 
 def test_the_other_operations_are_not_yet_available(w):
-    # aggiorna_broker is executed since A3 (tests/agent_a3_vm_test.py)
-    for op, params in (("crea_motore", {"porta": 8151}), ("aggiorna_motore", {}), ("togli_motore", {}),
-                       ("applica_catalogo", {"catalogo": "devices: []", "versione": 1})):
+    # aggiorna_broker since A3 (tests/agent_a3_vm_test.py), crea_motore and togli_motore since A2
+    # (tests/agent_a2_vm_test.py)
+    for op, params in (("aggiorna_motore", {}), ("applica_catalogo", {"catalogo": "devices: []", "versione": 1})):
         r = w.ex.handle(order(operazione=op, apartment_id="lab-02", seq=1, parametri=params), READER_UID)
         assert (r["esito"], r["codice"]) == ("rifiutato", "non_disponibile"), op
     assert w.runs == [] and w.gets == [] and not (w.state / "seq" / "lab-02").exists()
@@ -267,11 +267,13 @@ def test_r16_the_alarm_policy_reads_both_services():
     assert "domhouse-agent-(lettore|esecutore)" in flt
 
 
-def test_r7_the_executor_unit_is_strict_and_opens_only_what_a3_needs():
-    """R7, then A3 (N9): still ProtectSystem=strict; only /etc/domhouse/_broker writable and only CAP_CHOWN."""
+def test_r7_the_executor_unit_is_strict_and_opens_only_what_a3_and_a2_need():
+    """R7, then A3 (N9) and A2 (§4.2, N3): still ProtectSystem=strict; only the engines' three paths writable, only
+    CAP_CHOWN and CAP_DAC_OVERRIDE."""
     unit = (AGENT / "domhouse-agent-esecutore.service").read_text(encoding="utf-8")
     assert "ProtectSystem=strict" in unit and "ProtectSystem=full" not in unit
-    assert "CapabilityBoundingSet=CAP_CHOWN\n" in unit and "ReadWritePaths=/etc/domhouse/_broker\n" in unit
+    assert "CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE\n" in unit
+    assert "ReadWritePaths=/opt/domhouse /etc/domhouse /data\n" in unit
 
 
 @pytest.mark.skipif(not sys.platform.startswith("linux"), reason="SO_PEERCRED e i socket UNIX: solo Linux (CI)")

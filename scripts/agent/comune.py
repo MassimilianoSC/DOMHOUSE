@@ -24,7 +24,8 @@ from dataclasses import dataclass
 
 OPERATIONS = ("capienza", "crea_motore", "aggiorna_motore", "aggiorna_broker", "applica_catalogo", "stato",
               "togli_motore")
-EXECUTED = {"stato", "capienza", "aggiorna_broker"}   # A1, then A3; the other four are refused «non_disponibile»
+# A1, A3, then A2 (crea_motore, togli_motore); the other two are refused «non_disponibile»
+EXECUTED = {"stato", "capienza", "aggiorna_broker", "crea_motore", "togli_motore"}
 ENVIRONMENTS = ("staging", "prod")
 MAX_ORDER_BYTES = 128 * 1024
 MAX_CATALOG_BYTES = 64 * 1024
@@ -59,6 +60,9 @@ CODES = (
     "scaduto", "interrotto", "errore_interno",
     # A3 §6.3: an order without the server's signature
     "firma_non_valida",
+    # A2 (docs/proposta-a2.md §6.3): crea_motore and togli_motore
+    "capienza_insufficiente", "staging_pieno", "porta_occupata", "immagine_non_approvata", "gia_esiste_diverso",
+    "dati_presenti", "non_creato_da_agente", "segreto_illeggibile", "motore_non_sano", "broker_fallito",
     # A3 §6.1, §6.4: aggiorna_broker
     "appartamento_sconosciuto", "sync_fallito", "migrazione_non_fatta",
 )

@@ -92,7 +92,9 @@ def test_aggiorna_broker_writes_the_list_then_runs_the_sync(vm):
     assert argv == ["/bin/bash", str(vm.opt / "broker-vm.sh"), "sync"]
     # 20 November, Q2.3c on the VM: under the unit ProtectHome hides /root/.docker, and without DOCKER_CONFIG
     # «docker compose» is not found: the sync gets the same DOCKER_CONFIG as docker inspect (state/docker)
-    assert env == {"PATH": esecutore.CLEAN_ENV["PATH"], "DOCKER_CONFIG": str(vm.state / "docker")}
+    # A2: the executor holds the VM's lock for the whole order and tells the script (DOMHOUSE_LOCK_HELD)
+    assert env == {"PATH": esecutore.CLEAN_ENV["PATH"], "DOCKER_CONFIG": str(vm.state / "docker"),
+                   "DOMHOUSE_LOCK_HELD": "1"}
     if sys.platform.startswith("linux"):
         assert (vm.broker_etc / "devices" / "lab-07").stat().st_mode & 0o777 == 0o600
 
@@ -197,12 +199,14 @@ def test_a_bad_file_keeps_the_apartments_lines(broker, monkeypatch, capsys, line
 
 
 # ---- the unit and broker-vm.sh ------------------------------------------------------------------------------------
-def test_the_executor_unit_opens_exactly_what_a3_needs():
+def test_the_executor_unit_opens_exactly_what_a3_and_a2_need():
     unit = (AGENT / "domhouse-agent-esecutore.service").read_text(encoding="utf-8")
-    for line in ("ProtectSystem=strict\n", "ReadWritePaths=/etc/domhouse/_broker\n", "CapabilityBoundingSet=CAP_CHOWN\n",
-                 "SupplementaryGroups=domhouse-broker\n", "RestrictAddressFamilies=AF_UNIX AF_INET\n", "NoNewPrivileges=yes\n"):
+    # A2 (proposta §4.2, N3): /opt/domhouse, /etc/domhouse (it covers _broker) and /data; CAP_DAC_OVERRIDE declared
+    for line in ("ProtectSystem=strict\n", "ReadWritePaths=/opt/domhouse /etc/domhouse /data\n",
+                 "CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE\n", "SupplementaryGroups=domhouse-broker\n",
+                 "RestrictAddressFamilies=AF_UNIX AF_INET\n", "NoNewPrivileges=yes\n"):
         assert line in unit, line
-    assert "CAP_DAC_OVERRIDE" not in unit and "CAP_FOWNER" not in unit
+    assert "CAP_FOWNER" not in unit and "CAP_SETUID" not in unit and "CAP_SYS_ADMIN" not in unit
 
 
 def test_broker_vm_makes_auth_roots_with_the_brokers_group_and_the_devices_folder():

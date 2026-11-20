@@ -24,10 +24,14 @@ ProtectHome=yes
 # without capabilities (the socket /run/docker.sock is root's: owner, no DAC override needed)
 ProtectSystem=strict
 # A3 (docs/proposta-a3-server.md §6.1, N9): aggiorna_broker writes devices/<apt> and broker-vm.sh sync rewrites auth/
-# (root:1883 750, files 1883:1883 640): the folder only, CAP_CHOWN only to give the new files to 1883, and the broker's
-# group to re-read them. Da verificare sulla VM con systemd-run (id e lettura di un file di auth/) prima di installare
-ReadWritePaths=/etc/domhouse/_broker
-CapabilityBoundingSet=CAP_CHOWN
+# (root:1883 750, files 1883:1883 640): CAP_CHOWN to give the new files to 1883, and the broker's group to re-read them.
+# A2 (docs/proposta-a2.md §4.2, review point 4, N3): crea_motore and togli_motore write the engines' files
+# (/opt/domhouse: settings and the VM's lock; /etc/domhouse: key, catalog; /data/<apt>): CAP_CHOWN gives the data
+# folder to the engine's user 10001, CAP_DAC_OVERRIDE lets root empty /data/<apt> (10001, 750) when it takes an
+# engine back. Writes stay closed by ProtectSystem=strict and these three paths alone. Da verificare sulla VM con
+# systemd-run e le stesse impostazioni (procedura di installazione di A2) prima di installare
+ReadWritePaths=/opt/domhouse /etc/domhouse /data
+CapabilityBoundingSet=CAP_CHOWN CAP_DAC_OVERRIDE
 AmbientCapabilities=
 # the group by name (systemd refuses a gid no group has: 20 November); agent-vm.sh install makes it with gid 1883
 SupplementaryGroups=domhouse-broker

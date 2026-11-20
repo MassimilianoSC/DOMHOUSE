@@ -13,15 +13,17 @@ Programs run with execve and a list of arguments (subprocess, never a shell), wi
 alone (§1). Their output stays in the executor's journal (/var/lib/domhouse-executor/giornale, root, 14 days): the
 result carries codes only, the system log one line of op_id, operation, apartment, environment, outcome, duration.
 
-Package A1 executes only «stato» (the engine's /health and the image it runs) and «capienza» (MemAvailable and the
-engines). The other five operations pass the checks and are refused «non_disponibile» until their package: A1 touches
-neither engine-vm.sh nor broker-vm.sh (the engines' lock, DOMHOUSE_LOCK_HELD, comes with A2).
+Package A1 executes «stato» (the engine's /health and the image it runs) and «capienza» (MemAvailable and the
+engines); A3 «aggiorna_broker»; A2 «crea_motore» and «togli_motore» (docs/proposta-a2.md §4.2, §5.2). The others are
+refused «non_disponibile» until their package. Every order that changes the VM holds the VM's lock
+(/opt/domhouse/.engines.lock, the one of engine-vm.sh and broker-vm.sh) and runs the scripts with DOMHOUSE_LOCK_HELD=1.
 
 Only the standard library. No address and no VM name in the code (§7.1 of the registro): the engines' address is
 BIND_IP of the configuration or, if absent, the VM's internal address from the metadata server.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -53,7 +55,20 @@ PEER_TIMEOUT_S = 10                 # R14: a peer that sends nothing does not ho
 # an alarm; not these three, which are normal outcomes, nor errore_interno, which has its own line
 # A3 code review, point 1: lab-01 before its migration and an apartment the broker does not know are normal refusals
 NORMAL_REFUSALS = {"seq_vecchia", "non_disponibile", "motore_assente", "errore_interno", "appartamento_sconosciuto",
-                   "migrazione_non_fatta"}
+                   "migrazione_non_fatta",
+                   # A2: no room, or a port someone took by hand: normal; the other refusals of A2 are alarms
+                   "capienza_insufficiente", "staging_pieno", "porta_occupata"}
+# A2 (proposta §4.3, review point 6): the approved image, only by digest, from our repository
+DIGEST_RE = re.compile(r"^europe-west8-docker\.pkg\.dev/domotica-poc-511707/domotica/engine@sha256:[0-9a-f]{64}$")
+NEW_ENGINE_MB, MIN_FREE_MB = 150, 400        # §7 of the project: room for one engine more
+EMPTY_CATALOG = "rooms: []\ndevices: []\n"
+# A2: the worst case of one crea_motore (lock, install, broker refused, both taken back) stays well under the time
+# the reader waits for an answer (lettore.EXECUTOR_TIMEOUT_S; a test keeps it so)
+LOCK_WAIT_S = 60
+INSTALL_TIMEOUT_S = 300                      # a pull and a start of the engine (health: at most about 3 minutes)
+BROKER_TIMEOUT_S = 60
+REMOVE_TIMEOUT_S = 90
+WORST_CREATE_S = LOCK_WAIT_S + INSTALL_TIMEOUT_S + 2 * BROKER_TIMEOUT_S + REMOVE_TIMEOUT_S
 PORT_RE = re.compile(r"^PORT=([0-9]{4,5})$", re.M)
 ENV_RE = re.compile(r"^ENV=(staging|prod)$", re.M)
 METADATA_IP = "http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip"
@@ -71,6 +86,9 @@ class Config(NamedTuple):
     meminfo: Path = Path("/proc/meminfo")
     keys_dir: Path = Path("/etc/domhouse")     # A3 §6.3: agent-ordini.key and agent-risultati.key, root's, 600
     broker_etc: Path = Path("/etc/domhouse/_broker")   # A3 §6.1: the broker's list of apartments and devices/
+    etc: Path = Path("/etc/domhouse")          # A2: the catalogs, the keys' files of the engines, agent-immagine-<env>
+    data: Path = Path("/data")                 # A2: the engines' data
+    proc_net: Path = Path("/proc/net")         # A2: tcp and tcp6, the ports listening (no AF_NETLINK needed)
 
 
 def read_config(path: Path, uid_of: Callable[[str], int], check_owner: bool = True) -> Config:
@@ -117,6 +135,45 @@ def read_keys(path: Path, check_owner: bool = True) -> list[bytes]:
     if not 1 <= len(lines) <= 2 or not all(comune.KEY_RE.fullmatch(line) for line in lines):
         raise ValueError(f"{path}: una o due chiavi esadecimali da 64 caratteri")
     return [bytes.fromhex(line) for line in lines]
+
+
+def read_image(path: Path, check_owner: bool = True) -> str:
+    """A2 (proposta §4.3): the approved image of this environment, one line «…/engine@sha256:<64>», root's file
+    writable by root only, read at every order (publish-all.sh writes it)."""
+    if check_owner:
+        st = path.stat()
+        if st.st_uid != 0 or st.st_mode & 0o022:
+            raise ValueError(f"{path}: deve essere di root e scrivibile solo da root")
+    lines = [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    if len(lines) != 1 or not DIGEST_RE.fullmatch(lines[0]):
+        raise ValueError(f"{path}: una riga con l'immagine per digest")
+    return lines[0]
+
+
+@contextlib.contextmanager
+def vm_lock(path: Path):
+    """The VM's lock (flock on the same file as engine-vm.sh), waited for at most LOCK_WAIT_S. Only on Linux: where
+    fcntl does not exist (the tests on Windows) there is nothing to lock."""
+    try:
+        import fcntl
+    except ImportError:
+        yield
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as handle:
+        deadline = time.monotonic() + LOCK_WAIT_S
+        while True:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() > deadline:
+                    raise TimeoutError("blocco della VM occupato") from None
+                time.sleep(1)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def run_program(argv: list[str], env: dict, timeout: float) -> tuple[int, str]:
@@ -182,10 +239,13 @@ def _short(value) -> str | None:
 
 class Esecutore:
     def __init__(self, config: Config, run=run_program, http_get=http_get, log: Callable[[str], None] = print,
-                 keys: Callable[[str], list[bytes]] | None = None, clock: Callable[[], datetime] | None = None):
+                 keys: Callable[[str], list[bytes]] | None = None, clock: Callable[[], datetime] | None = None,
+                 image: Callable[[], str] | None = None, lock=None):
         self.config, self.run, self.http_get, self.log = config, run, http_get, log
         self.keys = keys or (lambda name: read_keys(config.keys_dir / f"agent-{name}.key"))
         self.clock = clock or (lambda: datetime.now(UTC))
+        self.image = image or (lambda: read_image(config.etc / f"agent-immagine-{config.ambiente}"))
+        self.lock = lock or (lambda: vm_lock(config.opt / ".engines.lock"))
 
     # ---- the request -------------------------------------------------------------------------------------------
     def handle(self, data: bytes, peer_uid: int) -> dict:
@@ -266,8 +326,17 @@ class Esecutore:
             return comune.result(order, "rifiutato", "errore_interno")
         if not fresh:
             return comune.result(order, "rifiutato", "seq_vecchia")
-        if order.operazione == "aggiorna_broker":
-            return self._update_broker(order, output)
+        if order.operazione in ("aggiorna_broker", "crea_motore", "togli_motore"):
+            try:
+                with self.lock():                                    # one change at a time on the VM (§6.1)
+                    if order.operazione == "aggiorna_broker":
+                        return self._update_broker(order, output)
+                    if order.operazione == "crea_motore":
+                        return self._create(order, output)
+                    return self._remove(order, output)
+            except TimeoutError:
+                output.append("blocco della VM occupato da oltre 10 minuti")
+                return comune.result(order, "fallito", "errore_interno")
         port = self._port(order.apartment_id)
         if port is None:
             return comune.result(order, "rifiutato", "motore_assente")
@@ -306,13 +375,160 @@ class Esecutore:
             return comune.result(order, "fallito", "errore_interno")
         # 20 November (Q2.3c on the VM): ProtectHome hides /root/.docker; without DOCKER_CONFIG «docker compose» is not
         # found and the sync stops («manca docker compose»): the same DOCKER_CONFIG as docker inspect (_state)
-        sync_env = {**CLEAN_ENV, "DOCKER_CONFIG": str(self.config.state / "docker")}
-        code, text = self.run(["/bin/bash", str(self.config.opt / "broker-vm.sh"), "sync"], sync_env,
+        code, text = self.run(["/bin/bash", str(self.config.opt / "broker-vm.sh"), "sync"], self._script_env(),
                               RUN_TIMEOUT_S * 4)
         output.append(text)
         if code != 0 or f"kept {apartment}" in text.split("\n"):
             return comune.result(order, "fallito", "sync_fallito")
         return comune.result(order, "riuscito", "ok", {"dispositivi": len(devices)})
+
+    def _script_env(self) -> dict:
+        """The scripts' environment: PATH, docker's folder (ProtectHome hides /root/.docker) and the lock held."""
+        return {**CLEAN_ENV, "DOCKER_CONFIG": str(self.config.state / "docker"), "DOMHOUSE_LOCK_HELD": "1"}
+
+    def _script(self, name: str, *args: str, timeout: float = RUN_TIMEOUT_S * 4, output: list[str]) -> int:
+        code, text = self.run(["/bin/bash", str(self.config.opt / name), *args], self._script_env(), timeout)
+        output.append(f"{name} {args[0]}: {code} {text}")
+        return code
+
+    # ---- A2 §4.2: crea_motore -----------------------------------------------------------------------------------
+    def _mark(self, apartment: str) -> Path:
+        return self.config.state / "creati" / apartment
+
+    def _read_mark(self, apartment: str) -> dict | None:
+        try:
+            mark = json.loads(self._mark(apartment).read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return None
+        except (OSError, ValueError):
+            return {}                                     # there but unreadable: never «absent»
+        return mark if isinstance(mark, dict) else {}
+
+    def _write_atomic(self, path: Path, text: str, mode: int) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        temporary = path.parent / f".{path.name}.nuovo"
+        fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, mode)
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as out:
+            out.write(text)
+            out.flush()
+            os.fsync(out.fileno())
+        os.chmod(temporary, mode)
+        os.replace(temporary, path)
+        _sync_dir(path.parent)
+
+    def _listening(self, port: int) -> bool:
+        """The port listening on the VM, from /proc/net/tcp and tcp6 (state 0A), without AF_NETLINK."""
+        for name in ("tcp", "tcp6"):
+            try:
+                lines = (self.config.proc_net / name).read_text(encoding="ascii", errors="replace").splitlines()[1:]
+            except OSError:
+                continue
+            for line in lines:
+                parts = line.split()
+                if len(parts) > 3 and parts[3] == "0A" and ":" in parts[1]:
+                    try:
+                        if int(parts[1].rsplit(":", 1)[1], 16) == port:
+                            return True
+                    except ValueError:
+                        continue
+        return False
+
+    def _port_taken(self, port: int, apartment: str) -> bool:
+        for settings in self.config.opt.glob("*.settings"):
+            if settings.stem == apartment:
+                continue
+            found = PORT_RE.search(settings.read_text(encoding="utf-8", errors="replace"))
+            if found and int(found.group(1)) == port:
+                return True
+        return self._listening(port)
+
+    def _create(self, order: comune.Order, output: list[str]) -> dict:
+        apartment, port, env = order.apartment_id, order.parametri["porta"], self.config.ambiente
+        try:
+            image = self.image()
+        except (OSError, ValueError) as exc:
+            output.append(f"immagine approvata: {type(exc).__name__}")
+            image = ""
+        if not DIGEST_RE.fullmatch(image):
+            return comune.result(order, "rifiutato", "immagine_non_approvata")
+        wanted = {"porta": port, "immagine": image, "env": env}
+        mark = self._read_mark(apartment)
+        settings = self.config.opt / f"{apartment}.settings"
+        if mark is not None and mark != wanted:
+            return comune.result(order, "rifiutato", "gia_esiste_diverso")
+        if mark is None:                                 # step 0 for a new apartment (step 1: ours with the same values)
+            if settings.exists():
+                return comune.result(order, "rifiutato", "gia_esiste_diverso")    # lab-01, made by hand
+            if self._port_taken(port, apartment):
+                return comune.result(order, "rifiutato", "porta_occupata")
+            room = self._capacity()
+            if room["motori_staging"] >= room["massimo_staging"]:
+                return comune.result(order, "rifiutato", "staging_pieno")
+            if room["mem_available_mb"] - NEW_ENGINE_MB < MIN_FREE_MB:
+                return comune.result(order, "rifiutato", "capienza_insufficiente")
+            folder = self.config.data / apartment
+            if folder.is_symlink() or (folder.exists() and (not folder.is_dir() or any(folder.iterdir()))):
+                return comune.result(order, "rifiutato", "dati_presenti")
+            try:                                         # 1b: the mark before anything else
+                self._write_atomic(self._mark(apartment), json.dumps(wanted, sort_keys=True), 0o600)
+            except OSError as exc:
+                output.append(f"segno di creazione: {type(exc).__name__}")
+                return comune.result(order, "fallito", "errore_interno")
+        catalog = self.config.etc / f"{apartment}.catalog.yaml"
+        if not catalog.exists():                         # 2: before compose up (a missing file becomes a folder)
+            try:
+                self._write_atomic(catalog, EMPTY_CATALOG, 0o644)
+            except OSError as exc:
+                output.append(f"catalogo: {type(exc).__name__}")
+                self._take_back(apartment, broker=False, output=output)
+                return comune.result(order, "fallito", "errore_interno")
+        code = self._script("engine-vm.sh", "install", "--da-agente", apartment, str(port), image, "shelly", env,
+                            str(catalog), timeout=INSTALL_TIMEOUT_S, output=output)
+        if code != 0:                                    # 3: exit 3 a secret, 4 the engine's health
+            self._take_back(apartment, broker=False, output=output)
+            return comune.result(order, "fallito", {3: "segreto_illeggibile", 4: "motore_non_sano"}.get(
+                code, "errore_interno"))
+        if self._script("broker-vm.sh", "add-apartment", apartment, timeout=BROKER_TIMEOUT_S, output=output) != 0:
+            self._take_back(apartment, broker=True, output=output)
+            return comune.result(order, "fallito", "broker_fallito")
+        return comune.result(order, "riuscito", "ok", {"porta": port, "immagine": image})
+
+    def _take_back(self, apartment: str, broker: bool, output: list[str]) -> bool:
+        """What this order made, in reverse; the mark goes last and only when everything went."""
+        ok = True
+        if broker:
+            ok &= self._script("broker-vm.sh", "remove-apartment", apartment, timeout=BROKER_TIMEOUT_S,
+                               output=output) == 0
+        ok &= self._script("engine-vm.sh", "remove", apartment, timeout=REMOVE_TIMEOUT_S, output=output) == 0
+        (self.config.etc / f"{apartment}.catalog.yaml").unlink(missing_ok=True)
+        if ok:
+            self._mark(apartment).unlink(missing_ok=True)
+        else:
+            self.log(f"agent alarm codice=ritorno_indietro_incompleto apartment={apartment}")
+        return ok
+
+    # ---- A2 §5.2: togli_motore (the piece A6 reuses) --------------------------------------------------------------
+    def _traces(self, apartment: str) -> bool:
+        try:
+            known = (self.config.broker_etc / "apartments").read_text(encoding="utf-8").split()
+        except OSError:
+            known = []
+        return apartment in known or any(p.exists() or p.is_symlink() for p in (
+            self.config.opt / f"{apartment}.settings", self.config.etc / f"{apartment}.env",
+            self.config.etc / f"{apartment}.catalog.yaml", self.config.data / apartment))
+
+    def _remove(self, order: comune.Order, output: list[str]) -> dict:
+        apartment = order.apartment_id
+        if self._read_mark(apartment) is None:
+            if self._traces(apartment):
+                return comune.result(order, "rifiutato", "non_creato_da_agente")   # lab-01: never until A6
+            return comune.result(order, "riuscito", "ok")                          # already removed
+        if self._script("engine-vm.sh", "remove", apartment, timeout=REMOVE_TIMEOUT_S, output=output) != 0:
+            return comune.result(order, "fallito", "errore_interno")
+        if self._script("broker-vm.sh", "remove-apartment", apartment, timeout=BROKER_TIMEOUT_S, output=output) != 0:
+            return comune.result(order, "fallito", "broker_fallito")
+        self._mark(apartment).unlink(missing_ok=True)                              # last
+        return comune.result(order, "riuscito", "ok")
 
     @staticmethod
     def _says_prod(data: bytes) -> bool:

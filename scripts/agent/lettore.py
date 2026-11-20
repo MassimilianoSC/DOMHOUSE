@@ -47,7 +47,7 @@ SOCKET_PATH = Path("/run/domhouse-agent/esecutore.sock")
 PUBSUB = "https://pubsub.googleapis.com/v1/"
 TOKEN_URL = "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token"
 JOURNAL_DAYS = 14
-EXECUTOR_TIMEOUT_S = 600            # an operation of a later package (crea_motore) can take minutes
+EXECUTOR_TIMEOUT_S = 900            # A2: crea_motore can take minutes (esecutore.WORST_CREATE_S stays under this)
 PULL_MAX = 1                        # R4: one order at a time, so that none waits for its ack behind others
 RESULT_KEYS = ("op_id", "operazione", "apartment_id", "ambiente", "seq", "esito", "codice", "dati", "ordine_sha256",
                "firma")
