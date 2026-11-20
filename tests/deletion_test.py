@@ -15,7 +15,7 @@ from bff import secret_admin as sa
 from bff.repository import get_repository
 from bff.repository.base import Apartment
 from bff.repository.seed import DEMO_TENANT
-from tests.creation_test import ADMIN, PLATFORM, call, push, to_ready, world  # noqa: F401  (world is the fixture)
+from tests.creation_test import ADMIN, PLATFORM, call, push, run, to_ready, world  # noqa: F401  (world is the fixture)
 
 APT = "lab-a2-61"
 BASE = f"/app/platform/tenants/{DEMO_TENANT}/apartments"
@@ -300,3 +300,137 @@ def test_only_the_platform_deletes(world, mails):
     r = call("POST", f"{BASE}/{APT}/elimina", headers=ADMIN, json={"nome": f"Prova {APT}"})
     assert r.status_code == 403
     assert deletion.can_delete(type("I", (), {"platform_manager": True})())
+
+
+# ---- security review of A6 (revisione-a2-a3/REVISIONE-CODICE-A6.md) -----------------------------------------------
+def full_form(name, enabled=True):
+    """The administrator's form sends the whole body (bff/routes/admin.py, «the PWA form sends the whole body»)."""
+    return {"name": name, "address": "", "timezone": "Europe/Rome", "instance_url": "http://10.198.0.2",
+            "port": get_repository().apartments[APT].port, "enabled": enabled, "italianway_id": None,
+            "enabled_features": None, "clear_features": False}
+
+
+def test_review_1_the_administrator_cannot_switch_on_what_the_platform_switched_off(world, mails):
+    to_ready(world, APT)
+    disattiva()
+    r = call("PATCH", f"/app/admin/apartments/{APT}", headers=ADMIN, json=full_form("Nome nuovo"))
+    assert r.status_code == 409 and r.json()["error"] == "disabled_by_platform", r.text
+    apt = get_repository().apartments[APT]
+    assert (apt.enabled, apt.name, apt.disattivato_da.ruolo) == (False, f"Prova {APT}", "gestore")
+    r = call("PATCH", f"/app/admin/apartments/{APT}", headers=ADMIN, json=full_form("Nome nuovo", enabled=False))
+    assert r.status_code == 200 and r.json()["name"] == "Nome nuovo"          # the same form, switch left off: saved
+    assert get_repository().apartments[APT].disattivato_da.ruolo == "gestore"  # who switched it off does not change
+
+
+def test_review_1_switching_on_sends_an_email_too(world, mails):
+    to_ready(world, APT)
+    disattiva()
+    mails.clear()
+    assert call("POST", f"{BASE}/{APT}/riattiva").status_code == 200
+    assert mails and all("riattivato" in m["subject"].lower() for m in mails)
+    call("PATCH", f"/app/admin/apartments/{APT}", headers=ADMIN, json={"enabled": False})
+    mails.clear()
+    call("PATCH", f"/app/admin/apartments/{APT}", headers=ADMIN, json={"enabled": True})
+    assert mails and all("riattivato" in m["subject"].lower() for m in mails)
+
+
+def test_review_2_a_stale_read_of_the_administrators_patch_never_erases_a_deletion(world, mails, monkeypatch):
+    ready_and_disabled(world)
+    repo = get_repository()
+    stale = repo.apartments[APT].model_copy(deep=True)                 # read before «Elimina»
+    assert elimina().status_code == 202
+    real = repo.get_apartment
+
+    async def old_read(apartment_id):
+        return stale.model_copy(deep=True) if apartment_id == APT else await real(apartment_id)
+    monkeypatch.setattr(repo, "get_apartment", old_read)
+    r = call("PATCH", f"/app/admin/apartments/{APT}", headers=ADMIN, json={"name": "Altro"})
+    monkeypatch.setattr(repo, "get_apartment", real)
+    assert r.status_code == 409 and r.json()["error"] == "deletion_in_progress"
+    assert repo.apartments[APT].eliminazione is not None and repo.apartments[APT].name == f"Prova {APT}"
+
+
+def test_review_2_the_systems_writes_change_only_their_field(world, mails, monkeypatch):
+    from bff import energy_since, instances
+    ready_and_disabled(world)
+    repo = get_repository()
+    stale = repo.apartments[APT].model_copy(deep=True)
+    assert elimina().status_code == 202
+    real = repo.get_apartment
+
+    async def old_read(apartment_id):
+        return stale.model_copy(deep=True) if apartment_id == APT else await real(apartment_id)
+    monkeypatch.setattr(repo, "get_apartment", old_read)
+    run(instances.save_last_check(APT, {"ok": True, "error": None}))
+    run(instances.save_timezone(APT, "Europe/London"))
+    run(energy_since.save_since(APT, "2026-01-01T00:00:00Z"))
+    monkeypatch.setattr(repo, "get_apartment", real)
+    apt = repo.apartments[APT]
+    assert apt.eliminazione is not None and apt.enabled is False and apt.disattivato_at
+    assert apt.last_check.ok is True and apt.timezone == "Europe/London" and apt.energy_since == "2026-01-01T00:00:00Z"
+
+
+def test_review_3_a_creation_not_ready_is_not_switched_off(world, mails):
+    assert call("POST", f"{BASE}/nuovo", json={"apartment_id": APT, "name": f"Prova {APT}",
+                                               "timezone": "Europe/Rome"}).status_code == 202
+    r = disattiva()
+    assert r.status_code == 409 and r.json()["error"] == "creation_not_ready"
+
+
+def test_review_4_the_daily_limit_counts_only_deletions_that_start(world, mails, monkeypatch):
+    ready_and_disabled(world)
+    world.configure(agent_ordini_key="")
+    for _ in range(3):
+        assert elimina().status_code == 503                             # refused: no place of the day taken
+    world.configure(agent_ordini_key=world.settings.agent_risultati_key)
+    repo = get_repository()
+    stale = repo.apartments[APT].model_copy(deep=True)
+    assert elimina().status_code == 202
+    real = repo.get_apartment
+
+    async def old_read(apartment_id):
+        return stale.model_copy(deep=True) if apartment_id == APT else await real(apartment_id)
+    monkeypatch.setattr(repo, "get_apartment", old_read)
+    assert elimina().json()["error"] == "deletion_in_progress"          # a double click
+    monkeypatch.setattr(repo, "get_apartment", real)
+    assert sum(v for k, v in repo.mail_counts.items() if k.startswith("deletions:")) == 1
+
+
+def test_review_5_the_deletion_email_is_never_taken_by_switching(world, mails):
+    to_ready(world, APT)
+    for _ in range(deletion.MAIL_PER_HOUR + 1):
+        disattiva()
+        call("POST", f"{BASE}/{APT}/riattiva")
+    disattiva()
+    apt = get_repository().apartments[APT]                               # switched off 8 days ago, toggled this hour
+    apt.disattivato_at = deletion.stamp(world.now - timedelta(days=8))
+    mails.clear()
+    assert elimina().status_code == 202
+    assert any("Eliminazione avviata" in m["subject"] for m in mails)
+
+
+def test_review_6_riprova_at_the_engine_step_drops_the_failed_order_at_once(world, mails, monkeypatch):
+    ready_and_disabled(world)
+    elimina()
+    push(world.published[-1], esito="fallito", codice="errore_interno")
+    e = call("GET", f"{BASE}/{APT}/eliminazione").json()["eliminazione"]
+
+    async def not_yet(apt):
+        return None
+    monkeypatch.setattr(deletion, "_send_togli", not_yet)               # the moment before the new order is saved
+    call("POST", f"{BASE}/{APT}/eliminazione/riprova", json={"version": e["version"]})
+    again = call("GET", f"{BASE}/{APT}/eliminazione").json()["eliminazione"]
+    assert again["stato"] == "in_corso"
+    r = call("POST", f"{BASE}/{APT}/eliminazione/riprova", json={"version": again["version"]})
+    assert r.status_code == 409 and r.json()["error"] == "invalid_state"
+
+
+def test_review_7_annulla_removes_the_devices_credentials_too(world, mails):
+    from tests.creation_test import act
+    assert call("POST", f"{BASE}/nuovo", json={"apartment_id": APT, "name": f"Prova {APT}",
+                                               "timezone": "Europe/Rome"}).status_code == 202
+    get_repository().device_creds[APT] = {"plug": {"device_id": "plug", "version": 1}}
+    later(world, minutes=21)                                            # «non_creato», nothing sent to install
+    r = act("annulla", apt=APT)
+    assert r.status_code == 202, r.text
+    assert APT not in get_repository().apartments and not get_repository().device_creds.get(APT)

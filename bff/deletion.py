@@ -14,9 +14,13 @@ apartment off, wait 7 days, delete it with its name.
   there. «a_mano» and «dimostrativo»: only the record, at once. «dev»: never (D-118).
 - State computed at read time, as the creation's: 20 minutes without progress, or the order closed without success, is
   «non_riuscita» with its code; «Riprova» goes on from the step that stopped.
-- Emails to the organisation's administrators and the platform managers at every switch-off (whoever did it: risk 1 of
-  the proposal is a compromised administrator) and when a deletion starts; at most MAIL_PER_HOUR per apartment.
-- At most DAILY_LIMIT deletions a day per organisation (answer 1210, point 6); «Riprova» does not count.
+- Emails to the organisation's administrators and the platform managers at every switch-off and switch-on (whoever
+  did it: risk 1 of the proposal is a compromised administrator) and when a deletion starts; at most MAIL_PER_HOUR an
+  hour per apartment for the switches, a quota of its own for the deletion (A6 review, point 5).
+- At most DAILY_LIMIT deletions a day per organisation (answer 1210, point 6), counted only once a deletion really
+  starts (review, point 4); «Riprova» does not count.
+- The administrator never switches on what the platform switched off (review, point 1, the prudent road until the
+  committente decides): 409 disabled_by_platform.
 """
 from __future__ import annotations
 
@@ -172,7 +176,9 @@ async def notify(apt: Apartment, what: str, who: str | None) -> None:
             warn("deletion mail not sent", apartment_id=apt.apartment_id, motivo="posta_non_configurata")
             return
         hour = utcnow().strftime("%Y%m%d%H")
-        if not await get_repository().take_mail_quota([(f"deletion_mail:{apt.apartment_id}:{hour}", MAIL_PER_HOUR)]):
+        kind = "eliminazione" if what == "eliminazione" else "interruttore"     # review, point 5: two quotas
+        if not await get_repository().take_mail_quota([(f"deletion_mail:{kind}:{apt.apartment_id}:{hour}",
+                                                        MAIL_PER_HOUR)]):
             warn("deletion mail not sent", apartment_id=apt.apartment_id, motivo="limite_orario")
             return
         when = utcnow().strftime("%d/%m/%Y %H:%M UTC")
@@ -184,6 +190,10 @@ async def notify(apt: Apartment, what: str, who: str | None) -> None:
                      "Excel sono fermi finché non viene riattivato."]
             if origine(apt) != "dev":
                 lines.append(f"Da {stamp(utcnow() + WAIT)[:10]} il gestore della piattaforma potrà eliminarlo.")
+        elif what == "riattivato":
+            subject = f"Appartamento riattivato: {apt.name}"
+            lines = [f"L'appartamento «{apt.name}» ({apt.apartment_id}) è stato riattivato il {when}"
+                     f"{' da ' + who if who else ''}.", "Notifiche, riepiloghi, prenotazioni ed export Excel ripartono."]
         else:
             subject = f"Eliminazione avviata: {apt.name}"
             lines = [f"L'eliminazione dell'appartamento «{apt.name}» ({apt.apartment_id}) è stata avviata il {when}"
@@ -209,6 +219,8 @@ async def disable(apt: Apartment, identity) -> Apartment:
     def change(a: Apartment):
         if a.eliminazione is not None:
             raise DeletionRefused(409, "deletion_in_progress", "L'eliminazione di questo appartamento è in corso.")
+        if a.creazione is not None and a.creazione.stato != "pronto":          # review, point 3
+            raise DeletionRefused(409, "creation_not_ready", "La creazione non è finita: usa «Annulla».")
         if not a.enabled and a.disattivato_at:
             raise DeletionRefused(409, "already_disabled", "L'appartamento è già disattivato.")
         a.enabled = False
@@ -237,6 +249,7 @@ async def enable(apt: Apartment, identity) -> Apartment:
     await _person(identity)
     await audit.record("apartment_reenabled", audit.by_platform(identity), saved.tenant_id,
                        audit.apartment_target(saved.apartment_id, saved.name))
+    await notify(saved, "riattivato", identity.display_name or None)          # review, point 1
     return saved
 
 
@@ -256,6 +269,9 @@ def on_admin_enabled(apt: Apartment, wanted: bool, user) -> str | None:
         apt.disattivato_da = Disattivazione(ruolo="amministratore", uid=user.uid)
         return "disabled"
     if not apt.enabled and wanted:
+        if apt.disattivato_da is not None and apt.disattivato_da.ruolo == "gestore":     # review, point 1
+            raise DeletionRefused(409, "disabled_by_platform",
+                                  "L'ha disattivato il gestore della piattaforma: solo lui può riattivarlo.")
         apt.disattivato_at, apt.disattivato_da = None, None
         return "enabled"
     return None
@@ -269,6 +285,7 @@ async def after_admin_switch(saved: Apartment, what: str | None, user) -> None:
     elif what == "enabled":
         await audit.record("apartment_reenabled", audit.by_user(user), saved.tenant_id,
                            audit.apartment_target(saved.apartment_id, saved.name))
+        await notify(saved, "riattivato", getattr(user, "display_name", None) or None)
 
 
 # ---- «Elimina» ---------------------------------------------------------------------------------------------------
@@ -299,29 +316,40 @@ async def start(apt: Apartment, nome, identity) -> tuple[int, dict]:
         raise DeletionRefused(422, "name_mismatch", "Il nome non corrisponde")
     if apt.eliminazione is not None:
         raise DeletionRefused(409, "deletion_in_progress", "L'eliminazione di questo appartamento è in corso.")
-    day = utcnow().strftime("%Y%m%d")
-    if not await get_repository().take_mail_quota([(f"deletions:{apt.tenant_id}:{day}", DAILY_LIMIT)]):
-        raise DeletionRefused(429, "rate_limited", "Oggi sono già state fatte le eliminazioni possibili: riprova domani.",
-                              riprova_dal=_tomorrow())
     if kind == "app" and not agent.configured():
         raise DeletionRefused(503, "agent_not_configured", "L'agente sulla VM non è configurato in questo ambiente")
+    # review, point 4: the deletion is written first, in the apartment's transaction (a double click or two managers:
+    # the second is refused here), and only then the place of the day is taken; without a place it is taken back
+    now = stamp()
+
+    def change(a: Apartment):
+        if a.enabled or a.eliminazione is not None:
+            raise DeletionRefused(409, "deletion_in_progress", "L'eliminazione di questo appartamento è in corso.")
+        a.eliminazione = Eliminazione(iniziata_da=identity.uid, updated_by=identity.uid, iniziata_at=now, updated_at=now,
+                                      passo="motore" if kind == "app" else "database")
+        return a
+    saved = await get_repository().change_apartment(apt.apartment_id, change)
+    if saved is None:
+        raise DeletionRefused(404, "not_found", "Appartamento inesistente")
+    day = utcnow().strftime("%Y%m%d")
+    if not await get_repository().take_mail_quota([(f"deletions:{apt.tenant_id}:{day}", DAILY_LIMIT)]):
+        def undo(a: Apartment):
+            if a.eliminazione is None or a.eliminazione.iniziata_at != now or a.eliminazione.iniziata_da != identity.uid:
+                return None
+            a.eliminazione = None
+            return a
+        await get_repository().change_apartment(apt.apartment_id, undo)
+        raise DeletionRefused(429, "rate_limited", "Oggi sono già state fatte le eliminazioni possibili: riprova domani.",
+                              riprova_dal=_tomorrow())
     await _person(identity)
     target = audit.apartment_target(apt.apartment_id, apt.name)
     if kind != "app":                                # only the record (answer 1210, point 4)
         await audit.record("apartment_deletion_started", audit.by_platform(identity), apt.tenant_id, target,
                            origine=kind)
-        await notify(apt, "eliminazione", identity.display_name or None)
-        await _remove(apt)
+        await notify(saved, "eliminazione", identity.display_name or None)
+        await _remove(saved)
         await audit.record("apartment_deleted", audit.by_platform(identity), apt.tenant_id, target)
         return 200, {"eliminazione": {"stato": "eliminato"}}
-
-    def change(a: Apartment):
-        if a.enabled or a.eliminazione is not None:
-            raise DeletionRefused(409, "deletion_in_progress", "Qualcuno ha appena cambiato questo appartamento.")
-        now = stamp()
-        a.eliminazione = Eliminazione(iniziata_da=identity.uid, updated_by=identity.uid, iniziata_at=now, updated_at=now)
-        return a
-    saved = await get_repository().change_apartment(apt.apartment_id, change)
     await audit.record("apartment_deletion_started", audit.by_platform(identity), apt.tenant_id, target, origine=kind)
     await notify(saved, "eliminazione", identity.display_name or None)
     await _send_togli(saved)                         # AgentError (502) goes up, saved «non_riuscita: non_inviato»
@@ -413,8 +441,9 @@ async def retry(apt: Apartment, version, identity) -> tuple[int, dict]:
         raise DeletionRefused(409, "invalid_state", "Con lo stato di adesso questa azione non si può fare.")
     if version != e.version:
         raise DeletionRefused(409, "version_changed", "Qualcuno ha appena cambiato questa eliminazione: ricarica.")
+    # review, point 6: no order until the new one is saved, so a second «Riprova» meanwhile reads «in corso»
     saved = await _save(apt.apartment_id, expect_version=version, uid=identity.uid, stato="in_corso", codice=None,
-                        op=None if e.passo != "motore" else e.op)
+                        op=None)
     if saved is None:
         raise DeletionRefused(409, "version_changed", "Qualcuno ha appena cambiato questa eliminazione: ricarica.")
     await _person(identity)

@@ -267,6 +267,9 @@ async def _finish_cancel(apartment_id: str) -> None:
     await repo.release_external_id("link", link_key(apt.creazione.porta), apartment_id)
     if apt.external_ids.italianway:
         await repo.release_external_id("italianway", apt.external_ids.italianway, apartment_id)
+    # A6 review, point 7: a lab-/test- apartment may get devices registered before «pronto» (the platform's route of
+    # the credentials, answer 1170), and Firestore does not remove a subcollection with its document
+    await repo.delete_device_credentials(apartment_id)
     await repo.delete_apartment(apartment_id)
     warn("creation cancelled", apartment_id=apartment_id)
 

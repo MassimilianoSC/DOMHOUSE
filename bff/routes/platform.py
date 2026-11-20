@@ -605,7 +605,18 @@ async def relink_tenant_apartment(tenant_id: str, apartment_id: str, body: Apart
     apt.external_ids.italianway = new_code
     if (apt.instance_url, apt.port) != (old_url, old_port):
         apt.energy_since = None     # P-90 S15: another engine, another history: bff/energy_since.py looks for it again
-    saved = await repo.upsert_apartment(apt)
+    linked = {"instance_url": apt.instance_url, "port": apt.port, "simulated": apt.simulated,
+              "energy_since": apt.energy_since}
+
+    def change(cur: Apartment):
+        # A6 review, point 2: only the link's fields on what is stored now (never a whole rewrite of an older read)
+        for k, v in linked.items():
+            setattr(cur, k, v)
+        cur.external_ids.italianway = new_code
+        return cur
+    saved = await repo.change_apartment(apartment_id, change)
+    if saved is None:
+        return err(404, "not_found", "Appartamento inesistente")
     if link_changes:
         await instances.release_link(old_url, old_port, apartment_id)
     if old_code and old_code != new_code:  # the old code is free again
