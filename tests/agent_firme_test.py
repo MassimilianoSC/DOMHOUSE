@@ -47,7 +47,11 @@ lettore = load("lettore")
 
 K_ORD, K_ORD_OLD, K_RIS = b"\x01" * 32, b"\x02" * 32, b"\x03" * 32
 OP = "8b2f6a3e-4c1d-4e5f-9a0b-1c2d3e4f5a6b"
-NOW = datetime(2026, 11, 19, 21, 0, 0, tzinfo=UTC)
+# the real time when the file is read: the server of these tests runs on NOW, but the repository judges an
+# operation's age by the real clock (finish_agent_op); a fixed date passed on 19 November and was «tardi» the day
+# after (CI, 20 November). Whole milliseconds, as the timestamps are written
+_STARTED = datetime.now(UTC)
+NOW = _STARTED.replace(microsecond=_STARTED.microsecond // 1000 * 1000)
 READER_UID = 4242
 
 
