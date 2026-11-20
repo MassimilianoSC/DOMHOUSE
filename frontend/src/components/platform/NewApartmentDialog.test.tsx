@@ -11,9 +11,10 @@ const s = vi.hoisted(() => ({
   appEnv: "staging",
   tenant: vi.fn(),
   createNew: vi.fn(),
+  capacity: vi.fn(),
 }));
 
-vi.mock("@/api/platform", () => ({ platformApi: { tenant: s.tenant, createNew: s.createNew } }));
+vi.mock("@/api/platform", () => ({ platformApi: { tenant: s.tenant, createNew: s.createNew, capacity: s.capacity } }));
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ me: { env: { app_env: s.appEnv, instance_mode: "real" } } }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warning: vi.fn() } }));
 
@@ -48,10 +49,24 @@ beforeEach(() => {
   s.appEnv = "staging";
   s.tenant.mockResolvedValue(quota(2));
   s.createNew.mockResolvedValue(created);
+  s.capacity.mockResolvedValue({ capienza: null, aggiornamento: null, aggiornabile_dal: null });
 });
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+describe("A7: i posti liberi della VM nel modulo (risposta 1201)", () => {
+  it("zero posti: la riga gialla lo dice, ma «Crea» resta acceso (il server ricontrolla)", async () => {
+    s.capacity.mockResolvedValue({
+      capienza: { ambiente: "staging", letta_at: "2026-11-20T14:58:00Z", vecchia: false, posti_liberi: 0, motivo: "staging_pieno", motori_ambiente: 4, massimo_motori: 4, mem_available_mb: 700, tetto_nuovo_mb: 120, somma_tetti_mb: 480, budget_mb: 500 },
+      aggiornamento: null, aggiornabile_dal: null,
+    });
+    await open();
+    expect(await screen.findByTestId("new-apt-capacity")).toHaveAttribute("data-kind", "zero");
+    fill();
+    expect(screen.getByTestId("new-apt-save")).toBeEnabled();
+  });
 });
 
 describe("i campi (§2.1)", () => {

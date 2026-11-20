@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, Input, Label } f
 import { t } from "@/i18n";
 import { freeFromText, newIdProblem, rateLimitOf } from "@/lib/apartmentCreation";
 import { cn, newCorrelationId } from "@/lib/utils";
+import { CapacityLine } from "./CapacityLine";
 
 const NAME_MAX = 80;
 const DEFAULT_LIMIT = 5;
@@ -170,6 +171,8 @@ export function NewApartmentDialog({ tenantId, tenantName, onClose, onCreated }:
         </div>
         <div className="mt-4 space-y-3">
           <LimitBox limit={limit} />
+          {/* A7: the free places of the VM; it informs only, «Crea» does not depend on it (answer 1201) */}
+          <CapacityLine />
           {boxError && (
             <div role="alert" className="space-y-1 rounded-xl border border-negative-border bg-negative-bg px-3 py-2.5 text-sm text-negative-fg" data-testid="new-apt-error">
               <p>{boxError.text}</p>

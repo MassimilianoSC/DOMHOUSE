@@ -24,6 +24,21 @@ describe("gestori della piattaforma: rimozione", () => {
   });
 });
 
+// A7 (bff/API.md «Capienza della VM»): reading the capacity sends no order; «Aggiorna» is a POST without a body.
+describe("capienza della VM", () => {
+  it("GET /app/platform/capienza; «Aggiorna»: POST …/capienza/aggiorna senza corpo, con l'id della richiesta", async () => {
+    await platformApi.capacity();
+    expect(new URL(calls[0].url).pathname).toBe("/app/platform/capienza");
+    expect(calls[0].init.method ?? "GET").toBe("GET");
+    await platformApi.refreshCapacity("corr-7");
+    const { url, init } = calls[1];
+    expect(new URL(url).pathname).toBe("/app/platform/capienza/aggiorna");
+    expect(init.method).toBe("POST");
+    expect(init.body ?? null).toBeNull();
+    expect((init.headers as Record<string, string>)["X-Correlation-Id"]).toBe("corr-7");
+  });
+});
+
 // A2 (docs/proposta-a2.md §2): the routes of the creation from the app, with the correlation id of each action.
 describe("creazione di un appartamento dall'app", () => {
   const last = () => ({ path: new URL(calls[calls.length - 1].url).pathname, init: calls[calls.length - 1].init });
