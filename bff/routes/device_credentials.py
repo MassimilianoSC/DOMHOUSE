@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Body, Depends, Request
 from fastapi.responses import JSONResponse
 
-from .. import agent, audit, device_alarms
+from .. import agent, audit, device_alarms, device_refusals
 from .. import device_credentials as dc
 from ..auth import CurrentUser, Identity, get_tenant_apartment, require_admin, require_platform
 from ..logs import warn
@@ -57,8 +57,9 @@ def _op_view(op: AgentOp | None) -> dict | None:
             "messaggio": agent.MESSAGES.get(codice or "") or agent.STATE_MESSAGES.get(stato, "")}
 
 
-def describe(apartment_id: str, doc: dict, op: AgentOp | None, ultima: int, names: dict, now: datetime) -> dict:
-    """§2.1: never the fingerprint, never an uid or an email."""
+def describe(apartment_id: str, doc: dict, op: AgentOp | None, ultima: int, names: dict, now: datetime,
+             refusals: dict | None = None) -> dict:
+    """§2.1: never the fingerprint, never an uid or an email. A5: «rifiuti», null when not known."""
     state = dc.state_of(doc, op, ultima, now)
     device = doc["device_id"]
     return {"device_id": device, "name": None, "stato": state, "version": doc.get("version"),
@@ -66,7 +67,8 @@ def describe(apartment_id: str, doc: dict, op: AgentOp | None, ultima: int, name
             "azione": dc.shown_action(doc, state), "engine_device_id": None, "op": _op_view(op),
             "connection": {"server": agent.get_settings().device_broker_address or None, "ssl_ca": "ca.pem",
                            "client_id": f"{apartment_id}.{device}", "user": f"{apartment_id}.{device}",
-                           "topic_prefix": f"{apartment_id}/{device}"}}
+                           "topic_prefix": f"{apartment_id}/{device}"},
+            "rifiuti": device_refusals.view_of(refusals, device)}
 
 
 async def _names(uids) -> dict:
@@ -79,7 +81,8 @@ async def _names(uids) -> dict:
 async def _listing(apartment_id: str) -> dict:
     docs, ultima, ops = await get_repository().device_credentials_view(apartment_id)
     names, now = await _names(d.get("updated_by") for d in docs), datetime.now(UTC)
-    return {"items": [describe(apartment_id, d, ops.get(d.get("op_id")), ultima, names, now) for d in docs]}
+    refusals = await device_refusals.for_apartment(apartment_id)
+    return {"items": [describe(apartment_id, d, ops.get(d.get("op_id")), ultima, names, now, refusals) for d in docs]}
 
 
 # ---- one action -----------------------------------------------------------------------------------------------------
@@ -133,7 +136,8 @@ async def _act(action: str, apt, device_id, version, uid: str, who) -> JSONRespo
         names = await _names([uid])
     except Exception:                                            # noqa: BLE001 - a name is not worth the password
         names = {}
-    credential = describe(apt.apartment_id, doc, op, 0, names, datetime.now(UTC))
+    credential = describe(apt.apartment_id, doc, op, 0, names, datetime.now(UTC),
+                          device_refusals.cached(apt.apartment_id))    # A5: the copy, never a read here
     if failed is not None and password is None:
         if action == "revoca":                   # N2: a revocation not applied, also from here
             try:

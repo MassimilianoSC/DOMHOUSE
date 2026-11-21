@@ -36,7 +36,9 @@ ONLY_STAGING = {"INSTANCE_ALLOWED",      # D04 (P-83): the engines staging may r
                 "AGENT_AMBIENTE", "AGENT_ORDERS_TOPIC", "AGENT_PUSH_AUDIENCE", "AGENT_PUSH_EMAIL",
                 "AGENT_PUSH_SUBSCRIPTION",
                 # tool A, A3 (Q3.1): the two keys of the signatures and the broker's address of the devices
-                "AGENT_ORDINI_KEY", "AGENT_RISULTATI_KEY", "DEVICE_BROKER_ADDRESS"}
+                "AGENT_ORDINI_KEY", "AGENT_RISULTATI_KEY", "DEVICE_BROKER_ADDRESS",
+                # tool A, A5: the log view of the refused logins (production: with the second VM, answer 1210 point 6)
+                "DEVICE_REFUSALS_VIEW"}
 
 
 def test_same_variables_and_secrets():
@@ -146,3 +148,12 @@ def test_a3_staging_reads_the_two_keys_from_their_secrets_and_knows_the_brokers_
     assert staging["AGENT_RISULTATI_KEY"] == "secret:domhouse-agent-risultati-staging"
     assert staging["DEVICE_BROKER_ADDRESS"] == "mqtt.dh-lab.eu:8883"
     assert not {"AGENT_ORDINI_KEY", "AGENT_RISULTATI_KEY", "DEVICE_BROKER_ADDRESS"} & set(prod)
+
+
+def test_a5_staging_reads_the_refusals_from_its_log_view_only():
+    """A5 (docs/proposta-a5.md §2 steps 3-4): the full name of the view, the one the server's permission names; not in
+    production until the second VM (answer 1210, point 6)."""
+    staging, prod = env(STAGING), env(PROD)
+    assert staging["DEVICE_REFUSALS_VIEW"] == ("projects/your-gcp-project-id/locations/global/buckets/domhouse-rifiuti/"
+                                               "views/_AllLogs")
+    assert "DEVICE_REFUSALS_VIEW" not in prod

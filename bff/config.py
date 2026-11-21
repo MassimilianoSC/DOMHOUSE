@@ -91,6 +91,9 @@ class Settings:
     # A3 §2.1: the broker's address the devices use (staging mqtt.dh-lab.eu:8883); empty in production until the second
     # VM: then «Registra» and «Rigenera» answer 503 broker_address_missing and the list shows server null
     device_broker_address: str = ""
+    # A5: the full name of the view of the bucket with only the lines «broker device refused» (projects/<p>/locations/
+    # global/buckets/domhouse-rifiuti/views/_AllLogs); empty (production until the second VM): «rifiuti» is null
+    device_refusals_view: str = ""
 
     @property
     def mail_configured(self) -> bool:
@@ -138,6 +141,7 @@ def get_settings() -> Settings:
         agent_risultati_key=e("AGENT_RISULTATI_KEY", "").strip(),
         agent_risultati_key_prev=e("AGENT_RISULTATI_KEY_PREV", "").strip(),
         device_broker_address=e("DEVICE_BROKER_ADDRESS", "").strip(),
+        device_refusals_view=e("DEVICE_REFUSALS_VIEW", "").strip(),
         italianway_webhook_secret=e("ITALIANWAY_WEBHOOK_SECRET", ""),
         italianway_signature_header=e("ITALIANWAY_SIGNATURE_HEADER", "X-Signature"),
         port=int(e("PORT", "8000")),

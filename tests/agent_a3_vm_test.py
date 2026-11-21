@@ -239,3 +239,70 @@ def test_review_3_connector_is_refused_in_the_orders_checks():
     with pytest.raises(comune.Refused) as e:
         comune.check_order(order(devices=[{"id": "connector", "impronta": H1}]), "staging")
     assert e.value.code == "id_non_valido"
+
+
+# ---- answer 1211 (second reading of A5, new point 1): the revoked devices stay named for 24 hours -------------------
+def _revoked(vm, apartment="lab-07"):
+    path = vm.broker_etc / "devices" / f"{apartment}.revocati"
+    if not path.exists():
+        return None
+    return {line.split()[0]: int(line.split()[1]) for line in path.read_text(encoding="utf-8").splitlines()}
+
+
+def test_1211_a_device_taken_out_is_kept_with_its_time_next_to_the_list(vm):
+    import time
+    two = [{"id": "shelly-1", "impronta": H1}, {"id": "shelly-2", "impronta": H2}]
+    assert vm.send(order(seq=1, devices=two))["codice"] == "ok"
+    assert _revoked(vm) is None                                   # nothing taken out yet
+    before = int(time.time())
+    assert vm.send(order(seq=2, devices=two[:1]))["codice"] == "ok"
+    kept = _revoked(vm)
+    assert list(kept) == ["shelly-2"] and before - 1 <= kept["shelly-2"] <= int(time.time()) + 1
+    text = (vm.broker_etc / "devices" / "lab-07.revocati").read_text(encoding="utf-8")
+    assert H1 not in text and H2 not in text                      # ids and times only, never a fingerprint
+    if sys.platform.startswith("linux"):
+        assert (vm.broker_etc / "devices" / "lab-07.revocati").stat().st_mode & 0o777 == 0o600
+
+
+def test_1211_a_device_registered_again_leaves_the_list(vm):
+    two = [{"id": "shelly-1", "impronta": H1}, {"id": "shelly-2", "impronta": H2}]
+    vm.send(order(seq=1, devices=two))
+    vm.send(order(seq=2, devices=[]))
+    assert sorted(_revoked(vm)) == ["shelly-1", "shelly-2"]
+    assert vm.send(order(seq=3, devices=two[1:]))["codice"] == "ok"
+    assert sorted(_revoked(vm)) == ["shelly-1"]
+    assert vm.send(order(seq=4, devices=two))["codice"] == "ok"
+    assert not _revoked(vm)                                       # empty: the file goes
+
+
+def test_1211_after_24_hours_an_id_leaves_the_list_and_bad_lines_are_dropped(vm):
+    import time
+    now = int(time.time())
+    folder = vm.broker_etc / "devices"
+    folder.mkdir(mode=0o700)
+    (folder / "lab-07").write_text(f"shelly-1 {H1}\n", encoding="utf-8")
+    (folder / "lab-07.revocati").write_text(f"old-1 {now - 24 * 3600 - 60}\nfresh-1 {now - 3600}\nnot a line\n"
+                                            f"Bad {now}\nx {now + 86400 * 10}\n", encoding="utf-8")
+    assert vm.send(order(seq=1, devices=[{"id": "shelly-1", "impronta": H1}]))["codice"] == "ok"
+    assert _revoked(vm) == {"fresh-1": now - 3600}
+
+
+def test_1211_a_list_that_cannot_be_read_stops_the_order_before_the_devices_change(vm):
+    folder = vm.broker_etc / "devices"
+    folder.mkdir(mode=0o700)
+    (folder / "lab-07").write_text(f"shelly-1 {H1}\n", encoding="utf-8")
+    (folder / "lab-07.revocati").mkdir()                          # not a file: neither readable nor replaceable
+    out = vm.send(order(seq=1, devices=[]))
+    assert (out["esito"], out["codice"]) == ("fallito", "errore_interno")
+    assert (folder / "lab-07").read_text(encoding="utf-8") == f"shelly-1 {H1}\n" and vm.runs == []
+
+
+def test_1211_a_refused_order_writes_no_list(vm):
+    """Third reading of A5, point 10: refused before anything (apartment unknown, lab-01 not migrated): no .revocati."""
+    folder = vm.broker_etc / "devices"
+    folder.mkdir(mode=0o700)
+    for apartment in ("lab-99", "lab-01"):
+        (folder / apartment).write_text(f"shelly-1 {H1}\n", encoding="utf-8")
+    assert vm.send(order(apartment="lab-99", seq=1, devices=[]))["codice"] == "appartamento_sconosciuto"
+    assert vm.send(order(apartment="lab-01", seq=1, devices=[]))["codice"] == "migrazione_non_fatta"
+    assert sorted(p.name for p in folder.iterdir()) == ["lab-01", "lab-99"] and vm.runs == []
