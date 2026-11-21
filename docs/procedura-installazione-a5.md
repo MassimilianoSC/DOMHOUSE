@@ -37,7 +37,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
   1. l'ultimo commit di `main`, «A5 è in main, su GitHub» e «procedura uguale a quella su GitHub» (seconda lettura, punto 3: si segue la versione corretta della procedura, non una copia vecchia). Se dopo questa procedura arriva una correzione del codice, la memoria storica mette qui il suo commit;
   2. `active`;
   3. «broker ok cert_days=…» e «broker started_at=…»;
-  4. l'elenco degli appartamenti del broker (`dev`, `lab-01` e quelli creati con A2);
+  4. l'elenco degli appartamenti del broker: `lab-01` e quelli creati con A2 (oggi `test-a2-02`); `dev` non c'è, perché non ha un account nel broker;
   5. il programma `awk` della VM (per esempio `/usr/bin/mawk` o `/usr/bin/gawk`): lo script è scritto per tutti e due (niente intervalli, niente `mktime`, gli elenchi passati come variabili: revisione, punto 6);
   6. due righe che cominciano con un'ora come `2026-11-…T…Z`: **da verificare**, è la forma che lo script legge.
 
