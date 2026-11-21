@@ -141,7 +141,7 @@ def test_setup_renders_a_valid_log_policy():
     import json
     import os
 
-    bash = shutil.which("bash")
+    bash = _runner().git_bash()      # never WSL's bash in System32 (full run of 21 November, from cmd)
     if not bash:
         pytest.skip("bash non disponibile")
     env = {**os.environ, "RENDER_ONLY": "projects/prova/notificationChannels/7", "GCP_PROJECT_ID": "prova", "EMAIL": "a@b.it"}
@@ -158,7 +158,7 @@ def test_setup_renders_the_alert_on_cloud_runs_429():
     import json
     import os
 
-    bash = shutil.which("bash")
+    bash = _runner().git_bash()      # never WSL's bash in System32 (full run of 21 November, from cmd)
     if not bash:
         pytest.skip("bash non disponibile")
     env = {**os.environ, "RENDER_ONLY_PLATFORM": "projects/prova/notificationChannels/7", "GCP_PROJECT_ID": "prova",
