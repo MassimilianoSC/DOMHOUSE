@@ -462,3 +462,31 @@ def test_second_reading_a_hand_linked_apartment_never_loses_its_secrets(world, m
     assert r.status_code == 200 and r.json()["eliminazione"]["stato"] == "eliminato", r.text
     assert "lab-a2-m1" not in repo.apartments
     assert all(state == "ENABLED" for _, state in world.secrets.versions[key] + world.secrets.versions[conn])
+
+
+# ---- the full run of 21 November: what the HTTP suites can no longer reach (they cannot wait 7 days) ---------------
+def test_full_run_a_deleted_apartment_leaves_the_lists_but_never_opens_all(world, mails):
+    """From backend_phase3_test (the old «deleted apartment leaves the lists but never opens all») and
+    backend_platform_test (the id never used again, the log entry), now through «Disattiva» and «Elimina»."""
+    import uuid
+    apt = "lab-a2-m3"
+    hand_linked(apt)
+    uids = []
+    for lists in ([apt], [apt, "apt-rimini-01"]):
+        r = call("POST", "/app/admin/users", headers=ADMIN,
+                 json={"email": f"liste-{uuid.uuid4().hex[:8]}@demo.it", "role": "operator", "apartment_ids": lists})
+        assert r.status_code == 201, r.text
+        uids.append(r.json()["uid"])
+    assert disattiva(apt).status_code == 200
+    later(world, days=7, seconds=1)
+    r = elimina(apt)
+    assert r.status_code == 200 and r.json()["eliminazione"]["stato"] == "eliminato", r.text
+    by_uid = {u["uid"]: u["apartment_ids"] for u in call("GET", "/app/admin/users", headers=ADMIN).json()}
+    assert by_uid[uids[0]] == []                                  # emptied, NOT "all"
+    assert by_uid[uids[1]] == ["apt-rimini-01"]
+    r = call("POST", BASE, json={"apartment_id": apt, "name": "Di nuovo", "instance_url": "mock://builtin"})
+    assert r.status_code == 409 and r.json()["message"] == "Identificativo non disponibile"      # D-67
+    items = call("GET", f"/app/platform/audit?tenant_id={DEMO_TENANT}&limit=50").json()["items"]
+    deleted = next(i for i in items if i["action"] == "apartment_deleted" and i["target"]["id"] == apt)
+    assert deleted["target"] == {"type": "apartment", "id": apt, "label": f"Prova {apt}", "removed": False, "role": None}
+    assert deleted["actor"]["kind"] == "platform"
