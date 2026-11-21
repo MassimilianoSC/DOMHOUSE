@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A6 e l'unione del ramo `o1-a6-eliminazione` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `95e22b9` (ramo `o1-a6-eliminazione`, con le correzioni delle due letture della revisione di sicurezza); G0 controlla `95e22b9` (codice e procedura con le correzioni delle due letture) e confronta il testo con quello su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | G0–G5, R1–R6 |
+| **G0–G2 eseguiti il 21 novembre 2026** (registro); **G3 dal 28 novembre 2026, 12:53** (`test-a2-02` «Eliminabile dal …»). Prima: **da rileggere**; si usa solo **dopo** la revisione di sicurezza di A6 e l'unione del ramo `o1-a6-eliminazione` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `95e22b9` (ramo `o1-a6-eliminazione`, con le correzioni delle due letture della revisione di sicurezza); G0 controlla `95e22b9` (codice e procedura con le correzioni delle due letture) e confronta il testo con quello su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | G0–G5, R1–R6 |
 
 **Cosa si installa** (`docs/proposta-a6.md`, risposte 1210: §8 punti 2–8 come proposti, punto 1 provvisorio):
 

@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A5 e l'unione del ramo `o1-a5-rifiuti` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `1db9b82` (ramo `o1-a5-rifiuti`, con le correzioni delle due letture della revisione di sicurezza e i revocati per 24 ore, risposta 1211); la procedura stessa si controlla in E0 confrontandola con quella su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | E0–E6 |
+| **Eseguita il 21 novembre 2026, E0–E7 tutti superati** (registro). Prima: **da rileggere**; si usa solo **dopo** la revisione di sicurezza di A5 e l'unione del ramo `o1-a5-rifiuti` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `1db9b82` (ramo `o1-a5-rifiuti`, con le correzioni delle due letture della revisione di sicurezza e i revocati per 24 ore, risposta 1211); la procedura stessa si controlla in E0 confrontandola con quella su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | E0–E6 |
 
 **Cosa si installa** (`docs/proposta-a5.md`, risposte 1210, §6 punti 1–6):
 
@@ -159,11 +159,11 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud logging read 'jsonPayload.message:"broker device refused apt=test-a2-02 "' --view=projects/domotica-poc-511707/locations/global/buckets/domhouse-rifiuti/views/_AllLogs --freshness=1h --limit=4 --format="value(jsonPayload.message)" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud logging read 'jsonPayload.message:"broker device refused apt=test-a2-02 "' --bucket=domhouse-rifiuti --location=global --view=_AllLogs --freshness=1h --limit=4 --format="value(jsonPayload.message)" --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
 ```
 
 - **Atteso:** fino a quattro righe «… broker device refused apt=test-a2-02 device=prova-a5 slot=… count=3 last=…»; la stessa finestra compare **due volte** (due giri del controllo): il server la conta una volta sola.
-- **Da verificare:** l'opzione `--view` di `gcloud logging read` (altrimenti `--bucket=domhouse-rifiuti --location=global`).
+- Verificato il 21 novembre: `--view` da sola dà «argument --bucket --location: Must be specified»; la forma giusta è quella del comando sopra.
 - Poi E7: la revoca di `prova-a5` serve anche da prova dei revocati.
 
 ## E7. La prova: un dispositivo revocato che prova ancora compare (risposta 1211)

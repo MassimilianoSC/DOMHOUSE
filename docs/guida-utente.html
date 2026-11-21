@@ -2599,6 +2599,31 @@ tocco.</p>
 <p><strong>Le operazioni</strong> rispondono «Appartamento disattivato».</p>
 </li>
 <li>
+<p><strong>Nello staging, dal 21 novembre 2026</strong> (in produzione con la prossima pubblicazione):</p>
+<ul>
+<li>
+<p>la conferma aggiunge «Gli amministratori dell&#x27;organizzazione e i gestori della piattaforma ricevono
+un&#x27;email.»;</p>
+</li>
+<li>
+<p>spento, sotto l&#x27;indirizzo compare «Disattivato il 18 nov 2026, 18:22 da Giulia Rossi (gestore della
+piattaforma)», oppure «… da Marco Bianchi (amministratore)»; uno spento prima di quella data non ha la riga;</p>
+</li>
+<li>
+<p>lo stato è uno solo: se lo spegne l&#x27;amministratore, il gestore della piattaforma lo vede spento e può
+riattivarlo;</p>
+</li>
+<li>
+<p><strong>spento dal gestore della piattaforma, solo il gestore lo riaccende</strong>: «Attivo» resta spento e non si può
+toccare, con «L&#x27;ha disattivato il gestore della piattaforma: solo lui può riattivarlo.»; in «Modifica» si
+salvano comunque nome, indirizzo e prezzo;</p>
+</li>
+<li>
+<p>eliminare può solo il gestore della piattaforma, 7 giorni dopo lo spegnimento (parte 7).</p>
+</li>
+</ul>
+</li>
+<li>
 <p><strong>Non spegne</strong> i dispositivi né gli automatismi del sistema domotico: caldaia, clima e regole continuano.</p>
 </li>
 <li>
@@ -3002,6 +3027,63 @@ modifica: … · nome».</p>
 <tr><td data-label="Azione" class="align-left">«Riprova»</td><td data-label="Quando usarla" class="align-left">Lo stato è «Non applicato»</td></tr>
 <tr><td data-label="Azione" class="align-left">«Registra di nuovo»</td><td data-label="Quando usarla" class="align-left">Nella sezione «Revocati», per uno Shelly rimontato</td></tr>
 </tbody></table></div>
+<p><strong>Gli accessi rifiutati (dal 21 novembre 2026):</strong></p>
+<ul>
+<li>
+<p><strong>Dove:</strong> sotto lo stato di ogni dispositivo.</p>
+</li>
+<li>
+<p><strong>Cosa vuol dire:</strong> lo Shelly ha provato a collegarsi con un utente o una password che il sistema domotico non
+accetta.</p>
+</li>
+</ul>
+<ol>
+<li>
+<p>Guarda la riga sotto lo stato: quanti tentativi rifiutati nelle ultime 24 ore e l&#x27;ora dell&#x27;ultimo.</p>
+</li>
+<li>
+<p>Se il riquadro è giallo, segui «Cosa fare».</p>
+</li>
+<li>
+<p>Apri «Dati di collegamento» e controlla che l&#x27;utente nello Shelly sia uguale.</p>
+</li>
+<li>
+<p>La password non si può rivedere: se non l&#x27;hai più, «Rigenera» nel menu «⋯» e scrivi la nuova nello Shelly.</p>
+</li>
+<li>
+<p>Dopo la correzione la riga diventa grigia: i tentativi vecchi restano contati per 24 ore.</p>
+</li>
+</ol>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Quando</th><th scope="col" class="align-left">Cosa fai</th></tr></thead>
+<tbody>
+<tr><td data-label="Cosa vedi" class="align-left">Riquadro giallo «Accessi rifiutati nelle ultime 24 ore: 12, l&#x27;ultimo alle 17:57.» con «Cosa fare»</td><td data-label="Quando" class="align-left">Tentativi dopo l&#x27;ultima modifica del dispositivo</td><td data-label="Cosa fai" class="align-left">Controlla utente e password nello Shelly (punti 3 e 4)</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">Riga grigia «… Tutti prima dell&#x27;ultima modifica: se lo Shelly ha i dati nuovi, non serve fare niente.»</td><td data-label="Quando" class="align-left">Tutti i tentativi sono di prima dell&#x27;ultima modifica, per esempio di prima di una «Rigenera»</td><td data-label="Cosa fai" class="align-left">Niente, se lo Shelly ha i dati nuovi</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">Riga grigia «… Lo Shelly prova ancora a collegarsi: spegnilo, oppure «Registra di nuovo».»</td><td data-label="Quando" class="align-left">Dispositivo revocato nelle ultime 24 ore che prova ancora</td><td data-label="Cosa fai" class="align-left">Spegni lo Shelly, oppure «Registra di nuovo» se va rimontato</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">Riga grigia con il solo numero</td><td data-label="Quando" class="align-left">Revoca in corso</td><td data-label="Cosa fai" class="align-left">Niente</td></tr>
+<tr><td data-label="Cosa vedi" class="align-left">Nessuna riga</td><td data-label="Quando" class="align-left">Nessun tentativo rifiutato, o il dato non è disponibile</td><td data-label="Cosa fai" class="align-left">Niente</td></tr>
+</tbody></table></div>
+<ul>
+<li>
+<p><strong>Con un solo tentativo:</strong> «Un accesso rifiutato nelle ultime 24 ore, alle {ora}.»; se l&#x27;ultimo è di un altro
+giorno: «… l&#x27;ultimo il {gg/mm} alle {ora}.».</p>
+</li>
+<li>
+<p><strong>Ritardo:</strong> un tentativo compare entro circa 10 minuti (di solito prima); le ore sono quelle di Roma.</p>
+</li>
+<li>
+<p><strong>Un revocato</strong> è nominato solo per 24 ore dalla revoca; dopo, i suoi tentativi non compaiono più.</p>
+</li>
+<li>
+<p><strong>Mai</strong> indirizzo IP né password tentata: solo il numero e l&#x27;ora.</p>
+</li>
+<li>
+<p><strong>I tentativi con un nome che non è di nessun dispositivo</strong> non compaiono in nessuna pagina.</p>
+</li>
+<li>
+<p><strong>«Stato dei dispositivi»</strong> non li mostra ancora: arriverà con il catalogo dei dispositivi (A4).</p>
+</li>
+</ul>
 <blockquote class="note-info">
 <p><strong>Da sapere</strong></p>
 <ul>
@@ -3336,8 +3418,8 @@ sistema domotico in più.»: premi «Annulla creazione».</p>
 </tbody></table></div>
 <ul>
 <li>
-<p><strong>Un appartamento creato dall&#x27;app</strong> non ha «Modifica collegamento» né «Elimina»: l&#x27;eliminazione arriverà più
-avanti (A6).</p>
+<p><strong>Un appartamento creato dall&#x27;app</strong> non ha «Modifica collegamento». Si elimina come gli altri: «Disattiva», 7
+giorni, «Elimina» (qui sotto, «verifica ed eliminazione»).</p>
 </li>
 <li>
 <p><strong>«Non creato»</strong> tiene riservati id e porta finché non premi «Riprova» o «Annulla creazione».</p>
@@ -3372,7 +3454,8 @@ potrà più usare; le chiavi si recuperano per 7 giorni.</p>
 <p><strong>In grigio</strong>: collegamento, porta, fuso e codice Italianway; poi «Ultima verifica».</p>
 </li>
 <li>
-<p><strong>I pulsanti</strong> «Modifica collegamento» e «Verifica connessione» hanno il contorno; «Elimina» è rosso.</p>
+<p><strong>I pulsanti</strong> «Modifica collegamento», «Verifica connessione», «Disattiva» e «Riattiva» hanno il contorno;
+«Elimina» è rosso e, nello staging, c&#x27;è solo per un appartamento disattivato.</p>
 </li>
 <li>
 <p><strong>Senza appartamenti</strong> leggi «Nessun appartamento in questa organizzazione».</p>
@@ -3503,16 +3586,136 @@ mock://builtin?variante=occupato».</p>
 crea il segreto …», «Chiave del sistema domotico non leggibile dal server: manca il permesso su …».</p>
 </li>
 </ul>
-<p><strong>«Elimina»:</strong></p>
+<p><strong>Eliminare un appartamento (nello staging dal 21 novembre 2026):</strong></p>
+<ol>
+<li>
+<p>Premi «Disattiva» nella riga dell&#x27;appartamento.</p>
+</li>
+<li>
+<p>Leggi la finestra e premi «Disattiva».</p>
+</li>
+<li>
+<p>Aspetta 7 giorni: la riga dice da quando si potrà eliminare.</p>
+</li>
+<li>
+<p>Premi «Elimina» (rosso).</p>
+</li>
+<li>
+<p>Leggi cosa si perde e cosa resta.</p>
+</li>
+<li>
+<p>Scrivi il nome dell&#x27;appartamento, maiuscole comprese.</p>
+</li>
+<li>
+<p>Premi «Elimina»: l&#x27;eliminazione parte.</p>
+</li>
+</ol>
+<p><strong>La finestra di «Disattiva»:</strong></p>
 <ul>
 <li>
-<p><strong>Chiede</strong> «Eliminare l&#x27;appartamento … («…») dell&#x27;organizzazione …? Sparirà per tutti i suoi utenti. Il suo
-sistema domotico non viene toccato.».</p>
+<p>«Disattivare «{nome}»?»</p>
 </li>
 <li>
-<p><strong>Mostra</strong> «Appartamento … eliminato». L&#x27;identificativo non si può riusare.</p>
+<p>«Gli automatismi del sistema domotico continuano. Si fermano notifiche (anche le gravi, come «sistema domotico
+non raggiungibile»), riepilogo del lunedì, prenotazioni da Italianway ed export Excel; le prenotazioni arrivate
+nel frattempo non si recuperano alla riattivazione.»</p>
+</li>
+<li>
+<p>«Dopo 7 giorni da disattivato si potrà eliminare.»</p>
+</li>
+<li>
+<p>«Gli amministratori dell&#x27;organizzazione e i gestori della piattaforma ricevono un&#x27;email.»</p>
 </li>
 </ul>
+<p><strong>La finestra di «Elimina»:</strong></p>
+<ul>
+<li>
+<p>«Eliminare «{nome}»?» con sotto «ID {id} · organizzazione {organizzazione}».</p>
+</li>
+<li>
+<p><strong>Creato dall&#x27;app:</strong> «Si perdono il sistema domotico con i suoi dati e le credenziali dei dispositivi;
+l&#x27;appartamento sparisce dall&#x27;app per tutti i suoi utenti.» e «Restano prenotazioni e riepiloghi per 12 mesi e il
+registro attività per 24 mesi. Lo storico del sistema domotico si può recuperare per 30 giorni, con l&#x27;aiuto del
+supporto.»</p>
+</li>
+<li>
+<p><strong>Collegato a mano o dimostrativo:</strong> «L&#x27;appartamento sparisce dall&#x27;app per tutti i suoi utenti.» e «Restano
+prenotazioni e riepiloghi per 12 mesi e il registro attività per 24 mesi.»</p>
+</li>
+<li>
+<p><strong>Collegato a mano a un sistema vero</strong> (come <code>lab-01</code>), in giallo: «Il sistema domotico sulla macchina virtuale
+resta: va tolto a mano dal supporto.»</p>
+</li>
+<li>
+<p>«L&#x27;ID {id} non si potrà più usare.» e la frase dell&#x27;email.</p>
+</li>
+<li>
+<p>Il campo «Scrivi il nome dell&#x27;appartamento per confermare», con sotto «Il nome è «{nome}», maiuscole comprese.»:
+«Elimina» si accende solo con il nome esatto.</p>
+</li>
+</ul>
+<p><strong>Gli stati nella riga:</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Stato</th><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa fai</th></tr></thead>
+<tbody>
+<tr><td data-label="Stato" class="align-left">Attivo</td><td data-label="Cosa vedi" class="align-left">«Disattiva»</td><td data-label="Cosa fai" class="align-left">«Disattiva» per cominciare</td></tr>
+<tr><td data-label="Stato" class="align-left">Disattivato, meno di 7 giorni</td><td data-label="Cosa vedi" class="align-left">Badge «disattivato»; «Disattivato il 18 nov 2026, 18:17 da Marco Bianchi (amministratore) · Si potrà eliminare dal 25 nov 2026, 18:17.»; «Elimina» spento</td><td data-label="Cosa fai" class="align-left">Aspetta, oppure «Riattiva»</td></tr>
+<tr><td data-label="Stato" class="align-left">Disattivato da 7 giorni</td><td data-label="Cosa vedi" class="align-left">Badge «disattivato»; «Disattivato il … da …»; «Elimina» acceso</td><td data-label="Cosa fai" class="align-left">«Elimina», oppure «Riattiva»</td></tr>
+<tr><td data-label="Stato" class="align-left">Spento prima del 21 novembre</td><td data-label="Cosa vedi" class="align-left">«Spento senza data: «Disattiva» fa partire i 7 giorni dopo i quali si può eliminare.»; «Elimina» spento</td><td data-label="Cosa fai" class="align-left">«Disattiva» per far partire i 7 giorni</td></tr>
+<tr><td data-label="Stato" class="align-left">Eliminazione in corso</td><td data-label="Cosa vedi" class="align-left">I 3 passi: sistema domotico, chiavi, dati dell&#x27;app; «Puoi chiudere la pagina: l&#x27;eliminazione continua.»; «Avviata il … da …»</td><td data-label="Cosa fai" class="align-left">Niente: alla fine leggi «{nome} eliminato.»</td></tr>
+<tr><td data-label="Stato" class="align-left">Eliminazione non riuscita</td><td data-label="Cosa vedi" class="align-left">Riga rossa in cima, con «Cosa è successo», il passo, l&#x27;ultimo tentativo e l&#x27;«ID richiesta»</td><td data-label="Cosa fai" class="align-left">«Riprova»</td></tr>
+</tbody></table></div>
+<ul>
+<li>
+<p><strong><code>dev</code></strong> non ha mai «Elimina».</p>
+</li>
+<li>
+<p><strong>Collegato a mano o dimostrativo:</strong> «Elimina» toglie solo l&#x27;appartamento dall&#x27;app, subito.</p>
+</li>
+<li>
+<p><strong>Disattivato dall&#x27;amministratore</strong> con «Attivo»: è lo stesso stato, e i 7 giorni contano da lì.</p>
+</li>
+<li>
+<p><strong>«Riattiva»</strong> non chiede conferma; dopo una nuova disattivazione i 7 giorni ripartono da zero.</p>
+</li>
+<li>
+<p><strong>Un appartamento creato dall&#x27;app e non ancora «Pronto»</strong> non si elimina: si usa «Annulla creazione».</p>
+</li>
+</ul>
+<p><strong>Messaggi di «Cosa è successo»:</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Messaggio</th><th scope="col" class="align-left">Cosa fare</th></tr></thead>
+<tbody>
+<tr><td data-label="Messaggio" class="align-left">«Il sistema domotico è stato tolto, ma le chiavi no: «Riprova».»</td><td data-label="Cosa fare" class="align-left">«Riprova»</td></tr>
+<tr><td data-label="Messaggio" class="align-left">«L&#x27;ordine non è partito verso la macchina virtuale: «Riprova».»</td><td data-label="Cosa fare" class="align-left">«Riprova»</td></tr>
+<tr><td data-label="Messaggio" class="align-left">«Nessuna risposta dalla macchina virtuale in 20 minuti: «Riprova».»</td><td data-label="Cosa fare" class="align-left">«Riprova»</td></tr>
+<tr><td data-label="Messaggio" class="align-left">«Errore interno del server: «Riprova», e se succede ancora serve un controllo (ID richiesta).»</td><td data-label="Cosa fare" class="align-left">«Riprova»; se si ripete, l&#x27;ID richiesta all&#x27;assistenza</td></tr>
+<tr><td data-label="Messaggio" class="align-left">«Il sistema domotico sulla macchina virtuale non risulta creato dall&#x27;app: serve il supporto (ID richiesta).»</td><td data-label="Cosa fare" class="align-left">L&#x27;ID richiesta all&#x27;assistenza</td></tr>
+<tr><td data-label="Messaggio" class="align-left">«L&#x27;eliminazione si è fermata prima della fine: «Riprova».»</td><td data-label="Cosa fare" class="align-left">«Riprova»</td></tr>
+</tbody></table></div>
+<p><strong>Messaggi della finestra «Elimina»:</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">Messaggio</th><th scope="col" class="align-left">Cosa vuol dire</th></tr></thead>
+<tbody>
+<tr><td data-label="Messaggio" class="align-left">«Il nome non corrisponde»</td><td data-label="Cosa vuol dire" class="align-left">Il nome scritto non è quello salvato</td></tr>
+<tr><td data-label="Messaggio" class="align-left">«Non ancora: si potrà eliminare dal {data, ora}.»</td><td data-label="Cosa vuol dire" class="align-left">Non sono passati 7 giorni</td></tr>
+<tr><td data-label="Messaggio" class="align-left">«Limite raggiunto: si possono eliminare al massimo 2 appartamenti al giorno per ogni organizzazione. …»</td><td data-label="Cosa vuol dire" class="align-left">Limite di sicurezza: 2 al giorno per organizzazione</td></tr>
+<tr><td data-label="Messaggio" class="align-left">Un altro messaggio con l&#x27;«ID richiesta»</td><td data-label="Cosa vuol dire" class="align-left">Da girare all&#x27;assistenza</td></tr>
+</tbody></table></div>
+<ul>
+<li>
+<p><strong>Avvisi verdi:</strong> «{nome} disattivato.», «{nome} riattivato.», «Eliminazione di {nome} avviata: ci vogliono
+alcuni minuti.», «{nome} eliminato.»</p>
+</li>
+<li>
+<p><strong>Nel registro attività:</strong> «ha disattivato l&#x27;appartamento», «ha riattivato l&#x27;appartamento», «ha avviato
+l&#x27;eliminazione dell&#x27;appartamento», «ha eliminato l&#x27;appartamento»; una riga del «Sistema» per ogni passo fermo
+(«Eliminazione dell&#x27;appartamento «…» non riuscita al passo «…»: serve «Riprova».»).</p>
+</li>
+</ul>
+<p><strong>In produzione, fino alla prossima pubblicazione,</strong> vale ancora il vecchio «Elimina»: chiede «Eliminare
+l&#x27;appartamento … («…») dell&#x27;organizzazione …? Sparirà per tutti i suoi utenti. Il suo sistema domotico non viene
+toccato.» e mostra «Appartamento … eliminato». L&#x27;identificativo non si può riusare.</p>
 <p><strong>«Prova l&#x27;agente»</strong> (solo per gli appartamenti di prova: «lab-…», «test-…» e «dev»):</p>
 <ul>
 <li>
@@ -3631,6 +3834,8 @@ semplici (D-182).»</p>
 <p><strong>Il tetto</strong> non si cambia dall&#x27;app.</p>
 </li>
 </ul>
+<p><strong>Disattivazione ed eliminazione</strong> (nello staging dal 21 novembre 2026): un&#x27;email a ogni disattivazione, anche
+fatta dall&#x27;amministratore con «Attivo», e all&#x27;inizio di ogni eliminazione.</p>
 <p><strong>Avvisi di monitoraggio del servizio</strong>, ai responsabili indicati nella configurazione:</p>
 <ul>
 <li>
@@ -4936,6 +5141,18 @@ dell&#x27;email di chi comanda.</p>
 <p class="lead"><strong>Che cosa è cambiato, aggiornamento per aggiornamento.</strong></p>
 <h3 id="21-novembre-2026-staging-2afcc45e">21 novembre 2026 (staging)</h3>
 <ul>
+<li>
+<p><strong>Credenziali dei dispositivi</strong>: sotto ogni dispositivo, i tentativi di collegamento rifiutati nelle ultime 24
+ore, con cosa fare (parte 6).</p>
+</li>
+<li>
+<p><strong>Organizzazioni</strong>: un appartamento si elimina con «Disattiva», 7 giorni di attesa ed «Elimina» scrivendo il
+nome; l&#x27;eliminazione toglie anche il sistema domotico, le chiavi e i dati (parte 7).</p>
+</li>
+<li>
+<p><strong>Amministrazione</strong>: un appartamento spento dice da quando e da chi; quello spento dal gestore della
+piattaforma lo riaccende solo il gestore (parte 6).</p>
+</li>
 <li>
 <p><strong>Gestore della piattaforma</strong>: in «Nuovo appartamento» la riga «Posti liberi nello staging» dice se sulla
 macchina virtuale c&#x27;è posto, con «Aggiorna» (parte 7). Senza posto la creazione si ferma con un messaggio chiaro.</p>
