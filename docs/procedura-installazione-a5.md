@@ -74,10 +74,12 @@ Come D3 di A7: `agent-vm.sh install` riscrive `agent.conf` (com'era), il codice 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo flock -w 300 /opt/domhouse/.engines.lock env AMBIENTE=staging SOTTOSCRIZIONE=projects/domotica-poc-511707/subscriptions/domhouse-staging-ordini-vm RISULTATI=projects/domotica-poc-511707/topics/domhouse-staging-risultati bash ~/a5/agent-vm.sh install; sudo bash ~/a5/agent-vm.sh status | head -2; sudo grep -c "_keep_revoked" /opt/domhouse/agent/esecutore.py; sudo journalctl -u domhouse-agent-esecutore --since "-5 min" --no-pager | grep -c protezione_persa' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo flock -w 300 /opt/domhouse/.engines.lock env AMBIENTE=staging SOTTOSCRIZIONE=projects/domotica-poc-511707/subscriptions/domhouse-staging-ordini-vm RISULTATI=projects/domotica-poc-511707/topics/domhouse-staging-risultati bash ~/a5/agent-vm.sh install; sudo bash ~/a5/agent-vm.sh status | head -2; sudo grep -c "_keep_revoked" /opt/domhouse/agent/esecutore.py' < /dev/null
 ```
 
-- **Atteso:** «agente installato: ambiente staging»; i due servizi `active`; `2`; **0** righe `protezione_persa`.
+- **Atteso:** «agente installato: ambiente staging»; i due servizi `active`; `2`.
+- **Poi, prima di E3: «Prova l'agente»** (come C8 di A2; scrive un ordine «stato»). Nell'app dello staging, pagina della piattaforma → «Prova l'agente» su `lab-01`. **Atteso:** esito **riuscito**: l'agente nuovo firma e risponde. Legge solo `/health` del motore, non tocca gli Shelly. Altro esito, o «in attesa» oltre un minuto: incolla le ultime righe di `sudo journalctl -u domhouse-agent-lettore -u domhouse-agent-esecutore -n 30 --no-pager`.
+- (Prima c'era un controllo `grep -c protezione_persa`: tolto, perché quella riga nasce solo con un ordine `aggiorna_broker`, `crea_motore` o `togli_motore`, e nei minuti dopo l'installazione non ne arriva nessuno; terza lettura della revisione di A5, come D3 di A7.)
 - **Da verificare:** che sulla VM ci sia ancora la copia dell'installazione di prima per il ritorno indietro (`~/a7` se A7 è stato installato con la sua procedura, altrimenti `~/a2`).
 - **Ritorno indietro:** lo stesso comando dalla copia di prima (`~/a7/agent-vm.sh install`, o `~/a2/agent-vm.sh install`, sotto il blocco). Gli elenchi `devices/*.revocati` già scritti restano ma non danno fastidio: l'esecutore di prima non li legge; il `broker-vm.sh` di A5 li legge per al massimo 24 ore. Per toglierli: `sudo rm -f /etc/domhouse/_broker/devices/*.revocati`.
 
