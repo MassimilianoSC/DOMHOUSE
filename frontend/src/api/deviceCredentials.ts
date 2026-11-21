@@ -38,6 +38,15 @@ export interface DeviceCredential {
   engine_device_id: string | null;
   op: CredentialOp | null;
   connection: CredentialConnection;
+  /** A5: the refused connections of the last 24 hours; null = not known (never shown as 0). Absent on older servers. */
+  rifiuti?: CredentialRefusals | null;
+}
+
+/** A5 (docs/proposta-a5.md; bff/API.md «rifiuti»): read from the logs every 5 minutes, up to about 10 minutes late. */
+export interface CredentialRefusals {
+  conteggio_24h: number;
+  /** ISO UTC of the last refusal; null with conteggio_24h 0. */
+  ultimo: string | null;
 }
 
 /** The answer of «Registra» and «Rigenera»: the only place a password appears. */

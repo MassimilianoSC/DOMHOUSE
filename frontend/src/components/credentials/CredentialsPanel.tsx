@@ -8,7 +8,7 @@ import { CopyableId } from "@/components/ui/CopyableId";
 import { Badge, Skeleton } from "@/components/ui/primitives";
 import { RowMenu, RowMenuItem } from "@/components/ui/RowMenu";
 import { t } from "@/i18n";
-import { allowedActions, credentialsSignature, MAX_POLL_MS, POLL_MS, splitCredentials, type CredentialAction } from "@/lib/deviceCredentials";
+import { allowedActions, credentialsSignature, MAX_POLL_MS, POLL_MS, refusalNote, splitCredentials, type CredentialAction } from "@/lib/deviceCredentials";
 import { pollWindow } from "@/lib/pollWindow";
 import { fmtDate, fmtDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -62,6 +62,36 @@ function StateLine({ c }: { c: DeviceCredential }) {
   return <p className="text-sm">{t(`credentials.lines.${c.stato}`)}</p>;
 }
 
+/** A5 (docs/proposta-a5.md): the refused connections of the last 24 hours; nothing when there are none or the server
+ *  does not know. Yellow with «Cosa fare» only when they came after the last change. */
+function Refusals({ c }: { c: DeviceCredential }) {
+  const note = refusalNote(c, Date.now());
+  if (!note) return null;
+  const warning = note.kind === "warning";
+  return (
+    <div
+      className={cn("space-y-1 text-sm", warning ? "rounded-lg border border-warning-border bg-warning-bg px-2.5 py-2 text-warning-fg" : "text-muted-foreground")}
+      data-testid={`credential-refusals-${c.device_id}`}
+      data-kind={note.kind}
+    >
+      <p className={cn(warning && "flex items-start gap-1.5 font-medium")}>
+        {warning && <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />}
+        <span>
+          {note.text}
+          {note.kind === "past" && <> {t("credentials.refusals.past")}</>}
+          {note.kind === "revoked" && <> {t("credentials.refusals.revoked")}</>}
+        </span>
+      </p>
+      {warning && (
+        <>
+          <p>{t("credentials.refusals.todo")}</p>
+          <p className="text-xs">{t("credentials.refusals.delay")}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
 // From 1024 px one table, as the other lists of the site; the date and the buttons have fixed widths, so every column
 // starts in the same place on every row whatever its buttons. Below, one card per device, as the apartments' cards.
 const GRID = "lg:grid lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.7fr)_9.5rem_19rem] lg:items-start lg:gap-4";
@@ -88,6 +118,7 @@ function Row({ c, onRequest }: { c: DeviceCredential; onRequest: (r: RowRequest)
           <StateIcon stato={c.stato} /> {t(`credentials.states.${c.stato}`)}
         </Badge>
         <StateLine c={c} />
+        <Refusals c={c} />
       </div>
       {/* on a card one quiet line, «Ultima modifica: 19 nov 2026, 16:12 · Giulia Rossi»; in the table its own column */}
       <div className="min-w-0 text-xs text-muted-foreground lg:text-sm lg:text-foreground">
