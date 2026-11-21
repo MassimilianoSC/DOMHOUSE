@@ -562,7 +562,8 @@
       "italianway": "ID Italianway",
       "code": "Codice",
       "enabled": "Attivo",
-      "disableConfirm": "Disattivare «{name}»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi.",
+      "disableConfirm": "Disattivare «{name}»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.",
+      "lockedByPlatform": "L'ha disattivato il gestore della piattaforma: solo lui può riattivarlo.",
       "disabled": "disattivato",
       "verify": "Verifica connessione",
       "verifyOk": "Connessione OK",
@@ -742,9 +743,6 @@
     "aptEditHint": "Qui cambi il collegamento al sistema domotico e il codice Italianway: nome, stato e funzioni dell'appartamento li gestisce l'amministratore dell'organizzazione.",
     "italianwayHint": "Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.",
     "aptSaved": "Collegamento aggiornato",
-    "aptDelete": "Elimina",
-    "aptDeleteConfirm": "Eliminare l'appartamento {id} («{name}») dell'organizzazione {tenant}? Sparirà per tutti i suoi utenti. Il suo sistema domotico non viene toccato.",
-    "aptDeleted": "Appartamento {id} eliminato",
     "aptEmpty": "Nessun appartamento in questa organizzazione",
     "creation": {
       "newButton": "Nuovo appartamento",
@@ -827,6 +825,63 @@
       "tenantPreparingOne": "1 appartamento in preparazione",
       "tenantPreparingMany": "{count} appartamenti in preparazione",
       "see": "Vedi"
+    },
+    "deletion": {
+      "disable": "Disattiva",
+      "reenable": "Riattiva",
+      "delete": "Elimina",
+      "disabledBy": "Disattivato il {when} da {name} ({role})",
+      "disabledAt": "Disattivato il {when}",
+      "roles": {
+        "gestore": "gestore della piattaforma",
+        "amministratore": "amministratore"
+      },
+      "deletableFrom": "Si potrà eliminare dal {when}.",
+      "noDate": "Spento senza data: «Disattiva» fa partire i 7 giorni dopo i quali si può eliminare.",
+      "disableTitle": "Disattivare «{name}»?",
+      "disableText": "Gli automatismi del sistema domotico continuano. Si fermano notifiche (anche le gravi, come «sistema domotico non raggiungibile»), riepilogo del lunedì, prenotazioni da Italianway ed export Excel; le prenotazioni arrivate nel frattempo non si recuperano alla riattivazione.",
+      "disableWait": "Dopo 7 giorni da disattivato si potrà eliminare.",
+      "email": "Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.",
+      "disabled": "{name} disattivato.",
+      "reenabled": "{name} riattivato.",
+      "deleteTitle": "Eliminare «{name}»?",
+      "deleteWhich": "ID {id} · organizzazione {tenant}",
+      "lostApp": "Si perdono il sistema domotico con i suoi dati e le credenziali dei dispositivi; l'appartamento sparisce dall'app per tutti i suoi utenti.",
+      "lostRecord": "L'appartamento sparisce dall'app per tutti i suoi utenti.",
+      "keptApp": "Restano prenotazioni e riepiloghi per 12 mesi e il registro attività per 24 mesi. Lo storico del sistema domotico si può recuperare per 30 giorni, con l'aiuto del supporto.",
+      "keptRecord": "Restano prenotazioni e riepiloghi per 12 mesi e il registro attività per 24 mesi.",
+      "idGone": "L'ID {id} non si potrà più usare.",
+      "manual": "Il sistema domotico sulla macchina virtuale resta: va tolto a mano dal supporto.",
+      "nameLabel": "Scrivi il nome dell'appartamento per confermare",
+      "nameHint": "Il nome è «{name}», maiuscole comprese.",
+      "confirm": "Elimina",
+      "tooEarly": "Non ancora: si potrà eliminare dal {when}.",
+      "tooEarlyNoDate": "Non ancora: prima «Disattiva», poi si potrà eliminare dopo 7 giorni.",
+      "limit": "Limite raggiunto: si possono eliminare al massimo 2 appartamenti al giorno per ogni organizzazione. Potrai eliminarne un altro {when}.",
+      "limitNoTime": "Limite raggiunto: si possono eliminare al massimo 2 appartamenti al giorno per ogni organizzazione. Riprova domani.",
+      "started": "Eliminazione di {name} avviata: ci vogliono alcuni minuti.",
+      "deleted": "{name} eliminato.",
+      "states": {
+        "in_corso": "Eliminazione in corso",
+        "non_riuscita": "Eliminazione non riuscita"
+      },
+      "steps": {
+        "motore": "sistema domotico",
+        "segreti": "chiavi",
+        "database": "dati dell'app"
+      },
+      "running": "Si tolgono il sistema domotico, le chiavi e i dati; poi l'appartamento sparisce dall'elenco. Puoi chiudere la pagina: l'eliminazione continua.",
+      "startedBy": "Avviata il {when} da {name}",
+      "startedAt": "Avviata il {when}",
+      "stoppedAt": "Si è fermata a: {step} (passo {n} di {of})",
+      "what": {
+        "manual": "Il sistema domotico sulla macchina virtuale non risulta creato dall'app: serve il supporto (ID richiesta).",
+        "chiavi_non_distrutte": "Il sistema domotico è stato tolto, ma le chiavi no: «Riprova».",
+        "non_inviato": "L'ordine non è partito verso la macchina virtuale: «Riprova».",
+        "tempo_scaduto": "Nessuna risposta dalla macchina virtuale in 20 minuti: «Riprova».",
+        "errore_interno": "Errore interno del server: «Riprova», e se succede ancora serve un controllo (ID richiesta).",
+        "generic": "L'eliminazione si è fermata prima della fine: «Riprova»."
+      }
     },
     "unattributedHint": "Prenotazioni arrivate da Italianway che non si possono assegnare a nessuna organizzazione: codice Italianway sconosciuto o collegato a più appartamenti, firma non valida, formato non riconosciuto. Gli amministratori delle organizzazioni non le vedono."
   },

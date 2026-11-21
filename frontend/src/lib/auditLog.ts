@@ -3,6 +3,7 @@ import { isPseudonym } from "@/lib/describe";
 import { fmtDateTime } from "@/lib/format";
 import { fmtPrice } from "@/lib/price";
 import { describeChange } from "@/lib/ruleChanges";
+import { DELETION_STEPS } from "@/lib/apartmentDeletion";
 
 // «Registro attività» (P-47): who did what on what, as one Italian sentence. Names come resolved by the BFF at read
 // time; a person who no longer exists arrives with removed: true and no email or name (P-48).
@@ -18,6 +19,8 @@ export const AUDIT_ACTIONS = [
   "device_credential_registered", "device_credential_regenerated", "device_credential_revoked", "device_credential_retried", "device_credential_revoke_not_applied",
   // A2 (o1 cb3ee25): target the apartment; apartment_created is written when the creation reaches «pronto»
   "apartment_creation_retried", "apartment_creation_cancelled",
+  // A6 (o1 d72892d): target the apartment; apartment_deleted is written when the deletion is over, the failure by the system
+  "apartment_disabled", "apartment_reenabled", "apartment_deletion_started", "apartment_deletion_failed",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTIONS)[number];
 
@@ -158,6 +161,10 @@ export function describeEntry(e: AuditEntry): { sentence: string; note: string |
     case "device_credential_retried":
     case "device_credential_revoke_not_applied":
       return { sentence: t(`audit.actions.${e.action}`, { ...v, device: text(d.device_id) ?? "—" }), note };
+    case "apartment_deletion_failed": {
+      const step = DELETION_STEPS.find((p) => p === d.passo);
+      return { sentence: step ? t("audit.actions.apartment_deletion_failed", { ...v, step: t(`platform.deletion.steps.${step}`) }) : t("audit.deletionFailedNoStep", v), note };
+    }
     default:
       return { sentence: t(`audit.actions.${e.action}`, v), note };
   }

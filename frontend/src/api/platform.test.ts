@@ -69,3 +69,24 @@ describe("creazione di un appartamento dall'app", () => {
     expect(last().path).toBe("/app/platform/tenants/t-1/apartments/lab-prova/creazione");
   });
 });
+
+// A6 (bff/API.md «Eliminazione di un appartamento»): Disattiva, Riattiva, Elimina with the name, Riprova with the version.
+describe("eliminazione di un appartamento", () => {
+  const at = (i: number) => ({ path: new URL(calls[i].url).pathname, method: calls[i].init.method, body: calls[i].init.body ? JSON.parse(String(calls[i].init.body)) : null, cid: (calls[i].init.headers as Record<string, string>)["X-Correlation-Id"] });
+
+  it("POST …/disattiva e …/riattiva senza corpo; …/elimina con il nome; …/eliminazione/riprova con la version", async () => {
+    await platformApi.disable("t 1", "lab-ponte", "c-1");
+    await platformApi.reenable("t 1", "lab-ponte", "c-2");
+    await platformApi.deleteApartment("t 1", "lab-ponte", " Bilocale Ponte ", "c-3");
+    await platformApi.retryDeletion("t 1", "lab-ponte", 4, "c-4");
+    expect(at(0)).toEqual({ path: "/app/platform/tenants/t%201/apartments/lab-ponte/disattiva", method: "POST", body: null, cid: "c-1" });
+    expect(at(1)).toEqual({ path: "/app/platform/tenants/t%201/apartments/lab-ponte/riattiva", method: "POST", body: null, cid: "c-2" });
+    expect(at(2)).toEqual({ path: "/app/platform/tenants/t%201/apartments/lab-ponte/elimina", method: "POST", body: { nome: " Bilocale Ponte " }, cid: "c-3" });
+    expect(at(3)).toEqual({ path: "/app/platform/tenants/t%201/apartments/lab-ponte/eliminazione/riprova", method: "POST", body: { version: 4 }, cid: "c-4" });
+  });
+
+  it("nessuna DELETE: la rotta di oggi risponde 409 use_elimina", () => {
+    expect(Object.keys(platformApi)).not.toContain("removeApartment");
+    expect(String(platformApi.deleteApartment)).not.toMatch(/DELETE/);
+  });
+});

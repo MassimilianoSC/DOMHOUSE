@@ -241,3 +241,27 @@ describe("registro attività: credenziali dei dispositivi (A3)", () => {
     expect(sentence({ action: "device_credential_revoked", target: apt, details: {} })).toBe("Anna Rossi ha revocato il dispositivo — in «Laboratorio»");
   });
 });
+
+describe("registro attività: disattivare ed eliminare (A6, o1 d72892d)", () => {
+  // target the apartment; apartment_disabled has details.da (gestore or amministratore: the actor says who already);
+  // apartment_deletion_started details.origine; apartment_deletion_failed is written by the system with passo and codice
+  const apt = { type: "apartment" as const, id: "lab-ponte", label: "Bilocale Ponte" };
+  it.each([
+    ["apartment_disabled", { da: "gestore" }, "Anna Rossi ha disattivato l'appartamento «Bilocale Ponte»"],
+    ["apartment_reenabled", {}, "Anna Rossi ha riattivato l'appartamento «Bilocale Ponte»"],
+    ["apartment_deletion_started", { origine: "app" }, "Anna Rossi ha avviato l'eliminazione dell'appartamento «Bilocale Ponte»"],
+  ])("%s", (action, details, text) => {
+    expect(AUDIT_ACTIONS).toContain(action);
+    expect(sentence({ action, target: apt, details })).toBe(text);
+  });
+
+  it("eliminazione non riuscita: una riga del sistema, con il passo a cui si è fermata", () => {
+    const system = { kind: "system" as const, uid: null, email: null, display_name: null, removed: false };
+    expect(AUDIT_ACTIONS).toContain("apartment_deletion_failed");
+    expect(sentence({ action: "apartment_deletion_failed", actor: system, target: apt, details: { passo: "segreti", codice: "chiavi_non_distrutte" } }))
+      .toBe("Eliminazione dell'appartamento «Bilocale Ponte» non riuscita al passo «chiavi»: serve «Riprova».");
+    // a step this version does not know: the sentence without it, never «undefined»
+    expect(sentence({ action: "apartment_deletion_failed", actor: system, target: apt, details: { passo: "nuovo" } }))
+      .toBe("Eliminazione dell'appartamento «Bilocale Ponte» non riuscita: serve «Riprova».");
+  });
+});

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Link2, PlugZap, Plus, Trash2, Waypoints } from "lucide-react";
+import { KeyRound, Link2, PlugZap, Plus, Power, PowerOff, Trash2, Waypoints } from "lucide-react";
 import { toast } from "sonner";
 import type { VerifyResult } from "@/api/admin";
 import { platformApi, type PlatformApartment } from "@/api/platform";
@@ -9,6 +9,7 @@ import { useAuth } from "@/auth/AuthProvider";
 import { CredentialsWorkspace } from "@/components/credentials/CredentialsWorkspace";
 import { AgentTest, agentTestable } from "@/components/platform/AgentTest";
 import { CancelCreationDialog, CreationRow, creationRowClass, ReadyInvite, showCreationError } from "@/components/platform/CreationRow";
+import { DeleteDialog, DeletionRow, deletionRowClass, DisableDialog, DisabledInfo } from "@/components/platform/DeletionRow";
 import { NewApartmentDialog, tenantKey } from "@/components/platform/NewApartmentDialog";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { Badge, Dialog, DialogContent, DialogDescription, DialogTitle, Label, Sk
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { creationSignature, isUsable, MAX_POLL_MS, POLL_MS, sortForPlatform } from "@/lib/apartmentCreation";
+import { deletionOffer, deletionSignature } from "@/lib/apartmentDeletion";
 import { pollWindow } from "@/lib/pollWindow";
 import { instanceAddress } from "@/lib/instanceAddress";
 import { cn, newCorrelationId } from "@/lib/utils";
@@ -125,13 +127,18 @@ function ConnectionDialog({ tenantId, apt, onClose, onSaved }: { tenantId: strin
  */
 export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { tenantId: string; tenantName: string; showStopped?: number }) {
   const qc = useQueryClient();
-  // A2: read again every 4 s while a creation or a cancellation is on its way, for at most 20 minutes (§3.3)
+  // A2 and A6: read again every 4 s while a creation, a cancellation or a deletion is on its way, for at most 20 minutes
   const pollOpen = useRef(pollWindow(MAX_POLL_MS));
   const q = useQuery({
     queryKey: key(tenantId),
     queryFn: () => platformApi.apartments(tenantId),
-    refetchInterval: (query) => (pollOpen.current(creationSignature(query.state.data), Date.now()) ? POLL_MS : false),
+    refetchInterval: (query) => {
+      const moving = [creationSignature(query.state.data), deletionSignature(query.state.data)].filter(Boolean).join("|");
+      return pollOpen.current(moving, Date.now()) ? POLL_MS : false;
+    },
   });
+  const [disableOf, setDisableOf] = useState<PlatformApartment | null>(null);
+  const [deleteOf, setDeleteOf] = useState<PlatformApartment | null>(null);
   const [cancelOf, setCancelOf] = useState<PlatformApartment | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -148,11 +155,12 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
   /** The organization's card counts the creations too (§4). */
   const refreshCounts = () => void qc.invalidateQueries({ queryKey: ["platform", "tenants"] });
 
-  // A2: the notices at the end (§3.2, §3.4): ready after «In preparazione», gone after «Annullamento in corso»
-  const seen = useRef<Map<string, { stato: string | undefined; name: string }> | null>(null);
+  // A2: the notices at the end (§3.2, §3.4): ready after «In preparazione», gone after «Annullamento in corso»;
+  // A6: gone after «Eliminazione in corso»
+  const seen = useRef<Map<string, { stato: string | undefined; deleting: boolean; name: string }> | null>(null);
   useEffect(() => {
     if (!q.data) return;
-    const now = new Map(q.data.map((a) => [a.apartment_id, { stato: a.creazione?.stato, name: a.name }]));
+    const now = new Map(q.data.map((a) => [a.apartment_id, { stato: a.creazione?.stato, deleting: a.eliminazione?.stato === "in_corso", name: a.name }]));
     const before = seen.current;
     if (before) {
       let changed = false;
@@ -160,6 +168,7 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
         const is = now.get(id);
         if (was.stato === "in_preparazione" && is?.stato === "pronto") toast.success(t("platform.creation.ready", { name: is.name }));
         if (was.stato === "annullamento_in_corso" && !is) toast.success(t("platform.creation.cancelled", { name: was.name }));
+        if (was.deleting && !is) toast.success(t("platform.deletion.deleted", { name: was.name }));
         if (was.stato !== is?.stato) changed = true;
       }
       if (changed) refreshCounts();
@@ -214,13 +223,30 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
     refresh(); // the BFF stores the outcome as last_check
   };
 
-  const remove = async (a: PlatformApartment) => {
-    if (!window.confirm(t("platform.aptDeleteConfirm", { id: a.apartment_id, name: a.name, tenant: tenantName }))) return;
-    const ok = await runAction(async (c) => {
-      await platformApi.deleteApartment(tenantId, a.apartment_id, c);
-      return true;
-    }, { success: t("platform.aptDeleted", { id: a.apartment_id }) });
-    if (ok) refresh();
+  /** A6: «Disattiva» (after its window) and «Riattiva»; the list is read again whatever the outcome. */
+  const setEnabled = async (a: PlatformApartment, on: boolean) => {
+    setBusyId(a.apartment_id);
+    await runAction((c) => (on ? platformApi.reenable(tenantId, a.apartment_id, c) : platformApi.disable(tenantId, a.apartment_id, c)), {
+      success: t(on ? "platform.deletion.reenabled" : "platform.deletion.disabled", { name: a.name }),
+    });
+    setBusyId(null);
+    refresh();
+  };
+
+  /** A6 «Riprova» of a stopped deletion, with its version; never repeated by the site. */
+  const retryDeletion = async (a: PlatformApartment) => {
+    const e = a.eliminazione;
+    if (!e) return;
+    const correlationId = newCorrelationId();
+    setBusyId(a.apartment_id);
+    try {
+      await platformApi.retryDeletion(tenantId, a.apartment_id, e.version, correlationId);
+    } catch (err) {
+      showCreationError(err, correlationId);
+    } finally {
+      setBusyId(null);
+      refresh();
+    }
   };
 
   return (
@@ -248,6 +274,13 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
         <ul className="divide-y rounded-2xl border">
           {sortForPlatform(q.data ?? []).map((a) => {
             const v = verify[a.apartment_id];
+            if (a.eliminazione)
+              return (
+                <li key={a.apartment_id} className={cn("p-3", deletionRowClass(a.eliminazione))} data-testid={`platform-apt-${a.apartment_id}`} data-deletion={a.eliminazione.stato}>
+                  <DeletionRow a={a} busy={busyId === a.apartment_id} onRetry={() => void retryDeletion(a)} />
+                </li>
+              );
+            const offer = deletionOffer(a, Date.now());
             if (!isUsable(a))
               return (
                 <li
@@ -279,9 +312,25 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
                     <Button size="sm" variant="outline" onClick={() => void check(a.apartment_id)} disabled={v === "loading"} data-testid={`platform-apt-verify-${a.apartment_id}`}>
                       <PlugZap /> {v === "loading" ? t("common.loading") : t("admin.apartments.verify")}
                     </Button>
-                    {!a.creazione && <Button size="sm" variant="destructive" onClick={() => void remove(a)} data-testid={`platform-apt-delete-${a.apartment_id}`}><Trash2 /> {t("platform.aptDelete")}</Button>}
+                    {/* A6: Disattiva, then Elimina 7 days later (the server's eliminabile_dal); dev never */}
+                    {offer.disable && (
+                      <Button size="sm" variant="outline" onClick={() => setDisableOf(a)} disabled={busyId === a.apartment_id} data-testid={`platform-apt-disable-${a.apartment_id}`}>
+                        <PowerOff /> {t("platform.deletion.disable")}
+                      </Button>
+                    )}
+                    {offer.reenable && (
+                      <Button size="sm" variant="outline" onClick={() => void setEnabled(a, true)} disabled={busyId === a.apartment_id} data-testid={`platform-apt-reenable-${a.apartment_id}`}>
+                        <Power /> {t("platform.deletion.reenable")}
+                      </Button>
+                    )}
+                    {offer.del !== "none" && (
+                      <Button size="sm" variant="destructive" onClick={() => setDeleteOf(a)} disabled={offer.del !== "ready"} data-testid={`platform-apt-delete-${a.apartment_id}`}>
+                        <Trash2 /> {t("platform.deletion.delete")}
+                      </Button>
+                    )}
                   </div>
                 </div>
+                {!a.enabled && <DisabledInfo a={a} offer={offer} />}
                 {v && v !== "loading" && <VerifyBadge r={v} />}
                 {/* strumento A, A1: the agent on the VM answers for the staging apartments and dev only */}
                 {agentTestable(a.apartment_id) && (
@@ -311,6 +360,18 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
           })}
         </ul>
       )}
+      {disableOf && (
+        <DisableDialog
+          a={disableOf}
+          onClose={() => setDisableOf(null)}
+          onConfirm={() => {
+            const a = disableOf;
+            setDisableOf(null);
+            void setEnabled(a, false);
+          }}
+        />
+      )}
+      {deleteOf && <DeleteDialog a={deleteOf} tenantId={tenantId} tenantName={tenantName} onClose={() => setDeleteOf(null)} onDone={refresh} />}
       {cancelOf && (
         <CancelCreationDialog
           a={cancelOf}

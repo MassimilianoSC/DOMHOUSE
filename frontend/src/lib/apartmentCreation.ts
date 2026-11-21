@@ -43,8 +43,9 @@ export const isUsable = (a: PlatformApartment) => !a.creazione || a.creazione.st
 
 const rank = (a: PlatformApartment) => {
   const s = a.creazione?.stato;
-  if (s === "non_creato") return 0;
-  if (s === "in_preparazione" || s === "annullamento_in_corso") return 1;
+  const e = a.eliminazione?.stato;
+  if (s === "non_creato" || e === "non_riuscita") return 0;
+  if (s === "in_preparazione" || s === "annullamento_in_corso" || e === "in_corso") return 1;
   return 2;
 };
 

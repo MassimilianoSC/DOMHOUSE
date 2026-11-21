@@ -250,13 +250,15 @@ describe("pronto (§3.4)", () => {
     expect(within(r).getByTestId("platform-apt-credentials-btn-lab-corte")).toBeInTheDocument();
   });
 
-  it("creato dall'app, anche pronto: niente «Modifica collegamento» né «Elimina» (o1 1f7d4b0: 409 created_from_app; l'eliminazione con A6)", async () => {
+  it("creato dall'app, anche pronto: niente «Modifica collegamento»; con A6 «Elimina» solo dopo «Disattiva» e 7 giorni, per tutti", async () => {
     await open([CREATED, READY]);
     expect(screen.queryByTestId("platform-apt-edit-lab-corte")).toBeNull();
-    expect(screen.queryByTestId("platform-apt-delete-lab-corte")).toBeNull();
-    // an apartment connected by hand keeps them
+    // an apartment connected by hand keeps its connection
     expect(screen.getByTestId("platform-apt-edit-apt-001")).toBeInTheDocument();
-    expect(screen.getByTestId("platform-apt-delete-apt-001")).toBeInTheDocument();
+    for (const id of ["lab-corte", "apt-001"]) {
+      expect(screen.getByTestId(`platform-apt-disable-${id}`)).toBeInTheDocument();
+      expect(screen.queryByTestId(`platform-apt-delete-${id}`)).toBeNull();
+    }
   });
 
   it("in preparazione subito dopo «Riprova», senza ordine (op null): i passi giusti, nessun errore", async () => {

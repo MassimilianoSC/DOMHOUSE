@@ -574,6 +574,10 @@
       "apartment_created": "{actor} ha creato l'appartamento {target}",
       "apartment_creation_retried": "{actor} ha fatto ripartire la creazione dell'appartamento {target}",
       "apartment_creation_cancelled": "{actor} ha annullato la creazione dell'appartamento {target}",
+      "apartment_disabled": "{actor} ha disattivato l'appartamento {target}",
+      "apartment_reenabled": "{actor} ha riattivato l'appartamento {target}",
+      "apartment_deletion_started": "{actor} ha avviato l'eliminazione dell'appartamento {target}",
+      "apartment_deletion_failed": "Eliminazione dell'appartamento {target} non riuscita al passo «{step}»: serve «Riprova».",
       "apartment_updated": "{actor} ha modificato l'appartamento {target}",
       "apartment_relinked": "{actor} ha cambiato il collegamento al motore dell'appartamento {target}",
       "apartment_deleted": "{actor} ha eliminato l'appartamento {target}",
@@ -597,7 +601,8 @@
       "simulator_reset": "{actor} ha ripristinato lo stato iniziale dell'appartamento simulato {target}",
       "rules_changed": "{actor} ha modificato le regole dell'appartamento {target}",
       "timezone_changed": "Fuso orario dell'appartamento {target} cambiato sul motore: {from} → {to}"
-    }
+    },
+    "deletionFailedNoStep": "Eliminazione dell'appartamento {target} non riuscita: serve «Riprova»."
   },
   "capacity": {
     "places": "Posti liberi {env}: {count} ({when})",

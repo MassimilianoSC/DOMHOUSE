@@ -1,6 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { toast } from "sonner";
+import { ApiError } from "@/api/bff";
 import { t } from "@/i18n";
 import { platformApartmentsUrl } from "@/lib/routes";
 import ApartmentsPage from "@/pages/ApartmentsPage";
@@ -306,7 +308,7 @@ describe("appartamenti dimostrativi (D-97, D-98)", () => {
 });
 
 describe("disattivare un appartamento chiede conferma, riattivarlo no (P-90 T2, 1107 = a)", () => {
-  const CONFIRM = "Disattivare «Milano Centro»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi.";
+  const CONFIRM = "Disattivare «Milano Centro»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.";
   afterEach(() => vi.restoreAllMocks());
 
   it("interruttore della riga, confermato: si salva disattivato", async () => {
@@ -352,5 +354,73 @@ describe("disattivare un appartamento chiede conferma, riattivarlo no (P-90 T2, 
     await save();
     expect(ask).not.toHaveBeenCalled();
     expect(state.patchApartment).toHaveBeenCalled();
+  });
+});
+
+// A6 (bff/API.md «Eliminazione di un appartamento»): one disabled state, whoever disabled it; the admin sees when and by
+// whom. «Si potrà eliminare dal …» is the platform manager's only: the admin does not delete until D-232.
+describe("A6: da quando e da chi è disattivato", () => {
+  it("disattivato con l'ora: la data e chi l'ha fatto, nient'altro", async () => {
+    state.apartments = [
+      { ...APT, enabled: false, disattivato_at: "2026-11-20T15:05:00Z", disattivato_da: { ruolo: "gestore", nome: "Giulia Rossi" } },
+      { ...APT, apartment_id: "apt-002", name: "Rimini Mare", enabled: false, disattivato_at: "2026-11-18T08:30:00Z", disattivato_da: { ruolo: "amministratore", nome: null } },
+    ];
+    renderAdmin();
+    const line = await screen.findByTestId("admin-apartment-disabled-apt-001");
+    expect(line).toHaveTextContent(/^Disattivato il 20 nov 2026, 16:05 da Giulia Rossi \(gestore della piattaforma\)$/);
+    expect(screen.getByTestId("admin-apartment-disabled-apt-002")).toHaveTextContent(/^Disattivato il 18 nov 2026, 09:30$/);
+    expect(screen.queryByText(/Si potrà eliminare/)).toBeNull();
+  });
+
+  it("attivo, o spento prima di A6 (senza ora): nessuna riga", async () => {
+    state.apartments = [APT, { ...APT, apartment_id: "apt-002", name: "Rimini Mare", enabled: false, disattivato_at: null, disattivato_da: null }];
+    renderAdmin();
+    await screen.findByTestId("admin-apartment-apt-002");
+    expect(screen.queryByTestId("admin-apartment-disabled-apt-001")).toBeNull();
+    expect(screen.queryByTestId("admin-apartment-disabled-apt-002")).toBeNull();
+  });
+});
+
+// A6, review point 1 (o1 7f471c8): what the platform manager switched off, only the platform manager switches on again.
+// The admin's PATCH with enabled: true answers 409 disabled_by_platform and saves nothing of the body.
+describe("A6: spento dal gestore della piattaforma, lo riaccende solo lui", () => {
+  const LOCKED = "L'ha disattivato il gestore della piattaforma: solo lui può riattivarlo.";
+  const byPlatform = { ...APT, enabled: false, disattivato_at: "2026-11-20T15:05:00Z", disattivato_da: { ruolo: "gestore", nome: "Giulia Rossi" } };
+  const byAdmin = { ...APT, apartment_id: "apt-002", name: "Rimini Mare", enabled: false, disattivato_at: "2026-11-20T15:05:00Z", disattivato_da: { ruolo: "amministratore", nome: "Marco Bianchi" } };
+
+  it("nella riga: interruttore spento e non cliccabile, con la frase; spento dall'amministratore: come oggi", async () => {
+    state.apartments = [byPlatform, byAdmin];
+    renderAdmin();
+    const toggle = await screen.findByTestId("admin-apartment-enabled-apt-001");
+    expect(toggle).toBeDisabled();
+    expect(toggle).not.toBeChecked();
+    expect(screen.getByTestId("admin-apartment-locked-apt-001")).toHaveTextContent(LOCKED);
+    await act(async () => { fireEvent.click(toggle); });
+    expect(state.patchApartment).not.toHaveBeenCalled();
+    expect(screen.getByTestId("admin-apartment-enabled-apt-002")).toBeEnabled();
+    expect(screen.queryByTestId("admin-apartment-locked-apt-002")).toBeNull();
+  });
+
+  it("in «Modifica»: «Attivo» spento e non cliccabile, con la frase; il salvataggio non manda «enabled»", async () => {
+    state.apartments = [byPlatform];
+    const dialog = await openEdit();
+    expect(field("enabled")).toBeDisabled();
+    expect(within(dialog).getByTestId("apt-form-enabled-locked")).toHaveTextContent(LOCKED);
+    fireEvent.change(field("name"), { target: { value: "Milano Centro 2" } });
+    await save();
+    expect(state.patchApartment).toHaveBeenCalledTimes(1);
+    const body = state.patchApartment.mock.calls[0][1];
+    expect(body).toEqual({ name: "Milano Centro 2", address: "Via Roma 1" });
+    expect(body).not.toHaveProperty("enabled");
+  });
+
+  it("se il 409 arriva lo stesso (spento dal gestore nel frattempo): il testo del server", async () => {
+    state.apartments = [byAdmin];
+    state.patchApartment.mockRejectedValueOnce(new ApiError(409, "disabled_by_platform", LOCKED, "c-9"));
+    renderAdmin();
+    const toggle = await screen.findByTestId("admin-apartment-enabled-apt-002");
+    await act(async () => { fireEvent.click(toggle); });
+    expect(state.patchApartment).toHaveBeenCalledWith("apt-002", { enabled: true }, expect.any(String));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LOCKED, expect.anything()));
   });
 });
