@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Riletta il 21 novembre** (revisore in sola lettura: «eseguibile dopo correzioni», sei punti corretti dalla memoria storica alle 10:29); si usa solo **dopo** l'installazione di A2 (C0–C9, fatta il 20 novembre). A7 è unito in `main` con `8c9b5d9` (20 novembre, 17:56), insieme alle correzioni di A2 (`c6ed88f`, `d6ea4a0`). Nessun passo provato sul vero | o1, 20 novembre 2026, 16:10; unione 17:56 | `8c9b5d9`, l'unione di A7 in `main` (le impronte si calcolano da `origin/main`, D1) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | D0–D6 |
+| **Eseguita il 21 novembre 2026, D0–D6 tutti superati** (registro). **Riletta il 21 novembre** (revisore in sola lettura: «eseguibile dopo correzioni», sei punti corretti dalla memoria storica alle 10:29); si usa solo **dopo** l'installazione di A2 (C0–C9, fatta il 20 novembre). A7 è unito in `main` con `8c9b5d9` (20 novembre, 17:56), insieme alle correzioni di A2 (`c6ed88f`, `d6ea4a0`). Nessun passo provato sul vero | o1, 20 novembre 2026, 16:10; unione 17:56 | `8c9b5d9`, l'unione di A7 in `main` (le impronte si calcolano da `origin/main`, D1) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | D0–D6 |
 
 **Cosa si installa** (`docs/proposta-a7.md`, risposte 1196–1202):
 

@@ -1942,6 +1942,23 @@ entrare, poi invita gli altri utenti.».
 - **Nello staging senza agente** il pulsante è spento con «Non disponibile in questo ambiente: manca il collegamento
   con la macchina virtuale.».
 
+**Prima di creare: c'è posto sulla macchina virtuale? (dal 21 novembre 2026, staging)**
+
+- **Nel modulo** una riga dice «Posti liberi nello staging: 1 (letto alle 11:50)»: quanti sistemi domotici in più
+  ci stanno, e quando è stato letto.
+- **«Aggiorna»** chiede di nuovo alla macchina virtuale; per qualche secondo la riga dice «Lettura in corso…».
+- **Il conto** tiene insieme memoria libera, numero massimo di sistemi domotici e memoria riservata allo staging.
+
+| La riga dice | Cosa vuol dire | Cosa fai |
+|---|---|---|
+| «Posti liberi nello staging: N (…)» | Ci sono N posti | Puoi creare |
+| «Nessun posto libero: serve una VM più grande o la seconda VM (…)» | La macchina virtuale è piena | Non creare: avvisa il supporto |
+| «Capienza non ancora letta» | Nessuna lettura recente | «Aggiorna» |
+| «Lettura non riuscita: …» | La macchina virtuale non ha risposto | Riprova più tardi con «Aggiorna» |
+
+- **Se crei senza posto**, la creazione si ferma come «Non creato» con «La macchina virtuale non ha memoria per un
+  sistema domotico in più.»: premi «Annulla creazione».
+
 **Gli stati della creazione:**
 
 | Stato | Cosa vedi | Cosa fai |
@@ -3018,6 +3035,11 @@ Per ogni problema annota:
 ## 14. Novità
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
+
+### 21 novembre 2026 (staging)
+
+- **Gestore della piattaforma**: in «Nuovo appartamento» la riga «Posti liberi nello staging» dice se sulla
+  macchina virtuale c'è posto, con «Aggiorna» (parte 7). Senza posto la creazione si ferma con un messaggio chiaro.
 
 ### 20 novembre 2026 (staging)
 

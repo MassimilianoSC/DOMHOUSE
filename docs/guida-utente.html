@@ -394,6 +394,7 @@
 </li>
 <li><a href="#14-novita-710a48f5">14. Novità</a>
 <ol>
+<li><a href="#21-novembre-2026-staging-2afcc45e">21 novembre 2026 (staging)</a></li>
 <li><a href="#20-novembre-2026-staging-9db0d001">20 novembre 2026 (staging)</a></li>
 <li><a href="#17-novembre-2026-3f0416fc">17 novembre 2026</a></li>
 <li><a href="#13-novembre-2026-11e5f0c5">13 novembre 2026</a></li>
@@ -3297,6 +3298,33 @@ sono stati creati nell&#x27;ultima ora; raggiunto il limite diventa giallo e dic
 con la macchina virtuale.».</p>
 </li>
 </ul>
+<p><strong>Prima di creare: c&#x27;è posto sulla macchina virtuale? (dal 21 novembre 2026, staging)</strong></p>
+<ul>
+<li>
+<p><strong>Nel modulo</strong> una riga dice «Posti liberi nello staging: 1 (letto alle 11:50)»: quanti sistemi domotici in più
+ci stanno, e quando è stato letto.</p>
+</li>
+<li>
+<p><strong>«Aggiorna»</strong> chiede di nuovo alla macchina virtuale; per qualche secondo la riga dice «Lettura in corso…».</p>
+</li>
+<li>
+<p><strong>Il conto</strong> tiene insieme memoria libera, numero massimo di sistemi domotici e memoria riservata allo staging.</p>
+</li>
+</ul>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">La riga dice</th><th scope="col" class="align-left">Cosa vuol dire</th><th scope="col" class="align-left">Cosa fai</th></tr></thead>
+<tbody>
+<tr><td data-label="La riga dice" class="align-left">«Posti liberi nello staging: N (…)»</td><td data-label="Cosa vuol dire" class="align-left">Ci sono N posti</td><td data-label="Cosa fai" class="align-left">Puoi creare</td></tr>
+<tr><td data-label="La riga dice" class="align-left">«Nessun posto libero: serve una VM più grande o la seconda VM (…)»</td><td data-label="Cosa vuol dire" class="align-left">La macchina virtuale è piena</td><td data-label="Cosa fai" class="align-left">Non creare: avvisa il supporto</td></tr>
+<tr><td data-label="La riga dice" class="align-left">«Capienza non ancora letta»</td><td data-label="Cosa vuol dire" class="align-left">Nessuna lettura recente</td><td data-label="Cosa fai" class="align-left">«Aggiorna»</td></tr>
+<tr><td data-label="La riga dice" class="align-left">«Lettura non riuscita: …»</td><td data-label="Cosa vuol dire" class="align-left">La macchina virtuale non ha risposto</td><td data-label="Cosa fai" class="align-left">Riprova più tardi con «Aggiorna»</td></tr>
+</tbody></table></div>
+<ul>
+<li>
+<p><strong>Se crei senza posto</strong>, la creazione si ferma come «Non creato» con «La macchina virtuale non ha memoria per un
+sistema domotico in più.»: premi «Annulla creazione».</p>
+</li>
+</ul>
 <p><strong>Gli stati della creazione:</strong></p>
 <div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
 <thead><tr><th scope="col" class="align-left">Stato</th><th scope="col" class="align-left">Cosa vedi</th><th scope="col" class="align-left">Cosa fai</th></tr></thead>
@@ -4906,6 +4934,13 @@ dell&#x27;email di chi comanda.</p>
 <section aria-labelledby="14-novita-710a48f5">
 <h2 id="14-novita-710a48f5">14. Novità</h2>
 <p class="lead"><strong>Che cosa è cambiato, aggiornamento per aggiornamento.</strong></p>
+<h3 id="21-novembre-2026-staging-2afcc45e">21 novembre 2026 (staging)</h3>
+<ul>
+<li>
+<p><strong>Gestore della piattaforma</strong>: in «Nuovo appartamento» la riga «Posti liberi nello staging» dice se sulla
+macchina virtuale c&#x27;è posto, con «Aggiorna» (parte 7). Senza posto la creazione si ferma con un messaggio chiaro.</p>
+</li>
+</ul>
 <h3 id="20-novembre-2026-staging-9db0d001">20 novembre 2026 (staging)</h3>
 <ul>
 <li>
