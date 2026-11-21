@@ -2,13 +2,14 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A5 e l'unione del ramo `o1-a5-rifiuti` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `99ac0ae` (ramo `o1-a5-rifiuti`, con le correzioni delle due letture della revisione di sicurezza); la procedura stessa si controlla in E0 confrontandola con quella su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | E0–E6 |
+| **Da rileggere**; si usa solo **dopo** la revisione di sicurezza di A5 e l'unione del ramo `o1-a5-rifiuti` in `main`. Nessun passo provato sul vero: i punti «da verificare» sono segnati | o1, 20 novembre 2026 | ultimo commit del codice: `1db9b82` (ramo `o1-a5-rifiuti`, con le correzioni delle due letture della revisione di sicurezza e i revocati per 24 ore, risposta 1211); la procedura stessa si controlla in E0 confrontandola con quella su GitHub | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | E0–E6 |
 
 **Cosa si installa** (`docs/proposta-a5.md`, risposte 1210, §6 punti 1–6):
 
 | Dove | Che cosa |
 |---|---|
 | VM | `broker-vm.sh` nuovo: il controllo di ogni 5 minuti scrive anche «broker device refused apt=… device=… slot=… count=… last=…», una riga per dispositivo e per finestra di 5 minuti; niente indirizzi, niente password |
+| VM | l'agente nuovo (risposta 1211): l'esecutore, quando un `aggiorna_broker` toglie dei dispositivi, tiene i loro id per 24 ore in `/etc/domhouse/_broker/devices/<apt>.revocati` (root, 600, solo id e ora, mai un'impronta); il controllo li nomina ancora, e il sito mostra «Lo Shelly prova ancora a collegarsi: spegnilo» |
 | Google Cloud | un bucket dei registri tutto suo, `domhouse-rifiuti` (2 giorni), riempito da un sink con **solo** quelle righe; il server dello staging può leggere **solo** la vista di quel bucket |
 | Server e sito dello staging | il campo `rifiuti` in ogni credenziale (`GET …/device-credentials`); la colonna e il «Cosa fare» di o2 |
 
@@ -20,15 +21,15 @@
 2. Ogni passo che scrive ha accanto il ritorno indietro.
 3. Solo lo **staging**: in produzione A3 non si apre prima della seconda VM, quindi nemmeno A5 (risposta 1210, punto 6).
 4. Ogni `gcloud compute ssh` finisce con `< /dev/null`.
-5. **L'esecutore riparte sotto il blocco della VM** dopo aver sostituito `broker-vm.sh`: è un file protetto dell'esecutore (procedura di A2, regola 5).
-6. **Ordine sicuro:** il server nuovo senza il bucket risponde `rifiuti: null` («non lo so»), mai un numero inventato; il `broker-vm.sh` nuovo senza il sink scrive righe che nessuno legge. Nessun ordine dei passi apre una finestra.
+5. **L'esecutore riparte sotto il blocco della VM** dopo aver sostituito `broker-vm.sh` o il codice dell'agente: sono file protetti dell'esecutore (procedura di A2, regola 5).
+6. **Ordine sicuro:** il server nuovo senza il bucket risponde `rifiuti: null` («non lo so»), mai un numero inventato; il `broker-vm.sh` nuovo senza il sink scrive righe che nessuno legge; il `broker-vm.sh` nuovo senza l'agente nuovo non trova elenchi di revocati e nomina solo i registrati, come prima. Nessun ordine dei passi apre una finestra.
 
 ## E0. Prerequisiti (sola lettura)
 
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor 99ac0ae origin/main && echo "A5 è in main, su GitHub" && git diff --quiet origin/main -- docs/procedura-installazione-a5.md && echo "procedura uguale a quella su GitHub"
+git fetch -q origin && git log --oneline -1 origin/main && git merge-base --is-ancestor 1db9b82 origin/main && echo "A5 è in main, su GitHub" && git diff --quiet origin/main -- docs/procedura-installazione-a5.md && echo "procedura uguale a quella su GitHub"
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='systemctl is-active domhouse-agent-esecutore; sudo bash /opt/domhouse/broker-vm.sh check | head -2; sudo cat /etc/domhouse/_broker/apartments; readlink -f "$(command -v awk)"; docker logs -t --tail 2 domhouse-broker 2>&1 | cut -c1-40' < /dev/null
 ```
 
@@ -45,13 +46,14 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-printf '%s %s\n' "$(git show origin/main:scripts/broker-vm.sh | tr -d '\r' | sha256sum | cut -c1-16)" scripts/broker-vm.sh
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='mkdir -p ~/a5' < /dev/null
-gcloud compute scp scripts/broker-vm.sh langbrain-dev:a5/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a5 && sed -i "s/\r*$//" broker-vm.sh && sha256sum broker-vm.sh | cut -c1-16,65-' < /dev/null
+for f in scripts/broker-vm.sh scripts/agent-vm.sh scripts/agent/comune.py scripts/agent/lettore.py scripts/agent/esecutore.py scripts/agent/domhouse-agent-esecutore.service scripts/agent/domhouse-agent-lettore.service; do printf '%s %s\n' "$(git show origin/main:$f | tr -d '\r' | sha256sum | cut -c1-16)" "$f"; done
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='mkdir -p ~/a5/agent' < /dev/null
+gcloud compute scp scripts/broker-vm.sh scripts/agent-vm.sh langbrain-dev:a5/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud compute scp scripts/agent/comune.py scripts/agent/lettore.py scripts/agent/esecutore.py scripts/agent/domhouse-agent-esecutore.service scripts/agent/domhouse-agent-lettore.service langbrain-dev:a5/agent/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a5 && sed -i "s/\r*$//" *.sh agent/*.py agent/*.service && sha256sum *.sh agent/* | cut -c1-16,65-; grep -c "_keep_revoked" agent/esecutore.py; grep -c "revoked_users" broker-vm.sh' < /dev/null
 ```
 
-- **Atteso:** la stessa impronta, prima dal PC (da `origin/main`) poi dalla VM. Diversa: fermati.
+- **Atteso:** prima le sette impronte calcolate sul PC da `origin/main`, poi le stesse sette dalla VM; poi `2` (le righe di `esecutore.py` con `_keep_revoked`) e `2` (quelle di `broker-vm.sh` con `revoked_users`). Una diversa: fermati.
 
 ## E2. `broker-vm.sh` nuovo (scrive sulla VM; il broker non si riavvia)
 
@@ -64,6 +66,20 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 - **Atteso:** «copia di prima fatta» (a un rilancio niente), `active`, poi nessuna riga o qualche riga «broker device refused …» (rifiuti veri degli ultimi 10 minuti), «rifiuti: fine», `1`.
 - **Fermati** se compare una riga con un indirizzo IP o un errore di `awk`.
 - **Ritorno indietro:** `sudo flock -w 300 /opt/domhouse/.engines.lock sh -c "install -m 755 /opt/domhouse/prima-a5/broker-vm.sh /opt/domhouse/broker-vm.sh && systemctl restart domhouse-agent-esecutore"`.
+
+## E2b. L'agente nuovo (scrive sulla VM; risposta 1211)
+
+Come D3 di A7: `agent-vm.sh install` riscrive `agent.conf` (com'era), il codice e le unità, e riavvia i due servizi, sotto il blocco della VM perché nessun ordine sia tagliato a metà. Cambia solo `esecutore.py` (l'elenco dei revocati); gli altri file sono quelli di A7.
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo flock -w 300 /opt/domhouse/.engines.lock env AMBIENTE=staging SOTTOSCRIZIONE=projects/domotica-poc-511707/subscriptions/domhouse-staging-ordini-vm RISULTATI=projects/domotica-poc-511707/topics/domhouse-staging-risultati bash ~/a5/agent-vm.sh install; sudo bash ~/a5/agent-vm.sh status | head -2; sudo grep -c "_keep_revoked" /opt/domhouse/agent/esecutore.py; sudo journalctl -u domhouse-agent-esecutore --since "-5 min" --no-pager | grep -c protezione_persa' < /dev/null
+```
+
+- **Atteso:** «agente installato: ambiente staging»; i due servizi `active`; `2`; **0** righe `protezione_persa`.
+- **Da verificare:** che sulla VM ci sia ancora la copia dell'installazione di prima per il ritorno indietro (`~/a7` se A7 è stato installato con la sua procedura, altrimenti `~/a2`).
+- **Ritorno indietro:** lo stesso comando dalla copia di prima (`~/a7/agent-vm.sh install`, o `~/a2/agent-vm.sh install`, sotto il blocco). Gli elenchi `devices/*.revocati` già scritti restano ma non danno fastidio: l'esecutore di prima non li legge; il `broker-vm.sh` di A5 li legge per al massimo 24 ore. Per toglierli: `sudo rm -f /etc/domhouse/_broker/devices/*.revocati`.
 
 ## E3. Il bucket e il sink (scrive su Google Cloud)
 
@@ -146,9 +162,25 @@ gcloud logging read 'jsonPayload.message:"broker device refused apt=test-a2-02 "
 
 - **Atteso:** fino a quattro righe «… broker device refused apt=test-a2-02 device=prova-a5 slot=… count=3 last=…»; la stessa finestra compare **due volte** (due giri del controllo): il server la conta una volta sola.
 - **Da verificare:** l'opzione `--view` di `gcloud logging read` (altrimenti `--bucket=domhouse-rifiuti --location=global`).
-- Se il dispositivo `prova-a5` era nuovo: «Revoca» nella pagina, così non resta un account inutile sul broker.
+- Poi E7: la revoca di `prova-a5` serve anche da prova dei revocati.
+
+## E7. La prova: un dispositivo revocato che prova ancora compare (risposta 1211)
+
+1. Nella stessa pagina: «Revoca» di `prova-a5`. Aspetta che lo stato diventi «Revocato» (l'ordine applicato sul broker).
+2. Sulla VM, l'elenco dei revocati e di nuovo i tre tentativi (sola lettura sull'elenco; i tentativi non cambiano niente):
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo cat /etc/domhouse/_broker/devices/test-a2-02.revocati; date +%s; for i in 1 2 3; do sudo docker run --rm --network host eclipse-mosquitto:2 mosquitto_pub -h mqtt.dh-lab.eu -p 8883 --capath /etc/ssl/certs -i test-a2-02.prova-a5 -u test-a2-02.prova-a5 -P password-sbagliata-di-prova -t test-a2-02/prova-a5/x -m x 2>&1 | tail -1; done' < /dev/null
+```
+
+- **Atteso:** una riga `prova-a5 <numero>` (l'ora della revoca in secondi) e, subito sotto, l'ora di adesso: la differenza è di pochi minuti, mai più di 86400 (24 ore). Poi tre righe di rifiuto. Se il file non c'è: fermati e incolla (l'esecutore nuovo non ha scritto l'elenco).
+- Gli altri dispositivi di `test-a2-02` non compaiono nell'elenco: c'è solo ciò che una revoca ha tolto nelle ultime 24 ore.
+3. Entro circa 10 minuti la pagina mostra per `prova-a5`, fra i revocati, gli accessi rifiutati e «Lo Shelly prova ancora a collegarsi: spegnilo».
+- **Niente da tornare indietro:** `prova-a5` resta revocato, e dopo 24 ore il controllo non lo nomina più; la riga sparisce dal file al primo `aggiorna_broker` di `test-a2-02`.
 
 ## Dopo l'installazione
 
-- Da annotare in `docs/limiti-noti.md` (memoria storica): ritardo fino a circa 10 minuti; i tentativi con un nome che non è di nessun dispositivo solo nella riga «other» della VM, mai nella pagina (risposta 1210, punto 4).
-- Le uscite di tutti i blocchi alla memoria storica, con l'impronta di E1 e il numero visto in E6.
+- Da annotare in `docs/limiti-noti.md` (memoria storica): ritardo fino a circa 10 minuti; i tentativi con un nome che non è di nessun dispositivo solo nella riga «other» della VM, mai nella pagina (risposta 1210, punto 4); un dispositivo revocato è nominato solo per 24 ore dalla revoca applicata, poi i suoi tentativi vanno fra gli «other» (risposta 1211).
+- Le uscite di tutti i blocchi alla memoria storica, con le impronte di E1, il numero visto in E6 e la riga dell'elenco vista in E7.
