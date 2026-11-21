@@ -389,6 +389,7 @@ class Esecutore:
 
     # ---- A3 §6.1: aggiorna_broker -------------------------------------------------------------------------------
     LEGACY = ("lab-01",)            # §6.4: the apartments of the old «-devices» secret, until their migration
+    REVOKED_S = 24 * 3600           # answer 1211: how long a device taken out stays named by the broker's check
 
     def _update_broker(self, order: comune.Order, output: list[str]) -> dict:
         """The complete list of fingerprints, written atomically to devices/<apt> (root, 600), then the broker's sync
@@ -406,6 +407,11 @@ class Esecutore:
         folder = self.config.broker_etc / "devices"
         folder.mkdir(mode=0o700, exist_ok=True)
         target, temporary = folder / apartment, folder / f".{apartment}.nuovo"
+        try:
+            self._keep_revoked(folder, apartment, {d["id"] for d in devices})
+        except OSError as exc:
+            output.append(f"elenco dei revocati di {apartment}: {type(exc).__name__}")
+            return comune.result(order, "fallito", "errore_interno")
         try:
             fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as out:
@@ -426,6 +432,40 @@ class Esecutore:
         if code != 0 or f"kept {apartment}" in text.split("\n"):
             return comune.result(order, "fallito", "sync_fallito")
         return comune.result(order, "riuscito", "ok", {"dispositivi": len(devices)})
+
+    def _keep_revoked(self, folder: Path, apartment: str, now_ids: set[str]) -> None:
+        """Answer 1211 (second reading of A5, new point 1): the ids this order takes out of devices/<apt> go to
+        devices/<apt>.revocati, «<id> <epoch>» per line (root, 600, never a fingerprint), for 24 hours: broker-vm.sh's
+        check names their refusals, and the page shows «Lo Shelly prova ancora a collegarsi: spegnilo». An id registered
+        again leaves it; older or bad lines are dropped. Written BEFORE devices/<apt>: if this fails the order fails
+        and nothing changed, so a retry finds the same ids to take out. An apartment id has no dot: no clash."""
+        now = int(self.clock().timestamp())
+        target = folder / apartment
+        try:
+            before = {line.split()[0] for line in target.read_text(encoding="utf-8").splitlines() if line.split()}
+        except FileNotFoundError:
+            before = set()
+        kept: dict[str, int] = {}
+        path = folder / f"{apartment}.revocati"
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            lines = []
+        for line in lines:
+            parts = line.split()
+            if (len(parts) == 2 and comune.DEVICE_ID_RE.fullmatch(parts[0]) and parts[1].isdigit()
+                    and now - self.REVOKED_S <= int(parts[1]) <= now + 300):
+                kept[parts[0]] = int(parts[1])
+        for device in before - now_ids:
+            if comune.DEVICE_ID_RE.fullmatch(device):
+                kept[device] = now
+        for device in now_ids:
+            kept.pop(device, None)
+        if kept:
+            self._write_atomic(path, "".join(f"{d} {t}\n" for d, t in sorted(kept.items())), 0o600)
+        elif path.exists() or path.is_symlink():
+            path.unlink()
+            _sync_dir(folder)
 
     def _protection_lost(self) -> list[str]:
         """Second reading of the code review, N1 and N2: a ReadOnlyPaths entry on a single file is a bind mount that
