@@ -484,7 +484,7 @@ auth_refused_devices() {
   # which must not fire for one device. At most AUTH_DEVICE_LINES device lines per round, the rest added to "other" (a burst of invented names cannot
   # fill the logs). awk without intervals nor mktime, and the lists as variables, not files (review A5, point 6: never the
   # name of the input file): the VM's awk may be mawk
-  local now slot s1 s2 apts users
+  local now slot s1 s2 apts users revoked
   now="${DOMHOUSE_NOW_EPOCH:-$(date +%s)}"
   slot=$(( now / 300 * 300 ))
   s1="$(date -u -d "@$(( slot - 300 ))" +%Y-%m-%dT%H:%M:00Z)"
@@ -497,11 +497,13 @@ auth_refused_devices() {
     echo "errore: elenco degli utenti del broker vuoto o illeggibile (${AUTH}/devices.passwd)" >&2
     return 1
   fi
+  revoked="$(revoked_users "${now}")"
   docker logs -t --since 20m "${CONTAINER}" 2>&1 | awk -v s1="${s1}" -v s2="${s2}" -v cap="${AUTH_DEVICE_LINES}" \
-      -v apts="${apts}" -v users="${users}" '
+      -v apts="${apts}" -v users="${users}" -v revoked="${revoked}" '
     function ok(x) { return length(x) <= 64 && x ~ /^[a-z0-9][a-z0-9-]*$/ }
     BEGIN { n_a = split(apts, a, " "); for (i = 1; i <= n_a; i++) known[a[i]] = 1
-            n_u = split(users, u, " "); for (i = 1; i <= n_u; i++) user[u[i]] = 1 }
+            n_u = split(users, u, " "); for (i = 1; i <= n_u; i++) user[u[i]] = 1
+            n_r = split(revoked, r, " "); for (i = 1; i <= n_r; i++) user[r[i]] = 1 }
     / New connection from .* on port 8883\.$/ { for (i = 1; i < NF; i++) if ($i == "from") outside[$(i + 1)] = 1; next }
     / disconnected: not authorised\.$/ {
       ts = $1
@@ -527,6 +529,21 @@ auth_refused_devices() {
       }
       for (s in other) print "broker device refused other slot=" s " count=" other[s]
     }'
+}
+
+revoked_users() {
+  # answer 1211 (second reading of A5, new point 1): the devices the executor took out of devices/<apt> in the last
+  # 24 hours, from devices/<apt>.revocati («<device> <epoch>» per line, written by aggiorna_broker), as «<apt>.<device>»:
+  # their refusals stay named, so the page shows «Lo Shelly prova ancora a collegarsi: spegnilo». After 24 hours, a
+  # time from the future or a bad line: not named (they count as «other»). The main awk still checks the id rule and
+  # the broker's list of apartments. The file reaches awk on stdin, never by its name
+  local now="$1" f apt
+  for f in "${DEVICES}"/*.revocati; do
+    [ -f "${f}" ] || continue
+    apt="${f##*/}"; apt="${apt%.revocati}"
+    awk -v now="${now}" -v apt="${apt}" -v keep=86400 \
+      'NF == 2 && $2 ~ /^[0-9]+$/ && $2 + 0 >= now - keep && $2 + 0 <= now + 300 { print apt "." $1 }' < "${f}" || true
+  done | tr '\n' ' '
 }
 
 auth_refused_devices_report() {
@@ -783,10 +800,10 @@ case "${cmd}" in
     valid_id "$1"
     lock_vm
     # A2 (project §6.9): repeatable, «already removed» is a success; the file of fingerprints goes in any case
-    if ! grep -qx "$1" "${APARTMENTS}"; then rm -f "${DEVICES}/$1"; echo "$1 non è nell'elenco: già tolto"; exit 0; fi
+    if ! grep -qx "$1" "${APARTMENTS}"; then rm -f "${DEVICES}/$1" "${DEVICES}/$1.revocati"; echo "$1 non è nell'elenco: già tolto"; exit 0; fi
     grep -vx "$1" "${APARTMENTS}" > "${APARTMENTS}.new" || true
     mv -f "${APARTMENTS}.new" "${APARTMENTS}"
-    rm -f "${DEVICES}/$1"
+    rm -f "${DEVICES}/$1" "${DEVICES}/$1.revocati"
     sync_accounts
     ;;
   devices-from-auth)

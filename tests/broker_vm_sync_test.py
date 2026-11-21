@@ -298,3 +298,56 @@ def test_a5_review_6_the_apartments_reach_awk_as_a_variable_not_through_filename
     text = (ROOT / "scripts" / "broker-vm.sh").read_text(encoding="utf-8")
     body = text[text.index("auth_refused_devices() {"):text.index("auth_refused_devices_report() {")]
     assert "FILENAME" not in body and '-v apts=' in body and '-v users=' in body
+
+
+# ---- answer 1211 (second reading of A5, new point 1): a revoked device stays named for 24 hours --------------------
+def _revoked_file(etc, apartment: str, text: str) -> None:
+    folder = etc / "_broker" / "devices"
+    folder.mkdir(exist_ok=True)
+    (folder / f"{apartment}.revocati").write_text(text, encoding="utf-8", newline="\n")
+
+
+def test_1211_a_device_revoked_less_than_24_hours_ago_is_named(vm):
+    run, stubs, etc = vm
+    _registered(etc, "apt-a.plug")
+    _revoked_file(etc, "apt-a", f"shelly-9 {int(NOW) - 3600}\n")
+    _with_log(stubs, _broker_log(("17:06:10", "apt-a.shelly-9", "out"), ("17:06:20", "apt-a.shelly-9", "out")))
+    r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW}")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == [
+        "broker device refused apt=apt-a device=shelly-9 slot=2026-11-20T17:05:00Z count=2 last=2026-11-20T17:06:20Z"]
+
+
+@pytest.mark.parametrize("text", [
+    f"shelly-9 {int(NOW) - 24 * 3600 - 1}\n",           # over 24 hours: back among the others
+    f"shelly-9 {int(NOW) + 3600}\n",                    # a time from the future is not believed
+    "shelly-9 yesterday\n",
+    "Shelly-9 1795190000\n",
+])
+def test_1211_after_24_hours_or_with_a_bad_line_it_is_other_again(vm, text):
+    run, stubs, etc = vm
+    _registered(etc, "apt-a.plug")
+    _revoked_file(etc, "apt-a", text)
+    _with_log(stubs, _broker_log(("17:06:10", "apt-a.shelly-9", "out")))
+    r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW}")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == ["broker device refused other slot=2026-11-20T17:05:00Z count=1"], r.stdout
+
+
+def test_1211_the_list_of_an_apartment_not_on_the_broker_names_nobody(vm):
+    run, stubs, etc = vm
+    _registered(etc, "apt-a.plug")
+    _revoked_file(etc, "apt-z", f"shelly-9 {int(NOW) - 60}\n")
+    _with_log(stubs, _broker_log(("17:06:10", "apt-z.shelly-9", "out")))
+    r = run("rifiuti", env=f"DOMHOUSE_NOW_EPOCH={NOW}")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.splitlines() == ["broker device refused other slot=2026-11-20T17:05:00Z count=1"], r.stdout
+
+
+def test_1211_remove_apartment_takes_the_list_away_too():
+    script = SCRIPT.read_text(encoding="utf-8")
+    remove = script[script.index("  remove-apartment)"):script.index("  devices-from-auth)")]
+    assert remove.count('rm -f "${DEVICES}/$1" "${DEVICES}/$1.revocati"') == 2      # in the list or already gone
+    body = script[script.index("revoked_users() {"):script.index("auth_refused_devices_report() {")]
+    assert "FILENAME" not in body and "< \"${f}\"" in body
+    assert "-v revoked=" in script[script.index("auth_refused_devices() {"):script.index("revoked_users() {")]
