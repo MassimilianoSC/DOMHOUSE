@@ -973,3 +973,72 @@ Solo i gestori della piattaforma, solo dove la creazione è disponibile (altrove
 - **La regola** (risposta 1196, la stessa dell'agente): al massimo `massimo_motori` motori nello staging; dopo il motore nuovo, con il suo tetto vero, almeno 400 MB disponibili; la somma dei tetti dell'ambiente più il nuovo entro il budget (staging 500 MB, risposta 1197; produzione: con la seconda VM, 1202). `posti_liberi` è quanti motori nuovi ci stanno ancora con la stessa regola.
 - **L'ultima lettura** si aggiorna con ogni `capienza` riuscita: quella di «Aggiorna» e quella di ogni creazione. Il sito rilegge la `GET` ogni 4 s finché `aggiornamento.stato` è «inviato».
 - **Una lettura con i numeri illeggibili non si salva:** `capienza` resta l'ultima buona (o `null`), e l'«Aggiorna» che l'ha chiesta risulta `aggiornamento: {stato: "fallito", codice: "errore_interno", messaggio: "La capienza letta non è valida: riprova"}`. `motivo` è quindi solo `null`, `staging_pieno` o `capienza_insufficiente`.
+
+## Eliminazione di un appartamento (strumento A, A6; `docs/proposta-a6.md`)
+
+**Forma concordata con o2 prima del codice (20 novembre); il codice è sul ramo `o1-a6-eliminazione` (`bff/deletion.py`).** Risposte del committente 1210: §8 punti 2–8 come proposti; punto 1 provvisorio.
+
+**Chi.** Disattiva e riattiva: il gestore della piattaforma con le rotte qui sotto, l'amministratore con l'interruttore «Attivo» di oggi (`PATCH /app/admin/apartments/{aid}` `{enabled}`). Elimina: **solo il gestore della piattaforma** (risposta 1210, punto 1 provvisorio), con il permesso in una funzione sola (`bff/deletion.py`, `can_delete`): con D-232 passa all'amministratore cambiando quella.
+
+**Uno stato solo.** «Disattiva» del gestore e «Attivo» spento dall'amministratore portano allo **stesso** stato: `enabled` falso più `disattivato_at` e `disattivato_da`. Fa esattamente quello che fa oggi (guida, «Attivo»): gli automatismi del motore continuano; si fermano notifiche (anche le gravi), riepiloghi, prenotazioni ed Excel; le operazioni rispondono 409 `apartment_disabled`. I 7 giorni (risposta 1210, punto 2) contano da `disattivato_at`, chiunque l'abbia disattivato. Riattivare toglie `disattivato_at` e `disattivato_da`: una nuova disattivazione riparte da zero. **Ciò che ha spento il gestore lo riaccende solo il gestore** (revisione di A6, punto 1, strada prudente finché il committente non decide): il `PATCH` dell'amministratore con `enabled: true` risponde 409 `disabled_by_platform` «L'ha disattivato il gestore della piattaforma: solo lui può riattivarlo.» e **non salva niente** del corpo (il modulo manda tutto il corpo: il sito deve mandare `enabled: false` o toglierlo, e mostrare il testo). Con `disattivato_da.ruolo` `amministratore`, o spento prima di A6, l'amministratore riaccende come oggi. «Disattiva» su una creazione non ancora pronta: 409 `creation_not_ready`.
+
+**Appartamenti spenti prima di A6** (nessun `disattivato_at`): `eliminabile_dal` è `null`. «Disattiva» su uno di loro risponde 200 e scrive l'ora: i 7 giorni partono da lì (la strada prudente: nessuno è eliminabile per un'attesa che il server non ha visto).
+
+### Campi nuovi
+
+In ogni riga di `GET /app/platform/tenants/{tid}/apartments`:
+
+| Campo | Forma | Note |
+|---|---|---|
+| `disattivato_at` | ora ISO UTC o `null` | `null` se attivo, o spento prima di A6 |
+| `disattivato_da` | `{ruolo: "gestore" \| "amministratore", nome}` o `null` | `nome` è il nome visibile, mai l'email |
+| `eliminabile_dal` | ora ISO UTC o `null` | calcolata dal server: `disattivato_at` + 7 giorni. `null` se attivo, senza `disattivato_at`, con `origine` `dev`, o con un'eliminazione già partita. Il sito mostra «Elimina» solo con `eliminabile_dal` passato (e il server lo ricontrolla) |
+| `origine` | `app`, `a_mano`, `dimostrativo`, `dev` | come si elimina (sotto) |
+| `eliminazione` | oggetto o `null` | `null` finché nessuno ha premuto «Elimina» |
+
+Nella riga dell'amministratore (`GET /app/admin/apartments`) solo `disattivato_at` e `disattivato_da`, per dire da quando e da chi è spento.
+
+**`origine`** (calcolata dal server):
+
+| Valore | Quando | «Elimina» |
+|---|---|---|
+| `app` | creato dall'app con A2 (`creazione` presente, `stato` `pronto`) | completa: motore, segreti, database (`togli_motore`) |
+| `a_mano` | collegato a mano a un motore vero (`lab-01`) | solo il documento, come oggi; il sito avvisa «Il motore sulla VM resta: va tolto a mano» (risposta 1210, punto 4) |
+| `dimostrativo` | `instance_url` `mock://…` | solo il documento (non c'è un motore) |
+| `dev` | l'appartamento `dev` | **mai** (D-118): 409 `not_deletable` |
+
+Un appartamento creato dall'app **non ancora pronto** non si elimina: si usa «Annulla» di A2 (409 `creation_not_ready`).
+
+**`eliminazione`:** `{stato, passo, codice, messaggio, op, version, iniziata_at, updated_at, updated_by}`.
+
+- `stato`: `in_corso` (dal clic all'ultimo passo), `non_riuscita` (calcolato alla lettura: 20 minuti senza avanzare, o l'ultimo ordine chiuso senza successo), `eliminato` (solo nella risposta che chiude: dopo, la riga non c'è più).
+- `passo`: `motore`, `segreti`, `database` (in quest'ordine: mai un documento tolto con il motore acceso).
+- `codice`/`messaggio`: perché si è fermata, solo con `non_riuscita`. I codici dell'agente per `togli_motore` (`bff/agent.py` CODES, per esempio `non_creato_da_agente`) e quelli del server: `chiavi_non_distrutte` (passo `segreti`), `errore_database` (passo `database`), `non_inviato`, `tempo_scaduto`, `errore_interno`.
+- `op`: `{op_id, operazione, stato, codice, messaggio}` dell'ultimo ordine all'agente, o `null`.
+- `updated_by`: nome visibile, mai l'email.
+- Mentre `eliminazione` non è `null` l'appartamento resta in elenco («Eliminazione in corso» / «Eliminazione non riuscita»), non si riattiva e non si modifica.
+
+### Rotte (tutte `require_platform`)
+
+| Chiamata | Corpo | Risposta |
+|---|---|---|
+| `POST /app/platform/tenants/{tid}/apartments/{aid}/disattiva` | — | 200 riga; 409 `already_disabled` (già spento con l'ora); 409 `deletion_in_progress` |
+| `POST …/{aid}/riattiva` | — | 200 riga; 409 `not_disabled`; 409 `deletion_in_progress` |
+| `POST …/{aid}/elimina` | `{nome}` | **202** `{eliminazione}` per `origine` `app`; **200** `{eliminazione: {stato: "eliminato", …}}` per `a_mano` e `dimostrativo` (solo il documento, subito); se la rimozione del documento fallisce, **202** con `non_riuscita` al passo `database` (`errore_database`) e «Riprova» toglie di nuovo **solo** il documento: i segreti di un appartamento collegato a mano non si toccano mai |
+| `GET …/{aid}/eliminazione` | — | 200 `{eliminazione}`; 404 se non è partita |
+| `POST …/{aid}/eliminazione/riprova` | `{version}` | riprende dal passo fermo; solo con `non_riuscita`. Passo `motore`: **202** `{eliminazione}` (un nuovo `togli_motore`). Passi `segreti` e `database` (niente VM): **200** `{eliminazione: {stato: "eliminato"}}` quando finisce, altrimenti 202 con il passo fermo |
+| `DELETE /app/platform/tenants/{tid}/apartments/{aid}` (di oggi) | — | **409 `use_elimina`** «Per eliminare: Disattiva, poi Elimina dopo 7 giorni»: nessuna strada che salti l'attesa e la conferma |
+
+Mentre un'eliminazione è in corso anche il `PATCH` dell'amministratore risponde 409 `deletion_in_progress`.
+
+**Ordine dei controlli di «Elimina»** (tutti prima di toccare qualcosa): 404 `not_found` (anche un `aid` di un'altra organizzazione); 409 `not_deletable` (`dev`); 409 `creation_not_ready`; 409 `not_disabled`; 409 `too_early` con `details.eliminabile_dal` (anche per gli spenti prima di A6, con `null`); 422 `name_mismatch` «Il nome non corrisponde» (confronto esatto con il nome salvato, dopo aver tolto gli spazi all'inizio e alla fine; niente maiuscole ignorate); 409 `deletion_in_progress`; 429 `rate_limited` con `details.riprova_dal` e `Retry-After` (2 eliminazioni al giorno per organizzazione, risposta 1210 punto 6; «Riprova» non conta); 503 `agent_not_configured` (solo `origine` `app`); 502 `agent_publish_failed` con `details.op`: l'eliminazione è comunque partita e si legge `non_riuscita` con `codice` `non_inviato` («Riprova»).
+
+**«Riprova»:** 422 `invalid_version`; 409 `version_changed`; 409 `invalid_state` (non è `non_riuscita`); 503/502 come sopra.
+
+### Email e registro attività
+
+- **Email agli amministratori dell'organizzazione e ai gestori della piattaforma** (risposta 1210, punto 5) a **ogni passaggio allo stato disattivato** e (revisione, punto 1) **a ogni riattivazione**, chiunque lo faccia: «Disattiva»/«Riattiva» del gestore **e** «Attivo» dell'amministratore. È la scelta prudente: il rischio 1 della proposta è proprio un amministratore compromesso. Poi all'inizio di «Elimina» (anche solo del documento). Nessuna email ai passi interni.
+- **Tetti delle email** per appartamento e per ora: 4 per gli interruttori (disattiva e riattiva), e un tetto **a parte** per «Eliminazione avviata», che nessun interruttore può consumare (revisione, punto 5).
+- **Il limite delle 2 al giorno** si conta solo quando un'eliminazione parte davvero: prima si scrive `eliminazione` nella transazione dell'appartamento (un doppio clic riceve 409 `deletion_in_progress`), poi si prende il posto; senza posto la scrittura si toglie e la risposta è 429 (revisione, punto 4). Un 503 non consuma posti.
+- Testo: nome e id dell'appartamento, chi (nome visibile), l'ora, e per «Disattiva» da quando si potrà eliminare. Nessun link che elimina.
+- Registro attività: `apartment_disabled` (`details.da`: `gestore` o `amministratore`), `apartment_reenabled`, `apartment_deletion_started` (`details.origine`), `apartment_deletion_failed` (scritta dal sistema, una volta per passo fermo, con `details.passo` e `details.codice`), `apartment_deleted` (di oggi).

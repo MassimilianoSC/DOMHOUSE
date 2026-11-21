@@ -165,7 +165,18 @@ class TestAdminApartments:
 
     def test_delete_apartment(self):
         assert requests.delete(f"{API}/app/admin/apartments/{self.APT_ID}", headers=hdr(ADMIN)).status_code == 403
-        assert plat("DELETE", f"{PLAT_APTS}/{self.APT_ID}").status_code == 204
+        # A6: never deleted without «Disattiva» and 7 days (this BFF cannot wait them: tests/deletion_test.py does);
+        # the old DELETE says where to go
+        r = plat("DELETE", f"{PLAT_APTS}/{self.APT_ID}")
+        assert r.status_code == 409 and r.json()["error"] == "use_elimina", r.text
+        r = plat("POST", f"{PLAT_APTS}/{self.APT_ID}/disattiva")
+        assert r.status_code == 200, r.text
+        assert r.json()["enabled"] is False and r.json()["disattivato_at"] and r.json()["eliminabile_dal"]
+        r = plat("POST", f"{PLAT_APTS}/{self.APT_ID}/elimina", json={"nome": "Renamed"})
+        assert r.status_code == 409 and r.json()["error"] == "too_early", r.text
+        row = next(a for a in requests.get(f"{API}/app/admin/apartments", headers=hdr(ADMIN)).json()
+                   if a["apartment_id"] == self.APT_ID)
+        assert row["enabled"] is False                               # still there, switched off
 
 
 # -------- instance URL (D-28): the BFF under test runs with INSTANCE_MODE=mock --------
@@ -222,7 +233,8 @@ class TestInstanceUrl:
         assert all("instance_secret_name" not in a for a in requests.get(f"{API}/app/admin/apartments", headers=hdr(ADMIN)).json())
 
     def test_cleanup(self):
-        assert plat("DELETE", f"{PLAT_APTS}/{self.APT_ID}").status_code == 204
+        # A6: switched off, not deleted (deleting waits 7 days); one BFF per suite, nothing after needs it gone
+        assert plat("POST", f"{PLAT_APTS}/{self.APT_ID}/disattiva").status_code == 200
 
 
 # -------- features --------
@@ -547,7 +559,9 @@ class TestApartmentScopeAdmin:
         assert self._patch({"apartment_ids": ["apt-rimini-01"]}).json()["apartment_ids"] == ["apt-rimini-01"]
         assert self._patch({"apartment_ids": "all"}).json()["apartment_ids"] == "all"
 
-    def test_deleted_apartment_leaves_lists_but_never_opens_all(self):
+    def test_a_switched_off_apartment_stays_in_the_lists(self):
+        """A6: «Disattiva» changes no list. «The deleted apartment leaves the lists but never opens all» needs the 7 days:
+        tests/deletion_test.py, test_full_run_a_deleted_apartment_leaves_the_lists_but_never_opens_all."""
         tmp = "apt-scope-tmp"
         r = plat("POST", PLAT_APTS, json={"apartment_id": tmp, "name": "Tmp", "instance_url": "mock://builtin"})
         assert r.status_code == 201, r.text
@@ -556,11 +570,11 @@ class TestApartmentScopeAdmin:
                           json={"email": "scope-two@demo.it", "role": "operator", "apartment_ids": [tmp, "apt-rimini-01"]})
         assert r.status_code == 201
         two = r.json()["uid"]
-        assert plat("DELETE", f"{PLAT_APTS}/{tmp}").status_code == 204
+        assert plat("DELETE", f"{PLAT_APTS}/{tmp}").json()["error"] == "use_elimina"
+        assert plat("POST", f"{PLAT_APTS}/{tmp}/disattiva").status_code == 200
         by_uid = {u["uid"]: u["apartment_ids"] for u in requests.get(f"{API}/app/admin/users", headers=hdr(ADMIN)).json()}
-        assert by_uid[TestApartmentScopeAdmin.uid] == []        # emptied, NOT "all"
-        assert by_uid[two] == ["apt-rimini-01"]
-        assert requests.get(f"{API}/app/apartments", headers=hdr(self.EMAIL)).json() == []
+        assert by_uid[TestApartmentScopeAdmin.uid] == [tmp]
+        assert by_uid[two] == [tmp, "apt-rimini-01"]
 
 
 if __name__ == "__main__":

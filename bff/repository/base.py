@@ -97,6 +97,28 @@ class Creazione(BaseModel):
     updated_by: str
 
 
+class Disattivazione(BaseModel):
+    """A6: who switched the apartment off (the platform's «Disattiva» or the administrator's «Attivo»): a Firebase uid,
+    its name from the activity log's people, never an email."""
+    ruolo: Literal["gestore", "amministratore"]
+    uid: str
+
+
+class Eliminazione(BaseModel):
+    """A6 (docs/proposta-a6.md §2): an apartment being deleted. `op` is the last order to the agent ({op_id,
+    operazione}); the state shown is computed at read time (bff/deletion.py: 20 minutes without progress, or the order
+    closed without success, is «non_riuscita»)."""
+    stato: Literal["in_corso", "non_riuscita"] = "in_corso"
+    passo: Literal["motore", "segreti", "database"] = "motore"
+    version: int = 1
+    op: dict | None = None
+    codice: str | None = None
+    iniziata_at: str = Field(default_factory=now_iso)
+    iniziata_da: str
+    updated_at: str = Field(default_factory=now_iso)
+    updated_by: str
+
+
 class Apartment(BaseModel):
     apartment_id: str
     tenant_id: str
@@ -119,6 +141,11 @@ class Apartment(BaseModel):
     simulated: bool = False
     # A2: set only for an apartment created from the app; None for those linked by hand (dev, lab-01, demonstrations)
     creazione: Creazione | None = None
+    # A6: switched off since (ISO, UTC) and by whom; None when on, or switched off before A6 (then not deletable until
+    # «Disattiva» writes the time). The 7 days of the deletion count from here, whoever switched it off
+    disattivato_at: str | None = None
+    disattivato_da: Disattivazione | None = None
+    eliminazione: Eliminazione | None = None
 
     @model_validator(mode="after")
     def _mock_is_simulated(self):
@@ -245,6 +272,9 @@ AuditAction = Literal[
     "device_credential_retried", "device_credential_revoke_not_applied",
     # A2 (docs/proposta-a2.md §6.4): «Riprova» and «Annulla» of a creation; apartment_created when it is «pronto»
     "apartment_creation_retried", "apartment_creation_cancelled",
+    # A6 (docs/proposta-a6.md §6): switched off (by either button) and on again; the deletion started, and a step stopped
+    # (written by the system); apartment_deleted when it is gone
+    "apartment_disabled", "apartment_reenabled", "apartment_deletion_started", "apartment_deletion_failed",
 ]
 
 
@@ -444,6 +474,8 @@ class Repository(Protocol):
     # absent; the way back removes only documents marked «migrato»
     async def put_migrated_credentials(self, apartment_id: str, fingerprints: dict, at: str) -> None: ...
     async def delete_migrated_credentials(self, apartment_id: str, device_ids: list) -> None: ...
+    # A6: every credential of the apartment (its last step of a deletion); the seq's record stays (D-67)
+    async def delete_device_credentials(self, apartment_id: str) -> None: ...
     async def device_credential_change(self, apartment_id: str, device_id: str, change, op: "AgentOp",
                                        build) -> tuple[dict, "AgentOp", bytes]: ...
 

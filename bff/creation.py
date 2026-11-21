@@ -267,6 +267,9 @@ async def _finish_cancel(apartment_id: str) -> None:
     await repo.release_external_id("link", link_key(apt.creazione.porta), apartment_id)
     if apt.external_ids.italianway:
         await repo.release_external_id("italianway", apt.external_ids.italianway, apartment_id)
+    # A6 review, point 7: a lab-/test- apartment may get devices registered before «pronto» (the platform's route of
+    # the credentials, answer 1170), and Firestore does not remove a subcollection with its document
+    await repo.delete_device_credentials(apartment_id)
     await repo.delete_apartment(apartment_id)
     warn("creation cancelled", apartment_id=apartment_id)
 
@@ -388,6 +391,10 @@ async def after_result(op, esito: str, codice: str, dati: dict, late: bool = Fal
     """Called by the receiver for capienza (of a creation), crea_motore and togli_motore, after the operation was
     closed (or found closed: Pub/Sub delivers again after a 503). What it did, for the log line."""
     repo = get_repository()
+    if op.operazione == "togli_motore":
+        from . import deletion
+        if await deletion.owns(op):                    # A6: the togli_motore of a deletion, not of a cancellation
+            return await deletion.after_result(op, esito, codice, late)
     apartment_id = op.apartment_id or op.per_appartamento
     apt = await repo.get_apartment(apartment_id) if apartment_id else None
     c = apt.creazione if apt else None

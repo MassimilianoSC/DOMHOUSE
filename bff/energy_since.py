@@ -77,14 +77,24 @@ async def search_and_save(apt: Apartment, actor: str, now: datetime | None = Non
         return None
     if found is None:
         return None
-    repo = get_repository()
-    stored = await repo.get_apartment(key)       # re-read: only energy_since changes, whatever else was saved stays
-    if stored is not None and (stored.energy_since is None or found < parse(stored.energy_since)):
-        stored.energy_since = iso(found)
-        await repo.upsert_apartment(stored)
+    saved = await save_since(key, iso(found))
+    if saved is not None:
         _next_try.pop(key, None)
-        return stored.energy_since
+        return saved
+    stored = await get_repository().get_apartment(key)
     return stored.energy_since if stored is not None else iso(found)
+
+
+async def save_since(apartment_id: str, value: str) -> str | None:
+    """Only energy_since, only when earlier than the stored one, inside the apartment's transaction (A6 review, point 2).
+    The value saved, or None when nothing changed."""
+    def change(a):
+        if a.energy_since is not None and parse(value) >= parse(a.energy_since):
+            return None
+        a.energy_since = value
+        return a
+    saved = await get_repository().change_apartment(apartment_id, change)
+    return saved.energy_since if saved is not None else None
 
 
 async def known(apt: Apartment, actor: str, *, wait: bool = False) -> str | None:

@@ -197,8 +197,10 @@ def test_italianway_code_is_freed_by_a_change_a_removal_or_a_deletion():
     row = run(platform.relink_tenant_apartment("t-iw-3", "apt-iw-4", platform.ApartmentLink(italianway_id=""), identity=PLAT))
     assert row["italianway_id"] is None                                            # "" removes it
     assert getattr(create("apt-iw-7", "IW-OLD"), "status_code", 200) == 200       # released by the removal
-    run(platform.delete_tenant_apartment("t-iw-3", "apt-iw-3", identity=PLAT))
-    assert getattr(create("apt-iw-5", "IW-NEW"), "status_code", 200) == 200       # released by the deletion
+    # A6: the old DELETE refuses (use_elimina); the deletion's last step is remove_apartment (bff/deletion.py _remove)
+    assert run(platform.delete_tenant_apartment("t-iw-3", "apt-iw-3", identity=PLAT)).status_code == 409
+    run(admin.remove_apartment(run(repo.get_apartment("apt-iw-3"))))
+    assert getattr(create("apt-iw-5", "IW-NEW"), "status_code", 200) == 200       # released by the deletion (1210, 8)
 
 
 def test_admin_cannot_set_or_change_an_italianway_code():

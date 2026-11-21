@@ -334,13 +334,36 @@ async def verify(apt: Apartment, actor: str) -> dict:
         out["contract_version"] = v.get("contract_version")
         out["features"] = v.get("features", [])
         out["ok"] = out["reachable"] and (out["health"] or {}).get("status_code") == 200 and bool(v)
-    repo = get_repository()
-    stored = await repo.get_apartment(apt.apartment_id)
-    if stored is not None:  # re-read: only last_check changes, whatever else was saved meanwhile stays
-        stored.last_check = LastCheck(ok=out["ok"], checked_at=now_iso(), error=out["error"],
-                                      secret_problem=bool(out.get("secret_problem")))
-        await repo.upsert_apartment(stored)
+    await save_last_check(apt.apartment_id, out)
     return out
+
+
+async def save_last_check(apartment_id: str, out: dict) -> None:
+    """Only last_check changes, inside the apartment's transaction: whatever else was saved meanwhile stays (A6 review,
+    point 2: a whole rewrite after a read could erase a deletion just started)."""
+    from .repository.base import LastCheck, now_iso
+    check = LastCheck(ok=out["ok"], checked_at=now_iso(), error=out["error"],
+                      secret_problem=bool(out.get("secret_problem")))
+
+    def change(a: Apartment):
+        a.last_check = check
+        return a
+    await get_repository().change_apartment(apartment_id, change)
+
+
+async def save_timezone(apartment_id: str, tz: str) -> tuple[str | None, Apartment | None]:
+    """Only the timezone changes, in the apartment's transaction; (the zone before, the apartment) or (None, None)
+    when there was nothing to change."""
+    before = {}
+
+    def change(a: Apartment):
+        if a.timezone == tz:
+            return None
+        before["tz"] = a.timezone
+        a.timezone = tz
+        return a
+    saved = await get_repository().change_apartment(apartment_id, change)
+    return (before.get("tz"), saved) if saved is not None else (None, None)
 
 
 async def get_version(apt: Apartment, *, timeout: float | None = None) -> dict:
@@ -402,12 +425,9 @@ async def sync_timezone(apt: Apartment, engine_apartment) -> None:
     if await repo.claim_work(claim, runtime.BOOT_ID, TZ_CLAIM_S) != "mine":
         return
     try:
-        stored = await repo.get_apartment(apt.apartment_id)
-        if stored is None or stored.timezone == tz:
+        before, stored = await save_timezone(apt.apartment_id, tz)
+        if stored is None:
             return
-        before = stored.timezone
-        stored.timezone = tz
-        await repo.upsert_apartment(stored)
         info("apartment timezone from the engine", apartment_id=apt.apartment_id, **{"from": before, "to": tz})
         await audit.record("timezone_changed", audit.SYSTEM, stored.tenant_id,
                            audit.apartment_target(stored.apartment_id, stored.name), **{"from": before, "to": tz})
