@@ -295,3 +295,14 @@ def test_1211_a_list_that_cannot_be_read_stops_the_order_before_the_devices_chan
     out = vm.send(order(seq=1, devices=[]))
     assert (out["esito"], out["codice"]) == ("fallito", "errore_interno")
     assert (folder / "lab-07").read_text(encoding="utf-8") == f"shelly-1 {H1}\n" and vm.runs == []
+
+
+def test_1211_a_refused_order_writes_no_list(vm):
+    """Third reading of A5, point 10: refused before anything (apartment unknown, lab-01 not migrated): no .revocati."""
+    folder = vm.broker_etc / "devices"
+    folder.mkdir(mode=0o700)
+    for apartment in ("lab-99", "lab-01"):
+        (folder / apartment).write_text(f"shelly-1 {H1}\n", encoding="utf-8")
+    assert vm.send(order(apartment="lab-99", seq=1, devices=[]))["codice"] == "appartamento_sconosciuto"
+    assert vm.send(order(apartment="lab-01", seq=1, devices=[]))["codice"] == "migrazione_non_fatta"
+    assert sorted(p.name for p in folder.iterdir()) == ["lab-01", "lab-99"] and vm.runs == []
