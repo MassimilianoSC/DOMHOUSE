@@ -363,6 +363,7 @@
 <li><a href="#invitare-un-collega-de805874">Invitare un collega</a></li>
 <li><a href="#provare-l-app-con-il-simulatore-8a0bfbac">Provare l&#x27;app con il Simulatore</a></li>
 <li><a href="#creare-un-organizzazione-e-un-appartamento-hqe-5f89b0a2">Creare un&#x27;organizzazione e un appartamento (HQE)</a></li>
+<li><a href="#un-appartamento-nuovo-da-zero-con-gli-shelly-staging-248b07e1">Un appartamento nuovo da zero, con gli Shelly (staging)</a></li>
 <li><a href="#quando-qualcosa-non-funziona-3520305f">Quando qualcosa non funziona</a></li>
 <li><a href="#una-giornata-tipo-dell-operatore-427bb9fd">Una giornata tipo dell&#x27;operatore</a></li>
 </ol></li>
@@ -4295,7 +4296,8 @@ primo amministratore», eventuale nome; «Crea». Leggi l&#x27;esito dell&#x27;i
 </li>
 <li>
 <p><strong>Nella scheda dell&#x27;organizzazione</strong> premi «Appartamenti» › «Collega un sistema esistente». Nello staging, per
-un appartamento nuovo da zero, c&#x27;è anche «Nuovo appartamento» (parte 7).</p>
+un appartamento nuovo da zero, c&#x27;è anche «Nuovo appartamento»: vedi «Un appartamento nuovo da zero, con gli
+Shelly», qui sotto.</p>
 </li>
 <li>
 <p><strong>Compila</strong> «ID» definitivo, «Nome», «Indirizzo del sistema domotico», eventuale «Porta», «Fuso orario», «ID
@@ -4320,6 +4322,68 @@ l&#x27;appartamento agli utenti.</p>
 <blockquote class="note-info">
 <p><strong>Da sapere</strong></p>
 <p>Nel sito vero i dimostrativi non si possono creare: si provano nell&#x27;ambiente di prova (dal 9 novembre 2026).</p>
+</blockquote>
+<h3 id="un-appartamento-nuovo-da-zero-con-gli-shelly-staging-248b07e1">Un appartamento nuovo da zero, con gli Shelly (staging)</h3>
+<p class="lead"><strong>Dall&#x27;appartamento vuoto ai dispositivi in linea. Stato al 21 novembre 2026: alcuni passi li fa ancora HQE.</strong></p>
+<ul>
+<li>
+<p><strong>Dove:</strong> per ora solo nello staging; in produzione arriva con la seconda macchina virtuale.</p>
+</li>
+<li>
+<p><strong>Chi crea l&#x27;appartamento:</strong> oggi il Gestore della piattaforma (HQE). Se potrà farlo anche l&#x27;amministratore del
+cliente è ancora da decidere.</p>
+</li>
+<li>
+<p><strong>La colonna «Chi»</strong> dice chi fa il passo oggi: «App» se c&#x27;è un pulsante, «HQE» se per ora lo facciamo noi.</p>
+</li>
+</ul>
+<p><strong>In sede, prima di andare nell&#x27;appartamento:</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">N.</th><th scope="col" class="align-left">Passo</th><th scope="col" class="align-left">Chi</th><th scope="col" class="align-left">Dove</th></tr></thead>
+<tbody>
+<tr><td data-label="N." class="align-left">1</td><td data-label="Passo" class="align-left">Fai l&#x27;inventario: stanze, cosa si comanda, dove vanno i sensori, il nome della rete Wi-Fi</td><td data-label="Chi" class="align-left">Cliente</td><td data-label="Dove" class="align-left">Guida del kit (in preparazione)</td></tr>
+<tr><td data-label="N." class="align-left">2</td><td data-label="Passo" class="align-left">Componi il kit e aggiorna il firmware di ogni Shelly alla versione fissata</td><td data-label="Chi" class="align-left">Cliente, con HQE</td><td data-label="Dove" class="align-left">Guida del kit (in preparazione)</td></tr>
+<tr><td data-label="N." class="align-left">3</td><td data-label="Passo" class="align-left">Controlla i posti liberi e crea l&#x27;appartamento: «Nuovo appartamento»</td><td data-label="Chi" class="align-left">App (Gestore della piattaforma)</td><td data-label="Dove" class="align-left">Parte 7</td></tr>
+<tr><td data-label="N." class="align-left">4</td><td data-label="Passo" class="align-left">Scrivi l&#x27;elenco dei dispositivi dell&#x27;appartamento (catalogo)</td><td data-label="Chi" class="align-left">HQE</td><td data-label="Dove" class="align-left">Arriverà nell&#x27;app con il catalogo</td></tr>
+<tr><td data-label="N." class="align-left">5</td><td data-label="Passo" class="align-left">Registra ogni Shelly: «Registra un dispositivo»</td><td data-label="Chi" class="align-left">App</td><td data-label="Dove" class="align-left">Parte 6, «Credenziali dei dispositivi»</td></tr>
+<tr><td data-label="N." class="align-left">6</td><td data-label="Passo" class="align-left">Copia i dati della finestra nella pagina MQTT dello Shelly; la password si vede una volta sola</td><td data-label="Chi" class="align-left">Cliente, a mano</td><td data-label="Dove" class="align-left">Parte 6, la tabella dei campi</td></tr>
+<tr><td data-label="N." class="align-left">7</td><td data-label="Passo" class="align-left">Le altre impostazioni dello Shelly: Matter spento, «com&#x27;era» dopo un blackout, cloud spento, le due reti Wi-Fi</td><td data-label="Chi" class="align-left">Cliente, con HQE</td><td data-label="Dove" class="align-left">Guida del kit (in preparazione)</td></tr>
+<tr><td data-label="N." class="align-left">8</td><td data-label="Passo" class="align-left">Abbina i sensori a batteria allo Shelly che fa da ponte</td><td data-label="Chi" class="align-left">Cliente, con HQE</td><td data-label="Dove" class="align-left">Guida del kit (in preparazione)</td></tr>
+<tr><td data-label="N." class="align-left">9</td><td data-label="Passo" class="align-left">Accendi tutto in sede e controlla che ogni Shelly sia «Pronto» e in linea</td><td data-label="Chi" class="align-left">App</td><td data-label="Dove" class="align-left">Parte 6, «Credenziali» e «Stato dei dispositivi»</td></tr>
+</tbody></table></div>
+<p><strong>Nell&#x27;appartamento:</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">N.</th><th scope="col" class="align-left">Passo</th><th scope="col" class="align-left">Chi</th><th scope="col" class="align-left">Dove</th></tr></thead>
+<tbody>
+<tr><td data-label="N." class="align-left">10</td><td data-label="Passo" class="align-left">L&#x27;elettricista monta gli Shelly secondo il foglio, senza password</td><td data-label="Chi" class="align-left">Elettricista</td><td data-label="Dove" class="align-left">Guida del kit (in preparazione)</td></tr>
+<tr><td data-label="N." class="align-left">11</td><td data-label="Passo" class="align-left">Dai corrente: ogni Shelly si collega da solo al Wi-Fi dell&#x27;appartamento</td><td data-label="Chi" class="align-left">—</td><td data-label="Dove" class="align-left">Parte 6, «Stato dei dispositivi»</td></tr>
+<tr><td data-label="N." class="align-left">12</td><td data-label="Passo" class="align-left">Se uno non si collega, guarda gli accessi rifiutati e segui «Cosa fare»</td><td data-label="Chi" class="align-left">App</td><td data-label="Dove" class="align-left">Parte 6, «Gli accessi rifiutati»</td></tr>
+<tr><td data-label="N." class="align-left">13</td><td data-label="Passo" class="align-left">Prova a mano che ogni relè scatti, prima di chiudere le scatole</td><td data-label="Chi" class="align-left">Elettricista, con l&#x27;app</td><td data-label="Dove" class="align-left">Collaudo guidato (arriverà con il catalogo)</td></tr>
+</tbody></table></div>
+<p><strong>Dopo:</strong></p>
+<div class="table-scroll" role="region" aria-label="Tabella della guida" tabindex="0"><table>
+<thead><tr><th scope="col" class="align-left">N.</th><th scope="col" class="align-left">Passo</th><th scope="col" class="align-left">Chi</th><th scope="col" class="align-left">Dove</th></tr></thead>
+<tbody>
+<tr><td data-label="N." class="align-left">14</td><td data-label="Passo" class="align-left">Completa l&#x27;appartamento e assegnalo agli utenti</td><td data-label="Chi" class="align-left">App (Amministratore)</td><td data-label="Dove" class="align-left">Parte 6, «Appartamenti»</td></tr>
+<tr><td data-label="N." class="align-left">15</td><td data-label="Passo" class="align-left">Regola la soglia di «spento» del clima</td><td data-label="Chi" class="align-left">HQE, per ora</td><td data-label="Dove" class="align-left">Nella pagina Regole, quando sarà pubblicata</td></tr>
+</tbody></table></div>
+<blockquote class="note-info">
+<p><strong>Da sapere</strong></p>
+<ul>
+<li>
+<p><strong>Una password persa</strong> non si recupera: «Rigenera» e scrivi la nuova nello Shelly.</p>
+</li>
+<li>
+<p><strong>Uno Shelly perso, rubato o tolto:</strong> «Revoca».</p>
+</li>
+<li>
+<p><strong>Se la creazione si ferma</strong> a metà: «Riprova» o «Annulla creazione», come dice il messaggio (parte 7).</p>
+</li>
+<li>
+<p><strong>Questa pagina cresce</strong> con il catalogo e la guida del kit: i passi «HQE» e «in preparazione» diventeranno
+pulsanti e istruzioni.</p>
+</li>
+</ul>
 </blockquote>
 <h3 id="quando-qualcosa-non-funziona-3520305f">Quando qualcosa non funziona</h3>
 <p class="lead"><strong>Leggere l&#x27;avviso, copiare l&#x27;identificativo, annotare, segnalare.</strong></p>
@@ -5141,6 +5205,9 @@ dell&#x27;email di chi comanda.</p>
 <p class="lead"><strong>Che cosa è cambiato, aggiornamento per aggiornamento.</strong></p>
 <h3 id="21-novembre-2026-staging-2afcc45e">21 novembre 2026 (staging)</h3>
 <ul>
+<li>
+<p><strong>Passo per passo</strong> (parte 9): «Un appartamento nuovo da zero, con gli Shelly», con chi fa ogni passo oggi.</p>
+</li>
 <li>
 <p><strong>Credenziali dei dispositivi</strong>: sotto ogni dispositivo, i tentativi di collegamento rifiutati nelle ultime 24
 ore, con cosa fare (parte 6).</p>

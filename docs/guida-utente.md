@@ -2560,7 +2560,8 @@ Vedi la parte 5, «Approvazioni: approvare o respingere». In breve:
    primo amministratore», eventuale nome; «Crea». Leggi l'esito dell'invito.
 2. **Il primo amministratore entra** come nella parte 2. Finché non entra puoi usare «Reinvia invito».
 3. **Nella scheda dell'organizzazione** premi «Appartamenti» › «Collega un sistema esistente». Nello staging, per
-   un appartamento nuovo da zero, c'è anche «Nuovo appartamento» (parte 7).
+   un appartamento nuovo da zero, c'è anche «Nuovo appartamento»: vedi «Un appartamento nuovo da zero, con gli
+   Shelly», qui sotto.
 4. **Compila** «ID» definitivo, «Nome», «Indirizzo del sistema domotico», eventuale «Porta», «Fuso orario», «ID
    Italianway» (deve essere quello giusto: decide dove vanno le prenotazioni), «Attivo», «Appartamento dimostrativo»;
    «Salva».
@@ -2574,6 +2575,53 @@ Vedi la parte 5, «Approvazioni: approvare o respingere». In breve:
 > **Da sapere**
 >
 > Nel sito vero i dimostrativi non si possono creare: si provano nell'ambiente di prova (dal 9 novembre 2026).
+
+### Un appartamento nuovo da zero, con gli Shelly (staging)
+
+**Dall'appartamento vuoto ai dispositivi in linea. Stato al 21 novembre 2026: alcuni passi li fa ancora HQE.**
+
+- **Dove:** per ora solo nello staging; in produzione arriva con la seconda macchina virtuale.
+- **Chi crea l'appartamento:** oggi il Gestore della piattaforma (HQE). Se potrà farlo anche l'amministratore del
+  cliente è ancora da decidere.
+- **La colonna «Chi»** dice chi fa il passo oggi: «App» se c'è un pulsante, «HQE» se per ora lo facciamo noi.
+
+**In sede, prima di andare nell'appartamento:**
+
+| N. | Passo | Chi | Dove |
+|---|---|---|---|
+| 1 | Fai l'inventario: stanze, cosa si comanda, dove vanno i sensori, il nome della rete Wi-Fi | Cliente | Guida del kit (in preparazione) |
+| 2 | Componi il kit e aggiorna il firmware di ogni Shelly alla versione fissata | Cliente, con HQE | Guida del kit (in preparazione) |
+| 3 | Controlla i posti liberi e crea l'appartamento: «Nuovo appartamento» | App (Gestore della piattaforma) | Parte 7 |
+| 4 | Scrivi l'elenco dei dispositivi dell'appartamento (catalogo) | HQE | Arriverà nell'app con il catalogo |
+| 5 | Registra ogni Shelly: «Registra un dispositivo» | App | Parte 6, «Credenziali dei dispositivi» |
+| 6 | Copia i dati della finestra nella pagina MQTT dello Shelly; la password si vede una volta sola | Cliente, a mano | Parte 6, la tabella dei campi |
+| 7 | Le altre impostazioni dello Shelly: Matter spento, «com'era» dopo un blackout, cloud spento, le due reti Wi-Fi | Cliente, con HQE | Guida del kit (in preparazione) |
+| 8 | Abbina i sensori a batteria allo Shelly che fa da ponte | Cliente, con HQE | Guida del kit (in preparazione) |
+| 9 | Accendi tutto in sede e controlla che ogni Shelly sia «Pronto» e in linea | App | Parte 6, «Credenziali» e «Stato dei dispositivi» |
+
+**Nell'appartamento:**
+
+| N. | Passo | Chi | Dove |
+|---|---|---|---|
+| 10 | L'elettricista monta gli Shelly secondo il foglio, senza password | Elettricista | Guida del kit (in preparazione) |
+| 11 | Dai corrente: ogni Shelly si collega da solo al Wi-Fi dell'appartamento | — | Parte 6, «Stato dei dispositivi» |
+| 12 | Se uno non si collega, guarda gli accessi rifiutati e segui «Cosa fare» | App | Parte 6, «Gli accessi rifiutati» |
+| 13 | Prova a mano che ogni relè scatti, prima di chiudere le scatole | Elettricista, con l'app | Collaudo guidato (arriverà con il catalogo) |
+
+**Dopo:**
+
+| N. | Passo | Chi | Dove |
+|---|---|---|---|
+| 14 | Completa l'appartamento e assegnalo agli utenti | App (Amministratore) | Parte 6, «Appartamenti» |
+| 15 | Regola la soglia di «spento» del clima | HQE, per ora | Nella pagina Regole, quando sarà pubblicata |
+
+> **Da sapere**
+>
+> - **Una password persa** non si recupera: «Rigenera» e scrivi la nuova nello Shelly.
+> - **Uno Shelly perso, rubato o tolto:** «Revoca».
+> - **Se la creazione si ferma** a metà: «Riprova» o «Annulla creazione», come dice il messaggio (parte 7).
+> - **Questa pagina cresce** con il catalogo e la guida del kit: i passi «HQE» e «in preparazione» diventeranno
+>   pulsanti e istruzioni.
 
 ### Quando qualcosa non funziona
 
@@ -3156,6 +3204,7 @@ Per ogni problema annota:
 
 ### 21 novembre 2026 (staging)
 
+- **Passo per passo** (parte 9): «Un appartamento nuovo da zero, con gli Shelly», con chi fa ogni passo oggi.
 - **Credenziali dei dispositivi**: sotto ogni dispositivo, i tentativi di collegamento rifiutati nelle ultime 24
   ore, con cosa fare (parte 6).
 - **Organizzazioni**: un appartamento si elimina con «Disattiva», 7 giorni di attesa ed «Elimina» scrivendo il
