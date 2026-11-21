@@ -2,7 +2,7 @@
 
 | Stato | Preparata | Codice | Chi lancia | Comandi |
 |---|---|---|---|---|
-| **Da rileggere**; si usa solo **dopo** l'installazione di A2 (C0–C9, fatta il 20 novembre). A7 è unito in `main` con `8c9b5d9` (20 novembre, 17:56), insieme alle correzioni di A2 (`c6ed88f`, `d6ea4a0`). Nessun passo provato sul vero | o1, 20 novembre 2026, 16:10; unione 17:56 | `8c9b5d9`, l'unione di A7 in `main` (le impronte si calcolano da `origin/main`, D1) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | D0–D6 |
+| **Riletta il 21 novembre** (revisore in sola lettura: «eseguibile dopo correzioni», sei punti corretti dalla memoria storica alle 10:29); si usa solo **dopo** l'installazione di A2 (C0–C9, fatta il 20 novembre). A7 è unito in `main` con `8c9b5d9` (20 novembre, 17:56), insieme alle correzioni di A2 (`c6ed88f`, `d6ea4a0`). Nessun passo provato sul vero | o1, 20 novembre 2026, 16:10; unione 17:56 | `8c9b5d9`, l'unione di A7 in `main` (le impronte si calcolano da `origin/main`, D1) | il committente, un blocco alla volta, in Git Bash, con la memoria storica in chat | D0–D6 |
 
 **Cosa si installa** (`docs/proposta-a7.md`, risposte 1196–1202):
 
@@ -46,10 +46,12 @@ for f in scripts/agent-vm.sh scripts/engine-vm.sh scripts/agent/comune.py script
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='mkdir -p ~/a7/agent' < /dev/null
 gcloud compute scp scripts/agent-vm.sh scripts/engine-vm.sh langbrain-dev:a7/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
 gcloud compute scp scripts/agent/comune.py scripts/agent/lettore.py scripts/agent/esecutore.py scripts/agent/domhouse-agent-esecutore.service scripts/agent/domhouse-agent-lettore.service langbrain-dev:a7/agent/ --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a7 && sed -i "s/\r*$//" *.sh agent/*.py agent/*.service && sha256sum *.sh agent/* | cut -c1-16,65-' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='cd ~/a7 && sed -i "s/\r*$//" *.sh agent/*.py agent/*.service && sha256sum *.sh agent/* | cut -c1-16,65- && sudo diff /etc/systemd/system/domhouse-agent-esecutore.service agent/domhouse-agent-esecutore.service && echo "unità dell'esecutore uguale"' < /dev/null
 ```
 
-- **Atteso:** prima le sette impronte calcolate sul PC da `origin/main`, poi le stesse sette dalla VM. Una diversa: fermati.
+- **Atteso:** prima le sette impronte calcolate sul PC da `origin/main`, poi le stesse sette dalla VM (in ordine diverso: si confrontano per nome). Una diversa: fermati.
+- **Poi** «unità dell'esecutore uguale»: l'unità non è cambiata dopo A2 (ultimo commit che la tocca `3641d19`), quindi non serve una prova con `systemd-run`. Se compaiono righe di differenza: fermati e incollale.
+- `broker-vm.sh` A7 non lo installa. Verificato dalla memoria storica il 21 novembre in sola lettura: quello sulla VM ha la stessa impronta di `origin/main` (`6044621450f726ef`), quindi la correzione di A2 `d6ea4a0` c'è già.
 
 ## D2. `engine-vm.sh` (scrive sulla VM; nessun motore si riavvia)
 
@@ -70,15 +72,29 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 ```bash
 # Git Bash
 cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
-gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo flock -w 300 /opt/domhouse/.engines.lock env AMBIENTE=staging SOTTOSCRIZIONE=projects/domotica-poc-511707/subscriptions/domhouse-staging-ordini-vm RISULTATI=projects/domotica-poc-511707/topics/domhouse-staging-risultati bash ~/a7/agent-vm.sh install; sudo bash ~/a7/agent-vm.sh status | head -2; sudo cat /etc/domhouse/agent.conf; sudo journalctl -u domhouse-agent-esecutore --since "-5 min" --no-pager | grep -c protezione_persa' < /dev/null
+gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo flock -w 300 /opt/domhouse/.engines.lock env AMBIENTE=staging SOTTOSCRIZIONE=projects/domotica-poc-511707/subscriptions/domhouse-staging-ordini-vm RISULTATI=projects/domotica-poc-511707/topics/domhouse-staging-risultati bash ~/a7/agent-vm.sh install; sudo bash ~/a7/agent-vm.sh status | head -2; sudo cat /etc/domhouse/agent.conf' < /dev/null
 ```
 
-- **Atteso:** «agente installato: ambiente staging»; i due servizi `active`; `agent.conf` **senza** righe `BUDGET_…`; **0** righe `protezione_persa`.
+- **Atteso:** «agente installato: ambiente staging»; i due servizi `active`; `agent.conf` **senza** righe `BUDGET_…`.
+- **Poi, prima di D4: «Prova l'agente»** (come C8 di A2; scrive un ordine «stato»). Nell'app dello staging, pagina della piattaforma → «Prova l'agente» su `lab-01`. **Atteso:** esito **riuscito**: l'agente nuovo firma e risponde. Legge solo `/health` del motore, non tocca gli Shelly. Altro esito, o «in attesa» oltre un minuto: incolla le ultime righe di `sudo journalctl -u domhouse-agent-lettore -u domhouse-agent-esecutore -n 30 --no-pager`.
+- (Prima c'era un controllo `grep -c protezione_persa`: tolto, perché quella riga nasce solo con un ordine `aggiorna_broker`, `crea_motore` o `togli_motore`, e nei minuti dopo l'installazione non ne arriva nessuno.)
 - **Ritorno indietro:** lo stesso comando dalla copia di A2 (`~/a2/agent-vm.sh install`, sotto il blocco). L'installatore di A2 riscrive `agent.conf` senza righe `BUDGET_…`: l'agente di A2 rifiuta una chiave che non conosce, e con quella riga l'esecutore non partirebbe. Per questo nessun passo lascia la riga scritta (D6.2 la toglie).
 
 ## D4. Server e sito dello staging (il committente pubblica)
 
 Come C7 di A2: `publish.sh` dello staging, server **e** sito, dal commit di `main` che contiene A7.
+
+**Prima, l'account di Firebase** (lezione di A2: `publish.sh` usa l'account attivo):
+
+```bash
+# Git Bash
+cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
+npx firebase-tools login:list
+```
+
+- **Atteso:** `m.scardovellicrac@gmail.com`. Se è un altro: `npx firebase-tools login:use m.scardovellicrac@gmail.com`, poi di nuovo `login:list`.
+
+**Poi la pubblicazione:**
 
 ```bash
 # Git Bash
@@ -87,7 +103,8 @@ git fetch -q origin && git merge-base --is-ancestor HEAD origin/main && git log 
 ```
 
 - **Atteso:** la pubblicazione dello staging riuscita, revisione nuova al 100 %, «PWA: https://domhouse-staging.web.app». Poi **ricarica la pagina** dell'app.
-- **Ritorno indietro:** `gcloud run services update-traffic domotica-bff-staging --to-revisions=<la revisione di prima>=100 --region=europe-west8 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com`.
+- **Ritorno indietro del server:** `gcloud run services update-traffic domotica-bff-staging --to-revisions=domotica-bff-staging-00025-8jq=100 --region=europe-west8 --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com` (`00025-8jq` è la revisione di oggi, da `bff:cea90d4`, letta il 21 novembre; se prima di D4 ne esce un'altra, vale quella che dice l'uscita di `publish.sh`).
+- **Ritorno indietro del sito:** nella console di Firebase, progetto dello staging → Hosting → cronologia delle release → sulla release di prima «Ripristina». Si fa insieme a quello del server: non è provato che il sito nuovo funzioni con il server di prima.
 
 ## D5. I due allarmi (scrive su Google Cloud)
 
@@ -102,13 +119,19 @@ DRY_RUN=1 GCP_PROJECT_ID=domotica-poc-511707 CLOUDSDK_CORE_ACCOUNT=m.scardovelli
 
 ## D6. Le prove (scrivono: ordini «capienza», una creazione che si ferma, due righe di prova nei registri)
 
+**Cosa resta dopo D6** (sulla VM niente: `capienza` non tocca i motori, `crea_motore` non parte e D6.2 rimette `agent.conf` com'era):
+
+- in Secret Manager i due segreti `langbrain-api-key-test-a7-01` e `langbrain-shelly-test-a7-01`, con le versioni distrutte con ritardo, finché non li toglie la pulizia mensile;
+- in Firestore l'id `test-a7-01`, che non si potrà più usare (D-67), e un posto delle 5 creazioni dell'ora;
+- in Cloud Logging le due righe «(prova di A7)» di D6.3, per i 30 giorni del bucket `_Default`: il resoconto del lunedì (D-210) le ignora.
+
 **D6.1 «Posti liberi»** (piano: la capienza si vede prima di creare).
 
 1. Nell'app dello staging: Organizzazioni → un'organizzazione di prova → «Nuovo appartamento»: la riga della capienza dice «Capienza non ancora letta» oppure l'ultima lettura con la sua ora.
-2. «Aggiorna»: entro qualche secondo «Posti liberi: N (letto alle …)».
+2. «Aggiorna»: entro qualche secondo «Posti liberi nello staging: N (letto alle …)».
 3. **Atteso**, con `dev`, `lab-01` e `test-a2-02` (tre motori di prova da 120 MB), secondo la memoria disponibile annotata in D0 (seconda lettura della revisione, nota 3):
-   - **520 MB o più:** **1** posto (il numero massimo 4 lascia un posto, il budget di 500 MB ne lascia uno, la memoria almeno uno);
-   - **meno di 520 MB:** **0** posti, «Nessun posto libero», con motivo `capienza_insufficiente`: dopo un motore nuovo da 120 MB resterebbero meno di 400 MB.
+   - **520 MB o più:** «Posti liberi nello staging: 1» (il numero massimo 4 lascia un posto, il budget di 500 MB ne lascia uno, la memoria almeno uno);
+   - **meno di 520 MB:** «Nessun posto libero: serve una VM più grande o la seconda VM (…)», con motivo `capienza_insufficiente`: dopo un motore nuovo da 120 MB resterebbero meno di 400 MB.
    - Un altro esito: incolla la schermata della riga alla memoria storica.
 4. I tetti contati dall'agente sono quelli veri dei contenitori (revisione del codice di A7, «da verificare» 1), sola lettura:
 
@@ -130,7 +153,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 1. **Atteso:** `BUDGET_MB_STAGING=200`.
 2. Nell'app: «Aggiorna» → «Nessun posto libero: serve una VM più grande o la seconda VM».
-3. «Nuovo appartamento», id `test-a7-01`: **Atteso:** «Creazione rimasta a metà» con «La macchina virtuale non ha memoria per un sistema domotico in più»; poi «Annulla creazione» (sulla VM non c'è niente da togliere).
+3. «Nuovo appartamento», id `test-a7-01`: **Atteso:** «Creazione rimasta a metà» con «La macchina virtuale non ha memoria per un sistema domotico in più.»; poi «Annulla creazione» (sulla VM non c'è niente da togliere).
 4. Il budget torna com'era: la riga si toglie (il valore predefinito torna 500):
 
 ```bash
@@ -139,7 +162,7 @@ cd /c/Users/mcracchiolo/Desktop/DOMOTICA/app
 gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --command='sudo flock -w 300 /opt/domhouse/.engines.lock sh -c "sed -i /^BUDGET_MB_STAGING=/d /etc/domhouse/agent.conf && systemctl restart domhouse-agent-esecutore"; sudo grep -c ^BUDGET /etc/domhouse/agent.conf' < /dev/null
 ```
 
-5. **Atteso:** **0** (nessuna riga `BUDGET_…`); nell'app «Aggiorna» torna a «Posti liberi: 1».
+5. **Atteso:** **0** (nessuna riga `BUDGET_…`); nell'app «Aggiorna» torna a «Posti liberi nello staging: 1 (letto alle …)».
 6. **Da non saltare:** se D6.2 si interrompe a metà, la riga va tolta comunque con questo blocco prima di qualsiasi ritorno all'agente di A2.
 
 **D6.3 Gli allarmi arrivano** (due righe di prova, scritte come le scrive il controllo).
@@ -171,9 +194,9 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 | N. | Che cosa | Dove si vede |
 |---|---|---|
 | 1 | `agent.conf` cambiato in D6.2: l'esecutore lo rilegge solo ripartendo, e riparte sotto il blocco; alla fine non resta nessuna riga `BUDGET_…` | D6.2 |
-| 4 | i tetti contati dall'agente sono quelli veri dei contenitori | D6.1 (punto 4) |
-| 2 | i registri di Google Cloud tengono `logger -t domhouse-check` come le righe del controllo (stesso filtro) | D6.3 |
-| 3 | `MemAvailable` letto dal controllo è quello di `free -m` | D6.4 |
+| 2 | i tetti contati dall'agente sono quelli veri dei contenitori | D6.1 (punto 4) |
+| 3 | i registri di Google Cloud tengono `logger -t domhouse-check` come le righe del controllo (stesso filtro) | D6.3 |
+| 4 | `MemAvailable` letto dal controllo è quello di `free -m` | D6.4 |
 
 ## Da incollare alla memoria storica
 
