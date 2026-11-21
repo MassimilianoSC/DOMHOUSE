@@ -158,12 +158,22 @@ class TestApartments:
         other = f"apt-iw2-{RUN}"
         r = P("POST", f"/tenants/{tid}/apartments", json={"apartment_id": other, "name": "x", "instance_url": "mock://builtin", "italianway_id": code})
         assert r.status_code == 201 and r.json()["italianway_id"] == code               # freed by the removal
-        assert P("DELETE", f"/tenants/{tid}/apartments/{other}").status_code == 204
+        assert P("POST", f"/tenants/{tid}/apartments/{other}/disattiva").status_code == 200   # A6: switched off, not deleted
 
-    def test_delete_and_id_never_reused(self):
+    def test_delete_waits_and_id_never_reused(self):
+        """A6: «Disattiva», then «Elimina» after 7 days with the name; this BFF cannot wait them, so the deletion itself,
+        the id never used again after it and its log entry are in tests/deletion_test.py
+        (test_full_run_a_deleted_apartment_leaves_the_lists_but_never_opens_all)."""
         tid, aid = STATE["tid"], STATE["aid"]
-        assert P("DELETE", f"/tenants/{tid}/apartments/{aid}").status_code == 204
-        assert requests.get(f"{API}/app/apartments/{aid}", headers=hdr(NEW_ADMIN)).status_code == 404
+        r = P("DELETE", f"/tenants/{tid}/apartments/{aid}")
+        assert r.status_code == 409 and r.json()["error"] == "use_elimina", r.text
+        r = P("POST", f"/tenants/{tid}/apartments/{aid}/disattiva")
+        assert r.status_code == 200, r.text
+        assert r.json()["enabled"] is False and r.json()["disattivato_at"] and r.json()["eliminabile_dal"]
+        assert r.json()["disattivato_da"]["ruolo"] == "gestore"
+        r = P("POST", f"/tenants/{tid}/apartments/{aid}/elimina", json={"nome": "Collegato"})
+        assert r.status_code == 409 and r.json()["error"] == "too_early", r.text
+        assert r.json()["details"]["eliminabile_dal"]
         r = P("POST", f"/tenants/{tid}/apartments", json={"apartment_id": aid, "name": "Di nuovo", "instance_url": "mock://builtin"})
         assert r.status_code == 409 and r.json()["message"] == "Identificativo non disponibile"         # D-67
         r = requests.post(f"{API}/app/admin/apartments", headers=hdr(NEW_ADMIN),
@@ -250,16 +260,16 @@ class TestAudit:
         assert len({i["audit_id"] for i in items}) == len(items)                         # no entry twice across pages
         actions = [i["action"] for i in items]
         for a in ("tenant_created", "invite_sent", "tenant_renamed", "invite_resent", "apartment_created",
-                  "apartment_relinked", "italianway_changed", "apartment_deleted"):
+                  "apartment_relinked", "italianway_changed", "apartment_disabled"):    # A6: deleting waits 7 days
             assert a in actions, (a, actions)
         invite = next(i for i in items if i["action"] == "invite_sent")
         # D-90: the platform sees the role of the organisation's people, never their email
         assert invite["target"]["type"] == "user" and invite["target"]["label"] is None and invite["target"]["role"] == "admin"
         assert invite["details"] == {"role": "admin", "apartment_ids": "all"}
         assert invite["actor"]["kind"] == "platform" and invite["actor"]["email"] == PLATFORM_ONLY
-        deleted = next(i for i in items if i["action"] == "apartment_deleted")
-        assert deleted["target"] == {"type": "apartment", "id": STATE["aid"], "label": "Collegato", "removed": False,
-                                     "role": None}
+        disabled = next(i for i in items if i["action"] == "apartment_disabled" and i["target"]["id"] == STATE["aid"])
+        assert disabled["target"] == {"type": "apartment", "id": STATE["aid"], "label": "Collegato", "removed": False,
+                                      "role": None}
         renamed = next(i for i in items if i["action"] == "tenant_renamed")
         assert set(renamed["details"]) == {"from", "to"}
 
