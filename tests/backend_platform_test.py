@@ -98,7 +98,10 @@ class TestTenants:
 class TestApartments:
     def row_keys(self):
         return {"apartment_id", "name", "instance_url", "port", "enabled", "timezone", "italianway_id", "simulated", "last_check",
-                "creazione"}                                         # A2 §2.2 point 23: null when linked by hand
+                "creazione",                                         # A2 §2.2 point 23: null when linked by hand
+                # A6 (bff/API.md «Eliminazione di un appartamento»): where it comes from, who switched it off and when,
+                # from when it can be deleted, the deletion in progress
+                "origine", "disattivato_at", "disattivato_da", "eliminabile_dal", "eliminazione"}
 
     def test_create_link_verify(self):
         aid = STATE["aid"] = f"apt-plat-{RUN}"
