@@ -195,6 +195,10 @@ export const platformApi = {
    *  change; italianway_id null (or "") = remove the code. */
   patchConnection: (tenantId: string, aptId: string, body: { instance_url?: string; port?: number | null; italianway_id?: string | null; simulated?: boolean }, correlationId: string) =>
     bffFetch<PlatformApartment>(`${apts(tenantId)}/${enc(aptId)}`, { method: "PATCH", body, correlationId }),
+  /** D-198: only the Italianway code, for an apartment created from the app (its connection belongs to the creation).
+   *  null = remove the code. The route is the server's answer to D-198 (o1): to be confirmed. */
+  setItalianwayCode: (tenantId: string, aptId: string, italianwayId: string | null, correlationId: string) =>
+    bffFetch<PlatformApartment>(`${apts(tenantId)}/${enc(aptId)}`, { method: "PATCH", body: { italianway_id: italianwayId }, correlationId }),
   verifyApartment: (tenantId: string, aptId: string, correlationId: string) =>
     bffFetch<VerifyResult>(`${apts(tenantId)}/${enc(aptId)}/verify`, { method: "POST", correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
   /** A6: «Disattiva» (the same state as the admin's «Attivo»; the 7 days start here) and «Riattiva». The row back. */
