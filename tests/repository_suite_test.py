@@ -413,6 +413,18 @@ def test_ai_cost_reserved_then_settled_never_passes_the_cap(repo):
     assert (u["calls"], u["reserved_eur"]) == (1, pytest.approx(0.0))
 
 
+def test_f13_an_organisations_quota_and_the_project_cap_in_one_reservation(repo):
+    """F-13: the organisation's document and the project's move together; either cap refuses."""
+    assert run(repo.reserve_ai_cost("2026-06", 0.6, 20.0, "t-q", 1.0)) is True
+    assert run(repo.reserve_ai_cost("2026-06", 0.6, 20.0, "t-q", 1.0)) is False
+    assert run(repo.get_ai_usage("2026-06"))["reserved_eur"] == pytest.approx(0.6)
+    totals = run(repo.settle_ai_cost("2026-06", 0.6, 0.25, 10, 5, 1, "t-q"))
+    assert totals["cost_eur"] == pytest.approx(0.25)
+    assert run(repo.get_ai_usage("2026-06", "t-q"))["cost_eur"] == pytest.approx(0.25)
+    assert run(repo.get_ai_usage("2026-06", "t-q"))["reserved_eur"] == pytest.approx(0.0)
+    assert run(repo.reserve_ai_cost("2026-06", 0.6, 0.5, "t-r", None)) is False        # the project's cap refuses
+
+
 def test_mail_quota_all_or_nothing(repo):
     """P-49: every bucket below its limit -> all go up by one; one bucket full -> none changes."""
     assert run(repo.take_mail_quota([("a", 2), ("b", 1)])) is True

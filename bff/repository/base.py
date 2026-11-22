@@ -30,6 +30,9 @@ class Tenant(BaseModel):
     suspended_at: str | None = None
     suspended_reason: str | None = None
     energy_price_eur_kwh: float | None = None   # P-52 (D-92): set by the admin; None = not set
+    # F-13 (answer 1242): the assistant's monthly quota of this organisation in euro, set by the platform; None = only
+    # the project's cap (AI_MONTHLY_CAP_EUR), which always counts as well; 0 = only the quick assistant
+    ai_monthly_quota_eur: float | None = None
 
 
 def tenant_name_key(name: str) -> str:
@@ -294,6 +297,7 @@ AuditAction = Literal[
     # A6 (docs/proposta-a6.md §6): switched off (by either button) and on again; the deletion started, and a step stopped
     # (written by the system); apartment_deleted when it is gone
     "apartment_disabled", "apartment_reenabled", "apartment_deletion_started", "apartment_deletion_failed",
+    "ai_quota_changed",   # F-13 (answer 1242): the assistant's monthly quota of an organisation, set by the platform
 ]
 
 
@@ -506,7 +510,8 @@ class Repository(Protocol):
     async def put_summary(self, summary: dict) -> dict: ...
     async def list_summaries(self, apartment_id: str, limit: int = 20) -> list[dict]: ...
 
-    async def get_ai_usage(self, month: str) -> dict: ...
+    # F-13: with tenant_id, that organisation's spending of the month (ai_usage_tenants/{tenant}__{month})
+    async def get_ai_usage(self, month: str, tenant_id: str | None = None) -> dict: ...
     # D-201: work done once whatever the number of instances. claim_work is atomic: "mine", "taken" (someone else has it
     # and its lease is running) or "done"; a lease run out can be taken over, attempts counts the claims. With a payload
     # the claim is listed by due_work when its lease runs out, so a process that dies does not lose the work.
@@ -531,9 +536,11 @@ class Repository(Protocol):
     # F-4 (attack-from-outside review): atomic. reserve: True and reserved_eur raised when cost_eur + reserved_eur +
     # amount stays within cap, else False and nothing changes. settle: the reservation goes back and the real cost (and
     # the call, when counted) is added; the totals after
-    async def reserve_ai_cost(self, month: str, amount: float, cap: float) -> bool: ...
+    # F-13: with tenant_id the organisation's document moves too, in the same transaction; tenant_cap None = no quota
+    async def reserve_ai_cost(self, month: str, amount: float, cap: float, tenant_id: str | None = None,
+                              tenant_cap: float | None = None) -> bool: ...
     async def settle_ai_cost(self, month: str, reserved: float, cost_eur: float, input_tokens: int, output_tokens: int,
-                             calls: int) -> dict: ...
+                             calls: int, tenant_id: str | None = None) -> dict: ...
     async def mark_ai_alert(self, month: str) -> bool: ...
 
     # pseudonyms towards the engine (P-48): claim is atomic (the existing one wins), forget removes both directions

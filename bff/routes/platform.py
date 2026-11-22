@@ -155,6 +155,64 @@ async def rename_tenant(tenant_id: str, body: TenantRename, identity: Identity =
     return await tenant_row(saved, identity.uid)
 
 
+# ---------- F-13 (answer 1242): the assistant's monthly quota of an organisation ----------
+def _euro(value: float) -> str:
+    return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _quota_problem(body, cap: float):
+    """(the quota, None) or (None, the 422): null, or an amount from 0 to the project's cap with at most two decimals."""
+    import math
+    refused = err(422, "invalid_quota", f"La quota deve essere un importo da 0 a {_euro(cap)} € (al massimo due "
+                  f"decimali), oppure vuota per usare il tetto del progetto.")
+    if not isinstance(body, dict) or "quota_eur" not in body:
+        return None, refused
+    q = body["quota_eur"]
+    if q is None:
+        return None, None
+    if isinstance(q, bool) or not isinstance(q, (int, float)) or not math.isfinite(q) or not 0 <= q <= cap:
+        return None, refused
+    if abs(q * 100 - round(q * 100)) > 1e-6:
+        return None, refused
+    return round(float(q), 2), None
+
+
+async def _quota_view(t: Tenant) -> dict:
+    from ..ai_gateway import month_now
+    repo, month = get_repository(), month_now()
+    return {"tenant_id": t.tenant_id, "quota_eur": t.ai_monthly_quota_eur, "month": month,
+            "spent_eur": round((await repo.get_ai_usage(month, t.tenant_id))["cost_eur"], 4),
+            "project_cap_eur": get_settings().ai_monthly_cap_eur,
+            "project_spent_eur": round((await repo.get_ai_usage(month))["cost_eur"], 4)}
+
+
+@router.get("/tenants/{tenant_id}/ai-quota")
+async def get_ai_quota(tenant_id: str, identity: Identity = Depends(require_platform)):
+    t = await _get_tenant(tenant_id)
+    if isinstance(t, JSONResponse):
+        return t
+    return await _quota_view(t)
+
+
+@router.put("/tenants/{tenant_id}/ai-quota")
+async def set_ai_quota(tenant_id: str, body=Body(default=None), identity: Identity = Depends(require_platform)):
+    """null = only the project's cap (rule 2); 0 = only the quick assistant for this organisation; the project's cap
+    always counts too (bff/ai_gateway.py). One log entry in the organisation's log and one in the platform's."""
+    t = await _get_tenant(tenant_id)
+    if isinstance(t, JSONResponse):
+        return t
+    quota, refused = _quota_problem(body, get_settings().ai_monthly_cap_eur)
+    if refused:
+        return refused
+    old = t.ai_monthly_quota_eur
+    saved = await get_repository().update_tenant(tenant_id, {"ai_monthly_quota_eur": quota}) or t
+    if old != quota:
+        who, target = audit.by_platform(identity), audit.tenant_target(tenant_id, t.name)
+        for registry in (tenant_id, None):
+            await audit.record("ai_quota_changed", who, registry, target, **{"from": old, "to": quota})
+    return await _quota_view(saved)
+
+
 @router.post("/tenants/{tenant_id}/invite")
 async def resend_first_admin_invite(tenant_id: str, identity: Identity = Depends(require_platform)):
     t = await _get_tenant(tenant_id)

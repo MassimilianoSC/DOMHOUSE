@@ -412,8 +412,14 @@ class FirestoreRepository:
         return sorted(out, key=lambda s: s["week"], reverse=True)[:limit]
 
     # the assistant's spending (P-60 step 9): ai_usage/{YYYY-MM}, raised in a transaction
-    async def get_ai_usage(self, month):
-        snap = await self._col("ai_usage").document(month).get()
+    def _usage_ref(self, month, tenant_id=None):
+        """F-13: the project's ai_usage/{month}, or an organisation's ai_usage_tenants/{tenant}__{month}."""
+        if tenant_id is None:
+            return self._col("ai_usage").document(month)
+        return self._col("ai_usage_tenants").document(f"{tenant_id}__{month}")
+
+    async def get_ai_usage(self, month, tenant_id=None):
+        snap = await self._usage_ref(month, tenant_id).get()
         return {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
 
     async def add_ai_usage(self, month, cost_eur, input_tokens, output_tokens):
@@ -430,35 +436,44 @@ class FirestoreRepository:
         async with self._lock("ai_usage"):
             return await txn(self.db.transaction())
 
-    async def reserve_ai_cost(self, month, amount, cap):
+    async def reserve_ai_cost(self, month, amount, cap, tenant_id=None, tenant_cap=None):
         if not reservable(amount):
             return False
-        ref = self._col("ai_usage").document(month)
+        refs = [(self._usage_ref(month), cap)]
+        if tenant_id is not None:
+            refs.append((self._usage_ref(month, tenant_id), tenant_cap))
 
         @firestore.async_transactional
         async def txn(tx):
-            snap = await ref.get(transaction=tx)
-            u = {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
-            if u["cost_eur"] + u["reserved_eur"] + amount > cap:
-                return False
-            u.update(reserved_eur=u["reserved_eur"] + amount, updated_at=now_iso())
-            tx.set(ref, u)
+            docs = []
+            for ref, limit in refs:                      # every read before any write (Firestore's transactions)
+                snap = await ref.get(transaction=tx)
+                u = {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
+                if limit is not None and u["cost_eur"] + u["reserved_eur"] + amount > limit:
+                    return False
+                docs.append((ref, u))
+            for ref, u in docs:
+                u.update(reserved_eur=u["reserved_eur"] + amount, updated_at=now_iso())
+                tx.set(ref, u)
             return True
         async with self._lock("ai_usage"):
             return await txn(self.db.transaction())
 
-    async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls):
-        ref = self._col("ai_usage").document(month)
+    async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls, tenant_id=None):
+        refs = [self._usage_ref(month)] + ([self._usage_ref(month, tenant_id)] if tenant_id is not None else [])
 
         @firestore.async_transactional
         async def txn(tx):
-            snap = await ref.get(transaction=tx)
-            u = {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
-            u.update(reserved_eur=reserved_after(u["reserved_eur"], reserved, month), cost_eur=u["cost_eur"] + cost_eur,
-                     calls=u["calls"] + calls, input_tokens=u["input_tokens"] + input_tokens,
-                     output_tokens=u["output_tokens"] + output_tokens, updated_at=now_iso())
-            tx.set(ref, u)
-            return {k: u[k] for k in EMPTY_AI_USAGE}
+            docs = []
+            for ref in refs:
+                snap = await ref.get(transaction=tx)
+                docs.append((ref, {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)))
+            for ref, u in docs:
+                u.update(reserved_eur=reserved_after(u["reserved_eur"], reserved, month), cost_eur=u["cost_eur"] + cost_eur,
+                         calls=u["calls"] + calls, input_tokens=u["input_tokens"] + input_tokens,
+                         output_tokens=u["output_tokens"] + output_tokens, updated_at=now_iso())
+                tx.set(ref, u)
+            return {k: docs[0][1][k] for k in EMPTY_AI_USAGE}
         async with self._lock("ai_usage"):
             return await txn(self.db.transaction())
 

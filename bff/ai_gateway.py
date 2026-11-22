@@ -270,7 +270,13 @@ async def chat(apartment_id: str, body: dict, ask_id: str = "") -> dict:
     # at the same time all passed. Now the most the call can cost is reserved atomically first, and settled after it
     # with the real cost, whatever happens in between (a failure, a cancellation by rules.py's time limit)
     reserved = cost_ceiling(request)
-    if not await repo.reserve_ai_cost(month, reserved, s.ai_monthly_cap_eur):
+    # F-13 (answer 1242): the organisation's quota too, in the same reservation; without one only the project's cap.
+    # Over either, the same 429 monthly_cap: the engine answers with the quick assistant
+    apt = await repo.get_apartment(apartment_id)
+    tenant_id = apt.tenant_id if apt else None
+    tenant = await repo.get_tenant(tenant_id) if tenant_id else None
+    quota = tenant.ai_monthly_quota_eur if tenant else None
+    if not await repo.reserve_ai_cost(month, reserved, s.ai_monthly_cap_eur, tenant_id, quota):
         raise GatewayError(429, "monthly_cap", CAP_MESSAGE)
     started = time.monotonic()
     cost, tokens_in, tokens_out, counted = 0.0, 0, 0, 0
@@ -295,7 +301,8 @@ async def chat(apartment_id: str, body: dict, ask_id: str = "") -> dict:
             cost = input_cost
         raise
     finally:
-        totals = await asyncio.shield(repo.settle_ai_cost(month, reserved, cost, tokens_in, tokens_out, counted))
+        totals = await asyncio.shield(repo.settle_ai_cost(month, reserved, cost, tokens_in, tokens_out, counted,
+                                                          tenant_id))
     info("assistant model call", apartment_id=apartment_id, **_ask(ask_id),
          model=s.ai_twin_model if twin else s.ai_model, input_tokens=tokens_in, output_tokens=tokens_out,
          cost_eur=round(cost, 6), month_eur=round(totals["cost_eur"], 4), seconds=round(time.monotonic() - started, 2),

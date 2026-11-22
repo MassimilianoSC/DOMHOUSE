@@ -32,6 +32,7 @@ class InMemoryRepository:
         self.audit_people: dict[str, AuditPerson] = {}
         self.mail_counts: dict[str, int] = {}
         self.ai_usage: dict[str, dict] = {}            # P-60 step 9: month -> the assistant's spending
+        self.ai_usage_tenants: dict[str, dict] = {}    # F-13: "<tenant>__<month>" -> that organisation's spending
         self.ai_stats: dict[str, dict] = {}            # decision 120: "<apartment>__<week>" -> the assistant's counters
         self.work: dict[str, dict] = {}                # D-201: key -> {status, lease_until, attempts, payload}
         self.summaries: dict[str, dict] = {}           # P-60 step 11: "<apartment>__<week>" -> summary
@@ -268,7 +269,9 @@ class InMemoryRepository:
         mine = [s for s in self.summaries.values() if s["apartment_id"] == apartment_id]
         return [dict(s) for s in sorted(mine, key=lambda s: s["week"], reverse=True)[:limit]]
 
-    async def get_ai_usage(self, month):
+    async def get_ai_usage(self, month, tenant_id=None):
+        if tenant_id is not None:
+            return dict(self.ai_usage_tenants.get(f"{tenant_id}__{month}") or EMPTY_AI_USAGE)
         return dict(self.ai_usage.get(month) or EMPTY_AI_USAGE)
 
     async def add_ai_usage(self, month, cost_eur, input_tokens, output_tokens):
@@ -279,24 +282,31 @@ class InMemoryRepository:
         u["output_tokens"] += output_tokens
         return dict(u)
 
-    async def reserve_ai_cost(self, month, amount, cap):
+    async def reserve_ai_cost(self, month, amount, cap, tenant_id=None, tenant_cap=None):
         if not reservable(amount):
             return False
-        u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))
-        u.setdefault("reserved_eur", 0.0)
-        if u["cost_eur"] + u["reserved_eur"] + amount > cap:
-            return False
-        u["reserved_eur"] += amount
+        docs = [(self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE)), cap)]
+        if tenant_id is not None:
+            docs.append((self.ai_usage_tenants.setdefault(f"{tenant_id}__{month}", dict(EMPTY_AI_USAGE)), tenant_cap))
+        for u, limit in docs:
+            u.setdefault("reserved_eur", 0.0)
+            if limit is not None and u["cost_eur"] + u["reserved_eur"] + amount > limit:
+                return False
+        for u, _ in docs:
+            u["reserved_eur"] += amount
         return True
 
-    async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls):
-        u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))
-        u["reserved_eur"] = reserved_after(u.get("reserved_eur", 0.0), reserved, month)
-        u["cost_eur"] += cost_eur
-        u["calls"] += calls
-        u["input_tokens"] += input_tokens
-        u["output_tokens"] += output_tokens
-        return dict(u)
+    async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls, tenant_id=None):
+        docs = [self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))]
+        if tenant_id is not None:
+            docs.append(self.ai_usage_tenants.setdefault(f"{tenant_id}__{month}", dict(EMPTY_AI_USAGE)))
+        for u in docs:
+            u["reserved_eur"] = reserved_after(u.get("reserved_eur", 0.0), reserved, month)
+            u["cost_eur"] += cost_eur
+            u["calls"] += calls
+            u["input_tokens"] += input_tokens
+            u["output_tokens"] += output_tokens
+        return dict(docs[0])
 
     async def add_ai_stats(self, apartment_id, week, bounds, asks=0, timeouts=0, twins=0, quick=None, ask_id=None):
         key = f"{apartment_id}__{week}"

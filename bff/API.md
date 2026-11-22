@@ -855,7 +855,16 @@ vero: acceso in staging, spento in produzione, che i dimostrativi li rifiuta, D-
 - **Gemella annullata o fallita.** Della richiesta gemella si conta anche l'ingresso.
 - **Corpo:** al massimo 20 messaggi con ruoli noti e 160 000 caratteri; `tools` solo se uguali a quelli del motore (`engine/assistant.py` TOOLS). Altrimenti 422 `bad_request`.
 - **Tetto giornaliero per appartamento,** solo su `/internal/ai/chat`: 200 chiamate per giorno UTC (`ENGINE_DAILY_CALLS`), oltre 429 `daily_limit`. Il motore ne fa al massimo `ASK_DAILY_LIMIT` per giorno locale (50, al più 100) e tratta il 429 come «limite mensile», cioè passa alla risposta rapida.
-- **Fuori da questa correzione:** il tetto per organizzazione (F-13) è una decisione del committente.
+- **Quota per organizzazione (F-13, risposta 1242).**
+  - Il gestore della piattaforma può dare a ogni organizzazione una quota mensile in euro.
+  - Senza quota vale solo il tetto del progetto, che vale comunque sempre.
+  - La prenotazione e il conguaglio toccano insieme, in modo atomico, il documento del progetto (`ai_usage/{AAAA-MM}`) e quello dell'organizzazione (`ai_usage_tenants/{tenant}__{AAAA-MM}`).
+  - Quota esaurita: 429 `monthly_cap` con lo stesso testo, solo per quell'organizzazione. Quota 0: per quell'organizzazione solo la risposta rapida.
+
+| Rotta (solo gestori della piattaforma) | Risposta |
+|---|---|
+| `GET /app/platform/tenants/{tid}/ai-quota` | 200 `{tenant_id, quota_eur, month, spent_eur, project_cap_eur, project_spent_eur}`, dove `quota_eur` null vuol dire «tetto del progetto»; 404 `not_found` se l'organizzazione non esiste |
+| `PUT /app/platform/tenants/{tid}/ai-quota` `{quota_eur: numero o null}`, campo obbligatorio | 200 come il GET; 422 `invalid_quota` «La quota deve essere un importo da 0 a 20,00 € (al massimo due decimali), oppure vuota per usare il tetto del progetto.» (l'importo è il tetto attuale); 404. A ogni cambio una voce `ai_quota_changed` `{from, to}` nel registro dell'organizzazione e in quello della piattaforma |
 
 Ogni chiamata riuscita lascia nel log «assistant model call» (token, costo, secondi); dal lotto 28 anche ogni chiamata
 non riuscita lascia «assistant model call failed», con `error` (`timeout`, `model_error` o il tipo

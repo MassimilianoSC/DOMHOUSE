@@ -39,6 +39,7 @@ def model(monkeypatch):
     monkeypatch.setattr(ai_gateway, "call_model", fake)
     monkeypatch.setattr(ai_gateway, "_reasoning_refused", False)
     get_repository().ai_usage = {}
+    get_repository().ai_usage_tenants = {}                # F-13: each organisation's spending too
     get_repository().mail_counts.clear()
     return sent, state
 
@@ -247,3 +248,148 @@ def test_p9_the_servers_daily_count_stays_above_any_engine_setting():
     assert load_config({**base, "ASK_DAILY_LIMIT": "100"}).settings["ASK_DAILY_LIMIT"] == 100
     with pytest.raises(Exception, match="ASK_DAILY_LIMIT"):
         load_config({**base, "ASK_DAILY_LIMIT": "101"})
+
+
+# -------- F-13: a monthly quota per organisation, within the project's cap (answer 1242) --------
+def _other_tenant(quota=None):
+    from bff.repository import Apartment, Tenant
+    repo = get_repository()
+    run(repo.upsert_tenant(Tenant(tenant_id="t-f13-b", name="F-13 B", ai_monthly_quota_eur=quota)))
+    run(repo.upsert_apartment(Apartment(apartment_id="apt-f13-b", tenant_id="t-f13-b", name="B",
+                                        instance_url="mock://builtin")))
+    return "apt-f13-b"
+
+
+def _set_quota(apartment_id, quota):
+    repo = get_repository()
+    apt = run(repo.get_apartment(apartment_id))
+    run(repo.update_tenant(apt.tenant_id, {"ai_monthly_quota_eur": quota}))
+    return apt.tenant_id
+
+
+async def post_for(apartment, body, client=None):
+    headers = {"X-Apartment-Id": apartment, "X-API-Key": get_settings().instance_api_key_fallback}
+    if client is not None:
+        return await client.post("/internal/ai/chat", json=body, headers=headers)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+        return await c.post("/internal/ai/chat", json=body, headers=headers)
+
+
+@pytest.fixture
+def two_tenants(model):
+    tenant_a = _set_quota(APT, None)
+    other = _other_tenant()
+    yield tenant_a, other
+    _set_quota(APT, None)
+
+
+def test_f13_an_organisation_over_its_quota_stops_only_its_own_assistant(model, monkeypatch, two_tenants):
+    sent, _ = model
+    settings(monkeypatch, ai_monthly_cap_eur=20.0, ai_twin_model="", ai_hedge_after_s=30.0)
+    tenant_a, other = two_tenants
+    _set_quota(APT, 0.10)                               # room for one call of BIG_USAGE (0.048 €), not two reservations
+    assert run(post(BODY)).status_code == 200
+    r = run(post(BODY))
+    assert r.status_code == 429 and r.json()["error"] == "monthly_cap"               # the same quick answer
+    assert run(post_for(other, BODY)).status_code == 200                            # B goes on
+    month = ai_gateway.month_now()
+    assert run(get_repository().get_ai_usage(month, tenant_a))["cost_eur"] == pytest.approx(0.048)
+    assert run(get_repository().get_ai_usage(month, "t-f13-b"))["cost_eur"] == pytest.approx(0.048)
+    assert usage()["cost_eur"] == pytest.approx(0.096)                               # the project counts both
+
+
+def test_f13_without_a_quota_only_the_projects_cap_counts(model, monkeypatch, two_tenants):
+    settings(monkeypatch, ai_monthly_cap_eur=20.0, ai_twin_model="", ai_hedge_after_s=30.0)
+    assert [run(post(BODY)).status_code for _ in range(5)] == [200] * 5
+
+
+def test_f13_calls_at_once_never_pass_the_organisations_quota(model, monkeypatch, two_tenants):
+    sent, state = model
+    settings(monkeypatch, ai_monthly_cap_eur=20.0, ai_twin_model="", ai_hedge_after_s=30.0)
+    _set_quota(APT, 0.10)
+    state["delay"] = 0.2
+
+    async def burst():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            return await asyncio.gather(*(post(BODY, c) for _ in range(30)))
+    codes = sorted(r.status_code for r in run(burst()))
+    assert len(sent) == 1 and codes.count(200) == 1 and codes.count(429) == 29
+
+
+def test_f13_the_repository_reserves_on_both_atomically():
+    repo = get_repository()
+    repo.ai_usage = {}
+    getattr(repo, "ai_usage_tenants", {}).clear()
+    assert run(repo.reserve_ai_cost("2026-07", 0.6, 20.0, "t-x", 1.0)) is True
+    assert run(repo.reserve_ai_cost("2026-07", 0.6, 20.0, "t-x", 1.0)) is False           # the quota refuses
+    assert run(repo.get_ai_usage("2026-07"))["reserved_eur"] == pytest.approx(0.6)       # the project unchanged
+    assert run(repo.reserve_ai_cost("2026-07", 0.6, 20.0, "t-y", None)) is True           # another, no quota
+    run(repo.settle_ai_cost("2026-07", 0.6, 0.2, 10, 5, 1, "t-x"))
+    assert run(repo.get_ai_usage("2026-07", "t-x"))["cost_eur"] == pytest.approx(0.2)
+    assert run(repo.get_ai_usage("2026-07", "t-x"))["reserved_eur"] == pytest.approx(0.0)
+    assert run(repo.get_ai_usage("2026-07"))["reserved_eur"] == pytest.approx(0.6)        # t-y's still running
+    assert run(repo.reserve_ai_cost("2026-07", 0.6, 1.0, "t-z", 5.0)) is False            # the project refuses
+
+
+# -------- F-13, the platform's route: GET and PUT /app/platform/tenants/{tid}/ai-quota --------
+PLATFORM = {"X-Dev-User": "piattaforma@demo.it"}
+
+
+async def quota_call(method, tenant, body=None, who=PLATFORM):
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+        return await c.request(method, f"/app/platform/tenants/{tenant}/ai-quota", json=body, headers=who)
+
+
+def test_f13_the_platform_reads_and_sets_a_quota_with_its_log_entries(model, monkeypatch, two_tenants):
+    from bff import audit
+    settings(monkeypatch, ai_monthly_cap_eur=20.0, ai_twin_model="", ai_hedge_after_s=30.0)
+    tenant_a, _ = two_tenants
+    assert run(post(BODY)).status_code == 200                                          # 0.048 € spent by A
+    r = run(quota_call("GET", tenant_a))
+    assert r.status_code == 200, r.text
+    got = r.json()
+    assert (got["tenant_id"], got["quota_eur"], got["month"]) == (tenant_a, None, ai_gateway.month_now())
+    assert got["spent_eur"] == pytest.approx(0.048) and got["project_cap_eur"] == 20.0
+    assert got["project_spent_eur"] == pytest.approx(0.048)
+    r = run(quota_call("PUT", tenant_a, {"quota_eur": 5.5}))
+    assert r.status_code == 200 and r.json()["quota_eur"] == 5.5
+    r = run(quota_call("PUT", tenant_a, {"quota_eur": None}))
+    assert r.status_code == 200 and r.json()["quota_eur"] is None
+    for registry in (tenant_a, None):
+        items = run(audit.page(registry, 50, None, viewer="platform"))["items"]
+        changed = [(i["details"]["from"], i["details"]["to"]) for i in items if i["action"] == "ai_quota_changed"]
+        assert changed[:2] == [(5.5, None), (None, 5.5)], (registry, changed)
+
+
+def test_f13_a_quota_of_zero_leaves_only_the_quick_assistant(model, monkeypatch, two_tenants):
+    sent, _ = model
+    settings(monkeypatch, ai_monthly_cap_eur=20.0, ai_twin_model="")
+    tenant_a, _ = two_tenants
+    assert run(quota_call("PUT", tenant_a, {"quota_eur": 0})).status_code == 200
+    assert run(post(BODY)).status_code == 429 and sent == []
+
+
+@pytest.mark.parametrize("value", [-0.01, 20.01, 1.234, "5", True, float("nan")], ids=str)
+def test_f13_a_quota_out_of_its_rules_is_refused_in_italian(model, monkeypatch, two_tenants, value):
+    settings(monkeypatch, ai_monthly_cap_eur=20.0)
+    tenant_a, _ = two_tenants
+    body = '{"quota_eur": NaN}' if value != value else None
+    if body:
+        async def raw():
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+                return await c.put(f"/app/platform/tenants/{tenant_a}/ai-quota", content=body,
+                                   headers={**PLATFORM, "Content-Type": "application/json"})
+        r = run(raw())
+    else:
+        r = run(quota_call("PUT", tenant_a, {"quota_eur": value}))
+    assert r.status_code == 422 and r.json() == {
+        "error": "invalid_quota",
+        "message": "La quota deve essere un importo da 0 a 20,00 € (al massimo due decimali), oppure vuota per usare il "
+                   "tetto del progetto."}, (value, r.text[:200])
+    assert run(quota_call("PUT", tenant_a, {})).status_code == 422                    # the field is required
+
+
+def test_f13_only_the_platform_and_only_an_existing_organisation(model, two_tenants):
+    tenant_a, _ = two_tenants
+    assert run(quota_call("GET", tenant_a, who={"X-Dev-User": "admin@demo.it"})).status_code == 403
+    assert run(quota_call("GET", "t-che-non-esiste")).status_code == 404
