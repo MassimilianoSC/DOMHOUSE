@@ -121,12 +121,17 @@ def delete_account(uid: str | None = None, email: str | None = None, protect: bo
 
 def current_env_claims(uid: str) -> dict | None:
     """R4-1: this environment's tenant and role as Firebase holds them NOW (a token carries a copy up to an hour old);
-    None when the accounts module is off (dev). Errors go to the caller."""
+    None when the accounts module is off (dev); {} when the account no longer exists (F-1: deleted by its owner or as
+    never used). Other errors go to the caller."""
     if not _enabled():
         return None
     fb_auth, app = _auth()
     from .auth import env_claims
-    return env_claims(fb_auth.get_user(uid, app=app).custom_claims)
+    try:
+        record = fb_auth.get_user(uid, app=app)
+    except fb_auth.UserNotFoundError:
+        return {}
+    return env_claims(record.custom_claims)
 
 
 def move_env_claims(uid: str, tenant_id: str, role: str) -> None:

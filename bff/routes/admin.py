@@ -187,6 +187,10 @@ async def delete_user(uid: str, user: CurrentUser = Depends(require_admin)):
         warn("admin: firebase account not detached", uid=target.uid, error=str(exc))
         await repo.upsert_user(target)  # put the record back: the person is not half removed
         return err(502, "auth_unavailable", "Rimozione non riuscita, riprova tra poco")
+    # F-1 (attack-from-outside review): once more, now that Firebase no longer holds the claims: a request of the
+    # person that made the record again between the first deletion and this point leaves nothing (bff/auth.py checks
+    # Firebase again after making a record, for a request that writes after this)
+    await repo.delete_user(target.uid)
     await audit.record("user_removed", audit.by_user(user), user.tenant_id, audit.user_target(target))
 
 
@@ -358,8 +362,9 @@ async def remove_apartment(apt: Apartment) -> None:
     # P-18: the id leaves every list, and a list stays a list even when it empties (never None, which means "all")
     for u in await repo.list_users(apt.tenant_id):
         if u.apartment_ids is not None and apt.apartment_id in u.apartment_ids:
-            u.apartment_ids = [a for a in u.apartment_ids if a != apt.apartment_id]
-            await repo.upsert_user(u)
+            # F-1: a person removed since the list was read is not written back
+            await repo.update_user_if_present(u.uid, lambda cur: cur.model_copy(update={"apartment_ids": None if (
+                cur.apartment_ids is None) else [a for a in cur.apartment_ids if a != apt.apartment_id]}))
     instances.invalidate_version(apt.apartment_id)
     hub_manager.drop(apt.apartment_id)
 

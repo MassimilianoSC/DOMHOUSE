@@ -21,6 +21,14 @@ Quando il token non si riesce a controllare (tempo massimo `TOKEN_CHECK_TIMEOUT_
 
 **Dimensione del corpo (F-2, revisione «attacco da fuori», 22 novembre 2026).** Ogni richiesta con un corpo oltre il suo limite riceve 413 `payload_too_large` «Richiesta troppo grande», prima di qualsiasi lettura, controllo d'accesso o firma (`bff/body_limit.py`, il middleware più esterno). Limiti: 64 KiB per `/webhooks/*`, 256 KiB per `/internal/ai/chat` e per tutto il resto. Vale sia con `Content-Length` sia per i corpi a pezzi. I corpi legittimi più grandi sono di poche decine di KiB (il prompt dell'assistente con lo stato dell'appartamento). Il 413 non porta le intestazioni CORS: il sito vede un errore di rete, ma nessuna sua richiesta si avvicina al limite.
 
+**Record creato dai claim (F-1, stessa revisione).**
+- **Chi lo riceve:** chi entra con i claim dell'ambiente ma senza record (per esempio il primo amministratore di `scripts/set_claims.py`). Il record si crea solo se Firebase ha ancora gli stessi claim: Firebase si legge prima della scrittura e di nuovo dopo.
+- **Claim che non ci sono più** (tolti con la persona, oppure account eliminato): 403 `forbidden`, nessun record.
+- **Firebase non risponde:** 503 `auth_unavailable`.
+- **Perché:** il token di una persona rimossa conserva i claim fino a un'ora. Prima della correzione la persona rientrava con tutti gli appartamenti.
+- **Rimozione e «Elimina il mio account»:** il record si cancella una seconda volta dopo l'operazione su Firebase.
+- **Push, preferenze e nome** (`POST`/`DELETE /app/push/subscribe`, `GET /app/push/status`, `PUT /app/me/notification-prefs`, `PATCH /app/me`): cambiano solo un record che esiste, mai uno ricreato. Se il record è sparito nel frattempo: 404 `not_found` «Utente inesistente». `PATCH /app/me` aggiorna comunque il nome del gestore della piattaforma.
+
 Mock: il motore simulato (`/mock/...`, solo con `INSTANCE_MODE=mock`) risponde solo alla chiamata del BFF in
 loopback; una richiesta che arriva da internet (con `X-Forwarded-For`) riceve 404, e la chiave è casuale per processo (F2).
 

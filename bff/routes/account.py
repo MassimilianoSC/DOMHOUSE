@@ -30,10 +30,10 @@ async def patch_profile(body: ProfilePatch, identity: Identity = Depends(resolve
     name = body.display_name.strip()
     user = identity.user
     if user is not None:
-        stored = await repo.get_user(user.uid) or User(uid=user.uid, email=user.email, tenant_id=user.tenant_id,
-                                                       role=user.role)
-        stored.display_name = name
-        await repo.upsert_user(stored)
+        # F-1: only a record that exists (made at sign-in); a person removed meanwhile is never written back
+        changed = await repo.update_user_if_present(user.uid, lambda cur: cur.model_copy(update={"display_name": name}))
+        if changed is None and not identity.platform_manager:
+            return err(404, "not_found", "Utente inesistente")
     if identity.platform_manager:
         member = await repo.get_platform_member(normalize_email(identity.email))
         if member is not None:
@@ -87,6 +87,9 @@ async def delete_account(identity: Identity = Depends(resolve_own_identity)):
         return err(502, "auth_unavailable", "Eliminazione non riuscita, riprova tra poco")
     info("account: deleted by its owner")
     if user is not None:
+        # F-1: once more after Firebase: a request of the same person, between its check and its write, cannot leave
+        # a record behind (bff/auth.py checks Firebase again after making one)
+        await repo.delete_user(user.uid)
         who = audit.by_user(user)
         me = User(uid=user.uid, email=user.email, display_name=user.display_name, tenant_id=user.tenant_id, role=user.role)
         await audit.record("account_deleted", who, user.tenant_id, audit.user_target(me))
