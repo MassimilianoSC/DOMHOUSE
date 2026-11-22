@@ -298,3 +298,34 @@ def test_f14_firebase_silent_is_try_again_never_an_invitation(firebase_claims):
     r = run(_send_as("POST", "/app/admin/users", {"email": "f14-silenzio@esempio.it", "role": "viewer"}))
     assert r.status_code == 503 and r.json()["error"] == "auth_unavailable", r.text
     assert run(get_repository().get_user_by_email("f14-silenzio@esempio.it")) is None
+
+
+# -------- rereading of the low fixes, B-4: an address saved before F-11 must not block the apartment's form --------
+def _stored_address(value):
+    from bff.repository import get_repository
+    repo = get_repository()
+    apt = run(repo.get_apartment("apt-rimini-01"))
+    run(repo.upsert_apartment(apt.model_copy(update={"address": value})))
+
+
+@pytest.mark.parametrize("old", ["v" * 250, "Via\tRoma 1", "Vedi www.vecchio.example"], ids=["long", "tab", "link"])
+def test_b4_the_form_saves_with_an_old_address_out_of_the_rule_sent_back_unchanged(old):
+    """The site's apartment window always sends address with name, enabled and price: a saved address now out of the
+    rule made every save fail with 422, A6's switch-off included. The address is checked only when it changes."""
+    _stored_address(old)
+    try:
+        r = run(_send_as("PATCH", "/app/admin/apartments/apt-rimini-01", {"name": "Rimini centro", "address": old}))
+        assert r.status_code == 200, (old[:20], r.text[:200])
+        r = run(_send_as("PATCH", "/app/admin/apartments/apt-rimini-01", {"address": old + " "}))
+        assert r.status_code == 422 and r.json()["error"] == "invalid_text"           # changed: the rule counts
+    finally:
+        _stored_address("Viale Vespucci 12, 47921 Rimini (RN)")
+
+
+def test_b4_a_real_address_with_a_slash_and_a_dot_passes():
+    try:
+        for address in ("Via S.Maria/3", "Via S. Maria 3/A, int. 4", "C.so Garibaldi 10/b"):
+            r = run(_send_as("PATCH", "/app/admin/apartments/apt-rimini-01", {"address": address}))
+            assert r.status_code == 200, (address, r.text[:200])
+    finally:
+        _stored_address("Viale Vespucci 12, 47921 Rimini (RN)")

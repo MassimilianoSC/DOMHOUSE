@@ -12,7 +12,8 @@ from typing import Annotated
 from pydantic import AfterValidator
 from pydantic_core import PydanticCustomError
 
-LINK_LIKE = re.compile(r"(?i)(://|\bwww\.|\b[a-z0-9-]+\.[a-z]{2,24}/)")
+# rereading B-4: a domain's label has at least 2 characters, so «Via S.Maria/3» is an address, not a link
+LINK_LIKE = re.compile(r"(?i)(://|\bwww\.|\b[a-z0-9-]{2,}\.[a-z]{2,24}/)")
 INVISIBLE = {"​", "‌", "‍", "⁠", "﻿", *map(chr, range(0x202A, 0x202F)),
              *map(chr, range(0x2066, 0x206A))}
 ERROR = "invalid_text"
@@ -35,6 +36,17 @@ def _rule(subject: str, longest: int):
 
 PlainName = Annotated[str, AfterValidator(_rule("Il nome", 80))]
 PlainAddress = Annotated[str, AfterValidator(_rule("L'indirizzo", 200))]
+_address_rule = _rule("L'indirizzo", 200)
+
+
+def address_problem(value: str) -> dict | None:
+    """Rereading B-4: the address is checked in the route, and only when it changes: the site's form always sends it,
+    and one saved before F-11 and now out of the rule must not block every save (A6's switch-off included)."""
+    try:
+        _address_rule(value)
+    except PydanticCustomError as exc:
+        return {"error": ERROR, "field": "address", "message": str(exc)}
+    return None
 
 
 def invalid_text(errors: list[dict]) -> dict | None:

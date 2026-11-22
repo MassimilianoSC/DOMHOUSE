@@ -9,7 +9,7 @@ from pydantic import BaseModel, EmailStr, Field
 from .. import accounts, actors, ai_stats, audit, deletion, instances, support
 from ..auth import CurrentUser, require_admin, scope_out
 from ..logs import warn
-from ..plain_text import PlainAddress, PlainName
+from ..plain_text import PlainName, address_problem
 from ..features import APP_FEATURES
 from ..invites import InviteRefused, create_invitation, send_invitation, shown
 from ..repository import Apartment, Tenant, User, get_repository
@@ -197,7 +197,7 @@ async def delete_user(uid: str, user: CurrentUser = Depends(require_admin)):
 
 class ApartmentPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
-    address: PlainAddress | None = None     # F-11
+    address: str | None = None              # F-11: checked in patch_apartment, only when it changes (rereading B-4)
     timezone: str | None = None        # D-177: accepted and ignored (the engine's TIMEZONE is the one source)
     instance_url: str | None = None
     instance_secret_name: str | None = None
@@ -297,6 +297,8 @@ async def patch_apartment(apartment_id: str, body: ApartmentPatch, user: Current
         return refused
     if "italianway_id" in body.model_fields_set and (refused := _code_refused(body.italianway_id, apt.external_ids.italianway)):
         return refused  # D-72: only the platform changes the code; the same value resent by the form is ignored
+    if body.address is not None and body.address != apt.address and (problem := address_problem(body.address)):
+        return JSONResponse(status_code=422, content=problem)     # F-11, only a changed address (rereading B-4)
     data = body.model_dump(exclude_unset=True, exclude={"italianway_id", "enabled_features", "clear_features",
                                                         "instance_secret_name", "instance_url", "port",
                                                         "energy_price_eur_kwh", "timezone"})
