@@ -85,3 +85,48 @@ def test_every_method_of_the_proxy_has_its_own_operation_id():
     assert sorted(item) == ["delete", "get", "patch", "post", "put"]
     assert {m: op["operationId"] for m, op in item.items()} == {
         m: f"proxy_app_apartments__apartment_id__instance__path__{m}" for m in item}
+
+
+# -------- F-7 (attack-from-outside review): «?» and «#» in a segment went around a feature switched off --------
+@pytest.fixture
+def commands_off(monkeypatch):
+    """The administrator switched «Comandi» and «Approvazioni» off for the apartment."""
+    from bff.features import APP_FEATURES
+    from bff.routes import apartments
+    monkeypatch.setattr(apartments, "configured_features",
+                        lambda *_a: set(APP_FEATURES) - {"commands", "approvals"})
+
+
+@pytest.mark.parametrize("method, suffix", [
+    ("POST", "/devices/x/commands%3F"), ("POST", "/devices/x/commands%23"), ("POST", "/devices/x/commands%3Fa=1"),
+    ("POST", "/approvals/a1/decision%3F"), ("POST", "/approvals/a1/decision%23x"),
+    ("POST", "/devices/x/commands%00"), ("POST", "/devices/x/commands%09"),
+    ("GET", "/devices%3F"), ("GET", "/devices%23"), ("GET", "/devices%7F"),
+])
+def test_f7_query_fragment_or_control_characters_never_reach_the_instance(calls, commands_off, method, suffix):
+    """Starlette decodes %3F into «?» in the path; the feature check found no feature for «commands?» and skipped,
+    then httpx took «?» as the start of the query and called /devices/x/commands: the command ran."""
+    r = request(method, BASE + suffix, ADMIN)
+    assert r.status_code == 404, (suffix, r.status_code, r.text)
+    assert calls == []
+
+
+def test_f7_a_line_feed_is_cut_by_the_router_and_never_reaches_the_instance(calls, commands_off):
+    """The route's {path:path} stops at «\n» (Starlette's regex): «commands%0A» arrives as «commands», refused as
+    switched off; nothing reaches the instance either way."""
+    assert request("POST", BASE + "/devices/x/commands%0A", ADMIN).status_code in (404, 501)
+    assert calls == []
+
+
+def test_f7_the_switched_off_feature_still_refuses_the_plain_path(calls, commands_off):
+    assert request("POST", BASE + "/devices/x/commands", ADMIN).status_code == 501
+    assert calls == []
+
+
+@pytest.mark.parametrize("path", ["devices/x/commands?", "devices#x", "devices/x\ncommands", "devices/\x00"])
+def test_f7_the_instance_call_refuses_them_too(path):
+    """Defence in depth in bff/instances.py call, as for the dot segments."""
+    from bff.repository import Apartment
+    apt = Apartment(apartment_id="apt-f7", tenant_id="t", name="F-7", instance_url="mock://builtin")
+    with pytest.raises(ValueError):
+        asyncio.run(instances.call(apt, "POST", path, actor="system:bff"))

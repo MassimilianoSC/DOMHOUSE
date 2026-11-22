@@ -132,6 +132,11 @@ def target_problem(raw: str, port: int | None = None) -> str | None:
     return MSG_NOT_ALLOWED
 
 
+def unsafe_path(path: str) -> bool:
+    """F-7: «?» or «#» would end the path inside the URL httpx builds; a control character has no place in it."""
+    return any(c in "?#" or ord(c) < 0x20 or ord(c) == 0x7F for c in path)
+
+
 def base_url(apt: Apartment) -> str:
     s = get_settings()
     url = normalize_instance_url(apt.instance_url)
@@ -251,6 +256,8 @@ async def call(
 ) -> httpx.Response:
     if any(seg in (".", "..") for seg in path.split("/")):  # F1: defence in depth, the routes already refuse them
         raise ValueError("dot segment in instance path")
+    if unsafe_path(path):                                    # F-7: the same for «?», «#» and control characters
+        raise ValueError("query, fragment or control character in instance path")
     if demo_refused(apt.instance_url):
         raise DemoRefused(apt.apartment_id)
     headers = await instance_headers(apt, actor, correlation_id)

@@ -32,8 +32,12 @@ PROXY_ALLOWED = {"apartment", "devices", "commands", "energy", "schedule", "rule
 
 def clean_instance_path(path: str) -> bool:
     """Only plain segments: no empty, "." or ".." segment (the path arrives already percent-decoded), no leftover "%"
-    (double encoding) and no backslash. Anything else could leave the apartment's /api/v1 on the instance."""
-    return all(seg not in ("", ".", "..") and "%" not in seg and "\\" not in seg for seg in path.split("/"))
+    (double encoding) and no backslash. Anything else could leave the apartment's /api/v1 on the instance.
+    F-7 (attack-from-outside review): no «?», «#» nor control character either: %3F arrives decoded as «?», the feature
+    check found no feature for «commands?» and skipped, and httpx took «?» as the start of the query, so a command ran
+    on an apartment whose administrator had switched «Comandi» off."""
+    return not instances.unsafe_path(path) and all(
+        seg not in ("", ".", "..") and "%" not in seg and "\\" not in seg for seg in path.split("/"))
 
 
 def err(status: int, error: str, message: str, **details) -> JSONResponse:
