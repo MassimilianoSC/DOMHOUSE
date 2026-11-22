@@ -286,8 +286,8 @@ async def _revoked_or_not_known(uid: str, issued_at: float) -> bool:
     """For a stream already open: if Google does not answer it stays open, and the next check asks again."""
     try:
         return await _revoked(uid, issued_at)
-    except TimeoutError:
-        warn("session check not available", error="TimeoutError")
+    except (TimeoutError, accounts.RevocationUnknown) as exc:
+        warn("session check not available", error=type(exc).__name__)
         return False
 
 
@@ -308,8 +308,8 @@ async def _verified_claims(request: Request) -> dict:
         raise _err(401, "unauthorized", "Sessione non valida o scaduta")
     try:
         revoked = await _revoked(claims["uid"], float(claims.get("iat", 0)))
-    except TimeoutError:
-        warn("token check not available", error="TimeoutError")
+    except (TimeoutError, accounts.RevocationUnknown) as exc:          # F-8: Firebase in error, nothing known yet
+        warn("token check not available", error=type(exc).__name__)
         raise _err(503, "auth_unavailable", "Controllo dell'accesso non disponibile: riprova tra poco")
     if revoked:
         raise _err(401, "unauthorized", "Sessione non valida o scaduta")

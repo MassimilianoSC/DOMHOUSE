@@ -19,6 +19,12 @@ esterni. Nessuna route chiamata dalla PWA manca nel BFF, nessun campo letto dall
 
 Quando il token non si riesce a controllare (tempo massimo `TOKEN_CHECK_TIMEOUT_S`, 10 s, o chiavi pubbliche di Google non raggiungibili) tutte le route autenticate rispondono 503 `auth_unavailable` «Controllo dell'accesso non disponibile: riprova tra poco»: è un intoppo, la sessione resta valida (D-198). Token sbagliato o scaduto: 401 come sempre.
 
+**Revoca quando Firebase non risponde (F-8, revisione «attacco da fuori», 22 novembre 2026).**
+- Firebase risponde con un errore ma il server conosce già la risposta: vale l'ultima risposta nota, anche vecchia.
+- Firebase risponde con un errore e il server non sa nulla: 503 `auth_unavailable`, non più «valido».
+- Un account disattivato dalla console di Firebase vale come revocato: 401.
+- Uno stream già aperto resta aperto finché Firebase non risponde, come prima.
+
 **Dimensione del corpo (F-2, revisione «attacco da fuori», 22 novembre 2026).** Ogni richiesta con un corpo oltre il suo limite riceve 413 `payload_too_large` «Richiesta troppo grande», prima di qualsiasi lettura, controllo d'accesso o firma (`bff/body_limit.py`, il middleware più esterno). Limiti: 256 KiB per `/internal/ai/chat`, 64 KiB per tutto il resto (`/app/*`, `/webhooks/*`, `/internal/agent/*`). Vale sia con `Content-Length` sia per i corpi a pezzi. I corpi legittimi più grandi, misurati il 22 novembre: la richiesta dell'assistente per un appartamento di 200 dispositivi circa 77 KiB; tutte le regole cambiate insieme 0,7 KiB; la copia delle regole verso 100 appartamenti 7,5 KiB. Il 413 non porta le intestazioni CORS: il sito vede un errore di rete, ma nessuna sua richiesta si avvicina al limite.
 
 **Record creato dai claim (F-1, stessa revisione).**

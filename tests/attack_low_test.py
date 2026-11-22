@@ -148,3 +148,63 @@ def test_f12_the_right_key_of_an_apartment_that_cannot_be_used_is_refused(monkey
         run(repo.upsert_apartment(original))
         run(repo.upsert_tenant(tenant))
         auth._known_tenants.clear()
+
+
+# -------- F-8: Firebase in error = not revoked; an account disabled in Firebase's console still came in --------
+class _FakeFirebase:
+    class UserNotFoundError(Exception):
+        pass
+
+    def __init__(self):
+        self.fail, self.disabled, self.valid_after_ms = False, False, 0
+
+    def get_user(self, uid, app=None):
+        if self.fail:
+            raise RuntimeError("Firebase non risponde")
+        import types
+        return types.SimpleNamespace(uid=uid, tokens_valid_after_timestamp=self.valid_after_ms, disabled=self.disabled,
+                                     custom_claims={}, email_verified=True)
+
+
+@pytest.fixture
+def firebase(monkeypatch):
+    from bff import accounts, auth
+    fake = _FakeFirebase()
+    s = dataclasses.replace(get_settings(), auth_mode="firebase")
+    monkeypatch.setattr(accounts, "get_settings", lambda: s)
+    monkeypatch.setattr(accounts, "_auth", lambda: (fake, None))
+    monkeypatch.setattr(auth, "_verify_firebase_token", lambda token: {"uid": "u-f8", "iat": 1000.0})
+    accounts._valid_after.clear()
+    yield fake
+    accounts._valid_after.clear()
+
+
+def _check():
+    import types
+    from fastapi import HTTPException
+    from bff import auth
+    try:
+        run(auth._verified_claims(types.SimpleNamespace(headers={"Authorization": "Bearer t"})))
+        return 200
+    except HTTPException as exc:
+        return exc.status_code
+
+
+def test_f8_firebase_in_error_without_a_known_answer_is_try_again_not_valid(firebase):
+    firebase.fail = True
+    assert _check() == 503
+
+
+def test_f8_firebase_in_error_reuses_the_last_known_answer_even_old(firebase, monkeypatch):
+    from bff import accounts
+    firebase.valid_after_ms = 5_000_000                             # revoked at 5000 s: the token of 1000 s is not valid
+    assert _check() == 401
+    now = accounts.time.monotonic()
+    monkeypatch.setattr(accounts.time, "monotonic", lambda: now + accounts.REVOCATION_CACHE_S + 5)
+    firebase.fail = True
+    assert _check() == 401                                          # the old answer still says revoked
+
+
+def test_f8_an_account_disabled_in_firebase_is_refused(firebase):
+    firebase.disabled = True
+    assert _check() == 401
