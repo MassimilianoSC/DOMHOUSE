@@ -112,3 +112,33 @@ def test_the_firebase_account_made_for_an_invitation_carries_no_name(monkeypatch
     monkeypatch.setattr(invites, "get_settings", lambda: s)
     assert invites._password_link("senza-nome@esempio.it")
     assert made and "display_name" not in made[0] and made[0]["email"] == "senza-nome@esempio.it"
+
+
+# -------- the technical id the deletion emails show: checked by the server on every way an apartment is created --------
+BAD_IDS = ["a.b", "a/b", "a_b", "A-b", "a b", "-ab", "a\b", "evil.com", "a%2fb"]
+
+
+@pytest.mark.parametrize("bad", BAD_IDS)
+def test_the_apartment_id_is_checked_on_every_way_of_creation(world, bad):
+    """Answer 1246, point 3: the deletion emails show the apartment's id instead of its name, so the id must never carry
+    a dot or a slash. Linked by hand by the platform: ^[a-z0-9][a-z0-9-]*$ (bff/routes/platform.py ApartmentCreate);
+    created from the app (A2, and the client's own creation with the Autonomia): the agent's rule, in staging
+    ^(lab|test)-[a-z0-9]([a-z0-9-]*[a-z0-9])?$, in production ^a-[a-z0-9]{8}$ (bff/creation.py _check_id,
+    bff/agent.py apartment_allowed); an admin never creates (D-77)."""
+    base = f"/app/platform/tenants/{DEMO_TENANT}/apartments"
+    r = call("POST", base, json={"apartment_id": bad, "name": "Prova", "instance_url": "mock://builtin"})
+    assert r.status_code == 422, (bad, r.status_code, r.text[:200])
+    r = call("POST", f"{base}/nuovo", json={"apartment_id": f"lab-{bad}", "name": "Prova", "timezone": "Europe/Rome"})
+    assert r.status_code == 422, (bad, r.status_code, r.text[:200])
+    r = call("POST", "/app/admin/apartments", headers=ADMIN,
+             json={"apartment_id": bad, "name": "Prova", "instance_url": "mock://builtin"})
+    assert r.status_code in (403, 422), (bad, r.status_code)
+    assert get_repository().apartments.get(bad) is None and get_repository().apartments.get(f"lab-{bad}") is None
+
+
+def test_a_good_id_still_creates_on_both_ways(world):
+    base = f"/app/platform/tenants/{DEMO_TENANT}/apartments"
+    r = call("POST", base, json={"apartment_id": "casa-1246", "name": "Prova", "instance_url": "mock://builtin"})
+    assert r.status_code == 201, r.text
+    r = call("POST", f"{base}/nuovo", json={"apartment_id": "lab-a2-1246", "name": "Prova", "timezone": "Europe/Rome"})
+    assert r.status_code in (201, 202), r.text
