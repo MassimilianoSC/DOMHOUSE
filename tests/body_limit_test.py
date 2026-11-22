@@ -223,6 +223,29 @@ def test_r2_a_pubsub_push_over_the_limit_is_acknowledged_204_unread_and_logged(d
         assert sent[0]["status"] == 413 and called == [] and lines == [], path
 
 
+def test_r2_at_most_10_lines_a_minute_the_others_counted_in_one_line(monkeypatch):
+    """a6, 22 November: the 204 comes before the signature check, so anyone could write that line at will. As for the
+    unsigned webhooks (F-5): at most 10 «troppo_grande» lines a minute per instance; the others still get their 204,
+    and are counted in one line when the minute is over."""
+    clock = [600.0]
+    monkeypatch.setattr(body_limit, "_clock", lambda: clock[0], raising=False)
+    statuses, lines = [], []
+    for _ in range(25):
+        sent, _reads, _called, got = _over_the_limit_on("/internal/agent/risultati", True, monkeypatch)
+        statuses.append(sent[0]["status"])
+        lines += got
+    assert statuses == [204] * 25
+    assert lines == [("agent result ignored", {"reason": "troppo_grande"})] * 10
+    clock[0] += 60
+    sent, _reads, _called, got = _over_the_limit_on("/internal/agent/risultati", False, monkeypatch)
+    assert sent[0]["status"] == 204
+    assert got == [("agent results ignored, lines not written", {"reason": "troppo_grande", "calls": 15}),
+                   ("agent result ignored", {"reason": "troppo_grande"})]
+    clock[0] += 120                                                # a minute without skipped calls: no count line
+    _sent, _reads, _called, got = _over_the_limit_on("/internal/agent/risultati", True, monkeypatch)
+    assert got == [("agent result ignored", {"reason": "troppo_grande"})]
+
+
 def test_the_root_path_prefix_counts_for_the_webhook_limit():
     assert body_limit.limit_for("/api/webhooks/italianway", "/api") == 64 * 1024
     assert body_limit.limit_for("/api/app/me", "/api") == body_limit.DEFAULT_LIMIT

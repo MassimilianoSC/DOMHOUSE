@@ -16,7 +16,11 @@ before the access check, and a JSON body takes up to about 24 times its size onc
 Rereading R2 (the committente's full run of 22 November, agent_server_test::test_r2): Pub/Sub delivers again, forever,
 a push that does not get a 2xx. So on the push of the agent's results (/internal/agent/risultati) a body over the limit
 is acknowledged with 204 instead of 413: never read past the limit, never given to the route, and a warn line «agent
-result ignored» with reason «troppo_grande», as the route does for a result it ignores. Every other path keeps 413."""
+result ignored» with reason «troppo_grande», as the route does for a result it ignores. Every other path keeps 413.
+That 204 comes before the signature check, so (a6, 22 November, as for the unsigned webhooks of F-5) at most 10 of those
+lines a minute per instance; the others get the same 204 and are counted in one line once the minute is over."""
+import time
+
 from starlette.datastructures import Headers
 
 from .logs import warn
@@ -26,6 +30,9 @@ AI_CHAT_LIMIT = 256 * 1024
 DEFAULT_LIMIT = 64 * 1024
 LIMITS = {"/webhooks/": WEBHOOK_LIMIT, "/internal/ai/chat": AI_CHAT_LIMIT}
 ACKNOWLEDGED = {"/internal/agent/risultati"}                     # R2: Pub/Sub's pushes, 204 even when too large
+ACKNOWLEDGED_LINES_PER_MINUTE = 10
+_acknowledged: dict = {}        # {"window": minute, "lines": lines written in it, "skipped": calls without a line}
+_clock = time.monotonic
 
 _BODY = (b'{"error":"payload_too_large","message":"Richiesta troppo grande"}')
 
@@ -49,8 +56,21 @@ async def _refuse(send) -> None:
     await send({"type": "http.response.body", "body": _BODY})
 
 
+def _acknowledged_line() -> None:
+    window = int(_clock() // 60)
+    if _acknowledged.get("window") != window:
+        if _acknowledged.get("skipped"):
+            warn("agent results ignored, lines not written", reason="troppo_grande", calls=_acknowledged["skipped"])
+        _acknowledged.update(window=window, lines=0, skipped=0)
+    if _acknowledged["lines"] < ACKNOWLEDGED_LINES_PER_MINUTE:
+        _acknowledged["lines"] += 1
+        warn("agent result ignored", reason="troppo_grande")
+    else:
+        _acknowledged["skipped"] += 1
+
+
 async def _acknowledge(send) -> None:
-    warn("agent result ignored", reason="troppo_grande")
+    _acknowledged_line()
     await send({"type": "http.response.start", "status": 204, "headers": [(b"connection", b"close")]})
     await send({"type": "http.response.body", "body": b""})
 

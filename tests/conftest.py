@@ -12,6 +12,9 @@ def _per_process_counters_fresh():
     module = sys.modules.get("bff.routes.webhooks")
     if module is not None:
         module._unsigned.clear()
+    limit = sys.modules.get("bff.body_limit")                  # R2: the «troppo_grande» lines of the minute
+    if limit is not None:
+        limit._acknowledged.clear()
     routes = sys.modules.get("bff.routes.apartments")         # F-6: streams opened by calling the route, never sent
     if routes is not None:
         routes._open_streams.clear()
