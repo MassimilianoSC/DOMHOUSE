@@ -73,6 +73,7 @@ def _env(monkeypatch, env):
     monkeypatch.setattr(accounts, "_auth", lambda: (fake, None))
     accounts._valid_after.clear()
     auth._known_tenants.clear()
+    getattr(auth, "_refused_claims", {}).clear()                   # rereading P-7: refusals remembered per token
     run(get_repository().upsert_tenant(Tenant(tenant_id=TENANT, name="F-1")))
     return fake
 
@@ -317,3 +318,60 @@ def test_an_invited_operator_keeps_the_apartments_of_the_invitation(prod, monkey
     token = {"uid": "u-f1-inv", "email": "x@f1.it", "email_verified": True, "iat": 1000}
     user = run(auth._member(_request(monkeypatch, token)))
     assert (user.role, user.apartment_ids) == ("operator", ["apt-1", "apt-2"])
+
+
+# -------- rereading P-7: a refusal confirmed by Firebase is remembered for that token --------
+def test_p7_a_removed_person_with_a_script_asks_firebase_once_per_token(prod, monkeypatch):
+    """_claims_hold_now asked Firebase (a thread of the small pool) at every request of a token with claims and no
+    record: in staging a removed person could keep it busy for an hour. Now the «no» is remembered for (uid, iat)
+    until the token expires; a new token asks again. Only a refusal is remembered."""
+    now = time.time()
+    old_token, boss = _limited_operator(prod, "prod", "u-f1-script")
+    old_token["iat"] = now - 60
+    run(admin.delete_user("u-f1-script", boss))
+    accounts._valid_after["u-f1-script"] = (time.monotonic(), 0.0)
+    asked = []
+    real = accounts.current_env_claims
+    monkeypatch.setattr(accounts, "current_env_claims", lambda uid: asked.append(uid) or real(uid))
+    for _ in range(5):
+        assert _refused(_request(monkeypatch, old_token)) == (403, "forbidden")
+    assert len(asked) == 1
+    newer = {**old_token, "iat": now}                                              # another token: asked again
+    assert _refused(_request(monkeypatch, newer)) == (403, "forbidden") and len(asked) == 2
+
+
+def test_p7_an_expired_refusal_is_forgotten_and_firebase_unanswered_is_never_remembered(prod, monkeypatch):
+    old_token, _boss = _limited_operator(prod, "prod", "u-f1-forget")
+    old_token["iat"] = time.time() - 60
+    run(get_repository().delete_user("u-f1-forget"))
+    accounts._valid_after["u-f1-forget"] = (time.monotonic(), 0.0)
+    prod.down = True
+    assert _refused(_request(monkeypatch, old_token)) == (503, "auth_unavailable")
+    prod.down = False                                    # a 503 says nothing, so it was not kept: asked again
+    assert run(auth._member(_request(monkeypatch, old_token))).uid == "u-f1-forget"   # the claims are still there
+    assert run(get_repository().get_user("u-f1-forget")) is not None
+
+
+def test_p7_a_remembered_refusal_ends_with_its_token(prod, monkeypatch):
+    old_token, boss = _limited_operator(prod, "prod", "u-f1-end")
+    run(admin.delete_user("u-f1-end", boss))
+    accounts._valid_after["u-f1-end"] = (time.monotonic(), 0.0)
+    asked = []
+    real = accounts.current_env_claims
+    monkeypatch.setattr(accounts, "current_env_claims", lambda uid: asked.append(uid) or real(uid))
+    old_token["iat"] = time.time() - 3600 + 1                      # a token about to expire
+    assert _refused(_request(monkeypatch, old_token))[0] == 403
+    monkeypatch.setattr(auth.time, "time", lambda: old_token["iat"] + 3601)   # expired: forgotten, never kept longer
+    assert _refused(_request(monkeypatch, old_token))[0] == 403 and len(asked) == 2
+
+
+def test_p7_the_remembered_refusals_are_bounded(prod, monkeypatch):
+    monkeypatch.setattr(auth, "REFUSED_CLAIMS_MAX", 3)
+    now = time.time()
+    for i in range(6):
+        token = {"uid": f"u-f1-many-{i}", "email": f"m{i}@f1.it", "email_verified": True, "iat": now - i,
+                 "prod": {"tenant_id": TENANT, "role": "operator"}}
+        prod.add(f"u-f1-many-{i}", f"m{i}@f1.it", {})                                # claims taken away
+        assert _refused(_request(monkeypatch, token))[0] == 403
+    assert len(auth._refused_claims) == 3
+    assert ("u-f1-many-5", now - 5) in auth._refused_claims                          # the newest kept

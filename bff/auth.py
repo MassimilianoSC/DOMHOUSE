@@ -173,7 +173,8 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
         # F-1 (attack-from-outside review): only when Firebase holds these claims NOW. A removed person's token keeps
         # its copy for up to an hour (staging never revokes; production's revocation is cached 60 s per instance), and
         # a record made from it gave back the role with every apartment (apartment_ids None)
-        await _claims_hold_now(uid, tenant_id, role)
+        issued_at = float(claims.get("iat", 0))
+        await _held_for_token(uid, tenant_id, role, issued_at)
         # rereading P-6 (decision of the memoria storica, 22 November, ESITO point 3): someone who is not an admin
         # starts with no apartment, the admin assigns them; so a record left by a race never opens every apartment
         stored = await repo.upsert_user(User(uid=uid, email=email, display_name=claims.get("name", "") or "",
@@ -184,7 +185,7 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
         # Rereading P-5: whatever ends the check other than its success (403, 503, a request cancelled) deletes it
         confirmed = False
         try:
-            await _claims_hold_now(uid, tenant_id, role)
+            await _held_for_token(uid, tenant_id, role, issued_at)
             confirmed = True
         finally:
             if not confirmed:
@@ -208,6 +209,36 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
     return CurrentUser(uid=uid, email=email, tenant_id=tenant_id, role=role,
                        display_name=(stored.display_name if stored else claims.get("name", "")) or "",
                        apartment_ids=stored.apartment_ids, issued_at=float(claims.get("iat", 0)))
+
+
+TOKEN_LIFETIME_S = 3600            # a Firebase ID token's life: iat + 1 hour
+REFUSED_CLAIMS_MAX = 10_000
+_refused_claims: dict[tuple[str, float], float] = {}     # (uid, token iat) -> until (epoch s): Firebase said no
+
+
+async def _held_for_token(uid: str, tenant_id: str, role: str, issued_at: float) -> None:
+    """Rereading P-7: _claims_hold_now asked Firebase (a thread of a small pool) at every request of a token with claims
+    and no record, so a removed person with a script could keep it busy for the token's hour. A refusal (403) is
+    remembered for that token (uid, iat) until it expires; another token asks again; a 503 says nothing and is never
+    kept. Safe: it only refuses."""
+    now = time.time()
+    until = _refused_claims.get((uid, issued_at))
+    if until is not None:
+        if until > now:
+            raise _err(403, "forbidden", "Account non abilitato: mancano tenant o ruolo")
+        _refused_claims.pop((uid, issued_at), None)
+    try:
+        await _claims_hold_now(uid, tenant_id, role)
+    except HTTPException as exc:
+        until = issued_at + TOKEN_LIFETIME_S
+        if exc.status_code == 403 and until > now:
+            if len(_refused_claims) >= REFUSED_CLAIMS_MAX:
+                for key in [k for k, t in _refused_claims.items() if t <= now]:
+                    del _refused_claims[key]
+                while len(_refused_claims) >= REFUSED_CLAIMS_MAX:
+                    _refused_claims.pop(next(iter(_refused_claims)))       # the oldest first
+            _refused_claims[(uid, issued_at)] = until
+        raise
 
 
 async def _claims_hold_now(uid: str, tenant_id: str, role: str) -> None:
