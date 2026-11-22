@@ -112,7 +112,7 @@ describe("i campi (§2.1)", () => {
     const btn = screen.getByTestId("new-apt-save");
     expect(btn).toBeDisabled();
     type("apt-form-apartment_id", "apt-001");
-    expect(screen.getByTestId("new-apt-id-problem")).toHaveTextContent("Id non valido: nello staging lab-… o test-…");
+    expect(screen.getByTestId("new-apt-id-problem")).toHaveTextContent("ID non valido: nello staging lab-… o test-…");
     type("apt-form-name", "Prova");
     expect(btn).toBeDisabled();
     type("apt-form-apartment_id", "lab-prova");
@@ -212,7 +212,7 @@ describe("gli altri rifiuti di «Crea» restano nel modulo (§6.1)", () => {
 
   it("invalid_apartment_id: il testo del sito sotto il campo Id", async () => {
     await refuse(new ApiError(422, "invalid_apartment_id", "invalid", "c-1"));
-    expect(screen.getByTestId("new-apt-id-problem")).toHaveTextContent("Id non valido: nello staging lab-… o test-…, lettere minuscole, cifre e trattini.");
+    expect(screen.getByTestId("new-apt-id-problem")).toHaveTextContent("ID non valido: nello staging lab-… o test-…, lettere minuscole, cifre e trattini.");
   });
 
   it("external_id_in_use: la frase del server sotto il codice Italianway", async () => {

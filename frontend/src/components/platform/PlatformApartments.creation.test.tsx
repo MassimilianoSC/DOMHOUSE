@@ -148,7 +148,7 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
     expect(box).toHaveTextContent("Il sistema domotico non è partito. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto.");
     expect(box).not.toHaveTextContent("Motore non sano");
     expect(box).toHaveTextContent("Si è fermata a: installazione del sistema domotico (passo 4 di 5)");
-    expect(box).toHaveTextContent("L'id lab-ponte e la porta 8152 restano riservati finché non premi «Riprova» o «Annulla creazione».");
+    expect(box).toHaveTextContent("L'ID lab-ponte e la porta 8152 restano riservati finché non premi «Riprova» o «Annulla creazione».");
     expect(box).toHaveTextContent("Ultimo tentativo: 19 nov 2026, 17:05, Giulia Rossi");
     expect(within(box).getByTestId("creation-op-lab-ponte")).toHaveTextContent("3f9c2a71");
     expect(within(r).getByTestId("creation-retry-lab-ponte")).toHaveTextContent("Riprova");
@@ -194,7 +194,7 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
     await click(screen.getByTestId("creation-cancel-lab-ponte"));
     const dlg = screen.getByTestId("creation-cancel-dialog");
     expect(dlg).toHaveTextContent("Annullare la creazione di Bilocale Ponte?");
-    expect(dlg).toHaveTextContent("Togli tutto quello che è stato preparato per Bilocale Ponte: sistema domotico, accesso dei dispositivi e chiavi. L'id lab-ponte non si potrà più usare; la porta torna libera. Le chiavi si possono recuperare per 7 giorni.");
+    expect(dlg).toHaveTextContent("Togli tutto quello che è stato preparato per Bilocale Ponte: sistema domotico, accesso dei dispositivi e chiavi. L'ID lab-ponte non si potrà più usare; la porta torna libera. Le chiavi si possono recuperare per 7 giorni.");
     await click(within(dlg).getByTestId("creation-cancel-back"));
     expect(screen.queryByTestId("creation-cancel-dialog")).toBeNull();
     expect(s.cancelCreation).not.toHaveBeenCalled();
