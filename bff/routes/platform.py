@@ -116,8 +116,7 @@ async def create_tenant(body: TenantCreate, identity: Identity = Depends(require
     who = audit.by_platform(identity)
     await audit.record("tenant_created", who, tenant_id, audit.tenant_target(tenant_id, t.name))
     await audit.record("invite_sent", who, tenant_id, audit.user_target(invited), role="admin", apartment_ids="all")
-    status = await send_invitation(t.first_admin_email, body.admin_display_name.strip(), "admin", t.name,
-                                   identity.display_name or identity.email, tenant_id, inviter_email=identity.email)
+    status = await send_invitation(t.first_admin_email, "admin", t.name, tenant_id, by_platform=True)
     if status == "deferred":
         await audit.record("invite_email_deferred", who, tenant_id, audit.user_target(invited))
     return {**await tenant_row(t, identity.uid), "email_status": shown(status)}
@@ -234,8 +233,7 @@ async def resend_first_admin_invite(tenant_id: str, identity: Identity = Depends
     if not u.uid.startswith("inv-"):
         return err(409, "already_active", "L'amministratore ha già effettuato l'accesso")
     await audit.record("invite_resent", audit.by_platform(identity), tenant_id, audit.user_target(u))
-    status = await send_invitation(u.email, u.display_name, "admin", t.name, identity.display_name or identity.email,
-                                   tenant_id, inviter_email=identity.email)
+    status = await send_invitation(u.email, "admin", t.name, tenant_id, by_platform=True)
     if status == "deferred":
         await audit.record("invite_email_deferred", audit.by_platform(identity), tenant_id, audit.user_target(u))
     return {**await tenant_row(t, identity.uid), "email_status": shown(status)}

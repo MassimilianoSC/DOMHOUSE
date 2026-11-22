@@ -129,14 +129,14 @@ def test_smtp_errors_never_log_the_address(monkeypatch):
     seen = []
     configured = dataclasses.replace(get_settings(), smtp_user="mittente@esempio.it", smtp_password="x")
     monkeypatch.setattr(invites, "get_settings", lambda: configured)
-    monkeypatch.setattr(invites, "_password_link", lambda e, n: None)
+    monkeypatch.setattr(invites, "_password_link", lambda e: None)
 
     def refuse(msg):
         raise smtplib.SMTPRecipientsRefused({"segreto@destinatario.it": (550, b"5.1.1 segreto@destinatario.it unknown")})
     monkeypatch.setattr(invites, "_send", refuse)
     monkeypatch.setattr(invites, "warn", lambda msg, **f: seen.append((msg, f)))
     run(get_repository().upsert_tenant(Tenant(tenant_id="t-smtp", name="Smtp")))
-    assert run(invites.send_invitation("segreto@destinatario.it", "", "viewer", "S", "A", "t-smtp")) == "failed"
+    assert run(invites.send_invitation("segreto@destinatario.it", "viewer", "S", "t-smtp")) == "failed"
     assert seen and "destinatario" not in json.dumps(seen) and "SMTPRecipientsRefused" in json.dumps(seen)
 
 

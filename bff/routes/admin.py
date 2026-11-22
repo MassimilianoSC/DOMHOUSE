@@ -85,8 +85,7 @@ async def invite_user(body: InviteBody, user: CurrentUser = Depends(require_admi
 
 async def _notify(target: User, inviter: CurrentUser) -> str:
     tenant = await get_repository().get_tenant(inviter.tenant_id)
-    status = await send_invitation(target.email, target.display_name, target.role, tenant.name if tenant else "",
-                                   inviter.display_name or inviter.email, inviter.tenant_id, inviter_email=inviter.email)
+    status = await send_invitation(target.email, target.role, tenant.name if tenant else "", inviter.tenant_id)
     if status == "deferred":  # P-49: the invitation stays; only the log says why the email did not leave
         await audit.record("invite_email_deferred", audit.by_user(inviter), inviter.tenant_id, audit.user_target(target))
     return shown(status)

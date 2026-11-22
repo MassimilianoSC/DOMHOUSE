@@ -46,7 +46,7 @@ def _with_lang(link: str, lang: str = "it") -> str:
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
-def _password_link(email: str, display_name: str) -> str | None:
+def _password_link(email: str) -> str | None:
     """Creates the Firebase account if missing and returns a password setup link (None outside firebase mode)."""
     settings = get_settings()
     if settings.auth_mode != "firebase":
@@ -59,23 +59,32 @@ def _password_link(email: str, display_name: str) -> str | None:
     try:
         fb_auth.get_user_by_email(email, app=app)
     except fb_auth.UserNotFoundError:
-        fb_auth.create_user(email=email, email_verified=False, display_name=display_name or None, app=app)
+        # rule of answer 1246: no user-written text in Firebase's profile either (its emails may show %DISPLAY_NAME%)
+        fb_auth.create_user(email=email, email_verified=False, app=app)
         info("invite: firebase account created", invite=invite_uid(email))
     action = fb_auth.ActionCodeSettings(url=settings.app_public_url) if settings.app_public_url else None
     return _with_lang(fb_auth.generate_password_reset_link(email, action_code_settings=action, app=app))
 
 
-def _compose(to: str, display_name: str, role: str, tenant_name: str, inviter: str, link: str | None) -> EmailMessage:
+def _compose(to: str, role: str, tenant_name: str, by_platform: bool, link: str | None) -> EmailMessage:
+    """Rule of answer 1246 (the committente, 22 November 2026): only fixed text and fields written by the platform (the
+    organisation's name, set only by the platform; the app's address and sender from the manifest); never a name
+    written by a user. The invited address stays (a6): the recipient's own."""
     s = get_settings()
     app_url = s.app_public_url or ""
     role_label = ROLE_LABELS.get(role, role)
-    org = f" per {tenant_name}" if tenant_name else ""
-    greeting = f"Ciao {display_name}," if display_name else "Ciao,"
+    greeting = "Ciao,"
+    if by_platform:
+        org = f" per «{tenant_name}»" if tenant_name else ""
+        sentence = f"Il gestore della piattaforma ti ha invitato a usare {s.mail_from_name}{org}, con il ruolo {role_label}."
+    else:
+        sentence = (f"Un amministratore di «{tenant_name}» ti ha invitato a usare {s.mail_from_name}, con il ruolo "
+                    f"{role_label}.")
 
     text = [
         greeting,
         "",
-        f"{inviter} ti ha invitato a usare {s.mail_from_name}{org}, con il ruolo {role_label}.",
+        sentence,
         "",
         f"Apri l'app: {app_url}",
         f"- Se {to} è un account Google, tocca «Accedi con Google».",
@@ -98,7 +107,7 @@ def _compose(to: str, display_name: str, role: str, tenant_name: str, inviter: s
     )
     body_html = f"""<!doctype html><html lang="it"><body style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.5">
 <p>{e(greeting)}</p>
-<p>{e(inviter)} ti ha invitato a usare <strong>{e(s.mail_from_name)}</strong>{e(org)}, con il ruolo <strong>{e(role_label)}</strong>.</p>
+<p>{e(sentence)}</p>
 <p><a href="{e(app_url)}" style="display:inline-block;padding:10px 18px;border-radius:10px;background:#1f2937;color:#ffffff;text-decoration:none;font-weight:bold">Apri l'app</a></p>
 <p>Se <strong>{e(to)}</strong> è un account Google, tocca «Accedi con Google».</p>
 {link_html}
@@ -141,25 +150,10 @@ def shown(status: EmailStatus) -> str:
     return "failed" if status == "deferred" else status
 
 
-def _shown_names(display_name: str, inviter: str, inviter_email: str) -> tuple[str, str]:
-    """Final rereading R-5: names saved before F-11 are checked again when the email is written. The invited person's
-    name out of the rule is left out; the inviter's becomes the part of their email before «@» when that passes, else
-    their email (as when they have no name). An inviter shown by email is kept as it is."""
-    from .plain_text import acceptable_name
-    if display_name and not acceptable_name(display_name):
-        warn("invite: invited name left out of the email")
-        display_name = ""
-    if inviter and "@" not in inviter and not acceptable_name(inviter):
-        warn("invite: inviter's name left out of the email")
-        local = inviter_email.split("@")[0]
-        inviter = local if local and acceptable_name(local) else inviter_email
-    return display_name, inviter
-
-
-async def send_invitation(email: str, display_name: str, role: str, tenant_name: str, inviter: str,
-                          tenant_id: str, inviter_email: str = "") -> EmailStatus:
+async def send_invitation(email: str, role: str, tenant_name: str, tenant_id: str,
+                          by_platform: bool = False) -> EmailStatus:
+    """by_platform: the platform manager invites (a new organisation's first admin), else an admin of tenant_name."""
     settings = get_settings()
-    display_name, inviter = _shown_names(display_name, inviter, inviter_email)
     if not settings.mail_configured:
         info("invite: email not sent, SMTP not configured", invite=invite_uid(email))
         return "not_configured"
@@ -172,12 +166,12 @@ async def send_invitation(email: str, display_name: str, role: str, tenant_name:
         warn("invite: email deferred by the anti-abuse limit", invite=invite_uid(email), tenant_id=tenant_id)
         return "deferred"
     try:
-        link = await asyncio.to_thread(_password_link, email, display_name)
+        link = await asyncio.to_thread(_password_link, email)
     except Exception as exc:  # the email still helps Google users
         warn("invite: password link not generated", invite=invite_uid(email), error=str(exc))
         link = None
     try:
-        await asyncio.to_thread(_send, _compose(email, display_name, role, tenant_name, inviter, link))
+        await asyncio.to_thread(_send, _compose(email, role, tenant_name, by_platform, link))
     except Exception as exc:
         # D-91: the type and the SMTP code only; the server's text may quote the address
         warn("invite: email failed", invite=invite_uid(email), error=type(exc).__name__,

@@ -467,44 +467,6 @@ def test_r2_claims_of_an_organisation_gone_or_suspended_do_not_block_an_invitati
     run(repo.delete_user(r.json()["uid"]))
 
 
-# -------- final rereading R-5: names saved before F-11 are checked again when the invitation email is written --------
-@pytest.fixture
-def outbox(monkeypatch):
-    from bff import invites
-    sent = []
-    s = dataclasses.replace(get_settings(), smtp_user="mittente@esempio.it", smtp_password="x", smtp_host="smtp.x")
-    monkeypatch.setattr(invites, "get_settings", lambda: s)
-    monkeypatch.setattr(invites, "_password_link", lambda email, name: None)
-    monkeypatch.setattr(invites, "_send", lambda msg: sent.append(msg))
-
-    async def allowed(_buckets):
-        return True
-    from bff.repository import get_repository
-    monkeypatch.setattr(get_repository(), "take_mail_quota", allowed)
-    return sent
-
-
-def _body(msg):
-    return "\n".join(part.get_content() for part in msg.walk() if part.get_content_type().startswith("text/"))
-
-
-def test_r5_an_invited_name_out_of_the_rule_is_left_out_of_the_email(outbox):
-    from bff import invites
-    status = run(invites.send_invitation("r5@esempio.it", "Vai su www.evil.example", "viewer", "Flatsharing",
-                                         "Anna Bianchi", "t-flatsharing-demo"))
-    assert status == "sent" and outbox
-    body = _body(outbox[0])
-    assert "evil" not in body and "Anna Bianchi" in body
-
-
-def test_r5_an_inviters_name_out_of_the_rule_becomes_the_part_of_their_email(outbox):
-    from bff import invites
-    run(invites.send_invitation("r5b@esempio.it", "Mario Rossi", "viewer", "Flatsharing",
-                                "Clicca https://evil.example", "t-flatsharing-demo", inviter_email="capo-ufficio@esempio.it"))
-    body = _body(outbox[0])
-    assert "evil" not in body and "capo-ufficio ti ha invitato" in body and "Ciao Mario Rossi" in body
-
-
 # -------- final rereading R-10: an apartment that cannot be used answers 401 before its secret is read --------
 @pytest.mark.parametrize("state", ["disabled", "not_ready", "suspended"])
 def test_r10_no_secret_read_for_an_apartment_that_cannot_be_used(monkeypatch, state):

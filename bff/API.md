@@ -199,6 +199,22 @@ dell'azione; email risolta per `user` e `manager`.
 `support_access_requested`, `_approved`, `_rejected` restano nell'elenco ma non si scrivono: la variante A (D-86) non
 ha approvazione. Un'azione nuova si concorda prima con il sito, che ha una frase per ognuna.
 
+### Testi delle email (regola della risposta 1246, 22 novembre 2026)
+
+Nelle email del server ci sono solo testo fisso e campi scritti dalla piattaforma: mai testi scritti dagli utenti
+(nomi di persone, nomi e indirizzi degli appartamenti). La prova è `tests/email_no_user_text_test.py`: in ogni campo
+scritto dagli utenti mette un marcatore, che non deve comparire in nessuna email composta.
+
+| Email | Contenuto variabile |
+|---|---|
+| Invito e reinvio (#14, #15) | «Ciao,»; «Un amministratore di «{organizzazione}» ti ha invitato a usare {MAIL_FROM_NAME}, con il ruolo {ruolo}.»; l'indirizzo dell'app; l'indirizzo email dell'invitato; il link per la password |
+| Invito del primo admin dalla piattaforma, e suo reinvio | come sopra, con «Il gestore della piattaforma ti ha invitato a usare {MAIL_FROM_NAME} per «{organizzazione}», con il ruolo amministratore.» |
+| Disattivato, riattivato, eliminazione avviata (A6) | oggetto e corpo con l'identificativo tecnico dell'appartamento (controllato dal server, `^[a-z0-9][a-z0-9-]*$`); «dal gestore della piattaforma» oppure «da un amministratore»; «Apri {MAIL_FROM_NAME} per vedere di quale appartamento si tratta: {APP_PUBLIC_URL}» |
+| Avviso di spesa dell'assistente | mese, importi, tetto, percentuale |
+
+Il nome dell'organizzazione lo scrive solo la piattaforma (vedi #25). L'account Firebase creato per un invito non ha
+nome (`display_name`), perché le email di Firebase possono mostrarlo (`%DISPLAY_NAME%`).
+
 ### Limite sulle email di invito (P-49)
 
 Gli inviti non hanno limiti; le EMAIL di invito sì, come protezione anti-abuso e invisibile a chi invita: per lo stesso
