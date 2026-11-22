@@ -44,23 +44,25 @@ class BodyLimit:
             return await self.app(scope, receive, send)
         limit = limit_for(scope["path"], self.root_path)
         declared = Headers(scope=scope).get("content-length")
-        if declared is not None and (not declared.strip().isdigit() or int(declared) > limit):
-            return await _refuse(send)
-        pieces, size = [], 0
+        if declared is not None:
+            declared = declared.strip()
+            if not (declared.isascii() and declared.isdigit()) or int(declared) > limit:   # «²» passes isdigit() alone
+                return await _refuse(send)
+        # rereading P-1: one growing buffer, not a list of pieces (a body sent 2 bytes at a time cost about 21 times its
+        # size as bytes objects and list entries)
+        buffer = bytearray()
         while True:
             message = await receive()
             if message["type"] != "http.request":             # the client went away before the end: passed on
                 first = message
                 break
-            piece = message.get("body", b"")
-            size += len(piece)
-            if size > limit:
+            buffer += message.get("body", b"")
+            if len(buffer) > limit:
                 return await _refuse(send)
-            pieces.append(piece)
             if not message.get("more_body", False):
-                first = {"type": "http.request", "body": b"".join(pieces), "more_body": False}
+                first = {"type": "http.request", "body": bytes(buffer), "more_body": False}
                 break
-        pieces = None
+        buffer = None
         given = False
 
         async def replay():

@@ -191,3 +191,41 @@ def test_under_the_limit_the_app_gets_the_whole_body_then_the_disconnect():
 def test_the_root_path_prefix_counts_for_the_webhook_limit():
     assert body_limit.limit_for("/api/webhooks/italianway", "/api") == 64 * 1024
     assert body_limit.limit_for("/api/app/me", "/api") == body_limit.DEFAULT_LIMIT == 256 * 1024
+
+
+def test_p1_a_body_in_drops_of_2_bytes_costs_about_its_size():
+    """Rereading P-1: the pieces were kept in a list and joined at the end: a body sent 2 bytes at a time cost about
+    21 times its size (a bytes object and its list entry per piece). Now one growing buffer."""
+    import tracemalloc
+    size = 60 * 1024                                              # under every limit
+    left = [size // 2]
+    got = []
+
+    async def receive():
+        left[0] -= 1
+        piece = (left[0] % 65536).to_bytes(2, "big")              # a new object every time, as from the socket
+        return {"type": "http.request", "body": piece, "more_body": left[0] > 0}
+
+    async def inner(scope, receive_, send):
+        got.append(len((await receive_())["body"]))
+
+    tracemalloc.start()
+    try:
+        run(body_limit.BodyLimit(inner)(_scope("/app/me"), receive, None))
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert got == [size]
+    assert peak < 4 * size, f"peak {peak} bytes for a body of {size}"
+
+
+def test_a_declared_length_that_is_not_ascii_digits_is_refused_not_an_error():
+    """Rereading, minor note: «²» passes str.isdigit() and breaks int(); h11 refuses it first, the middleware too."""
+    sent = []
+
+    async def send(message):
+        sent.append(message)
+    for value in ("²", "1²", " 12 x", "-1"):
+        sent.clear()
+        run(body_limit.BodyLimit(lambda *a: None)(_scope("/app/me", [(b"content-length", value.encode("latin-1"))]), None, send))
+        assert sent[0]["status"] == 413, value
