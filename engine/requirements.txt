@@ -3,7 +3,7 @@
 # For the tests also: pip install pytest httpx
 aiomqtt==2.5.1
 annotated-types==0.8.0
-anyio==4.15.1
+anyio==4.16.0
 click==8.5.0
 fastapi==0.162.4
 h11==0.16.0
