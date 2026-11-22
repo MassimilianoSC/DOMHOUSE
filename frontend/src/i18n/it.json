@@ -160,7 +160,11 @@
     "resetSent": "Se {email} ha un account, riceverai a breve un'email con il link. Controlla anche lo spam.",
     "backToLogin": "Torna all'accesso",
     "verifySent": "Conferma il tuo indirizzo: abbiamo inviato un link a {email}. Aprilo e poi accedi di nuovo.",
-    "verifyFailed": "Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto."
+    "verifyFailed": "Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto.",
+    "sharedDevice": "Questo è un dispositivo condiviso",
+    "sharedDeviceHint": "Dopo 30 minuti senza usare l'app l'uscita è automatica, e alla riapertura serve di nuovo l'accesso. Lasciala spenta sul tuo telefono o computer personale.",
+    "sharedDeviceUnavailable": "Su questo browser l'uscita automatica non è disponibile: premi «Esci» quando hai finito.",
+    "autoLoggedOut": "Uscita automatica: l'app non è stata usata per 30 minuti su un dispositivo condiviso. Accedi di nuovo per continuare."
   },
   "account": {
     "title": "Account",
@@ -199,7 +203,8 @@
       "recentLogin": "Per sicurezza esci e accedi di nuovo, poi riprova",
       "network": "Connessione assente: riprova",
       "generic": "Operazione non riuscita, riprova"
-    }
+    },
+    "sharedDevice": "Dispositivo condiviso: uscita automatica dopo 30 minuti senza usare l'app. Per toglierla esci e accedi di nuovo senza la casella."
   },
   "roles": {
     "admin": "Amministratore",
