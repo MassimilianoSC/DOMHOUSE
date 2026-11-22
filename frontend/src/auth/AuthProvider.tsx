@@ -100,10 +100,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /**
    * F-15: grows at every sign-out. A read of the profile that started before (or while) the person left is dropped
    * when it answers: found in the browser, a late read put the person back in after the automatic exit, without a
-   * session. Also while a sign-out is under way (leaving), no read lets the person in.
+   * session. Also while a sign-out is under way (exiting), no read lets the person in.
    */
   const sessionGen = useRef(0);
-  const leaving = useRef(false);
+  /** F-15 (second review R-2): the sign-out under way, one at a time; a second request waits for the same one. */
+  const exiting = useRef<Promise<void> | null>(null);
   /** A profile read in flight: a blocking answer meanwhile (also /app/me's own) does not start another one (P-50). */
   const profileLoading = useRef(false);
   /** A blocking answer that came while a profile read was in flight: handled right after it (D-89). */
@@ -121,8 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     sessionGen.current += 1;
     setMe(null);
     setStatus("anonymous");
-    // F-15 (review S-6): the session is over (not a network failure), so the person's shared-device key goes
-    if (sessionOver && lastUid.current) forgetShared(lastUid.current);
+    // F-15 (second review R-1): the shared-device key is not removed here: a 401 ends the app's session but not
+    // Firebase's, and a key kept makes the next read that succeeds find «expired». It goes with «Esci», the automatic
+    // exit, Firebase saying the session is over, «Esci da tutti i dispositivi» and the deleted account.
     lastUid.current = null;
     endSupportSession();
     clearUserData(queryClient);
@@ -137,25 +139,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * «Esci»: also the automatic exit of a shared device (F-15), with the same cleaning of the push (P-44). The person's
    * shared-device key goes too (review S-6): the next sign-in passes through the box anyway.
    */
-  const leave = useCallback(async (uid: string | null = lastUid.current) => {
-    leaving.current = true;
-    try {
-      await closeOwnSupport();
-      await leaveDevice(); // while still signed in: the BFF needs the user's token to drop the push registration
-      if (env.authMode === "dev") localStorage.removeItem(DEV_KEY);
-      else await firebaseSignOut();
-      if (uid) forgetShared(uid);
-      signedOut();
-    } finally {
-      leaving.current = false;
-    }
+  const leave = useCallback((uid: string | null = lastUid.current, hide = false): Promise<void> => {
+    // F-15 (second review R-2): one sign-out at a time; touches during it do not start another one, which could
+    // finish later and sign out the next person
+    if (exiting.current) return exiting.current;
+    // the automatic exit hides the person's page at once, before the network calls (and shows no form either)
+    if (hide) setStatus("loading");
+    const run = (async () => {
+      try {
+        await closeOwnSupport();
+        await leaveDevice(); // while still signed in: the BFF needs the user's token to drop the push registration
+        if (env.authMode === "dev") localStorage.removeItem(DEV_KEY);
+        else await firebaseSignOut();
+        if (uid) forgetShared(uid);
+        signedOut();
+      } catch (err) {
+        // the key stays: the next opening finds «expired» again; the page does not stay hidden for ever
+        if (hide) signedOut();
+        throw err;
+      }
+    })();
+    const shared = run.finally(() => {
+      exiting.current = null;
+    });
+    exiting.current = shared;
+    return shared;
   }, [signedOut]);
 
   /** F-15: 30 minutes without using the app on a shared device; the sign-in page says why the person is out. */
   const autoLeave = useRef<(uid: string) => Promise<void>>(async () => {});
   autoLeave.current = async (uid: string) => {
+    if (exiting.current) return exiting.current;
     setAutoLoggedOut(true);
-    await leave(uid);
+    await leave(uid, true).catch(() => undefined);
   };
 
   /** The assistance access ended (closed, expired): back to the manager's own area, the tab emptied (P-50). */
@@ -216,7 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       for (;;) {
         const gen = sessionGen.current;
-        const stale = () => leaving.current || gen !== sessionGen.current;
+        const stale = () => exiting.current !== null || gen !== sessionGen.current;
         try {
           const next = await bffFetch<Me>("/app/me");
           if (stale()) return; // the person left meanwhile (F-15): this answer belongs to a session that is over
@@ -303,7 +319,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsub = onAuthStateChanged(auth, (user) => {
         setProviders(user ? user.providerData.map((p) => p.providerId) : []);
         if (user) void loadMe();
-        else signedOut();
+        else {
+          // Firebase says the session is over (another tab left, revoked): the person's shared-device key goes (R-1)
+          if (lastUid.current) forgetShared(lastUid.current);
+          signedOut();
+        }
       });
     }).catch(() => {
       // E-29: a block of a previous release that no longer exists, as for the pages (lazyPage): one reload, then say so.
@@ -313,12 +333,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadMe, signedOut]);
 
   // F-15: on a shared device a tap, a key or scrolling (wheel, a finger moving; review S-7) is a use, and nothing else;
-  // every minute, and on coming back from the background (before the return counts as a use), more than 30 minutes
-  // since the last use means the automatic exit.
+  // every minute, and on coming back to the page (visibility, focus, back-forward cache: second review R-3; before the
+  // return counts as a use), more than 30 minutes since the last use means the automatic exit. A tab that started as
+  // shared and no longer finds the key (another tab left and removed it: R-1) leaves too.
   const sharedUid = status === "authenticated" ? me?.user.uid : undefined;
   useEffect(() => {
     if (!sharedUid || !isShared(sharedUid)) return;
     const check = () => {
+      if (!isShared(sharedUid)) {
+        void leave(sharedUid, true).catch(() => undefined);
+        return true;
+      }
       if (sharedExpired(sharedUid, Date.now())) {
         void autoLeave.current(sharedUid);
         return true;
@@ -335,16 +360,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const USE = ["pointerdown", "keydown", "wheel", "touchmove"] as const;
     for (const type of USE) window.addEventListener(type, used, { capture: true, passive: true });
     document.addEventListener("visibilitychange", back);
+    window.addEventListener("focus", back);
+    window.addEventListener("pageshow", back);
     return () => {
       clearInterval(every);
       for (const type of USE) window.removeEventListener(type, used, { capture: true });
       document.removeEventListener("visibilitychange", back);
+      window.removeEventListener("focus", back);
+      window.removeEventListener("pageshow", back);
     };
-  }, [sharedUid]);
+  }, [sharedUid, leave]);
 
   // E-29: without this a start that never answers is a loading state for ever, with no request and no message.
   useEffect(() => {
-    if (status !== "loading") return;
+    // not while a sign-out hides the page (F-15 R-2): it ends in «anonymous» by itself
+    if (status !== "loading" || exiting.current) return;
     const timer = setTimeout(() => setStatus("unavailable"), STARTUP_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [status]);
@@ -408,11 +438,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await verifyBeforeUpdateEmail(await reauthenticate(current), newEmail, continueUrl());
       },
       logoutEverywhere: async () => {
+        const uid = lastUid.current;
         await closeOwnSupport();
         await leaveDevice(); // before the revocation, which makes this session's token useless
         await bffFetch<void>("/app/me/revoke-sessions", { method: "POST" });
         if (env.authMode === "dev") localStorage.removeItem(DEV_KEY);
         else await firebaseSignOut();
+        if (uid) forgetShared(uid);
         signedOut();
       },
       deleteAccount: async () => {
@@ -423,6 +455,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await bffFetch<void>("/app/me", { method: "DELETE" });
         if (env.authMode === "dev") localStorage.removeItem(DEV_KEY);
         else await firebaseSignOut();
+        if (uid) forgetShared(uid);
         signedOut();
         if (uid) forgetPushResume(uid); // the account is gone: nothing to bring back (P-44)
       },

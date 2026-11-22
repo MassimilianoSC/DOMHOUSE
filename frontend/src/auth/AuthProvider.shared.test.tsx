@@ -267,3 +267,79 @@ describe("pagina «Accedi» aperta con una sessione in caricamento (S-1)", () =>
     expect(isShared("anna")).toBe(true);
   });
 });
+
+// Second review (RILETTURA-F15-BIS.md): R-1 the key is not lost on a 401 and a tab whose key vanished leaves; R-2 one
+// exit at a time and the page hidden at once; R-3 the check also on focus; R-6 keydown and touchmove are uses.
+describe("seconda rilettura (R-1, R-2, R-3, R-6)", () => {
+  it("anche un tasto e un dito che scorre sono usi", async () => {
+    start();
+    await settle();
+    await press("login-anna-shared");
+    await settle(20 * 60_000);
+    await act(async () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "a" })));
+    await settle(20 * 60_000);
+    await act(async () => window.dispatchEvent(new Event("touchmove")));
+    await settle(20 * 60_000);
+    expect(status()).toBe("authenticated");
+  });
+
+  it("R-1: un 401 di passaggio non toglie la chiave; alla riapertura dopo 30 minuti si esce con l'avviso", async () => {
+    const first = start();
+    await settle();
+    await press("login-anna-shared");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "unauthorized", message: "x" }), { status: 401, headers: { "Content-Type": "application/json" } })));
+    await press("refresh");
+    expect(status()).toBe("anonymous");
+    expect(isShared("anna")).toBe(true); // the key stays
+    first.unmount();
+    // the session was still valid (Firebase kept it): the reopening 31 minutes later
+    bff();
+    localStorage.setItem(DEV_KEY, "anna@esempio.it");
+    vi.setSystemTime(Date.now() + 31 * 60_000);
+    start();
+    await settle();
+    expect(status()).toBe("anonymous");
+    expect(auto()).toBe("true");
+  });
+
+  it("R-1: due schede, l'altra è uscita e ha tolto la chiave: questa esce anche lei", async () => {
+    start();
+    await settle();
+    await press("login-anna-shared");
+    localStorage.removeItem(SHARED("anna")); // what the other tab's exit does
+    await settle(60_000);
+    expect(status()).toBe("anonymous");
+    expect(localStorage.getItem(DEV_KEY)).toBeNull();
+  });
+
+  it("R-2: un'uscita sola alla volta, la pagina sparisce subito; chi entra dopo resta dentro", async () => {
+    vi.mocked(disablePush).mockImplementation(async () => {
+      signedInAtPushCleaning.push(localStorage.getItem(DEV_KEY));
+      await new Promise((r) => setTimeout(r, 5000)); // a slow network
+    });
+    start();
+    await settle();
+    await press("login-anna-shared");
+    await settle(31 * 60_000); // the minute check starts the automatic exit
+    expect(status()).toBe("loading"); // Anna's page is gone at once, before the network calls
+    for (let i = 0; i < 3; i++) await act(async () => window.dispatchEvent(new Event("pointerdown")));
+    await press("logout"); // also «Esci» during it waits for the same exit
+    await settle(6000);
+    expect(status()).toBe("anonymous");
+    expect(signedInAtPushCleaning.filter((who) => who !== null)).toEqual(["anna@esempio.it"]); // one exit only
+    await press("login-bruno");
+    await settle(30_000);
+    expect(status()).toBe("authenticated");
+    expect(localStorage.getItem(DEV_KEY)).toBe("bruno@esempio.it");
+  });
+
+  it("R-3: anche il ritorno con focus controlla subito", async () => {
+    start();
+    await settle();
+    await press("login-anna-shared");
+    vi.setSystemTime(Date.now() + 60 * 60_000); // the laptop slept, the minute check did not fire
+    await act(async () => window.dispatchEvent(new Event("focus")));
+    await settle();
+    expect(status()).toBe("anonymous");
+  });
+});

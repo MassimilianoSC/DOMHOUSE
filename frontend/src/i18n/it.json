@@ -159,6 +159,7 @@
     "verifyFailed": "Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto.",
     "sharedDevice": "Questo è un dispositivo condiviso",
     "sharedDeviceHint": "Dopo 30 minuti senza usare l'app l'uscita è automatica, e alla riapertura serve di nuovo l'accesso. Lasciala spenta sul tuo telefono o computer personale.",
+    "sharedDeviceUnavailable": "Su questo browser l'uscita automatica non è disponibile: premi «Esci» quando hai finito.",
     "autoLoggedOut": "Uscita automatica: l'app non è stata usata per 30 minuti su un dispositivo condiviso. Accedi di nuovo per continuare."
   },
   "account": {

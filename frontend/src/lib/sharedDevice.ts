@@ -71,6 +71,17 @@ export function touchShared(uid: string, now: number) {
   write(sharedKey(uid), String(now));
 }
 
+/** Second review R-5: without a writable storage the box would do nothing, silently; the sign-in page says it. */
+export function storageWritable(): boolean {
+  try {
+    localStorage.setItem("domotica.storageProbe", "1");
+    localStorage.removeItem("domotica.storageProbe");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** After «Esci» or the automatic exit (review S-6): no list of who used the device, nor when, stays on it. */
 export function forgetShared(uid: string) {
   write(sharedKey(uid), null);

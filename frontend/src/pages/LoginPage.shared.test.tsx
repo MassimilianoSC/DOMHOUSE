@@ -109,3 +109,22 @@ describe("pagina «Accedi»: dispositivo condiviso (F-15)", () => {
     expect(screen.queryByTestId("dev-login")).toBeNull();
   });
 });
+
+describe("memoria del browser non scrivibile (seconda rilettura R-5)", () => {
+  it("sotto la casella: l'uscita automatica non è disponibile, premi «Esci»", () => {
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new DOMException("blocked", "SecurityError");
+    });
+    try {
+      show();
+      expect(screen.getByTestId("login-shared-device-unavailable")).toHaveTextContent("Su questo browser l'uscita automatica non è disponibile: premi «Esci» quando hai finito.");
+    } finally {
+      set.mockRestore();
+    }
+  });
+
+  it("con la memoria che funziona: niente riga", () => {
+    show();
+    expect(screen.queryByTestId("login-shared-device-unavailable")).toBeNull();
+  });
+});

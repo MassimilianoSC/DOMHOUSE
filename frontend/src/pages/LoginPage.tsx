@@ -8,6 +8,7 @@ import type { DevUser } from "@/api/types";
 import { authErrorMessage, useAuth } from "@/auth/AuthProvider";
 import { firebaseConfigured } from "@/auth/firebase";
 import { showLoginError } from "@/lib/loginErrors";
+import { storageWritable } from "@/lib/sharedDevice";
 import { PageProblem } from "@/components/layout/PageProblem";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label, Skeleton } from "@/components/ui/primitives";
@@ -130,6 +131,8 @@ type SharedProps = { shared: boolean; onShared: (v: boolean) => void };
  * only holds the choice: the sign-in writes it when a button is pressed (review S-1), never this field.
  */
 function SharedDeviceBox({ shared, onShared }: SharedProps) {
+  // R-5: read once; the probe writes and removes a key of its own
+  const [writable] = useState(storageWritable);
   return (
     <label className="flex items-start gap-3 rounded-xl border bg-secondary/40 px-3 py-2.5 text-sm" data-testid="login-shared-device">
       <input
@@ -143,6 +146,7 @@ function SharedDeviceBox({ shared, onShared }: SharedProps) {
       <span>
         <span className="block font-semibold">{t("login.sharedDevice")}</span>
         <span id="login-shared-device-hint" className="block text-xs text-muted-foreground">{t("login.sharedDeviceHint")}</span>
+        {!writable && <span className="mt-1 block text-xs font-medium text-warning-fg" data-testid="login-shared-device-unavailable">{t("login.sharedDeviceUnavailable")}</span>}
       </span>
     </label>
   );
