@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import json
+import time
 import uuid
 
 from fastapi import APIRouter, Request
@@ -15,6 +16,13 @@ from ..repository import WebhookLog, get_repository
 
 router = APIRouter(prefix="/webhooks")
 RAW_BODY_LIMIT = 16_000
+# F-5 (attack-from-outside review): every unsigned call wrote a row (about 23 Firestore operations) and a warn line, with
+# no limit, and pushed real signature errors out of the platform's 20 unsigned rows. Now at most this many unsigned calls
+# a minute, per instance (production up to 3), get their row and their warn line; the others the same 401, nothing
+# parsed nor written, counted in one warn line a minute. Signed calls are never limited.
+UNSIGNED_ROWS_PER_MINUTE = 10
+_unsigned: dict = {}            # {"window": minute, "rows": rows written in it, "skipped": calls without a row}
+_clock = time.monotonic
 # D-90, D-91 (F2): of an Italianway call only what is useful is kept. The stored body keeps its shape, but a value
 # survives only at a known PATH and of the expected TYPE; everything else, lists included, becomes OBSCURED. So guests'
 # data are never kept, whatever the field is called and wherever it sits.
@@ -86,6 +94,19 @@ def structured(payload) -> dict:
             "guests": guests if isinstance(guests, int) and not isinstance(guests, bool) else None}
 
 
+def _unsigned_row_allowed() -> bool:
+    window = int(_clock() // 60)
+    if _unsigned.get("window") != window:
+        if _unsigned.get("skipped"):
+            warn("webhook unsigned calls not logged", source="italianway", calls=_unsigned["skipped"])
+        _unsigned.update(window=window, rows=0, skipped=0)
+    if _unsigned["rows"] < UNSIGNED_ROWS_PER_MINUTE:
+        _unsigned["rows"] += 1
+        return True
+    _unsigned["skipped"] += 1
+    return False
+
+
 def verify_signature(raw: bytes, header_value: str | None, secret: str) -> bool:
     if not secret or not header_value:
         return False
@@ -121,6 +142,8 @@ async def italianway(request: Request):
     # on the raw bytes before they are parsed. An unsigned call keeps its obscured body and fields in the register
     # (decision of 22 November, a6: the platform sees an Italianway call with the wrong secret); its volume is F-5
     signature_ok = verify_signature(raw, request.headers.get(s.italianway_signature_header), s.italianway_webhook_secret)
+    if not signature_ok and not _unsigned_row_allowed():                 # F-5: over the minute's rows
+        return JSONResponse(status_code=401, content={"error": "invalid_signature", "message": "Firma non valida"})
     parsed, kept = _read(raw)
     log = WebhookLog(log_id=f"wh-{uuid.uuid4().hex[:12]}", signature_ok=signature_ok, status_code=0, outcome="",
                      correlation_id=correlation_id, raw_body=kept, **structured(parsed))

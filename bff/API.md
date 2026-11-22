@@ -402,6 +402,13 @@ Dei messaggi ricevuti su #30 si conserva solo ciò che serve. Ogni `WebhookLog` 
 non passano mai, comunque si chiami il campo e ovunque stia. Un corpo non JSON diventa `"[corpo non JSON, N byte]"`. Vale per tutte
 le chiamate, anche non attribuite o con firma sbagliata. I soggiorni (`BookingRecord`) non hanno mai avuto dati personali.
 
+**Chiamate con firma sbagliata (F-5, revisione «attacco da fuori», 22 novembre 2026).**
+- Ogni istanza del server registra al massimo **10 al minuto** (`UNSIGNED_ROWS_PER_MINUTE`): la riga nel registro e la riga di log `warn`. La produzione ha fino a 3 istanze.
+- Le chiamate oltre quel numero ricevono lo stesso 401 `invalid_signature`, ma non vengono lette né scritte.
+- Una riga di log `warn` al minuto le conta: «webhook unsigned calls not logged», campo `calls`.
+- Le chiamate firmate non hanno mai limiti.
+- Prima ogni chiamata non firmata costava circa 23 operazioni Firestore e spingeva fuori dalle 20 righe «non firmate» un vero errore di firma.
+
 ## Chiave dell'istanza (P-36 S3, D-60, dal 16 ottobre 2026)
 
 La chiave che il BFF manda all'istanza (`X-API-Key`) si legge da Secret Manager con un nome **sempre** derivato
