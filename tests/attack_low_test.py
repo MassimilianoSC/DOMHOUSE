@@ -273,7 +273,8 @@ def firebase_claims(monkeypatch):
 def test_f14_an_email_enabled_in_another_organisation_by_claims_is_refused_like_a_record_there(firebase_claims):
     """A person enabled in B with claims only (e.g. the first admin of set_claims.py, never signed in, so no record)
     invited by A's admin: at the first sign-in the invitation won and B lost the person without deciding it."""
-    from bff.repository import get_repository
+    from bff.repository import Tenant, get_repository
+    run(get_repository().upsert_tenant(Tenant(tenant_id="t-altra-f14", name="Altra F-14")))     # exists, active
     firebase_claims.users["f14@esempio.it"] = {"tenant_id": "t-altra-f14", "role": "admin"}
     r = run(_send_as("POST", "/app/admin/users", {"email": "f14@esempio.it", "role": "viewer"}))
     assert r.status_code == 409 and r.json() == {"error": "already_exists",
@@ -445,3 +446,22 @@ def test_r6_real_addresses_with_dots_and_slashes_pass(address):
 def test_r6_web_addresses_are_still_refused_in_an_address(address):
     from bff import plain_text
     assert plain_text.address_problem(address) is not None, address
+
+
+
+# -------- final rereading R-2 (a6's choice a): only claims naming an existing, active organisation refuse --------
+@pytest.mark.parametrize("state", ["missing", "suspended"])
+def test_r2_claims_of_an_organisation_gone_or_suspended_do_not_block_an_invitation(firebase_claims, state):
+    """People removed before R4-1 may still hold the claims of their old organisation: if it no longer exists, or is
+    suspended, another organisation can invite them; an active one still refuses (F-14), until the platform clears the
+    claims with scripts/set_claims.py --orphan-claims --apply --email <email>."""
+    from bff.repository import Tenant, get_repository
+    repo = get_repository()
+    tenant = f"t-r2-{state}"
+    if state == "suspended":
+        run(repo.upsert_tenant(Tenant(tenant_id=tenant, name=f"R-2 {state}", status="suspended")))
+    email = f"r2-{state}@esempio.it"
+    firebase_claims.users[email] = {"tenant_id": tenant, "role": "viewer"}
+    r = run(_send_as("POST", "/app/admin/users", {"email": email, "role": "viewer"}))
+    assert r.status_code == 201, (state, r.text[:200])
+    run(repo.delete_user(r.json()["uid"]))

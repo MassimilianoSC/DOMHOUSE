@@ -204,8 +204,14 @@ async def create_invitation(tenant_id: str, email: str, role: str, display_name:
     except Exception as exc:
         warn("invite: claims of the email not read", error=type(exc).__name__)
         raise InviteRefused("Controllo dell'accesso non disponibile: riprova tra poco", 503, "auth_unavailable")
-    if claims and claims.get("tenant_id") and claims.get("tenant_id") != tenant_id:
-        raise InviteRefused("Questa email non può essere invitata")
+    other = claims.get("tenant_id") if claims else None
+    if other and other != tenant_id:
+        # final rereading R-2 (a6's choice a): only an organisation that exists and is active keeps the person; claims
+        # left by one deleted or suspended (people removed before R4-1) do not block. An active one's stale claims are
+        # cleared by the platform: scripts/set_claims.py --orphan-claims --apply --email <email>
+        held_by = await repo.get_tenant(other)
+        if held_by is not None and held_by.status == "active":
+            raise InviteRefused("Questa email non può essere invitata")
     user = User(uid=invite_uid(email), email=email, display_name=display_name, tenant_id=tenant_id, role=role,
                 apartment_ids=apartment_ids)
     if not await repo.create_user_if_absent(user):  # someone created the same invitation a moment ago
