@@ -131,6 +131,18 @@ def env_claims(claims: dict | None) -> dict:
     return {}
 
 
+def claims_name(claims: dict) -> str:
+    """Rereading of the attack-from-outside low fixes, B-11: a name taken from a token's «name» claim (Google's) follows
+    F-11's rule, because it becomes the inviter's name in the invitation emails; out of the rule, the part of the email
+    before «@» when that passes, else nothing."""
+    from .plain_text import acceptable_name
+    name = (claims.get("name") or "").strip()
+    if not name or acceptable_name(name):
+        return name
+    local = (claims.get("email") or "").split("@")[0]
+    return local if local and acceptable_name(local) else ""
+
+
 async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> CurrentUser:
     """Custom claims (tenant_id, role) are the source of truth; an invited user without claims yet is
     recognised by email and its `inv-*` record is migrated to the real uid on first login."""
@@ -177,7 +189,7 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
         await _held_for_token(uid, tenant_id, role, issued_at)
         # rereading P-6 (decision of the memoria storica, 22 November, ESITO point 3): someone who is not an admin
         # starts with no apartment, the admin assigns them; so a record left by a race never opens every apartment
-        stored = await repo.upsert_user(User(uid=uid, email=email, display_name=claims.get("name", "") or "",
+        stored = await repo.upsert_user(User(uid=uid, email=email, display_name=claims_name(claims),
                                              tenant_id=tenant_id, role=role,
                                              apartment_ids=None if role == "admin" else []))
         # and again after the write: a removal that took the claims away while this request was between its check and
@@ -207,7 +219,7 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
             warn("auth: email change not adopted, already used by another account", uid=uid)
             email = stored.email
     return CurrentUser(uid=uid, email=email, tenant_id=tenant_id, role=role,
-                       display_name=(stored.display_name if stored else claims.get("name", "")) or "",
+                       display_name=(stored.display_name if stored else claims_name(claims)) or "",
                        apartment_ids=stored.apartment_ids, issued_at=float(claims.get("iat", 0)))
 
 
@@ -326,7 +338,7 @@ async def _caller(request: Request) -> tuple[str, str, bool, str, float]:
         return (stored.uid if stored else f"dev-{email}"), email, True, (stored.display_name if stored else ""), 0.0
     claims = await _verified_claims(request)
     return (claims["uid"], (claims.get("email") or "").lower(), bool(claims.get("email_verified")),
-            claims.get("name", "") or "", float(claims.get("iat", 0)))
+            claims_name(claims), float(claims.get("iat", 0)))
 
 
 async def _support_user(request: Request, tenant_id: str) -> CurrentUser:
@@ -457,7 +469,7 @@ async def _identity(request: Request, allow_suspended: bool = False) -> Identity
             if exc.detail.get("error") != "forbidden":  # unverified invitation, inactive tenant: same answer as resolve_user
                 raise
             user = None
-        name = (user.display_name if user else claims.get("name", "")) or ""
+        name = (user.display_name if user else claims_name(claims)) or ""
     platform = await _is_platform_member(email, verified, name)
     if user is None and platform:                 # D-178: the name saved in the managers' list
         member = await repo.get_platform_member(normalize_email(email))

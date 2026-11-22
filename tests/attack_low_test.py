@@ -370,3 +370,24 @@ def test_b3_real_names_still_pass(name):
 def test_b3_real_addresses_still_pass(address):
     from bff import plain_text
     assert plain_text.address_problem(address) is None, address
+
+
+# -------- rereading of the low fixes, B-11: the name taken from a token's «name» claim follows F-11's rule --------
+@pytest.mark.parametrize("name, kept", [
+    ("Clicca https://evil.example", "primo.admin"), ("x" * 90, "primo.admin"), ("Mario‮issoR", "primo.admin"),
+    ("Anna Bianchi", "Anna Bianchi"), ("", ""),
+])
+def test_b11_the_first_admins_name_from_the_claims_follows_the_rule(name, kept):
+    """The first admin of set_claims.py takes their name from Google's «name» claim, and that name is the inviter's in
+    every invitation email: out of the rule, the part of the email before «@» (when that passes) is used instead."""
+    from bff import auth
+    from bff.repository import get_repository
+    repo = get_repository()
+    claims = {"uid": "u-b11", "email": "primo.admin@esempio.it", "email_verified": True, "name": name,
+              "tenant_id": "t-flatsharing-demo", "role": "admin"}
+    try:
+        user = run(auth._from_claims(repo, claims))
+        assert user.display_name == kept and run(repo.get_user("u-b11")).display_name == kept
+    finally:
+        run(repo.delete_user("u-b11"))
+    assert auth.claims_name({"name": "Vai su www.evil.example", "email": "www.evil@x.it"}) == ""
