@@ -1,8 +1,6 @@
 # Assistenza al gestore: chi risponde e come
 
-*Approvata dal committente il 22 novembre 2026 (risposte 1234 e 1235). Prima della produzione si converte in HTML. Vale per il primo
-appartamento e il mese di prove, quando l'assistenza la fa HQE. Dopo la consegna vale la risposta del cliente alla
-domanda 19.2 di `cose-da-fare.md`.*
+*Approvata dal committente il 22 novembre 2026 (risposte 1234 e 1235). Prima della produzione si converte in HTML. Vale per il primo appartamento e il mese di prove, quando l'assistenza la fa HQE. Dopo la consegna vale la risposta del cliente alla domanda 19.2 di `cose-da-fare.md`.*
 
 ## 1. A chi scrive il gestore
 
