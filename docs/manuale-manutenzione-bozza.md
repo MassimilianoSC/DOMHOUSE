@@ -16,6 +16,7 @@ consegna si rilegge tutto e si converte in HTML, come la guida.*
 | **Riavvio dei sistemi domotici** se si fermano | da solo | un allarme se un sistema resta muto |
 | **Proposte di aggiornamento delle librerie** (Dependabot su GitHub) | ogni lunedì, al massimo una richiesta per tipo di libreria (Python, sito, immagini, azioni) | le richieste su GitHub: non si uniscono da sole; il tecnico le prova e le unisce con la CI verde, oppure le chiude |
 | **Controllo dei difetti noti** nella CI («difetti-noti») | a ogni modifica | se è rosso, una libreria ha un difetto grave o critico: il tecnico legge l'avviso stampato e aggiorna la libreria, con le prove, prima della pubblicazione successiva |
+| **Avvisi accettati per un periodo** (`.github/audit/accettati.yml`) | solo se serve | se la CI è rossa per un difetto grave che non si può correggere subito, il tecnico può accettarlo per al massimo 30 giorni con una voce (id dell'avviso, libreria, data di oggi, scadenza, motivo), copiando l'esempio nel file; alla scadenza la CI torna rossa da sola ed entro quel giorno si aggiorna la libreria, con le prove; una voce senza motivo o più lunga di 30 giorni rende rossa la CI |
 | **Aggiornamenti di sicurezza** della macchina virtuale | [da completare con la voce 50] | [da completare] |
 | **Pulizia dei dati vecchi** secondo i tempi di conservazione decisi | da sola | niente |
 
