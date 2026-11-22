@@ -83,7 +83,11 @@ async def authenticate(apartment_id: str | None, key: str | None):
     apt = await repo.get_apartment(apartment_id)
     if apt is None:
         raise refused
-    expected = await instances.api_key(apt)
+    try:
+        expected = await instances.api_key(apt)
+    except Exception as exc:     # rereading B-2: a secret not there (A2 before it, after a deletion) is the same 401
+        warn("assistant: apartment key not read", apartment_id=apartment_id, error=type(exc).__name__)
+        raise refused from None
     if not hmac.compare_digest(key.encode(), expected.encode()):
         raise refused
     from .auth import tenant_status

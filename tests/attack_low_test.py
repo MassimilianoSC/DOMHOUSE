@@ -391,3 +391,21 @@ def test_b11_the_first_admins_name_from_the_claims_follows_the_rule(name, kept):
     finally:
         run(repo.delete_user("u-b11"))
     assert auth.claims_name({"name": "Vai su www.evil.example", "email": "www.evil@x.it"}) == ""
+
+
+# -------- rereading of the low fixes, B-2: an unreadable secret is the same 401 as F-12, not a 500 --------
+def test_b2_an_apartment_whose_secret_cannot_be_read_answers_like_an_unknown_one(monkeypatch):
+    from bff import instances
+
+    async def unreadable(apt):
+        raise RuntimeError("segreto inesistente")
+    monkeypatch.setattr(instances, "api_key", unreadable)
+    unknown = run(_ai("apt-che-non-esiste", "chiave-qualsiasi"))
+
+    async def go():
+        transport = httpx.ASGITransport(app=main.app, raise_app_exceptions=False)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+            return await c.post("/internal/ai/chat", json={"messages": [{"role": "user", "content": "x"}]},
+                                headers={"X-Apartment-Id": "apt-bologna-01", "X-API-Key": "chiave-qualsiasi"})
+    r = run(go())
+    assert (r.status_code, r.json() if r.status_code != 500 else r.text) == (unknown.status_code, unknown.json())
