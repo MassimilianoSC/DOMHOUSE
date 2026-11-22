@@ -102,3 +102,49 @@ def test_f11_a_user_s_name_changed_by_the_admin_follows_the_same_rule():
     target = next(u for u in users if u.role == "viewer")
     r = run(_send_as("PATCH", f"/app/admin/users/{target.uid}", {"display_name": "Vedi https://evil.example"}))
     assert r.status_code == 422, r.text[:200]
+
+
+# -------- F-12: without a key one learnt whether an apartment existed; a key opened unusable apartments --------
+async def _ai(apartment, key):
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://t") as c:
+        return await c.post("/internal/ai/chat", json={"messages": [{"role": "user", "content": "x"}]},
+                            headers={"X-Apartment-Id": apartment, "X-API-Key": key})
+
+
+def test_f12_an_unknown_apartment_and_a_wrong_key_get_the_same_answer():
+    unknown = run(_ai("apt-che-non-esiste", "chiave-qualsiasi"))
+    wrong = run(_ai("apt-bologna-01", "chiave-qualsiasi"))
+    assert (unknown.status_code, unknown.json()) == (wrong.status_code, wrong.json())
+    assert unknown.status_code == 401
+
+
+@pytest.mark.parametrize("state", ["disabled", "not_ready", "suspended"])
+def test_f12_the_right_key_of_an_apartment_that_cannot_be_used_is_refused(monkeypatch, state):
+    from bff import ai_gateway, auth
+    from bff.repository import Tenant, get_repository
+    from bff.repository.base import Creazione
+    repo = get_repository()
+    called = []
+
+    async def model(body):
+        called.append(body)
+        return {"choices": [{"message": {"role": "assistant", "content": "Ciao"}}], "usage": {}}
+    monkeypatch.setattr(ai_gateway, "call_model", model)
+    apt = run(repo.get_apartment("apt-bologna-01")).model_copy(deep=True)
+    original = apt.model_copy(deep=True)
+    tenant = run(repo.get_tenant(apt.tenant_id))
+    try:
+        if state == "disabled":
+            apt.enabled = False
+        elif state == "not_ready":
+            apt.creazione = Creazione.model_construct(stato="in_preparazione", porta=8151)
+        run(repo.upsert_apartment(apt))
+        if state == "suspended":
+            run(repo.upsert_tenant(tenant.model_copy(update={"status": "suspended"})))
+            auth._known_tenants.clear()
+        r = run(_ai("apt-bologna-01", get_settings().instance_api_key_fallback))
+        assert r.status_code == 401 and called == [], (state, r.status_code, r.text[:200])
+    finally:
+        run(repo.upsert_apartment(original))
+        run(repo.upsert_tenant(tenant))
+        auth._known_tenants.clear()

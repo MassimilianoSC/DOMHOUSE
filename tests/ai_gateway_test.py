@@ -55,7 +55,7 @@ BODY = {"messages": [{"role": "user", "content": "Che temperatura c'è?"}]}
 def test_only_an_engine_with_its_key(model):
     assert run(post(BODY, key=None)).status_code == 401
     assert run(post(BODY, key="chiave-sbagliata")).status_code == 401
-    assert run(post(BODY, apartment="apt-che-non-esiste")).status_code == 404
+    assert run(post(BODY, apartment="apt-che-non-esiste")).status_code == 401      # F-12: as a wrong key
     r = run(post(BODY))
     assert r.status_code == 200 and r.json()["choices"][0]["message"]["content"] == "Ciao"
     assert len(model) == 1

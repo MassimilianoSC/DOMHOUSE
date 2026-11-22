@@ -829,8 +829,8 @@ Una destinazione con un motore che non ha ancora un parametro (per esempio `pres
 `POST /internal/ai/chat` NON è una route del sito: la chiamano i motori (sulla VM e i dimostrativi dentro il BFF) per
 parlare con il modello. Intestazioni `X-Apartment-Id` e `X-API-Key` (la chiave d'istanza dell'appartamento, la stessa
 che il BFF manda al motore); corpo compatibile OpenAI (`messages`, `tools`, `tool_choice`, `temperature`; il resto si
-ignora, modello e `max_tokens` li sceglie il BFF). Risposte: 200 con la risposta del modello; 401 chiave sbagliata; 404
-appartamento sconosciuto; 422 `bad_request` senza `messages`; 429 `monthly_cap` «Limite mensile raggiunto, riprova dal
+ignora, modello e `max_tokens` li sceglie il BFF). Risposte: 200 con la risposta del modello; 401 chiave sbagliata, appartamento sconosciuto (F-12: la stessa risposta,
+senza dire se l'appartamento esiste), appartamento disattivato, non pronto o di un'organizzazione sospesa; 422 `bad_request` senza `messages`; 429 `monthly_cap` «Limite mensile raggiunto, riprova dal
 mese prossimo»; 502 `model_unavailable` o `model_error`; 504 `timeout`. Il BFF tiene in Firestore (`ai_usage/{AAAA-MM}`,
 mese UTC) la spesa del progetto, calcolata dai token restituiti, e all'80 % del tetto manda una sola email al mese ai
 gestori della piattaforma. Impostazioni: `AI_MODEL`, `AI_LOCATION`, `AI_MONTHLY_CAP_EUR` (20), `AI_ALERT_PERCENT` (80),

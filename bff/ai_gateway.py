@@ -72,15 +72,23 @@ def cost_eur(usage: dict, price: tuple[float, float, float] | None = None) -> tu
 
 
 async def authenticate(apartment_id: str | None, key: str | None):
-    """The apartment whose engine is calling; 401 for a wrong key, 404 for an unknown apartment."""
+    """The apartment whose engine is calling. F-12 (attack-from-outside review): the same 401 for an unknown apartment
+    and a wrong key (a 404 told without any key which apartment ids exist), and the right key of an apartment that
+    cannot be used is refused too: switched off, not ready (created from the app, A2) or of a suspended organisation."""
     if not apartment_id or not key:
         raise GatewayError(401, "unauthorized", "Mancano X-Apartment-Id o X-API-Key")
-    apt = await get_repository().get_apartment(apartment_id)
+    refused = GatewayError(401, "unauthorized", "Chiave non valida")
+    repo = get_repository()
+    apt = await repo.get_apartment(apartment_id)
     if apt is None:
-        raise GatewayError(404, "not_found", "Appartamento sconosciuto")
+        raise refused
     expected = await instances.api_key(apt)
     if not hmac.compare_digest(key.encode(), expected.encode()):
-        raise GatewayError(401, "unauthorized", "Chiave non valida")
+        raise refused
+    from .auth import tenant_status
+    from .creation import usable
+    if not apt.enabled or not usable(apt) or await tenant_status(repo, apt.tenant_id) != "active":
+        raise refused
     return apt
 
 
