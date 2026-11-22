@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1228 |
+| **Ultima domanda al committente** | 1229 |
 
 ## 2. Cose da fare
 
@@ -49,7 +49,6 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 7 | Prova di carico (P-84) | di notte, prima del passaggio in produzione | C lancia | strumento pronto | `procedura-prova-di-carico.md` |
 | 8 | Verifica in due passaggi all'accesso (P-69) | nessuna | o2, o1, MS, comandi di C | aperto | registro, P-69 |
 | 9 | Il sito resta vecchio dopo una pubblicazione (P-92, con E-29): avviso «versione nuova — Aggiorna» con ricaricamento automatico, più `index.html` sempre dalla rete (tolto il gestore fetch) | deciso (1227 = a); poi verifica sul telefono del committente | o2, poi C | in corso: mandato a o2 il 22 novembre (1228 = a) | registro, P-92 |
-| 10 | Check-out con movimento: variante A o B (P-88) | decisione | C | aperto | registro, P-88 |
 | 11 | Procedura scritta di assistenza al gestore | nessuna | MS con C | aperto | `produzione-cosa-manca.md` B |
 | 12 | Informativa privacy approvata dal consulente del titolare; condizioni d'uso (P-70) | il consulente | C | bozza fatta | `informativa-privacy-bozza.md` |
 | 13 | Notifiche push provate su telefoni veri (P-11) | telefoni veri | C, colleghi | in parte | registro, P-11; `limiti-noti.md` |
@@ -63,7 +62,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 |---|---|---|---|---|---|
 | 17 | Passo 5: prove al banco 1–7 (Matter via MQTT sulla 2.x; seconda rete Wi-Fi; orologio del ponte; versione dei sensori BLU; portata e sensori per ponte; antigelo con lo script; impianto vero) | Y in ufficio; la 6 solo se il cliente la sceglie; la 7 con caldaia e split veri | Y | in parte | documento 2 dell'Autonomia |
 | 18 | Passo 7: richiudere le righe «da verificare» del documento 2 | dopo il 17 | MS | in parte | documento 2 dell'Autonomia |
-| 19 | Passo 8: risposta scritta del cliente (responsabilità, assistenza, chi crea ed elimina gli appartamenti D-232, kit, relè della caldaia, Wi-Fi solo per i dispositivi, fatturazione, dual split, trasmettitore a infrarossi, chi fa la manutenzione dopo la consegna) | il documento 3 è completo e consegnato (la proposta di progetto del 12 novembre è un'altra cosa) | MS prepara, C consegna, cliente risponde | da preparare | documento 3 dell'Autonomia |
+| 19 | Passo 8: risposta scritta del cliente (responsabilità, assistenza, chi crea ed elimina gli appartamenti D-232, kit, relè della caldaia, Wi-Fi solo per i dispositivi, fatturazione, dual split, trasmettitore a infrarossi, chi fa la manutenzione dopo la consegna; check-out con movimento: tenere la domanda al gestore come oggi o passare sempre a casa vuota come nella proposta, P-88, 1229) | il documento 3 è completo e consegnato (la proposta di progetto del 12 novembre è un'altra cosa) | MS prepara, C consegna, cliente risponde | da preparare | documento 3 dell'Autonomia |
 | 20 | Passo 6: messaggio a L, poi segreto e formato delle prenotazioni di Italianway (P-9, P-10) | contratto di vendita firmato | C, L | aperto | `da-inviare/messaggio-italianway-per-leonardo.md` |
 | 21 | Passo 9: lavori per il primo appartamento (infrarossi, Italianway vero, relè della caldaia, revisione del codice) | dopo il passo 8; infrarossi dopo l'acquisto | o1, o2, Y | aperto | §15 |
 | 22 | Passo 11: A4, catalogo dei dispositivi, con il collaudo guidato | dopo il passo 5 | o1, o2, Y | aperto | §15, documento 2 riga 20 |
