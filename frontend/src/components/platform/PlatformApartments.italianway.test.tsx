@@ -96,6 +96,11 @@ describe("codice Italianway di un appartamento creato dall'app (D-198)", () => {
     await waitFor(() => expect(screen.getByTestId("platform-apt-lab-corte")).toHaveTextContent("IW IW-4471"));
   });
 
+  it("il campo accetta al massimo 120 caratteri, come il server (rilettura I-2)", async () => {
+    await openDialog();
+    expect(field()).toHaveAttribute("maxLength", "120");
+  });
+
   it("cambiarlo: il campo parte dal codice di oggi", async () => {
     await openDialog({ ...CREATED, italianway_id: "IW-1000" });
     expect(field().value).toBe("IW-1000");

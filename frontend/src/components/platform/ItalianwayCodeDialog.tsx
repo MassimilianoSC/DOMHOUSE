@@ -9,6 +9,9 @@ import { showError } from "@/lib/actions";
 import { newCorrelationId } from "@/lib/utils";
 import { toast } from "sonner";
 
+/** The server's limit for the code (review I-2): a longer one would meet its raw 422, not the sentence. */
+const ITALIANWAY_MAX = 120;
+
 /**
  * D-198: the Italianway code of an apartment created from the app, added or changed after the creation (the creation
  * form says «Si può aggiungere anche dopo»). Only the code: the connection belongs to the creation, so these apartments
@@ -47,6 +50,7 @@ export function ItalianwayCodeDialog({ tenantId, apt, onClose, onSaved }: { tena
           <FormField id="italianway_code" label={t("admin.apartments.italianway")} hint={t("platform.italianwayHint")} problem={problem} problemTestId="apt-italianway-problem">
             <Input
               id="italianway_code"
+              maxLength={ITALIANWAY_MAX}
               value={code}
               onChange={(e) => {
                 setCode(e.target.value);
