@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1246 |
+| **Ultima domanda al committente** | 1247 |
 
 ## 2. Cose da fare
 
@@ -83,7 +83,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 |---|---|---|---|
 | 19.1 | Responsabilità: chi risponde di che cosa, fra cliente e HQE | piano, passo 8 | da chiedere |
 | 19.2 | Assistenza ai gestori: chi la fa, con quali tempi | piano, passo 8 | da chiedere |
-| 19.3 | Chi crea ed elimina gli appartamenti, e con quale numero massimo | D-232 | da chiedere |
+| 19.3 | Chi crea ed elimina gli appartamenti, e con quale numero massimo (nota tecnica: una rotta nuova di creazione per il cliente deve passare da `creation.create` e dal suo controllo dell'identificativo, prova da estendere) | D-232 | da chiedere |
 | 19.4 | Chi prepara i kit dei dispositivi | piano, passo 8 | da chiedere |
 | 19.5 | Relè della caldaia: una delle tre possibilità, anche «resta com'era» | §15.3, punto 4 | da chiedere |
 | 19.6 | Una rete Wi-Fi solo per i dispositivi, separata da quella degli ospiti | decisione 6 della proposta | da chiedere |
