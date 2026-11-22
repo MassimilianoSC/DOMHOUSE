@@ -1,7 +1,11 @@
 {
   "app": {
     "name": "DOMHOUSE",
-    "tagline": "Riscaldamento, clima e consumi dei tuoi appartamenti"
+    "tagline": "Riscaldamento, clima e consumi dei tuoi appartamenti",
+    "newVersion": {
+      "title": "È disponibile una versione nuova",
+      "reload": "Aggiorna"
+    }
   },
   "common": {
     "loading": "Caricamento…",

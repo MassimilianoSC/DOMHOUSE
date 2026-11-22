@@ -1,6 +1,6 @@
 import { t } from "@/i18n";
 import { startSupportSession, endSupportSession } from "@/lib/support";
-import { ApiError, bffDownload, bffFetch, fileNameFrom } from "./bff";
+import { ApiError, bffDownload, bffFetch, fileNameFrom, writesInFlight } from "./bff";
 
 // What the user reads when the BFF refuses a request: its Italian message, or a plain fallback, never a bare code.
 function answer(status: number, body: unknown) {
@@ -74,5 +74,29 @@ describe("file dal BFF (P-52)", () => {
   it("rifiuto del server: l'ApiError di sempre, con il suo messaggio", async () => {
     answer(501, { error: "not_implemented", message: "Consumi non disponibili per questo appartamento" });
     await expect(bffDownload("/app/apartments/apt-001/energy/export", { query: { month: "2026-10" }, fallbackName: "x" })).rejects.toMatchObject({ status: 501, code: "not_implemented", message: "Consumi non disponibili per questo appartamento" });
+  });
+});
+
+// P-92, review P2: the requests that change something still on their way; the new-version reload waits for them.
+describe("modifiche in viaggio verso il server", () => {
+  it("contate dall'invio alla risposta, anche se rifiutate o senza rete; le letture (GET) no", async () => {
+    let answer: (r: Response) => void = () => {};
+    vi.stubGlobal("fetch", vi.fn(() => new Promise<Response>((r) => { answer = r; })));
+    const read = bffFetch("/app/me");
+    await new Promise((r) => setTimeout(r, 0));
+    expect(writesInFlight()).toBe(0);
+    answer(new Response("{}", { status: 200 }));
+    await read;
+
+    const save = bffFetch("/app/admin/users/u1", { method: "PATCH", body: {} });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(writesInFlight()).toBe(1);
+    answer(new Response(JSON.stringify({ error: "x", message: "no" }), { status: 409 }));
+    await save.catch(() => undefined);
+    expect(writesInFlight()).toBe(0);
+
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("Failed to fetch"); }));
+    await bffFetch("/app/x", { method: "post" }).catch(() => undefined);
+    expect(writesInFlight()).toBe(0);
   });
 });
