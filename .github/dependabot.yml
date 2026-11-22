@@ -3,8 +3,10 @@
 # library versions are changed with their tests (o1). It starts working after the push to GitHub.
 version: 2
 updates:
-  # The Python libraries of the server and of the engine. One pull request for both folders: bff/requirements.txt and
-  # engine/requirements.txt keep the same versions of the libraries they share (engine/requirements.txt, first line).
+  # The Python libraries of the server and of the engine. bff/requirements.txt and engine/requirements.txt keep the same
+  # versions of the libraries they share (engine/requirements.txt, first line): group-by dependency-name gives one pull
+  # request per library for both folders together (review D-5: without it a group opens one pull request per folder,
+  # and the two could be merged apart). docs.github.com, Dependabot options reference, «group-by».
   - package-ecosystem: pip
     directories:
       - "/bff"
@@ -18,6 +20,7 @@ updates:
     groups:
       python:
         patterns: ["*"]
+        group-by: dependency-name
     commit-message:
       prefix: "[deps]"
 
@@ -36,8 +39,8 @@ updates:
     commit-message:
       prefix: "[deps]"
 
-  # The images the containers start from. The Python version (python:3.11-slim) is a decision of the project, not a
-  # weekly update: only updates inside it are proposed. The floating tag already takes the security fixes of Debian and
+  # The images the containers start from, one pull request per folder (they need not be aligned). The Python version
+  # (python:3.11-slim) is a decision of the project, not a weekly update: only updates inside it are proposed. The floating tag already takes the security fixes of Debian and
   # Python 3.11 at every build.
   - package-ecosystem: docker
     directories:

@@ -236,8 +236,9 @@ jobs:
         run: yarn e2e
 
   difetti-noti:
-    # Voce 50 (risposta 1222 = a): i difetti noti delle librerie. Rossa solo per i gravi o critici (.github/audit/gravi.py),
-    # gli altri si stampano. Server e motore: pip-audit sui requirements con le versioni fisse (non installa le librerie,
+    # Voce 50 (risposta 1222 = a): i difetti noti delle librerie. Rossa solo per i gravi o critici non accettati
+    # (.github/audit/gravi.py, .github/audit/accettati.yml), gli altri si stampano; OSV o un audit che non rispondono:
+    # uscita 2, da rilanciare. Server e motore: pip-audit sui requirements con le versioni fisse (non installa le librerie,
     # solo pip-audit). Sito: yarn audit (yarn 1, basta yarn.lock) delle dipendenze che finiscono nel sito pubblicato; gli
     # strumenti di sviluppo (devDependencies: vite, vitest…) non arrivano mai a un browser e si stampano soltanto. Le
     # versioni le cambia o1, con le prove; gli aggiornamenti proposti arrivano da Dependabot (.github/dependabot.yml).
@@ -251,8 +252,11 @@ jobs:
         with:
           node-version: "22"
 
-      - name: pip-audit
-        run: pip install pip-audit
+      - name: pip-audit e le prove del controllo
+        run: |
+          # versioni fisse (rilettura D-3); PyYAML per l'elenco degli avvisi accettati, pytest per le prove di gravi.py
+          pip install pip-audit==2.10.1 PyYAML==6.0.3 pytest==8.3.5
+          python -m pytest .github/audit -q -p no:cacheprovider
 
       - name: Difetti noti di server e motore (pip-audit)
         run: |
@@ -269,7 +273,8 @@ jobs:
           yarn audit --groups devDependencies --json > ../yarn-audit-dev.json || true
 
       - name: Gravi o critici fanno diventare rossa la CI
-        run: python .github/audit/gravi.py --pip pip-audit-bff.json --pip pip-audit-engine.json --yarn yarn-audit.json
+        # .github/audit/accettati.yml: avvisi accettati per al massimo 30 giorni, con il motivo (risposta 1245 = a)
+        run: python .github/audit/gravi.py --pip pip-audit-bff.json --pip pip-audit-engine.json --yarn yarn-audit.json --accettati .github/audit/accettati.yml
 
       - name: Strumenti di sviluppo del sito (solo stampa)
         if: always()
