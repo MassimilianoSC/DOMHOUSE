@@ -196,7 +196,8 @@ export const platformApi = {
   patchConnection: (tenantId: string, aptId: string, body: { instance_url?: string; port?: number | null; italianway_id?: string | null; simulated?: boolean }, correlationId: string) =>
     bffFetch<PlatformApartment>(`${apts(tenantId)}/${enc(aptId)}`, { method: "PATCH", body, correlationId }),
   /** D-198: only the Italianway code, for an apartment created from the app (its connection belongs to the creation).
-   *  null = remove the code. The route is the server's answer to D-198 (o1): to be confirmed. */
+   *  null = remove the code. o1 0b2548d: only a body with italianway_id alone is accepted on these apartments (any
+   *  other field: 409 created_from_app); a code in use: 409 external_id_in_use; 200 with the apartment's row. */
   setItalianwayCode: (tenantId: string, aptId: string, italianwayId: string | null, correlationId: string) =>
     bffFetch<PlatformApartment>(`${apts(tenantId)}/${enc(aptId)}`, { method: "PATCH", body: { italianway_id: italianwayId }, correlationId }),
   verifyApartment: (tenantId: string, aptId: string, correlationId: string) =>

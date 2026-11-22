@@ -134,6 +134,16 @@ describe("codice Italianway di un appartamento creato dall'app (D-198)", () => {
     expect(screen.getByTestId("platform-apt-italianway-dialog-lab-corte")).toBeInTheDocument();
   });
 
+  it("409 created_from_app (un server che non accetta ancora il solo codice): l'avviso rosso con la frase del server", async () => {
+    s.setItalianwayCode.mockRejectedValueOnce(new ApiError(409, "created_from_app", "Questo appartamento è stato creato dall'app", "c-3"));
+    await openDialog();
+    fireEvent.change(field(), { target: { value: "IW-4471" } });
+    await click(save());
+    expect(toast.error).toHaveBeenCalledWith("Questo appartamento è stato creato dall'app", expect.anything());
+    expect(screen.queryByTestId("apt-italianway-problem")).toBeNull();
+    expect(screen.getByTestId("platform-apt-italianway-dialog-lab-corte")).toBeInTheDocument();
+  });
+
   it("«Annulla» chiude senza salvare", async () => {
     await openDialog();
     fireEvent.change(field(), { target: { value: "IW-4471" } });
