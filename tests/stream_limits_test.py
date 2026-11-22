@@ -70,7 +70,22 @@ def test_a_slot_comes_back_when_the_response_ends_even_before_its_first_step(ope
 
     async def send(_message):
         pass
-    scope = {"type": "http", "asgi": {"version": "3.0", "spec_version": "2.4"}, "method": "GET", "path": "/",
+    scope = {"type": "http", "asgi": {"version": "3.0", "spec_version": "2.3"}, "method": "GET", "path": "/",
              "headers": []}
     run(first[0](scope, gone, send))
     assert _status(opened("u-f6-d")) == 200
+
+
+def test_p5_a_failure_before_the_response_gives_the_slot_back(opened, monkeypatch):
+    """Rereading of the medium fixes, P-5: the slot was taken before hub(), hub.start() and support.parse(); if one
+    raised (a malformed support expiry), the response never existed and the slot never came back."""
+    monkeypatch.setattr(apartments, "get_tenant_apartment",
+                        lambda user, aid: get_repository().get_apartment(aid))
+
+    def broken(self, last):
+        raise RuntimeError("hub rotto")
+    monkeypatch.setattr(InstanceHub, "start", broken)
+    for _ in range(12):
+        with pytest.raises(RuntimeError):
+            opened("u-f6-e")
+    assert apartments._open_streams.get("u-f6-e", 0) == 0

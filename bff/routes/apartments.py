@@ -444,15 +444,19 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
         info("stream refused: too many open", open_for_user=_open_streams.get(user.uid, 0),
              open_here=sum(_open_streams.values()))
         return err(429, "too_many_streams", "Troppe connessioni aperte: chiudi qualche scheda e riprova")
-    last_event_id = request.headers.get("Last-Event-ID")
-    hub = hub_manager.hub(apt)
-    if apt.enabled:                                    # D-201: a disabled apartment has no connection to its engine
-        hub.start(last_event_id)
-    settings = get_settings()
-    ends = time.monotonic() + settings.stream_max_s    # D-197 (E-27): a normal end of the response; the site reopens
-
-    # P-50: a support stream ends at the exact expiry of the access, not at the next periodic check
-    deadline = support.parse(user.support_expires_at).timestamp() if user.support_expires_at else None
+    try:
+        # rereading of the medium fixes, P-5: whatever fails before the response exists gives the slot back
+        last_event_id = request.headers.get("Last-Event-ID")
+        hub = hub_manager.hub(apt)
+        if apt.enabled:                                # D-201: a disabled apartment has no connection to its engine
+            hub.start(last_event_id)
+        settings = get_settings()
+        ends = time.monotonic() + settings.stream_max_s    # D-197 (E-27): a normal end of the response; the site reopens
+        # P-50: a support stream ends at the exact expiry of the access, not at the next periodic check
+        deadline = support.parse(user.support_expires_at).timestamp() if user.support_expires_at else None
+    except BaseException:
+        _release_stream(user.uid)
+        raise
 
     async def gen():
         checked = time.monotonic()
