@@ -1,0 +1,78 @@
+# Updates proposed by GitHub (item 50 of cose-da-fare.md, answer 1222 = a: «automatico dove è sicuro»). Dependabot opens
+# pull requests, once a week, one per ecosystem; nothing is merged by itself: a person reads the CI and approves, and the
+# library versions are changed with their tests (o1). It starts working after the push to GitHub.
+version: 2
+updates:
+  # The Python libraries of the server and of the engine. bff/requirements.txt and engine/requirements.txt keep the same
+  # versions of the libraries they share (engine/requirements.txt, first line): group-by dependency-name gives one pull
+  # request per library for both folders together (review D-5: without it a group opens one pull request per folder,
+  # and the two could be merged apart). docs.github.com, Dependabot options reference, «group-by».
+  - package-ecosystem: pip
+    directories:
+      - "/bff"
+      - "/engine"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Rome
+    open-pull-requests-limit: 5
+    groups:
+      python:
+        patterns: ["*"]
+        group-by: dependency-name
+    commit-message:
+      prefix: "[deps]"
+
+  # The site (frontend/package.json and yarn.lock, yarn 1).
+  - package-ecosystem: npm
+    directory: "/frontend"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Rome
+    open-pull-requests-limit: 5
+    groups:
+      sito:
+        patterns: ["*"]
+    commit-message:
+      prefix: "[deps]"
+
+  # The images the containers start from, one pull request per folder (they need not be aligned). The Python version
+  # (python:3.11-slim) is a decision of the project, not a weekly update: only updates inside it are proposed. The floating tag already takes the security fixes of Debian and
+  # Python 3.11 at every build.
+  - package-ecosystem: docker
+    directories:
+      - "/bff"
+      - "/engine"
+      - "/tests/broker_rig"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Rome
+    open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+    groups:
+      immagini:
+        patterns: ["*"]
+    commit-message:
+      prefix: "[deps]"
+
+  # The actions of .github/workflows (actions/checkout, setup-python, setup-node, setup-java).
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Europe/Rome
+    open-pull-requests-limit: 5
+    groups:
+      azioni:
+        patterns: ["*"]
+    commit-message:
+      prefix: "[deps]"
