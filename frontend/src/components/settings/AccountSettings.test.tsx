@@ -182,3 +182,33 @@ describe("gestore della piattaforma senza organizzazione (D-178)", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 });
+
+// F-11 (o1 ee5899d): my own name at most 80 characters; a refused one says why under the field
+describe("Impostazioni > Account: nome rifiutato dal server (F-11)", () => {
+  it("«Il nome non può contenere un indirizzo web.» sotto il campo, niente avviso rosso; sparisce scrivendo", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "invalid_text", field: "display_name", message: "Il nome non può contenere un indirizzo web." }), { status: 422, headers: { "Content-Type": "application/json" } })));
+    render(<AccountSettings />);
+    expect(screen.getByTestId("account-name-input")).toHaveAttribute("maxLength", "80");
+    type("account-name-input", "Gestore www.esempio.it/x");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("account-name-save"));
+    });
+    expect(await screen.findByTestId("account-name-problem")).toHaveTextContent("Il nome non può contenere un indirizzo web.");
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(state.auth.refreshMe).not.toHaveBeenCalled();
+    type("account-name-input", "Gestore Due");
+    expect(screen.queryByTestId("account-name-problem")).toBeNull();
+  });
+
+  it("un altro errore resta l'avviso rosso", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "not_found", message: "Utente inesistente" }), { status: 404, headers: { "Content-Type": "application/json" } })));
+    render(<AccountSettings />);
+    type("account-name-input", "Gestore Due");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("account-name-save"));
+    });
+    expect(toast.error).toHaveBeenCalled();
+    expect(screen.queryByTestId("account-name-problem")).toBeNull();
+  });
+});

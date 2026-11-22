@@ -56,13 +56,17 @@ export function DemoBadge({ testId }: { testId: string }) {
 /** With INSTANCE_MODE=mock the BFF accepts only mock:// URLs (D-28): a new apartment starts with the built-in mock. */
 export const defaultInstanceUrl = (mock: boolean) => (mock ? "mock://builtin" : "");
 
-export function Field({ id, label, value, onChange, type = "text", placeholder, hint }: { id: string; label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; hint?: string }) {
+export function Field({ id, label, value, onChange, type = "text", placeholder, hint, maxLength, problem }: { id: string; label: string; value: string; onChange: (v: string) => void; type?: string; placeholder?: string; hint?: string; maxLength?: number; problem?: string | null }) {
   return (
     <div className="field-cell">
       <Label htmlFor={id}>{label}</Label>
       <div className="space-y-1">
-        <Input id={id} type={type} value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} data-testid={`apt-form-${id}`} />
-        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        <Input id={id} type={type} value={value} placeholder={placeholder} maxLength={maxLength} aria-invalid={Boolean(problem)} aria-describedby={problem ? `${id}-problem` : undefined} onChange={(e) => onChange(e.target.value)} data-testid={`apt-form-${id}`} />
+        {problem ? (
+          <p id={`${id}-problem`} className="text-xs font-medium text-negative-fg" role="alert" data-testid={`apt-form-${id}-problem`}>{problem}</p>
+        ) : (
+          hint && <p className="text-xs text-muted-foreground">{hint}</p>
+        )}
       </div>
     </div>
   );

@@ -428,3 +428,36 @@ describe("A6: spento dal gestore della piattaforma, lo riaccende solo lui", () =
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LOCKED, expect.anything()));
   });
 });
+
+// F-11 (o1 ee5899d): the apartment's address at most 200 characters; a refused one says why under the field
+describe("indirizzo rifiutato dal server (F-11)", () => {
+  it("il campo accetta al massimo 200 caratteri", async () => {
+    await openEdit();
+    expect(field("address")).toHaveAttribute("maxLength", "200");
+  });
+
+  it.each([
+    "L'indirizzo contiene caratteri non ammessi.",
+    "L'indirizzo non può contenere un indirizzo web.",
+    "L'indirizzo può avere al massimo 200 caratteri.",
+  ])("«%s» sotto l'indirizzo, la finestra resta aperta, niente avviso rosso", async (sentence) => {
+    state.patchApartment.mockRejectedValueOnce(new ApiError(422, "invalid_text", sentence, "c-3", { field: "address" }));
+    await openEdit();
+    fireEvent.change(field("address"), { target: { value: "https://esempio.it" } });
+    await save();
+    expect(screen.getByTestId("apt-form-address-problem")).toHaveTextContent(sentence);
+    expect(field("address")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("apartment-dialog")).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+    fireEvent.change(field("address"), { target: { value: "Via Roma 2" } });
+    expect(screen.queryByTestId("apt-form-address-problem")).toBeNull();
+  });
+
+  it("un rifiuto su un campo che la finestra non ha: l'avviso rosso", async () => {
+    state.patchApartment.mockRejectedValueOnce(new ApiError(422, "invalid_text", "Il nome contiene caratteri non ammessi.", "c-4", { field: "display_name" }));
+    await openEdit();
+    await save();
+    expect(toast.error).toHaveBeenCalledWith("Il nome contiene caratteri non ammessi.", expect.anything());
+    expect(screen.queryByTestId("apt-form-address-problem")).toBeNull();
+  });
+});

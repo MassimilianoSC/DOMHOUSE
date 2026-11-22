@@ -13,6 +13,9 @@ import { RowsSkeleton } from "@/components/ui/Skeletons";
 import { t } from "@/i18n";
 import { runAction } from "@/lib/actions";
 
+/** F-11 (bff/plain_text.py): the server refuses longer names. */
+const NAME_MAX = 80;
+
 const ROLES: Role[] = ["admin", "operator", "viewer"];
 
 function notifyEmail(res: InviteResult) {
@@ -65,6 +68,8 @@ export function AdminUsers() {
   const [form, setForm] = useState({ email: "", display_name: "", role: "operator" as Role, apartment_ids: "all" as ApartmentScope });
   const [scopeUser, setScopeUser] = useState<AdminUser | null>(null);
   const [busy, setBusy] = useState(false);
+  // F-11: the server's sentence under the name (too long, characters not allowed, a web address)
+  const [nameProblem, setNameProblem] = useState<string | null>(null);
   const [resending, setResending] = useState<string | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin", "users"] });
 
@@ -73,7 +78,9 @@ export function AdminUsers() {
     const { apartment_ids, ...rest } = form;
     if (form.role !== "admin" && !confirmScope(apartment_ids, form.email)) return;
     setBusy(true);
-    const res = await runAction((c) => adminApi.invite(form.role === "admin" ? rest : form, c));
+    const res = await runAction((c) => adminApi.invite(form.role === "admin" ? rest : form, c), {
+      fieldProblem: (field, message) => field === "display_name" && (setNameProblem(message), true),
+    });
     setBusy(false);
     if (res) {
       notifyEmail(res);
@@ -115,7 +122,19 @@ export function AdminUsers() {
           </div>
           <div className="space-y-1">
             <Label htmlFor="inv-name">{t("admin.users.name")}</Label>
-            <Input id="inv-name" value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} data-testid="admin-invite-name" />
+            <Input
+              id="inv-name"
+              maxLength={NAME_MAX}
+              value={form.display_name}
+              aria-invalid={Boolean(nameProblem)}
+              aria-describedby={nameProblem ? "inv-name-problem" : undefined}
+              onChange={(e) => {
+                setNameProblem(null);
+                setForm({ ...form, display_name: e.target.value });
+              }}
+              data-testid="admin-invite-name"
+            />
+            {nameProblem && <p id="inv-name-problem" className="text-xs font-medium text-negative-fg" role="alert" data-testid="admin-invite-name-problem">{nameProblem}</p>}
           </div>
           <div className="space-y-1">
             <Label htmlFor="inv-role">{t("settings.role")}</Label>

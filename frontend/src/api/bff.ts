@@ -89,14 +89,16 @@ export function buildUrl(path: string, query?: RequestOptions["query"]): string 
 
 /** The ApiError of a refused answer; a blocking one (suspension, assistance over) is also reported (P-50). */
 function refusal(resp: Response, data: unknown, path: string, correlationId: string | null): ApiError {
-  const body = (data ?? {}) as { error?: string; message?: string; details?: Record<string, unknown>; detail?: unknown };
+  const body = (data ?? {}) as { error?: string; message?: string; details?: Record<string, unknown>; detail?: unknown; field?: unknown };
   // FastAPI's own validation answer ({"detail": [...]}) has no Italian message: say it plainly instead of "Errore 422".
   const validation = !body.message && Array.isArray(body.detail);
   const message = body.message ?? (validation ? t("errors.invalidRequest") : t("errors.status", { status: resp.status }));
   // The profile read (/app/me) handles its own refusal: only the other calls report it, or a refused profile read would
   // report itself and start another one, forever.
   if (resp.status === 403 && body.error && BLOCKING.has(body.error) && path !== "/app/me") onBlocked(body.error);
-  return new ApiError(resp.status, body.error ?? (validation ? "validation_error" : "error"), message, correlationId, body.details);
+  // F-11 (o1 ee5899d): invalid_text names the refused field at the top level; it is kept with the details
+  const details = typeof body.field === "string" ? { ...body.details, field: body.field } : body.details;
+  return new ApiError(resp.status, body.error ?? (validation ? "validation_error" : "error"), message, correlationId, details);
 }
 
 const parseJson = (text: string): unknown => {

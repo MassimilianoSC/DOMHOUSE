@@ -323,3 +323,20 @@ describe("Organizzazioni: rifiniture dell'assistenza (D-89)", () => {
     expect(info).not.toHaveTextContent("null");
   });
 });
+
+// Review F-b (RILETTURA-SITO-O2.md): the server's limits as field limits, so a long name never meets a raw 422
+describe("Organizzazioni: lunghezza dei nomi (F-11, F-b)", () => {
+  it("nuova organizzazione: nome dell'organizzazione al massimo 120 caratteri, nome del primo amministratore 80", async () => {
+    await open();
+    await click(await screen.findByTestId("tenant-add-btn"));
+    expect(screen.getByTestId("tenant-form-name")).toHaveAttribute("maxLength", "120");
+    expect(screen.getByTestId("tenant-form-admin-name")).toHaveAttribute("maxLength", "80");
+  });
+
+  it("rinomina: al massimo 120 caratteri, come alla creazione", async () => {
+    await open();
+    await openMenu("tenant-menu-t-1");
+    await click(await screen.findByTestId("tenant-rename-btn-t-1"));
+    expect(screen.getByTestId("tenant-rename-input")).toHaveAttribute("maxLength", "120");
+  });
+});

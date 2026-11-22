@@ -28,6 +28,9 @@ const confirmDisable = (name: string) => window.confirm(t("admin.apartments.disa
  *  answers 409 disabled_by_platform to the admin's enabled: true. */
 const lockedByPlatform = (a: AdminApartment) => !a.enabled && a.disattivato_da?.ruolo === "gestore";
 
+/** F-11 (bff/plain_text.py): the server refuses longer ones. */
+const ADDRESS_MAX = 200;
+
 const priceText = (n: number | null | undefined) => (n === null || n === undefined ? t("admin.price.notSet") : t("admin.price.value", { price: fmtPrice(n) }));
 
 function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartment; orgPrice: number | null; onClose: () => void; onSaved: () => void }) {
@@ -35,7 +38,12 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
   const [f, setF] = useState({ name: apt.name, address: apt.address, enabled: apt.enabled });
   const [price, setPrice] = useState(priceInput(apt.energy_price_eur_kwh));
   const [saving, setSaving] = useState(false);
-  const set = (k: "name" | "address") => (v: string) => setF((s) => ({ ...s, [k]: v }));
+  // F-11: the server's sentence under the address (too long, characters not allowed, a web address)
+  const [addressProblem, setAddressProblem] = useState<string | null>(null);
+  const set = (k: "name" | "address") => (v: string) => {
+    if (k === "address") setAddressProblem(null);
+    setF((s) => ({ ...s, [k]: v }));
+  };
   const parsed = parsePrice(price);
   const locked = lockedByPlatform(apt);
   const save = async () => {
@@ -45,7 +53,10 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
     const fields = locked ? { name: f.name, address: f.address } : f;
     // The exception is sent only when it changed (empty = back to the organization's price).
     const body = parsed !== undefined && parsed !== (apt.energy_price_eur_kwh ?? null) ? { ...fields, energy_price_eur_kwh: parsed } : fields;
-    const res = await runAction((c) => adminApi.patchApartment(apt.apartment_id, body, c), { success: t("admin.apartments.saved") });
+    const res = await runAction((c) => adminApi.patchApartment(apt.apartment_id, body, c), {
+      success: t("admin.apartments.saved"),
+      fieldProblem: (field, message) => field === "address" && (setAddressProblem(message), true),
+    });
     setSaving(false);
     if (res) {
       onClose();
@@ -58,7 +69,7 @@ function ApartmentDialog({ apt, orgPrice, onClose, onSaved }: { apt: AdminApartm
         <DialogTitle>{t("admin.apartments.edit")}</DialogTitle>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
           <Field id="name" label={t("admin.apartments.name")} value={f.name} onChange={set("name")} />
-          <Field id="address" label={t("admin.apartments.address")} value={f.address} onChange={set("address")} />
+          <Field id="address" label={t("admin.apartments.address")} value={f.address} onChange={set("address")} maxLength={ADDRESS_MAX} problem={addressProblem} />
           <div className="space-y-1 rounded-xl border border-dashed px-3 py-2 sm:col-span-2" data-testid="apt-form-timezone-locked">
             <div className="text-sm font-semibold">{t("admin.apartments.timezone")}</div>
             <div className="tabular text-xs text-muted-foreground">{apt.timezone}</div>

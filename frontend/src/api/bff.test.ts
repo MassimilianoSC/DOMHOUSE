@@ -100,3 +100,13 @@ describe("modifiche in viaggio verso il server", () => {
     expect(writesInFlight()).toBe(0);
   });
 });
+
+// F-11 (o1 ee5899d): a refused name or address: 422 {"error": "invalid_text", "field", "message"}
+describe("nome o indirizzo rifiutato (F-11)", () => {
+  it("la frase del server e il campo arrivano al sito", async () => {
+    answer(422, { error: "invalid_text", field: "address", message: "L'indirizzo non può contenere un indirizzo web." });
+    const e = await failure();
+    expect(e).toMatchObject({ status: 422, code: "invalid_text", message: "L'indirizzo non può contenere un indirizzo web." });
+    expect(e.details).toEqual({ field: "address" });
+  });
+});
