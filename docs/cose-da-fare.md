@@ -45,7 +45,6 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 
 | N. | Cosa | Condizione per partire | Chi | Stato | Dettaglio |
 |---|---|---|---|---|---|
-| 6 | Decisione scritta per ogni tipo di controllo mai fatto: attacco da fuori, ripristino vero dalle copie, dipendenze, sicurezza in appartamento, usabilità, ritorni indietro, lungo periodo | nessuna: si può fare ora | MS con o1 e o2; decide C | fatto: sicurezza dentro la VM fatta il 17 novembre; attacco da fuori: revisione fatta il 22 novembre, 16 difetti confermati (voci 44–48); tutti gli altri tipi decisi il 22 novembre (voci 49–55). **Ogni tipo ha la sua decisione scritta**; restano da eseguire le voci 7, 44–55 | `produzione-cosa-manca.md` D.2 |
 | 7 | Prova di carico (P-84) | di notte, prima del passaggio in produzione | C lancia | strumento pronto | `procedura-prova-di-carico.md` |
 | 8 | Verifica in due passaggi all'accesso (P-69) | nessuna | o2, o1, MS, comandi di C | aperto | registro, P-69 |
 | 9 | Il sito resta vecchio dopo una pubblicazione (P-92, con E-29): avviso «versione nuova — Aggiorna» con ricaricamento automatico, più `index.html` sempre dalla rete (tolto il gestore fetch) | deciso (1227 = a); poi verifica sul telefono del committente | o2, poi C | in corso: mandato a o2 il 22 novembre (1228 = a) | registro, P-92 |
