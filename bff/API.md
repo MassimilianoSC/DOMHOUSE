@@ -841,7 +841,7 @@ vero: acceso in staging, spento in produzione, che i dimostrativi li rifiuta, D-
 - **Rifiuto.** Se la spesa più le prenotazioni in corso supererebbe il tetto: 429 `monthly_cap`. Così le chiamate contemporanee non superano mai il tetto. Vicino al tetto l'ultima parte resta inutilizzata (circa 0,08 € per una domanda normale).
 - **Gemella annullata o fallita.** Della richiesta gemella si conta anche l'ingresso.
 - **Corpo:** al massimo 20 messaggi con ruoli noti e 160 000 caratteri; `tools` solo se uguali a quelli del motore (`engine/assistant.py` TOOLS). Altrimenti 422 `bad_request`.
-- **Tetto giornaliero per appartamento,** solo su `/internal/ai/chat`: 100 chiamate per giorno UTC (`ENGINE_DAILY_CALLS`), oltre 429 `daily_limit`. Il motore ne fa al massimo 50 per giorno locale e tratta il 429 come «limite mensile», cioè passa alla risposta rapida.
+- **Tetto giornaliero per appartamento,** solo su `/internal/ai/chat`: 200 chiamate per giorno UTC (`ENGINE_DAILY_CALLS`), oltre 429 `daily_limit`. Il motore ne fa al massimo `ASK_DAILY_LIMIT` per giorno locale (50, al più 100) e tratta il 429 come «limite mensile», cioè passa alla risposta rapida.
 - **Fuori da questa correzione:** il tetto per organizzazione (F-13) è una decisione del committente.
 
 Ogni chiamata riuscita lascia nel log «assistant model call» (token, costo, secondi); dal lotto 28 anche ogni chiamata

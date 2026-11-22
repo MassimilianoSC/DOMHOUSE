@@ -234,3 +234,16 @@ def test_p11_a_message_carries_text_only(model, monkeypatch, content):
     settings(monkeypatch, ai_twin_model="")
     r = run(post({"messages": [{"role": "user", "content": content}]}))
     assert r.status_code == 422 and sent == [], (content, r.status_code)
+
+
+def test_p9_the_servers_daily_count_stays_above_any_engine_setting():
+    """Rereading P-9: ASK_DAILY_LIMIT could be set up to 1000 on an engine, above the server's 100 a day. Now the engine
+    takes at most 100 a local day, and the server counts 200 a UTC day (a UTC day holds parts of two local days)."""
+    from engine.config import SETTINGS, load_config
+    from bff.routes import ai as ai_routes
+    assert SETTINGS["ASK_DAILY_LIMIT"][2] == 100
+    assert ai_routes.ENGINE_DAILY_CALLS >= 2 * SETTINGS["ASK_DAILY_LIMIT"][2]
+    base = {"APARTMENT_ID": "apt-p9", "API_KEY": "chiave-di-prova-0123456789", "CONNECTOR": "simulated"}
+    assert load_config({**base, "ASK_DAILY_LIMIT": "100"}).settings["ASK_DAILY_LIMIT"] == 100
+    with pytest.raises(Exception, match="ASK_DAILY_LIMIT"):
+        load_config({**base, "ASK_DAILY_LIMIT": "101"})

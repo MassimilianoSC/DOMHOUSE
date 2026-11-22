@@ -13,9 +13,10 @@ from ..repository import get_repository
 
 router = APIRouter(prefix="/internal/ai")
 # F-4 (attack-from-outside review): the server's own count per apartment and UTC day on the engines' way, for a stolen
-# key that skips the engine's 50 questions a day (ASK_DAILY_LIMIT, per local day: a UTC day can hold up to 100 of them).
-# Over it 429, which the engine answers with the quick assistant
-ENGINE_DAILY_CALLS = 100
+# key that skips the engine's own count (ASK_DAILY_LIMIT, 50 by default, at most 100 per local day since rereading P-9:
+# a UTC day holds parts of two local days, so twice the engine's maximum). Over it 429, which the engine answers with the
+# quick assistant
+ENGINE_DAILY_CALLS = 200
 
 
 @router.post("/chat")
