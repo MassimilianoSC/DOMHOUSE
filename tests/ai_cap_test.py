@@ -393,3 +393,14 @@ def test_f13_only_the_platform_and_only_an_existing_organisation(model, two_tena
     tenant_a, _ = two_tenants
     assert run(quota_call("GET", tenant_a, who={"X-Dev-User": "admin@demo.it"})).status_code == 403
     assert run(quota_call("GET", "t-che-non-esiste")).status_code == 404
+
+
+# -------- rereading of the low fixes, B-1: the input's estimate is a true maximum --------
+@pytest.mark.parametrize("text, per_char", [("1234567890" * 1_000, 1), ("\U000f0000" * 5_000, 4), ("电" * 5_000, 3)],
+                         ids=["digits", "private-use", "cjk"])
+def test_b1_the_input_is_reserved_as_its_utf8_bytes(monkeypatch, text, per_char):
+    """A tokenizer splits each digit, and falls back to bytes for characters outside its vocabulary (up to 4 tokens a
+    character): one token covers at least one UTF-8 byte, so the bytes are a ceiling the model cannot pass."""
+    settings(monkeypatch, ai_twin_model="", ai_max_tokens=1)
+    request = {"messages": [{"role": "user", "content": text}], "max_tokens": 1}
+    assert ai_gateway.input_tokens_ceiling(request) >= per_char * len(text)

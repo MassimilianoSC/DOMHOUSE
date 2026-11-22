@@ -224,11 +224,12 @@ def _body_problem(body: dict) -> str | None:
 
 
 def input_tokens_ceiling(request: dict) -> int:
-    """F-4, rereading P-2: the input counted prudently: one token every 2 ASCII characters (more than the 3-4 of Italian
-    text) and one for every other character (CJK, emoji: one character can be a token or more)."""
+    """F-4, rereadings P-2 and B-1: a true maximum of the input's tokens: its UTF-8 bytes. A token covers at least one
+    byte (a tokenizer splits each digit, and falls back to bytes, up to 4 a character, outside its vocabulary), so the
+    model cannot bill more; Italian text costs about a quarter of that, the rest of the reservation comes back at the
+    settling."""
     text = json.dumps(request.get("messages") or [], ensure_ascii=False) + json.dumps(request.get("tools") or [])
-    other = sum(1 for c in text if ord(c) > 0x7F)
-    return (len(text) - other) // 2 + other + 1
+    return len(text.encode("utf-8")) + 1
 
 
 def cost_ceiling(request: dict) -> float:

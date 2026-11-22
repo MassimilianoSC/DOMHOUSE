@@ -849,9 +849,9 @@ il 1° gennaio 2027 a 1.65 e 8.25), `AI_MAX_TOKENS` (4096), `AI_TIMEOUT_S` (25),
 vero: acceso in staging, spento in produzione, che i dimostrativi li rifiuta, D-202). Serve il ruolo `roles/aiplatform.user` sull'account del BFF.
 
 **Tetto e limiti (F-4, revisione «attacco da fuori», 22 novembre 2026).**
-- **Prenotazione prima della chiamata.** Si prenota, in modo atomico, il costo massimo della chiamata: un token ogni 2 caratteri in ingresso, più `max_tokens` in uscita, per la richiesta e per la gemella. Il campo è `reserved_eur` in `ai_usage/{AAAA-MM}`.
+- **Prenotazione prima della chiamata.** Si prenota, in modo atomico, il costo massimo della chiamata: un token per ogni byte UTF-8 in ingresso (un massimo vero: rilettura B-1), più `max_tokens` in uscita, per la richiesta e per la gemella. Il campo è `reserved_eur` in `ai_usage/{AAAA-MM}`.
 - **Conguaglio dopo.** Dopo la chiamata si toglie la prenotazione e si somma il costo vero. Succede anche se la chiamata fallisce o viene interrotta.
-- **Rifiuto.** Se la spesa più le prenotazioni in corso supererebbe il tetto: 429 `monthly_cap`. Così le chiamate contemporanee non superano mai il tetto. Vicino al tetto l'ultima parte resta inutilizzata (circa 0,08 € per una domanda normale).
+- **Rifiuto.** Se la spesa più le prenotazioni in corso supererebbe il tetto: 429 `monthly_cap`. Così le chiamate contemporanee non superano mai il tetto. Vicino al tetto l'ultima parte resta inutilizzata: circa 0,1 € per una domanda normale, fino a circa 0,3 € per un appartamento di 200 dispositivi.
 - **Gemella annullata o fallita.** Della richiesta gemella si conta anche l'ingresso.
 - **Corpo:** al massimo 20 messaggi con ruoli noti e 160 000 caratteri; `tools` solo se uguali a quelli del motore (`engine/assistant.py` TOOLS). Altrimenti 422 `bad_request`.
 - **Tetto giornaliero per appartamento,** solo su `/internal/ai/chat`: 200 chiamate per giorno UTC (`ENGINE_DAILY_CALLS`), oltre 429 `daily_limit`. Il motore ne fa al massimo `ASK_DAILY_LIMIT` per giorno locale (50, al più 100) e tratta il 429 come «limite mensile», cioè passa alla risposta rapida.
