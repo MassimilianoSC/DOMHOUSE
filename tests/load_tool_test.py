@@ -151,8 +151,11 @@ def test_p3_the_limits_are_said_and_written_in_the_results(server, tmp_path):
     from bff.routes import apartments
     assert (tool.STREAMS_PER_ACCOUNT, tool.STREAMS_PER_INSTANCE) == (apartments.STREAMS_PER_USER,
                                                                      apartments.STREAMS_PER_INSTANCE)
-    assert tool.accounts_problem(1000, 100) is None and tool.accounts_problem(1000, 99) is not None
-    assert "al massimo 2000 persone" in tool.accounts_problem(2500, 200)
+    # rereading of the low fixes, B-9: one test person every 8 people, a margin over the 10 streams of an account (a
+    # stream the server has not yet seen closed would take a reopening's place)
+    assert tool.PEOPLE_PER_ACCOUNT == 8
+    assert tool.accounts_problem(1000, 125) is None and tool.accounts_problem(1000, 124) is not None
+    assert "al massimo 1600 persone" in tool.accounts_problem(2000, 200)
     out = run_tool("persone", "--dev", "--bff", server, "--gradini", "2", "--minuti", "0.25", "--salita-s", "1",
                    "--cartella", str(tmp_path))
     assert out.returncode == 0, out.stdout + out.stderr

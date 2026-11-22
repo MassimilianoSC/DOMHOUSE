@@ -63,13 +63,13 @@ gcloud run services describe domotica-bff-staging --region=europe-west8 --projec
 **2. Prepara l'ambiente nello staging, prima a secco.** Il testo dice che ogni segreto sarà «leggibile da domotica-bff-staging@ e langbrain-vm@».
 
 ```bash
-GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python scripts/load/ambiente.py prepara --persone 100 --prova
+GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python scripts/load/ambiente.py prepara --persone 125 --prova
 ```
 
-**3. Prepara l'ambiente nello staging per davvero. Annota l'ora: qui comincia la prova.** Il comando crea 5 segreti di prova, un'organizzazione di prova, 5 appartamenti, 100 persone e il file `logs/carico-utenti.json`. Da F-6 (22 novembre 2026) il server apre al massimo 10 aggiornamenti in diretta per account e 200 per istanza: per il gradino di 1000 persone servono almeno 100 persone di prova (senza, `carico.py` si ferma prima di cominciare e dice quante prepararne). Lo staging ha una sola istanza: oltre 200 persone i gradini misurano il tetto di 200, non la capacità del server; `carico.py` lo scrive all'inizio e nel file dei risultati.
+**3. Prepara l'ambiente nello staging per davvero. Annota l'ora: qui comincia la prova.** Il comando crea 5 segreti di prova, un'organizzazione di prova, 5 appartamenti, 125 persone e il file `logs/carico-utenti.json`. Da F-6 (22 novembre 2026) il server apre al massimo 10 aggiornamenti in diretta per account e 200 per istanza: per il gradino di 1000 persone servono almeno 125 persone di prova (una ogni 8 persone, per avere margine) (senza, `carico.py` si ferma prima di cominciare e dice quante prepararne). Lo staging ha una sola istanza: oltre 200 persone i gradini misurano il tetto di 200, non la capacità del server; `carico.py` lo scrive all'inizio e nel file dei risultati.
 
 ```bash
-GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python scripts/load/ambiente.py prepara --persone 100
+GCP_PROJECT_ID=domotica-poc-511707 .venv/Scripts/python scripts/load/ambiente.py prepara --persone 125
 ```
 
 **4. Avvia i 5 motori di prova sulla VM.**
