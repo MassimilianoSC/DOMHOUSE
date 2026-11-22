@@ -217,7 +217,7 @@ in `/data/<apartment_id>` (`engine.db`, SQLite) e la chiave in un file fuori dal
 | `GCP_PROJECT_ID`, `GCP_REGION`, `FIREBASE_PROJECT_ID` | | placeholder `your-gcp-project-id`, `europe-west8` |
 | `SECRET_MANAGER_PREFIX` | `langbrain-api-key-` | nome segreto = prefisso + `apartment_id` (o `instance_secret_name`) |
 | `ITALIANWAY_WEBHOOK_SECRET`, `ITALIANWAY_SIGNATURE_HEADER` | | HMAC-SHA256 esadecimale sul body grezzo (accetta anche `sha256=<hex>`) |
-| `INSTANCE_ALLOWED` | vuoto (produzione) | D04: nello staging i motori raggiungibili, `host:porta` o `host:prima-ultima` separati da virgole; senza, lo staging reale non parte |
+| `INSTANCE_ALLOWED` | vuoto (sviluppo) | D04 e F-3: i motori raggiungibili, `host:porta` o `host:prima-ultima` separati da virgole; senza, lo staging e la produzione reali non partono (staging: dev 8100 e 8150-8169; produzione: dev 8100 fino alla seconda VM e 8101-8149) |
 | `INSTANCE_TIMEOUT_S`, `PORT`, `BFF_ROOT_PATH` | | `BFF_ROOT_PATH` = prefisso unico quando il BFF è dietro un path (es. `/api`) |
 | `CORS_ORIGINS` | | origini della PWA ammesse fuori da dev, separate da virgola |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` | default `smtp.gmail.com`, `465` | email di invito; senza `SMTP_USER`/`SMTP_PASSWORD` l'invito è solo registrato. Su Cloud Run la password arriva dal segreto `smtp-app-password` |

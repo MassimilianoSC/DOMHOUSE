@@ -626,6 +626,8 @@ async def relink_tenant_apartment(tenant_id: str, apartment_id: str, body: Apart
     who, target = audit.by_platform(identity), audit.apartment_target(saved.apartment_id, saved.name)
     if (saved.instance_url, saved.port) != (old_url, old_port):   # also for mock://, where link_key ignores the port
         await audit.record("apartment_relinked", who, tenant_id, target)
+        # F-3: a trace in the process log too, with the manager's uid (never the email); no email to anyone (a6)
+        warn("apartment relinked", apartment_id=saved.apartment_id, by=identity.uid)
     if new_code != old_code:
         await audit.record("italianway_changed", who, tenant_id, target, **{"from": old_code, "to": new_code})
     if saved.simulated != old_sim:

@@ -74,11 +74,13 @@ def check_access_settings(settings, environ=None) -> None:
     elif settings.app_env != "dev" and settings.auth_mode != "firebase":
         problem = (f"AUTH_MODE «{settings.auth_mode}» with APP_ENV «{settings.app_env}»: outside development it must be "
                    f"firebase (AUTH_MODE is «dev» when the variable is missing)")
-    elif settings.app_env == "staging" and settings.instance_mode == "real" and (
+    elif settings.app_env in ("staging", "prod") and settings.instance_mode == "real" and (
             not instances.allowed_targets(settings.instance_allowed) or "your-" in settings.instance_allowed):
-        # D04 (P-83): staging reaches the same VM as production; without the list it could reach any engine
-        problem = (f"INSTANCE_ALLOWED «{settings.instance_allowed}» in staging: it must list the engines staging may "
-                   f"reach (host:porta), filled by deploy.sh")
+        # D04 (P-83): staging reaches the same VM as production; without the list it could reach any engine.
+        # F-3 (attack-from-outside review): production too: without it a stolen platform manager's account moved a real
+        # apartment onto any address, and the BFF sent it the engine's key
+        problem = (f"INSTANCE_ALLOWED «{settings.instance_allowed}» in {settings.app_env}: it must list the engines "
+                   f"{settings.app_env} may reach (host:porta), filled by deploy.sh")
     if problem:
         error("development setting refused", app_env=settings.app_env, auth_mode=settings.auth_mode,
               service=environ.get("K_SERVICE"), problem=problem)

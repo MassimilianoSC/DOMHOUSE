@@ -72,8 +72,9 @@ class Settings:
     # D-217: until this instant (ISO 8601 with its offset, at most 30 days ahead) the «sistema domotico non
     # raggiungibile» notifications wait: a planned shutdown (procedure M19). Empty: on. Read by bff/push.py
     unreachable_alerts_off_until: str = ""
-    # D04 (P-83): in staging, the engines it may reach, «host:porta» or «host:prima-ultima» separated by commas; empty =
-    # any (production). Checked before any key is read (bff/instances.py target_problem)
+    # D04 (P-83), F-3: the engines this environment may reach, «host:porta» or «host:prima-ultima» separated by commas;
+    # required in staging and production in real mode (bff/main.py); empty only in development (any). Checked before any
+    # key is read (bff/instances.py target_problem)
     instance_allowed: str = ""
     # Tool A, A1 (docs/progetto-strumento-a-base.md §3, §4.2): the order receiver on the VM. Empty AGENT_AMBIENTE = off
     # (production until the second VM, §5.4). The orders' topic of this environment, and the address and account the
