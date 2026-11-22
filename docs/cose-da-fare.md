@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1219 |
+| **Ultima domanda al committente** | 1220 |
 
 ## 2. Cose da fare
 
@@ -28,7 +28,7 @@ Colonna «Chi»: MS = memoria storica; C = committente; Y = Youssouf; L = Leonar
 | 3 | Togliere le copie per tornare indietro: `prima-passo3` e la sua copia del disco, `prima-e38`, `~/e38`, quelle di A1, `~/a2`, `prima-a7`, `~/a7`, `prima-a5`, `~/a5` | una settimana senza problemi dopo ciascuna installazione (A7 e A5: dal 28 novembre) | MS prepara, C lancia | aperto | registro, 17–21 novembre |
 | 4 | Pubblicazione in produzione di ciò che è solo nello staging | decisione del committente; CI verde | C | pronta | registro, 20–21 novembre |
 | 5 | A3 Q8: «Rigenera» degli Shelly di `lab-01`, poi distruzione del vecchio segreto `langbrain-shelly-lab-01-devices` | con Y e gli Shelly accesi in ufficio | C, Y | aperto | `procedura-installazione-a3.md` |
-| 44 | Correggere i due difetti gravi dell'attacco da fuori: F-2 (corpo enorme che fa cadere il server) e F-1 (persona rimossa che rientra); poi il controllo in sola lettura di chi fosse già rientrato | subito (D-198) | o1, revisore, C per il controllo | aperto | `DOMOTICA/revisione-attacco-da-fuori/ESITO.md` |
+| 44 | Correggere i due difetti gravi dell'attacco da fuori: F-2 (corpo enorme che fa cadere il server) e F-1 (persona rimossa che rientra); poi il controllo in sola lettura di chi fosse già rientrato | subito (D-198) | o1, revisore, C per il controllo | in corso: mandato a o1 il 22 novembre (1220 = a) | `DOMOTICA/revisione-attacco-da-fuori/ESITO.md` |
 | 45 | Correggere i difetti medi e bassi dell'attacco da fuori (F-3…F-12, F-16), con una prova automatica per ognuno | dopo la 44; F-3 prima del primo appartamento vero | o1, o2 | aperto | `ESITO.md` |
 | 46 | Decisioni sui difetti F-13 (tetto dell'assistente per organizzazione), F-14 (invito che porta via una persona), F-15 (scadenza per inattività) | prima della loro correzione | C | aperto | `ESITO.md` |
 | 47 | Verifiche dal vivo in sola lettura dell'attacco da fuori (12: memoria e limiti di Cloud Run, istanze, firewall della VM, impostazioni di Firebase…) | nessuna | MS | aperto | `ESITO.md`, sezione 4 |
