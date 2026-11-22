@@ -411,7 +411,10 @@ le chiamate, anche non attribuite o con firma sbagliata. I soggiorni (`BookingRe
 **Chiamate con firma sbagliata (F-5, revisione «attacco da fuori», 22 novembre 2026).**
 - Ogni istanza del server registra al massimo **10 al minuto** (`UNSIGNED_ROWS_PER_MINUTE`): la riga nel registro e la riga di log `warn`. La produzione ha fino a 3 istanze.
 - Le chiamate oltre quel numero ricevono lo stesso 401 `invalid_signature`, ma non vengono lette né scritte.
-- Una riga di log `warn` al minuto le conta: «webhook unsigned calls not logged», campo `calls`.
+- Una riga di log `warn` al minuto le conta: «webhook unsigned calls not logged», campi `calls`, `well_formed` ed `event_ids`.
+  - `well_formed` sono quelle con una firma della forma giusta (64 cifre esadecimali), come quelle di Italianway con il segreto sbagliato;
+  - `event_ids` sono i loro identificativi d'evento, al massimo 20.
+- La riga «webhook correlation id replaced» c'è solo per le chiamate che hanno la loro riga.
 - Le chiamate firmate non hanno mai limiti.
 - Prima ogni chiamata non firmata costava circa 23 operazioni Firestore e spingeva fuori dalle 20 righe «non firmate» un vero errore di firma.
 

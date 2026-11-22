@@ -87,7 +87,7 @@ def test_the_next_minute_gets_its_rows_again_and_one_line_counts_the_skipped(ita
     burst(1)
     assert len(writes) == first + 1
     summary = [kw for m, kw in seen if m == "webhook unsigned calls not logged"]
-    assert summary == [{"source": "italianway", "calls": 30 - first}]
+    assert summary == [{"source": "italianway", "calls": 30 - first, "well_formed": 0, "event_ids": []}]
 
 
 def test_a_skipped_unsigned_call_is_not_even_parsed(italianway, monkeypatch):
@@ -97,3 +97,44 @@ def test_a_skipped_unsigned_call_is_not_even_parsed(italianway, monkeypatch):
         raise AssertionError("parsed")
     monkeypatch.setattr(webhooks, "_read", boom)
     assert burst(5)[-1].status_code == 401
+
+
+# -------- rereading of the medium fixes, P-4 and P-7 --------
+def _calls(n, signature, event=None, correlation=None):
+    async def go():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            out = []
+            for i in range(n):
+                body = {"event": "reservation.created", "id": event.format(i) if event else None}
+                headers = {"Content-Type": "application/json", "X-Signature": signature}
+                if correlation:
+                    headers["X-Correlation-Id"] = correlation
+                out.append(await c.post("/webhooks/italianway", content=json.dumps(body).encode(), headers=headers))
+            return out
+    return run(go())
+
+
+def test_p7_the_replaced_correlation_id_line_only_for_calls_that_get_a_row(italianway, monkeypatch):
+    """The line «webhook correlation id replaced» (120 characters of the caller's) was written for every call, before
+    the F-5 limit: one log line per call of a script."""
+    seen = []
+    monkeypatch.setattr(webhooks, "info", lambda msg, **kw: seen.append((msg, kw)))
+    _calls(30, "sbagliata", correlation="non-un-uuid " * 20)
+    lines = [kw for m, kw in seen if m == "webhook correlation id replaced"]
+    assert len(lines) == getattr(webhooks, "UNSIGNED_ROWS_PER_MINUTE", 10)
+
+
+def test_p4_skipped_calls_with_a_well_formed_signature_are_counted_with_their_event_ids(italianway, monkeypatch):
+    """A real Italianway call with the wrong secret, after the tenth unsigned call of the minute, left no row: now the
+    minute's warn line counts the skipped calls whose signature has the right form (64 hex digits) and names their
+    event ids, so the logs still tell a wrong secret from a script."""
+    clock, writes = italianway
+    seen = []
+    monkeypatch.setattr(webhooks, "warn", lambda msg, **kw: seen.append((msg, kw)))
+    _calls(12, "sbagliata")                                             # 10 rows, 2 skipped
+    _calls(3, "sha256=" + "ab" * 32, event="iw-ev-p4-{}")               # well formed, wrong: skipped
+    clock[0] += 60
+    _calls(1, "sbagliata")
+    summary = [kw for m, kw in seen if m == "webhook unsigned calls not logged"]
+    assert summary == [{"source": "italianway", "calls": 5, "well_formed": 3,
+                        "event_ids": ["iw-ev-p4-0", "iw-ev-p4-1", "iw-ev-p4-2"]}], summary

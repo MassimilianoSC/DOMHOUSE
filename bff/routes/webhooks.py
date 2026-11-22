@@ -2,6 +2,7 @@
 import hashlib
 import hmac
 import json
+import re
 import time
 import uuid
 
@@ -94,16 +95,30 @@ def structured(payload) -> dict:
             "guests": guests if isinstance(guests, int) and not isinstance(guests, bool) else None}
 
 
-def _unsigned_row_allowed() -> bool:
+WELL_FORMED_SIGNATURE = re.compile(r"(?i)^\s*(sha256=)?[0-9a-f]{64}\s*$")
+EVENT_IDS_KEPT = 20
+
+
+def _unsigned_row_allowed(raw: bytes, signature: str | None) -> bool:
     window = int(_clock() // 60)
     if _unsigned.get("window") != window:
         if _unsigned.get("skipped"):
-            warn("webhook unsigned calls not logged", source="italianway", calls=_unsigned["skipped"])
-        _unsigned.update(window=window, rows=0, skipped=0)
+            # rereading P-4: how many of them had a signature of the right form (64 hex digits, what Italianway sends
+            # with a wrong secret), and their event ids: a wrong secret is still told from a script in the logs
+            warn("webhook unsigned calls not logged", source="italianway", calls=_unsigned["skipped"],
+                 well_formed=_unsigned["well_formed"], event_ids=_unsigned["event_ids"])
+        _unsigned.update(window=window, rows=0, skipped=0, well_formed=0, event_ids=[])
     if _unsigned["rows"] < UNSIGNED_ROWS_PER_MINUTE:
         _unsigned["rows"] += 1
         return True
     _unsigned["skipped"] += 1
+    if signature and WELL_FORMED_SIGNATURE.match(signature):
+        _unsigned["well_formed"] += 1
+        if len(_unsigned["event_ids"]) < EVENT_IDS_KEPT:
+            payload = _parse(raw)                       # at most 64 KiB (bff/body_limit.py), only for these
+            event = payload.get("id") if isinstance(payload, dict) else None
+            if isinstance(event, str) and event:
+                _unsigned["event_ids"].append(event[:64])
     return False
 
 
@@ -136,14 +151,15 @@ async def italianway(request: Request):
     incoming = request.headers.get("X-Correlation-Id")
     correlation_id = instances.correlation_id(incoming)  # Fable D-75 note 2: the engine wants a UUID
     ctx_correlation.set(correlation_id)
-    if incoming and incoming.strip() != correlation_id:
-        info("webhook correlation id replaced", source="italianway", original=incoming[:120])
     # F-2: the size is already limited (bff/body_limit.py, 64 KiB, before the body is read); the signature is checked
     # on the raw bytes before they are parsed. An unsigned call keeps its obscured body and fields in the register
     # (decision of 22 November, a6: the platform sees an Italianway call with the wrong secret); its volume is F-5
-    signature_ok = verify_signature(raw, request.headers.get(s.italianway_signature_header), s.italianway_webhook_secret)
-    if not signature_ok and not _unsigned_row_allowed():                 # F-5: over the minute's rows
+    signature = request.headers.get(s.italianway_signature_header)
+    signature_ok = verify_signature(raw, signature, s.italianway_webhook_secret)
+    if not signature_ok and not _unsigned_row_allowed(raw, signature):   # F-5: over the minute's rows
         return JSONResponse(status_code=401, content={"error": "invalid_signature", "message": "Firma non valida"})
+    if incoming and incoming.strip() != correlation_id:   # rereading P-7: only for calls that get their row
+        info("webhook correlation id replaced", source="italianway", original=incoming[:120])
     parsed, kept = _read(raw)
     log = WebhookLog(log_id=f"wh-{uuid.uuid4().hex[:12]}", signature_ok=signature_ok, status_code=0, outcome="",
                      correlation_id=correlation_id, raw_body=kept, **structured(parsed))
