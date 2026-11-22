@@ -168,18 +168,17 @@ describe("invito: nome rifiutato dal server (F-11)", () => {
 
   it.each([
     "Il nome contiene caratteri non ammessi.",
-    "Il nome non può contenere un indirizzo web.",
     "Il nome può avere al massimo 80 caratteri.",
   ])("«%s» sotto il campo del nome, niente avviso rosso; sparisce scrivendo", async (sentence) => {
     s.invite.mockRejectedValueOnce(new ApiError(422, "invalid_text", sentence, "c-1", { field: "display_name" }));
     await renderUsers();
     fireEvent.change(screen.getByTestId("admin-invite-email"), { target: { value: "nuovo@demo.it" } });
-    fireEvent.change(screen.getByTestId("admin-invite-name"), { target: { value: "www.esempio.it/promo" } });
+    fireEvent.change(screen.getByTestId("admin-invite-name"), { target: { value: "Mario\u200b Rossi" } });
     await click(screen.getByTestId("admin-invite-btn"));
     expect(screen.getByTestId("admin-invite-name-problem")).toHaveTextContent(sentence);
     expect(screen.getByTestId("admin-invite-name")).toHaveAttribute("aria-invalid", "true");
     expect(toast.error).not.toHaveBeenCalled();
-    expect(screen.getByTestId("admin-invite-name")).toHaveValue("www.esempio.it/promo"); // what was written stays
+    expect(screen.getByTestId("admin-invite-name")).toHaveValue("Mario\u200b Rossi"); // what was written stays
     fireEvent.change(screen.getByTestId("admin-invite-name"), { target: { value: "Mario Rossi" } });
     expect(screen.queryByTestId("admin-invite-name-problem")).toBeNull();
   });

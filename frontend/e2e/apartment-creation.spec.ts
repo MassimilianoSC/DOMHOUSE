@@ -80,7 +80,7 @@ for (const width of [360, 390, 430]) {
     // the confirmation of «Annulla creazione», inside the screen
     await page.getByTestId("creation-cancel-lab-ponte").click();
     const dlg = page.getByTestId("creation-cancel-dialog");
-    await expect(dlg).toContainText("L'id lab-ponte non si potrà più usare");
+    await expect(dlg).toContainText("L'ID lab-ponte non si potrà più usare");
     const box = await dlg.boundingBox();
     expect(box!.x).toBeGreaterThanOrEqual(0);
     expect(box!.x + box!.width).toBeLessThanOrEqual(width + 1);

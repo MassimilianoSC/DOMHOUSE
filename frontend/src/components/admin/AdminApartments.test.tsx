@@ -438,12 +438,11 @@ describe("indirizzo rifiutato dal server (F-11)", () => {
 
   it.each([
     "L'indirizzo contiene caratteri non ammessi.",
-    "L'indirizzo non può contenere un indirizzo web.",
     "L'indirizzo può avere al massimo 200 caratteri.",
   ])("«%s» sotto l'indirizzo, la finestra resta aperta, niente avviso rosso", async (sentence) => {
     state.patchApartment.mockRejectedValueOnce(new ApiError(422, "invalid_text", sentence, "c-3", { field: "address" }));
     await openEdit();
-    fireEvent.change(field("address"), { target: { value: "https://esempio.it" } });
+    fireEvent.change(field("address"), { target: { value: "Via Roma\u200b 1" } });
     await save();
     expect(screen.getByTestId("apt-form-address-problem")).toHaveTextContent(sentence);
     expect(field("address")).toHaveAttribute("aria-invalid", "true");
