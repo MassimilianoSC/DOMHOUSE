@@ -185,7 +185,11 @@ def load_config(env: Mapping[str, str] | None = None) -> EngineConfig:
             if not low <= settings[name] <= high:
                 raise ValueError
         except ValueError:
-            problems.append(f"{name} must be a number between {low:g} and {high:g}")
+            # rereading of the attack-from-outside low fixes, B-7: ASK_DAILY_LIMIT's maximum came down from 1000 to
+            # 100 on 22 November 2026; an engine still set above it says why it does not start
+            why = (" (since 22 November 2026: the BFF counts at most 200 calls a UTC day per apartment)"
+                   if name == "ASK_DAILY_LIMIT" else "")
+            problems.append(f"{name} must be a number between {low:g} and {high:g}{why}")
     for name, (default, allowed) in CHOICES.items():
         value = env.get(name, "").strip().lower() or default
         if value not in allowed:

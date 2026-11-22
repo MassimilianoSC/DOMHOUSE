@@ -449,3 +449,13 @@ def test_b10_a_reservation_never_settled_stops_counting_after_an_hour(monkeypatc
     run(repo.settle_ai_cost("2026-05", 0.6, 0.1, 10, 5, 1, key="perduta"))           # too late: said, never negative
     assert seen == ["assistant reservation not found"]
     assert run(repo.get_ai_usage("2026-05"))["reserved_eur"] == pytest.approx(0.6)       # «seconda» still counts
+
+
+def test_b7_an_engine_refused_for_its_ask_daily_limit_says_why():
+    """Rereading of the low fixes, B-7: no engine sets it today (a6 checked the VM); if one did, its log must say why."""
+    from engine.config import load_config
+    base = {"APARTMENT_ID": "apt-b7", "API_KEY": "chiave-di-prova-0123456789", "CONNECTOR": "simulated"}
+    with pytest.raises(Exception) as refused:
+        load_config({**base, "ASK_DAILY_LIMIT": "500"})
+    text = str(refused.value)
+    assert "ASK_DAILY_LIMIT must be a number between 1 and 100" in text and "200" in text and "BFF" in text
