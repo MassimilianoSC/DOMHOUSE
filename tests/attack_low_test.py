@@ -539,3 +539,15 @@ def test_r10_no_secret_read_for_an_apartment_that_cannot_be_used(monkeypatch, st
         run(repo.upsert_apartment(original))
         run(repo.upsert_tenant(tenant))
         auth._known_tenants.clear()
+
+
+# -------- the first admin's name when the platform creates an organisation follows the same rule --------
+@pytest.mark.parametrize("name", ["Vai su www.evil.example", "evil.zip", "Mario‮issoR", "x" * 81])
+def test_the_first_admins_name_of_a_new_organisation_follows_the_rule(name):
+    from bff.repository import get_repository
+    before = len(run(get_repository().list_tenants()))
+    r = run(_send_as("POST", "/app/platform/tenants", {"name": f"Nuova {len(name)}", "admin_email": "primo-f11@esempio.it",
+                                                       "admin_display_name": name}, who="piattaforma@demo.it"))
+    assert r.status_code == 422 and r.json()["error"] == "invalid_text", (name, r.status_code, r.text[:200])
+    assert r.json()["field"] == "admin_display_name"
+    assert len(run(get_repository().list_tenants())) == before

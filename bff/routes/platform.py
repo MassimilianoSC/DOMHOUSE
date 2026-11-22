@@ -19,6 +19,7 @@ from ..config import get_settings
 from ..invites import InviteRefused, create_invitation, send_invitation, shown
 from ..repository import Apartment, ExternalIds, PlatformMember, Tenant, get_repository, normalize_email
 from ..logs import warn
+from ..plain_text import PlainName
 from ..repository.base import now_iso, tenant_name_key
 from ..sse_hub import hub_manager
 from .admin import _check_tz, remove_apartment
@@ -38,7 +39,7 @@ def err(status: int, error: str, message: str, **details) -> JSONResponse:
 class TenantCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     admin_email: EmailStr
-    admin_display_name: str = Field(default="", max_length=80)
+    admin_display_name: PlainName = ""        # F-11: the first admin's name, in the invitation email too
 
 
 class TenantRename(BaseModel):
