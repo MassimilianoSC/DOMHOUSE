@@ -220,7 +220,9 @@ WEBHOOK_LOG_LIMIT = 100
 # D54 (P-83): calls without a valid signature (nobody's organisation) keep their own few rows: a flood of them never
 # pushes out the unattributed calls signed with an unknown code, the ones the diagnosis needs
 UNSIGNED_LOG_LIMIT = 20
-EMPTY_AI_USAGE = {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0, "alerted": False}
+# F-4: reserved_eur is what the calls running now may still cost at most (reserved before, settled after)
+EMPTY_AI_USAGE = {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0, "alerted": False,
+                  "reserved_eur": 0.0}
 
 
 def ai_stats_added(doc: dict | None, apartment_id: str, week: str, bounds: tuple[str, str], asks: int, timeouts: int,
@@ -509,6 +511,12 @@ class Repository(Protocol):
                            twins: int = 0, quick: str | None = None, ask_id: str | None = None) -> bool: ...
     async def get_ai_stats(self, keys: list[str]) -> dict[str, dict]: ...
     async def add_ai_usage(self, month: str, cost_eur: float, input_tokens: int, output_tokens: int) -> dict: ...
+    # F-4 (attack-from-outside review): atomic. reserve: True and reserved_eur raised when cost_eur + reserved_eur +
+    # amount stays within cap, else False and nothing changes. settle: the reservation goes back and the real cost (and
+    # the call, when counted) is added; the totals after
+    async def reserve_ai_cost(self, month: str, amount: float, cap: float) -> bool: ...
+    async def settle_ai_cost(self, month: str, reserved: float, cost_eur: float, input_tokens: int, output_tokens: int,
+                             calls: int) -> dict: ...
     async def mark_ai_alert(self, month: str) -> bool: ...
 
     # pseudonyms towards the engine (P-48): claim is atomic (the existing one wins), forget removes both directions

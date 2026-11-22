@@ -278,6 +278,23 @@ class InMemoryRepository:
         u["output_tokens"] += output_tokens
         return dict(u)
 
+    async def reserve_ai_cost(self, month, amount, cap):
+        u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))
+        u.setdefault("reserved_eur", 0.0)
+        if u["cost_eur"] + u["reserved_eur"] + amount > cap:
+            return False
+        u["reserved_eur"] += amount
+        return True
+
+    async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls):
+        u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))
+        u["reserved_eur"] = max(0.0, u.get("reserved_eur", 0.0) - reserved)
+        u["cost_eur"] += cost_eur
+        u["calls"] += calls
+        u["input_tokens"] += input_tokens
+        u["output_tokens"] += output_tokens
+        return dict(u)
+
     async def add_ai_stats(self, apartment_id, week, bounds, asks=0, timeouts=0, twins=0, quick=None, ask_id=None):
         key = f"{apartment_id}__{week}"
         d = ai_stats_added(self.ai_stats.get(key), apartment_id, week, bounds, asks, timeouts, twins, quick, ask_id)

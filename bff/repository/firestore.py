@@ -429,6 +429,36 @@ class FirestoreRepository:
         async with self._lock("ai_usage"):
             return await txn(self.db.transaction())
 
+    async def reserve_ai_cost(self, month, amount, cap):
+        ref = self._col("ai_usage").document(month)
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            u = {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
+            if u["cost_eur"] + u["reserved_eur"] + amount > cap:
+                return False
+            u.update(reserved_eur=u["reserved_eur"] + amount, updated_at=now_iso())
+            tx.set(ref, u)
+            return True
+        async with self._lock("ai_usage"):
+            return await txn(self.db.transaction())
+
+    async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls):
+        ref = self._col("ai_usage").document(month)
+
+        @firestore.async_transactional
+        async def txn(tx):
+            snap = await ref.get(transaction=tx)
+            u = {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
+            u.update(reserved_eur=max(0.0, u["reserved_eur"] - reserved), cost_eur=u["cost_eur"] + cost_eur,
+                     calls=u["calls"] + calls, input_tokens=u["input_tokens"] + input_tokens,
+                     output_tokens=u["output_tokens"] + output_tokens, updated_at=now_iso())
+            tx.set(ref, u)
+            return {k: u[k] for k in EMPTY_AI_USAGE}
+        async with self._lock("ai_usage"):
+            return await txn(self.db.transaction())
+
     # decision 120: ai_stats/{apartment}__{week}, raised in a transaction, expire 12 months after the week's Monday
     async def add_ai_stats(self, apartment_id, week, bounds, asks=0, timeouts=0, twins=0, quick=None, ask_id=None):
         ref = self._col("ai_stats").document(f"{apartment_id}__{week}")

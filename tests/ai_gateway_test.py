@@ -62,11 +62,12 @@ def test_only_an_engine_with_its_key(model):
 
 
 def test_the_bff_chooses_model_and_tokens_and_forwards_only_what_it_knows(model):
+    from engine.assistant import TOOLS                 # F-4: tools only if they are the engine's own
     run(post({**BODY, "model": "un-altro-modello", "max_tokens": 99_999, "stream": True, "temperature": 0.1,
-              "tools": [{"type": "function", "function": {"name": "stato"}}]}))
+              "tools": TOOLS}))
     sent = model[0]
     assert sent["model"] == "google/gemini-3.5-flash" and sent["max_tokens"] == 4096
-    assert "stream" not in sent and sent["temperature"] == 0.1 and sent["tools"][0]["function"]["name"] == "stato"
+    assert "stream" not in sent and sent["temperature"] == 0.1 and sent["tools"] == TOOLS
     assert "reasoning_effort" not in sent                                         # D-182: nothing by default
     assert run(post({"messages": []})).status_code == 422
 
@@ -246,7 +247,8 @@ def test_d187_a_silent_main_model_gets_the_twin_on_the_lite_priced_as_the_lite(m
     assert ("assistant model twin started", {"apartment_id": APT, "after_s": 0.05, "model": LITE, "reason": "silenzio"}) in logged
     call = [kw for msg, kw in logged if msg == "assistant model call"][-1]
     lite_cost = (600 * 0.30 + 400 * 0.03 + 500 * 2.50) / 1_000_000                 # the lite's prices, not the main's
-    assert call["model"] == LITE and call["attempt"] == 2 and call["cost_eur"] == round(lite_cost, 6)
+    main_input = 1000 * 1.50 / 1_000_000              # F-4: the cancelled main request's input counted too
+    assert call["model"] == LITE and call["attempt"] == 2 and call["cost_eur"] == round(lite_cost + main_input, 6)
 
 
 def test_d187_a_quick_error_of_the_main_model_starts_the_twin_at_once(model, monkeypatch):

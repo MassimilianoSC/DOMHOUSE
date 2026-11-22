@@ -15,6 +15,7 @@ logged here, only apartment, tokens and cost.
 """
 import asyncio
 import hmac
+import json
 import time
 from datetime import UTC, datetime
 from email.message import EmailMessage
@@ -150,7 +151,8 @@ async def _alert(month: str, spent: float) -> None:
         warn("assistant spending alert email failed", error=type(exc).__name__)
 
 
-async def _hedged(request: dict, apartment_id: str = "", ask_id: str = "") -> tuple[dict, int]:
+async def _hedged(request: dict, apartment_id: str = "", ask_id: str = "",
+                  started: list | None = None) -> tuple[dict, int]:
     """C-10 layer 1: the model's answer and which request gave it (1 or 2). A second request starts when the first is
     still silent after AI_HEDGE_AFTER_S; the first answer that arrives wins, the other is cancelled. D-187: the second
     goes to AI_TWIN_MODEL when there is one (another model: failures independent) and then starts at once also when
@@ -167,6 +169,8 @@ async def _hedged(request: dict, apartment_id: str = "", ask_id: str = "") -> tu
             if apartment_id:
                 await ai_stats.count_twin(apartment_id)              # decision 120: the twins of the week
             tasks.append(asyncio.create_task(call_model({**request, "model": twin_model})))
+        if started is not None:                                  # F-4: how many requests went to the model
+            started.append(len(tasks))
         error: BaseException | None = None
         running = list(tasks)
         while running:
@@ -183,6 +187,42 @@ async def _hedged(request: dict, apartment_id: str = "", ask_id: str = "") -> tu
                 t.cancel()
 
 
+MAX_MESSAGES = 20                 # F-4: the engine sends 2 (D-182), a rules' proposal 2
+MAX_CHARACTERS = 160_000          # F-4: the engine's largest request, 200 devices, is about 79,000 (twice that)
+ROLES = ("system", "user", "assistant", "tool")
+
+
+def _body_problem(body: dict) -> str | None:
+    """F-4: what reaches the model, besides the 256 KiB of bff/body_limit.py: a few messages of known roles, a bounded
+    number of characters, and tools only if they are the engine's own (engine/assistant.py TOOLS)."""
+    messages = body["messages"]
+    if len(messages) > MAX_MESSAGES:
+        return f"Al massimo {MAX_MESSAGES} messaggi"
+    if not all(isinstance(m, dict) and m.get("role") in ROLES for m in messages):
+        return "Messaggi non validi"
+    if len(json.dumps(messages, ensure_ascii=False)) > MAX_CHARACTERS:
+        return "Richiesta troppo lunga"
+    tools = body.get("tools")
+    if tools:
+        from engine.assistant import TOOLS
+        if tools != TOOLS:
+            return "Strumenti non ammessi"
+    return None
+
+
+def cost_ceiling(request: dict) -> float:
+    """F-4: the most this request can cost, reserved before it: its input counted as one token every 2 characters (more
+    than the 3-4 of Italian text), max_tokens of output, and the twin request too (C-10, D-187), at its own prices."""
+    chars = (len(json.dumps(request.get("messages") or [], ensure_ascii=False))
+             + len(json.dumps(request.get("tools") or [])))
+    tokens_in, tokens_out = chars // 2 + 1, int(request["max_tokens"])
+    total = 0.0
+    for twin in (False, True):
+        p_in, p_out, _ = prices(twin)
+        total += (tokens_in * p_in + tokens_out * p_out) / 1_000_000
+    return total
+
+
 def _ask(ask_id: str) -> dict:
     """The question in the log lines, when the engine said it (X-Ask-Id); nothing for the rules' proposals."""
     return {"ask_id": ask_id} if ask_id else {}
@@ -193,25 +233,58 @@ async def chat(apartment_id: str, body: dict, ask_id: str = "") -> dict:
     s = get_settings()
     if not isinstance(body, dict) or not isinstance(body.get("messages"), list) or not body["messages"]:
         raise GatewayError(422, "bad_request", "messages obbligatorio")
+    if problem := _body_problem(body):
+        raise GatewayError(422, "bad_request", problem)
     month = month_now()
     repo = get_repository()
-    if (await repo.get_ai_usage(month))["cost_eur"] >= s.ai_monthly_cap_eur:
-        raise GatewayError(429, "monthly_cap", CAP_MESSAGE)
     request = {k: v for k, v in body.items() if k in ("messages", "tools", "tool_choice", "temperature")}
     request["model"] = s.ai_model
     request["max_tokens"] = min(int(body.get("max_tokens") or s.ai_max_tokens), s.ai_max_tokens)
     if s.ai_reasoning_effort and not _reasoning_refused:
         request["reasoning_effort"] = s.ai_reasoning_effort
+    # F-4 (attack-from-outside review): the cap was checked only before the call and the cost added after it, so calls
+    # at the same time all passed. Now the most the call can cost is reserved atomically first, and settled after it
+    # with the real cost, whatever happens in between (a failure, a cancellation by rules.py's time limit)
+    reserved = cost_ceiling(request)
+    if not await repo.reserve_ai_cost(month, reserved, s.ai_monthly_cap_eur):
+        raise GatewayError(429, "monthly_cap", CAP_MESSAGE)
+    started = time.monotonic()
+    cost, tokens_in, tokens_out, counted = 0.0, 0, 0, 0
+    went: list = []
+    try:
+        answer, attempt = await _call(request, apartment_id, ask_id, went)
+        twin = attempt == 2 and bool(s.ai_twin_model)
+        cost, tokens_in, tokens_out = cost_eur(answer.get("usage") or {}, prices(twin))   # D-187: the winner's prices
+        if went and went[-1] == 2:
+            # F-4 (ESITO point 3): the other request, cancelled or failed, read the same input: counted at its input
+            # price (what it may have written is not known; the bill is checked in the live verifications, point 9)
+            cost += tokens_in * prices(not twin and bool(s.ai_twin_model))[0] / 1_000_000
+        counted = 1
+    finally:
+        totals = await asyncio.shield(repo.settle_ai_cost(month, reserved, cost, tokens_in, tokens_out, counted))
+    info("assistant model call", apartment_id=apartment_id, **_ask(ask_id),
+         model=s.ai_twin_model if twin else s.ai_model, input_tokens=tokens_in, output_tokens=tokens_out,
+         cost_eur=round(cost, 6), month_eur=round(totals["cost_eur"], 4), seconds=round(time.monotonic() - started, 2),
+         attempt=attempt, requests=went[-1] if went else 1)
+    if totals["cost_eur"] >= s.ai_monthly_cap_eur * s.ai_alert_percent / 100:
+        await _alert(month, totals["cost_eur"])
+    return answer
+
+
+async def _call(request: dict, apartment_id: str, ask_id: str, went: list) -> tuple[dict, int]:
+    """The call with its twin (C-10), once more without reasoning_effort when the model refuses it; every failure leaves
+    a line and becomes a GatewayError. went: how many requests went to the model (F-4)."""
     started = time.monotonic()
     try:
         try:
-            answer, attempt = await _hedged(request, apartment_id, ask_id)
+            answer, attempt = await _hedged(request, apartment_id, ask_id, went)
         except GatewayError as exc:
             if "reasoning_effort" not in request or " 400" not in exc.message:
                 raise
             _refuse_reasoning(apartment_id)             # the model does not take it: once more without, then never
             request.pop("reasoning_effort")
-            answer, attempt = await _hedged(request, apartment_id, ask_id)
+            went.clear()
+            answer, attempt = await _hedged(request, apartment_id, ask_id, went)
     except GatewayError as exc:              # lot 28 d: every failed call leaves a line, with how long it took
         warn("assistant model call failed", apartment_id=apartment_id, **_ask(ask_id), error=exc.error, phase=exc.phase,
              seconds=round(time.monotonic() - started, 2))
@@ -224,13 +297,4 @@ async def chat(apartment_id: str, body: dict, ask_id: str = "") -> dict:
         warn("assistant model call failed", apartment_id=apartment_id, **_ask(ask_id), error=type(exc).__name__,
              phase="credenziali o rete", seconds=round(time.monotonic() - started, 2))
         raise GatewayError(502, "model_unavailable", "Modello non raggiungibile") from None
-    twin = attempt == 2 and bool(s.ai_twin_model)
-    cost, tokens_in, tokens_out = cost_eur(answer.get("usage") or {}, prices(twin))   # D-187: the winner's prices
-    totals = await repo.add_ai_usage(month, cost, tokens_in, tokens_out)
-    info("assistant model call", apartment_id=apartment_id, **_ask(ask_id), model=s.ai_twin_model if twin else s.ai_model,
-         input_tokens=tokens_in, output_tokens=tokens_out,
-         cost_eur=round(cost, 6), month_eur=round(totals["cost_eur"], 4), seconds=round(time.monotonic() - started, 2),
-         attempt=attempt)
-    if totals["cost_eur"] >= s.ai_monthly_cap_eur * s.ai_alert_percent / 100:
-        await _alert(month, totals["cost_eur"])
-    return answer
+    return answer, attempt
