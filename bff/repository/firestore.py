@@ -13,7 +13,7 @@ from google.cloud import firestore
 
 from .. import retention
 
-from .base import reservable, reserved_after
+from .base import add_reservation, drop_reservation, live_usage, reservable, reservation_key, room_left
 from .base import (SEQ_UNCHECKED, iso_seconds, migrated_document, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email, now_iso)
 
@@ -420,7 +420,7 @@ class FirestoreRepository:
 
     async def get_ai_usage(self, month, tenant_id=None):
         snap = await self._usage_ref(month, tenant_id).get()
-        return {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
+        return live_usage({**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE))
 
     async def add_ai_usage(self, month, cost_eur, input_tokens, output_tokens):
         ref = self._col("ai_usage").document(month)
@@ -436,9 +436,10 @@ class FirestoreRepository:
         async with self._lock("ai_usage"):
             return await txn(self.db.transaction())
 
-    async def reserve_ai_cost(self, month, amount, cap, tenant_id=None, tenant_cap=None):
+    async def reserve_ai_cost(self, month, amount, cap, tenant_id=None, tenant_cap=None, key=None):
         if not reservable(amount):
             return False
+        key = key or reservation_key()
         refs = [(self._usage_ref(month), cap)]
         if tenant_id is not None:
             refs.append((self._usage_ref(month, tenant_id), tenant_cap))
@@ -449,17 +450,19 @@ class FirestoreRepository:
             for ref, limit in refs:                      # every read before any write (Firestore's transactions)
                 snap = await ref.get(transaction=tx)
                 u = {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
-                if limit is not None and u["cost_eur"] + u["reserved_eur"] + amount > limit:
+                if not room_left(u, amount, limit):
                     return False
                 docs.append((ref, u))
             for ref, u in docs:
-                u.update(reserved_eur=u["reserved_eur"] + amount, updated_at=now_iso())
+                add_reservation(u, key, amount)
+                u["updated_at"] = now_iso()
                 tx.set(ref, u)
             return True
         async with self._lock("ai_usage"):
             return await txn(self.db.transaction())
 
-    async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls, tenant_id=None):
+    async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls, tenant_id=None,
+                             key=None):
         refs = [self._usage_ref(month)] + ([self._usage_ref(month, tenant_id)] if tenant_id is not None else [])
 
         @firestore.async_transactional
@@ -469,11 +472,12 @@ class FirestoreRepository:
                 snap = await ref.get(transaction=tx)
                 docs.append((ref, {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)))
             for ref, u in docs:
-                u.update(reserved_eur=reserved_after(u["reserved_eur"], reserved, month), cost_eur=u["cost_eur"] + cost_eur,
-                         calls=u["calls"] + calls, input_tokens=u["input_tokens"] + input_tokens,
-                         output_tokens=u["output_tokens"] + output_tokens, updated_at=now_iso())
+                drop_reservation(u, key, reserved, month)
+                u.update(cost_eur=u["cost_eur"] + cost_eur, calls=u["calls"] + calls,
+                         input_tokens=u["input_tokens"] + input_tokens, output_tokens=u["output_tokens"] + output_tokens,
+                         updated_at=now_iso())
                 tx.set(ref, u)
-            return {k: docs[0][1][k] for k in EMPTY_AI_USAGE}
+            return {k: live_usage(docs[0][1])[k] for k in EMPTY_AI_USAGE}
         async with self._lock("ai_usage"):
             return await txn(self.db.transaction())
 

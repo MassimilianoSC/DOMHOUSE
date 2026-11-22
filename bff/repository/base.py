@@ -1,4 +1,6 @@
 import math
+import time
+import uuid
 from datetime import UTC, datetime
 from typing import Literal, Protocol
 
@@ -237,12 +239,52 @@ def reservable(amount) -> bool:
     return isinstance(amount, (int, float)) and not isinstance(amount, bool) and math.isfinite(amount) and amount > 0
 
 
-def reserved_after(current: float, reserved: float, month: str) -> float:
-    """What stays reserved after a settling; below zero is an accounting error: said in the log, never hidden."""
-    left = current - reserved
-    if left < -1e-9:
-        warn("assistant reservation below zero", month=month, missing_eur=round(-left, 6))
-    return max(0.0, left)
+# Rereading of the low fixes, B-10: every reservation is kept by its key with an expiry; one never settled (its
+# instance stopped mid-call, a cancellation landing just after the reservation) stops counting after this
+RESERVATION_TTL_S = 3600.0
+
+
+def reservation_clock() -> float:
+    return time.time()
+
+
+def _live(u: dict) -> dict:
+    now = reservation_clock()
+    return {k: v for k, v in (u.get("reservations") or {}).items() if v.get("until", 0) > now}
+
+
+def live_usage(u: dict) -> dict:
+    """The usage as read: reserved_eur = the reservations still running; the map itself stays inside."""
+    out = {k: v for k, v in u.items() if k != "reservations"}
+    out["reserved_eur"] = sum(v["eur"] for v in _live(u).values())
+    return out
+
+
+def room_left(u: dict, amount: float, cap: float | None) -> bool:
+    return cap is None or u.get("cost_eur", 0.0) + sum(v["eur"] for v in _live(u).values()) + amount <= cap
+
+
+def add_reservation(u: dict, key: str, amount: float) -> None:
+    live = _live(u)
+    live[key] = {"eur": amount, "until": reservation_clock() + RESERVATION_TTL_S}
+    u["reservations"], u["reserved_eur"] = live, sum(v["eur"] for v in live.values())
+
+
+def drop_reservation(u: dict, key: str | None, amount: float, month: str) -> None:
+    """The settled reservation goes; one not found (expired, settled twice) is an accounting fact said in the log,
+    never a negative reservation. key None: the first running one of the same amount (callers without a key)."""
+    live = _live(u)
+    if key is None:
+        key = next((k for k, v in live.items() if abs(v["eur"] - amount) < 1e-12), None)
+    if key in live:
+        live.pop(key)
+    else:
+        warn("assistant reservation not found", month=month, eur=round(amount, 6))
+    u["reservations"], u["reserved_eur"] = live, sum(v["eur"] for v in live.values())
+
+
+def reservation_key() -> str:
+    return uuid.uuid4().hex
 
 
 def ai_stats_added(doc: dict | None, apartment_id: str, week: str, bounds: tuple[str, str], asks: int, timeouts: int,
@@ -537,10 +579,11 @@ class Repository(Protocol):
     # amount stays within cap, else False and nothing changes. settle: the reservation goes back and the real cost (and
     # the call, when counted) is added; the totals after
     # F-13: with tenant_id the organisation's document moves too, in the same transaction; tenant_cap None = no quota
+    # B-10: key names the reservation (expires after RESERVATION_TTL_S); None = one made here / the first of that amount
     async def reserve_ai_cost(self, month: str, amount: float, cap: float, tenant_id: str | None = None,
-                              tenant_cap: float | None = None) -> bool: ...
+                              tenant_cap: float | None = None, key: str | None = None) -> bool: ...
     async def settle_ai_cost(self, month: str, reserved: float, cost_eur: float, input_tokens: int, output_tokens: int,
-                             calls: int, tenant_id: str | None = None) -> dict: ...
+                             calls: int, tenant_id: str | None = None, key: str | None = None) -> dict: ...
     async def mark_ai_alert(self, month: str) -> bool: ...
 
     # pseudonyms towards the engine (P-48): claim is atomic (the existing one wins), forget removes both directions

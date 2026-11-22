@@ -853,6 +853,8 @@ vero: acceso in staging, spento in produzione, che i dimostrativi li rifiuta, D-
 - **Conguaglio dopo.** Dopo la chiamata si toglie la prenotazione e si somma il costo vero. Succede anche se la chiamata fallisce o viene interrotta.
 - **Rifiuto.** Se la spesa più le prenotazioni in corso supererebbe il tetto: 429 `monthly_cap`. Così le chiamate contemporanee non superano mai il tetto. Vicino al tetto l'ultima parte resta inutilizzata: circa 0,1 € per una domanda normale, fino a circa 0,3 € per un appartamento di 200 dispositivi.
 - **Gemella annullata o fallita.** Della richiesta gemella si conta anche l'ingresso.
+- **Chiamate interrotte (rilettura B-5).** Una chiamata tagliata, in timeout, o `model_unavailable` dopo l'invio, si conguaglia almeno con l'ingresso di ogni richiesta partita: due, se la gemella era partita.
+- **Prenotazioni con chiave (rilettura B-10).** Ogni prenotazione ha una chiave e scade dopo un'ora. Una mai conguagliata, per esempio perché l'istanza si è fermata a metà, smette di contare da sola. Un conguaglio che non trova la sua prenotazione lo scrive nel log («assistant reservation not found»).
 - **Corpo:** al massimo 20 messaggi con ruoli noti e 160 000 caratteri; `tools` solo se uguali a quelli del motore (`engine/assistant.py` TOOLS). Altrimenti 422 `bad_request`.
 - **Tetto giornaliero per appartamento,** solo su `/internal/ai/chat`: 200 chiamate per giorno UTC (`ENGINE_DAILY_CALLS`), oltre 429 `daily_limit`. Il motore ne fa al massimo `ASK_DAILY_LIMIT` per giorno locale (50, al più 100) e tratta il 429 come «limite mensile», cioè passa alla risposta rapida.
 - **Quota per organizzazione (F-13, risposta 1242).**

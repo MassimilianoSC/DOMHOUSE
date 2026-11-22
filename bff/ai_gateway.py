@@ -17,6 +17,7 @@ import asyncio
 import hmac
 import json
 import time
+import uuid
 from datetime import UTC, datetime
 from email.message import EmailMessage
 from email.utils import formataddr
@@ -195,6 +196,7 @@ async def _hedged(request: dict, apartment_id: str = "", ask_id: str = "",
                 t.cancel()
 
 
+SENT_PHASES = ("invio della richiesta", "attesa della risposta", "lettura della risposta")   # bff/net_phase.py
 MAX_MESSAGES = 20                 # F-4: the engine sends 2 (D-182), a rules' proposal 2
 MAX_CHARACTERS = 160_000          # F-4: the engine's largest request, 200 devices, is about 79,000 (twice that)
 ROLES = ("system", "user", "assistant", "tool")
@@ -277,14 +279,20 @@ async def chat(apartment_id: str, body: dict, ask_id: str = "") -> dict:
     tenant_id = apt.tenant_id if apt else None
     tenant = await repo.get_tenant(tenant_id) if tenant_id else None
     quota = tenant.ai_monthly_quota_eur if tenant else None
-    if not await repo.reserve_ai_cost(month, reserved, s.ai_monthly_cap_eur, tenant_id, quota):
+    key = uuid.uuid4().hex                       # rereading B-10: the reservation by its key, with an expiry
+    if not await repo.reserve_ai_cost(month, reserved, s.ai_monthly_cap_eur, tenant_id, quota, key=key):
         raise GatewayError(429, "monthly_cap", CAP_MESSAGE)
     started = time.monotonic()
     cost, tokens_in, tokens_out, counted = 0.0, 0, 0, 0
     went: list = []
-    # rereading P-2: a call cut after it was sent (rules.py's time limit, the model's timeout) may be billed for its
-    # input: settled with that at least, never 0
-    input_cost = input_tokens_ceiling(request) * prices()[0] / 1_000_000
+    # rereadings P-2 and B-5: a call cut after it was sent (rules.py's time limit, the model's timeout, the model lost
+    # after the request went) may be billed for its input: settled with that at least, for each request that went (the
+    # twin at its own price), never 0
+    tokens_ceiling = input_tokens_ceiling(request)
+
+    def input_cost() -> float:
+        price = prices()[0] + (prices(True)[0] if went and went[-1] == 2 else 0.0)
+        return tokens_ceiling * price / 1_000_000
     try:
         answer, attempt = await _call(request, apartment_id, ask_id, went)
         twin = attempt == 2 and bool(s.ai_twin_model)
@@ -295,15 +303,15 @@ async def chat(apartment_id: str, body: dict, ask_id: str = "") -> dict:
             cost += tokens_in * prices(not twin and bool(s.ai_twin_model))[0] / 1_000_000
         counted = 1
     except (asyncio.CancelledError, TimeoutError):
-        cost = input_cost
+        cost = input_cost()
         raise
     except GatewayError as exc:
-        if exc.error == "timeout":
-            cost = input_cost
+        if exc.error == "timeout" or (exc.error == "model_unavailable" and exc.phase in SENT_PHASES):
+            cost = input_cost()
         raise
     finally:
         totals = await asyncio.shield(repo.settle_ai_cost(month, reserved, cost, tokens_in, tokens_out, counted,
-                                                          tenant_id))
+                                                          tenant_id, key=key))
     info("assistant model call", apartment_id=apartment_id, **_ask(ask_id),
          model=s.ai_twin_model if twin else s.ai_model, input_tokens=tokens_in, output_tokens=tokens_out,
          cost_eur=round(cost, 6), month_eur=round(totals["cost_eur"], 4), seconds=round(time.monotonic() - started, 2),

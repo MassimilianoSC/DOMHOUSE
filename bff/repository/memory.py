@@ -1,7 +1,7 @@
 import copy
 import time
 
-from .base import reservable, reserved_after
+from .base import add_reservation, drop_reservation, live_usage, reservable, reservation_key, room_left
 from .base import (SEQ_UNCHECKED, iso_seconds, migrated_document, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
 
@@ -271,8 +271,8 @@ class InMemoryRepository:
 
     async def get_ai_usage(self, month, tenant_id=None):
         if tenant_id is not None:
-            return dict(self.ai_usage_tenants.get(f"{tenant_id}__{month}") or EMPTY_AI_USAGE)
-        return dict(self.ai_usage.get(month) or EMPTY_AI_USAGE)
+            return live_usage(self.ai_usage_tenants.get(f"{tenant_id}__{month}") or EMPTY_AI_USAGE)
+        return live_usage(self.ai_usage.get(month) or EMPTY_AI_USAGE)
 
     async def add_ai_usage(self, month, cost_eur, input_tokens, output_tokens):
         u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))
@@ -282,31 +282,31 @@ class InMemoryRepository:
         u["output_tokens"] += output_tokens
         return dict(u)
 
-    async def reserve_ai_cost(self, month, amount, cap, tenant_id=None, tenant_cap=None):
+    async def reserve_ai_cost(self, month, amount, cap, tenant_id=None, tenant_cap=None, key=None):
         if not reservable(amount):
             return False
+        key = key or reservation_key()
         docs = [(self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE)), cap)]
         if tenant_id is not None:
             docs.append((self.ai_usage_tenants.setdefault(f"{tenant_id}__{month}", dict(EMPTY_AI_USAGE)), tenant_cap))
-        for u, limit in docs:
-            u.setdefault("reserved_eur", 0.0)
-            if limit is not None and u["cost_eur"] + u["reserved_eur"] + amount > limit:
-                return False
+        if not all(room_left(u, amount, limit) for u, limit in docs):
+            return False
         for u, _ in docs:
-            u["reserved_eur"] += amount
+            add_reservation(u, key, amount)
         return True
 
-    async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls, tenant_id=None):
+    async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls, tenant_id=None,
+                             key=None):
         docs = [self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))]
         if tenant_id is not None:
             docs.append(self.ai_usage_tenants.setdefault(f"{tenant_id}__{month}", dict(EMPTY_AI_USAGE)))
         for u in docs:
-            u["reserved_eur"] = reserved_after(u.get("reserved_eur", 0.0), reserved, month)
+            drop_reservation(u, key, reserved, month)
             u["cost_eur"] += cost_eur
             u["calls"] += calls
             u["input_tokens"] += input_tokens
             u["output_tokens"] += output_tokens
-        return dict(docs[0])
+        return live_usage(docs[0])
 
     async def add_ai_stats(self, apartment_id, week, bounds, asks=0, timeouts=0, twins=0, quick=None, ask_id=None):
         key = f"{apartment_id}__{week}"

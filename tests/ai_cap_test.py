@@ -188,8 +188,10 @@ def test_p1_settling_more_than_reserved_is_said_in_the_log_not_hidden(monkeypatc
     repo.ai_usage = {}
     assert run(repo.reserve_ai_cost("2026-08", 0.5, 20.0)) is True
     totals = run(repo.settle_ai_cost("2026-08", 0.8, 0.1, 10, 5, 1))
-    assert totals["reserved_eur"] == 0.0
-    assert [m for m, _ in seen] == ["assistant reservation below zero"]
+    # rereading B-10: reservations go by key; one not found is said in the log and the others are untouched (the
+    # 0.5 € one runs out by itself after an hour), never a negative reservation
+    assert totals["reserved_eur"] == pytest.approx(0.5)
+    assert [m for m, _ in seen] == ["assistant reservation not found"]
 
 
 # -------- rereading P-2 and P-11: what the model may bill beyond the reservation --------
@@ -404,3 +406,46 @@ def test_b1_the_input_is_reserved_as_its_utf8_bytes(monkeypatch, text, per_char)
     settings(monkeypatch, ai_twin_model="", ai_max_tokens=1)
     request = {"messages": [{"role": "user", "content": text}], "max_tokens": 1}
     assert ai_gateway.input_tokens_ceiling(request) >= per_char * len(text)
+
+
+# -------- rereading of the low fixes, B-5 and B-10 --------
+def test_b5_a_call_cut_after_its_twin_started_is_settled_with_both_inputs(model, monkeypatch):
+    sent, state = model
+    settings(monkeypatch, ai_monthly_cap_eur=20.0, ai_twin_model="", ai_hedge_after_s=0.05)
+    state["delay"] = 5.0
+
+    async def cut():
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(ai_gateway.chat(APT, dict(BODY)), timeout=0.3)
+    run(cut())
+    assert len(sent) == 2                                                               # the twin had started
+    one = ai_gateway.input_tokens_ceiling({"messages": BODY["messages"]}) * ai_gateway.prices()[0] / 1_000_000
+    assert usage()["cost_eur"] == pytest.approx(2 * one)
+
+
+@pytest.mark.parametrize("phase, billed", [("attesa della risposta", True), ("lettura della risposta", True),
+                                           ("invio della richiesta", True), ("DNS", False), ("connessione", False)])
+def test_b5_model_unavailable_after_sending_is_settled_with_its_input(model, monkeypatch, phase, billed):
+    sent, state = model
+    settings(monkeypatch, ai_monthly_cap_eur=20.0, ai_twin_model="", ai_hedge_after_s=30.0)
+    state["fail"] = ai_gateway.GatewayError(502, "model_unavailable", "Modello non raggiungibile", phase=phase)
+    assert run(post(BODY)).status_code == 502
+    assert (usage()["cost_eur"] > 0) is billed, phase
+
+
+def test_b10_a_reservation_never_settled_stops_counting_after_an_hour(monkeypatch):
+    from bff.repository import base
+    repo = get_repository()
+    repo.ai_usage = {}
+    now = [100_000.0]
+    monkeypatch.setattr(base, "reservation_clock", lambda: now[0])
+    assert run(repo.reserve_ai_cost("2026-05", 0.6, 1.0, key="perduta")) is True       # its instance died
+    assert run(repo.reserve_ai_cost("2026-05", 0.6, 1.0, key="seconda")) is False
+    now[0] += 3601
+    assert run(repo.get_ai_usage("2026-05"))["reserved_eur"] == pytest.approx(0.0)
+    assert run(repo.reserve_ai_cost("2026-05", 0.6, 1.0, key="seconda")) is True
+    seen = []
+    monkeypatch.setattr(base, "warn", lambda msg, **kw: seen.append(msg))
+    run(repo.settle_ai_cost("2026-05", 0.6, 0.1, 10, 5, 1, key="perduta"))           # too late: said, never negative
+    assert seen == ["assistant reservation not found"]
+    assert run(repo.get_ai_usage("2026-05"))["reserved_eur"] == pytest.approx(0.6)       # «seconda» still counts
