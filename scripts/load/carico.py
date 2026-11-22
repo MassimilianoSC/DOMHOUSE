@@ -12,6 +12,10 @@ with Firebase's email and password, the site's own way, and behaves like the sit
     python3 carico.py persone --utenti carico-utenti.json                 # 25 ... 1000 people, 5 minutes per step
     python3 carico.py comandi --utenti carico-utenti.json                 # 50 people, then 6 ... 120 commands a minute
 
+Since F-6 the server opens at most 10 streams per account and 200 per instance: the test needs at least people/10 test
+people (ambiente.py prepara --persone N; it stops before starting otherwise), and above 200 people on staging's single
+instance a step measures that limit, not the server (said at the start and written in the results).
+
 persone: the people grow by steps (--gradini), each reached in --salita-s seconds and held --minuti minutes. comandi:
 --persone people as above, plus commands (switch on/off of a simulated device, through the server) at each rate of
 --ritmi (commands a minute in all), each timed from the request to its final state in the person's stream.
@@ -46,6 +50,12 @@ COMMAND_WAIT_S = 30.0         # a command without its final state in the stream 
 FINAL = {"acked", "failed", "timeout"}
 METRICS_DELAY_S = 240         # Cloud Monitoring has the last minutes' numbers after about this
 POLLS = (("elenco", 20.0), ("riepilogo", 30.0), ("decisioni", 30.0), ("sonda", 60.0))
+# F-6 (attack-from-outside review): the server opens at most this many streams per account and in all, per instance
+# (bff/routes/apartments.py STREAMS_PER_USER and STREAMS_PER_INSTANCE; staging has one instance, production up to 3).
+# With fewer test people than people/10, or above 200 people on one instance, a step measures the limit, not the server
+STREAMS_PER_ACCOUNT = 10
+STREAMS_PER_INSTANCE = 200
+MAX_TEST_PEOPLE = 200         # scripts/load/ambiente.py prepares at most these
 SIGN_IN = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword"
 REFRESH = "https://securetoken.googleapis.com/v1/token"
 MONITORING = "https://monitoring.googleapis.com/v3/projects/{project}/timeSeries"
@@ -351,6 +361,19 @@ def load_people(args, client: httpx.AsyncClient) -> tuple[list, dict]:
     return people, conf
 
 
+def accounts_problem(people_max: int, accounts: int) -> str | None:
+    """Rereading of the medium fixes, P-3: the test people needed so that no account opens more than its streams."""
+    needed = math.ceil(people_max / STREAMS_PER_ACCOUNT)
+    if needed > MAX_TEST_PEOPLE:
+        return (f"{people_max} persone sono troppe: con {MAX_TEST_PEOPLE} persone di prova (il massimo di ambiente.py) "
+                f"si misurano al massimo {MAX_TEST_PEOPLE * STREAMS_PER_ACCOUNT} persone")
+    if accounts < needed:
+        return (f"per {people_max} persone servono almeno {needed} persone di prova (il server apre al massimo "
+                f"{STREAMS_PER_ACCOUNT} aggiornamenti in diretta per account e per istanza): ne hai {accounts}. "
+                f"Preparale con: python3 ambiente.py prepara --persone {needed}")
+    return None
+
+
 async def check_target(client: httpx.AsyncClient, base: str, dev: bool) -> str:
     r = await client.get(f"{base.rstrip('/')}/health", timeout=30.0)
     env = r.json().get("app_env") if r.status_code == 200 else None
@@ -484,8 +507,14 @@ async def main_async(args) -> int:
         pool, conf = load_people(args, client)
         base = conf["bff_url"]
         env = await check_target(client, base, args.dev)
+        people_max = max(args.gradini) if args.prova == "persone" else args.persone
+        if problem := accounts_problem(people_max, len(pool)):
+            raise SystemExit(f"FERMO prima di cominciare: {problem}")
         started = time.time()
         say(f"INIZIO della prova «{args.prova}»: {utc(started)} (UTC), server {base} ({env})")
+        say(f"Tetto del server (F-6): {STREAMS_PER_INSTANCE} aggiornamenti in diretta per istanza (lo staging ne ha una) "
+            f"e {STREAMS_PER_ACCOUNT} per account: oltre {STREAMS_PER_INSTANCE} persone su un'istanza i gradini "
+            f"misurano questo tetto, non la capacità del server")
         if not args.dev:
             say(f"Accesso a Firebase delle {len(pool)} persone di prova...")
             for ident, _ in pool:
@@ -546,6 +575,7 @@ async def main_async(args) -> int:
         out = os.path.join(args.cartella, f"risultati-{args.prova}-{utc(started).replace(':', '')}.json")
         with open(out, "w", encoding="utf-8") as f:
             json.dump({"prova": args.prova, "inizio": utc(started), "fine": utc(ended), "server": base,
+                       "stream_per_account": STREAMS_PER_ACCOUNT, "stream_per_istanza": STREAMS_PER_INSTANCE,
                        "gradini": [st.as_dict() for st in steps], "metriche_mancanti": problem}, f, indent=2,
                       ensure_ascii=False)
         say(f"Tutti i numeri: {out}")

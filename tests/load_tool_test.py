@@ -129,3 +129,33 @@ def test_percentiles_and_italian_numbers():
     with pytest.raises(SystemExit):
         tool.parse_args(["persone", "--gradini", "100,50"])
     assert tool.parse_args(["comandi"]).minuti == 3.0 and tool.parse_args(["persone"]).minuti == 5.0
+
+
+# -------- rereading of the medium fixes, P-3: F-6's stream limits in the load test --------
+def test_p3_too_few_test_people_for_the_steps_stops_before_any_step(server, tmp_path):
+    """The server opens at most 10 streams per account and 200 per instance (F-6): with fewer accounts than people/10
+    the steps would measure the limit, not the server. --dev has one person: 11 people need 2."""
+    out = run_tool("persone", "--dev", "--bff", server, "--gradini", "2,11", "--minuti", "0.25", "--salita-s", "1",
+                   "--cartella", str(tmp_path))
+    assert out.returncode != 0
+    text = out.stdout + out.stderr
+    assert "servono almeno 2 persone di prova" in text and "ambiente.py prepara --persone 2" in text
+    assert not list(tmp_path.glob("risultati-*"))
+
+
+def test_p3_the_limits_are_said_and_written_in_the_results(server, tmp_path):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("carico_p3", TOOL)
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    from bff.routes import apartments
+    assert (tool.STREAMS_PER_ACCOUNT, tool.STREAMS_PER_INSTANCE) == (apartments.STREAMS_PER_USER,
+                                                                     apartments.STREAMS_PER_INSTANCE)
+    assert tool.accounts_problem(1000, 100) is None and tool.accounts_problem(1000, 99) is not None
+    assert "al massimo 2000 persone" in tool.accounts_problem(2500, 200)
+    out = run_tool("persone", "--dev", "--bff", server, "--gradini", "2", "--minuti", "0.25", "--salita-s", "1",
+                   "--cartella", str(tmp_path))
+    assert out.returncode == 0, out.stdout + out.stderr
+    assert "200 aggiornamenti in diretta per istanza" in out.stdout
+    data = results(tmp_path, "persone")
+    assert (data["stream_per_account"], data["stream_per_istanza"]) == (10, 200)
