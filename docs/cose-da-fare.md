@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1237 |
+| **Ultima domanda al committente** | 1238 |
 
 ## 2. Cose da fare
 
@@ -40,7 +40,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 53 | Usabilità dell'Autonomia: lettura da esperto di pagine e guida, poi prova con uno o due colleghi su compiti veri nello staging (fogli di compiti e domande della memoria storica) | lettura: tempo morto; prova: con i colleghi disponibili | MS, colleghi, C | lettura fatta il 22 novembre (53 punti: 10 alti, 31 medi, 12 bassi; voci 56–57); prova con i colleghi da fare | `DOMOTICA/revisione-usabilita/LETTURA-ESPERTO.md` |
 | 54 | Prova dei ritorni indietro nello staging per ogni pezzo (server, sito, un motore, broker, agente), con i tempi; tabella «come si torna indietro» per il manuale (voce 51) | tempo morto | MS prepara, C lancia | deciso (1225 = a) | `produzione-cosa-manca.md` D.2 |
 | 56 | Difetto: un appartamento creato dall'app non può ricevere il codice Italianway dopo la creazione (il modulo dice «Si può aggiungere anche dopo», il server rifiuta con `created_from_app`) | subito (D-198), dopo i lavori in corso | o1 (rotta), o2 (sito) | in coda a o1 e o2 | `LETTURA-ESPERTO.md` 1.2 |
-| 57 | Correzioni dell'usabilità, punti alti: guida (cosa fare se uno Shelly non si collega e non ci sono accessi rifiutati; come si apre la pagina dello Shelly), testi delle schermate (messaggi di creazione senza azione, «Pronto» che sembra «collegato», «Stato dei dispositivi» vuoto senza catalogo, finestra «Elimina» che non dice nulla di Shelly e caldaia), documento 3 allineato su chi crea ed elimina (dipende da 19.3); poi i 43 medi e bassi | punti alti: adesso; medi e bassi: tempo morto | MS (guida), o2 (testi, scelte al committente), C | aperto | `LETTURA-ESPERTO.md` |
+| 57 | Correzioni dell'usabilità, punti alti: guida (cosa fare se uno Shelly non si collega e non ci sono accessi rifiutati; come si apre la pagina dello Shelly), testi delle schermate (messaggi di creazione senza azione, «Pronto» che sembra «collegato», «Stato dei dispositivi» vuoto senza catalogo, finestra «Elimina» che non dice nulla di Shelly e caldaia), documento 3 allineato su chi crea ed elimina (dipende da 19.3); poi i 43 medi e bassi | punti alti: adesso; medi e bassi: tempo morto | MS e o2 concordano testi coerenti fra app e guida (1238), C per 19.3 | testi: o2 propone dopo la voce 56 | `LETTURA-ESPERTO.md` |
 | 55 | Lungo periodo: elenco delle misure con le soglie, poi misure su `lab-01` nel resoconto del lunedì | elenco: tempo morto; misure: dopo che Y lascia gli Shelly di `lab-01` sempre accesi | MS, Y | elenco fatto il 22 novembre (16 misure, soglie da tarare); misure dopo che Y lascia accesi gli Shelly | `misure-lungo-periodo.md` |
 
 ### B. Obblighi prima del primo appartamento vero
