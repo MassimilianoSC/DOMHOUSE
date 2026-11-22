@@ -57,13 +57,37 @@ afterEach(() => {
 });
 
 describe("A7: i posti liberi della VM nel modulo (risposta 1201)", () => {
-  it("zero posti: la riga gialla lo dice, ma «Crea» resta acceso (il server ricontrolla)", async () => {
+  // usability reading 1.4 (answer of the memoria, 22 Nov): zero places in the last reading, «Crea» off; old or not
+  it("zero posti: la riga gialla dice perché, e «Crea» è spento anche con il modulo compilato", async () => {
     s.capacity.mockResolvedValue({
       capienza: { ambiente: "staging", letta_at: "2026-11-20T14:58:00Z", vecchia: false, posti_liberi: 0, motivo: "staging_pieno", motori_ambiente: 4, massimo_motori: 4, mem_available_mb: 700, tetto_nuovo_mb: 120, somma_tetti_mb: 480, budget_mb: 500 },
       aggiornamento: null, aggiornabile_dal: null,
     });
     await open();
     expect(await screen.findByTestId("new-apt-capacity")).toHaveAttribute("data-kind", "zero");
+    expect(screen.getByTestId("new-apt-capacity-text")).toHaveTextContent("Nessun posto libero sulla macchina virtuale: per ora non si creano appartamenti. Scrivi all'assistenza HQE. (");
+    fill();
+    expect(screen.getByTestId("new-apt-save")).toBeDisabled();
+  });
+
+  it("anche con una lettura vecchia segue l'ultima lettura: zero posti, «Crea» spento", async () => {
+    s.capacity.mockResolvedValue({
+      capienza: { ambiente: "staging", letta_at: "2026-11-18T09:00:00Z", vecchia: true, posti_liberi: 0, motivo: "staging_pieno", motori_ambiente: 4, massimo_motori: 4, mem_available_mb: 700, tetto_nuovo_mb: 120, somma_tetti_mb: 480, budget_mb: 500 },
+      aggiornamento: null, aggiornabile_dal: null,
+    });
+    await open();
+    expect(await screen.findByTestId("new-apt-capacity")).toHaveAttribute("data-kind", "zero");
+    fill();
+    expect(screen.getByTestId("new-apt-save")).toBeDisabled();
+  });
+
+  it("con posti liberi, o senza nessuna lettura, «Crea» si accende", async () => {
+    s.capacity.mockResolvedValue({
+      capienza: { ambiente: "staging", letta_at: "2026-11-20T14:58:00Z", vecchia: false, posti_liberi: 1, motivo: null, motori_ambiente: 3, massimo_motori: 4, mem_available_mb: 900, tetto_nuovo_mb: 120, somma_tetti_mb: 360, budget_mb: 500 },
+      aggiornamento: null, aggiornabile_dal: null,
+    });
+    await open();
+    expect(await screen.findByTestId("new-apt-capacity")).toHaveAttribute("data-kind", "places");
     fill();
     expect(screen.getByTestId("new-apt-save")).toBeEnabled();
   });
@@ -76,7 +100,7 @@ describe("i campi (§2.1)", () => {
     // the row's button by its name: the form has an «Annulla» of its own
     expect(screen.getByText(/Ci vogliono alcuni minuti/)).toHaveTextContent("finché non premi «Riprova» o «Annulla creazione».");
     expect(screen.getByTestId("apt-form-timezone")).toHaveValue("Europe/Rome");
-    expect(screen.getByText("Nello staging comincia con lab- o test-; lettere minuscole, cifre e trattini. Non si cambia più.")).toBeInTheDocument();
+    expect(screen.getByText("Scegli un nome breve e stabile, per esempio lab-milano-roma-12. Nello staging comincia con lab- o test-; lettere minuscole, cifre e trattini. Non si cambia e non si potrà riusare, nemmeno dopo l'eliminazione.")).toBeInTheDocument();
     expect(screen.getByText("Si può aggiungere anche dopo.")).toBeInTheDocument();
     // no address or port: the server chooses them
     expect(screen.queryByTestId("apt-form-instance_url")).toBeNull();

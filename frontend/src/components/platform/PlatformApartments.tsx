@@ -258,6 +258,8 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
             <Button size="sm" variant="outline" onClick={() => setCreating(true)} data-testid={`platform-apt-add-btn-${tenantId}`}><Link2 /> {t("platform.aptAdd")}</Button>
             <Button size="sm" onClick={() => setCreatingNew(true)} disabled={newOff} data-testid={`platform-apt-new-btn-${tenantId}`}><Plus /> {t("platform.creation.newButton")}</Button>
           </div>
+          {/* usability reading 1.11: the two buttons are easy to confuse */}
+          <p className="max-w-xs text-right text-xs text-muted-foreground" data-testid={`platform-apt-add-note-${tenantId}`}>{t("platform.aptAddNote")}</p>
           {newOff && (
             <p className="max-w-xs text-right text-xs text-muted-foreground" data-testid={`platform-apt-new-unavailable-${tenantId}`}>
               {t(notProd ? "platform.creation.notAvailable" : "platform.creation.notInProd")}

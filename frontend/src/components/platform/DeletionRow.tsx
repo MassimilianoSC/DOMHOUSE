@@ -89,10 +89,17 @@ function WhatHappened({ id, e }: { id: string; e: Eliminazione }) {
       <p>{t("platform.deletion.stoppedAt", { step: t(`platform.deletion.steps.${at.passo}`), n: at.n, of: at.of })}</p>
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>{e.updated_by ? t("platform.creation.lastAttempt", { when, name: e.updated_by }) : t("platform.creation.lastAttemptNoName", { when })}</span>
-        {e.op && (
+        {e.op ? (
           <span className="inline-flex items-center gap-1.5">
             {t("credentials.requestId")}
             <CopyableId id={e.op.op_id} testId={`deletion-op-${id}`} label={t("credentials.requestId")} />
+          </span>
+        ) : (
+          // no order reached the VM: the messages say «con l'ID qui sotto», so the apartment's ID, with its own label;
+          // the whole ID, on its own line under the label on a phone
+          <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
+            {t("platform.creation.aptId")}
+            <CopyableId id={id} full testId={`deletion-apt-id-${id}`} label={t("platform.creation.aptId")} />
           </span>
         )}
       </p>
@@ -202,6 +209,13 @@ export function DeleteDialog({ a, tenantId, tenantName, onClose, onDone }: { a: 
             </p>
           )}
           <p>{t(fromApp ? "platform.deletion.lostApp" : "platform.deletion.lostRecord")}</p>
+          {/* usability reading 5.2: what stays on the walls. The relay after the removal is still to be checked with Y */}
+          {fromApp && (
+            <p className="flex items-start gap-2 rounded-xl border border-warning-border bg-warning-bg px-3 py-2.5 text-warning-fg" data-testid="apt-delete-devices">
+              <TriangleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+              <span>{t("platform.deletion.devicesStay")}</span>
+            </p>
+          )}
           <p>{t(fromApp ? "platform.deletion.keptApp" : "platform.deletion.keptRecord")}</p>
           <p className="[overflow-wrap:anywhere]">{t("platform.deletion.idGone", { id: a.apartment_id })}</p>
           <p className="text-muted-foreground">{t("platform.deletion.email")}</p>

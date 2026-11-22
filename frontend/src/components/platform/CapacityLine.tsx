@@ -14,7 +14,8 @@ import { cn, newCorrelationId } from "@/lib/utils";
 
 // A7 (docs/proposta-a7.md §2 n. 5, §3; answers 1201, 1203): the free places of the VM in «Nuovo appartamento», from the
 // last reading the server keeps (opening the form sends no order). «Aggiorna» sends one, read again every 4 s while it
-// is «inviato», at most 20 minutes. It informs only: «Crea» stays on, the server and the agent check again.
+// is «inviato», at most 20 minutes. With zero places in the last reading «Crea» is off (usability reading 1.4); the
+// server and the agent check again anyway.
 
 export const capacityKey = ["platform", "capienza"];
 

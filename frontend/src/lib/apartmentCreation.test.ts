@@ -116,40 +116,40 @@ describe("rilettura ogni 4 secondi, al massimo 20 minuti (§3.3)", () => {
 describe("«Cosa è successo» (§6.2; o1 cb3ee25: il perché sta in creazione.codice, anche senza un ordine dietro)", () => {
   const op = (codice: string | null, messaggio = "Frase del server") => ({ op_id: "op-1", operazione: "crea_motore", stato: "fallito", codice, messaggio });
   it.each([
-    ["capienza_insufficiente", "La macchina virtuale non ha memoria per un sistema domotico in più."],
-    ["staging_pieno", "Lo staging ha già il numero massimo di sistemi domotici."],
-    ["porta_occupata", "La porta scelta è occupata sulla macchina virtuale: «Riprova» ne prende un'altra."],
-    ["porta_fuori_fascia", "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta)."],
-    ["immagine_non_approvata", "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta)."],
-    ["gia_esiste_diverso", "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta)."],
-    ["dati_presenti", "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta)."],
-    ["non_creato_da_agente", "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta)."],
-    ["firma_non_valida", "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta)."],
-    ["segreto_illeggibile", "I permessi sulle chiavi non sono ancora attivi: riprova fra qualche minuto."],
-    ["motore_non_sano", "Il sistema domotico non è partito: «Riprova», e se succede ancora serve un controllo."],
-    ["broker_fallito", "L'accesso dei dispositivi non è stato preparato: «Riprova»."],
-    ["tempo_scaduto", "Nessuna risposta dalla macchina virtuale in 20 minuti: «Riprova»."],
-    ["segreti_non_creati", "Le chiavi non sono state create: «Riprova»."],
-    ["secret_conflict", "C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla creazione» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che il supporto ha tolto quella chiave."],
-    ["collegamento_fallito", "Il sistema domotico è installato ma l'app non lo raggiunge: «Riprova»."],
-    ["chiavi_non_distrutte", "Il sistema domotico è stato tolto, ma le chiavi no: «Annulla creazione» di nuovo."],
-    ["non_inviato", "L'ordine non è partito verso la macchina virtuale: «Riprova»."],
+    ["capienza_insufficiente", "La macchina virtuale non ha memoria per un sistema domotico in più. Se puoi aspettare, chiedi all'assistenza HQE di fare posto e poi premi «Riprova»: tieni lo stesso ID. «Annulla creazione» libera tutto, ma l'ID non si potrà più usare."],
+    ["staging_pieno", "Lo staging ha già il numero massimo di sistemi domotici. Se puoi aspettare, chiedi all'assistenza HQE di fare posto e poi premi «Riprova»: tieni lo stesso ID."],
+    ["porta_occupata", "La porta scelta è occupata sulla macchina virtuale: premi «Riprova», ne prende un'altra."],
+    ["porta_fuori_fascia", "Richiesta rifiutata dal sistema. Non annullare: scrivi all'assistenza HQE con l'ID qui sotto."],
+    ["immagine_non_approvata", "Richiesta rifiutata dal sistema. Non annullare: scrivi all'assistenza HQE con l'ID qui sotto."],
+    ["gia_esiste_diverso", "Richiesta rifiutata dal sistema. Non annullare: scrivi all'assistenza HQE con l'ID qui sotto."],
+    ["dati_presenti", "Richiesta rifiutata dal sistema. Non annullare: scrivi all'assistenza HQE con l'ID qui sotto."],
+    ["non_creato_da_agente", "Richiesta rifiutata dal sistema. Non annullare: scrivi all'assistenza HQE con l'ID qui sotto."],
+    ["firma_non_valida", "Richiesta rifiutata dal sistema. Non annullare: scrivi all'assistenza HQE con l'ID qui sotto."],
+    ["segreto_illeggibile", "I permessi sulle chiavi non sono ancora attivi: aspetta qualche minuto e premi «Riprova»."],
+    ["motore_non_sano", "Il sistema domotico non è partito. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto."],
+    ["broker_fallito", "L'accesso dei dispositivi non è stato preparato: premi «Riprova»."],
+    ["tempo_scaduto", "Nessuna risposta dalla macchina virtuale in 20 minuti: premi «Riprova»."],
+    ["segreti_non_creati", "Le chiavi non sono state create: premi «Riprova»."],
+    ["secret_conflict", "C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla creazione» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che l'assistenza HQE ha tolto quella chiave."],
+    ["collegamento_fallito", "Il sistema domotico è installato ma l'app non lo raggiunge: premi «Riprova»."],
+    ["chiavi_non_distrutte", "Il sistema domotico è stato tolto, ma le chiavi no: premi di nuovo «Annulla creazione»."],
+    ["non_inviato", "L'ordine non è partito verso la macchina virtuale: premi «Riprova»."],
   ])("%s", (codice, text) => {
     expect(whatHappened(creazione({ stato: "non_creato", codice, messaggio: "Frase del server" }))).toBe(text);
   });
   it("il codice della creazione conta più di quello dell'ultimo ordine", () => {
-    expect(whatHappened(creazione({ stato: "non_creato", codice: "collegamento_fallito", op: op("motore_non_sano") }))).toBe("Il sistema domotico è installato ma l'app non lo raggiunge: «Riprova».");
+    expect(whatHappened(creazione({ stato: "non_creato", codice: "collegamento_fallito", op: op("motore_non_sano") }))).toBe("Il sistema domotico è installato ma l'app non lo raggiunge: premi «Riprova».");
   });
   it("una risposta senza codice della creazione: quello dell'ordine", () => {
-    expect(whatHappened(creazione({ stato: "non_creato", op: op("staging_pieno") }))).toBe("Lo staging ha già il numero massimo di sistemi domotici.");
+    expect(whatHappened(creazione({ stato: "non_creato", op: op("staging_pieno") }))).toBe("Lo staging ha già il numero massimo di sistemi domotici. Se puoi aspettare, chiedi all'assistenza HQE di fare posto e poi premi «Riprova»: tieni lo stesso ID.");
   });
   it("un codice che il sito non conosce: la frase del server, prima quella della creazione", () => {
     expect(whatHappened(creazione({ stato: "non_creato", codice: "nuovo_codice", messaggio: "Frase della creazione", op: op("altro", "Frase dell'ordine") }))).toBe("Frase della creazione");
     expect(whatHappened(creazione({ stato: "non_creato", op: op("nuovo_codice", "Frase nuova del server") }))).toBe("Frase nuova del server");
   });
   it("senza codice né frase: una frase generica, mai vuota", () => {
-    expect(whatHappened(creazione({ stato: "non_creato", op: null }))).toBe("La creazione si è fermata prima della fine.");
-    expect(whatHappened(creazione({ stato: "non_creato", messaggio: " ", op: op(null, "") }))).toBe("La creazione si è fermata prima della fine.");
+    expect(whatHappened(creazione({ stato: "non_creato", op: null }))).toBe("La creazione si è fermata prima della fine. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto.");
+    expect(whatHappened(creazione({ stato: "non_creato", messaggio: " ", op: op(null, "") }))).toBe("La creazione si è fermata prima della fine. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto.");
   });
 });
 

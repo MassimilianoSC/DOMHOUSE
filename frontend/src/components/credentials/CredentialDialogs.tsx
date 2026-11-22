@@ -143,7 +143,8 @@ export function ConnectionDialog({ c, onClose }: { c: DeviceCredential; onClose:
   );
 }
 
-/** «Registra un dispositivo»: one field, checked while typing with the project's rule; capitals are not converted. */
+/** «Registra un dispositivo»: one field, checked while typing with the project's rule; capitals become lower case by
+ *  themselves (usability reading 2.10: the Shelly shows its name in capitals). */
 export function RegisterDialog({ busy, serverProblem, onSave, onClose }: { busy: boolean; serverProblem: string | null; onSave: (deviceId: string) => void; onClose: () => void }) {
   const [value, setValue] = useState("");
   const problem = deviceIdProblem(value);
@@ -165,7 +166,7 @@ export function RegisterDialog({ busy, serverProblem, onSave, onClose }: { busy:
             id="credential-code"
             className="font-mono"
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            onChange={(e) => setValue(e.target.value.toLowerCase())}
             placeholder={t("credentials.registerDialog.placeholder")}
             autoComplete="off"
             spellCheck={false}
