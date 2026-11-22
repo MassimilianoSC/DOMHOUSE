@@ -329,3 +329,44 @@ def test_b4_a_real_address_with_a_slash_and_a_dot_passes():
             assert r.status_code == 200, (address, r.text[:200])
     finally:
         _stored_address("Viale Vespucci 12, 47921 Rimini (RN)")
+
+
+# -------- rereading of the low fixes, B-3: the rule of F-11 against Unicode --------
+LINKS_EVERYWHERE = ["https：//evil.example", "https：／／evil.example", "evil。example/login",
+                    "evil․example/login", "evil.example／login", "еvil.example/login",
+                    "evil.exаmple/login", "evil.com?x=1", "evil.com:8080", "evil.com\login", "10.0.0.1/login",
+                    "//evil.com", "mailto:x@evil.com", "javascript:alert(1)"]
+INVISIBLE_ONES = ["a‎b", "a‏b", "a؜b", "a b", "a b", "a­b", "a⁡b", "aㅤb",
+                  "a\U000e0041b", "ab", "a\U000f0000b"]
+
+
+@pytest.mark.parametrize("text", LINKS_EVERYWHERE + INVISIBLE_ONES, ids=repr)
+def test_b3_tricks_with_unicode_are_refused_in_names_and_addresses(text):
+    from bff import plain_text
+    assert plain_text.address_problem(text) is not None, text
+    r = run(_send_as("PATCH", "/app/me", {"display_name": text}))
+    assert r.status_code == 422 and r.json()["error"] == "invalid_text", (text, r.text[:120])
+
+
+def test_b3_a_domain_alone_is_refused_in_a_name_and_allowed_in_an_address():
+    """Gmail and Outlook make a link of a domain alone in an invitation email: not in a name; an address may name one."""
+    from bff import plain_text
+    for name in ("Verifica su evil-domhouse.com", "Casa.it", "mario@evil.com"):
+        r = run(_send_as("PATCH", "/app/me", {"display_name": name}))
+        assert r.status_code == 422 and r.json()["message"] == "Il nome non può contenere un indirizzo web.", name
+    assert plain_text.address_problem("Residence Casa.it, Via Roma 1") is None
+
+
+@pytest.mark.parametrize("name", ["Zoë Müller", "Maria Rossi-D'Amico", "Lucia Dell’Acqua", "José María Pérez",
+                                  "Nguyễn Văn An", "王小明", "M. Rossi", "Dott.ssa Bianchi", "Ufficio 3, piano 2",
+                                  "S.r.l. Rossi & Figli", "Ing. Giorgio Verdi"])
+def test_b3_real_names_still_pass(name):
+    r = run(_send_as("PATCH", "/app/me", {"display_name": name}))
+    assert r.status_code == 200, (name, r.text[:200])
+
+
+@pytest.mark.parametrize("address", ["Viale Vespucci 12, 47921 Rimini (RN)", "Via S.Maria/3", "C.so Garibaldi 10/b",
+                                     "Località Ca' di Bassi 4", "Via dell’Orso 7, int. 2", "Piazza XX Settembre 1"])
+def test_b3_real_addresses_still_pass(address):
+    from bff import plain_text
+    assert plain_text.address_problem(address) is None, address

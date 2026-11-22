@@ -1,42 +1,72 @@
 """F-11 (attack-from-outside review, 22 November 2026): the free texts an administrator writes go in the invitation
 email sent by DOMHOUSE (the invited person's name, and the inviter's own name) and in every list of the organisation.
 Without a rule an admin of any organisation could send phishing with a link from DOMHOUSE's sender, up to 50 an hour,
-and save fields of about 1 MiB. Now a name is at most 80 characters and an address 200 (as platform.py and account.py),
-with no control or invisible direction character and nothing that reads as a web address: a scheme («://»), «www.» or
-a domain followed by a path («esempio.it/…»). A plain domain alone («Casa.it») stays allowed: names like «M. Rossi»
-must pass. Refused: 422 invalid_text with the field and an Italian sentence (a6, 22 November; bff/main.py turns the
-validation error into that answer)."""
+and save fields of about 1 MiB. Now a name is at most 80 characters and an address 200 (as platform.py and account.py).
+Refused: 422 invalid_text with the field and an Italian sentence (a6, 22 November; bff/main.py turns the validation
+error into that answer; the apartment's address is checked in its route, only when it changes, rereading B-4).
+
+The rule (rereading of the low fixes, B-3): the text is first brought to NFKC (full-width «：／．» become «:/.»), and the
+ideographic full stops become «.»; then
+- refused characters by Unicode category: control (Cc), format (Cf: direction marks, soft hyphen, tags), line and
+  paragraph separators (Zl, Zp), private use (Co), unassigned (Cn), surrogates (Cs), and the blank fillers;
+- refused everywhere: a scheme («://», «mailto:», «javascript:»…), «//», «www.», an IPv4 address, and a domain followed
+  by a path, a query, a port or a backslash («esempio.it/…», «evil.com:8080»), labels in any script (homoglyphs);
+- in a name also a domain alone with a common top-level domain («Casa.it», «evil-domhouse.com»): Gmail and Outlook make
+  it a link in the invitation email; an address may name one. A label has at least 2 characters before its dot and an
+  abbreviation is not a domain, so «M. Rossi», «Dott.ssa Bianchi», «S.r.l.» and «Via S.Maria/3» pass."""
 import re
+import unicodedata
 from typing import Annotated
 
 from pydantic import AfterValidator
 from pydantic_core import PydanticCustomError
 
-# rereading B-4: a domain's label has at least 2 characters, so «Via S.Maria/3» is an address, not a link
-LINK_LIKE = re.compile(r"(?i)(://|\bwww\.|\b[a-z0-9-]{2,}\.[a-z]{2,24}/)")
-INVISIBLE = {"​", "‌", "‍", "⁠", "﻿", *map(chr, range(0x202A, 0x202F)),
-             *map(chr, range(0x2066, 0x206A))}
+REFUSED_CATEGORIES = {"Cc", "Cf", "Zl", "Zp", "Co", "Cn", "Cs"}
+BLANK_FILLERS = {"ᅟ", "ᅠ", "ㅤ", "ﾠ", "⠀"}
+FULL_STOPS = str.maketrans({"。": ".", "｡": ".", "︒": "."})
+LINK_ANYWHERE = re.compile(
+    r"(?i)(://|//|\bwww\.|\b(?:mailto|https?|ftp|file|javascript|data|tel|sms|ws|wss):"
+    r"|\b\d{1,3}(?:\.\d{1,3}){3}\b"
+    r"|[\w-]{2,}\.[^\W\d_]{2,24}(?=[/?#:\\]))")
+TOP_LEVEL = ("com|net|org|info|biz|xyz|top|app|dev|online|site|shop|store|link|click|live|tech|club|website|page|"
+             "cloud|email|login|support|help|services|digital|network|today|news|world|life|vip|win|bid|loan|work")
+DOMAIN_ALONE = re.compile(rf"(?i)[\w-]{{2,}}\.(?:[a-z]{{2}}|{TOP_LEVEL})\b")
 ERROR = "invalid_text"
 
 
-def _rule(subject: str, longest: int):
-    """subject: «Il nome» or «L'indirizzo», the start of each sentence."""
+def _normal(value: str) -> str:
+    return unicodedata.normalize("NFKC", value).translate(FULL_STOPS)
+
+
+def _rule(subject: str, longest: int, domain_alone: bool):
+    """subject: «Il nome» or «L'indirizzo», the start of each sentence; domain_alone: a bare domain is refused too."""
     def check(value: str | None) -> str | None:
         if value is None:
             return value
         if len(value) > longest:
             raise PydanticCustomError(ERROR, f"{subject} può avere al massimo {longest} caratteri.")
-        if any(ord(c) < 0x20 or 0x7F <= ord(c) <= 0x9F or c in INVISIBLE for c in value):
+        text = _normal(value)
+        if any(unicodedata.category(c) in REFUSED_CATEGORIES or c in BLANK_FILLERS for c in value + text):
             raise PydanticCustomError(ERROR, f"{subject} contiene caratteri non ammessi.")
-        if LINK_LIKE.search(value):
+        if LINK_ANYWHERE.search(text) or (domain_alone and DOMAIN_ALONE.search(text)):
             raise PydanticCustomError(ERROR, f"{subject} non può contenere un indirizzo web.")
         return value
     return check
 
 
-PlainName = Annotated[str, AfterValidator(_rule("Il nome", 80))]
-PlainAddress = Annotated[str, AfterValidator(_rule("L'indirizzo", 200))]
-_address_rule = _rule("L'indirizzo", 200)
+_name_rule = _rule("Il nome", 80, domain_alone=True)
+_address_rule = _rule("L'indirizzo", 200, domain_alone=False)
+PlainName = Annotated[str, AfterValidator(_name_rule)]
+PlainAddress = Annotated[str, AfterValidator(_address_rule)]
+
+
+def acceptable_name(value: str) -> bool:
+    """Rereading B-11: whether a name taken from elsewhere (a token's «name» claim) follows the rule."""
+    try:
+        _name_rule(value)
+    except PydanticCustomError:
+        return False
+    return True
 
 
 def address_problem(value: str) -> dict | None:
