@@ -8,7 +8,7 @@ import type { ProblemCause } from "@/components/layout/PageProblem";
 import { t } from "@/i18n";
 import { reloadOnce } from "@/lib/lazyPage";
 import { disablePush, forgetPushResume } from "@/lib/push";
-import { adoptSharedChoice, isShared, markAutoLogout, sharedExpired, touchShared } from "@/lib/sharedDevice";
+import { adoptSharedChoice, forgetShared, forgetSharedChoice, isShared, rememberSharedChoice, sharedExpired, touchShared } from "@/lib/sharedDevice";
 import { clearUserData } from "@/lib/session";
 import { endSupportSession, startSupportSession, supportSession, type SupportSession } from "@/lib/support";
 import { env, newCorrelationId } from "@/lib/utils";
@@ -35,9 +35,12 @@ interface AuthContextValue {
   me: Me | null;
   /** Firebase sign-in providers of the current user ("password", "google.com"); empty in dev mode. */
   providers: string[];
-  devLogin: (email: string) => Promise<void>;
-  emailLogin: (email: string, password: string) => Promise<void>;
-  googleLogin: () => Promise<void>;
+  /** shared: the box «Questo è un dispositivo condiviso» at the moment of this sign-in (F-15, review S-1). */
+  devLogin: (email: string, shared?: boolean) => Promise<void>;
+  emailLogin: (email: string, password: string, shared?: boolean) => Promise<void>;
+  googleLogin: (shared?: boolean) => Promise<void>;
+  /** F-15: the person was signed out by the automatic exit of a shared device, in this page (review S-5). */
+  autoLoggedOut: boolean;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -89,8 +92,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Why the status is "unavailable", when the profile said it (D-211); unknown for a start that never answered. */
   const [problem, setProblem] = useState<ProblemCause | undefined>(undefined);
   const [providers, setProviders] = useState<string[]>([]);
+  // F-15 (review S-5): a state of this page, never stored: an automatic exit happens in the open page, so its notice
+  // cannot come back at a later visit
+  const [autoLoggedOut, setAutoLoggedOut] = useState(false);
   const queryClient = useQueryClient();
   const lastUid = useRef<string | null>(null);
+  /**
+   * F-15: grows at every sign-out. A read of the profile that started before (or while) the person left is dropped
+   * when it answers: found in the browser, a late read put the person back in after the automatic exit, without a
+   * session. Also while a sign-out is under way (leaving), no read lets the person in.
+   */
+  const sessionGen = useRef(0);
+  const leaving = useRef(false);
   /** A profile read in flight: a blocking answer meanwhile (also /app/me's own) does not start another one (P-50). */
   const profileLoading = useRef(false);
   /** A blocking answer that came while a profile read was in flight: handled right after it (D-89). */
@@ -105,8 +118,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * itself when the same person signs in again on this device, never for anyone else (P-44).
    */
   const signedOut = useCallback((sessionOver: boolean = true) => {
+    sessionGen.current += 1;
     setMe(null);
     setStatus("anonymous");
+    // F-15 (review S-6): the session is over (not a network failure), so the person's shared-device key goes
+    if (sessionOver && lastUid.current) forgetShared(lastUid.current);
     lastUid.current = null;
     endSupportSession();
     clearUserData(queryClient);
@@ -117,20 +133,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *  at their own next sign-in here if it was on (P-44). */
   const leaveDevice = () => disablePush({ resume: true }).catch(() => undefined);
 
-  /** «Esci»: also the automatic exit of a shared device (F-15), with the same cleaning of the push (P-44). */
-  const leave = useCallback(async () => {
-    await closeOwnSupport();
-    await leaveDevice(); // while still signed in: the BFF needs the user's token to drop the push registration
-    if (env.authMode === "dev") localStorage.removeItem(DEV_KEY);
-    else await firebaseSignOut();
-    signedOut();
+  /**
+   * «Esci»: also the automatic exit of a shared device (F-15), with the same cleaning of the push (P-44). The person's
+   * shared-device key goes too (review S-6): the next sign-in passes through the box anyway.
+   */
+  const leave = useCallback(async (uid: string | null = lastUid.current) => {
+    leaving.current = true;
+    try {
+      await closeOwnSupport();
+      await leaveDevice(); // while still signed in: the BFF needs the user's token to drop the push registration
+      if (env.authMode === "dev") localStorage.removeItem(DEV_KEY);
+      else await firebaseSignOut();
+      if (uid) forgetShared(uid);
+      signedOut();
+    } finally {
+      leaving.current = false;
+    }
   }, [signedOut]);
 
   /** F-15: 30 minutes without using the app on a shared device; the sign-in page says why the person is out. */
-  const autoLeave = useRef<() => Promise<void>>(async () => {});
-  autoLeave.current = async () => {
-    markAutoLogout();
-    await leave();
+  const autoLeave = useRef<(uid: string) => Promise<void>>(async () => {});
+  autoLeave.current = async (uid: string) => {
+    setAutoLoggedOut(true);
+    await leave(uid);
   };
 
   /** The assistance access ended (closed, expired): back to the manager's own area, the tab emptied (P-50). */
@@ -190,17 +215,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let retried = false;
     try {
       for (;;) {
+        const gen = sessionGen.current;
+        const stale = () => leaving.current || gen !== sessionGen.current;
         try {
           const next = await bffFetch<Me>("/app/me");
+          if (stale()) return; // the person left meanwhile (F-15): this answer belongs to a session that is over
           // F-15: the box of this sign-in becomes this person's choice; an opening after 30 minutes on a shared
-          // device asks the sign-in again, before any page is shown
+          // device asks the sign-in again, before any page is shown. A read of the profile is never a use (review
+          // S-2: the administrators' notice reads it every 2 minutes): it only checks.
           const now = Date.now();
           adoptSharedChoice(next.user.uid, now);
           if (sharedExpired(next.user.uid, now)) {
-            await autoLeave.current();
+            await autoLeave.current(next.user.uid);
             return;
           }
-          touchShared(next.user.uid, now);
+          setAutoLoggedOut(false);
           if (lastUid.current && lastUid.current !== next.user.uid) clearUserData(queryClient);
           lastUid.current = next.user.uid;
           setMe(next);
@@ -214,6 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             dropSupport(true);
             continue;
           }
+          if (stale()) return;
           await profileFailed(err);
           return;
         }
@@ -282,14 +312,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsub();
   }, [loadMe, signedOut]);
 
-  // F-15: on a shared device a tap or a key is a use; every minute, and on coming back from the background (before the
-  // return counts as a use), more than 30 minutes since the last use means the automatic exit.
+  // F-15: on a shared device a tap, a key or scrolling (wheel, a finger moving; review S-7) is a use, and nothing else;
+  // every minute, and on coming back from the background (before the return counts as a use), more than 30 minutes
+  // since the last use means the automatic exit.
   const sharedUid = status === "authenticated" ? me?.user.uid : undefined;
   useEffect(() => {
     if (!sharedUid || !isShared(sharedUid)) return;
     const check = () => {
       if (sharedExpired(sharedUid, Date.now())) {
-        void autoLeave.current();
+        void autoLeave.current(sharedUid);
         return true;
       }
       return false;
@@ -301,13 +332,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (document.visibilityState === "visible") check();
     };
     const every = setInterval(check, 60_000);
-    window.addEventListener("pointerdown", used, true);
-    window.addEventListener("keydown", used, true);
+    const USE = ["pointerdown", "keydown", "wheel", "touchmove"] as const;
+    for (const type of USE) window.addEventListener(type, used, { capture: true, passive: true });
     document.addEventListener("visibilitychange", back);
     return () => {
       clearInterval(every);
-      window.removeEventListener("pointerdown", used, true);
-      window.removeEventListener("keydown", used, true);
+      for (const type of USE) window.removeEventListener(type, used, { capture: true });
       document.removeEventListener("visibilitychange", back);
     };
   }, [sharedUid]);
@@ -325,19 +355,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       problem,
       me,
       providers,
-      devLogin: async (email) => {
+      // F-15 (review S-1): the box is written here, at the moment of the sign-in, and nowhere else; a sign-in that
+      // fails leaves nothing behind
+      devLogin: async (email, shared = false) => {
+        rememberSharedChoice(shared);
         localStorage.setItem(DEV_KEY, email);
         await loadMe();
       },
-      emailLogin: async (email, password) => {
+      emailLogin: async (email, password, shared = false) => {
         const { signInWithEmailAndPassword } = await import("firebase/auth");
-        await signInWithEmailAndPassword(await firebaseAuth(), email, password);
+        rememberSharedChoice(shared);
+        try {
+          await signInWithEmailAndPassword(await firebaseAuth(), email, password);
+        } catch (err) {
+          forgetSharedChoice();
+          throw err;
+        }
       },
-      googleLogin: async () => {
+      googleLogin: async (shared = false) => {
         const { signInWithPopup, GoogleAuthProvider } = await import("firebase/auth");
-        await signInWithPopup(await firebaseAuth(), new GoogleAuthProvider());
+        rememberSharedChoice(shared);
+        try {
+          await signInWithPopup(await firebaseAuth(), new GoogleAuthProvider());
+        } catch (err) {
+          forgetSharedChoice();
+          throw err;
+        }
       },
-      logout: leave,
+      autoLoggedOut,
+      logout: () => {
+        setAutoLoggedOut(false);
+        return leave();
+      },
       refreshMe: loadMe,
       enterSupport: async (s) => {
         startSupportSession(s);
@@ -378,7 +427,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (uid) forgetPushResume(uid); // the account is gone: nothing to bring back (P-44)
       },
     }),
-    [status, problem, me, providers, loadMe, signedOut, leaveSupport, queryClient, leave],
+    [status, problem, me, providers, loadMe, signedOut, leaveSupport, queryClient, leave, autoLoggedOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

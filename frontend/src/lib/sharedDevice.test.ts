@@ -1,8 +1,9 @@
-import { adoptSharedChoice, clearAutoLogout, isShared, markAutoLogout, rememberSharedChoice, SHARED_IDLE_MS, sharedExpired, touchShared, wasAutoLogout } from "./sharedDevice";
+import { adoptSharedChoice, CLOCK_BACK_MS, forgetShared, forgetSharedChoice, isShared, rememberSharedChoice, SHARED_IDLE_MS, sharedExpired, touchShared } from "./sharedDevice";
 
 // F-15 (answer 1244 = a): the choice «Questo è un dispositivo condiviso», per device and per person, and its 30 minutes.
 
 const T0 = 1_800_000_000_000;
+const key = (uid: string) => localStorage.getItem(`domotica.shared.${uid}`);
 
 beforeEach(() => localStorage.clear());
 
@@ -29,7 +30,16 @@ describe("la scelta a ogni accesso", () => {
     adoptSharedChoice("anna", T0);
     adoptSharedChoice("anna", T0 + 60_000); // nothing pending
     expect(isShared("anna")).toBe(true);
-    expect(sharedExpired("anna", T0 + 60_000)).toBe(false);
+  });
+
+  it("un accesso non riuscito non lascia la sua casella a nessuno", () => {
+    rememberSharedChoice(false);
+    forgetSharedChoice();
+    rememberSharedChoice(true);
+    adoptSharedChoice("anna", T0);
+    forgetSharedChoice(); // nothing left
+    adoptSharedChoice("anna", T0 + 1000);
+    expect(isShared("anna")).toBe(true);
   });
 
   it("due persone sullo stesso dispositivo: ognuna ha la sua scelta", () => {
@@ -39,7 +49,14 @@ describe("la scelta a ogni accesso", () => {
     adoptSharedChoice("bruno", T0 + 1000);
     expect(isShared("anna")).toBe(true);
     expect(isShared("bruno")).toBe(false);
-    expect(sharedExpired("bruno", T0 + 2 * SHARED_IDLE_MS)).toBe(false);
+  });
+
+  it("dopo l'uscita la chiave della persona non resta sul dispositivo (S-6)", () => {
+    rememberSharedChoice(true);
+    adoptSharedChoice("anna", T0);
+    forgetShared("anna");
+    expect(key("anna")).toBeNull();
+    expect(isShared("anna")).toBe(false);
   });
 });
 
@@ -69,20 +86,18 @@ describe("i 30 minuti", () => {
     expect(isShared("bruno")).toBe(false);
   });
 
-  it("orologio del dispositivo tornato indietro di più di 30 minuti: si esce, non si resta dentro di più", () => {
+  it("orologio tornato indietro (S-4): oltre 2 minuti si esce; un uso non riporta indietro l'ultimo uso", () => {
     rememberSharedChoice(true);
     adoptSharedChoice("anna", T0);
-    expect(sharedExpired("anna", T0 - SHARED_IDLE_MS - 1)).toBe(true);
+    expect(sharedExpired("anna", T0 - CLOCK_BACK_MS + 1)).toBe(false); // a small correction of the clock
+    expect(sharedExpired("anna", T0 - CLOCK_BACK_MS - 1)).toBe(true);
+    expect(sharedExpired("anna", T0 - 29 * 60_000)).toBe(true);
+    touchShared("anna", T0 - 60 * 60_000);
+    expect(key("anna")).toBe(String(T0));
   });
-});
 
-describe("l'avviso dopo l'uscita automatica", () => {
-  it("si legge senza consumarlo (React disegna due volte in sviluppo), finché la pagina non lo toglie", () => {
-    expect(wasAutoLogout()).toBe(false);
-    markAutoLogout();
-    expect(wasAutoLogout()).toBe(true);
-    expect(wasAutoLogout()).toBe(true);
-    clearAutoLogout();
-    expect(wasAutoLogout()).toBe(false);
+  it("un valore illeggibile vale come scaduto", () => {
+    localStorage.setItem("domotica.shared.anna", "rotto");
+    expect(sharedExpired("anna", T0)).toBe(true);
   });
 });

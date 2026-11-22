@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { KeyRound, UserRound } from "lucide-react";
@@ -8,14 +8,13 @@ import type { DevUser } from "@/api/types";
 import { authErrorMessage, useAuth } from "@/auth/AuthProvider";
 import { firebaseConfigured } from "@/auth/firebase";
 import { showLoginError } from "@/lib/loginErrors";
-import { clearAutoLogout, rememberSharedChoice, wasAutoLogout } from "@/lib/sharedDevice";
 import { PageProblem } from "@/components/layout/PageProblem";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label, Skeleton } from "@/components/ui/primitives";
 import { t } from "@/i18n";
 import { env } from "@/lib/utils";
 
-function DevLogin() {
+function DevLogin({ shared, onShared }: SharedProps) {
   const { devLogin } = useAuth();
   const users = useQuery({ queryKey: ["dev-users"], queryFn: () => bffFetch<DevUser[]>("/app/dev/users") });
   return (
@@ -24,12 +23,13 @@ function DevLogin() {
         <KeyRound className="h-4 w-4 text-primary" /> {t("login.devTitle")}
       </div>
       <p className="text-xs text-muted-foreground">{t("login.devHint")}</p>
+      <SharedDeviceBox shared={shared} onShared={onShared} />
       {users.isLoading && <Skeleton className="h-14" />}
       {users.data?.map((u) => (
         <button
           key={u.email}
           type="button"
-          onClick={() => void devLogin(u.email)}
+          onClick={() => void devLogin(u.email, shared)}
           data-testid={`dev-login-${u.email}`}
           className="flex w-full items-center gap-3 rounded-lg border bg-card px-4 py-3 text-left transition-[background-color,transform] hover:bg-secondary active:scale-[0.99] focus-ring"
         >
@@ -81,7 +81,7 @@ function ForgotPassword({ initialEmail, onBack }: { initialEmail: string; onBack
   );
 }
 
-function FirebaseLogin() {
+function FirebaseLogin({ shared, onShared }: SharedProps) {
   const { emailLogin, googleLogin } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -91,7 +91,7 @@ function FirebaseLogin() {
     e.preventDefault();
     setBusy(true);
     try {
-      await emailLogin(email, password);
+      await emailLogin(email, password, shared);
     } catch (err) {
       showLoginError(err, "email"); // D-156: the sentence and «Codice: auth/…»
     } finally {
@@ -113,32 +113,30 @@ function FirebaseLogin() {
           {t("login.forgot")}
         </button>
       </div>
+      <SharedDeviceBox shared={shared} onShared={onShared} />
       <Button type="submit" className="w-full" disabled={busy} data-testid="login-submit-btn">{t("login.submit")}</Button>
       <div className="text-center text-xs text-muted-foreground">{t("login.or")}</div>
-      <Button type="button" variant="outline" className="w-full" onClick={() => googleLogin().catch((err) => showLoginError(err, "google"))} data-testid="login-google-btn">
+      <Button type="button" variant="outline" className="w-full" onClick={() => googleLogin(shared).catch((err) => showLoginError(err, "google"))} data-testid="login-google-btn">
         {t("login.google")}
       </Button>
     </form>
   );
 }
 
+type SharedProps = { shared: boolean; onShared: (v: boolean) => void };
+
 /**
- * F-15: «Questo è un dispositivo condiviso», off at first. Its state is what the next sign-in takes (lib/sharedDevice):
- * written at once and at every change, so signing in without ticking it removes the choice for that person.
+ * F-15: «Questo è un dispositivo condiviso», off at first, inside the form above the sign-in buttons (review S-3). It
+ * only holds the choice: the sign-in writes it when a button is pressed (review S-1), never this field.
  */
-function SharedDeviceBox() {
-  const [shared, setShared] = useState(false);
-  useEffect(() => rememberSharedChoice(false), []);
+function SharedDeviceBox({ shared, onShared }: SharedProps) {
   return (
-    <label className="mt-5 flex items-start gap-3 rounded-xl border bg-secondary/40 px-3 py-2.5 text-sm" data-testid="login-shared-device">
+    <label className="flex items-start gap-3 rounded-xl border bg-secondary/40 px-3 py-2.5 text-sm" data-testid="login-shared-device">
       <input
         type="checkbox"
         className="mt-0.5 size-[18px] shrink-0 accent-foreground"
         checked={shared}
-        onChange={(e) => {
-          setShared(e.target.checked);
-          rememberSharedChoice(e.target.checked);
-        }}
+        onChange={(e) => onShared(e.target.checked)}
         aria-describedby="login-shared-device-hint"
         data-testid="login-shared-device-box"
       />
@@ -151,17 +149,14 @@ function SharedDeviceBox() {
 }
 
 export default function LoginPage() {
-  const { status, problem } = useAuth();
-  // the notice stays while the page is open and does not come back at the next visit: read at the first render,
-  // cleared once shown (not inside the render: React renders twice in development)
-  const [autoLoggedOut] = useState(wasAutoLogout);
-  useEffect(() => {
-    if (autoLoggedOut) clearAutoLogout();
-  }, [autoLoggedOut]);
+  const { status, problem, autoLoggedOut } = useAuth();
+  const [shared, setShared] = useState(false);
   if (status === "authenticated") return <Navigate to="/" replace />;
   // D-211: signed in but the profile could not be read (no network, 5xx), or a start that never ended: the form would
   // not help, the person is still signed in.
   if (status === "unavailable") return <PageProblem cause={problem} />;
+  // F-15 (review S-1): while a session is being loaded there is no form, so nothing can be chosen or written for it
+  if (status === "loading") return <div className="grid min-h-screen place-items-center p-5" data-testid="login-loading"><Skeleton className="h-40 w-full max-w-md" /></div>;
   return (
     <div className="grid min-h-screen grid-cols-1 lg:grid-cols-[1.1fr_1fr]">
       <section className="relative hidden flex-col justify-between overflow-hidden bg-foreground p-12 text-background lg:flex">
@@ -183,8 +178,7 @@ export default function LoginPage() {
               {t("login.autoLoggedOut")}
             </p>
           )}
-          {env.authMode === "dev" ? <DevLogin /> : <FirebaseLogin />}
-          <SharedDeviceBox />
+          {env.authMode === "dev" ? <DevLogin shared={shared} onShared={setShared} /> : <FirebaseLogin shared={shared} onShared={setShared} />}
         </Card>
       </section>
     </div>

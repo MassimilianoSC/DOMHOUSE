@@ -1,23 +1,36 @@
 import { StrictMode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { markAutoLogout } from "@/lib/sharedDevice";
 import LoginPage from "./LoginPage";
 
-// F-15 (answer 1244 = a) on the sign-in page: the box, off at first, with its line; what the next sign-in takes; the
-// notice after an automatic exit, once.
+// F-15 (answer 1244 = a) on the sign-in page: the box, off at first, inside the form above the sign-in buttons (review
+// S-3), passed to the sign-in (S-1: the page itself writes nothing); the notice after an automatic exit; no form while
+// a session loads. In StrictMode, as main.tsx.
 
+const s = vi.hoisted(() => ({
+  env: { authMode: "dev" } as Record<string, unknown>,
+  auth: {
+    status: "anonymous",
+    problem: undefined,
+    autoLoggedOut: false,
+    devLogin: vi.fn(async () => {}),
+    emailLogin: vi.fn(async () => {}),
+    googleLogin: vi.fn(async () => {}),
+  },
+}));
 vi.mock("@/lib/utils", async (importOriginal) => {
   const mod = await importOriginal<typeof import("@/lib/utils")>();
-  return { ...mod, env: { ...mod.env, authMode: "dev", bffUrl: "" } };
+  return { ...mod, env: Object.assign(s.env, { ...mod.env, authMode: s.env.authMode, bffUrl: "" }) };
 });
+vi.mock("@/auth/firebase", () => ({ firebaseConfigured: true, firebaseApp: async () => ({}), firebaseAuth: async () => ({}), continueUrl: () => ({ url: "" }) }));
 vi.mock("@/auth/AuthProvider", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/auth/AuthProvider")>()),
-  useAuth: () => ({ status: "anonymous", problem: undefined, devLogin: vi.fn() }),
+  useAuth: () => s.auth,
 }));
 
-/** In StrictMode, as main.tsx: React renders twice in development, a side effect in the render would show here. */
+const DEV_USERS = [{ email: "anna@esempio.it", display_name: "Anna", role: "operator" }];
+
 function show() {
   return render(
     <StrictMode>
@@ -29,42 +42,70 @@ function show() {
     </StrictMode>,
   );
 }
+const before = (a: HTMLElement, b: HTMLElement) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
 
 beforeEach(() => {
+  vi.clearAllMocks();
   localStorage.clear();
-  vi.stubGlobal("fetch", vi.fn(async () => new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } })));
+  s.env.authMode = "dev";
+  s.auth.status = "anonymous";
+  s.auth.autoLoggedOut = false;
+  vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(DEV_USERS), { status: 200, headers: { "Content-Type": "application/json" } })));
 });
 
 describe("pagina «Accedi»: dispositivo condiviso (F-15)", () => {
-  it("la casella, spenta all'inizio, con la sua riga", () => {
+  it("la casella, spenta all'inizio, con la sua riga; la pagina non scrive niente", () => {
     show();
     const box = screen.getByTestId("login-shared-device-box") as HTMLInputElement;
     expect(box.checked).toBe(false);
     expect(screen.getByTestId("login-shared-device")).toHaveTextContent("Questo è un dispositivo condiviso");
     expect(screen.getByTestId("login-shared-device")).toHaveTextContent("Dopo 30 minuti senza usare l'app l'uscita è automatica, e alla riapertura serve di nuovo l'accesso. Lasciala spenta sul tuo telefono o computer personale.");
     expect(box).toHaveAccessibleName(/Questo è un dispositivo condiviso/);
+    fireEvent.click(box);
+    expect(localStorage.length).toBe(0); // S-1: only the sign-in writes it
   });
 
-  it("il prossimo accesso prende lo stato della casella: spenta all'apertura, poi come la lascia la persona", () => {
+  it("accesso di sviluppo: la casella sta sopra le persone (S-3) e va con l'accesso, spuntata o no", async () => {
     show();
-    expect(localStorage.getItem("domotica.sharedPending")).toBe("0");
+    const person = await screen.findByTestId("dev-login-anna@esempio.it");
+    expect(before(screen.getByTestId("login-shared-device"), person)).toBe(true);
+    fireEvent.click(person);
+    expect(s.auth.devLogin).toHaveBeenLastCalledWith("anna@esempio.it", false);
     fireEvent.click(screen.getByTestId("login-shared-device-box"));
-    expect(localStorage.getItem("domotica.sharedPending")).toBe("1");
-    fireEvent.click(screen.getByTestId("login-shared-device-box"));
-    expect(localStorage.getItem("domotica.sharedPending")).toBe("0");
+    fireEvent.click(person);
+    expect(s.auth.devLogin).toHaveBeenLastCalledWith("anna@esempio.it", true);
   });
 
-  it("dopo un'uscita automatica l'avviso, una volta sola", () => {
-    markAutoLogout();
+  it("accesso con email o Google: la casella sta sopra «Accedi» e Google (S-3) e va con l'accesso", async () => {
+    s.env.authMode = "firebase";
+    show();
+    const box = screen.getByTestId("login-shared-device-box");
+    expect(before(screen.getByTestId("login-shared-device"), screen.getByTestId("login-submit-btn"))).toBe(true);
+    expect(before(screen.getByTestId("login-shared-device"), screen.getByTestId("login-google-btn"))).toBe(true);
+    fireEvent.click(box);
+    fireEvent.change(screen.getByTestId("login-email-input"), { target: { value: "anna@esempio.it" } });
+    fireEvent.change(screen.getByTestId("login-password-input"), { target: { value: "segreta-123" } });
+    fireEvent.submit(screen.getByTestId("firebase-login-form"));
+    await waitFor(() => expect(s.auth.emailLogin).toHaveBeenCalledWith("anna@esempio.it", "segreta-123", true));
+    fireEvent.click(screen.getByTestId("login-google-btn"));
+    expect(s.auth.googleLogin).toHaveBeenCalledWith(true);
+  });
+
+  it("dopo un'uscita automatica l'avviso; altrimenti niente", () => {
+    s.auth.autoLoggedOut = true;
     const first = show();
     expect(screen.getByTestId("login-auto-logout")).toHaveTextContent("Uscita automatica: l'app non è stata usata per 30 minuti su un dispositivo condiviso. Accedi di nuovo per continuare.");
     first.unmount();
+    s.auth.autoLoggedOut = false;
     show();
     expect(screen.queryByTestId("login-auto-logout")).toBeNull();
   });
 
-  it("senza uscita automatica nessun avviso", () => {
+  it("mentre una sessione si carica: nessun modulo, nessuna casella (S-1)", () => {
+    s.auth.status = "loading";
     show();
-    expect(screen.queryByTestId("login-auto-logout")).toBeNull();
+    expect(screen.getByTestId("login-loading")).toBeInTheDocument();
+    expect(screen.queryByTestId("login-shared-device")).toBeNull();
+    expect(screen.queryByTestId("dev-login")).toBeNull();
   });
 });
