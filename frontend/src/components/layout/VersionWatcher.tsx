@@ -1,38 +1,26 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
+import { writesInFlight } from "@/api/bff";
 import { t } from "@/i18n";
-import { CHECK_EVERY_MS, documentRefs, fetchIndexHtml, VersionWatch } from "@/lib/appVersion";
+import { CHECK_EVERY_MS, documentRefs, fetchIndexHtml, pageBusy, VersionWatch } from "@/lib/appVersion";
 import { browser } from "@/lib/lazyPage";
+import { pushWorkInFlight } from "@/lib/push";
 
 // P-92. Read when this module is evaluated, at start-up, before any page block is loaded (see documentRefs).
 const STARTUP_REFS = typeof document !== "undefined" ? documentRefs(document) : "";
 /** The page has just come from the network: one check a little later covers a publication in those seconds. */
 const FIRST_CHECK_MS = 2_000;
+/** Coming back from the background the network may not be ready yet (review P11): one more try, inside the 8 seconds. */
+export const RETRY_MS = 2_500;
 
+const working = () => writesInFlight() > 0 || pushWorkInFlight();
+
+// sessionStorage as it is: if it throws, the watch never reloads by itself (review P4).
 const session = {
-  getItem: (k: string) => {
-    try {
-      return sessionStorage.getItem(k);
-    } catch {
-      return null;
-    }
-  },
-  setItem: (k: string, v: string) => {
-    try {
-      sessionStorage.setItem(k, v);
-    } catch {
-      /* storage unavailable */
-    }
-  },
+  getItem: (k: string) => sessionStorage.getItem(k),
+  setItem: (k: string, v: string) => sessionStorage.setItem(k, v),
 };
-
-/** A dialog open or a field in use. */
-function busy(): boolean {
-  if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return true;
-  const el = document.activeElement as HTMLElement | null;
-  return !!el && (el.matches("input, textarea, select") || el.isContentEditable);
-}
 
 const showBanner = () =>
   toast(t("app.newVersion.title"), {
@@ -45,22 +33,36 @@ const showBanner = () =>
 export function VersionWatcher({ baseline = STARTUP_REFS }: { baseline?: string }) {
   const watch = useRef<VersionWatch | null>(null);
   if (!watch.current) {
-    watch.current = new VersionWatch({ baseline, fetchHtml: fetchIndexHtml, reload: () => browser.reload(), banner: showBanner, busy, storage: session });
+    watch.current = new VersionWatch({
+      baseline,
+      fetchHtml: fetchIndexHtml,
+      reload: () => browser.reload(),
+      banner: showBanner,
+      busy: () => pageBusy(document, working),
+      working,
+      storage: session,
+      clock: () => performance.now(),
+      wall: () => Date.now(),
+    });
   }
 
   useEffect(() => {
     const w = watch.current!;
-    w.opened(Date.now());
     if (!baseline) return;
-    const check = () => void w.check(Date.now());
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const check = () => void w.check();
+    const checkWithRetry = async () => {
+      clearTimeout(retry);
+      if ((await w.check()) === "unknown") retry = setTimeout(check, RETRY_MS);
+    };
     const opened = () => {
-      w.opened(Date.now());
-      check();
+      w.opened();
+      void checkWithRetry();
     };
     const onVisibility = () => document.visibilityState === "visible" && opened();
     const onPageShow = (e: PageTransitionEvent) => e.persisted && opened();
     const touched = () => w.touched();
-    const first = setTimeout(check, FIRST_CHECK_MS);
+    const first = setTimeout(() => void checkWithRetry(), FIRST_CHECK_MS);
     const every = setInterval(() => document.visibilityState === "visible" && check(), CHECK_EVERY_MS);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("pageshow", onPageShow);
@@ -69,6 +71,7 @@ export function VersionWatcher({ baseline = STARTUP_REFS }: { baseline?: string 
     window.addEventListener("keydown", touched, true);
     return () => {
       clearTimeout(first);
+      clearTimeout(retry);
       clearInterval(every);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pageshow", onPageShow);

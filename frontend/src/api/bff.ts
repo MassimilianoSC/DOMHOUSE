@@ -107,7 +107,22 @@ const parseJson = (text: string): unknown => {
   }
 };
 
+let writesOnTheirWay = 0;
+/**
+ * P-92 (review P2): requests that change something (any method but GET) still waiting for their answer. The
+ * new-version reload waits for them, so the person sees the confirmation or the error and does not repeat a command.
+ */
+export const writesInFlight = () => writesOnTheirWay;
+
 export function bffFetch<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  if ((opts.method ?? "GET").toUpperCase() === "GET") return bffCall<T>(path, opts);
+  writesOnTheirWay++;
+  return bffCall<T>(path, opts).finally(() => {
+    writesOnTheirWay--;
+  });
+}
+
+function bffCall<T>(path: string, opts: RequestOptions): Promise<T> {
   return withinTime(opts.timeoutMs ?? CALL_TIMEOUT_MS, opts.correlationId, async (signal) => {
     const headers: Record<string, string> = { Accept: "application/json", ...(await tokenHeaders(opts.correlationId)), ...supportHeader(path, opts.method) };
     if (opts.correlationId) headers["X-Correlation-Id"] = opts.correlationId;

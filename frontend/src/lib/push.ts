@@ -113,7 +113,23 @@ export async function enablePush(uid: string): Promise<void> {
  * Turns push off on this device; also called on every sign-out (D-59). resume (sign-outs, P-44): if push was on for
  * a person, it comes back at that same person's next sign-in here. Without it («Disattiva» in Impostazioni) it stays off.
  */
-export async function disablePush({ resume = false }: { resume?: boolean } = {}): Promise<void> {
+export async function disablePush(opts: { resume?: boolean } = {}): Promise<void> {
+  pushWork++;
+  try {
+    await turnPushOff(opts);
+  } finally {
+    pushWork--;
+  }
+}
+
+let pushWork = 0;
+/**
+ * P-92 (review P7): the push token is being removed (a sign-out, a session that expired). The new-version reload waits
+ * for it, or the BFF and FCM might not hear that this device no longer receives that person's notifications.
+ */
+export const pushWorkInFlight = () => pushWork > 0;
+
+async function turnPushOff({ resume = false }: { resume?: boolean }): Promise<void> {
   const token = localStorage.getItem(TOKEN_KEY);
   if (!token) return;
   const owner = localStorage.getItem(OWNER_KEY);

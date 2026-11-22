@@ -19,35 +19,40 @@ describe("firebase.json: un sito per ambiente", () => {
   });
 });
 
-// P-92 / E-29: every opening takes index.html from the network. The service worker only does web push: no fetch
-// handler (Chrome no longer starts it for navigations, so a stuck worker cannot hold the site, E-29) and no copy of
-// the site in Cache Storage. The browser keeps the files under /assets/ (named by content) for a year, as before.
-import swSource from "./sw.ts?raw";
+// P-92 / E-29: every opening takes index.html from the network. The service worker only does web push (src/sw.test.ts
+// runs it). Review P6: Firebase matches each header rule against the address asked for, not the file the rewrite
+// serves, so what counts for an opening is the rule of "/" and of every page of the app; "/index.html" is never asked.
 import viteConfig from "../vite.config.ts?raw";
 
+type Rule = { source: string; headers: { key: string; value: string }[] };
+
+/** The globs of firebase.json, by hand: an unknown form fails the test, so a new rule is looked at here. */
+function matches(source: string, path: string): boolean {
+  if (source === "**") return true;
+  if (source === "**/!(*.*)") return !(path.split("/").pop() ?? "").includes(".");
+  if (source.endsWith("/**")) return path.startsWith(source.slice(0, -2));
+  if (!/[*?!(){}[\]]/.test(source)) return path === source;
+  throw new Error(`regola non prevista dalla prova: ${source}`);
+}
+
 describe("P-92: index.html sempre dalla rete", () => {
-  const headers = (hosting[0].headers as { source: string; headers: { key: string; value: string }[] }[]);
-  const cacheOf = (source: string) => headers.find((h) => h.source === source)?.headers.find((x) => x.key === "Cache-Control")?.value;
+  const rules = hosting[0].headers as Rule[];
+  const cacheFor = (path: string) =>
+    rules.filter((r) => matches(r.source, path)).flatMap((r) => r.headers.filter((h) => h.key === "Cache-Control").map((h) => h.value));
 
-  it("intestazioni di oggi: index.html e sw.js no-cache, /assets/** un anno immutable", () => {
-    expect(cacheOf("/index.html")).toBe("no-cache");
-    expect(cacheOf("/sw.js")).toBe("no-cache");
-    expect(cacheOf("/assets/**")).toBe("public, max-age=31536000, immutable");
+  it.each(["/", "/login", "/impostazioni", "/organizzazioni", "/a/apt-001/regole", "/a/lab-01/panoramica"])(
+    "apertura di %s: solo no-cache, la pagina arriva sempre dalla rete",
+    (path) => {
+      expect(cacheFor(path)).toEqual(["no-cache"]);
+    },
+  );
+
+  it("sw.js no-cache; i file di /assets/ un anno immutable, come prima", () => {
+    expect(cacheFor("/sw.js")).toEqual(["no-cache"]);
+    expect(cacheFor("/assets/index-AbC123.js")).toEqual(["public, max-age=31536000, immutable"]);
   });
 
-  it("il service worker non risponde alle richieste e non tiene il sito in cache", () => {
-    expect(swSource).not.toMatch(/addEventListener\(\s*["']fetch["']/);
-    expect(swSource).not.toMatch(/workbox-precaching|workbox-routing|__WB_MANIFEST|registerRoute/);
+  it("al worker non si inietta più l'elenco della copia del sito", () => {
     expect(viteConfig).toMatch(/injectionPoint:\s*undefined/);
-  });
-
-  it("le copie lasciate dai worker di prima si cancellano", () => {
-    expect(swSource).toMatch(/addEventListener\(\s*["']activate["']/);
-    expect(swSource).toMatch(/caches\.delete/);
-  });
-
-  it("le notifiche restano: push e clic sulla notifica", () => {
-    expect(swSource).toMatch(/addEventListener\(\s*["']push["']/);
-    expect(swSource).toMatch(/addEventListener\(\s*["']notificationclick["']/);
   });
 });

@@ -4,11 +4,13 @@
 // the running page with those of index.html on the network: Vite names them by content, so a difference is a new
 // version. The service worker is not involved: the check works the same where there is none (or it is stuck, E-29).
 
-/** In the first seconds after opening or coming back to the app, with nothing touched yet, a new version reloads by itself. */
+/** In the first seconds after opening or coming back to the app, on a page never touched, a new version reloads by itself. */
 export const AUTO_RELOAD_MS = 8_000;
+/** At most one automatic reload per tab in this time, whatever the version (review P3: old and new pages alternating). */
+export const AUTO_RELOAD_GAP_MS = 10 * 60_000;
 /** While the page stays visible. */
 export const CHECK_EVERY_MS = 10 * 60_000;
-const RELOAD_KEY = "domotica.versionReload";
+export const RELOAD_KEY = "domotica.versionReload";
 const FETCH_TIMEOUT_MS = 10_000;
 
 const ASSET = /(?:src|href)=["'](\/assets\/[^"']+\.(?:js|css))["']/g;
@@ -41,6 +43,18 @@ export async function fetchIndexHtml(): Promise<string> {
   return res.text();
 }
 
+/**
+ * The page is in use: a dialog open, a field with the cursor, or work still on its way (a request that changes
+ * something, the removal of the push token at sign-out). Never reload then.
+ */
+export function pageBusy(doc: Document, working: () => boolean): boolean {
+  if (working()) return true;
+  if (doc.querySelector('[role="dialog"], [role="alertdialog"]')) return true;
+  const el = doc.activeElement as HTMLElement | null;
+  return !!el && (el.matches("input, textarea, select") || el.isContentEditable === true);
+}
+
+/** sessionStorage as it is: its errors reach the watch, which then never reloads by itself (review P4). */
 interface Storage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
@@ -53,34 +67,42 @@ export interface VersionWatchDeps {
   reload: () => void;
   /** Shows «È disponibile una versione nuova — Aggiorna». */
   banner: () => void;
-  /** A dialog open or a field in use: never reload under the person's hands. */
+  /** pageBusy: a dialog, a field in use or work on its way. */
   busy: () => boolean;
+  /** Work on its way only (requests that change something, push token removal): a change of page waits for it. */
+  working: () => boolean;
   storage: Storage;
+  /** Monotonic, for the seconds after an opening (performance.now). */
+  clock: () => number;
+  /** Wall clock, for the record that outlives the reload (Date.now). */
+  wall: () => number;
 }
 
 export type CheckResult = "off" | "unknown" | "same" | "reloaded" | "banner";
 
 export class VersionWatch {
-  private openedAt = 0;
-  private touchedSinceOpen = false;
+  private openedAt: number;
+  /** Ever touched since the page was loaded: coming back from the background does not clear it (review P1). */
+  private touchedEver = false;
   /** Fingerprint of the newer version on the network, once found. */
   private ready: string | null = null;
   private bannerFor: string | null = null;
 
-  constructor(private deps: VersionWatchDeps) {}
-
-  /** The page was loaded, or came back from the background. */
-  opened(now: number) {
-    this.openedAt = now;
-    this.touchedSinceOpen = false;
+  constructor(private deps: VersionWatchDeps) {
+    this.openedAt = deps.clock();
   }
 
-  /** A tap, click or key: from now on the page is in use. */
+  /** The page came back from the background (or from the back-forward cache). */
+  opened() {
+    this.openedAt = this.deps.clock();
+  }
+
+  /** A tap, click or key: from now on until the next load, the page may hold something not saved. */
   touched() {
-    this.touchedSinceOpen = true;
+    this.touchedEver = true;
   }
 
-  async check(now: number): Promise<CheckResult> {
+  async check(): Promise<CheckResult> {
     if (!this.deps.baseline) return "off";
     let refs: string;
     try {
@@ -91,7 +113,8 @@ export class VersionWatch {
     if (!refs) return "unknown";
     if (refs === this.deps.baseline) return "same";
     this.ready = refs;
-    const fresh = now - this.openedAt <= AUTO_RELOAD_MS && !this.touchedSinceOpen;
+    // Measured when the answer arrives (review P5): a slow answer does not stretch the seconds after the opening.
+    const fresh = this.deps.clock() - this.openedAt <= AUTO_RELOAD_MS && !this.touchedEver;
     if (fresh && !this.deps.busy() && this.reloadTo(refs)) return "reloaded";
     if (this.bannerFor !== refs) {
       this.bannerFor = refs;
@@ -100,22 +123,31 @@ export class VersionWatch {
     return "banner";
   }
 
-  /** At a change of page the screen is being replaced anyway: the newer version, if there is one, loads now. */
+  /**
+   * At a change of page the screen is being replaced anyway: the newer version, if there is one, loads now. Not while
+   * work is on its way (review P2, P7): the next change of page tries again.
+   */
   navigated() {
-    if (this.ready) this.reloadTo(this.ready);
+    if (this.ready && !this.deps.working()) this.reloadTo(this.ready);
   }
 
   /**
-   * Reloads towards `target`, at most once per tab: if the page is still the old one after it (a server still
-   * handing out the previous index.html), only the banner remains, never a loop of reloads.
+   * Reloads by itself towards `target` only if this tab has not done it already towards that version, nor towards any
+   * version in the last AUTO_RELOAD_GAP_MS, and the record of it can be written and read back. Otherwise only the
+   * banner remains, never a loop of reloads.
    */
   private reloadTo(target: string): boolean {
     try {
-      const last = JSON.parse(this.deps.storage.getItem(RELOAD_KEY) ?? "null") as { to?: unknown } | null;
+      const { storage, wall } = this.deps;
+      const last = JSON.parse(storage.getItem(RELOAD_KEY) ?? "null") as { to?: unknown; at?: unknown } | null;
       if (last?.to === target) return false;
-      this.deps.storage.setItem(RELOAD_KEY, JSON.stringify({ to: target, at: Date.now() }));
+      // A clock moved backwards counts as «recent»: the automatic reload waits, the banner does not.
+      if (typeof last?.at === "number" && wall() - last.at < AUTO_RELOAD_GAP_MS) return false;
+      const record = JSON.stringify({ to: target, at: wall() });
+      storage.setItem(RELOAD_KEY, record);
+      if (storage.getItem(RELOAD_KEY) !== record) return false;
     } catch {
-      /* storage unavailable: reload anyway, the banner stays the fallback */
+      return false; // storage unavailable (review P4): no record, so no automatic reload; the banner stays
     }
     this.deps.reload();
     return true;
