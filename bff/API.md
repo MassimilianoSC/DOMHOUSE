@@ -19,6 +19,8 @@ esterni. Nessuna route chiamata dalla PWA manca nel BFF, nessun campo letto dall
 
 Quando il token non si riesce a controllare (tempo massimo `TOKEN_CHECK_TIMEOUT_S`, 10 s, o chiavi pubbliche di Google non raggiungibili) tutte le route autenticate rispondono 503 `auth_unavailable` «Controllo dell'accesso non disponibile: riprova tra poco»: è un intoppo, la sessione resta valida (D-198). Token sbagliato o scaduto: 401 come sempre.
 
+**Dimensione del corpo (F-2, revisione «attacco da fuori», 22 novembre 2026).** Ogni richiesta con un corpo oltre il suo limite riceve 413 `payload_too_large` «Richiesta troppo grande», prima di qualsiasi lettura, controllo d'accesso o firma (`bff/body_limit.py`, il middleware più esterno). Limiti: 64 KiB per `/webhooks/*`, 256 KiB per `/internal/ai/chat` e per tutto il resto. Vale sia con `Content-Length` sia per i corpi a pezzi. I corpi legittimi più grandi sono di poche decine di KiB (il prompt dell'assistente con lo stato dell'appartamento). Il 413 non porta le intestazioni CORS: il sito vede un errore di rete, ma nessuna sua richiesta si avvicina al limite.
+
 Mock: il motore simulato (`/mock/...`, solo con `INSTANCE_MODE=mock`) risponde solo alla chiamata del BFF in
 loopback; una richiesta che arriva da internet (con `X-Forwarded-For`) riceve 404, e la chiave è casuale per processo (F2).
 

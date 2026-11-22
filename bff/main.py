@@ -9,7 +9,7 @@ from starlette.datastructures import MutableHeaders
 
 from engine.log import setup_logging as setup_engine_logging
 
-from . import instances, push, runtime
+from . import body_limit, instances, push, runtime
 from .config import get_settings
 from .logs import setup_logging
 from .routes import account, admin, apartments, platform, webhooks
@@ -175,6 +175,8 @@ def create_app() -> FastAPI:
     mock_app = create_mock_app(api_key=settings.instance_api_key_fallback, model_for=model_for)
     app.state.mock_registry = mock_app.state.registry   # the reset of a demonstration apartment (D-97)
     app.mount("/mock", mock_app)
+    # F-2: added last, so it is the outermost: no body over its limit reaches CORS, the counters or the routes
+    app.add_middleware(body_limit.BodyLimit, root_path=settings.root_path)
     return app
 
 

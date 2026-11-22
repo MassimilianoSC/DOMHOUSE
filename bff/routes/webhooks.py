@@ -8,7 +8,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from .. import instances
-from .. import instances
 from ..bookings import ForwardError, ItalianwayTranslator, TranslationError, forward
 from ..config import get_settings
 from ..logs import ctx_correlation, info, warn
@@ -56,10 +55,21 @@ def obscured_body(raw: bytes, payload) -> str:
 
 
 def _parse(raw: bytes):
+    """F-2: also a JSON nested too deep for the parser (RecursionError) is «not JSON», never a 500 without its line."""
     try:
         return json.loads(raw)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
+
+
+def _read(raw: bytes):
+    """The payload and its obscured copy for the register. F-2: a JSON the parser accepts but nested beyond what the
+    obscuring can walk (about 1000 objects) counts as not JSON too, so it gets 400 and its line, not a 500."""
+    parsed = _parse(raw)
+    try:
+        return parsed, obscured_body(raw, parsed)
+    except RecursionError:
+        return None, obscured_body(raw, None)
 
 
 def structured(payload) -> dict:
@@ -107,16 +117,19 @@ async def italianway(request: Request):
     ctx_correlation.set(correlation_id)
     if incoming and incoming.strip() != correlation_id:
         info("webhook correlation id replaced", source="italianway", original=incoming[:120])
-    parsed = _parse(raw)
-    log = WebhookLog(log_id=f"wh-{uuid.uuid4().hex[:12]}", signature_ok=False, status_code=0, outcome="",
-                     correlation_id=correlation_id, raw_body=obscured_body(raw, parsed), **structured(parsed))
+    # F-2: the size is already limited (bff/body_limit.py, 64 KiB, before the body is read); the signature is checked
+    # on the raw bytes before they are parsed. An unsigned call keeps its obscured body and fields in the register
+    # (decision of 22 November, a6: the platform sees an Italianway call with the wrong secret); its volume is F-5
+    signature_ok = verify_signature(raw, request.headers.get(s.italianway_signature_header), s.italianway_webhook_secret)
+    parsed, kept = _read(raw)
+    log = WebhookLog(log_id=f"wh-{uuid.uuid4().hex[:12]}", signature_ok=signature_ok, status_code=0, outcome="",
+                     correlation_id=correlation_id, raw_body=kept, **structured(parsed))
 
     async def done(status: int, outcome: str, body: dict):
         log.status_code, log.outcome = status, outcome
         await get_repository().add_webhook_log(log)
         return JSONResponse(status_code=status, content=body)
 
-    log.signature_ok = verify_signature(raw, request.headers.get(s.italianway_signature_header), s.italianway_webhook_secret)
     if not log.signature_ok:
         warn("webhook signature rejected", source="italianway")
         return await done(401, "invalid_signature", {"error": "invalid_signature", "message": "Firma non valida"})
