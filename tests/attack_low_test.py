@@ -67,11 +67,9 @@ async def _send_as(method, path, body, who="admin@demo.it"):
         return await c.request(method, path, json=body, headers={"X-Dev-User": who})
 
 
-@pytest.mark.parametrize("name", [
-    "x" * 81, "Clicca qui https://evil.example/login", "Vai su www.evil.example", "Accedi a evil.example/login",
-    "Mario\nRossi", "Mario\x00Rossi", "Mario‮issoR",
-], ids=["81", "scheme", "www", "domain-path", "newline", "nul", "bidi"])
-def test_f11_a_name_too_long_link_like_or_with_control_characters_is_refused(name):
+@pytest.mark.parametrize("name", ["x" * 81, "Mario\nRossi", "Mario\x00Rossi", "Mario‮issoR"],
+                         ids=["81", "newline", "nul", "bidi"])
+def test_f11_a_name_too_long_or_with_control_characters_is_refused(name):
     from bff.repository import get_repository
     before = len(run(get_repository().list_users("t-flatsharing-demo")))
     email = f"f11-{abs(hash(name)) % 10_000_000}@esempio.it"
@@ -90,8 +88,8 @@ def test_f11_ordinary_names_and_addresses_still_pass():
     assert r.status_code == 200, r.text[:200]
 
 
-def test_f11_an_address_over_200_characters_or_link_like_is_refused():
-    for address in ("v" * 201, "Via Roma 1 https://evil.example", "Via\tRoma\r\n1"):
+def test_f11_an_address_over_200_characters_or_with_control_characters_is_refused():
+    for address in ("v" * 201, "Via\tRoma\r\n1"):
         r = run(_send_as("PATCH", "/app/admin/apartments/apt-rimini-01", {"address": address}))
         assert r.status_code == 422, (address[:30], r.status_code)
 
@@ -100,7 +98,7 @@ def test_f11_a_user_s_name_changed_by_the_admin_follows_the_same_rule():
     from bff.repository import get_repository
     users = run(get_repository().list_users("t-flatsharing-demo"))
     target = next(u for u in users if u.role == "viewer")
-    r = run(_send_as("PATCH", f"/app/admin/users/{target.uid}", {"display_name": "Vedi https://evil.example"}))
+    r = run(_send_as("PATCH", f"/app/admin/users/{target.uid}", {"display_name": "Vedi\u202eRossi"}))
     assert r.status_code == 422, r.text[:200]
 
 
@@ -215,7 +213,6 @@ def test_f8_an_account_disabled_in_firebase_is_refused(firebase):
     ("x" * 81, "Il nome può avere al massimo 80 caratteri."),
     ("Mario\nRossi", "Il nome contiene caratteri non ammessi."),
     ("Mario‮issoR", "Il nome contiene caratteri non ammessi."),
-    ("Vai su www.evil.example", "Il nome non può contenere un indirizzo web."),
 ])
 def test_f11_the_refusal_of_a_name_says_why_in_italian(name, message):
     for method, path, body in (("POST", "/app/admin/users", {"email": "f11-msg@esempio.it", "role": "viewer",
@@ -229,7 +226,6 @@ def test_f11_the_refusal_of_a_name_says_why_in_italian(name, message):
 @pytest.mark.parametrize("address, message", [
     ("v" * 201, "L'indirizzo può avere al massimo 200 caratteri."),
     ("Via\tRoma 1", "L'indirizzo contiene caratteri non ammessi."),
-    ("Via Roma 1 https://evil.example", "L'indirizzo non può contenere un indirizzo web."),
 ])
 def test_f11_the_refusal_of_an_address_says_why_in_italian(address, message):
     r = run(_send_as("PATCH", "/app/admin/apartments/apt-rimini-01", {"address": address}))
@@ -309,7 +305,7 @@ def _stored_address(value):
     run(repo.upsert_apartment(apt.model_copy(update={"address": value})))
 
 
-@pytest.mark.parametrize("old", ["v" * 250, "Via\tRoma 1", "Vedi www.vecchio.example"], ids=["long", "tab", "link"])
+@pytest.mark.parametrize("old", ["v" * 250, "Via\tRoma 1"], ids=["long", "tab"])
 def test_b4_the_form_saves_with_an_old_address_out_of_the_rule_sent_back_unchanged(old):
     """The site's apartment window always sends address with name, enabled and price: a saved address now out of the
     rule made every save fail with 422, A6's switch-off included. The address is checked only when it changes."""
@@ -333,31 +329,16 @@ def test_b4_a_real_address_with_a_slash_and_a_dot_passes():
 
 
 # -------- rereading of the low fixes, B-3: the rule of F-11 against Unicode --------
-# final rereading R-6: in an address a domain with a path counts only with a known top-level domain, so the examples
-# use .com; the homoglyph in the top-level domain and «.example» are refused in names (test_r4 below)
-LINKS_EVERYWHERE = ["https：//evil.example", "https：／／evil.example", "evil。com/login",
-                    "evil․com/login", "evil.com／login", "еvil.com/login",
-                    "evil.com?x=1", "evil.com:8080", "evil.com\\login", "10.0.0.1/login",
-                    "//evil.com", "mailto:x@evil.com", "javascript:alert(1)"]
 INVISIBLE_ONES = ["a‎b", "a‏b", "a؜b", "a b", "a b", "a­b", "a⁡b", "aㅤb",
                   "a\U000e0041b", "ab", "a\U000f0000b"]
 
 
-@pytest.mark.parametrize("text", LINKS_EVERYWHERE + INVISIBLE_ONES, ids=repr)
+@pytest.mark.parametrize("text", INVISIBLE_ONES, ids=repr)
 def test_b3_tricks_with_unicode_are_refused_in_names_and_addresses(text):
     from bff import plain_text
     assert plain_text.address_problem(text) is not None, text
     r = run(_send_as("PATCH", "/app/me", {"display_name": text}))
     assert r.status_code == 422 and r.json()["error"] == "invalid_text", (text, r.text[:120])
-
-
-def test_b3_a_domain_alone_is_refused_in_a_name_and_allowed_in_an_address():
-    """Gmail and Outlook make a link of a domain alone in an invitation email: not in a name; an address may name one."""
-    from bff import plain_text
-    for name in ("Verifica su evil-domhouse.com", "Casa.it", "mario@evil.com"):
-        r = run(_send_as("PATCH", "/app/me", {"display_name": name}))
-        assert r.status_code == 422 and r.json()["message"] == "Il nome non può contenere un indirizzo web.", name
-    assert plain_text.address_problem("Residence Casa.it, Via Roma 1") is None
 
 
 @pytest.mark.parametrize("name", ["Zoë Müller", "Maria Rossi-D'Amico", "Lucia Dell’Acqua", "José María Pérez",
@@ -377,7 +358,8 @@ def test_b3_real_addresses_still_pass(address):
 
 # -------- rereading of the low fixes, B-11: the name taken from a token's «name» claim follows F-11's rule --------
 @pytest.mark.parametrize("name, kept", [
-    ("Clicca https://evil.example", "primo-admin"), ("x" * 90, "primo-admin"), ("Mario‮issoR", "primo-admin"),
+    ("Clicca https://esempio.it", "Clicca https://esempio.it"), ("x" * 90, "primo-admin"),
+    ("Mario‮issoR", "primo-admin"),
     ("Anna Bianchi", "Anna Bianchi"), ("", ""),
 ])
 def test_b11_the_first_admins_name_from_the_claims_follows_the_rule(name, kept):
@@ -393,7 +375,7 @@ def test_b11_the_first_admins_name_from_the_claims_follows_the_rule(name, kept):
         assert user.display_name == kept and run(repo.get_user("u-b11")).display_name == kept
     finally:
         run(repo.delete_user("u-b11"))
-    assert auth.claims_name({"name": "Vai su www.evil.example", "email": "www.evil@x.it"}) == ""
+    assert auth.claims_name({"name": "Mario\u202eissoR", "email": "a\u202eb@x.it"}) == ""
 
 
 # -------- rereading of the low fixes, B-2: an unreadable secret is the same 401 as F-12, not a 500 --------
@@ -424,29 +406,12 @@ def test_r1_italian_titles_and_company_forms_pass_in_a_name(name):
     assert r.status_code == 200, (name, r.text[:200])
 
 
-@pytest.mark.parametrize("name", ["Vai su evil.zip", "evil.bank", "evil.icu", "evil.ninja", "evil.academy",
-                                  "evil-dom.house", "evil.museum", "evil.pro", "пример.рф",
-                                  "evil.comа", "evil.com_x", "evil.example/login", "evil.exаmple/login"],
-                         ids=repr)
-def test_r4_any_domain_is_refused_in_a_name(name):
-    r = run(_send_as("PATCH", "/app/me", {"display_name": name}))
-    assert r.status_code == 422 and r.json()["message"] == "Il nome non può contenere un indirizzo web.", (name, r.text)
-
-
 @pytest.mark.parametrize("address", ["Fraz.Colle/2", "Loc.Prato/Fraz.Colle", "Via Sta.Maria/3", "Loc.Tà/3",
                                      "Via Roma 1 Tel: 06123456", "c/o Rossi, V.le Monza 12/14", "Km 12.300",
                                      "Str.Prov.le 12/A"])
 def test_r6_real_addresses_with_dots_and_slashes_pass(address):
     from bff import plain_text
     assert plain_text.address_problem(address) is None, address
-
-
-@pytest.mark.parametrize("address", ["Vedi evil.com/login", "evil.it/x", "www.evil.example", "https://evil.example",
-                                     "10.0.0.1/x", "mailto:a@evil.com"])
-def test_r6_web_addresses_are_still_refused_in_an_address(address):
-    from bff import plain_text
-    assert plain_text.address_problem(address) is not None, address
-
 
 
 # -------- final rereading R-2 (a6's choice a): only claims naming an existing, active organisation refuse --------
@@ -504,7 +469,7 @@ def test_r10_no_secret_read_for_an_apartment_that_cannot_be_used(monkeypatch, st
 
 
 # -------- the first admin's name when the platform creates an organisation follows the same rule --------
-@pytest.mark.parametrize("name", ["Vai su www.evil.example", "evil.zip", "Mario‮issoR", "x" * 81])
+@pytest.mark.parametrize("name", ["Mario‮issoR", "Mario\nRossi", "x" * 81])
 def test_the_first_admins_name_of_a_new_organisation_follows_the_rule(name):
     from bff.repository import get_repository
     before = len(run(get_repository().list_tenants()))
@@ -513,3 +478,14 @@ def test_the_first_admins_name_of_a_new_organisation_follows_the_rule(name):
     assert r.status_code == 422 and r.json()["error"] == "invalid_text", (name, r.status_code, r.text[:200])
     assert r.json()["field"] == "admin_display_name"
     assert len(run(get_repository().list_tenants())) == before
+
+
+# -------- answer 1246: the emails carry no user-written text, so «looks like a web address» is no longer refused --------
+@pytest.mark.parametrize("text", ["Vai su www.evil.example", "evil.zip", "https://esempio.it", "Mario.Rossi",
+                                  "Dott.Rossi", "mailto:a@esempio.it", "10.0.0.1/x"])
+def test_1246_text_that_reads_as_a_web_address_is_taken_in_names_and_addresses(text):
+    """Only the length and the invisible or control characters stay (answer 1246, point 1)."""
+    from bff import plain_text
+    r = run(_send_as("PATCH", "/app/me", {"display_name": text}))
+    assert r.status_code == 200, (text, r.text[:200])
+    assert plain_text.address_problem(text) is None, text

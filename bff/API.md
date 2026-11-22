@@ -34,13 +34,12 @@ Quando il token non si riesce a controllare (tempo massimo `TOKEN_CHECK_TIMEOUT_
 - **Perché:** il token di una persona rimossa conserva i claim fino a un'ora. Prima della correzione la persona rientrava con tutti gli appartamenti.
 - **Rimozione e «Elimina il mio account»:** il record si cancella una seconda volta dopo l'operazione su Firebase.
 **Testi liberi (F-11, stessa revisione).**
-- **Quali campi:** il nome dell'invitato (`POST /app/admin/users`), il nome cambiato dall'admin (`PATCH /app/admin/users/{uid}`), il proprio nome (`PATCH /app/me`, che è anche il mittente nell'email d'invito) e l'indirizzo dell'appartamento (`PATCH /app/admin/apartments/{id}`).
+- **Quali campi:** il nome dell'invitato (`POST /app/admin/users`), il nome cambiato dall'admin (`PATCH /app/admin/users/{uid}`), il proprio nome (`PATCH /app/me`), il nome del primo admin di un'organizzazione nuova (`POST /app/platform/tenants`) e l'indirizzo dell'appartamento (`PATCH /app/admin/apartments/{id}`, controllato solo quando cambia).
 - **Limiti:** il nome al massimo 80 caratteri, l'indirizzo 200.
-- **Cosa non possono contenere:** caratteri di controllo, caratteri invisibili di direzione, testo che si legge come un indirizzo web («://», «www.», un dominio seguito da «/»). Un dominio da solo («Casa.it») resta ammesso.
+- **Cosa non possono contenere:** caratteri di controllo, caratteri invisibili di direzione e simili (per categoria Unicode). Dalla risposta 1246 nessuna email contiene testi scritti dagli utenti (vedi «Testi delle email»), quindi un testo che si legge come un indirizzo web è ammesso.
 - **Altrimenti:** 422 `{"error": "invalid_text", "field": "display_name" | "address", "message"}` (`bff/plain_text.py`, gestore in `bff/main.py`). I messaggi:
   - «Il nome può avere al massimo 80 caratteri.» oppure «L'indirizzo può avere al massimo 200 caratteri.»;
   - «Il nome contiene caratteri non ammessi.» oppure «L'indirizzo contiene caratteri non ammessi.»;
-  - «Il nome non può contenere un indirizzo web.» oppure «L'indirizzo non può contenere un indirizzo web.».
 - Gli altri errori di validazione restano il 422 solito di FastAPI.
 
 - **Push, preferenze e nome** (`POST`/`DELETE /app/push/subscribe`, `GET /app/push/status`, `PUT /app/me/notification-prefs`, `PATCH /app/me`): cambiano solo un record che esiste, mai uno ricreato. Se il record è sparito nel frattempo: 404 `not_found` «Utente inesistente». `PATCH /app/me` aggiorna comunque il nome del gestore della piattaforma.
