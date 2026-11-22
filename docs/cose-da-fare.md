@@ -28,12 +28,17 @@ Colonna «Chi»: MS = memoria storica; C = committente; Y = Youssouf; L = Leonar
 | 3 | Togliere le copie per tornare indietro: `prima-passo3` e la sua copia del disco, `prima-e38`, `~/e38`, quelle di A1, `~/a2`, `prima-a7`, `~/a7`, `prima-a5`, `~/a5` | una settimana senza problemi dopo ciascuna installazione (A7 e A5: dal 28 novembre) | MS prepara, C lancia | aperto | registro, 17–21 novembre |
 | 4 | Pubblicazione in produzione di ciò che è solo nello staging | decisione del committente; CI verde | C | pronta | registro, 20–21 novembre |
 | 5 | A3 Q8: «Rigenera» degli Shelly di `lab-01`, poi distruzione del vecchio segreto `langbrain-shelly-lab-01-devices` | con Y e gli Shelly accesi in ufficio | C, Y | aperto | `procedura-installazione-a3.md` |
+| 44 | Correggere i due difetti gravi dell'attacco da fuori: F-2 (corpo enorme che fa cadere il server) e F-1 (persona rimossa che rientra); poi il controllo in sola lettura di chi fosse già rientrato | subito (D-198) | o1, revisore, C per il controllo | aperto | `DOMOTICA/revisione-attacco-da-fuori/ESITO.md` |
+| 45 | Correggere i difetti medi e bassi dell'attacco da fuori (F-3…F-12, F-16), con una prova automatica per ognuno | dopo la 44; F-3 prima del primo appartamento vero | o1, o2 | aperto | `ESITO.md` |
+| 46 | Decisioni sui difetti F-13 (tetto dell'assistente per organizzazione), F-14 (invito che porta via una persona), F-15 (scadenza per inattività) | prima della loro correzione | C | aperto | `ESITO.md` |
+| 47 | Verifiche dal vivo in sola lettura dell'attacco da fuori (12: memoria e limiti di Cloud Run, istanze, firewall della VM, impostazioni di Firebase…) | nessuna | MS | aperto | `ESITO.md`, sezione 4 |
+| 48 | Guida, parte 1: «Come è stato controllato DOMHOUSE», dalla bozza `DOMOTICA/testi-guida/controlli-fatti-bozza.md` (cinque punti «da verificare»); i difetti dell'attacco da fuori si descrivono dopo la correzione | con le correzioni pubblicate | MS | bozza fatta | bozza |
 
 ### B. Obblighi prima del primo appartamento vero
 
 | N. | Cosa | Condizione per partire | Chi | Stato | Dettaglio |
 |---|---|---|---|---|---|
-| 6 | Decisione scritta per ogni tipo di controllo mai fatto: attacco da fuori, ripristino vero dalle copie, dipendenze, sicurezza in appartamento, usabilità, ritorni indietro, lungo periodo | nessuna: si può fare ora | MS con o1 e o2; decide C | in corso: sicurezza dentro la VM fatta il 17 novembre; attacco da fuori deciso (1219 = a), revisione da avviare | `produzione-cosa-manca.md` D.2 |
+| 6 | Decisione scritta per ogni tipo di controllo mai fatto: attacco da fuori, ripristino vero dalle copie, dipendenze, sicurezza in appartamento, usabilità, ritorni indietro, lungo periodo | nessuna: si può fare ora | MS con o1 e o2; decide C | in corso: sicurezza dentro la VM fatta il 17 novembre; attacco da fuori: revisione fatta il 22 novembre, 16 difetti confermati (voci 44–48); restano sei tipi | `produzione-cosa-manca.md` D.2 |
 | 7 | Prova di carico (P-84) | di notte, prima del passaggio in produzione | C lancia | strumento pronto | `procedura-prova-di-carico.md` |
 | 8 | Verifica in due passaggi all'accesso (P-69) | nessuna | o2, o1, MS, comandi di C | aperto | registro, P-69 |
 | 9 | Il sito resta vecchio dopo una pubblicazione (P-92, con E-29) | decisione fra le strade a, b, c | C, poi o2 | aperto | registro, P-92 |
