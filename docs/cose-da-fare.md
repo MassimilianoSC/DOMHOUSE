@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1235 |
+| **Ultima domanda al committente** | 1236 |
 
 ## 2. Cose da fare
 
@@ -28,10 +28,10 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 3 | Togliere le copie per tornare indietro: `prima-passo3` e la sua copia del disco, `prima-e38`, `~/e38`, quelle di A1, `~/a2`, `prima-a7`, `~/a7`, `prima-a5`, `~/a5` | una settimana senza problemi dopo ciascuna installazione (A7 e A5: dal 28 novembre) | MS prepara, C lancia | aperto | registro, 17–21 novembre |
 | 4 | Pubblicazione in produzione di ciò che è solo nello staging (comprese le icone nuove di Luca, PR #19: dopo, controllare l'icona installando l'app; nella guida «chi ha già installato l'app la reinstalla per vedere l'icona nuova», su iPhone sempre) | decisione del committente; CI verde | C | pronta | registro, 20–21 novembre |
 | 5 | A3 Q8: «Rigenera» degli Shelly di `lab-01`, poi distruzione del vecchio segreto `langbrain-shelly-lab-01-devices` | con Y e gli Shelly accesi in ufficio | C, Y | aperto | `procedura-installazione-a3.md` |
-| 44 | Correggere i due difetti gravi dell'attacco da fuori: F-2 (corpo enorme che fa cadere il server) e F-1 (persona rimossa che rientra) | subito (D-198) | o1, revisore | in corso: mandato a o1 il 22 novembre (1220 = a) | `DOMOTICA/revisione-attacco-da-fuori/ESITO.md` |
+| 44 | Correggere i due difetti gravi dell'attacco da fuori: F-2 (corpo enorme che fa cadere il server) e F-1 (persona rimossa che rientra) | subito (D-198) | o1, revisore | corretti sul ramo `o1-attacco-f1-f2` (testa `531a728`), riletti, riserve corrette; mancano giro completo, unione e pubblicazione | `DOMOTICA/revisione-attacco-da-fuori/ESITO.md` |
 | 45 | Correggere i difetti medi e bassi dell'attacco da fuori (F-3…F-12, F-16), con una prova automatica per ognuno | dopo la 44; F-3 prima del primo appartamento vero | o1, o2 | aperto | `ESITO.md` |
 | 46 | Decisioni sui difetti F-13 (tetto dell'assistente per organizzazione), F-14 (invito che porta via una persona), F-15 (scadenza per inattività) | prima della loro correzione | C | aperto | `ESITO.md` |
-| 47 | Verifiche dal vivo in sola lettura dell'attacco da fuori (12: memoria e limiti di Cloud Run, istanze, firewall della VM, impostazioni di Firebase…) | tempo morto | MS | aperto | `ESITO.md`, sezione 4 |
+| 47 | Verifiche dal vivo in sola lettura dell'attacco da fuori (12: memoria e limiti di Cloud Run, istanze, firewall della VM, impostazioni di Firebase…) | tempo morto | MS, C per 3, 7, 8, 10 | in parte: 1, 2, 4, 5, 6, 11 fatti il 22 novembre (F-16 confermato, nessun Cloud Armor); restano 3, 7, 8, 9, 10 | `VERIFICHE-DAL-VIVO.md` |
 | 48 | Guida, parte 1: «Come è stato controllato DOMHOUSE», dalla bozza `DOMOTICA/testi-guida/controlli-fatti-bozza.md` (cinque punti «da verificare»); i difetti dell'attacco da fuori si descrivono dopo la correzione | con le correzioni pubblicate | MS | bozza fatta | bozza |
 | 49 | Prova di ripristino completa su copie: dati dell'app in un database nuovo, dati di un motore su un motore di prova, fotografia del disco accesa come VM temporanea; tempi e dati persi misurati; procedura «cosa fare se» | prima della produzione; tempo morto | MS prepara, C lancia, o1 | deciso (1221 = a) | `produzione-cosa-manca.md` D.2 |
 | 50 | Dipendenze, parte automatica: aggiornamenti di sicurezza della VM da soli con riavvio a orario fisso, Dependabot con la CI, controllo delle immagini con email | tempo morto | o1, MS prepara, C lancia | deciso (1222 = a) | `produzione-cosa-manca.md` D.2 |
