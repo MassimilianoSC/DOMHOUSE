@@ -109,7 +109,9 @@ def local_text(dt: datetime, tz: ZoneInfo) -> str:
 def workbook(r: Report, usage: Usage, generated_at: datetime) -> bytes:
     tz = ZoneInfo(r.timezone)
     buf = io.BytesIO()
-    wb = xlsxwriter.Workbook(buf, {"in_memory": True})
+    # F-9 (attack-from-outside review): names come from operators (devices), admins and Italianway: a text starting
+    # with «=» or «http» stays text, never a formula nor a live link
+    wb = xlsxwriter.Workbook(buf, {"in_memory": True, "strings_to_formulas": False, "strings_to_urls": False})
     bold = wb.add_format({"bold": True})
     title = wb.add_format({"bold": True, "font_size": 14})
     kwh = wb.add_format({"num_format": "0.00"})

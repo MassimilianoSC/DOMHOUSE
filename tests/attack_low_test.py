@@ -35,3 +35,27 @@ def test_f10_development_keeps_them(monkeypatch):
     monkeypatch.setattr(main, "get_settings", lambda: s)
     app = main.create_app()
     assert run(_get(app, "/openapi.json")).status_code == 200 and run(_get(app, "/docs")).status_code == 200
+
+
+# -------- F-9: a device named «=HYPERLINK(...)» became a formula or a live link in the consumption Excel --------
+def test_f9_names_are_text_never_formulas_nor_links_in_the_excel():
+    import io
+    import zipfile
+    from datetime import UTC, datetime
+    from bff import energy_report as er
+    start, end = datetime(2026, 10, 1, tzinfo=UTC), datetime(2026, 11, 1, tzinfo=UTC)
+    report = er.Report(organisation="=1+1", apartment="http://x.example", apartment_id="apt-f9", timezone="Europe/Rome",
+                       start=start, end=end, in_progress=False, price=0.25, title="Rendiconto mensile",
+                       period="ottobre 2026", stay={"booking_id": "=HYPERLINK(\"http://x.example\",\"clic\")",
+                                                    "guests": 2, "status": "confirmed"})
+    usage = er.Usage(hours={start: 1.5}, devices={"d1": ["=1+1", 1.0], "d2": ["http://x.example", 0.5],
+                                                 "d3": ["=HYPERLINK(\"http://x.example\",\"clic\")", 0.1]})
+    data = er.workbook(report, usage, end)
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        sheets = {n: z.read(n).decode("utf-8") for n in z.namelist() if n.startswith("xl/worksheets/")}
+        strings = z.read("xl/sharedStrings.xml").decode("utf-8")
+    assert sheets
+    for name, xml in sheets.items():
+        assert "<f>" not in xml and "<hyperlink" not in xml, name
+    assert not [n for n in sheets if "/_rels/" in n]                               # no link relationship at all
+    assert "=HYPERLINK" in strings and "=1+1" in strings and "http://x.example" in strings   # the names kept, as text
