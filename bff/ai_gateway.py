@@ -83,16 +83,18 @@ async def authenticate(apartment_id: str | None, key: str | None):
     apt = await repo.get_apartment(apartment_id)
     if apt is None:
         raise refused
+    # final rereading R-10: the state first, so an apartment that cannot be used (often one without a secret: A2 in
+    # preparation, half deleted) answers like an unknown id, with no read of Secret Manager and no log line each time
+    from .auth import tenant_status
+    from .creation import usable
+    if not apt.enabled or not usable(apt) or await tenant_status(repo, apt.tenant_id) != "active":
+        raise refused
     try:
         expected = await instances.api_key(apt)
     except Exception as exc:     # rereading B-2: a secret not there (A2 before it, after a deletion) is the same 401
         warn("assistant: apartment key not read", apartment_id=apartment_id, error=type(exc).__name__)
         raise refused from None
     if not hmac.compare_digest(key.encode(), expected.encode()):
-        raise refused
-    from .auth import tenant_status
-    from .creation import usable
-    if not apt.enabled or not usable(apt) or await tenant_status(repo, apt.tenant_id) != "active":
         raise refused
     return apt
 

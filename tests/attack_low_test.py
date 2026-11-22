@@ -503,3 +503,39 @@ def test_r5_an_inviters_name_out_of_the_rule_becomes_the_part_of_their_email(out
                                 "Clicca https://evil.example", "t-flatsharing-demo", inviter_email="capo-ufficio@esempio.it"))
     body = _body(outbox[0])
     assert "evil" not in body and "capo-ufficio ti ha invitato" in body and "Ciao Mario Rossi" in body
+
+
+# -------- final rereading R-10: an apartment that cannot be used answers 401 before its secret is read --------
+@pytest.mark.parametrize("state", ["disabled", "not_ready", "suspended"])
+def test_r10_no_secret_read_for_an_apartment_that_cannot_be_used(monkeypatch, state):
+    """B-2 gave the right 401, but every request with the id of an A2 apartment in preparation or half deleted read
+    Secret Manager (failed reads are not cached) and wrote a warn line, without limit, with a timing unlike an unknown
+    id. The state is now checked first: no read, as for an id that does not exist."""
+    from bff import auth, instances
+    from bff.repository import get_repository
+    from bff.repository.base import Creazione
+    repo = get_repository()
+    reads = []
+
+    async def counted(apt):
+        reads.append(apt.apartment_id)
+        return get_settings().instance_api_key_fallback
+    monkeypatch.setattr(instances, "api_key", counted)
+    apt = run(repo.get_apartment("apt-bologna-01")).model_copy(deep=True)
+    original = apt.model_copy(deep=True)
+    tenant = run(repo.get_tenant(apt.tenant_id))
+    try:
+        if state == "disabled":
+            apt.enabled = False
+        elif state == "not_ready":
+            apt.creazione = Creazione.model_construct(stato="in_preparazione", porta=8151)
+        run(repo.upsert_apartment(apt))
+        if state == "suspended":
+            run(repo.upsert_tenant(tenant.model_copy(update={"status": "suspended"})))
+            auth._known_tenants.clear()
+        r = run(_ai("apt-bologna-01", "chiave-qualsiasi"))
+        assert r.status_code == 401 and reads == [], (state, reads)
+    finally:
+        run(repo.upsert_apartment(original))
+        run(repo.upsert_tenant(tenant))
+        auth._known_tenants.clear()
