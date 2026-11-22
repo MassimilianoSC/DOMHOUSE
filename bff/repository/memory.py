@@ -1,6 +1,7 @@
 import copy
 import time
 
+from .base import reservable, reserved_after
 from .base import (SEQ_UNCHECKED, iso_seconds, migrated_document, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email)
 
@@ -279,6 +280,8 @@ class InMemoryRepository:
         return dict(u)
 
     async def reserve_ai_cost(self, month, amount, cap):
+        if not reservable(amount):
+            return False
         u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))
         u.setdefault("reserved_eur", 0.0)
         if u["cost_eur"] + u["reserved_eur"] + amount > cap:
@@ -288,7 +291,7 @@ class InMemoryRepository:
 
     async def settle_ai_cost(self, month, reserved, cost_eur, input_tokens, output_tokens, calls):
         u = self.ai_usage.setdefault(month, dict(EMPTY_AI_USAGE))
-        u["reserved_eur"] = max(0.0, u.get("reserved_eur", 0.0) - reserved)
+        u["reserved_eur"] = reserved_after(u.get("reserved_eur", 0.0), reserved, month)
         u["cost_eur"] += cost_eur
         u["calls"] += calls
         u["input_tokens"] += input_tokens

@@ -149,3 +149,43 @@ def test_the_engines_way_has_a_daily_count_per_apartment(model, monkeypatch):
     codes = [run(post(BODY)).status_code for _ in range(4)]
     assert codes == [200, 200, 200, 429], codes
     assert len(sent) == 3
+
+
+# -------- rereading of the medium fixes, P-1: a negative max_tokens made a negative reservation --------
+@pytest.mark.parametrize("value", [-1_000_000, 0, -1, True, 1.5, "100", 4097, 99_999])
+def test_p1_max_tokens_outside_1_to_the_setting_is_refused_and_reserves_nothing(model, monkeypatch, value):
+    """min(int(-10**9), 4096) reserved about -11,500 €: the cap then let every other call through, and at the settling
+    +11,500 € stayed reserved and the assistant stopped for everyone until the month ended."""
+    sent, _ = model
+    settings(monkeypatch, ai_twin_model="", ai_max_tokens=4096)
+    r = run(post({**BODY, "max_tokens": value}))
+    assert r.status_code == 422 and r.json()["error"] == "bad_request", (value, r.status_code, r.text[:200])
+    assert sent == [] and usage()["reserved_eur"] == 0.0
+
+
+def test_p1_a_valid_max_tokens_still_passes(model, monkeypatch):
+    sent, _ = model
+    settings(monkeypatch, ai_twin_model="", ai_max_tokens=4096)
+    assert run(post({**BODY, "max_tokens": 4096})).status_code == 200
+    assert run(post({**BODY, "max_tokens": 1})).status_code == 200 and sent[-1]["max_tokens"] == 1
+    assert run(post(BODY)).status_code == 200 and sent[-1]["max_tokens"] == 4096     # missing: the setting
+
+
+@pytest.mark.parametrize("amount", [-11_500.0, 0.0, float("nan"), float("inf"), float("-inf")])
+def test_p1_the_repository_never_takes_a_reservation_that_is_not_a_positive_number(amount):
+    repo = get_repository()
+    repo.ai_usage = {}
+    assert run(repo.reserve_ai_cost("2026-08", amount, 20.0)) is False
+    assert run(repo.get_ai_usage("2026-08"))["reserved_eur"] == 0.0
+
+
+def test_p1_settling_more_than_reserved_is_said_in_the_log_not_hidden(monkeypatch):
+    from bff.repository import base
+    seen = []
+    monkeypatch.setattr(base, "warn", lambda msg, **kw: seen.append((msg, kw)), raising=False)
+    repo = get_repository()
+    repo.ai_usage = {}
+    assert run(repo.reserve_ai_cost("2026-08", 0.5, 20.0)) is True
+    totals = run(repo.settle_ai_cost("2026-08", 0.8, 0.1, 10, 5, 1))
+    assert totals["reserved_eur"] == 0.0
+    assert [m for m, _ in seen] == ["assistant reservation below zero"]

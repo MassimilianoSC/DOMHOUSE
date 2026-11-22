@@ -1,7 +1,10 @@
+import math
 from datetime import UTC, datetime
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field, model_validator
+
+from ..logs import warn
 
 Role = Literal["admin", "operator", "viewer"]
 
@@ -223,6 +226,20 @@ UNSIGNED_LOG_LIMIT = 20
 # F-4: reserved_eur is what the calls running now may still cost at most (reserved before, settled after)
 EMPTY_AI_USAGE = {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0, "alerted": False,
                   "reserved_eur": 0.0}
+
+
+def reservable(amount) -> bool:
+    """Rereading of the medium fixes, P-1: a reservation is a positive finite number of euro; a negative one (from a
+    negative max_tokens) let every other call pass the cap, and left a huge reservation at its settling."""
+    return isinstance(amount, (int, float)) and not isinstance(amount, bool) and math.isfinite(amount) and amount > 0
+
+
+def reserved_after(current: float, reserved: float, month: str) -> float:
+    """What stays reserved after a settling; below zero is an accounting error: said in the log, never hidden."""
+    left = current - reserved
+    if left < -1e-9:
+        warn("assistant reservation below zero", month=month, missing_eur=round(-left, 6))
+    return max(0.0, left)
 
 
 def ai_stats_added(doc: dict | None, apartment_id: str, week: str, bounds: tuple[str, str], asks: int, timeouts: int,

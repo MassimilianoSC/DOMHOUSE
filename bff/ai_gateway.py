@@ -239,7 +239,12 @@ async def chat(apartment_id: str, body: dict, ask_id: str = "") -> dict:
     repo = get_repository()
     request = {k: v for k, v in body.items() if k in ("messages", "tools", "tool_choice", "temperature")}
     request["model"] = s.ai_model
-    request["max_tokens"] = min(int(body.get("max_tokens") or s.ai_max_tokens), s.ai_max_tokens)
+    # rereading P-1: an integer from 1 to AI_MAX_TOKENS, or missing (the setting); never clamped in silence (a negative
+    # one made a negative reservation)
+    asked = body.get("max_tokens")
+    if asked is not None and (type(asked) is not int or not 1 <= asked <= s.ai_max_tokens):
+        raise GatewayError(422, "bad_request", f"max_tokens deve essere un intero da 1 a {s.ai_max_tokens}")
+    request["max_tokens"] = s.ai_max_tokens if asked is None else asked
     if s.ai_reasoning_effort and not _reasoning_refused:
         request["reasoning_effort"] = s.ai_reasoning_effort
     # F-4 (attack-from-outside review): the cap was checked only before the call and the cost added after it, so calls

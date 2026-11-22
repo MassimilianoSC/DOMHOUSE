@@ -13,6 +13,7 @@ from google.cloud import firestore
 
 from .. import retention
 
+from .base import reservable, reserved_after
 from .base import (SEQ_UNCHECKED, iso_seconds, migrated_document, EMPTY_AI_USAGE, ai_stats_added, UNSIGNED_LOG_LIMIT, WEBHOOK_LOG_LIMIT, ActorRecord, AgentOp, Apartment, AuditEntry, AuditPerson, BookingRecord, PlatformMember, SupportAccess,
                    Tenant, User, WebhookLog, normalize_email, now_iso)
 
@@ -430,6 +431,8 @@ class FirestoreRepository:
             return await txn(self.db.transaction())
 
     async def reserve_ai_cost(self, month, amount, cap):
+        if not reservable(amount):
+            return False
         ref = self._col("ai_usage").document(month)
 
         @firestore.async_transactional
@@ -451,7 +454,7 @@ class FirestoreRepository:
         async def txn(tx):
             snap = await ref.get(transaction=tx)
             u = {**EMPTY_AI_USAGE, **(snap.to_dict() or {})} if snap.exists else dict(EMPTY_AI_USAGE)
-            u.update(reserved_eur=max(0.0, u["reserved_eur"] - reserved), cost_eur=u["cost_eur"] + cost_eur,
+            u.update(reserved_eur=reserved_after(u["reserved_eur"], reserved, month), cost_eur=u["cost_eur"] + cost_eur,
                      calls=u["calls"] + calls, input_tokens=u["input_tokens"] + input_tokens,
                      output_tokens=u["output_tokens"] + output_tokens, updated_at=now_iso())
             tx.set(ref, u)

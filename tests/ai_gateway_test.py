@@ -63,8 +63,8 @@ def test_only_an_engine_with_its_key(model):
 
 def test_the_bff_chooses_model_and_tokens_and_forwards_only_what_it_knows(model):
     from engine.assistant import TOOLS                 # F-4: tools only if they are the engine's own
-    run(post({**BODY, "model": "un-altro-modello", "max_tokens": 99_999, "stream": True, "temperature": 0.1,
-              "tools": TOOLS}))
+    assert run(post({**BODY, "max_tokens": 99_999})).status_code == 422   # rereading P-1: refused, never clamped
+    run(post({**BODY, "model": "un-altro-modello", "stream": True, "temperature": 0.1, "tools": TOOLS}))
     sent = model[0]
     assert sent["model"] == "google/gemini-3.5-flash" and sent["max_tokens"] == 4096
     assert "stream" not in sent and sent["temperature"] == 0.1 and sent["tools"] == TOOLS
