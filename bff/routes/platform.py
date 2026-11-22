@@ -160,17 +160,24 @@ def _euro(value: float) -> str:
     return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+QUOTA_MIN_EUR = 1.0
+
+
 def _quota_problem(body, cap: float):
-    """(the quota, None) or (None, the 422): null, or an amount from 0 to the project's cap with at most two decimals."""
+    """(the quota, None) or (None, the 422): null, 0, or an amount from 1 € to the project's cap with at most two
+    decimals. Final rereading R-7: a reservation is worth about 0.1-0.3 €, up to about 1.6 €, so a quota under 1 € worked
+    as 0 without anyone knowing."""
     import math
-    refused = err(422, "invalid_quota", f"La quota deve essere un importo da 0 a {_euro(cap)} € (al massimo due "
-                  f"decimali), oppure vuota per usare il tetto del progetto.")
+    refused = err(422, "invalid_quota", f"La quota deve essere 0 oppure un importo da {_euro(QUOTA_MIN_EUR)} a "
+                  f"{_euro(cap)} € (al massimo due decimali), oppure vuota per usare il tetto del progetto.")
     if not isinstance(body, dict) or "quota_eur" not in body:
         return None, refused
     q = body["quota_eur"]
     if q is None:
         return None, None
     if isinstance(q, bool) or not isinstance(q, (int, float)) or not math.isfinite(q) or not 0 <= q <= cap:
+        return None, refused
+    if 0 < q < QUOTA_MIN_EUR:
         return None, refused
     if abs(q * 100 - round(q * 100)) > 1e-6:
         return None, refused

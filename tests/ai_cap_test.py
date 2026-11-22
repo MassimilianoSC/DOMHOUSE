@@ -371,7 +371,7 @@ def test_f13_a_quota_of_zero_leaves_only_the_quick_assistant(model, monkeypatch,
     assert run(post(BODY)).status_code == 429 and sent == []
 
 
-@pytest.mark.parametrize("value", [-0.01, 20.01, 1.234, "5", True, float("nan")], ids=str)
+@pytest.mark.parametrize("value", [-0.01, 20.01, 1.234, "5", True, float("nan"), 0.05, 0.5, 0.99], ids=str)
 def test_f13_a_quota_out_of_its_rules_is_refused_in_italian(model, monkeypatch, two_tenants, value):
     settings(monkeypatch, ai_monthly_cap_eur=20.0)
     tenant_a, _ = two_tenants
@@ -386,8 +386,8 @@ def test_f13_a_quota_out_of_its_rules_is_refused_in_italian(model, monkeypatch, 
         r = run(quota_call("PUT", tenant_a, {"quota_eur": value}))
     assert r.status_code == 422 and r.json() == {
         "error": "invalid_quota",
-        "message": "La quota deve essere un importo da 0 a 20,00 € (al massimo due decimali), oppure vuota per usare il "
-                   "tetto del progetto."}, (value, r.text[:200])
+        "message": "La quota deve essere 0 oppure un importo da 1,00 a 20,00 € (al massimo due decimali), oppure vuota "
+                   "per usare il tetto del progetto."}, (value, r.text[:200])
     assert run(quota_call("PUT", tenant_a, {})).status_code == 422                    # the field is required
 
 
@@ -459,3 +459,13 @@ def test_b7_an_engine_refused_for_its_ask_daily_limit_says_why():
         load_config({**base, "ASK_DAILY_LIMIT": "500"})
     text = str(refused.value)
     assert "ASK_DAILY_LIMIT must be a number between 1 and 100" in text and "200" in text and "BFF" in text
+
+
+
+def test_r7_a_quota_of_one_euro_or_zero_is_taken(model, monkeypatch, two_tenants):
+    """Final rereading R-7: a reservation is worth about 0.1-0.3 €, up to about 1.6 €: a quota under 1 € worked as 0
+    without anyone knowing. 0 (only the quick assistant) or at least 1.00 €."""
+    settings(monkeypatch, ai_monthly_cap_eur=20.0)
+    tenant_a, _ = two_tenants
+    for value in (0, 1, 1.0, 20):
+        assert run(quota_call("PUT", tenant_a, {"quota_eur": value})).status_code == 200, value

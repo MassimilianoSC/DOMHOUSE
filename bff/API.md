@@ -866,7 +866,7 @@ vero: acceso in staging, spento in produzione, che i dimostrativi li rifiuta, D-
 | Rotta (solo gestori della piattaforma) | Risposta |
 |---|---|
 | `GET /app/platform/tenants/{tid}/ai-quota` | 200 `{tenant_id, quota_eur, month, spent_eur, project_cap_eur, project_spent_eur}`, dove `quota_eur` null vuol dire «tetto del progetto»; 404 `not_found` se l'organizzazione non esiste |
-| `PUT /app/platform/tenants/{tid}/ai-quota` `{quota_eur: numero o null}`, campo obbligatorio | 200 come il GET; 422 `invalid_quota` «La quota deve essere un importo da 0 a 20,00 € (al massimo due decimali), oppure vuota per usare il tetto del progetto.» (l'importo è il tetto attuale); 404. A ogni cambio una voce `ai_quota_changed` `{from, to}` nel registro dell'organizzazione e in quello della piattaforma |
+| `PUT /app/platform/tenants/{tid}/ai-quota` `{quota_eur: numero o null}`, campo obbligatorio | 200 come il GET; 422 `invalid_quota` «La quota deve essere 0 oppure un importo da 1,00 a 20,00 € (al massimo due decimali), oppure vuota per usare il tetto del progetto.» (il massimo è il tetto attuale; fra 0 e 1 € la quota varrebbe come 0, perché una prenotazione vale 0,1-0,3 €, fino a circa 1,6 €: rilettura finale R-7); 404. A ogni cambio una voce `ai_quota_changed` `{from, to}` nel registro dell'organizzazione e in quello della piattaforma |
 
 Ogni chiamata riuscita lascia nel log «assistant model call» (token, costo, secondi); dal lotto 28 anche ogni chiamata
 non riuscita lascia «assistant model call failed», con `error` (`timeout`, `model_error` o il tipo
