@@ -141,9 +141,25 @@ def shown(status: EmailStatus) -> str:
     return "failed" if status == "deferred" else status
 
 
+def _shown_names(display_name: str, inviter: str, inviter_email: str) -> tuple[str, str]:
+    """Final rereading R-5: names saved before F-11 are checked again when the email is written. The invited person's
+    name out of the rule is left out; the inviter's becomes the part of their email before «@» when that passes, else
+    their email (as when they have no name). An inviter shown by email is kept as it is."""
+    from .plain_text import acceptable_name
+    if display_name and not acceptable_name(display_name):
+        warn("invite: invited name left out of the email")
+        display_name = ""
+    if inviter and "@" not in inviter and not acceptable_name(inviter):
+        warn("invite: inviter's name left out of the email")
+        local = inviter_email.split("@")[0]
+        inviter = local if local and acceptable_name(local) else inviter_email
+    return display_name, inviter
+
+
 async def send_invitation(email: str, display_name: str, role: str, tenant_name: str, inviter: str,
-                          tenant_id: str) -> EmailStatus:
+                          tenant_id: str, inviter_email: str = "") -> EmailStatus:
     settings = get_settings()
+    display_name, inviter = _shown_names(display_name, inviter, inviter_email)
     if not settings.mail_configured:
         info("invite: email not sent, SMTP not configured", invite=invite_uid(email))
         return "not_configured"
