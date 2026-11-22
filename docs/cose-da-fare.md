@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1234 |
+| **Ultima domanda al committente** | 1235 |
 
 ## 2. Cose da fare
 
@@ -48,7 +48,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 7 | Prova di carico (P-84) | di notte, prima del passaggio in produzione | C lancia | strumento pronto | `procedura-prova-di-carico.md` |
 | 8 | Verifica in due passaggi all'accesso (P-69) | nessuna | o2, o1, MS, comandi di C | aperto | registro, P-69 |
 | 9 | Il sito resta vecchio dopo una pubblicazione (P-92, con E-29): avviso «versione nuova — Aggiorna» con ricaricamento automatico, più `index.html` sempre dalla rete (tolto il gestore fetch) | deciso (1227 = a); poi verifica sul telefono del committente | o2, poi C | in corso: mandato a o2 il 22 novembre (1228 = a) | registro, P-92 |
-| 11 | Procedura scritta di assistenza al gestore | lettura del committente delle righe «Proposta» | MS con C | bozza fatta (1234) | `procedura-assistenza-gestore.md` |
+| 11 | Procedura di assistenza al gestore: approvata (1234, 1235); da convertire in HTML | prima della produzione | MS | approvata, manca l'HTML | `procedura-assistenza-gestore.md` |
 | 12 | Informativa privacy approvata dal consulente del titolare; condizioni d'uso (P-70) | il consulente | C | bozza fatta | `informativa-privacy-bozza.md` |
 | 13 | Notifiche push provate su telefoni veri (P-11) | telefoni veri | C, colleghi | in parte | registro, P-11; `limiti-noti.md` |
 | 14 | Email dal dominio del prodotto e indirizzo dell'app (P-53): il dominio lo sceglie il cliente nel passo 8 (1233 = a), poi o1 collega e MS prepara i comandi | dopo la risposta del cliente (voce 19) | cliente, poi o1, MS, C | in attesa del cliente | registro, P-53 |
