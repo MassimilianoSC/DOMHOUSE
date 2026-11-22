@@ -19,6 +19,7 @@ from ..config import get_settings
 from ..invites import InviteRefused, create_invitation, send_invitation, shown
 from ..repository import Apartment, ExternalIds, PlatformMember, Tenant, get_repository, normalize_email
 from ..logs import warn
+from ..plain_text import PlainName
 from ..repository.base import now_iso, tenant_name_key
 from ..sse_hub import hub_manager
 from .admin import _check_tz, remove_apartment
@@ -38,7 +39,7 @@ def err(status: int, error: str, message: str, **details) -> JSONResponse:
 class TenantCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     admin_email: EmailStr
-    admin_display_name: str = Field(default="", max_length=80)
+    admin_display_name: PlainName = ""        # F-11: the first admin's name, in the invitation email too
 
 
 class TenantRename(BaseModel):
@@ -109,14 +110,13 @@ async def create_tenant(body: TenantCreate, identity: Identity = Depends(require
         invited = await create_invitation(tenant_id, body.admin_email, "admin", body.admin_display_name.strip())
     except InviteRefused as exc:
         await repo.release_tenant_name(key, tenant_id)
-        return err(409, "email_taken", exc.message)
+        return err(exc.status, exc.error or "email_taken", exc.message)
     t = await repo.upsert_tenant(Tenant(tenant_id=tenant_id, name=name, created_by=identity.email,
                                         first_admin_email=normalize_email(body.admin_email)))
     who = audit.by_platform(identity)
     await audit.record("tenant_created", who, tenant_id, audit.tenant_target(tenant_id, t.name))
     await audit.record("invite_sent", who, tenant_id, audit.user_target(invited), role="admin", apartment_ids="all")
-    status = await send_invitation(t.first_admin_email, body.admin_display_name.strip(), "admin", t.name,
-                                   identity.display_name or identity.email, tenant_id)
+    status = await send_invitation(t.first_admin_email, "admin", t.name, tenant_id, by_platform=True)
     if status == "deferred":
         await audit.record("invite_email_deferred", who, tenant_id, audit.user_target(invited))
     return {**await tenant_row(t, identity.uid), "email_status": shown(status)}
@@ -155,6 +155,71 @@ async def rename_tenant(tenant_id: str, body: TenantRename, identity: Identity =
     return await tenant_row(saved, identity.uid)
 
 
+# ---------- F-13 (answer 1242): the assistant's monthly quota of an organisation ----------
+def _euro(value: float) -> str:
+    return f"{value:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+QUOTA_MIN_EUR = 1.0
+
+
+def _quota_problem(body, cap: float):
+    """(the quota, None) or (None, the 422): null, 0, or an amount from 1 € to the project's cap with at most two
+    decimals. Final rereading R-7: a reservation is worth about 0.1-0.3 €, up to about 1.6 €, so a quota under 1 € worked
+    as 0 without anyone knowing."""
+    import math
+    refused = err(422, "invalid_quota", f"La quota deve essere 0 oppure un importo da {_euro(QUOTA_MIN_EUR)} a "
+                  f"{_euro(cap)} € (al massimo due decimali), oppure vuota per usare il tetto del progetto.")
+    if not isinstance(body, dict) or "quota_eur" not in body:
+        return None, refused
+    q = body["quota_eur"]
+    if q is None:
+        return None, None
+    if isinstance(q, bool) or not isinstance(q, (int, float)) or not math.isfinite(q) or not 0 <= q <= cap:
+        return None, refused
+    if 0 < q < QUOTA_MIN_EUR:
+        return None, refused
+    if abs(q * 100 - round(q * 100)) > 1e-6:
+        return None, refused
+    return round(float(q), 2), None
+
+
+async def _quota_view(t: Tenant) -> dict:
+    from ..ai_gateway import month_now
+    repo, month = get_repository(), month_now()
+    return {"tenant_id": t.tenant_id, "quota_eur": t.ai_monthly_quota_eur, "month": month,
+            "spent_eur": round((await repo.get_ai_usage(month, t.tenant_id))["cost_eur"], 4),
+            "project_cap_eur": get_settings().ai_monthly_cap_eur,
+            "project_spent_eur": round((await repo.get_ai_usage(month))["cost_eur"], 4)}
+
+
+@router.get("/tenants/{tenant_id}/ai-quota")
+async def get_ai_quota(tenant_id: str, identity: Identity = Depends(require_platform)):
+    t = await _get_tenant(tenant_id)
+    if isinstance(t, JSONResponse):
+        return t
+    return await _quota_view(t)
+
+
+@router.put("/tenants/{tenant_id}/ai-quota")
+async def set_ai_quota(tenant_id: str, body=Body(default=None), identity: Identity = Depends(require_platform)):
+    """null = only the project's cap (rule 2); 0 = only the quick assistant for this organisation; the project's cap
+    always counts too (bff/ai_gateway.py). One log entry in the organisation's log and one in the platform's."""
+    t = await _get_tenant(tenant_id)
+    if isinstance(t, JSONResponse):
+        return t
+    quota, refused = _quota_problem(body, get_settings().ai_monthly_cap_eur)
+    if refused:
+        return refused
+    old = t.ai_monthly_quota_eur
+    saved = await get_repository().update_tenant(tenant_id, {"ai_monthly_quota_eur": quota}) or t
+    if old != quota:
+        who, target = audit.by_platform(identity), audit.tenant_target(tenant_id, t.name)
+        for registry in (tenant_id, None):
+            await audit.record("ai_quota_changed", who, registry, target, **{"from": old, "to": quota})
+    return await _quota_view(saved)
+
+
 @router.post("/tenants/{tenant_id}/invite")
 async def resend_first_admin_invite(tenant_id: str, identity: Identity = Depends(require_platform)):
     t = await _get_tenant(tenant_id)
@@ -168,8 +233,7 @@ async def resend_first_admin_invite(tenant_id: str, identity: Identity = Depends
     if not u.uid.startswith("inv-"):
         return err(409, "already_active", "L'amministratore ha già effettuato l'accesso")
     await audit.record("invite_resent", audit.by_platform(identity), tenant_id, audit.user_target(u))
-    status = await send_invitation(u.email, u.display_name, "admin", t.name, identity.display_name or identity.email,
-                                   tenant_id)
+    status = await send_invitation(u.email, "admin", t.name, tenant_id, by_platform=True)
     if status == "deferred":
         await audit.record("invite_email_deferred", audit.by_platform(identity), tenant_id, audit.user_target(u))
     return {**await tenant_row(t, identity.uid), "email_status": shown(status)}
@@ -435,11 +499,13 @@ async def create_tenant_apartment(tenant_id: str, body: ApartmentCreate, identit
 # ---------- A2: an apartment created from the app (docs/proposta-a2.md §2) ----------
 def _made_by_the_app(apt: Apartment) -> JSONResponse | None:
     """Code review A2, point 5: the old link and delete would leave engine, broker and secrets behind and free the
-    port: an apartment created from the app changes only through its creation («Riprova», «Annulla»), until A6."""
+    port: an apartment created from the app changes its link only through its creation; its Italianway code changes
+    here (usability reading), its deletion is A6's. The message names the site's buttons (a6, 22 November)."""
     if apt.creazione is None:
         return None
-    return err(409, "created_from_app", "Questo appartamento è stato creato dall'app: si gestisce dalla sua "
-               "creazione («Riprova», «Annulla»); l'eliminazione arriverà con A6.")
+    return err(409, "created_from_app", "Questo appartamento è stato creato dall'app: il collegamento si gestisce dalla "
+               "sua creazione («Riprova», «Annulla creazione»); il codice Italianway si cambia con «Codice Italianway», "
+               "l'eliminazione con «Disattiva» ed «Elimina».")
 
 
 
@@ -572,7 +638,9 @@ async def relink_tenant_apartment(tenant_id: str, apartment_id: str, body: Apart
     apt = await _tenant_apartment(tenant_id, apartment_id)
     if isinstance(apt, JSONResponse):
         return apt
-    if refused := _made_by_the_app(apt):
+    # usability reading (22 November, D-198): «Nuovo appartamento» says the Italianway code «Si può aggiungere anche
+    # dopo»; on an apartment created from the app only that code changes here (its link stays the creation's)
+    if (refused := _made_by_the_app(apt)) and body.model_fields_set != {"italianway_id"}:
         return refused
     repo = get_repository()
     old_url, old_port, old_code, old_sim = apt.instance_url, apt.port, apt.external_ids.italianway, apt.simulated
@@ -626,6 +694,8 @@ async def relink_tenant_apartment(tenant_id: str, apartment_id: str, body: Apart
     who, target = audit.by_platform(identity), audit.apartment_target(saved.apartment_id, saved.name)
     if (saved.instance_url, saved.port) != (old_url, old_port):   # also for mock://, where link_key ignores the port
         await audit.record("apartment_relinked", who, tenant_id, target)
+        # F-3: a trace in the process log too, with the manager's uid (never the email); no email to anyone (a6)
+        warn("apartment relinked", apartment_id=saved.apartment_id, by=identity.uid)
     if new_code != old_code:
         await audit.record("italianway_changed", who, tenant_id, target, **{"from": old_code, "to": new_code})
     if saved.simulated != old_sim:

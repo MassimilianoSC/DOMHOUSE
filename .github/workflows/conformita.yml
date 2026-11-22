@@ -7,6 +7,8 @@
 #  3. i repository (memoria e Firestore, con emulatore) passino la suite condivisa;
 #  4. il sito passi le sue prove (vitest) e quelle nel browser a 360 px (Playwright, D-155): nessuna pagina più larga
 #     dello schermo di un telefono, con una prova che controlla la misura stessa.
+#  5. le librerie non abbiano difetti noti gravi o critici (voce 50, risposta 1222 = a): pip-audit per server e motore,
+#     yarn audit per il sito; i difetti meno gravi si stampano e basta.
 # Se 1 o 2 falliscono, l'app sta usando qualcosa che il motore reale non avrà: fermarsi e correggere.
 name: conformita
 
@@ -232,3 +234,48 @@ jobs:
         env:
           PYTHON: python                # il BFF di sviluppo con il Python di setup-python
         run: yarn e2e
+
+  difetti-noti:
+    # Voce 50 (risposta 1222 = a): i difetti noti delle librerie. Rossa solo per i gravi o critici non accettati
+    # (.github/audit/gravi.py, .github/audit/accettati.yml), gli altri si stampano; OSV o un audit che non rispondono:
+    # uscita 2, da rilanciare. Server e motore: pip-audit sui requirements con le versioni fisse (non installa le librerie,
+    # solo pip-audit). Sito: yarn audit (yarn 1, basta yarn.lock) delle dipendenze che finiscono nel sito pubblicato; gli
+    # strumenti di sviluppo (devDependencies: vite, vitest…) non arrivano mai a un browser e si stampano soltanto. Le
+    # versioni le cambia o1, con le prove; gli aggiornamenti proposti arrivano da Dependabot (.github/dependabot.yml).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: pip-audit e le prove del controllo
+        run: |
+          # versioni fisse (rilettura D-3); PyYAML per l'elenco degli avvisi accettati, pytest per le prove di gravi.py
+          pip install pip-audit==2.10.1 PyYAML==6.0.3 pytest==8.3.5
+          python -m pytest .github/audit -q -p no:cacheprovider
+
+      - name: Difetti noti di server e motore (pip-audit)
+        run: |
+          # pip-audit esce con 1 quando trova qualcosa: decide gravi.py; senza il file JSON invece è un errore vero
+          for r in bff engine; do
+            pip-audit -r "$r/requirements.txt" --no-deps --disable-pip --format json -o "pip-audit-$r.json" || test -s "pip-audit-$r.json"
+          done
+
+      - name: Difetti noti del sito (yarn audit)
+        working-directory: frontend
+        run: |
+          # yarn 1 esce con la somma delle gravità trovate: decide gravi.py, che controlla anche che il riepilogo ci sia
+          yarn audit --groups dependencies --json > ../yarn-audit.json || true
+          yarn audit --groups devDependencies --json > ../yarn-audit-dev.json || true
+
+      - name: Gravi o critici fanno diventare rossa la CI
+        # .github/audit/accettati.yml: avvisi accettati per al massimo 30 giorni, con il motivo (risposta 1245 = a)
+        run: python .github/audit/gravi.py --pip pip-audit-bff.json --pip pip-audit-engine.json --yarn yarn-audit.json --accettati .github/audit/accettati.yml
+
+      - name: Strumenti di sviluppo del sito (solo stampa)
+        if: always()
+        run: python .github/audit/gravi.py --yarn yarn-audit-dev.json || true

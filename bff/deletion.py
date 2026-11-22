@@ -169,8 +169,13 @@ async def _recipients(tenant_id: str) -> list[str]:
     return sorted({e.strip().lower() for e in admins + managers})
 
 
+BY_PLATFORM, BY_ADMIN = "dal gestore della piattaforma", "da un amministratore"
+
+
 async def notify(apt: Apartment, what: str, who: str | None) -> None:
-    """«disattivato» or «eliminazione»: never blocks the change; a failure is a log line."""
+    """«disattivato» or «eliminazione»: never blocks the change; a failure is a log line. Rule of answer 1246: only
+    fixed text, the technical id (^[a-z0-9][a-z0-9-]*$, checked by the server on every way of creation) and the app's
+    address from the manifest; who is BY_PLATFORM or BY_ADMIN, never a name, and never the apartment's name."""
     try:
         if not _mail_ready():
             warn("deletion mail not sent", apartment_id=apt.apartment_id, motivo="posta_non_configurata")
@@ -182,22 +187,24 @@ async def notify(apt: Apartment, what: str, who: str | None) -> None:
             warn("deletion mail not sent", apartment_id=apt.apartment_id, motivo="limite_orario")
             return
         when = utcnow().strftime("%d/%m/%Y %H:%M UTC")
+        s = get_settings()
+        by = f" {who}" if who else ""
         if what == "disattivato":
-            subject = f"Appartamento disattivato: {apt.name}"
-            lines = [f"L'appartamento «{apt.name}» ({apt.apartment_id}) è stato disattivato il {when}"
-                     f"{' da ' + who if who else ''}.",
+            subject = f"Appartamento disattivato: {apt.apartment_id}"
+            lines = [f"L'appartamento {apt.apartment_id} è stato disattivato il {when}{by}.",
                      "Gli automatismi del sistema domotico continuano; notifiche, riepiloghi, prenotazioni ed export "
                      "Excel sono fermi finché non viene riattivato."]
             if origine(apt) != "dev":
                 lines.append(f"Da {stamp(utcnow() + WAIT)[:10]} il gestore della piattaforma potrà eliminarlo.")
         elif what == "riattivato":
-            subject = f"Appartamento riattivato: {apt.name}"
-            lines = [f"L'appartamento «{apt.name}» ({apt.apartment_id}) è stato riattivato il {when}"
-                     f"{' da ' + who if who else ''}.", "Notifiche, riepiloghi, prenotazioni ed export Excel ripartono."]
+            subject = f"Appartamento riattivato: {apt.apartment_id}"
+            lines = [f"L'appartamento {apt.apartment_id} è stato riattivato il {when}{by}.",
+                     "Notifiche, riepiloghi, prenotazioni ed export Excel ripartono."]
         else:
-            subject = f"Eliminazione avviata: {apt.name}"
-            lines = [f"L'eliminazione dell'appartamento «{apt.name}» ({apt.apartment_id}) è stata avviata il {when}"
-                     f"{' da ' + who if who else ''}.", "Non si può annullare: resta solo il recupero dello storico."]
+            subject = f"Eliminazione avviata: {apt.apartment_id}"
+            lines = [f"L'eliminazione dell'appartamento {apt.apartment_id} è stata avviata il {when}{by}.",
+                     "Non si può annullare: resta solo il recupero dello storico."]
+        lines.insert(1, f"Apri {s.mail_from_name} per vedere di quale appartamento si tratta: {s.app_public_url or ''}")
         lines.append("Se non te lo aspettavi, avvisa subito il gestore della piattaforma.")
         for to in await _recipients(apt.tenant_id):
             try:
@@ -232,7 +239,7 @@ async def disable(apt: Apartment, identity) -> Apartment:
     await _person(identity)
     await audit.record("apartment_disabled", audit.by_platform(identity), saved.tenant_id,
                        audit.apartment_target(saved.apartment_id, saved.name), da="gestore")
-    await notify(saved, "disattivato", identity.display_name or None)
+    await notify(saved, "disattivato", BY_PLATFORM)
     return saved
 
 
@@ -249,7 +256,7 @@ async def enable(apt: Apartment, identity) -> Apartment:
     await _person(identity)
     await audit.record("apartment_reenabled", audit.by_platform(identity), saved.tenant_id,
                        audit.apartment_target(saved.apartment_id, saved.name))
-    await notify(saved, "riattivato", identity.display_name or None)          # review, point 1
+    await notify(saved, "riattivato", BY_PLATFORM)          # review, point 1
     return saved
 
 
@@ -281,11 +288,11 @@ async def after_admin_switch(saved: Apartment, what: str | None, user) -> None:
     if what == "disabled":
         await audit.record("apartment_disabled", audit.by_user(user), saved.tenant_id,
                            audit.apartment_target(saved.apartment_id, saved.name), da="amministratore")
-        await notify(saved, "disattivato", getattr(user, "display_name", None) or None)
+        await notify(saved, "disattivato", BY_ADMIN)
     elif what == "enabled":
         await audit.record("apartment_reenabled", audit.by_user(user), saved.tenant_id,
                            audit.apartment_target(saved.apartment_id, saved.name))
-        await notify(saved, "riattivato", getattr(user, "display_name", None) or None)
+        await notify(saved, "riattivato", BY_ADMIN)
 
 
 # ---- «Elimina» ---------------------------------------------------------------------------------------------------
@@ -346,7 +353,7 @@ async def start(apt: Apartment, nome, identity) -> tuple[int, dict]:
     if kind != "app":                                # only the record (answer 1210, point 4)
         await audit.record("apartment_deletion_started", audit.by_platform(identity), apt.tenant_id, target,
                            origine=kind)
-        await notify(saved, "eliminazione", identity.display_name or None)
+        await notify(saved, "eliminazione", BY_PLATFORM)
         try:
             await _remove(saved)
         except Exception as exc:                                 # noqa: BLE001 - second reading: «Riprova», never a 500
@@ -356,7 +363,7 @@ async def start(apt: Apartment, nome, identity) -> tuple[int, dict]:
         await audit.record("apartment_deleted", audit.by_platform(identity), apt.tenant_id, target)
         return 200, {"eliminazione": {"stato": "eliminato"}}
     await audit.record("apartment_deletion_started", audit.by_platform(identity), apt.tenant_id, target, origine=kind)
-    await notify(saved, "eliminazione", identity.display_name or None)
+    await notify(saved, "eliminazione", BY_PLATFORM)
     await _send_togli(saved)                         # AgentError (502) goes up, saved «non_riuscita: non_inviato»
     return 202, {"eliminazione": await eliminazione_view(await get_repository().get_apartment(apt.apartment_id))}
 

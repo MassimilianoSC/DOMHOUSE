@@ -101,9 +101,12 @@ def test_staging_lists_only_the_engines_it_may_reach_and_needs_the_vms_address(r
     assert "value: 10.0.0.9:8100,10.0.0.9:8150-8169" in rendered
     out, calls, _ = repo("staging", env="SKIP_BUILD=1 VM_INTERNAL_IP=")
     assert out.returncode != 0 and "set VM_INTERNAL_IP" in out.stderr and "services replace" not in calls
-    out, _, rendered = repo("prod", env="SKIP_BUILD=1 VM_INTERNAL_IP=")
-    assert out.returncode == 0, out.stderr                                 # production has no list: not needed
-    assert "INSTANCE_ALLOWED" not in rendered
+    # F-3: production has its list too, filled the same way; without the address, no deploy
+    out, _, rendered = repo("prod")
+    assert out.returncode == 0, out.stderr
+    assert "value: 10.0.0.9:8100,10.0.0.9:8101-8149" in rendered
+    out, calls, _ = repo("prod", env="SKIP_BUILD=1 VM_INTERNAL_IP=")
+    assert out.returncode != 0 and "set VM_INTERNAL_IP" in out.stderr and "services replace" not in calls
 
 
 def test_staging_without_its_site_stops_before_writing_anything(repo):

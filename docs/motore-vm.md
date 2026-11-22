@@ -309,7 +309,7 @@ Risultato atteso: le impostazioni in vigore, oppure «tutte ai valori predefinit
 - `MODEL_BASE_URL` (facoltativa, nessun predefinito): l'indirizzo del server pubblicato (`https://…`). Con questa
   l'assistente dell'appartamento risponde con il modello vero, attraverso il server, dentro il tetto mensile del
   progetto (passo 9, D-143). Senza: assistente a parole chiave se il connector è simulato, altrimenti assistente spento;
-- `ASK_DAILY_LIMIT` (predefinito 50, da 1 a 1000): domande all'assistente al giorno per appartamento; oltre, «Limite di
+- `ASK_DAILY_LIMIT` (predefinito 50, da 1 a 100; il server ne conta al massimo 200 per giorno UTC): domande all'assistente al giorno per appartamento; oltre, «Limite di
   50 domande al giorno raggiunto per questo appartamento: riprova domani»;
 - `DEMO_VARIANT` (`auto`, `vuoto`, `occupato`; predefinito `auto`; solo con `CONNECTOR=simulated`): variante del
   dimostrativo al primo avvio dell'appartamento (`vuoto` = nessun ospite, casa fredda; `occupato` = soggiorno in corso;

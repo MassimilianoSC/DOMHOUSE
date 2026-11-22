@@ -25,7 +25,7 @@ def smtp(monkeypatch):
     sent = []
     configured = dataclasses.replace(get_settings(), smtp_user="mittente@esempio.it", smtp_password="x")
     monkeypatch.setattr(invites, "get_settings", lambda: configured)
-    monkeypatch.setattr(invites, "_password_link", lambda email, name: None)
+    monkeypatch.setattr(invites, "_password_link", lambda email: None)
     monkeypatch.setattr(invites, "_send", lambda msg: sent.append(msg["To"]))
     get_repository().mail_counts.clear()
     run(get_repository().upsert_tenant(Tenant(tenant_id=TENANT, name="Limiti")))
@@ -35,14 +35,14 @@ def smtp(monkeypatch):
 def send(email, tenant=TENANT, now=None):
     if now is not None:
         return run(_at(now, email, tenant))
-    return run(invites.send_invitation(email, "", "viewer", "Limiti", "Admin", tenant))
+    return run(invites.send_invitation(email, "viewer", "Limiti", tenant))
 
 
 async def _at(now, email, tenant):
     real = invites.mail_buckets
     invites.mail_buckets = lambda e, t: real(e, t, now)
     try:
-        return await invites.send_invitation(email, "", "viewer", "Limiti", "Admin", tenant)
+        return await invites.send_invitation(email, "viewer", "Limiti", tenant)
     finally:
         invites.mail_buckets = real
 

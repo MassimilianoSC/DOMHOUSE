@@ -7,11 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/primitives";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { t } from "@/i18n";
+import { invalidText } from "@/lib/actions";
+import { isShared } from "@/lib/sharedDevice";
 import { env } from "@/lib/utils";
 
 const MIN_PASSWORD = 8;
 
 const Section = SettingsSection;
+
+/** Thrown by an action that already showed its problem under the field: no toast for it. */
+const QUIET = Symbol("shown under the field");
 
 /** Runs an account action with a busy flag; Firebase and BFF errors become an Italian toast. */
 function useAction() {
@@ -23,7 +28,7 @@ function useAction() {
       if (success) toast.success(success);
       return true;
     } catch (err) {
-      toast.error(authErrorMessage(err), { duration: 8000 });
+      if (err !== QUIET) toast.error(authErrorMessage(err), { duration: 8000 });
       return false;
     } finally {
       setBusy(false);
@@ -35,11 +40,22 @@ function useAction() {
 function DisplayName() {
   const { me, refreshMe } = useAuth();
   const [name, setName] = useState(me?.user.display_name ?? "");
+  // F-11: the server's sentence under the name (too long, characters not allowed, a web address)
+  const [problem, setProblem] = useState<string | null>(null);
   const { busy, run } = useAction();
   const save = (e: FormEvent) => {
     e.preventDefault();
     void run(async () => {
-      await bffFetch("/app/me", { method: "PATCH", body: { display_name: name.trim() } });
+      try {
+        await bffFetch("/app/me", { method: "PATCH", body: { display_name: name.trim() } });
+      } catch (err) {
+        const refused = invalidText(err);
+        if (refused?.field === "display_name") {
+          setProblem(refused.message);
+          throw QUIET;
+        }
+        throw err;
+      }
       await refreshMe();
     }, t("account.nameSaved"));
   };
@@ -47,11 +63,30 @@ function DisplayName() {
     <form onSubmit={save} className="flex flex-wrap items-end gap-3" data-testid="account-name-form">
       <div className="min-w-[200px] flex-1 space-y-1.5">
         <Label htmlFor="acc-name">{t("account.displayName")}</Label>
-        <Input id="acc-name" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} data-testid="account-name-input" />
+        <Input
+          id="acc-name"
+          maxLength={80}
+          value={name}
+          aria-invalid={Boolean(problem)}
+          aria-describedby={problem ? "acc-name-problem" : undefined}
+          onChange={(e) => {
+            setProblem(null);
+            setName(e.target.value);
+          }}
+          data-testid="account-name-input"
+        />
+        {problem && <p id="acc-name-problem" className="text-xs font-medium text-negative-fg" role="alert" data-testid="account-name-problem">{problem}</p>}
       </div>
       <Button type="submit" variant="outline" disabled={busy || name.trim() === (me?.user.display_name ?? "")} data-testid="account-name-save">{t("common.save")}</Button>
     </form>
   );
+}
+
+/** F-15: while this device is shared for this person (the box at the last sign-in). */
+function SharedDeviceNote() {
+  const { me } = useAuth();
+  if (!me || !isShared(me.user.uid)) return null;
+  return <p className="mt-3 text-sm text-muted-foreground" data-testid="account-shared-device">{t("account.sharedDevice")}</p>;
 }
 
 function ChangePassword() {
@@ -133,6 +168,7 @@ export function AccountSettings({ profile }: { profile?: ReactNode }) {
         {profile}
         <div className={profile ? "mt-4 border-t pt-4" : undefined}>
           <DisplayName />
+          <SharedDeviceNote />
         </div>
       </Section>
 

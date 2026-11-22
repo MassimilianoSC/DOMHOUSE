@@ -149,7 +149,7 @@ describe("Elimina", () => {
     expect(dialog).toHaveTextContent("lab-ponte");
     expect(dialog).toHaveTextContent("Residenze Esempio");
     expect(dialog).toHaveTextContent("Si perdono il sistema domotico con i suoi dati e le credenziali dei dispositivi; l'appartamento sparisce dall'app per tutti i suoi utenti.");
-    expect(dialog).toHaveTextContent("Restano prenotazioni e riepiloghi per 12 mesi e il registro attività per 24 mesi. Lo storico del sistema domotico si può recuperare per 30 giorni, con l'aiuto del supporto.");
+    expect(dialog).toHaveTextContent("Restano prenotazioni e riepiloghi per 12 mesi e il registro dell'organizzazione per 24 mesi. Lo storico del sistema domotico si può recuperare per 30 giorni, con l'aiuto dell'assistenza HQE.");
     expect(dialog).toHaveTextContent("L'ID lab-ponte non si potrà più usare.");
     expect(dialog).toHaveTextContent("Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.");
     expect(q("apt-delete-manual")).toBeNull();
@@ -180,9 +180,9 @@ describe("Elimina", () => {
   it("collegato a mano: l'avviso del motore che resta; nessuno storico; tolto subito", async () => {
     s.deleteApartment.mockResolvedValue({ eliminazione: elim({ stato: "eliminato" }) });
     const dialog = await openDelete(off({ apartment_id: "lab-01", name: "Laboratorio", origine: "a_mano", creazione: null }));
-    expect(screen.getByTestId("apt-delete-manual")).toHaveTextContent("Il sistema domotico sulla macchina virtuale resta: va tolto a mano dal supporto.");
+    expect(screen.getByTestId("apt-delete-manual")).toHaveTextContent("Il sistema domotico sulla macchina virtuale resta: lo toglie a mano l'assistenza HQE.");
     expect(dialog).toHaveTextContent("L'appartamento sparisce dall'app per tutti i suoi utenti.");
-    expect(dialog).toHaveTextContent("Restano prenotazioni e riepiloghi per 12 mesi e il registro attività per 24 mesi.");
+    expect(dialog).toHaveTextContent("Restano prenotazioni e riepiloghi per 12 mesi e il registro dell'organizzazione per 24 mesi.");
     expect(dialog).not.toHaveTextContent("Lo storico");
     type(field(), "Laboratorio");
     await click(confirm());
@@ -250,7 +250,7 @@ describe("la riga dell'eliminazione", () => {
     expect(within(r).getByTestId("deletion-state-lab-ponte")).toHaveTextContent("Eliminazione non riuscita");
     const box = within(r).getByTestId("deletion-what-lab-ponte");
     expect(box).toHaveTextContent("Cosa è successo");
-    expect(box).toHaveTextContent("Il sistema domotico è stato tolto, ma le chiavi no: «Riprova».");
+    expect(box).toHaveTextContent("Il sistema domotico è stato tolto, ma le chiavi no: premi «Riprova».");
     expect(box).toHaveTextContent("Si è fermata a: chiavi (passo 2 di 3)");
     expect(box).toHaveTextContent("Ultimo tentativo: 20 nov 2026, 16:55, Giulia Rossi");
     expect(within(box).getByTestId("deletion-op-lab-ponte")).toHaveTextContent(OP.slice(0, 8));
@@ -288,5 +288,34 @@ describe("rilettura e avviso alla fine", () => {
     const calls = s.apartments.mock.calls.length;
     await wait(12_000);
     expect(s.apartments).toHaveBeenCalledTimes(calls);
+  });
+});
+
+// Usability reading (22 Nov, answers of the memoria): what stays on the walls (5.2), and the apartment's ID where the
+// row has no request ID (8.1).
+describe("testi dalla lettura di usabilità", () => {
+  const DEVICES = "Gli Shelly restano montati e, per quanto sappiamo oggi, restano come sono in quel momento: se la caldaia è accesa, può restare accesa senza che nessuno la comandi. Prima di eliminare metti l'appartamento in «Casa vuota», oppure fai togliere gli Shelly.";
+
+  it("«Elimina» di un appartamento creato dall'app: la riga gialla su Shelly e caldaia", async () => {
+    await open([off()]);
+    await click(screen.getByTestId("platform-apt-delete-lab-ponte"));
+    expect(screen.getByTestId("apt-delete-devices")).toHaveTextContent(DEVICES);
+  });
+
+  it.each(["a_mano", "dimostrativo"] as const)("%s: niente riga (il sistema domotico resta, o non ci sono Shelly)", async (origine) => {
+    await open([off({ origine, creazione: null })]);
+    await click(screen.getByTestId("platform-apt-delete-lab-ponte"));
+    expect(q("apt-delete-devices")).toBeNull();
+    if (origine === "a_mano") expect(screen.getByTestId("apt-delete-manual")).toHaveTextContent("Il sistema domotico sulla macchina virtuale resta: lo toglie a mano l'assistenza HQE.");
+  });
+
+  it("eliminazione ferma senza un ordine dietro: l'ID dell'appartamento, con la sua etichetta, al posto dell'ID richiesta", async () => {
+    await open([off({ eliminazione: elim({ stato: "non_riuscita", passo: "database", codice: "errore_interno", op: null }) })]);
+    const box = screen.getByTestId("deletion-what-lab-ponte");
+    expect(box).toHaveTextContent("Errore interno del server. Premi «Riprova»; se succede ancora, scrivi all'assistenza HQE con l'ID qui sotto.");
+    expect(box).toHaveTextContent("ID dell'appartamento");
+    expect(box).not.toHaveTextContent("ID richiesta");
+    expect(within(box).getByTestId("deletion-apt-id-lab-ponte")).toHaveTextContent("lab-ponte");
+    expect(q("deletion-op-lab-ponte")).toBeNull();
   });
 });

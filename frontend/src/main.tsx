@@ -7,6 +7,8 @@ import { Toaster } from "sonner";
 import App from "./App";
 import { AuthProvider } from "./auth/AuthProvider";
 import { ErrorBoundary } from "./components/layout/PageProblem";
+// P-92: reads the files of this page at start-up, before any page block is loaded
+import { VersionWatcher } from "./components/layout/VersionWatcher";
 import { TooltipProvider } from "./components/ui/primitives";
 // P-83, D55: the fonts are part of the site, no request to Google (Manrope variable 200–800, all scripts by
 // unicode-range; JetBrains Mono for codes and identifiers, Latin only)
@@ -36,6 +38,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
           <TooltipProvider>
             <BrowserRouter>
               <App />
+              <VersionWatcher />
             </BrowserRouter>
             <Toaster position="top-center" richColors closeButton toastOptions={{ className: "font-sans" }} />
           </TooltipProvider>

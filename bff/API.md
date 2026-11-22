@@ -19,6 +19,31 @@ esterni. Nessuna route chiamata dalla PWA manca nel BFF, nessun campo letto dall
 
 Quando il token non si riesce a controllare (tempo massimo `TOKEN_CHECK_TIMEOUT_S`, 10 s, o chiavi pubbliche di Google non raggiungibili) tutte le route autenticate rispondono 503 `auth_unavailable` «Controllo dell'accesso non disponibile: riprova tra poco»: è un intoppo, la sessione resta valida (D-198). Token sbagliato o scaduto: 401 come sempre.
 
+**Revoca quando Firebase non risponde (F-8, revisione «attacco da fuori», 22 novembre 2026).**
+- Firebase risponde con un errore ma il server conosce già la risposta: vale l'ultima risposta nota, anche vecchia.
+- Firebase risponde con un errore e il server non sa nulla: 503 `auth_unavailable`, non più «valido».
+- Un account disattivato dalla console di Firebase vale come revocato: 401.
+- Uno stream già aperto resta aperto finché Firebase non risponde, come prima.
+
+**Dimensione del corpo (F-2, revisione «attacco da fuori», 22 novembre 2026).** Ogni richiesta con un corpo oltre il suo limite riceve 413 `payload_too_large` «Richiesta troppo grande», prima di qualsiasi lettura, controllo d'accesso o firma (`bff/body_limit.py`, il middleware più esterno). Limiti: 256 KiB per `/internal/ai/chat`, 64 KiB per tutto il resto (`/app/*`, `/webhooks/*`, `/internal/agent/*`). Vale sia con `Content-Length` sia per i corpi a pezzi. I corpi legittimi più grandi, misurati il 22 novembre: la richiesta dell'assistente per un appartamento di 200 dispositivi circa 77 KiB; tutte le regole cambiate insieme 0,7 KiB; la copia delle regole verso 100 appartamenti 7,5 KiB. Il 413 non porta le intestazioni CORS: il sito vede un errore di rete, ma nessuna sua richiesta si avvicina al limite.
+
+**Record creato dai claim (F-1, stessa revisione).**
+- **Chi lo riceve:** chi entra con i claim dell'ambiente ma senza record (per esempio il primo amministratore di `scripts/set_claims.py`). Il record si crea solo se Firebase ha ancora gli stessi claim: Firebase si legge prima della scrittura e di nuovo dopo. Se il secondo controllo non riesce, per qualsiasi motivo (anche una richiesta annullata), il record si cancella. Chi non è amministratore parte senza appartamenti (`apartment_ids: []`): glieli assegna l'admin (decisione della memoria storica, 22 novembre). L'amministratore li vede tutti, come prima.
+- **Claim che non ci sono più** (tolti con la persona, oppure account eliminato): 403 `forbidden`, nessun record.
+- **Firebase non risponde:** 503 `auth_unavailable`.
+- **Perché:** il token di una persona rimossa conserva i claim fino a un'ora. Prima della correzione la persona rientrava con tutti gli appartamenti.
+- **Rimozione e «Elimina il mio account»:** il record si cancella una seconda volta dopo l'operazione su Firebase.
+**Testi liberi (F-11, stessa revisione).**
+- **Quali campi:** il nome dell'invitato (`POST /app/admin/users`), il nome cambiato dall'admin (`PATCH /app/admin/users/{uid}`), il proprio nome (`PATCH /app/me`), il nome del primo admin di un'organizzazione nuova (`POST /app/platform/tenants`) e l'indirizzo dell'appartamento (`PATCH /app/admin/apartments/{id}`, controllato solo quando cambia).
+- **Limiti:** il nome al massimo 80 caratteri, l'indirizzo 200.
+- **Cosa non possono contenere:** caratteri di controllo, caratteri invisibili di direzione e simili (per categoria Unicode). Dalla risposta 1246 nessuna email contiene testi scritti dagli utenti (vedi «Testi delle email»), quindi un testo che si legge come un indirizzo web è ammesso.
+- **Altrimenti:** 422 `{"error": "invalid_text", "field": "display_name" | "address", "message"}` (`bff/plain_text.py`, gestore in `bff/main.py`). I messaggi:
+  - «Il nome può avere al massimo 80 caratteri.» oppure «L'indirizzo può avere al massimo 200 caratteri.»;
+  - «Il nome contiene caratteri non ammessi.» oppure «L'indirizzo contiene caratteri non ammessi.»;
+- Gli altri errori di validazione restano il 422 solito di FastAPI.
+
+- **Push, preferenze e nome** (`POST`/`DELETE /app/push/subscribe`, `GET /app/push/status`, `PUT /app/me/notification-prefs`, `PATCH /app/me`): cambiano solo un record che esiste, mai uno ricreato. Se il record è sparito nel frattempo: 404 `not_found` «Utente inesistente». `PATCH /app/me` aggiorna comunque il nome del gestore della piattaforma.
+
 Mock: il motore simulato (`/mock/...`, solo con `INSTANCE_MODE=mock`) risponde solo alla chiamata del BFF in
 loopback; una richiesta che arriva da internet (con `X-Forwarded-For`) riceve 404, e la chiave è casuale per processo (F2).
 
@@ -49,12 +74,12 @@ per utente»).
 | 9 | `GET·POST·PUT·PATCH·DELETE /app/apartments/{id}/instance/{path}` | `proxy` | USER; scrittura solo operator/admin; `_test` solo admin con simulatore; D-90: `version` solo admin, `ask` (anche `GET ask/{id}`) solo operator/admin | risposta dell'istanza 1:1; F1 (D-70): solo percorsi puliti sotto i prefissi del contratto (lista bianca), segmenti vuoti/`.`/`..` o `%` → 404 | `instanceApi` (`request`), `simulatorApi.state` | vedi «Proxy» |
 | 10 | `GET /app/apartments/{id}/bookings` | `list_bookings` | USER | `{items: [BookingRecord]}` senza `event_ids`, `last_event_type`, `updated_at`, `source` (D-90) | `useStays` (`useCurrentStay`) | `booking_id`, `checkin_at`, `checkout_at`, `guests`, `status` |
 | 11 | `POST /app/apartments/{id}/simulator/booking` | `simulator_booking` | USER + controllo interno: admin (altrimenti 403 `forbidden`) e appartamento `simulated` (altrimenti 403 `not_simulated`), in ogni ambiente (D-97); `guests`, se c'è, è un intero da 1 in su (D-189), altrimenti 422 `untranslatable` «Gli ospiti devono essere almeno 1» | `{correlation_id, …BookingIngestResult dell'istanza}` | `simulatorApi.booking` (`SimulatorPage`) | `duplicate`, `schedule_ids` |
-| 12 | `GET /app/apartments/{id}/stream` | `stream` (SSE) | USER | `text/event-stream`; `Last-Event-ID` solo in header; si chiude anche quando la sessione viene revocata («Esci da tutti i dispositivi», cambio di ruolo), controllo ogni 30 s (P-36 punto 10), con una chiusura normale quando il browser non legge più e ha `STREAM_QUEUE_MAX` eventi in attesa (500, D-198), e dopo `STREAM_MAX_S` secondi (240, chiusura normale della risposta, sotto il timeout di 300 s del servizio: il sito la riapre) | `useApartmentStream` (`fetchEventSource`) | eventi del contratto |
+| 12 | `GET /app/apartments/{id}/stream` | `stream` (SSE) | USER | `text/event-stream`; `Last-Event-ID` solo in header; si chiude anche quando la sessione viene revocata («Esci da tutti i dispositivi», cambio di ruolo), controllo ogni 30 s (P-36 punto 10), con una chiusura normale quando il browser non legge più e ha `STREAM_QUEUE_MAX` eventi in attesa (500, D-198), e dopo `STREAM_MAX_S` secondi (240, chiusura normale della risposta, sotto il timeout di 300 s del servizio: il sito la riapre). F-6: per istanza al massimo 10 stream aperti per persona e 200 in tutto; oltre, 429 `too_many_streams`, che il sito riprova come una riconnessione («Riconnessione…») | `useApartmentStream` (`fetchEventSource`) | eventi del contratto |
 | 13 | `GET /app/admin/users` | `list_users` | ADMIN | `[user_out]`: `uid, email, display_name, role, pending, push_tokens, apartment_ids` | `adminApi.users` (`AdminUsers`) | tutti |
-| 14 | `POST /app/admin/users` | `invite_user` | ADMIN | `user_out` + `email_status`; corpo con `apartment_ids` facoltativo; 409 `already_exists`: «È già un utente della tua organizzazione» se l'email è nella stessa organizzazione, «Questa email non può essere invitata» se è in un'altra (D-63, non rivela quale); idempotente: uid dell'invito derivato dall'email e creato in modo atomico, un doppio clic non crea due inviti (P-36); un'email già di un gestore della piattaforma → 409 neutro (F5) | `adminApi.invite` | `email`, `email_status` |
+| 14 | `POST /app/admin/users` | `invite_user` | ADMIN | `user_out` + `email_status`; corpo con `apartment_ids` facoltativo; 409 `already_exists`: «È già un utente della tua organizzazione» se l'email è nella stessa organizzazione, «Questa email non può essere invitata» se è in un'altra (D-63, non rivela quale), anche quando l'altra organizzazione, esistente e attiva, la abilita solo con i claim di Firebase, senza record (F-14; claim di un'organizzazione cancellata o sospesa non bloccano); 503 `auth_unavailable` se Firebase non risponde; idempotente: uid dell'invito derivato dall'email e creato in modo atomico, un doppio clic non crea due inviti (P-36); un'email già di un gestore della piattaforma → 409 neutro (F5) | `adminApi.invite` | `email`, `email_status` |
 | 15 | `POST /app/admin/users/{uid}/invite` | `resend_invite` | ADMIN | `user_out` + `email_status` (vedi «Limite sulle email di invito») | `adminApi.resendInvite` | `email`, `email_status` |
 | 16 | `PATCH /app/admin/users/{uid}` | `patch_user` | ADMIN | `user_out`; corpo con `apartment_ids` facoltativo; 409 `last_admin` «Deve restare almeno un amministratore nell'organizzazione» se il declassamento lascerebbe l'organizzazione senza admin, controllato in modo atomico anche fra due admin che si declassano a vicenda (P-36 punto 14) | `adminApi.patchUser` | rilettura via query |
-| 17 | `DELETE /app/admin/users/{uid}` | `delete_user` | ADMIN | 204; 409 `last_admin` come #16, atomico; l'account Firebase di un utente verificato o di un gestore non viene mai eliminato, solo sessioni revocate (F5); R4-1 (P-83): prima della revoca gli si tolgono i claim di questo ambiente che nominano l'organizzazione (`{"prod": …}` e quelli piatti di prima di P-67), così al login successivo non rientra; i claim di un'altra organizzazione restano. Chi ha ancora claim di un'organizzazione da cui è stato tolto e accetta un invito altrove entra dove è invitato: i claim seguono l'invito, e la copia vecchia in un token non lo riporta indietro (il record cambia organizzazione o ruolo solo se Firebase ha gli stessi claim in quel momento) | `adminApi.deleteUser` | – |
+| 17 | `DELETE /app/admin/users/{uid}` | `delete_user` | ADMIN | 204; 409 `last_admin` come #16, atomico; l'account Firebase di un utente verificato o di un gestore non viene mai eliminato, solo sessioni revocate (F5); R4-1 (P-83): prima della revoca gli si tolgono i claim di questo ambiente che nominano l'organizzazione (`{"prod": …}` e quelli piatti di prima di P-67), così al login successivo non rientra; i claim di un'altra organizzazione restano. Chi ha ancora claim di un'organizzazione da cui è stato tolto (prima di R4-1) e accetta un invito altrove entra dove è invitato: i claim seguono l'invito, e la copia vecchia in un token non lo riporta indietro (il record cambia organizzazione o ruolo solo se Firebase ha gli stessi claim in quel momento). Da F-14 l'invito però nasce solo se l'organizzazione dei claim non esiste più o è sospesa; se è attiva l'invito è rifiutato («Questa email non può essere invitata») finché il gestore della piattaforma non toglie i claim vecchi con `scripts/set_claims.py --orphan-claims --apply --email <email>` (rilettura finale, R-2) | `adminApi.deleteUser` | – |
 | 18 | `GET /app/admin/apartments` | `list_apartments` (`routes/admin.py`) → `apt_out` | ADMIN | `[Apartment + italianway_id]`, senza `instance_secret_name` (D-60) né `tenant_id`, `created_at`, `external_ids` (D-90); `last_check` = `{ok, checked_at, error}` o null, esito dell'ultima «Verifica connessione» (D-64); se l'errore riguarda la chiave dell'istanza `error` è «Chiave del sistema domotico non configurata: contatta l'assistenza HQE» (D-90: il nome del segreto lo vede solo la piattaforma); `simulated` in sola lettura (D-97) | `adminApi.apartments` (`AdminApartments`, `AdminFeatures`) | `apartment_id`, `name`, `address`, `timezone`, `instance_url`, `port`, `enabled`, `italianway_id`, `enabled_features` |
 | 19 | `POST /app/admin/apartments` | `create_apartment` | ADMIN | sempre 403 `platform_only`, in ogni modalità (D-64, D-77: gli appartamenti li crea solo la piattaforma, anche in staging); il corpo non viene letto | `adminApi.createApartment` | – |
 | 20 | `PATCH /app/admin/apartments/{id}` | `patch_apartment` | ADMIN | `apt_out`; 403 `platform_only` se `instance_url` o `port` sono DIVERSI da quelli salvati, in ogni modalità (D-77; il form che li rimanda uguali funziona, e quei valori si ignorano); 403 `platform_only` se `italianway_id` è diverso da quello salvato, anche `null` o `""` (D-72: il valore uguale rimandato dal form si ignora; l'admin lo legge soltanto); 422 `invalid_feature`, `secret_name_not_allowed`; nome, indirizzo, `enabled` e funzioni restano all'admin; D-177: `timezone` si accetta e si ignora (il fuso è l'impostazione `TIMEZONE` del motore); P-52: `energy_price_eur_kwh` (prezzo dell'appartamento, null = quello dell'organizzazione; 0–10 €/kWh, al massimo 4 decimali, altrimenti 422 `invalid_price`; nel registro `energy_price_changed`) | `adminApi.patchApartment` | – |
@@ -112,7 +137,7 @@ Rotte (tutte `require_platform`; un utente senza il ruolo riceve 403 «Operazion
 | `GET /app/platform/webhook-logs` | `unattributed_webhook_logs` | `[WebhookLog]` con `tenant_id` null (ultime 100); corpo oscurato anche per le chiamate senza firma valida (D-90) |
 | `GET /app/platform/tenants/{tid}/apartments` | `list_tenant_apartments` | `[{apartment_id, name, instance_url, port, enabled, timezone, italianway_id, last_check}]`: solo anagrafica tecnica (D-66) |
 | `POST /app/platform/tenants/{tid}/apartments` `{apartment_id, name, instance_url, port?, timezone?, enabled?, italianway_id?}` | `create_tenant_apartment` | 201 riga; 409 `link_in_use` se il collegamento è già di un altro appartamento; 409 `external_id_in_use` «Codice Italianway già in uso» se il codice è già di un altro appartamento, di qualsiasi organizzazione (prenotazione atomica, P-36 punto 7; spazi tolti, vuoto = nessun codice, D-72); l'id deve coincidere con l'istanza `lb-<id>` e il segreto `langbrain-api-key-<id>`; 409 «Identificativo non disponibile» se in uso o già usato (D-67); 422 `invalid_instance_url` (D-28), `invalid_timezone` |
-| `PATCH /app/platform/tenants/{tid}/apartments/{aid}` `{instance_url?, port?, italianway_id?}` | `relink_tenant_apartment` | riga; 409 `link_in_use`; 409 `external_id_in_use`; SOLO collegamento e codice Italianway (nome ed `enabled` restano all'admin); `italianway_id` assente = invariato, `null` o `""` = tolto; un codice cambiato o tolto libera il vecchio solo dopo il salvataggio, un rifiuto non cambia nulla (D-72) |
+| `PATCH /app/platform/tenants/{tid}/apartments/{aid}` `{instance_url?, port?, italianway_id?}` | `relink_tenant_apartment` | riga; 409 `link_in_use`; 409 `external_id_in_use`; SOLO collegamento e codice Italianway (nome ed `enabled` restano all'admin); `italianway_id` assente = invariato, `null` o `""` = tolto; un codice cambiato o tolto libera il vecchio solo dopo il salvataggio, un rifiuto non cambia nulla (D-72). Un appartamento creato dall'app (A2) accetta solo `{italianway_id}` (aggiunto, cambiato o tolto con `null`, voce `italianway_changed`; lettura dell'usabilità del 22 novembre); con qualsiasi altro campo 409 `created_from_app` |
 | `POST /app/platform/tenants/{tid}/apartments/{aid}/verify` | `verify_tenant_apartment` | `{apartment_id, ok, error, contract_version}` soltanto (L4); aggiorna `last_check` |
 | `DELETE /app/platform/tenants/{tid}/apartments/{aid}` | `delete_tenant_apartment` | 204; stessa pulizia dell'admin (`remove_apartment`): record, liste `apartment_ids`, cache, stream; l'id resta usato |
 | `POST /app/platform/agent/prova` `{apartment_id}` | `test_the_agent` (`routes/agent.py` → `bff/agent.py`) | strumento A, A1: il pulsante «Prova l'agente». Manda all'agente sulla VM un ordine `stato` per quell'appartamento (id dello staging `lab-…`/`test-…`, oppure `dev`). 202 con l'operazione (sotto); 422 `invalid_apartment`; 503 `agent_not_configured` (ambiente senza agente: la produzione fino alla seconda VM); 502 `agent_publish_failed`, con `details.op` già «fallito: non_inviato» |
@@ -172,6 +197,22 @@ dell'azione; email risolta per `user` e `manager`.
 
 `support_access_requested`, `_approved`, `_rejected` restano nell'elenco ma non si scrivono: la variante A (D-86) non
 ha approvazione. Un'azione nuova si concorda prima con il sito, che ha una frase per ognuna.
+
+### Testi delle email (regola della risposta 1246, 22 novembre 2026)
+
+Nelle email del server ci sono solo testo fisso e campi scritti dalla piattaforma: mai testi scritti dagli utenti
+(nomi di persone, nomi e indirizzi degli appartamenti). La prova è `tests/email_no_user_text_test.py`: in ogni campo
+scritto dagli utenti mette un marcatore, che non deve comparire in nessuna email composta.
+
+| Email | Contenuto variabile |
+|---|---|
+| Invito e reinvio (#14, #15) | «Ciao,»; «Un amministratore di «{organizzazione}» ti ha invitato a usare {MAIL_FROM_NAME}, con il ruolo {ruolo}.»; l'indirizzo dell'app; l'indirizzo email dell'invitato; il link per la password |
+| Invito del primo admin dalla piattaforma, e suo reinvio | come sopra, con «Il gestore della piattaforma ti ha invitato a usare {MAIL_FROM_NAME} per «{organizzazione}», con il ruolo amministratore.» |
+| Disattivato, riattivato, eliminazione avviata (A6) | oggetto e corpo con l'identificativo tecnico dell'appartamento (controllato dal server, `^[a-z0-9][a-z0-9-]*$`); «dal gestore della piattaforma» oppure «da un amministratore»; «Apri {MAIL_FROM_NAME} per vedere di quale appartamento si tratta: {APP_PUBLIC_URL}» |
+| Avviso di spesa dell'assistente | mese, importi, tetto, percentuale |
+
+Il nome dell'organizzazione lo scrive solo la piattaforma (vedi #25). L'account Firebase creato per un invito non ha
+nome (`display_name`), perché le email di Firebase possono mostrarlo (`%DISPLAY_NAME%`).
 
 ### Limite sulle email di invito (P-49)
 
@@ -392,6 +433,16 @@ Dei messaggi ricevuti su #30 si conserva solo ciò che serve. Ogni `WebhookLog` 
 non passano mai, comunque si chiami il campo e ovunque stia. Un corpo non JSON diventa `"[corpo non JSON, N byte]"`. Vale per tutte
 le chiamate, anche non attribuite o con firma sbagliata. I soggiorni (`BookingRecord`) non hanno mai avuto dati personali.
 
+**Chiamate con firma sbagliata (F-5, revisione «attacco da fuori», 22 novembre 2026).**
+- Ogni istanza del server registra al massimo **10 al minuto** (`UNSIGNED_ROWS_PER_MINUTE`): la riga nel registro e la riga di log `warn`. La produzione ha fino a 3 istanze.
+- Le chiamate oltre quel numero ricevono lo stesso 401 `invalid_signature`, ma non vengono lette né scritte.
+- Una riga di log `warn` al minuto le conta: «webhook unsigned calls not logged», campi `calls`, `well_formed` ed `event_ids`.
+  - `well_formed` sono quelle con una firma della forma giusta (64 cifre esadecimali), come quelle di Italianway con il segreto sbagliato;
+  - `event_ids` sono i loro identificativi d'evento, al massimo 20.
+- La riga «webhook correlation id replaced» c'è solo per le chiamate che hanno la loro riga.
+- Le chiamate firmate non hanno mai limiti.
+- Prima ogni chiamata non firmata costava circa 23 operazioni Firestore e spingeva fuori dalle 20 righe «non firmate» un vero errore di firma.
+
 ## Chiave dell'istanza (P-36 S3, D-60, dal 16 ottobre 2026)
 
 La chiave che il BFF manda all'istanza (`X-API-Key`) si legge da Secret Manager con un nome **sempre** derivato
@@ -414,7 +465,8 @@ Un valore già salvato nei record vecchi viene ignorato.
 - Con `INSTANCE_MODE=real` si accetta `http://` o `https://` con un host, e `mock://builtin` per gli appartamenti dimostrativi (D-97). Altro → 422
   `invalid_instance_url`, messaggio «Indirizzo non valido: deve cominciare con http:// o https://».
 - Il controllo vale solo per creazione e modifica: gli appartamenti già salvati non vengono toccati.
-- D04 (P-83): nello staging `INSTANCE_ALLOWED` elenca i motori raggiungibili (`host:porta` o `host:prima-ultima`, oggi dev 8100 e i motori della prova di carico 8150-8169 sulla VM; `deploy.sh` mette l'indirizzo). Un altro indirizzo o un'altra porta → 422 `invalid_instance_url` «In questo ambiente di prova si collegano solo il motore di sviluppo e quelli della prova di carico: indirizzo e porta non ammessi», in creazione e in modifica (#114, #115, con la porta del campo `port`). Vale anche per i record già salvati: nessuna chiamata, nessuno stream e nessuna chiave letta (il proxy risponde 502 `instance_unreachable`, `verify` riporta lo stesso messaggio). Lo staging con `INSTANCE_MODE=real` non parte senza l'elenco. In produzione l'elenco non c'è e nulla cambia.
+- D04 (P-83): nello staging `INSTANCE_ALLOWED` elenca i motori raggiungibili (`host:porta` o `host:prima-ultima`, oggi dev 8100 e i motori della prova di carico 8150-8169 sulla VM; `deploy.sh` mette l'indirizzo). Un altro indirizzo o un'altra porta → 422 `invalid_instance_url` «In questo ambiente di prova si collegano solo il motore di sviluppo e quelli della prova di carico: indirizzo e porta non ammessi», in creazione e in modifica (#114, #115, con la porta del campo `port`). Vale anche per i record già salvati: nessuna chiamata, nessuno stream e nessuna chiave letta (il proxy risponde 502 `instance_unreachable`, `verify` riporta lo stesso messaggio). Lo staging con `INSTANCE_MODE=real` non parte senza l'elenco.
+- F-3 (revisione «attacco da fuori», 22 novembre 2026): anche la produzione ha il suo elenco, `10.198.0.2:8100` (il motore dev, che serve la produzione fino alla seconda VM, A10) e `10.198.0.2:8101-8149`; `deploy.sh` mette l'indirizzo e senza elenco la produzione reale non parte. Stessi controlli dello staging, con il messaggio «Indirizzo del motore non ammesso: in questo ambiente si collegano solo i motori della produzione». Fuori dallo sviluppo loopback, link-local e `0.0.0.0` sono sempre rifiutati, anche se elencati. Ogni ricollegamento lascia anche una riga di log `warn` «apartment relinked» con l'uid del gestore.
 - `verify` (#22), campo `error`: lo stesso messaggio se l'URL salvato non va bene nel modo attuale (nessuna chiamata);
   «Sistema domotico non raggiungibile» se la chiamata fallisce (il tipo di errore tecnico va solo nel log); `null` se risponde.
 
@@ -802,14 +854,34 @@ Una destinazione con un motore che non ha ancora un parametro (per esempio `pres
 `POST /internal/ai/chat` NON è una route del sito: la chiamano i motori (sulla VM e i dimostrativi dentro il BFF) per
 parlare con il modello. Intestazioni `X-Apartment-Id` e `X-API-Key` (la chiave d'istanza dell'appartamento, la stessa
 che il BFF manda al motore); corpo compatibile OpenAI (`messages`, `tools`, `tool_choice`, `temperature`; il resto si
-ignora, modello e `max_tokens` li sceglie il BFF). Risposte: 200 con la risposta del modello; 401 chiave sbagliata; 404
-appartamento sconosciuto; 422 `bad_request` senza `messages`; 429 `monthly_cap` «Limite mensile raggiunto, riprova dal
+ignora, modello e `max_tokens` li sceglie il BFF). Risposte: 200 con la risposta del modello; 401 chiave sbagliata, appartamento sconosciuto (F-12: la stessa risposta,
+senza dire se l'appartamento esiste), appartamento disattivato, non pronto o di un'organizzazione sospesa; 422 `bad_request` senza `messages`; 429 `monthly_cap` «Limite mensile raggiunto, riprova dal
 mese prossimo»; 502 `model_unavailable` o `model_error`; 504 `timeout`. Il BFF tiene in Firestore (`ai_usage/{AAAA-MM}`,
 mese UTC) la spesa del progetto, calcolata dai token restituiti, e all'80 % del tetto manda una sola email al mese ai
 gestori della piattaforma. Impostazioni: `AI_MODEL`, `AI_LOCATION`, `AI_MONTHLY_CAP_EUR` (20), `AI_ALERT_PERCENT` (80),
 `AI_PRICE_IN_EUR_PER_M` (0.83), `AI_PRICE_OUT_EUR_PER_M` (4.13), `AI_PRICE_CACHED_EUR_PER_M` (0.08; prezzi da aggiornare
 il 1° gennaio 2027 a 1.65 e 8.25), `AI_MAX_TOKENS` (4096), `AI_TIMEOUT_S` (25), `AI_DEMOS` (i dimostrativi con il modello
 vero: acceso in staging, spento in produzione, che i dimostrativi li rifiuta, D-202). Serve il ruolo `roles/aiplatform.user` sull'account del BFF.
+
+**Tetto e limiti (F-4, revisione «attacco da fuori», 22 novembre 2026).**
+- **Prenotazione prima della chiamata.** Si prenota, in modo atomico, il costo massimo della chiamata: un token per ogni byte UTF-8 in ingresso (un massimo vero: rilettura B-1), più `max_tokens` in uscita, per la richiesta e per la gemella. Il campo è `reserved_eur` in `ai_usage/{AAAA-MM}`.
+- **Conguaglio dopo.** Dopo la chiamata si toglie la prenotazione e si somma il costo vero. Succede anche se la chiamata fallisce o viene interrotta.
+- **Rifiuto.** Se la spesa più le prenotazioni in corso supererebbe il tetto: 429 `monthly_cap`. Così le chiamate contemporanee non superano mai il tetto. Vicino al tetto l'ultima parte resta inutilizzata: circa 0,1 € per una domanda normale, fino a circa 0,3 € per un appartamento di 200 dispositivi.
+- **Gemella annullata o fallita.** Della richiesta gemella si conta anche l'ingresso.
+- **Chiamate interrotte (rilettura B-5).** Una chiamata tagliata, in timeout, o `model_unavailable` dopo l'invio, si conguaglia almeno con l'ingresso di ogni richiesta partita: due, se la gemella era partita.
+- **Prenotazioni con chiave (rilettura B-10).** Ogni prenotazione ha una chiave e scade dopo un'ora. Una mai conguagliata, per esempio perché l'istanza si è fermata a metà, smette di contare da sola. Un conguaglio che non trova la sua prenotazione lo scrive nel log («assistant reservation not found»).
+- **Corpo:** al massimo 20 messaggi con ruoli noti e 160 000 caratteri; `tools` solo se uguali a quelli del motore (`engine/assistant.py` TOOLS). Altrimenti 422 `bad_request`.
+- **Tetto giornaliero per appartamento,** solo su `/internal/ai/chat`: 200 chiamate per giorno UTC (`ENGINE_DAILY_CALLS`), oltre 429 `daily_limit`. Il motore ne fa al massimo `ASK_DAILY_LIMIT` per giorno locale (50, al più 100) e tratta il 429 come «limite mensile», cioè passa alla risposta rapida.
+- **Quota per organizzazione (F-13, risposta 1242).**
+  - Il gestore della piattaforma può dare a ogni organizzazione una quota mensile in euro.
+  - Senza quota vale solo il tetto del progetto, che vale comunque sempre.
+  - La prenotazione e il conguaglio toccano insieme, in modo atomico, il documento del progetto (`ai_usage/{AAAA-MM}`) e quello dell'organizzazione (`ai_usage_tenants/{tenant}__{AAAA-MM}`).
+  - Quota esaurita: 429 `monthly_cap` con lo stesso testo, solo per quell'organizzazione. Quota 0: per quell'organizzazione solo la risposta rapida.
+
+| Rotta (solo gestori della piattaforma) | Risposta |
+|---|---|
+| `GET /app/platform/tenants/{tid}/ai-quota` | 200 `{tenant_id, quota_eur, month, spent_eur, project_cap_eur, project_spent_eur}`, dove `quota_eur` null vuol dire «tetto del progetto»; 404 `not_found` se l'organizzazione non esiste |
+| `PUT /app/platform/tenants/{tid}/ai-quota` `{quota_eur: numero o null}`, campo obbligatorio | 200 come il GET; 422 `invalid_quota` «La quota deve essere 0 oppure un importo da 1,00 a 20,00 € (al massimo due decimali), oppure vuota per usare il tetto del progetto.» (il massimo è il tetto attuale; fra 0 e 1 € la quota varrebbe come 0, perché una prenotazione vale 0,1-0,3 €, fino a circa 1,6 €: rilettura finale R-7); 404. A ogni cambio una voce `ai_quota_changed` `{from, to}` nel registro dell'organizzazione e in quello della piattaforma |
 
 Ogni chiamata riuscita lascia nel log «assistant model call» (token, costo, secondi); dal lotto 28 anche ogni chiamata
 non riuscita lascia «assistant model call failed», con `error` (`timeout`, `model_error` o il tipo
@@ -903,6 +975,7 @@ written»).
 | `process started` | `boot_id`, `revision` (`K_REVISION`), `pid` |
 | `process got SIGTERM`, `process stopping` | `boot_id`, `uptime_s`, `streams_open` |
 | `stream opened` | `boot_id`, `stream_id`, `apartment_id` |
+| `stream refused: too many open` | `open_for_user`, `open_here` (F-6, livello info) |
 | `stream closed` | `boot_id`, `stream_id`, `apartment_id`, `seconds`, `reason`: `max_duration`, `client_disconnect`, `queue_full`, `apartment_removed`, `access_ended`, `error` |
 | `process status`, ogni `STATUS_LOG_S` (60) | `boot_id`, `streams_open`, `requests_active` (stream compresi, non le chiamate interne al motore integrato), `queue_max` (la coda di stream più lunga), `loop_lag_ms` (il ritardo peggiore dell'event loop nel periodo) |
 

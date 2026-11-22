@@ -2,6 +2,7 @@ import { t } from "@/i18n";
 import { isPseudonym } from "@/lib/describe";
 import { fmtDateTime } from "@/lib/format";
 import { fmtPrice } from "@/lib/price";
+import { fmtEuro } from "@/lib/aiQuota";
 import { describeChange } from "@/lib/ruleChanges";
 import { DELETION_STEPS } from "@/lib/apartmentDeletion";
 
@@ -15,6 +16,8 @@ export const AUDIT_ACTIONS = [
   "support_access_requested", "support_access_opened", "support_access_approved", "support_access_rejected", "support_access_closed", "support_access_expired",
   "manager_added", "manager_removed", "account_deleted",
   "energy_price_changed", "apartment_simulated_changed", "simulator_reset", "rules_changed", "timezone_changed",
+  // F-13 (o1 59f3ba7): target the organisation, details {from, to} in euro, null = the project's cap
+  "ai_quota_changed",
   // A3 (o1 25c97cf): target the apartment, the device in details.device_id; the last one is written by the system
   "device_credential_registered", "device_credential_regenerated", "device_credential_revoked", "device_credential_retried", "device_credential_revoke_not_applied",
   // A2 (o1 cb3ee25): target the apartment; apartment_created is written when the creation reaches «pronto»
@@ -138,6 +141,14 @@ export function describeEntry(e: AuditEntry): { sentence: string; note: string |
       if (to === null) return { sentence: e.target.type === "apartment" ? t("audit.priceAptRemoved", v) : t("audit.priceRemoved", { ...v, where }), note };
       if (from === null) return { sentence: t("audit.priceSet", { ...v, where, to }), note };
       return { sentence: t("audit.priceChanged", { ...v, where, from, to }), note };
+    }
+    case "ai_quota_changed": {
+      // F-13: set, changed, or removed (back to the project's cap); 0 is a quota too (only quick answers)
+      const from = typeof d.from === "number" ? fmtEuro(d.from) : null;
+      const to = typeof d.to === "number" ? fmtEuro(d.to) : null;
+      if (to === null) return { sentence: t("audit.aiQuotaRemoved", v), note };
+      if (from === null) return { sentence: t("audit.actions.ai_quota_changed", { ...v, to }), note };
+      return { sentence: t("audit.aiQuotaChanged", { ...v, from, to }), note };
     }
     case "timezone_changed":
       // D-183: the time zone is set on the engine; the BFF writes it here when it reads a different one

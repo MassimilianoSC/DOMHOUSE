@@ -2,12 +2,13 @@
 import hashlib
 import hmac
 import json
+import re
+import time
 import uuid
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from .. import instances
 from .. import instances
 from ..bookings import ForwardError, ItalianwayTranslator, TranslationError, forward
 from ..config import get_settings
@@ -16,6 +17,13 @@ from ..repository import WebhookLog, get_repository
 
 router = APIRouter(prefix="/webhooks")
 RAW_BODY_LIMIT = 16_000
+# F-5 (attack-from-outside review): every unsigned call wrote a row (about 23 Firestore operations) and a warn line, with
+# no limit, and pushed real signature errors out of the platform's 20 unsigned rows. Now at most this many unsigned calls
+# a minute, per instance (production up to 3), get their row and their warn line; the others the same 401, nothing
+# parsed nor written, counted in one warn line a minute. Signed calls are never limited.
+UNSIGNED_ROWS_PER_MINUTE = 10
+_unsigned: dict = {}            # {"window": minute, "rows": rows written in it, "skipped": calls without a row}
+_clock = time.monotonic
 # D-90, D-91 (F2): of an Italianway call only what is useful is kept. The stored body keeps its shape, but a value
 # survives only at a known PATH and of the expected TYPE; everything else, lists included, becomes OBSCURED. So guests'
 # data are never kept, whatever the field is called and wherever it sits.
@@ -56,10 +64,21 @@ def obscured_body(raw: bytes, payload) -> str:
 
 
 def _parse(raw: bytes):
+    """F-2: also a JSON nested too deep for the parser (RecursionError) is «not JSON», never a 500 without its line."""
     try:
         return json.loads(raw)
-    except ValueError:
+    except (ValueError, RecursionError):
         return None
+
+
+def _read(raw: bytes):
+    """The payload and its obscured copy for the register. F-2: a JSON the parser accepts but nested beyond what the
+    obscuring can walk (about 1000 objects) counts as not JSON too, so it gets 400 and its line, not a 500."""
+    parsed = _parse(raw)
+    try:
+        return parsed, obscured_body(raw, parsed)
+    except RecursionError:
+        return None, obscured_body(raw, None)
 
 
 def structured(payload) -> dict:
@@ -74,6 +93,33 @@ def structured(payload) -> dict:
     return {"event_type": text(payload.get("event")), "external_id": text(res.get("apartment_id")),
             "checkin_at": text(res.get("checkin")), "checkout_at": text(res.get("checkout")),
             "guests": guests if isinstance(guests, int) and not isinstance(guests, bool) else None}
+
+
+WELL_FORMED_SIGNATURE = re.compile(r"(?i)^\s*(sha256=)?[0-9a-f]{64}\s*$")
+EVENT_IDS_KEPT = 20
+
+
+def _unsigned_row_allowed(raw: bytes, signature: str | None) -> bool:
+    window = int(_clock() // 60)
+    if _unsigned.get("window") != window:
+        if _unsigned.get("skipped"):
+            # rereading P-4: how many of them had a signature of the right form (64 hex digits, what Italianway sends
+            # with a wrong secret), and their event ids: a wrong secret is still told from a script in the logs
+            warn("webhook unsigned calls not logged", source="italianway", calls=_unsigned["skipped"],
+                 well_formed=_unsigned["well_formed"], event_ids=_unsigned["event_ids"])
+        _unsigned.update(window=window, rows=0, skipped=0, well_formed=0, event_ids=[])
+    if _unsigned["rows"] < UNSIGNED_ROWS_PER_MINUTE:
+        _unsigned["rows"] += 1
+        return True
+    _unsigned["skipped"] += 1
+    if signature and WELL_FORMED_SIGNATURE.match(signature):
+        _unsigned["well_formed"] += 1
+        if len(_unsigned["event_ids"]) < EVENT_IDS_KEPT:
+            payload = _parse(raw)                       # at most 64 KiB (bff/body_limit.py), only for these
+            event = payload.get("id") if isinstance(payload, dict) else None
+            if isinstance(event, str) and event:
+                _unsigned["event_ids"].append(event[:64])
+    return False
 
 
 def verify_signature(raw: bytes, header_value: str | None, secret: str) -> bool:
@@ -105,18 +151,24 @@ async def italianway(request: Request):
     incoming = request.headers.get("X-Correlation-Id")
     correlation_id = instances.correlation_id(incoming)  # Fable D-75 note 2: the engine wants a UUID
     ctx_correlation.set(correlation_id)
-    if incoming and incoming.strip() != correlation_id:
+    # F-2: the size is already limited (bff/body_limit.py, 64 KiB, before the body is read); the signature is checked
+    # on the raw bytes before they are parsed. An unsigned call keeps its obscured body and fields in the register
+    # (decision of 22 November, a6: the platform sees an Italianway call with the wrong secret); its volume is F-5
+    signature = request.headers.get(s.italianway_signature_header)
+    signature_ok = verify_signature(raw, signature, s.italianway_webhook_secret)
+    if not signature_ok and not _unsigned_row_allowed(raw, signature):   # F-5: over the minute's rows
+        return JSONResponse(status_code=401, content={"error": "invalid_signature", "message": "Firma non valida"})
+    if incoming and incoming.strip() != correlation_id:   # rereading P-7: only for calls that get their row
         info("webhook correlation id replaced", source="italianway", original=incoming[:120])
-    parsed = _parse(raw)
-    log = WebhookLog(log_id=f"wh-{uuid.uuid4().hex[:12]}", signature_ok=False, status_code=0, outcome="",
-                     correlation_id=correlation_id, raw_body=obscured_body(raw, parsed), **structured(parsed))
+    parsed, kept = _read(raw)
+    log = WebhookLog(log_id=f"wh-{uuid.uuid4().hex[:12]}", signature_ok=signature_ok, status_code=0, outcome="",
+                     correlation_id=correlation_id, raw_body=kept, **structured(parsed))
 
     async def done(status: int, outcome: str, body: dict):
         log.status_code, log.outcome = status, outcome
         await get_repository().add_webhook_log(log)
         return JSONResponse(status_code=status, content=body)
 
-    log.signature_ok = verify_signature(raw, request.headers.get(s.italianway_signature_header), s.italianway_webhook_secret)
     if not log.signature_ok:
         warn("webhook signature rejected", source="italianway")
         return await done(401, "invalid_signature", {"error": "invalid_signature", "message": "Firma non valida"})

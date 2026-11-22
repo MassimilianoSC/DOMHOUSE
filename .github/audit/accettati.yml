@@ -1,0 +1,11 @@
+# Advisories accepted for a while (answer 1245 = a), read by .github/audit/gravi.py in the CI job «difetti-noti».
+# An accepted advisory that has not expired is printed with its expiry and reason and does not turn the CI red; on the
+# day after the expiry it counts again by itself. At most 30 days between «inserito» and «scadenza»; «motivo» is
+# required; a wrong entry turns the CI red. Dates as AAAA-MM-GG. Example (to copy, without the «#»):
+#
+#   - id: GHSA-xxxx-xxxx-xxxx        # the advisory, as the CI prints it (GHSA, PYSEC or CVE)
+#     libreria: nome-della-libreria  # as the CI prints it, without the version
+#     inserito: 2026-11-22
+#     scadenza: 2026-12-22
+#     motivo: Perché si può aspettare, e cosa si fa entro la scadenza.
+accettati: []

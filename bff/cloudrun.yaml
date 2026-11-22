@@ -88,6 +88,12 @@ spec:
               value: https://your-gcp-project-id.web.app,https://your-gcp-project-id.firebaseapp.com
             - name: SECRET_MANAGER_PREFIX
               value: langbrain-api-key-
+            # F-3 (attack-from-outside review): the engines production may reach, filled by deploy.sh with the VM's
+            # internal address (VM_INTERNAL_IP, from scripts/publish-settings.conf). 8100 is the VM's dev engine, which
+            # serves production until the second VM (A10; D-210, «V8» of 10 November); 8101-8149 is production's band
+            # (bff/creation.py BANDS). With A10 this list is reviewed. Without it the BFF does not start (bff/main.py)
+            - name: INSTANCE_ALLOWED
+              value: your-vm-internal-ip:8100,your-vm-internal-ip:8101-8149
             - name: INSTANCE_TIMEOUT_S
               value: "10"
             - name: ITALIANWAY_SIGNATURE_HEADER

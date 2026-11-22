@@ -10,24 +10,18 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       VitePWA({
-        // One service worker for cache, updates and web push (P-11): src/sw.ts, with the precache list injected here.
+        // One service worker, for web push only (P-11): src/sw.ts. P-92 / E-29: no precache list is injected and the
+        // worker has no fetch handler, so every opening takes index.html from the network; the new version of an open
+        // page is src/lib/appVersion.ts. The plugin still builds the worker, registers it (registerSW.js) and writes
+        // the manifest.
         strategies: "injectManifest",
         srcDir: "src",
         filename: "sw.ts",
-        injectManifest: { globPatterns: ["**/*.{js,css,html,svg,png,woff2}"] },
+        injectManifest: { injectionPoint: undefined },
         registerType: "autoUpdate",
-        includeAssets: [
-          "favicon.svg",
-          "brand/domhouse-mark.svg",
-          "icons/icon-192.png",
-          "icons/icon-512.png",
-          "icons/maskable-192.png",
-          "icons/maskable-512.png",
-          "icons/apple-touch-icon.png",
-        ],
         devOptions: {
-          // The custom injectManifest worker relies on a build-time precache that Vite dev does not produce.
-          // Validate PWA behavior with the production build/preview instead of registering a broken dev worker.
+          // No worker in Vite dev: push and the worker are checked on the production build (P-92: the new-version
+          // watch is off there too, the page has no /assets/ files).
           enabled: false,
         },
         manifest: {

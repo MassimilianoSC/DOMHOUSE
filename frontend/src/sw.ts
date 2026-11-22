@@ -1,20 +1,32 @@
 /// <reference lib="webworker" />
-// The site's only service worker (P-11): Workbox cache and updates exactly as the generated worker did for P-20,
-// plus web push. FCM data-only messages arrive as standard web push JSON, so no Firebase SDK is needed here: the page
-// gets the token with firebase/messaging, passing this registration.
-import { clientsClaim } from "workbox-core";
-import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from "workbox-precaching";
-import { NavigationRoute, registerRoute } from "workbox-routing";
+// The site's only service worker (P-11), for web push only. FCM data-only messages arrive as standard web push JSON,
+// so no Firebase SDK is needed here: the page gets the token with firebase/messaging, passing this registration.
+//
+// P-92 / E-29: no fetch handler and no copy of the site. Until P-92 this worker kept the whole site in Cache Storage
+// and answered every opening with it, so the first opening after a publication showed the previous release, and a
+// worker stuck in «starting» held the navigation (E-29). Now every opening takes index.html from the network (no-cache
+// in firebase.json); the files under /assets/ stay in the browser cache for a year (immutable, named by content).
+// Without network the app does not open: accepted with P-92 (answer 1227 = a). The new version of an open page is
+// src/lib/appVersion.ts.
+
 import { t } from "@/i18n";
 import { deliverInApp, isWebKitSafari, notificationOptions, safeLink, toNotice, type OpenMessage, type PushMessage } from "@/lib/pushPayload";
 
-declare let self: ServiceWorkerGlobalScope & { __WB_MANIFEST: Array<string | { url: string; revision: string | null }> };
+declare let self: ServiceWorkerGlobalScope;
 
+// Replaces the previous worker at once, so the copy of the site it kept stops being served on the very next opening.
 self.skipWaiting();
-clientsClaim();
-cleanupOutdatedCaches();
-precacheAndRoute(self.__WB_MANIFEST);
-registerRoute(new NavigationRoute(createHandlerBoundToURL("index.html"), { denylist: [/^\/app\//, /^\/api\//, /^\/webhooks\//, /^\/healthz/] }));
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      // The precache of the workers before P-92 («workbox-precache-v2-…»): nothing reads it any more.
+      const keys = await caches.keys();
+      await Promise.all(keys.filter((k) => k.startsWith("workbox-")).map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })(),
+  );
+});
 
 const appWindows = () => self.clients.matchAll({ type: "window", includeUncontrolled: true });
 

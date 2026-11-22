@@ -4,7 +4,8 @@ import { DEFAULT_TZ } from "@/lib/format";
 import { MAX_POLL_MS } from "@/lib/apartmentCreation";
 
 // A7 (docs/proposta-a7.md §2 n. 5, §3; answers 1201, 1203): the line of the free places in «Nuovo appartamento», from
-// the last reading the server keeps. It informs only: «Crea» stays on, the server and the agent check again.
+// the last reading the server keeps. Zero places turns «Crea» off (NewApartmentDialog); the server and the agent check
+// again anyway.
 
 /** After this a reading is old: how long ago, not the hour (the server's «vecchia» too, but the form may stay open). */
 export const STALE_MS = 10 * 60_000;

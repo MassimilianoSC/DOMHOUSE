@@ -141,6 +141,17 @@ export const PLATFORM_SCOPE = "platform";
 const enc = encodeURIComponent;
 const apts = (tenantId: string) => `/app/platform/tenants/${enc(tenantId)}/apartments`;
 
+/** F-13 (o1 59f3ba7): the assistant's monthly quota of an organisation. quota_eur null = the project's cap. */
+export interface AiQuotaView {
+  tenant_id: string;
+  quota_eur: number | null;
+  /** «2026-11» */
+  month: string;
+  spent_eur: number;
+  project_cap_eur: number;
+  project_spent_eur: number;
+}
+
 export const platformApi = {
   /** «Registro attività» (P-47) of one organization, or "platform" for the actions without one (managers added and removed). */
   audit: (scope: string, before?: string) =>
@@ -148,6 +159,10 @@ export const platformApi = {
   tenants: () => bffFetch<PlatformTenant[]>("/app/platform/tenants"),
   /** One organization, with the creations of the last hour (A2, before opening «Nuovo appartamento»). */
   tenant: (tenantId: string) => bffFetch<PlatformTenantDetail>(`/app/platform/tenants/${enc(tenantId)}`),
+  /** F-13: GET; PUT {quota_eur: number or null} (the field is required); 422 invalid_quota with the server's limits. */
+  aiQuota: (tenantId: string) => bffFetch<AiQuotaView>(`/app/platform/tenants/${enc(tenantId)}/ai-quota`),
+  setAiQuota: (tenantId: string, quotaEur: number | null, correlationId: string) =>
+    bffFetch<AiQuotaView>(`/app/platform/tenants/${enc(tenantId)}/ai-quota`, { method: "PUT", body: { quota_eur: quotaEur }, correlationId }),
   /** One call: the BFF checks name and email first, then creates organization and invitation, then sends the email. */
   createTenant: (body: { name: string; admin_email: string; admin_display_name?: string }, correlationId: string) =>
     bffFetch<CreatedTenant>("/app/platform/tenants", { method: "POST", body, correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
@@ -195,6 +210,11 @@ export const platformApi = {
    *  change; italianway_id null (or "") = remove the code. */
   patchConnection: (tenantId: string, aptId: string, body: { instance_url?: string; port?: number | null; italianway_id?: string | null; simulated?: boolean }, correlationId: string) =>
     bffFetch<PlatformApartment>(`${apts(tenantId)}/${enc(aptId)}`, { method: "PATCH", body, correlationId }),
+  /** D-198: only the Italianway code, for an apartment created from the app (its connection belongs to the creation).
+   *  null = remove the code. o1 0b2548d: only a body with italianway_id alone is accepted on these apartments (any
+   *  other field: 409 created_from_app); a code in use: 409 external_id_in_use; 200 with the apartment's row. */
+  setItalianwayCode: (tenantId: string, aptId: string, italianwayId: string | null, correlationId: string) =>
+    bffFetch<PlatformApartment>(`${apts(tenantId)}/${enc(aptId)}`, { method: "PATCH", body: { italianway_id: italianwayId }, correlationId }),
   verifyApartment: (tenantId: string, aptId: string, correlationId: string) =>
     bffFetch<VerifyResult>(`${apts(tenantId)}/${enc(aptId)}/verify`, { method: "POST", correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),
   /** A6: «Disattiva» (the same state as the admin's «Attivo»; the 7 days start here) and «Riattiva». The row back. */

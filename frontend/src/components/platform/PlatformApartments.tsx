@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { KeyRound, Link2, PlugZap, Plus, Power, PowerOff, Trash2, Waypoints } from "lucide-react";
+import { KeyRound, Link2, PlugZap, Plus, Power, PowerOff, Tag, Trash2, Waypoints } from "lucide-react";
 import { toast } from "sonner";
 import type { VerifyResult } from "@/api/admin";
 import { platformApi, type PlatformApartment } from "@/api/platform";
@@ -10,6 +10,7 @@ import { CredentialsWorkspace } from "@/components/credentials/CredentialsWorksp
 import { AgentTest, agentTestable } from "@/components/platform/AgentTest";
 import { CancelCreationDialog, CreationRow, creationRowClass, ReadyInvite, showCreationError } from "@/components/platform/CreationRow";
 import { DeleteDialog, DeletionRow, deletionRowClass, DisableDialog, DisabledInfo } from "@/components/platform/DeletionRow";
+import { ItalianwayCodeDialog } from "@/components/platform/ItalianwayCodeDialog";
 import { NewApartmentDialog, tenantKey } from "@/components/platform/NewApartmentDialog";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
@@ -144,6 +145,8 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
   const [creating, setCreating] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
   const [editing, setEditing] = useState<PlatformApartment | null>(null);
+  // D-198: the Italianway code of an apartment created from the app
+  const [codeOf, setCodeOf] = useState<PlatformApartment | null>(null);
   const [verify, setVerify] = useState<Record<string, VerifyResult | "loading">>({});
   const env = useAuth().me?.env;
   const notProd = env?.app_env !== "prod";
@@ -258,6 +261,8 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
             <Button size="sm" variant="outline" onClick={() => setCreating(true)} data-testid={`platform-apt-add-btn-${tenantId}`}><Link2 /> {t("platform.aptAdd")}</Button>
             <Button size="sm" onClick={() => setCreatingNew(true)} disabled={newOff} data-testid={`platform-apt-new-btn-${tenantId}`}><Plus /> {t("platform.creation.newButton")}</Button>
           </div>
+          {/* usability reading 1.11: the two buttons are easy to confuse */}
+          <p className="max-w-xs text-right text-xs text-muted-foreground" data-testid={`platform-apt-add-note-${tenantId}`}>{t("platform.aptAddNote")}</p>
           {newOff && (
             <p className="max-w-xs text-right text-xs text-muted-foreground" data-testid={`platform-apt-new-unavailable-${tenantId}`}>
               {t(notProd ? "platform.creation.notAvailable" : "platform.creation.notInProd")}
@@ -309,6 +314,8 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
                   <div className="flex flex-wrap gap-2">
                     {/* created from the app (o1 1f7d4b0): connection and deletion belong to its creation, and to A6 */}
                     {!a.creazione && <Button size="sm" variant="outline" onClick={() => setEditing(a)} data-testid={`platform-apt-edit-${a.apartment_id}`}><Waypoints /> {t("platform.aptEditConnection")}</Button>}
+                    {/* D-198: created from the app, only its Italianway code can change after the creation */}
+                    {a.creazione && <Button size="sm" variant="outline" onClick={() => setCodeOf(a)} data-testid={`platform-apt-italianway-${a.apartment_id}`}><Tag /> {t("platform.italianwayCode.button")}</Button>}
                     <Button size="sm" variant="outline" onClick={() => void check(a.apartment_id)} disabled={v === "loading"} data-testid={`platform-apt-verify-${a.apartment_id}`}>
                       <PlugZap /> {v === "loading" ? t("common.loading") : t("admin.apartments.verify")}
                     </Button>
@@ -397,6 +404,7 @@ export function PlatformApartments({ tenantId, tenantName, showStopped = 0 }: { 
       )}
       {creating && <CreateDialog tenantId={tenantId} tenantName={tenantName} onClose={() => setCreating(false)} onCreated={refresh} />}
       {editing && <ConnectionDialog key={editing.apartment_id} tenantId={tenantId} apt={editing} onClose={() => setEditing(null)} onSaved={refresh} />}
+      {codeOf && <ItalianwayCodeDialog key={codeOf.apartment_id} tenantId={tenantId} apt={codeOf} onClose={() => setCodeOf(null)} onSaved={refresh} />}
     </div>
   );
 }

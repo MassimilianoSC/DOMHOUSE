@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, Input, Label } f
 import { t } from "@/i18n";
 import { freeFromText, newIdProblem, rateLimitOf } from "@/lib/apartmentCreation";
 import { cn, newCorrelationId } from "@/lib/utils";
-import { CapacityLine } from "./CapacityLine";
+import { CapacityLine, capacityKey } from "./CapacityLine";
 
 const NAME_MAX = 80;
 const DEFAULT_LIMIT = 5;
@@ -27,7 +27,7 @@ function requestIdOf(err: ApiError, correlationId: string): string {
   return typeof op?.op_id === "string" ? op.op_id : err.correlationId ?? correlationId;
 }
 
-function FormField({ id, label, hint, problem, problemTestId, children }: { id: string; label: string; hint?: string; problem?: string | null; problemTestId?: string; children: ReactNode }) {
+export function FormField({ id, label, hint, problem, problemTestId, children }: { id: string; label: string; hint?: string; problem?: string | null; problemTestId?: string; children: ReactNode }) {
   return (
     <div className="field-cell">
       <Label htmlFor={id}>{label}</Label>
@@ -94,7 +94,10 @@ export function NewApartmentDialog({ tenantId, tenantName, onClose, onCreated }:
 
   const typed = newIdProblem(f.apartment_id);
   const idProblem = idError ?? (typed === "invalid" ? t("platform.creation.idInvalid") : null);
-  const ready = !typed && f.name.trim().length > 0 && !limit.reached;
+  // A7, usability reading 1.4: no free place in the last reading, no «Crea» (the line says why); no reading, on
+  const capacity = useQuery({ queryKey: capacityKey, queryFn: () => platformApi.capacity(), staleTime: 0 });
+  const noPlace = (capacity.data?.capienza?.posti_liberi ?? 1) <= 0;
+  const ready = !typed && f.name.trim().length > 0 && !limit.reached && !noPlace;
 
   const save = async () => {
     const correlationId = newCorrelationId();

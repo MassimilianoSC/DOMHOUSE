@@ -110,6 +110,9 @@ describe.each(["mock", "real"])("Amministrazione > Appartamenti, ambiente %s: li
     expect(within(dialog).getByTestId("apt-form-connection-locked")).not.toHaveTextContent(":8101:8101");
     expect(within(dialog).getByTestId("apt-form-connection-locked")).toHaveTextContent(t("admin.apartments.connectionByPlatform"));
     expect(within(dialog).getByTestId("apt-form-italianway-locked")).toHaveTextContent("IW-7");
+    // one name for the code, in fields and sentences (usability texts, 22 Nov)
+    expect(dialog).toHaveTextContent("Codice Italianway");
+    expect(dialog).not.toHaveTextContent("ID Italianway");
     expect(within(dialog).getByTestId("apt-form-italianway-locked")).toHaveTextContent(t("admin.apartments.italianwayByPlatform"));
     // D-183: the time zone is shown, set on the engine, not editable here
     expect(screen.queryByTestId("apt-form-timezone")).not.toBeInTheDocument();
@@ -308,7 +311,8 @@ describe("appartamenti dimostrativi (D-97, D-98)", () => {
 });
 
 describe("disattivare un appartamento chiede conferma, riattivarlo no (P-90 T2, 1107 = a)", () => {
-  const CONFIRM = "Disattivare «Milano Centro»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.";
+  // usability reading 5.3: the same words as the manager's window; the 7 days stay in the manager's only (20 Nov)
+  const CONFIRM = "Disattivare «Milano Centro»? Gli automatismi del sistema domotico continuano. Si fermano notifiche (anche le gravi, come «sistema domotico non raggiungibile»), riepilogo del lunedì, prenotazioni da Italianway ed export Excel; le prenotazioni arrivate nel frattempo non si recuperano alla riattivazione. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.";
   afterEach(() => vi.restoreAllMocks());
 
   it("interruttore della riga, confermato: si salva disattivato", async () => {
@@ -422,5 +426,38 @@ describe("A6: spento dal gestore della piattaforma, lo riaccende solo lui", () =
     await act(async () => { fireEvent.click(toggle); });
     expect(state.patchApartment).toHaveBeenCalledWith("apt-002", { enabled: true }, expect.any(String));
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(LOCKED, expect.anything()));
+  });
+});
+
+// F-11 (o1 ee5899d): the apartment's address at most 200 characters; a refused one says why under the field
+describe("indirizzo rifiutato dal server (F-11)", () => {
+  it("il campo accetta al massimo 200 caratteri", async () => {
+    await openEdit();
+    expect(field("address")).toHaveAttribute("maxLength", "200");
+  });
+
+  it.each([
+    "L'indirizzo contiene caratteri non ammessi.",
+    "L'indirizzo non può contenere un indirizzo web.",
+    "L'indirizzo può avere al massimo 200 caratteri.",
+  ])("«%s» sotto l'indirizzo, la finestra resta aperta, niente avviso rosso", async (sentence) => {
+    state.patchApartment.mockRejectedValueOnce(new ApiError(422, "invalid_text", sentence, "c-3", { field: "address" }));
+    await openEdit();
+    fireEvent.change(field("address"), { target: { value: "https://esempio.it" } });
+    await save();
+    expect(screen.getByTestId("apt-form-address-problem")).toHaveTextContent(sentence);
+    expect(field("address")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("apartment-dialog")).toBeInTheDocument();
+    expect(toast.error).not.toHaveBeenCalled();
+    fireEvent.change(field("address"), { target: { value: "Via Roma 2" } });
+    expect(screen.queryByTestId("apt-form-address-problem")).toBeNull();
+  });
+
+  it("un rifiuto su un campo che la finestra non ha: l'avviso rosso", async () => {
+    state.patchApartment.mockRejectedValueOnce(new ApiError(422, "invalid_text", "Il nome contiene caratteri non ammessi.", "c-4", { field: "display_name" }));
+    await openEdit();
+    await save();
+    expect(toast.error).toHaveBeenCalledWith("Il nome contiene caratteri non ammessi.", expect.anything());
+    expect(screen.queryByTestId("apt-form-address-problem")).toBeNull();
   });
 });

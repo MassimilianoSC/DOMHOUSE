@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { EmailStatus } from "@/api/admin";
 import { platformApi, type PlatformTenant } from "@/api/platform";
 import { useAuth } from "@/auth/AuthProvider";
+import { AiQuota } from "@/components/platform/AiQuota";
 import { PlatformApartments } from "@/components/platform/PlatformApartments";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
@@ -21,6 +22,10 @@ const KEY = ["platform", "tenants"];
 const isEmail = (s: string) => /^\S+@\S+\.\S+$/.test(s.trim());
 
 /** Outcome of an invitation email, as in Amministrazione > Utenti: sent, failed (use "Reinvia invito"), not configured. */
+/** F-11 (review F-b): the server's limits; a longer name would meet its raw 422. */
+const TENANT_NAME_MAX = 120;
+const PERSON_NAME_MAX = 80;
+
 function notifyCreated(name: string, email: string, status: EmailStatus | undefined) {
   if (status === "failed") toast.warning(t("platform.createdEmailFailed", { name, email }), { duration: 10000 });
   else if (status === "not_configured") toast.warning(t("platform.createdEmailOff", { name, email }), { duration: 10000 });
@@ -55,7 +60,7 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
         <div className="mt-4 space-y-3">
           <div className="space-y-1">
             <Label htmlFor="tn-name">{t("platform.name")}</Label>
-            <Input id="tn-name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="tenant-form-name" />
+            <Input id="tn-name" maxLength={TENANT_NAME_MAX} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="tenant-form-name" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="tn-email">{t("platform.adminEmail")}</Label>
@@ -63,7 +68,7 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
           </div>
           <div className="space-y-1">
             <Label htmlFor="tn-admin-name">{t("platform.adminName")}</Label>
-            <Input id="tn-admin-name" value={f.admin_display_name} onChange={(e) => setF({ ...f, admin_display_name: e.target.value })} data-testid="tenant-form-admin-name" />
+            <Input id="tn-admin-name" maxLength={PERSON_NAME_MAX} value={f.admin_display_name} onChange={(e) => setF({ ...f, admin_display_name: e.target.value })} data-testid="tenant-form-admin-name" />
           </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
@@ -93,7 +98,7 @@ function RenameDialog({ tenant, onClose, onSaved }: { tenant: PlatformTenant; on
         <DialogTitle>{t("platform.renameTitle")}</DialogTitle>
         <div className="mt-4 space-y-1">
           <Label htmlFor="tn-rename">{t("platform.name")}</Label>
-          <Input id="tn-rename" value={name} onChange={(e) => setName(e.target.value)} data-testid="tenant-rename-input" />
+          <Input id="tn-rename" maxLength={TENANT_NAME_MAX} value={name} onChange={(e) => setName(e.target.value)} data-testid="tenant-rename-input" />
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>{t("common.cancel")}</Button>
@@ -346,6 +351,8 @@ export function PlatformTenants({ openTenant = null }: { openTenant?: string | n
             <div className="border-t pt-3 text-sm text-muted-foreground">
               {t("platform.firstAdmin")}: <AdminState tenant={tn} />
             </div>
+            {/* F-13: the assistant's monthly quota of this organisation */}
+            <AiQuota tenantId={tn.tenant_id} tenantName={tn.name} />
             {openApts === tn.tenant_id && (
               <div className="border-t pt-3">
                 <PlatformApartments tenantId={tn.tenant_id} tenantName={tn.name} showStopped={seeStopped} />

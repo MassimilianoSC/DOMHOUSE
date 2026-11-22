@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 import re
 import time
 import uuid
@@ -97,6 +98,20 @@ def instance_url_problem(raw: str) -> str | None:
 
 MSG_NOT_ALLOWED = ("In questo ambiente di prova si collegano solo il motore di sviluppo e quelli della prova di carico: "
                    "indirizzo e porta non ammessi")
+# F-3: production's own words (a6, 22 November)
+MSG_NOT_ALLOWED_PROD = "Indirizzo del motore non ammesso: in questo ambiente si collegano solo i motori della produzione"
+
+
+def _local_host(host: str) -> bool:
+    """F-3: loopback, link-local (the metadata server among them) and unspecified addresses: never an engine outside
+    development, even when listed."""
+    if host in ("localhost", "localhost.") or host.endswith(".localhost"):
+        return True
+    try:
+        ip = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return False
+    return ip.is_loopback or ip.is_link_local or ip.is_unspecified
 
 
 class TargetRefused(Exception):
@@ -115,21 +130,37 @@ def allowed_targets(spec: str) -> list[tuple[str, int, int]]:
 
 
 def target_problem(raw: str, port: int | None = None) -> str | None:
-    """D04 (P-83): with INSTANCE_ALLOWED set (staging) only those engines, host and port, the port of the link or the
-    apartment's or the scheme's; mock:// is in this process and always allowed. None when allowed."""
-    spec = get_settings().instance_allowed
+    """D04 (P-83): with INSTANCE_ALLOWED set only those engines, host and port, the port of the link or the apartment's
+    or the scheme's; mock:// is in this process and always allowed. None when allowed. F-3: production has its list too
+    (bff/main.py refuses to start without it) and its own message; loopback and link-local refused outside development."""
+    s = get_settings()
+    spec = s.instance_allowed
     v = normalize_instance_url(raw)
-    if not spec or v.startswith("mock://"):
+    if v.startswith("mock://"):
         return None
+    message = MSG_NOT_ALLOWED_PROD if s.app_env == "prod" else MSG_NOT_ALLOWED
     parts = urlsplit(v)
+    host = (parts.hostname or "").lower()
+    if parts.username is not None or parts.password is not None:
+        # rereading of the medium fixes, P-6: user and password in the address made base_url call another port than
+        # the one checked here; never needed by an engine, refused in every environment
+        return message
+    if s.app_env != "dev" and _local_host(host):
+        return message
+    if not spec:
+        return None
     try:
         number = parts.port or port or (443 if parts.scheme == "https" else 80)
     except ValueError:
-        return MSG_NOT_ALLOWED
-    host = (parts.hostname or "").lower()
+        return message
     if any(host == h and lo <= number <= hi for h, lo, hi in allowed_targets(spec)):
         return None
-    return MSG_NOT_ALLOWED
+    return message
+
+
+def unsafe_path(path: str) -> bool:
+    """F-7: «?» or «#» would end the path inside the URL httpx builds; a control character has no place in it."""
+    return any(c in "?#" or ord(c) < 0x20 or ord(c) == 0x7F for c in path)
 
 
 def base_url(apt: Apartment) -> str:
@@ -139,7 +170,11 @@ def base_url(apt: Apartment) -> str:
         return f"http://127.0.0.1:{s.port}{s.root_path}/mock/{apt.apartment_id}/api/v1"
     parts = urlsplit(url.rstrip("/"))
     netloc = parts.netloc
-    if apt.port and ":" not in netloc:
+    try:
+        own_port = parts.port                      # P-6: the URL's own port, not a «:» anywhere in the netloc
+    except ValueError:                             # a malformed one stays as written (target_problem refuses it)
+        own_port = -1
+    if apt.port and own_port is None:
         netloc = f"{netloc}:{apt.port}"
     path = parts.path or "/api/v1"
     return urlunsplit((parts.scheme or "http", netloc, path, "", ""))
@@ -251,6 +286,8 @@ async def call(
 ) -> httpx.Response:
     if any(seg in (".", "..") for seg in path.split("/")):  # F1: defence in depth, the routes already refuse them
         raise ValueError("dot segment in instance path")
+    if unsafe_path(path):                                    # F-7: the same for «?», «#» and control characters
+        raise ValueError("query, fragment or control character in instance path")
     if demo_refused(apt.instance_url):
         raise DemoRefused(apt.apartment_id)
     headers = await instance_headers(apt, actor, correlation_id)

@@ -265,3 +265,17 @@ describe("registro attività: disattivare ed eliminare (A6, o1 d72892d)", () => 
       .toBe("Eliminazione dell'appartamento «Bilocale Ponte» non riuscita: serve «Riprova».");
   });
 });
+
+describe("registro: quota mensile dell'assistente (F-13, o1 59f3ba7)", () => {
+  // target the organisation; details {from, to} in euro, null = the project's cap
+  const tenant = { type: "tenant" as const, id: "t-1", label: "Residenze Esempio" };
+  it.each([
+    [{ from: null, to: 10 }, "Anna Rossi ha impostato la quota mensile dell'assistente di «Residenze Esempio» a 10,00 €"],
+    [{ from: 10, to: 3.5 }, "Anna Rossi ha impostato la quota mensile dell'assistente di «Residenze Esempio» da 10,00 a 3,50 €"],
+    [{ from: 3.5, to: 0 }, "Anna Rossi ha impostato la quota mensile dell'assistente di «Residenze Esempio» da 3,50 a 0,00 €"],
+    [{ from: 3.5, to: null }, "Anna Rossi ha tolto la quota mensile dell'assistente di «Residenze Esempio»: vale il tetto del progetto"],
+  ])("%j", (details, text) => {
+    expect(AUDIT_ACTIONS).toContain("ai_quota_changed");
+    expect(sentence({ action: "ai_quota_changed", target: tenant, details })).toBe(text);
+  });
+});

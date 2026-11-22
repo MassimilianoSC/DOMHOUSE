@@ -86,10 +86,17 @@ function WhatHappened({ a, c }: { a: PlatformApartment; c: Creazione }) {
       {/* «ID richiesta» and its code go to a new line together on a phone */}
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <span>{c.updated_by ? t("platform.creation.lastAttempt", { when, name: c.updated_by }) : t("platform.creation.lastAttemptNoName", { when })}</span>
-        {c.op && (
+        {c.op ? (
           <span className="inline-flex items-center gap-1.5">
             {t("credentials.requestId")}
             <CopyableId id={c.op.op_id} testId={`creation-op-${a.apartment_id}`} label={t("credentials.requestId")} />
+          </span>
+        ) : (
+          // no order reached the VM: the messages say «con l'ID qui sotto», so the apartment's ID, with its own label;
+          // the whole ID, on its own line under the label on a phone
+          <span className="inline-flex max-w-full flex-wrap items-center gap-1.5">
+            {t("platform.creation.aptId")}
+            <CopyableId id={a.apartment_id} full testId={`creation-apt-id-${a.apartment_id}`} label={t("platform.creation.aptId")} />
           </span>
         )}
       </p>

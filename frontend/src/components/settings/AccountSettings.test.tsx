@@ -182,3 +182,50 @@ describe("gestore della piattaforma senza organizzazione (D-178)", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 });
+
+// F-11 (o1 ee5899d): my own name at most 80 characters; a refused one says why under the field
+describe("Impostazioni > Account: nome rifiutato dal server (F-11)", () => {
+  it("«Il nome non può contenere un indirizzo web.» sotto il campo, niente avviso rosso; sparisce scrivendo", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "invalid_text", field: "display_name", message: "Il nome non può contenere un indirizzo web." }), { status: 422, headers: { "Content-Type": "application/json" } })));
+    render(<AccountSettings />);
+    expect(screen.getByTestId("account-name-input")).toHaveAttribute("maxLength", "80");
+    type("account-name-input", "Gestore www.esempio.it/x");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("account-name-save"));
+    });
+    expect(await screen.findByTestId("account-name-problem")).toHaveTextContent("Il nome non può contenere un indirizzo web.");
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(state.auth.refreshMe).not.toHaveBeenCalled();
+    type("account-name-input", "Gestore Due");
+    expect(screen.queryByTestId("account-name-problem")).toBeNull();
+  });
+
+  it("un altro errore resta l'avviso rosso", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "not_found", message: "Utente inesistente" }), { status: 404, headers: { "Content-Type": "application/json" } })));
+    render(<AccountSettings />);
+    type("account-name-input", "Gestore Due");
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("account-name-save"));
+    });
+    expect(toast.error).toHaveBeenCalled();
+    expect(screen.queryByTestId("account-name-problem")).toBeNull();
+  });
+});
+
+// F-15: while this device is shared for this person, a line says it and how to remove it
+describe("Impostazioni > Account: dispositivo condiviso (F-15)", () => {
+  afterEach(() => localStorage.clear());
+
+  it("con la scelta attiva per questa persona: la riga", () => {
+    localStorage.setItem("domotica.shared.u1", String(Date.now()));
+    render(<AccountSettings />);
+    expect(screen.getByTestId("account-shared-device")).toHaveTextContent("Dispositivo condiviso: uscita automatica dopo 30 minuti senza usare l'app. Per toglierla esci e accedi di nuovo senza la casella.");
+  });
+
+  it("senza scelta, o con la scelta di un'altra persona: niente riga", () => {
+    localStorage.setItem("domotica.shared.altra", String(Date.now()));
+    render(<AccountSettings />);
+    expect(screen.queryByTestId("account-shared-device")).toBeNull();
+  });
+});

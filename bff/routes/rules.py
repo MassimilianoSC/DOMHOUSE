@@ -82,7 +82,7 @@ async def propose(apartment_id: str, request: Request, user: CurrentUser = Depen
         return refused
     try:
         body = await request.json()
-    except ValueError:
+    except (ValueError, RecursionError):      # rereading P-3: nested too deep is not JSON either
         body = None
     text = (body or {}).get("text") if isinstance(body, dict) else None
     if not isinstance(text, str) or not text.strip():
@@ -123,7 +123,7 @@ async def apply(apartment_id: str, request: Request, user: CurrentUser = Depends
         return refused
     try:
         body = await request.json()
-    except ValueError:
+    except (ValueError, RecursionError):      # rereading P-3: nested too deep is not JSON either
         body = None
     if not isinstance(body, dict) or not isinstance(body.get("based_on"), str) or not isinstance(body.get("rules"), list):
         return err(422, "bad_request", "based_on e rules obbligatori")
@@ -180,7 +180,7 @@ async def _copy_request(user: CurrentUser, apartment_id: str, request: Request):
         return None, None, None, err(403, "forbidden", "Solo gli amministratori possono copiare le regole")
     try:
         body = await request.json()
-    except ValueError:
+    except (ValueError, RecursionError):      # rereading P-3: nested too deep is not JSON either
         body = None
     to = body.get("to") if isinstance(body, dict) else None
     if not isinstance(to, list) or not to or not all(isinstance(x, str) for x in to):

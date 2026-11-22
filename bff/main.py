@@ -2,6 +2,8 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette._utils import get_route_path
@@ -9,7 +11,7 @@ from starlette.datastructures import MutableHeaders
 
 from engine.log import setup_logging as setup_engine_logging
 
-from . import instances, push, runtime
+from . import body_limit, instances, push, runtime
 from .config import get_settings
 from .logs import setup_logging
 from .routes import account, admin, apartments, platform, webhooks
@@ -74,11 +76,13 @@ def check_access_settings(settings, environ=None) -> None:
     elif settings.app_env != "dev" and settings.auth_mode != "firebase":
         problem = (f"AUTH_MODE «{settings.auth_mode}» with APP_ENV «{settings.app_env}»: outside development it must be "
                    f"firebase (AUTH_MODE is «dev» when the variable is missing)")
-    elif settings.app_env == "staging" and settings.instance_mode == "real" and (
+    elif settings.app_env in ("staging", "prod") and settings.instance_mode == "real" and (
             not instances.allowed_targets(settings.instance_allowed) or "your-" in settings.instance_allowed):
-        # D04 (P-83): staging reaches the same VM as production; without the list it could reach any engine
-        problem = (f"INSTANCE_ALLOWED «{settings.instance_allowed}» in staging: it must list the engines staging may "
-                   f"reach (host:porta), filled by deploy.sh")
+        # D04 (P-83): staging reaches the same VM as production; without the list it could reach any engine.
+        # F-3 (attack-from-outside review): production too: without it a stolen platform manager's account moved a real
+        # apartment onto any address, and the BFF sent it the engine's key
+        problem = (f"INSTANCE_ALLOWED «{settings.instance_allowed}» in {settings.app_env}: it must list the engines "
+                   f"{settings.app_env} may reach (host:porta), filled by deploy.sh")
     if problem:
         error("development setting refused", app_env=settings.app_env, auth_mode=settings.auth_mode,
               service=environ.get("K_SERVICE"), problem=problem)
@@ -110,7 +114,10 @@ def create_app() -> FastAPI:
         push.stop_background()
         await hub_manager.stop_all()
 
-    app = FastAPI(title="DOMHOUSE BFF", lifespan=lifespan)
+    # F-10 (attack-from-outside review): /docs, /redoc and /openapi.json listed every route (/internal/*, the platform's)
+    # with the fields they take, to anyone: only in development, as in the engine (D61). app.openapi() stays at hand
+    docs = {} if settings.app_env == "dev" else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    app = FastAPI(title="DOMHOUSE BFF", lifespan=lifespan, **docs)
     app.add_middleware(NoStoreMiddleware, root_path=settings.root_path)
     app.add_middleware(runtime.RequestCounter, root_path=settings.root_path)
     if settings.is_dev:
@@ -129,6 +136,15 @@ def create_app() -> FastAPI:
     async def http_error(_request: Request, exc: HTTPException):
         detail = exc.detail if isinstance(exc.detail, dict) else {"error": "error", "message": str(exc.detail)}
         return JSONResponse(status_code=exc.status_code, content=detail)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError):
+        # F-11: a name or an address out of its rules says why, in Italian (bff/plain_text.py); every other validation
+        # error keeps FastAPI's usual answer
+        from .plain_text import invalid_text
+        if (answer := invalid_text(exc.errors())) is not None:
+            return JSONResponse(status_code=422, content=answer)
+        return await request_validation_exception_handler(request, exc)
 
     # /healthz serves only Cloud Run's own startup/liveness probes: from outside, Cloud Run's front end reserves paths
     # ending in "z" and answers 404 itself (https://cloud.google.com/run/docs/known-issues#reserved-url-paths, E-12).
@@ -175,6 +191,8 @@ def create_app() -> FastAPI:
     mock_app = create_mock_app(api_key=settings.instance_api_key_fallback, model_for=model_for)
     app.state.mock_registry = mock_app.state.registry   # the reset of a demonstration apartment (D-97)
     app.mount("/mock", mock_app)
+    # F-2: added last, so it is the outermost: no body over its limit reaches CORS, the counters or the routes
+    app.add_middleware(body_limit.BodyLimit, root_path=settings.root_path)
     return app
 
 

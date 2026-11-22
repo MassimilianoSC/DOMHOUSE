@@ -89,14 +89,16 @@ export function buildUrl(path: string, query?: RequestOptions["query"]): string 
 
 /** The ApiError of a refused answer; a blocking one (suspension, assistance over) is also reported (P-50). */
 function refusal(resp: Response, data: unknown, path: string, correlationId: string | null): ApiError {
-  const body = (data ?? {}) as { error?: string; message?: string; details?: Record<string, unknown>; detail?: unknown };
+  const body = (data ?? {}) as { error?: string; message?: string; details?: Record<string, unknown>; detail?: unknown; field?: unknown };
   // FastAPI's own validation answer ({"detail": [...]}) has no Italian message: say it plainly instead of "Errore 422".
   const validation = !body.message && Array.isArray(body.detail);
   const message = body.message ?? (validation ? t("errors.invalidRequest") : t("errors.status", { status: resp.status }));
   // The profile read (/app/me) handles its own refusal: only the other calls report it, or a refused profile read would
   // report itself and start another one, forever.
   if (resp.status === 403 && body.error && BLOCKING.has(body.error) && path !== "/app/me") onBlocked(body.error);
-  return new ApiError(resp.status, body.error ?? (validation ? "validation_error" : "error"), message, correlationId, body.details);
+  // F-11 (o1 ee5899d): invalid_text names the refused field at the top level; it is kept with the details
+  const details = typeof body.field === "string" ? { ...body.details, field: body.field } : body.details;
+  return new ApiError(resp.status, body.error ?? (validation ? "validation_error" : "error"), message, correlationId, details);
 }
 
 const parseJson = (text: string): unknown => {
@@ -107,7 +109,22 @@ const parseJson = (text: string): unknown => {
   }
 };
 
+let writesOnTheirWay = 0;
+/**
+ * P-92 (review P2): requests that change something (any method but GET) still waiting for their answer. The
+ * new-version reload waits for them, so the person sees the confirmation or the error and does not repeat a command.
+ */
+export const writesInFlight = () => writesOnTheirWay;
+
 export function bffFetch<T>(path: string, opts: RequestOptions = {}): Promise<T> {
+  if ((opts.method ?? "GET").toUpperCase() === "GET") return bffCall<T>(path, opts);
+  writesOnTheirWay++;
+  return bffCall<T>(path, opts).finally(() => {
+    writesOnTheirWay--;
+  });
+}
+
+function bffCall<T>(path: string, opts: RequestOptions): Promise<T> {
   return withinTime(opts.timeoutMs ?? CALL_TIMEOUT_MS, opts.correlationId, async (signal) => {
     const headers: Record<string, string> = { Accept: "application/json", ...(await tokenHeaders(opts.correlationId)), ...supportHeader(path, opts.method) };
     if (opts.correlationId) headers["X-Correlation-Id"] = opts.correlationId;

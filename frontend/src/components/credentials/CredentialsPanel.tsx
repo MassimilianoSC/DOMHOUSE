@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Ban, Check, ChevronRight, KeyRound, Link2, Loader2, Plus, RotateCcw, TriangleAlert } from "lucide-react";
+import { Ban, ChevronRight, KeyRound, Link2, Loader2, Plus, RotateCcw, TriangleAlert } from "lucide-react";
 import { credentialsApi, type CredentialScope, type DeviceCredential } from "@/api/deviceCredentials";
 import { ApiError } from "@/api/bff";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,8 @@ import { cn } from "@/lib/utils";
 export type RowRequest = { kind: CredentialAction | "connection"; credential: DeviceCredential };
 
 const TONE: Record<DeviceCredential["stato"], string> = {
-  pronto: "border-positive-border bg-positive-bg text-positive-fg",
+  // «Abilitato» (usability reading 2.2): it may connect, not «it is connected»; green stays for «In linea» only
+  pronto: "border-neutral-border bg-neutral-bg text-neutral-fg",
   in_attesa: "border-neutral-border bg-neutral-bg text-neutral-fg",
   cambio_in_corso: "border-warning-border bg-warning-bg text-warning-fg",
   revoca_in_corso: "border-warning-border bg-warning-bg text-warning-fg",
@@ -27,7 +28,7 @@ const TONE: Record<DeviceCredential["stato"], string> = {
 
 function StateIcon({ stato }: { stato: DeviceCredential["stato"] }) {
   const cls = "size-3";
-  if (stato === "pronto") return <Check className={cls} aria-hidden />;
+  if (stato === "pronto") return <KeyRound className={cls} aria-hidden />;
   if (stato === "non_applicato") return <TriangleAlert className={cls} aria-hidden />;
   if (stato === "revocato") return <Ban className={cls} aria-hidden />;
   return <Loader2 className={cn(cls, "motion-safe:animate-spin")} aria-hidden />;

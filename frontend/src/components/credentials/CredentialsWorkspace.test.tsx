@@ -75,19 +75,24 @@ beforeEach(() => {
 });
 
 describe("«Registra un dispositivo»", () => {
-  it("il codice si controlla mentre si scrive: maiuscole, spazi e «connector» no; il pulsante resta spento", async () => {
+  it("il codice si controlla mentre si scrive: spazi e «connector» no, il pulsante resta spento; le maiuscole diventano minuscole da sole", async () => {
     open();
     fireEvent.click(await screen.findByTestId("credentials-register-btn"));
     const field = await screen.findByTestId("credential-register-input");
     const save = screen.getByTestId("credential-register-save");
     expect(save).toBeDisabled();
-    fireEvent.change(field, { target: { value: "ShellyPlug" } });
+    fireEvent.change(field, { target: { value: "Shelly Plug" } });
     expect(screen.getByTestId("credential-register-problem")).toHaveTextContent("Solo lettere minuscole, cifre e trattini, fino a 64 caratteri.");
     expect(save).toBeDisabled();
     fireEvent.change(field, { target: { value: "connector" } });
     expect(screen.getByTestId("credential-register-problem")).toHaveTextContent("riservato");
     expect(save).toBeDisabled();
     fireEvent.change(field, { target: { value: "shellyplugmg3-aa01" } });
+    expect(screen.queryByTestId("credential-register-problem")).toBeNull();
+    expect(save).toBeEnabled();
+    // usability reading 2.10: the Shelly shows its name in capitals
+    fireEvent.change(field, { target: { value: "ShellyPlugMG3-AA01" } });
+    expect(field).toHaveValue("shellyplugmg3-aa01");
     expect(screen.queryByTestId("credential-register-problem")).toBeNull();
     expect(save).toBeEnabled();
     expect(posts()).toEqual([]);
@@ -103,6 +108,10 @@ describe("«Registra un dispositivo»", () => {
     const dlg = await screen.findByTestId("credential-password-dialog");
     expect(posts()).toEqual([{ method: "POST", path: BASE, body: { device_id: "shellyplugmg3-aa01" } }]);
     expect(dlg).toHaveTextContent("La vedi solo ora.");
+    // usability reading 2.6, 2.8, 2.11: the whole sentences
+    expect(dlg).toHaveTextContent("Copiala adesso nella pagina dello Shelly: non ricaricare la pagina e non chiudere la scheda finché non hai finito. Dopo non si può più leggere, né qui né altrove. Se la perdi, usa «Rigenera».");
+    expect(dlg).toHaveTextContent("Nella pagina MQTT dello Shelly (la voce delle impostazioni dove si scrive a quale server collegarsi) compila i campi così, nell'ordine:");
+    expect(dlg).toHaveTextContent("Se il tuo PC sincronizza gli appunti con altri dispositivi, dopo la copia svuotali (su Windows: tasto Windows + V, poi «Cancella tutto»).");
     expect(within(dlg).getByTestId("credential-value-password")).toHaveTextContent(PASSWORD);
     expect(within(dlg).getByTestId("credential-value-server")).toHaveTextContent("mqtt.example.test:8883");
     expect(within(dlg).getByTestId("credential-value-client_id")).toHaveTextContent("lab-prova.shellyplugmg3-aa01");
@@ -334,7 +343,7 @@ describe("A5: gli accessi rifiutati nella riga (docs/proposta-a5.md)", () => {
     const box = await screen.findByTestId("credential-refusals-presa-cucina");
     expect(box).toHaveAttribute("data-kind", "warning");
     expect(box).toHaveTextContent(/^Accessi rifiutati nelle ultime 24 ore: 12, l'ultimo alle \d\d:\d\d\./);
-    expect(box).toHaveTextContent("Cosa fare: nello Shelly utente o password non corrispondono. Controlla l'utente in «Dati di collegamento»; la password non si può rivedere: se non l'hai più, «Rigenera» e scrivi la nuova nello Shelly.");
+    expect(box).toHaveTextContent("Cosa fare: nello Shelly utente o password non corrispondono. Controlla l'utente in «Dati di collegamento» e quello scritto nella pagina dello Shelly (per aprirla devi essere sulla sua stessa rete Wi-Fi); la password non si può rivedere: se non l'hai più, «Rigenera» e scrivi la nuova nello Shelly.");
     expect(box).toHaveTextContent("I tentativi compaiono con circa 10 minuti di ritardo e restano contati per 24 ore.");
     // «non lo so» and zero: no line, never «0»
     expect(screen.queryByTestId("credential-refusals-presa-bagno")).toBeNull();

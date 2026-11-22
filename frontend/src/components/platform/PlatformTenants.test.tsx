@@ -29,9 +29,10 @@ const s = vi.hoisted(() => ({
   leaveSupport: vi.fn(async () => {}),
   ownTenant: "t-0",
   ownSupport: null as null | { access_id: string },
+  aiQuota: vi.fn(async (_tenantId: string): Promise<unknown> => { throw new Error("not set by this test"); }),
 }));
 
-vi.mock("@/api/platform", () => ({ platformApi: { tenants: s.tenants, createTenant: s.createTenant, renameTenant: s.renameTenant, resendInvite: s.resendInvite, suspendTenant: s.suspendTenant, reactivateTenant: s.reactivateTenant, openSupport: s.openSupport, closeSupport: s.closeSupport } }));
+vi.mock("@/api/platform", () => ({ platformApi: { tenants: s.tenants, createTenant: s.createTenant, renameTenant: s.renameTenant, resendInvite: s.resendInvite, suspendTenant: s.suspendTenant, reactivateTenant: s.reactivateTenant, openSupport: s.openSupport, closeSupport: s.closeSupport, aiQuota: s.aiQuota, setAiQuota: vi.fn() } }));
 vi.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ refreshMe: s.refreshMe, enterSupport: s.enterSupport, leaveSupport: s.leaveSupport, me: { tenant: { tenant_id: s.ownTenant, name: "Mia" }, support: s.ownSupport } }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warning: vi.fn() } }));
 
@@ -321,5 +322,33 @@ describe("Organizzazioni: rifiniture dell'assistenza (D-89)", () => {
     const info = await screen.findByTestId("tenant-support-info-t-1");
     expect(info).toHaveTextContent(t("common.removedUser"));
     expect(info).not.toHaveTextContent("null");
+  });
+});
+
+// Review F-b (RILETTURA-SITO-O2.md): the server's limits as field limits, so a long name never meets a raw 422
+describe("Organizzazioni: lunghezza dei nomi (F-11, F-b)", () => {
+  it("nuova organizzazione: nome dell'organizzazione al massimo 120 caratteri, nome del primo amministratore 80", async () => {
+    await open();
+    await click(await screen.findByTestId("tenant-add-btn"));
+    expect(screen.getByTestId("tenant-form-name")).toHaveAttribute("maxLength", "120");
+    expect(screen.getByTestId("tenant-form-admin-name")).toHaveAttribute("maxLength", "80");
+  });
+
+  it("rinomina: al massimo 120 caratteri, come alla creazione", async () => {
+    await open();
+    await openMenu("tenant-menu-t-1");
+    await click(await screen.findByTestId("tenant-rename-btn-t-1"));
+    expect(screen.getByTestId("tenant-rename-input")).toHaveAttribute("maxLength", "120");
+  });
+});
+
+// F-13: the assistant's monthly quota in every organisation's card (its own tests: AiQuota.test.tsx)
+describe("quota dell'assistente nella scheda (F-13)", () => {
+  it("ogni scheda ha il suo riquadro, letto per quell'organizzazione", async () => {
+    s.aiQuota.mockImplementation(async (tenantId: string) => ({ tenant_id: tenantId, quota_eur: null, month: "2026-11", spent_eur: 0, project_cap_eur: 20, project_spent_eur: 0 }));
+    s.tenants.mockResolvedValue(LIST);
+    await open();
+    expect(await screen.findByTestId("tenant-ai-quota-t-1")).toHaveTextContent("Quota mensile dell'assistente (€)");
+    expect(s.aiQuota).toHaveBeenCalledWith("t-1");
   });
 });

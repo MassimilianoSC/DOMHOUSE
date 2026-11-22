@@ -283,9 +283,12 @@ def test_platform_manager_deleting_own_account_leaves_the_platform(fb, managers)
 def test_invitation_email_carries_the_app_name():
     from bff import invites
 
-    msg = invites._compose("nuovo@esempio.it", "Nuovo", "viewer", "Flatsharing", "admin@demo.it", None)
+    msg = invites._compose("nuovo@esempio.it", "viewer", "Flatsharing", False, None)
     assert msg["Subject"] == "Invito a DOMHOUSE" and msg["From"].startswith("DOMHOUSE")
-    assert "a usare DOMHOUSE per Flatsharing" in msg.get_body(("plain",)).get_content()
+    assert "Un amministratore di «Flatsharing» ti ha invitato a usare DOMHOUSE" in msg.get_body(("plain",)).get_content()
+    msg = invites._compose("primo@esempio.it", "admin", "Flatsharing", True, None)      # answer 1246: no names
+    assert "Il gestore della piattaforma ti ha invitato a usare DOMHOUSE per «Flatsharing»" in msg.get_body(
+        ("plain",)).get_content()
 
 
 # -------- P-47 / P-48: after "Elimina il mio account" the log keeps the actions, not the person --------

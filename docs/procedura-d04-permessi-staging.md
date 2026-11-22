@@ -35,6 +35,8 @@ gcloud secrets add-iam-policy-binding italianway-webhook-secret --project=domoti
 gcloud secrets add-iam-policy-binding smtp-app-password --project=domotica-poc-511707 --account=m.scardovellicrac@gmail.com --member=serviceAccount:domotica-bff-staging@domotica-poc-511707.iam.gserviceaccount.com --role=roles/secretmanager.secretAccessor
 ```
 
+- **Nota (22 novembre 2026, F-16 della revisione «attacco da fuori»):** il permesso dello staging su `italianway-webhook-secret` (riga sopra) si toglie con i comandi di F-16. Lo staging ora legge `italianway-webhook-secret-staging`.
+
 ## 2. Verifica (sola lettura)
 
 ```bash

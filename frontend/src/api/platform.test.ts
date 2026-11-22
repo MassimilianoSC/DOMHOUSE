@@ -90,3 +90,31 @@ describe("eliminazione di un appartamento", () => {
     expect(String(platformApi.deleteApartment)).not.toMatch(/DELETE/);
   });
 });
+
+// D-198 (o1 0b2548d): on an apartment created from the app the server takes a body with italianway_id alone; any other
+// field answers 409 created_from_app. So the site sends exactly that, and null to remove the code.
+describe("codice Italianway di un appartamento creato dall'app", () => {
+  it("PATCH …/tenants/{t}/apartments/{id} con il solo italianway_id; null per toglierlo", async () => {
+    await platformApi.setItalianwayCode("t 1", "lab-corte", "IW-4471", "corr-9");
+    expect(new URL(calls[0].url).pathname).toBe("/app/platform/tenants/t%201/apartments/lab-corte");
+    expect(calls[0].init.method).toBe("PATCH");
+    expect(JSON.parse(String(calls[0].init.body))).toStrictEqual({ italianway_id: "IW-4471" });
+    expect((calls[0].init.headers as Record<string, string>)["X-Correlation-Id"]).toBe("corr-9");
+    await platformApi.setItalianwayCode("t 1", "lab-corte", null, "corr-10");
+    expect(JSON.parse(String(calls[1].init.body))).toStrictEqual({ italianway_id: null });
+  });
+});
+
+// F-13 (o1 59f3ba7): the quota of an organisation; quota_eur is a required field of the PUT, null for the project's cap
+describe("quota mensile dell'assistente", () => {
+  it("GET …/tenants/{t}/ai-quota; PUT con quota_eur sempre presente, anche null", async () => {
+    await platformApi.aiQuota("t 1");
+    expect(new URL(calls[0].url).pathname).toBe("/app/platform/tenants/t%201/ai-quota");
+    expect(calls[0].init.method ?? "GET").toBe("GET");
+    await platformApi.setAiQuota("t 1", null, "corr-11");
+    expect(calls[1].init.method).toBe("PUT");
+    expect(JSON.parse(String(calls[1].init.body))).toStrictEqual({ quota_eur: null });
+    await platformApi.setAiQuota("t 1", 0, "corr-12");
+    expect(JSON.parse(String(calls[2].init.body))).toStrictEqual({ quota_eur: 0 });
+  });
+});

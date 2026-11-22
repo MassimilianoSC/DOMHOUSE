@@ -1,7 +1,11 @@
 {
   "app": {
     "name": "DOMHOUSE",
-    "tagline": "Riscaldamento, clima e consumi dei tuoi appartamenti"
+    "tagline": "Riscaldamento, clima e consumi dei tuoi appartamenti",
+    "newVersion": {
+      "title": "È disponibile una versione nuova",
+      "reload": "Aggiorna"
+    }
   },
   "common": {
     "loading": "Caricamento…",
@@ -156,7 +160,11 @@
     "resetSent": "Se {email} ha un account, riceverai a breve un'email con il link. Controlla anche lo spam.",
     "backToLogin": "Torna all'accesso",
     "verifySent": "Conferma il tuo indirizzo: abbiamo inviato un link a {email}. Aprilo e poi accedi di nuovo.",
-    "verifyFailed": "Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto."
+    "verifyFailed": "Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto.",
+    "sharedDevice": "Questo è un dispositivo condiviso",
+    "sharedDeviceHint": "Dopo 30 minuti senza usare l'app l'uscita è automatica, e alla riapertura serve di nuovo l'accesso. Lasciala spenta sul tuo telefono o computer personale.",
+    "sharedDeviceUnavailable": "Su questo browser l'uscita automatica non è disponibile: premi «Esci» quando hai finito.",
+    "autoLoggedOut": "Uscita automatica: l'app non è stata usata per 30 minuti su un dispositivo condiviso. Accedi di nuovo per continuare."
   },
   "account": {
     "title": "Account",
@@ -195,7 +203,8 @@
       "recentLogin": "Per sicurezza esci e accedi di nuovo, poi riprova",
       "network": "Connessione assente: riprova",
       "generic": "Operazione non riuscita, riprova"
-    }
+    },
+    "sharedDevice": "Dispositivo condiviso: uscita automatica dopo 30 minuti senza usare l'app. Per toglierla esci e accedi di nuovo senza la casella."
   },
   "roles": {
     "admin": "Amministratore",
@@ -408,7 +417,7 @@
   },
   "contract": {
     "incompatibleTitle": "Versione del contratto non compatibile",
-    "incompatible": "Il sistema domotico dichiara il contratto {version}: questa app supporta solo la versione 1.x. Contatta il supporto tecnico."
+    "incompatible": "Il sistema domotico dichiara il contratto {version}: questa app supporta solo la versione 1.x. Scrivi all'assistenza HQE."
   },
   "phase": {
     "soon": "In arrivo",
@@ -559,10 +568,10 @@
       "instanceUrlHintMock": "In questo ambiente usa mock://builtin",
       "instanceUrlHintProd": "Scrivi l'indirizzo del motore dell'appartamento; i dimostrativi si provano in staging",
       "port": "Porta",
-      "italianway": "ID Italianway",
+      "italianway": "Codice Italianway",
       "code": "Codice",
       "enabled": "Attivo",
-      "disableConfirm": "Disattivare «{name}»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.",
+      "disableConfirm": "Disattivare «{name}»? Gli automatismi del sistema domotico continuano. Si fermano notifiche (anche le gravi, come «sistema domotico non raggiungibile»), riepilogo del lunedì, prenotazioni da Italianway ed export Excel; le prenotazioni arrivate nel frattempo non si recuperano alla riattivazione. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.",
       "lockedByPlatform": "L'ha disattivato il gestore della piattaforma: solo lui può riattivarlo.",
       "disabled": "disattivato",
       "verify": "Verifica connessione",
@@ -717,7 +726,7 @@
     "suspendedInfo": "Sospesa il {when}. Motivo: {reason}",
     "suspendTitle": "Sospendere «{name}»?",
     "suspendHint": "I suoi utenti escono dall'app e non possono rientrare finché non la riattivi; le notifiche si fermano. Le prenotazioni continuano ad arrivare al motore degli appartamenti.",
-    "suspendReason": "Motivo (obbligatorio, resta nel registro attività)",
+    "suspendReason": "Motivo (obbligatorio, resta nel registro dell'organizzazione)",
     "suspendConfirm": "Sospendi l'organizzazione",
     "suspendedDone": "Organizzazione «{name}» sospesa",
     "reactivateConfirm": "Riattivare «{name}»? I suoi utenti potranno di nuovo entrare nell'app.",
@@ -734,6 +743,7 @@
     "removed": "Ruolo di gestore tolto a {email}",
     "apartments": "Appartamenti",
     "aptAdd": "Collega un sistema esistente",
+    "aptAddNote": "Per un sistema domotico già installato a mano: di solito serve solo all'assistenza HQE.",
     "aptAddTitle": "Collega un sistema esistente a {name}",
     "aptAddHint": "L'identificativo non si potrà più cambiare: usa minuscole, numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l'amministratore dell'organizzazione.",
     "aptCreated": "Appartamento {id} creato",
@@ -742,6 +752,13 @@
     "aptEditTitle": "Collegamento di «{name}»",
     "aptEditHint": "Qui cambi il collegamento al sistema domotico e il codice Italianway: nome, stato e funzioni dell'appartamento li gestisce l'amministratore dell'organizzazione.",
     "italianwayHint": "Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.",
+    "italianwayCode": {
+      "button": "Codice Italianway",
+      "title": "Codice Italianway di «{name}»",
+      "hint": "Il collegamento al sistema domotico resta quello creato dall'app: qui cambi solo il codice.",
+      "saved": "Codice Italianway di «{name}» salvato.",
+      "removed": "Codice Italianway di «{name}» tolto."
+    },
     "aptSaved": "Collegamento aggiornato",
     "aptEmpty": "Nessun appartamento in questa organizzazione",
     "creation": {
@@ -751,10 +768,10 @@
       "formTitle": "Nuovo appartamento in {name}",
       "formHint": "Ci vogliono alcuni minuti. Se la creazione si ferma a metà, l'appartamento resta nell'elenco come «Non creato» finché non premi «Riprova» o «Annulla creazione».",
       "idPlaceholder": "lab-…",
-      "idHint": "Nello staging comincia con lab- o test-; lettere minuscole, cifre e trattini. Non si cambia più.",
-      "idInvalid": "Id non valido: nello staging lab-… o test-…, lettere minuscole, cifre e trattini.",
+      "idHint": "Scegli un nome breve e stabile, per esempio lab-milano-roma-12. Nello staging comincia con lab- o test-; lettere minuscole, cifre e trattini. Non si cambia e non si potrà riusare, nemmeno dopo l'eliminazione.",
+      "idInvalid": "ID non valido: nello staging lab-… o test-…, lettere minuscole, cifre e trattini.",
       "idTaken": "Identificativo non disponibile: è già usato, o lo è stato.",
-      "italianwayHint": "Si può aggiungere anche dopo.",
+      "italianwayHint": "Si può aggiungere anche dopo, con «Codice Italianway» nella riga dell'appartamento.",
       "limitInfo": "Si possono creare al massimo {limit} appartamenti all'ora per ogni organizzazione. Nell'ultima ora: {used} su {limit}.",
       "limitInfoPlain": "Si possono creare al massimo {limit} appartamenti all'ora per ogni organizzazione.",
       "limitReached": "Limite raggiunto: questa organizzazione ha già creato {limit} appartamenti nell'ultima ora. Potrai crearne un altro {when}.",
@@ -771,7 +788,7 @@
         "annullamento_in_corso": "Annullamento in corso"
       },
       "steps": {
-        "riserva": "prenotazione di id e porta",
+        "riserva": "ID e porta riservati",
         "segreti": "chiavi",
         "capienza": "spazio sulla macchina virtuale",
         "motore": "installazione del sistema domotico",
@@ -790,35 +807,36 @@
       "cancelling": "Si sta togliendo quello che era stato preparato; poi l'appartamento sparisce dall'elenco.",
       "whatTitle": "Cosa è successo",
       "what": {
-        "capienza_insufficiente": "La macchina virtuale non ha memoria per un sistema domotico in più.",
-        "staging_pieno": "Lo staging ha già il numero massimo di sistemi domotici.",
-        "porta_occupata": "La porta scelta è occupata sulla macchina virtuale: «Riprova» ne prende un'altra.",
-        "rifiutata": "Richiesta rifiutata dal sistema: serve un controllo (ID richiesta).",
-        "segreto_illeggibile": "I permessi sulle chiavi non sono ancora attivi: riprova fra qualche minuto.",
-        "motore_non_sano": "Il sistema domotico non è partito: «Riprova», e se succede ancora serve un controllo.",
-        "broker_fallito": "L'accesso dei dispositivi non è stato preparato: «Riprova».",
-        "tempo_scaduto": "Nessuna risposta dalla macchina virtuale in 20 minuti: «Riprova».",
-        "segreti_non_creati": "Le chiavi non sono state create: «Riprova».",
-        "secret_conflict": "C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla creazione» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che il supporto ha tolto quella chiave.",
-        "collegamento_fallito": "Il sistema domotico è installato ma l'app non lo raggiunge: «Riprova».",
-        "chiavi_non_distrutte": "Il sistema domotico è stato tolto, ma le chiavi no: «Annulla creazione» di nuovo.",
-        "non_inviato": "L'ordine non è partito verso la macchina virtuale: «Riprova».",
-        "generic": "La creazione si è fermata prima della fine."
+        "capienza_insufficiente": "La macchina virtuale non ha memoria per un sistema domotico in più. Se puoi aspettare, chiedi all'assistenza HQE di fare posto e poi premi «Riprova»: tieni lo stesso ID. «Annulla creazione» libera tutto, ma l'ID non si potrà più usare.",
+        "staging_pieno": "Lo staging ha già il numero massimo di sistemi domotici. Se puoi aspettare, chiedi all'assistenza HQE di fare posto e poi premi «Riprova»: tieni lo stesso ID.",
+        "porta_occupata": "La porta scelta è occupata sulla macchina virtuale: premi «Riprova», ne prende un'altra.",
+        "rifiutata": "Richiesta rifiutata dal sistema. Non annullare: scrivi all'assistenza HQE con l'ID qui sotto.",
+        "segreto_illeggibile": "I permessi sulle chiavi non sono ancora attivi: aspetta qualche minuto e premi «Riprova».",
+        "motore_non_sano": "Il sistema domotico non è partito. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto.",
+        "broker_fallito": "L'accesso dei dispositivi non è stato preparato: premi «Riprova».",
+        "tempo_scaduto": "Nessuna risposta dalla macchina virtuale in 20 minuti: premi «Riprova».",
+        "segreti_non_creati": "Le chiavi non sono state create: premi «Riprova».",
+        "secret_conflict": "C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla creazione» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che l'assistenza HQE ha tolto quella chiave.",
+        "collegamento_fallito": "Il sistema domotico è installato ma l'app non lo raggiunge: premi «Riprova».",
+        "chiavi_non_distrutte": "Il sistema domotico è stato tolto, ma le chiavi no: premi di nuovo «Annulla creazione».",
+        "non_inviato": "L'ordine non è partito verso la macchina virtuale: premi «Riprova».",
+        "generic": "La creazione si è fermata prima della fine. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto."
       },
       "stoppedAt": "Si è fermata a: {step} (passo {n} di {of})",
-      "reserved": "L'id {id} e la porta {port} restano riservati finché non premi «Riprova» o «Annulla creazione».",
-      "reservedNoPort": "L'id {id} resta riservato finché non premi «Riprova» o «Annulla creazione».",
+      "reserved": "L'ID {id} e la porta {port} restano riservati finché non premi «Riprova» o «Annulla creazione».",
+      "reservedNoPort": "L'ID {id} resta riservato finché non premi «Riprova» o «Annulla creazione».",
       "lastAttempt": "Ultimo tentativo: {when}, {name}",
       "lastAttemptNoName": "Ultimo tentativo: {when}",
+      "aptId": "ID dell'appartamento",
       "retry": "Riprova",
       "cancel": "Annulla creazione",
       "back": "Indietro",
       "cancelTitle": "Annullare la creazione di {name}?",
-      "cancelText": "Togli tutto quello che è stato preparato per {name}: sistema domotico, accesso dei dispositivi e chiavi. L'id {id} non si potrà più usare; la porta torna libera. Le chiavi si possono recuperare per 7 giorni.",
+      "cancelText": "Togli tutto quello che è stato preparato per {name}: sistema domotico, accesso dei dispositivi e chiavi. L'ID {id} non si potrà più usare; la porta torna libera. Le chiavi si possono recuperare per 7 giorni.",
       "cancelled": "Creazione di {name} annullata.",
       "ready": "{name} è pronto.",
       "readyLead": "Pronto.",
-      "readyNext": "Prossimi passi: registra gli Shelly e scrivi l'elenco dei dispositivi.",
+      "readyNext": "Prossimo passo: registra gli Shelly con il pulsante «Credenziali dei dispositivi». L'elenco dei dispositivi per ora lo scrive l'assistenza HQE.",
       "changed": "Qualcuno ha appena cambiato questa creazione: l'elenco è stato aggiornato.",
       "tenantStoppedOne": "1 appartamento non creato: serve «Riprova» o «Annulla creazione»",
       "tenantStoppedMany": "{count} appartamenti non creati: serve «Riprova» o «Annulla creazione»",
@@ -847,11 +865,12 @@
       "deleteTitle": "Eliminare «{name}»?",
       "deleteWhich": "ID {id} · organizzazione {tenant}",
       "lostApp": "Si perdono il sistema domotico con i suoi dati e le credenziali dei dispositivi; l'appartamento sparisce dall'app per tutti i suoi utenti.",
+      "devicesStay": "Gli Shelly restano montati e, per quanto sappiamo oggi, restano come sono in quel momento: se la caldaia è accesa, può restare accesa senza che nessuno la comandi. Prima di eliminare metti l'appartamento in «Casa vuota», oppure fai togliere gli Shelly.",
       "lostRecord": "L'appartamento sparisce dall'app per tutti i suoi utenti.",
-      "keptApp": "Restano prenotazioni e riepiloghi per 12 mesi e il registro attività per 24 mesi. Lo storico del sistema domotico si può recuperare per 30 giorni, con l'aiuto del supporto.",
-      "keptRecord": "Restano prenotazioni e riepiloghi per 12 mesi e il registro attività per 24 mesi.",
+      "keptApp": "Restano prenotazioni e riepiloghi per 12 mesi e il registro dell'organizzazione per 24 mesi. Lo storico del sistema domotico si può recuperare per 30 giorni, con l'aiuto dell'assistenza HQE.",
+      "keptRecord": "Restano prenotazioni e riepiloghi per 12 mesi e il registro dell'organizzazione per 24 mesi.",
       "idGone": "L'ID {id} non si potrà più usare.",
-      "manual": "Il sistema domotico sulla macchina virtuale resta: va tolto a mano dal supporto.",
+      "manual": "Il sistema domotico sulla macchina virtuale resta: lo toglie a mano l'assistenza HQE.",
       "nameLabel": "Scrivi il nome dell'appartamento per confermare",
       "nameHint": "Il nome è «{name}», maiuscole comprese.",
       "confirm": "Elimina",
@@ -875,20 +894,28 @@
       "startedAt": "Avviata il {when}",
       "stoppedAt": "Si è fermata a: {step} (passo {n} di {of})",
       "what": {
-        "manual": "Il sistema domotico sulla macchina virtuale non risulta creato dall'app: serve il supporto (ID richiesta).",
-        "chiavi_non_distrutte": "Il sistema domotico è stato tolto, ma le chiavi no: «Riprova».",
-        "non_inviato": "L'ordine non è partito verso la macchina virtuale: «Riprova».",
-        "tempo_scaduto": "Nessuna risposta dalla macchina virtuale in 20 minuti: «Riprova».",
-        "errore_interno": "Errore interno del server: «Riprova», e se succede ancora serve un controllo (ID richiesta).",
-        "generic": "L'eliminazione si è fermata prima della fine: «Riprova»."
+        "manual": "Il sistema domotico sulla macchina virtuale non risulta creato dall'app: scrivi all'assistenza HQE con l'ID qui sotto.",
+        "chiavi_non_distrutte": "Il sistema domotico è stato tolto, ma le chiavi no: premi «Riprova».",
+        "non_inviato": "L'ordine non è partito verso la macchina virtuale: premi «Riprova».",
+        "tempo_scaduto": "Nessuna risposta dalla macchina virtuale in 20 minuti: premi «Riprova».",
+        "errore_interno": "Errore interno del server. Premi «Riprova»; se succede ancora, scrivi all'assistenza HQE con l'ID qui sotto.",
+        "generic": "L'eliminazione si è fermata prima della fine: premi «Riprova»."
       }
     },
-    "unattributedHint": "Prenotazioni arrivate da Italianway che non si possono assegnare a nessuna organizzazione: codice Italianway sconosciuto o collegato a più appartamenti, firma non valida, formato non riconosciuto. Gli amministratori delle organizzazioni non le vedono."
+    "unattributedHint": "Prenotazioni arrivate da Italianway che non si possono assegnare a nessuna organizzazione: codice Italianway sconosciuto o collegato a più appartamenti, firma non valida, formato non riconosciuto. Gli amministratori delle organizzazioni non le vedono.",
+    "aiQuota": {
+      "label": "Quota mensile dell'assistente (€)",
+      "spentWithQuota": "Speso a {month}: {spent} € su {quota} €.",
+      "spentNoQuota": "Speso a {month}: {spent} €. Senza quota vale il tetto del progetto: {cap} € al mese per tutte le organizzazioni insieme, già spesi {projectSpent} €.",
+      "rules": "Vuoto: vale il tetto del progetto. 0: solo risposte rapide, l'assistente completo non si usa.",
+      "saved": "Quota dell'assistente di «{name}» salvata: {quota} € al mese.",
+      "removed": "Quota dell'assistente di «{name}» tolta: vale il tetto del progetto."
+    }
   },
   "support": {
     "open": "Accesso di assistenza",
     "openTitle": "Accesso di assistenza a «{name}»",
-    "openHint": "Per il tempo scelto lavori dentro l'organizzazione con i permessi di un operatore. L'amministratore lo vede subito e può chiuderlo; apertura e chiusura restano nel registro attività.",
+    "openHint": "Per il tempo scelto lavori dentro l'organizzazione con i permessi di un operatore. L'amministratore lo vede subito e può chiuderlo; apertura e chiusura restano nel registro dell'organizzazione.",
     "hours": "Durata",
     "hoursOne": "1 ora",
     "hoursMany": "{count} ore",

@@ -1,4 +1,4 @@
-import { disablePush, enablePush, forgetPushResume, PushError, pushResumePending, pushState, syncPushToken } from "./push";
+import { disablePush, enablePush, forgetPushResume, PushError, pushResumePending, pushState, pushWorkInFlight, syncPushToken } from "./push";
 
 // Push on this device with everything simulated: Firebase messaging, the BFF (pushApi), the browser permission and
 // the service worker registration.
@@ -362,5 +362,25 @@ describe("push: uscita senza rete (P-83, D50)", () => {
     expect(s.deleteToken).toHaveBeenCalledTimes(2);
     expect(s.unsubscribe).toHaveBeenLastCalledWith("tok-1");
     expect(pushResumePending("u1")).toBe(true); // la persona ritrova le notifiche al suo rientro (P-44)
+  });
+});
+
+// P-92, review P7: while the token is being removed (a sign-out, an expired session) the new-version reload waits.
+describe("rimozione del token in corso", () => {
+  it("pushWorkInFlight è vero finché disablePush lavora, anche se fallisce", async () => {
+    own("tok-1");
+    let release: () => void = () => {};
+    s.unsubscribe.mockImplementationOnce(() => new Promise((r) => { release = () => r({ subscribed: false }); }));
+    expect(pushWorkInFlight()).toBe(false);
+    const work = disablePush({ resume: true });
+    await new Promise((r) => setTimeout(r, 0));
+    expect(pushWorkInFlight()).toBe(true);
+    release();
+    await work;
+    expect(pushWorkInFlight()).toBe(false);
+    own("tok-2");
+    s.deleteToken.mockRejectedValueOnce(new Error("offline"));
+    await disablePush();
+    expect(pushWorkInFlight()).toBe(false);
   });
 });
