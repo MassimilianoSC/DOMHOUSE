@@ -27,6 +27,12 @@ Quando il token non si riesce a controllare (tempo massimo `TOKEN_CHECK_TIMEOUT_
 - **Firebase non risponde:** 503 `auth_unavailable`.
 - **Perché:** il token di una persona rimossa conserva i claim fino a un'ora. Prima della correzione la persona rientrava con tutti gli appartamenti.
 - **Rimozione e «Elimina il mio account»:** il record si cancella una seconda volta dopo l'operazione su Firebase.
+**Testi liberi (F-11, stessa revisione).**
+- **Quali campi:** il nome dell'invitato (`POST /app/admin/users`), il nome cambiato dall'admin (`PATCH /app/admin/users/{uid}`), il proprio nome (`PATCH /app/me`, che è anche il mittente nell'email d'invito) e l'indirizzo dell'appartamento (`PATCH /app/admin/apartments/{id}`).
+- **Limiti:** il nome al massimo 80 caratteri, l'indirizzo 200.
+- **Cosa non possono contenere:** caratteri di controllo, caratteri invisibili di direzione, testo che si legge come un indirizzo web («://», «www.», un dominio seguito da «/»). Un dominio da solo («Casa.it») resta ammesso.
+- **Altrimenti:** 422 di validazione (`bff/plain_text.py`).
+
 - **Push, preferenze e nome** (`POST`/`DELETE /app/push/subscribe`, `GET /app/push/status`, `PUT /app/me/notification-prefs`, `PATCH /app/me`): cambiano solo un record che esiste, mai uno ricreato. Se il record è sparito nel frattempo: 404 `not_found` «Utente inesistente». `PATCH /app/me` aggiorna comunque il nome del gestore della piattaforma.
 
 Mock: il motore simulato (`/mock/...`, solo con `INSTANCE_MODE=mock`) risponde solo alla chiamata del BFF in

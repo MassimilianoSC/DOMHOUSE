@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, Field
 from .. import accounts, actors, ai_stats, audit, deletion, instances, support
 from ..auth import CurrentUser, require_admin, scope_out
 from ..logs import warn
+from ..plain_text import PlainAddress, PlainName
 from ..features import APP_FEATURES
 from ..invites import InviteRefused, create_invitation, send_invitation, shown
 from ..repository import Apartment, Tenant, User, get_repository
@@ -37,13 +38,13 @@ ApartmentScope = Literal["all"] | list[str]
 class InviteBody(BaseModel):
     email: EmailStr
     role: Role
-    display_name: str = ""
+    display_name: PlainName = ""            # F-11: in the invitation email
     apartment_ids: ApartmentScope = "all"
 
 
 class UserPatch(BaseModel):
     role: Role | None = None
-    display_name: str | None = None
+    display_name: PlainName | None = None   # F-11
     apartment_ids: ApartmentScope | None = None  # missing = no change; an explicit null is refused in patch_user
 
 
@@ -196,7 +197,7 @@ async def delete_user(uid: str, user: CurrentUser = Depends(require_admin)):
 
 class ApartmentPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
-    address: str | None = None
+    address: PlainAddress | None = None     # F-11
     timezone: str | None = None        # D-177: accepted and ignored (the engine's TIMEZONE is the one source)
     instance_url: str | None = None
     instance_secret_name: str | None = None

@@ -4,11 +4,12 @@ import asyncio
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .. import accounts, audit, erasure, support
 from ..auth import CurrentUser, Identity, resolve_own_identity, resolve_own_user
 from ..logs import info, warn
+from ..plain_text import PlainName
 from ..repository import User, get_repository, normalize_email
 
 router = APIRouter(prefix="/app/me")
@@ -19,7 +20,7 @@ def err(status: int, error: str, message: str) -> JSONResponse:
 
 
 class ProfilePatch(BaseModel):
-    display_name: str = Field(max_length=80)
+    display_name: PlainName                 # F-11: an admin's own name is the inviter's in the invitation email
 
 
 @router.patch("")
