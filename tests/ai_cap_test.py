@@ -189,3 +189,48 @@ def test_p1_settling_more_than_reserved_is_said_in_the_log_not_hidden(monkeypatc
     totals = run(repo.settle_ai_cost("2026-08", 0.8, 0.1, 10, 5, 1))
     assert totals["reserved_eur"] == 0.0
     assert [m for m, _ in seen] == ["assistant reservation below zero"]
+
+
+# -------- rereading P-2 and P-11: what the model may bill beyond the reservation --------
+def test_p2_text_that_is_not_latin_is_reserved_one_token_per_character(monkeypatch):
+    """chars/2 was low for CJK and emoji (one character can be one token or more)."""
+    settings(monkeypatch, ai_twin_model="", ai_max_tokens=1)
+    text = "电" * 50_000 + "😀" * 1_000
+    request = {"messages": [{"role": "user", "content": text}], "max_tokens": 1}
+    p_in = ai_gateway.prices()[0]
+    assert ai_gateway.cost_ceiling(request) >= 2 * 51_000 * p_in / 1_000_000           # the request and its twin
+
+
+def test_p2_a_call_cut_after_it_was_sent_is_settled_with_its_input_at_least(model, monkeypatch):
+    sent, state = model
+    settings(monkeypatch, ai_monthly_cap_eur=20.0, ai_twin_model="", ai_hedge_after_s=30.0)
+    state["delay"] = 5.0
+
+    async def cut():
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(ai_gateway.chat(APT, dict(BODY)), timeout=0.1)
+    run(cut())
+    u = usage()
+    assert len(sent) == 1 and u["reserved_eur"] == pytest.approx(0.0) and u["calls"] == 0
+    assert u["cost_eur"] > 0                                                          # its input, at least
+
+
+def test_p2_a_model_timeout_is_settled_with_its_input_and_a_refusal_before_sending_with_nothing(model, monkeypatch):
+    sent, state = model
+    settings(monkeypatch, ai_monthly_cap_eur=20.0, ai_twin_model="", ai_hedge_after_s=30.0)
+    state["fail"] = ai_gateway.GatewayError(504, "timeout", "Il modello non ha risposto in tempo")
+    assert run(post(BODY)).status_code == 504
+    assert usage()["cost_eur"] > 0
+    get_repository().ai_usage = {}
+    state["fail"] = ai_gateway.GatewayError(502, "model_error", "Il modello ha risposto 400")
+    assert run(post(BODY)).status_code == 502
+    assert usage()["cost_eur"] == 0.0                                                 # an error answer is not billed
+
+
+@pytest.mark.parametrize("content", [[{"type": "image_url", "image_url": {"url": "https://x.example/a.png"}}],
+                                     {"text": "ciao"}, 42])
+def test_p11_a_message_carries_text_only(model, monkeypatch, content):
+    sent, _ = model
+    settings(monkeypatch, ai_twin_model="")
+    r = run(post({"messages": [{"role": "user", "content": content}]}))
+    assert r.status_code == 422 and sent == [], (content, r.status_code)

@@ -200,6 +200,11 @@ def _body_problem(body: dict) -> str | None:
         return f"Al massimo {MAX_MESSAGES} messaggi"
     if not all(isinstance(m, dict) and m.get("role") in ROLES for m in messages):
         return "Messaggi non validi"
+    # rereading P-11: text only (an image or a file costs many tokens in few characters); null only for an assistant's
+    # turn that carries tool calls
+    if not all(isinstance(m.get("content"), str) or (m.get("content") is None and m.get("role") == "assistant")
+               for m in messages):
+        return "Messaggi non validi: solo testo"
     if len(json.dumps(messages, ensure_ascii=False)) > MAX_CHARACTERS:
         return "Richiesta troppo lunga"
     tools = body.get("tools")
@@ -210,12 +215,18 @@ def _body_problem(body: dict) -> str | None:
     return None
 
 
+def input_tokens_ceiling(request: dict) -> int:
+    """F-4, rereading P-2: the input counted prudently: one token every 2 ASCII characters (more than the 3-4 of Italian
+    text) and one for every other character (CJK, emoji: one character can be a token or more)."""
+    text = json.dumps(request.get("messages") or [], ensure_ascii=False) + json.dumps(request.get("tools") or [])
+    other = sum(1 for c in text if ord(c) > 0x7F)
+    return (len(text) - other) // 2 + other + 1
+
+
 def cost_ceiling(request: dict) -> float:
-    """F-4: the most this request can cost, reserved before it: its input counted as one token every 2 characters (more
-    than the 3-4 of Italian text), max_tokens of output, and the twin request too (C-10, D-187), at its own prices."""
-    chars = (len(json.dumps(request.get("messages") or [], ensure_ascii=False))
-             + len(json.dumps(request.get("tools") or [])))
-    tokens_in, tokens_out = chars // 2 + 1, int(request["max_tokens"])
+    """F-4: the most this request can cost, reserved before it: its input (input_tokens_ceiling), max_tokens of output,
+    and the twin request too (C-10, D-187), at its own prices."""
+    tokens_in, tokens_out = input_tokens_ceiling(request), int(request["max_tokens"])
     total = 0.0
     for twin in (False, True):
         p_in, p_out, _ = prices(twin)
@@ -256,6 +267,9 @@ async def chat(apartment_id: str, body: dict, ask_id: str = "") -> dict:
     started = time.monotonic()
     cost, tokens_in, tokens_out, counted = 0.0, 0, 0, 0
     went: list = []
+    # rereading P-2: a call cut after it was sent (rules.py's time limit, the model's timeout) may be billed for its
+    # input: settled with that at least, never 0
+    input_cost = input_tokens_ceiling(request) * prices()[0] / 1_000_000
     try:
         answer, attempt = await _call(request, apartment_id, ask_id, went)
         twin = attempt == 2 and bool(s.ai_twin_model)
@@ -265,6 +279,13 @@ async def chat(apartment_id: str, body: dict, ask_id: str = "") -> dict:
             # price (what it may have written is not known; the bill is checked in the live verifications, point 9)
             cost += tokens_in * prices(not twin and bool(s.ai_twin_model))[0] / 1_000_000
         counted = 1
+    except (asyncio.CancelledError, TimeoutError):
+        cost = input_cost
+        raise
+    except GatewayError as exc:
+        if exc.error == "timeout":
+            cost = input_cost
+        raise
     finally:
         totals = await asyncio.shield(repo.settle_ai_cost(month, reserved, cost, tokens_in, tokens_out, counted))
     info("assistant model call", apartment_id=apartment_id, **_ask(ask_id),
