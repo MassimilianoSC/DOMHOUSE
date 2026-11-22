@@ -188,6 +188,41 @@ def test_under_the_limit_the_app_gets_the_whole_body_then_the_disconnect():
     assert got == [{"type": "http.request", "body": b"abcd", "more_body": False}, {"type": "http.disconnect"}]
 
 
+def _over_the_limit_on(path, declared: bool, monkeypatch):
+    """A body over the limit on `path`, with or without Content-Length: what was sent, how many pieces were read,
+    whether the app ran, and the warn lines."""
+    called, reads, sent, lines = [], [], [], []
+
+    async def inner(scope, receive, send):
+        called.append(True)
+
+    async def receive():
+        reads.append(1)
+        return {"type": "http.request", "body": b"x" * 1024, "more_body": True}   # an endless body
+
+    async def send(message):
+        sent.append(message)
+    monkeypatch.setattr(body_limit, "warn", lambda msg, **fields: lines.append((msg, fields)))
+    headers = [(b"content-length", str(160 * 1024).encode())] if declared else []
+    run(body_limit.BodyLimit(inner, root_path="/api")(_scope(path, headers), receive, send))
+    return sent, reads, called, lines
+
+
+@pytest.mark.parametrize("declared", [True, False], ids=["content-length", "pieces"])
+def test_r2_a_pubsub_push_over_the_limit_is_acknowledged_204_unread_and_logged(declared, monkeypatch):
+    """Rereading R2 (agent_server_test::test_r2, the committente's full run of 22 November): Pub/Sub delivers again a
+    push that does not get a 2xx, forever. So on /internal/agent/risultati a body over the limit is acknowledged with 204,
+    never given to the app, read no further than the limit, and a warn line says so; every other path stays 413."""
+    for path in ("/internal/agent/risultati", "/api/internal/agent/risultati"):
+        sent, reads, called, lines = _over_the_limit_on(path, declared, monkeypatch)
+        assert sent[0]["status"] == 204 and called == [], path
+        assert reads == ([] if declared else [1] * (body_limit.DEFAULT_LIMIT // 1024 + 1)), path
+        assert lines == [("agent result ignored", {"reason": "troppo_grande"})], path
+    for path in ("/internal/agent/risultati-altro", "/internal/agent", "/app/me"):
+        sent, _reads, called, lines = _over_the_limit_on(path, declared, monkeypatch)
+        assert sent[0]["status"] == 413 and called == [] and lines == [], path
+
+
 def test_the_root_path_prefix_counts_for_the_webhook_limit():
     assert body_limit.limit_for("/api/webhooks/italianway", "/api") == 64 * 1024
     assert body_limit.limit_for("/api/app/me", "/api") == body_limit.DEFAULT_LIMIT
