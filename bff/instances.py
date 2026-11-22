@@ -141,6 +141,10 @@ def target_problem(raw: str, port: int | None = None) -> str | None:
     message = MSG_NOT_ALLOWED_PROD if s.app_env == "prod" else MSG_NOT_ALLOWED
     parts = urlsplit(v)
     host = (parts.hostname or "").lower()
+    if parts.username is not None or parts.password is not None:
+        # rereading of the medium fixes, P-6: user and password in the address made base_url call another port than
+        # the one checked here; never needed by an engine, refused in every environment
+        return message
     if s.app_env != "dev" and _local_host(host):
         return message
     if not spec:
@@ -166,7 +170,11 @@ def base_url(apt: Apartment) -> str:
         return f"http://127.0.0.1:{s.port}{s.root_path}/mock/{apt.apartment_id}/api/v1"
     parts = urlsplit(url.rstrip("/"))
     netloc = parts.netloc
-    if apt.port and ":" not in netloc:
+    try:
+        own_port = parts.port                      # P-6: the URL's own port, not a «:» anywhere in the netloc
+    except ValueError:                             # a malformed one stays as written (target_problem refuses it)
+        own_port = -1
+    if apt.port and own_port is None:
         netloc = f"{netloc}:{apt.port}"
     path = parts.path or "/api/v1"
     return urlunsplit((parts.scheme or "http", netloc, path, "", ""))

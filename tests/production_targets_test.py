@@ -143,3 +143,22 @@ def test_staging_still_reaches_dev_lab_01_and_the_load_test(monkeypatch):
         assert instances.target_problem(url, port) is None, (url, port)
     assert instances.target_problem("http://10.198.0.2:8101") == instances.MSG_NOT_ALLOWED
     main.check_access_settings(dataclasses.replace(s, auth_mode="firebase"), {})
+
+
+# -------- rereading of the medium fixes, P-6: the port checked was not the port called --------
+@pytest.mark.parametrize("env", ["prod", "staging", "dev"])
+def test_p6_an_address_with_user_and_password_is_refused(monkeypatch, env):
+    """http://u:p@10.198.0.2 with the port field 8101: the check saw 8101 (allowed), base_url saw «:» in the netloc
+    (the userinfo's), added no port, and the key went to 10.198.0.2:80."""
+    s = dataclasses.replace(get_settings(), instance_mode="real", app_env=env,
+                            instance_allowed=ALLOWED if env != "dev" else "")
+    monkeypatch.setattr(instances, "get_settings", lambda: s)
+    for url in ("http://u:p@10.198.0.2", "http://u@10.198.0.2:8101", "http://:p@10.198.0.2:8101"):
+        assert instances.target_problem(url, 8101) is not None, (env, url)
+
+
+def test_p6_the_port_called_is_the_port_checked():
+    apt = Apartment(apartment_id="a-p6", tenant_id="t", name="P6", instance_url="http://10.198.0.2", port=8101)
+    assert instances.base_url(apt) == "http://10.198.0.2:8101/api/v1"
+    apt = Apartment(apartment_id="a-p6", tenant_id="t", name="P6", instance_url="http://[fd00::2]", port=8101)
+    assert instances.base_url(apt) == "http://[fd00::2]:8101/api/v1"            # «:» of IPv6 is not a port
