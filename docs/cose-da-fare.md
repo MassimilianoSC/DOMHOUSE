@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1232 |
+| **Ultima domanda al committente** | 1233 |
 
 ## 2. Cose da fare
 
@@ -52,7 +52,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 11 | Procedura scritta di assistenza al gestore | nessuna | MS con C | aperto | `produzione-cosa-manca.md` B |
 | 12 | Informativa privacy approvata dal consulente del titolare; condizioni d'uso (P-70) | il consulente | C | bozza fatta | `informativa-privacy-bozza.md` |
 | 13 | Notifiche push provate su telefoni veri (P-11) | telefoni veri | C, colleghi | in parte | registro, P-11; `limiti-noti.md` |
-| 14 | Email dal dominio del prodotto e indirizzo dell'app (P-53) | decisione | C | rinviata (D-93) | registro, P-53 |
+| 14 | Email dal dominio del prodotto e indirizzo dell'app (P-53): il dominio lo sceglie il cliente nel passo 8 (1233 = a), poi o1 collega e MS prepara i comandi | dopo la risposta del cliente (voce 19) | cliente, poi o1, MS, C | in attesa del cliente | registro, P-53 |
 | 15 | Stagione del riscaldamento per appartamento (E1, 1231 = a): due date proposte secondo la zona climatica di legge, modificabili dall'amministratore; fuori stagione niente caldaia per il comfort, antigelo sempre attivo. Caldaia rotta con il comando che funziona (E2, 1232 = a): avviso «la temperatura non risale» se la stanza resta sotto l'antigelo per un tempo regolabile con la caldaia comandata accesa | prima del primo appartamento vero | o1, o2 | decisi | `limiti-noti.md`, P-90 |
 | 16 | Collaudo finale: checklist con i colleghi, relè vero, appartamenti | a fine implementazione | colleghi, Y, C | aperto | `checklist-collaudo.md` |
 
@@ -62,7 +62,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 |---|---|---|---|---|---|
 | 17 | Passo 5: prove al banco 1–7 (Matter via MQTT sulla 2.x; seconda rete Wi-Fi; orologio del ponte; versione dei sensori BLU; portata e sensori per ponte; antigelo con lo script; impianto vero) | Y in ufficio; la 6 solo se il cliente la sceglie; la 7 con caldaia e split veri | Y | in parte | documento 2 dell'Autonomia |
 | 18 | Passo 7: richiudere le righe «da verificare» del documento 2 | dopo il 17 | MS | in parte | documento 2 dell'Autonomia |
-| 19 | Passo 8: risposta scritta del cliente (responsabilità, assistenza, chi crea ed elimina gli appartamenti D-232, kit, relè della caldaia, Wi-Fi solo per i dispositivi, fatturazione, dual split, trasmettitore a infrarossi, chi fa la manutenzione dopo la consegna; check-out con movimento: tenere la domanda al gestore come oggi o passare sempre a casa vuota come nella proposta, P-88, 1229; consumi alti durante le pulizie: le pulizie usano prese comandate?, 1230) | il documento 3 è completo e consegnato (la proposta di progetto del 12 novembre è un'altra cosa) | MS prepara, C consegna, cliente risponde | da preparare | documento 3 dell'Autonomia |
+| 19 | Passo 8: risposta scritta del cliente (responsabilità, assistenza, chi crea ed elimina gli appartamenti D-232, kit, relè della caldaia, Wi-Fi solo per i dispositivi, fatturazione, dual split, trasmettitore a infrarossi, chi fa la manutenzione dopo la consegna; check-out con movimento: tenere la domanda al gestore come oggi o passare sempre a casa vuota come nella proposta, P-88, 1229; consumi alti durante le pulizie: le pulizie usano prese comandate?, 1230; dominio dell'app e delle email, 1233) | il documento 3 è completo e consegnato (la proposta di progetto del 12 novembre è un'altra cosa) | MS prepara, C consegna, cliente risponde | da preparare | documento 3 dell'Autonomia |
 | 20 | Passo 6: messaggio a L, poi segreto e formato delle prenotazioni di Italianway (P-9, P-10) | contratto di vendita firmato | C, L | aperto | `da-inviare/messaggio-italianway-per-leonardo.md` |
 | 21 | Passo 9: lavori per il primo appartamento (infrarossi, Italianway vero, relè della caldaia, revisione del codice) | dopo il passo 8; infrarossi dopo l'acquisto | o1, o2, Y | aperto | §15 |
 | 22 | Passo 11: A4, catalogo dei dispositivi, con il collaudo guidato | dopo il passo 5 | o1, o2, Y | aperto | §15, documento 2 riga 20 |
