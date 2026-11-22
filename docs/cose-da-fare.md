@@ -70,7 +70,7 @@ Colonna «Chi»: MS = memoria storica; C = committente; Y = Youssouf; L = Leonar
 | 30 | Leggere le novità di Mosquitto 3.0 | prima di aggiornare il broker | o1 | aperto | `limiti-noti.md` |
 | 31 | Riverificare il fermo E-27 con stream aperti | da decidere | o1 | aperto | `limiti-noti.md` |
 | 32 | P-82: benestare di Y su «PER SCARANTINO», poi consegna al cliente | Y | C, Y | in parte | registro, P-82 |
-| 33 | Allineare le colonne superate: §15.1, documento 2, `produzione-cosa-manca.md`, `limiti-noti.md`, tabella degli errori, tabella P | nessuna | MS | in parte: fatti §15.1, tabella P, tabella degli errori, `produzione-cosa-manca.md` (22 novembre); restano documento 2 e `limiti-noti.md` | controllo del 22 novembre |
+| 33 | Colonne superate allineate (§15.1, documento 2, `produzione-cosa-manca.md`, `limiti-noti.md`, tabelle degli errori e P): restano due verifiche con o1 | nessuna | MS | fatto il 22 novembre; restano da verificare con o1 due righe di `limiti-noti.md` (risposte a nome di un altro dispositivo attive sulla VM; R1 coperta dalla #13) | controllo del 22 novembre |
 
 ### E. Idee e decisioni senza scadenza
 
