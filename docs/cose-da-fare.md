@@ -51,7 +51,7 @@ Colonna «Chi»: MS = memoria storica; C = committente; Y = Youssouf; L = Leonar
 |---|---|---|---|---|---|
 | 17 | Passo 5: prove al banco 1–7 (Matter via MQTT sulla 2.x; seconda rete Wi-Fi; orologio del ponte; versione dei sensori BLU; portata e sensori per ponte; antigelo con lo script; impianto vero) | Y in ufficio; la 6 solo se il cliente la sceglie; la 7 con caldaia e split veri | Y | in parte | documento 2 dell'Autonomia |
 | 18 | Passo 7: richiudere le righe «da verificare» del documento 2 | dopo il 17 | MS | in parte | documento 2 dell'Autonomia |
-| 19 | Passo 8: risposta scritta del cliente (responsabilità, assistenza, chi crea ed elimina gli appartamenti D-232, kit, relè della caldaia, Wi-Fi solo per i dispositivi, fatturazione, dual split, trasmettitore a infrarossi) | proposta inviata il 12 novembre | cliente | in attesa | documento 3 dell'Autonomia |
+| 19 | Passo 8: risposta scritta del cliente (responsabilità, assistenza, chi crea ed elimina gli appartamenti D-232, kit, relè della caldaia, Wi-Fi solo per i dispositivi, fatturazione, dual split, trasmettitore a infrarossi) | il documento 3 è completo e consegnato (la proposta di progetto del 12 novembre è un'altra cosa) | MS prepara, C consegna, cliente risponde | da preparare | documento 3 dell'Autonomia |
 | 20 | Passo 6: messaggio a L, poi segreto e formato delle prenotazioni di Italianway (P-9, P-10) | contratto di vendita firmato | C, L | aperto | `da-inviare/messaggio-italianway-per-leonardo.md` |
 | 21 | Passo 9: lavori per il primo appartamento (infrarossi, Italianway vero, relè della caldaia, revisione del codice) | dopo il passo 8; infrarossi dopo l'acquisto | o1, o2, Y | aperto | §15 |
 | 22 | Passo 11: A4, catalogo dei dispositivi, con il collaudo guidato | dopo il passo 5 | o1, o2, Y | aperto | §15, documento 2 riga 20 |
@@ -70,7 +70,7 @@ Colonna «Chi»: MS = memoria storica; C = committente; Y = Youssouf; L = Leonar
 | 30 | Leggere le novità di Mosquitto 3.0 | prima di aggiornare il broker | o1 | aperto | `limiti-noti.md` |
 | 31 | Riverificare il fermo E-27 con stream aperti | da decidere | o1 | aperto | `limiti-noti.md` |
 | 32 | P-82: benestare di Y su «PER SCARANTINO», poi consegna al cliente | Y | C, Y | in parte | registro, P-82 |
-| 33 | Allineare le colonne superate: §15.1, documento 2, `produzione-cosa-manca.md`, `limiti-noti.md`, tabella degli errori (E-31…E-38), tabella P (P-60, P-65, P-67, P-78, P-79, P-83 fatti; P-62) | nessuna | MS | aperto | controllo del 22 novembre |
+| 33 | Allineare le colonne superate: §15.1, documento 2, `produzione-cosa-manca.md`, `limiti-noti.md`, tabella degli errori, tabella P | nessuna | MS | in parte: fatti §15.1, tabella P, tabella degli errori, `produzione-cosa-manca.md` (22 novembre); restano documento 2 e `limiti-noti.md` | controllo del 22 novembre |
 
 ### E. Idee e decisioni senza scadenza
 
