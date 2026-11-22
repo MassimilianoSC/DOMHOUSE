@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { toast } from "sonner";
 import type { MockInstance } from "vitest";
+import { ApiError } from "@/api/bff";
 import { t } from "@/i18n";
 import { AdminUsers } from "./AdminUsers";
 
@@ -155,5 +156,49 @@ describe("Utenti: elenco e modifica degli appartamenti", () => {
     fireEvent.click(within(dialog).getByTestId("scope-edit-u-owner-apt-rimini-01"));
     await click(within(dialog).getByTestId("scope-dialog-save"));
     expect(s.patchUser).toHaveBeenCalledWith("u-owner", { apartment_ids: [] }, expect.any(String));
+  });
+});
+
+// F-11 (o1 ee5899d): the name of the invited person at most 80 characters; a refused one says why under the field
+describe("invito: nome rifiutato dal server (F-11)", () => {
+  it("il campo accetta al massimo 80 caratteri", async () => {
+    await renderUsers();
+    expect(screen.getByTestId("admin-invite-name")).toHaveAttribute("maxLength", "80");
+  });
+
+  it.each([
+    "Il nome contiene caratteri non ammessi.",
+    "Il nome non può contenere un indirizzo web.",
+    "Il nome può avere al massimo 80 caratteri.",
+  ])("«%s» sotto il campo del nome, niente avviso rosso; sparisce scrivendo", async (sentence) => {
+    s.invite.mockRejectedValueOnce(new ApiError(422, "invalid_text", sentence, "c-1", { field: "display_name" }));
+    await renderUsers();
+    fireEvent.change(screen.getByTestId("admin-invite-email"), { target: { value: "nuovo@demo.it" } });
+    fireEvent.change(screen.getByTestId("admin-invite-name"), { target: { value: "www.esempio.it/promo" } });
+    await click(screen.getByTestId("admin-invite-btn"));
+    expect(screen.getByTestId("admin-invite-name-problem")).toHaveTextContent(sentence);
+    expect(screen.getByTestId("admin-invite-name")).toHaveAttribute("aria-invalid", "true");
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.getByTestId("admin-invite-name")).toHaveValue("www.esempio.it/promo"); // what was written stays
+    fireEvent.change(screen.getByTestId("admin-invite-name"), { target: { value: "Mario Rossi" } });
+    expect(screen.queryByTestId("admin-invite-name-problem")).toBeNull();
+  });
+
+  it("un rifiuto su un campo che l'invito non ha: l'avviso rosso, niente sotto il nome", async () => {
+    s.invite.mockRejectedValueOnce(new ApiError(422, "invalid_text", "L'indirizzo contiene caratteri non ammessi.", "c-5", { field: "address" }));
+    await renderUsers();
+    fireEvent.change(screen.getByTestId("admin-invite-email"), { target: { value: "nuovo@demo.it" } });
+    await click(screen.getByTestId("admin-invite-btn"));
+    expect(toast.error).toHaveBeenCalledWith("L'indirizzo contiene caratteri non ammessi.", expect.anything());
+    expect(screen.queryByTestId("admin-invite-name-problem")).toBeNull();
+  });
+
+  it("un altro errore resta l'avviso rosso", async () => {
+    s.invite.mockRejectedValueOnce(new ApiError(409, "email_taken", "Email già usata", "c-2"));
+    await renderUsers();
+    fireEvent.change(screen.getByTestId("admin-invite-email"), { target: { value: "nuovo@demo.it" } });
+    await click(screen.getByTestId("admin-invite-btn"));
+    expect(toast.error).toHaveBeenCalledWith("Email già usata", expect.anything());
+    expect(screen.queryByTestId("admin-invite-name-problem")).toBeNull();
   });
 });
