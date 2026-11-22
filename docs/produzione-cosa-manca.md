@@ -76,7 +76,7 @@ di cercarli. Un tipo di controllo mai fatto è un punto cieco, anche quando gli 
 
 ### D.2 Obbligo prima della produzione vera: analizzare i tipi di controllo non ancora fatti
 
-**Prima del primo appartamento vero**, per ognuno dei tipi qui sotto la memoria storica, con o1 e o2, scrive in questa
+**Stato al 22 novembre 2026: ogni tipo ha la sua decisione scritta** (risposte 1130, 1219, 1221–1226; prova di carico già prevista). **Prima del primo appartamento vero**, per ognuno dei tipi qui sotto la memoria storica, con o1 e o2, scrive in questa
 sezione: se va fatto, con quale ampiezza, chi lo fa, oppure perché non serve. Il committente decide. Nessun tipo resta
 senza una decisione scritta. Il primo è già deciso.
 
@@ -91,7 +91,7 @@ senza una decisione scritta. Il primo è già deciso.
 | **Sicurezza in appartamento** | un ospite sulla rete Wi-Fi di casa può aprire la pagina di uno Shelly o disturbare i dispositivi? | **deciso (risposta 1223 = a, 22 novembre):** analisi scritta dei rischi (Wi-Fi, accesso fisico, Bluetooth) con le difese già decise, poi prova al banco con Youssouf da un portatile sul Wi-Fi del banco (pagine degli Shelly, comandi, sensore finto); ciò che passa diventa un difetto o una regola della guida del kit. Collegata alla rete solo per i dispositivi, decisione 6 della proposta |
 | **Usabilità per chi non è tecnico** | gestori, operatori e cliente capiscono l'app e le guide senza aiuto? | in parte (collaudo dei colleghi, D-200). **Deciso per l'Autonomia (risposta 1224 = a, 22 novembre):** lettura da esperto di pagine e guida nei panni di chi non è tecnico (tempo morto), poi prova con uno o due colleghi che fanno compiti veri nello staging seguendo solo la guida, con fogli di compiti e domande; i problemi diventano correzioni. Il passo 17 del piano resta la prova finale |
 | **Aggiornamenti e ritorni indietro** | una pubblicazione sbagliata si annulla davvero, anche sui motori e sul broker? | **deciso (risposta 1225 = a, 22 novembre):** nessun ritorno indietro risulta eseguito davvero (solo scritto nelle procedure, con le copie tenute); prova nello staging per ogni pezzo (server, sito, un motore, broker, agente): indietro, controllo, avanti, tempi misurati; ne esce la tabella «come si torna indietro» per il manuale di manutenzione; tempo morto |
-| **Lungo periodo con dispositivi veri** | batterie, orologi, disconnessioni, firmware dopo settimane | coperto dal mese di prove del primo appartamento; da scrivere cosa si misura |
+| **Lungo periodo con dispositivi veri** | batterie, orologi, disconnessioni, firmware dopo settimane | **deciso (risposta 1226 = a, 22 novembre):** elenco delle misure con le soglie (batterie, orologio del ponte, scollegamenti e tempi di ritorno, memoria e disco dei motori, allarmi falsi, comandi falliti) scritto in un tempo morto; poi misure su `lab-01` con gli Shelly sempre accesi (da chiedere a Youssouf), nel resoconto del lunedì, come valori di confronto per il mese di prove del primo appartamento |
 
 **Regola da qui in avanti:** quando un controllo trova un difetto di un tipo nuovo, si aggiunge una riga in D.2 per quel
 tipo, e si valuta se ripetere quel controllo su tutto il sistema.
