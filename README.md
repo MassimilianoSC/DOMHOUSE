@@ -233,7 +233,7 @@ Prerequisiti (una tantum, progetto `your-gcp-project-id`):
 1. Abilita API: Cloud Run, Artifact Registry, Cloud Build, Firestore (modalità Native, regione `europe-west8`), Secret Manager, Firebase Auth (Email/password e Google), Cloud Messaging.
 2. Artifact Registry: `gcloud artifacts repositories create domotica --repository-format=docker --location=europe-west8`.
 3. Service account `domotica-bff@your-gcp-project-id.iam.gserviceaccount.com` con ruoli `roles/datastore.user`, `roles/secretmanager.secretAccessor`, `roles/firebaseauth.admin`, `roles/firebasemessaging.admin`.
-4. Segreti: `italianway-webhook-secret`, `smtp-app-password` (password SMTP del mittente delle email di invito, es. app
+4. Segreti: `italianway-webhook-secret` (produzione) e `italianway-webhook-secret-staging` (staging, F-16), `smtp-app-password` (password SMTP del mittente delle email di invito, es. app
    password Gmail) e uno per istanza `langbrain-api-key-<apartment_id>`; `domotica-bff` deve poterli leggere
    (`roles/secretmanager.secretAccessor` sul singolo segreto). I segreti citati nel manifest devono esistere prima del
    deploy, altrimenti Cloud Run rifiuta la revisione.

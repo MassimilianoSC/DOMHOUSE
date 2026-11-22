@@ -16,7 +16,9 @@ WANTED = {"APP_ENV": ("staging", "prod"), "FIRESTORE_DATABASE": ("staging", "(de
           # D04 (P-83) and F-3: each environment's engines, never one of the other's (dev 8100 serves production until
           # the second VM, A10)
           "INSTANCE_ALLOWED": ("your-vm-internal-ip:8100,your-vm-internal-ip:8150-8169",
-                               "your-vm-internal-ip:8100,your-vm-internal-ip:8101-8149")}
+                               "your-vm-internal-ip:8100,your-vm-internal-ip:8101-8149"),
+          # F-16: each environment its own webhook secret
+          "ITALIANWAY_WEBHOOK_SECRET": ("secret:italianway-webhook-secret-staging", "secret:italianway-webhook-secret")}
 
 
 def env(manifest: str) -> dict[str, str]:
@@ -160,3 +162,11 @@ def test_a5_staging_reads_the_refusals_from_its_log_view_only():
     assert staging["DEVICE_REFUSALS_VIEW"] == ("projects/your-gcp-project-id/locations/global/buckets/domhouse-rifiuti/"
                                                "views/_AllLogs")
     assert "DEVICE_REFUSALS_VIEW" not in prod
+
+
+def test_f16_staging_signs_its_webhooks_with_a_secret_of_its_own():
+    """F-16 (attack-from-outside review): both manifests read italianway-webhook-secret; whoever took staging could sign
+    bookings that production accepted. Staging reads italianway-webhook-secret-staging; production keeps its own."""
+    staging, prod = env(STAGING), env(PROD)
+    assert prod["ITALIANWAY_WEBHOOK_SECRET"] == "secret:italianway-webhook-secret"
+    assert staging["ITALIANWAY_WEBHOOK_SECRET"] == "secret:italianway-webhook-secret-staging"
