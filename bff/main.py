@@ -112,7 +112,10 @@ def create_app() -> FastAPI:
         push.stop_background()
         await hub_manager.stop_all()
 
-    app = FastAPI(title="DOMHOUSE BFF", lifespan=lifespan)
+    # F-10 (attack-from-outside review): /docs, /redoc and /openapi.json listed every route (/internal/*, the platform's)
+    # with the fields they take, to anyone: only in development, as in the engine (D61). app.openapi() stays at hand
+    docs = {} if settings.app_env == "dev" else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+    app = FastAPI(title="DOMHOUSE BFF", lifespan=lifespan, **docs)
     app.add_middleware(NoStoreMiddleware, root_path=settings.root_path)
     app.add_middleware(runtime.RequestCounter, root_path=settings.root_path)
     if settings.is_dev:
