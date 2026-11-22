@@ -39,7 +39,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 52 | Sicurezza in appartamento: analisi scritta dei rischi (Wi-Fi, accesso fisico, Bluetooth), poi prova al banco da un portatile sul Wi-Fi del banco | analisi: tempo morto; prova: con Y in ufficio | MS, poi Y e C | deciso (1223 = a) | `produzione-cosa-manca.md` D.2 |
 | 53 | Usabilità dell'Autonomia: lettura da esperto di pagine e guida, poi prova con uno o due colleghi su compiti veri nello staging (fogli di compiti e domande della memoria storica) | lettura: tempo morto; prova: con i colleghi disponibili | MS, colleghi, C | deciso (1224 = a) | `produzione-cosa-manca.md` D.2 |
 | 54 | Prova dei ritorni indietro nello staging per ogni pezzo (server, sito, un motore, broker, agente), con i tempi; tabella «come si torna indietro» per il manuale (voce 51) | tempo morto | MS prepara, C lancia | deciso (1225 = a) | `produzione-cosa-manca.md` D.2 |
-| 55 | Lungo periodo: elenco delle misure con le soglie, poi misure su `lab-01` nel resoconto del lunedì | elenco: tempo morto; misure: dopo che Y lascia gli Shelly di `lab-01` sempre accesi | MS, Y | deciso (1226 = a) | `produzione-cosa-manca.md` D.2 |
+| 55 | Lungo periodo: elenco delle misure con le soglie, poi misure su `lab-01` nel resoconto del lunedì | elenco: tempo morto; misure: dopo che Y lascia gli Shelly di `lab-01` sempre accesi | MS, Y | elenco fatto il 22 novembre (16 misure, soglie da tarare); misure dopo che Y lascia accesi gli Shelly | `misure-lungo-periodo.md` |
 
 ### B. Obblighi prima del primo appartamento vero
 
