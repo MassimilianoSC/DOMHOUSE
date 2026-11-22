@@ -381,7 +381,9 @@ async def simulator_booking(apartment_id: str, request: Request, user: CurrentUs
     ctx_correlation.set(correlation_id)
     try:
         payload = await request.json()
-    except ValueError:
+    except (ValueError, RecursionError):          # rereading P-3: nested too deep is not JSON either
+        return err(400, "bad_request", "JSON non valido")
+    if not isinstance(payload, dict):             # a list gave TypeError below: a 500
         return err(400, "bad_request", "JSON non valido")
     try:
         _, ev = SimulatorTranslator().translate({**payload, "apartment_id": apartment_id, "source": "simulator"})
