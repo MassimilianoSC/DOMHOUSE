@@ -897,7 +897,15 @@
         "generic": "L'eliminazione si è fermata prima della fine: premi «Riprova»."
       }
     },
-    "unattributedHint": "Prenotazioni arrivate da Italianway che non si possono assegnare a nessuna organizzazione: codice Italianway sconosciuto o collegato a più appartamenti, firma non valida, formato non riconosciuto. Gli amministratori delle organizzazioni non le vedono."
+    "unattributedHint": "Prenotazioni arrivate da Italianway che non si possono assegnare a nessuna organizzazione: codice Italianway sconosciuto o collegato a più appartamenti, firma non valida, formato non riconosciuto. Gli amministratori delle organizzazioni non le vedono.",
+    "aiQuota": {
+      "label": "Quota mensile dell'assistente (€)",
+      "spentWithQuota": "Speso a {month}: {spent} € su {quota} €.",
+      "spentNoQuota": "Speso a {month}: {spent} €. Senza quota vale il tetto del progetto: {cap} € al mese per tutte le organizzazioni insieme, già spesi {projectSpent} €.",
+      "rules": "Vuoto: vale il tetto del progetto. 0: solo risposte rapide, l'assistente completo non si usa.",
+      "saved": "Quota dell'assistente di «{name}» salvata: {quota} € al mese.",
+      "removed": "Quota dell'assistente di «{name}» tolta: vale il tetto del progetto."
+    }
   },
   "support": {
     "open": "Accesso di assistenza",

@@ -104,3 +104,17 @@ describe("codice Italianway di un appartamento creato dall'app", () => {
     expect(JSON.parse(String(calls[1].init.body))).toStrictEqual({ italianway_id: null });
   });
 });
+
+// F-13 (o1 59f3ba7): the quota of an organisation; quota_eur is a required field of the PUT, null for the project's cap
+describe("quota mensile dell'assistente", () => {
+  it("GET …/tenants/{t}/ai-quota; PUT con quota_eur sempre presente, anche null", async () => {
+    await platformApi.aiQuota("t 1");
+    expect(new URL(calls[0].url).pathname).toBe("/app/platform/tenants/t%201/ai-quota");
+    expect(calls[0].init.method ?? "GET").toBe("GET");
+    await platformApi.setAiQuota("t 1", null, "corr-11");
+    expect(calls[1].init.method).toBe("PUT");
+    expect(JSON.parse(String(calls[1].init.body))).toStrictEqual({ quota_eur: null });
+    await platformApi.setAiQuota("t 1", 0, "corr-12");
+    expect(JSON.parse(String(calls[2].init.body))).toStrictEqual({ quota_eur: 0 });
+  });
+});
