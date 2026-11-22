@@ -243,3 +243,108 @@ def test_p2_the_app_routes_parse_at_most_64_kib_before_the_access():
     assert body_limit.limit_for("/internal/ai/chat") == 256 * 1024
     many = b"[" + b"{}," * 30_000 + b"{}]"                       # about 90 KiB
     _too_large(run(_put("/app/me/notification-prefs", many)))
+
+
+# -------- rereading P-8: the largest legitimate body through the whole app, and a stream through the filter --------
+def _request_of_200_devices(monkeypatch) -> dict:
+    """The engine's own request to the model (scripts/measure_model.py, D-182) for an apartment of 200 devices, the
+    agent's MAX_DEVICES, with long Italian names and 10 recent decisions with long reasons (the measure of P-4)."""
+    import copy
+    import sys
+    import uuid
+    from pathlib import Path
+    from engine.connector import simulated
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+    import measure_model
+    real = simulated.seed_devices
+
+    def big(variant):
+        _rooms, devices = real(variant)
+        rooms = [{"room_id": f"stanza-{i:02d}", "name": f"Càmera da lètto n. {i:02d} lato giardino è più"} for i in range(20)]
+        out = {}
+        for i in range(200):
+            d = copy.deepcopy(list(devices.values())[i % len(devices)])
+            d["device_id"], d["room_id"] = f"{d['device_id']}-{i:03d}", f"stanza-{i % 20:02d}"
+            d["label"] = f"Climatizzatore à parete della càmera matrimoniale più grande è {i:03d}"[:60]
+            out[d["device_id"]] = d
+        return rooms, out
+    monkeypatch.setattr(simulated, "seed_devices", big)
+    e = measure_model.measure_engine()
+    assert len(e.devices) == 200
+    why = ("Finestra della càmera matrimoniale aperta da più di 5 minuti con il climatizzatore acceso: spento per non "
+           "sprecare energia, si riaccende quando la finestra è chiusa")
+    for dev in list(e.devices)[:10]:
+        e.log("rule:window_open_off", {"type": "device", "device_id": dev}, "turn_off", "on", "off", why, "applied",
+              str(uuid.uuid4()), emit=False)
+    messages, _tools = measure_model.request_messages("Che temperatura c'è nella càmera più grande?", e)
+    return {"messages": messages, "temperature": 0.2}
+
+
+def test_p8a_the_largest_legitimate_body_crosses_the_whole_app(monkeypatch):
+    sent = []
+
+    async def fake(body):
+        sent.append(body)
+        return {"choices": [{"message": {"role": "assistant", "content": "Ciao"}}],
+                "usage": {"prompt_tokens": 10, "completion_tokens": 2}}
+    monkeypatch.setattr(ai_gateway, "call_model", fake)
+    monkeypatch.setattr(ai_gateway, "_reasoning_refused", False)
+    get_repository().ai_usage = {}
+    body = json.dumps(_request_of_200_devices(monkeypatch)).encode()          # ASCII-escaped with spaces: the largest
+    assert 60 * 1024 < len(body) < body_limit.AI_CHAT_LIMIT / 3, len(body)     # P-4: more than 3 times of margin
+    r = run(_post("/internal/ai/chat", body, {"X-Apartment-Id": "apt-bologna-01",
+                                                 "X-API-Key": get_settings().instance_api_key_fallback}))
+    assert r.status_code == 200, r.text[:200]
+    assert sent[0]["messages"] == json.loads(body)["messages"]                 # arrived whole
+    r = run(_post("/internal/ai/chat", _pieces(body, 1024), {"X-Apartment-Id": "apt-bologna-01",
+                                                              "X-API-Key": get_settings().instance_api_key_fallback}))
+    assert r.status_code == 200 and sent[1]["messages"] == sent[0]["messages"]   # in pieces too
+
+
+def test_p8b_a_stream_opens_streams_and_ends_through_the_filter(monkeypatch):
+    """The SSE stream of the app through the whole middleware chain, raw ASGI: 200 text/event-stream, «connected»,
+    an event published after it, and the end when the browser goes away (the disconnect passed on after the body)."""
+    from bff.sse_hub import InstanceHub, SseEvent, hub_manager
+    import time as clock
+    monkeypatch.setattr(InstanceHub, "start", lambda self, last: None)
+    apt = run(get_repository().get_apartment("apt-rimini-01"))
+
+    async def main():
+        hub = hub_manager.hub(apt)
+        gone = asyncio.Event()
+        messages, given = [], []
+
+        async def receive():
+            if not given:
+                given.append(True)
+                return {"type": "http.request", "body": b"", "more_body": False}
+            await gone.wait()
+            return {"type": "http.disconnect"}
+
+        async def send(message):
+            messages.append(message)
+        scope = {"type": "http", "asgi": {"version": "3.0"}, "http_version": "1.1", "method": "GET", "scheme": "http",
+                 "path": "/app/apartments/apt-rimini-01/stream", "raw_path": b"/app/apartments/apt-rimini-01/stream",
+                 "root_path": "", "query_string": b"", "server": ("t", 80), "client": ("127.0.0.1", 1),
+                 "headers": [(b"host", b"t"), (b"x-dev-user", b"admin@demo.it")]}
+        task = asyncio.create_task(app(scope, receive, send))
+
+        def body():
+            return b"".join(m.get("body", b"") for m in messages if m["type"] == "http.response.body")
+        for _ in range(200):
+            if b"connected" in body():
+                break
+            await asyncio.sleep(0.01)
+        start = next(m for m in messages if m["type"] == "http.response.start")
+        headers = {k.decode(): v.decode() for k, v in start["headers"]}
+        assert start["status"] == 200 and headers["content-type"].startswith("text/event-stream")
+        assert headers.get("cache-control") != "no-store"                         # the stream keeps its own
+        await hub._publish(SseEvent("p8b-1", "device.state", '{"p8b": true}', clock.monotonic()))
+        for _ in range(200):
+            if b"p8b" in body():
+                break
+            await asyncio.sleep(0.01)
+        assert b'"p8b": true' in body() or b'"p8b":true' in body()
+        gone.set()
+        await asyncio.wait_for(task, 5)                                           # ended by the disconnect
+    run(main())
