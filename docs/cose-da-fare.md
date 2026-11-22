@@ -3,7 +3,7 @@
 *Elenco unico, chiesto dal committente il 22 novembre 2026. Alla domanda «a che punto siamo» o «cosa resta da fare» si
 risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 
-**Aggiornato:** 22 novembre 2026, 11:42 (memoria storica, stati verificati sul registro in sola lettura).
+**Aggiornato:** 22 novembre 2026, 11:56 (memoria storica, stati verificati sul registro in sola lettura).
 
 ## 1. Dove siamo oggi
 
@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1218 |
+| **Ultima domanda al committente** | 1219 |
 
 ## 2. Cose da fare
 
@@ -33,7 +33,7 @@ Colonna «Chi»: MS = memoria storica; C = committente; Y = Youssouf; L = Leonar
 
 | N. | Cosa | Condizione per partire | Chi | Stato | Dettaglio |
 |---|---|---|---|---|---|
-| 6 | Decisione scritta per ogni tipo di controllo mai fatto: attacco da fuori, ripristino vero dalle copie, dipendenze, sicurezza in appartamento, usabilità, ritorni indietro, lungo periodo | nessuna: si può fare ora | MS con o1 e o2; decide C | aperto (sicurezza dentro la VM fatta il 17 novembre) | `produzione-cosa-manca.md` D.2 |
+| 6 | Decisione scritta per ogni tipo di controllo mai fatto: attacco da fuori, ripristino vero dalle copie, dipendenze, sicurezza in appartamento, usabilità, ritorni indietro, lungo periodo | nessuna: si può fare ora | MS con o1 e o2; decide C | in corso: sicurezza dentro la VM fatta il 17 novembre; attacco da fuori deciso (1219 = a), revisione da avviare | `produzione-cosa-manca.md` D.2 |
 | 7 | Prova di carico (P-84) | di notte, prima del passaggio in produzione | C lancia | strumento pronto | `procedura-prova-di-carico.md` |
 | 8 | Verifica in due passaggi all'accesso (P-69) | nessuna | o2, o1, MS, comandi di C | aperto | registro, P-69 |
 | 9 | Il sito resta vecchio dopo una pubblicazione (P-92, con E-29) | decisione fra le strade a, b, c | C, poi o2 | aperto | registro, P-92 |

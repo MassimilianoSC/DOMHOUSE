@@ -81,7 +81,7 @@ senza una decisione scritta. Il primo è già deciso.
 |---|---|---|
 | **Sicurezza dentro la VM** (compromissione e movimenti laterali) | se un motore, il broker o un dispositivo sono ostili, fin dove arrivano? | **deciso (risposta 1130 = a):** pochi agenti in sola lettura più un verificatore, dopo l'applicazione delle correzioni di E-31, E-32 ed E-33 e prima del primo appartamento vero |
 | **Prova di carico** (P-84) | quante persone e appartamenti regge il sistema insieme? | prevista, procedura pronta (`docs/procedura-prova-di-carico.md`); da fare |
-| **Attacco da fuori al sito e al server** | accessi non autorizzati, iniezioni, CORS, limiti di frequenza, sessioni: cosa può fare uno sconosciuto da internet? | da analizzare |
+| **Attacco da fuori al sito e al server** | accessi non autorizzati, iniezioni, CORS, limiti di frequenza, sessioni: cosa può fare uno sconosciuto da internet? | **deciso (risposta 1219 = a, 22 novembre):** revisione da avversario in sola lettura (mappa delle porte del server, tre revisori indipendenti, un verificatore), poi per ogni difetto confermato una prova automatica che rifà l'attacco e la correzione; esito nella guida, parte 1 |
 | **Ripristino vero dalle copie** | se si perde il database o il disco della VM, si torna indietro davvero, in quanto tempo e con quali dati? | da analizzare (o1 ha stimato una prova di ripristino sul motore di produzione) |
 | **Dipendenze e aggiornamenti di sicurezza** | librerie, immagini dei container e firmware degli Shelly con difetti noti: chi li controlla e quando? | da analizzare |
 | **Dati personali** | l'informativa e i trattamenti sono corretti per il titolare? | bozza pronta; manca il consulente del titolare |
