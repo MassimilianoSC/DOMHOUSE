@@ -174,15 +174,21 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
         # its copy for up to an hour (staging never revokes; production's revocation is cached 60 s per instance), and
         # a record made from it gave back the role with every apartment (apartment_ids None)
         await _claims_hold_now(uid, tenant_id, role)
+        # rereading P-6 (decision of the memoria storica, 22 November, ESITO point 3): someone who is not an admin
+        # starts with no apartment, the admin assigns them; so a record left by a race never opens every apartment
         stored = await repo.upsert_user(User(uid=uid, email=email, display_name=claims.get("name", "") or "",
-                                             tenant_id=tenant_id, role=role))
+                                             tenant_id=tenant_id, role=role,
+                                             apartment_ids=None if role == "admin" else []))
         # and again after the write: a removal that took the claims away while this request was between its check and
-        # its write leaves no record (the removal deletes the record once more after Firebase, bff/routes/admin.py)
+        # its write leaves no record (the removal deletes the record once more after Firebase, bff/routes/admin.py).
+        # Rereading P-5: whatever ends the check other than its success (403, 503, a request cancelled) deletes it
+        confirmed = False
         try:
             await _claims_hold_now(uid, tenant_id, role)
-        except HTTPException:
-            await repo.delete_user(uid)
-            raise
+            confirmed = True
+        finally:
+            if not confirmed:
+                await asyncio.shield(repo.delete_user(uid))
     if (stored.tenant_id != tenant_id or stored.role != role) and own.get("tenant_id"):
         # F-1: only a record that is still there (a removal may have deleted it since it was read)
         stored = await _still_there(repo, uid, lambda cur: cur.model_copy(update={"tenant_id": tenant_id, "role": role}))

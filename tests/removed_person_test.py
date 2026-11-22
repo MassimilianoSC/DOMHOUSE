@@ -274,3 +274,46 @@ def test_an_apartment_deleted_never_writes_back_a_person_removed_meanwhile(monke
     monkeypatch.setattr(repo, "list_users", users)
     run(admin.remove_apartment(apt))
     assert run(repo.get_user("u-f1-list")) is None
+
+
+# -------- rereading P-5, P-6: the record made from claims --------
+@pytest.mark.parametrize("role, seen", [("operator", []), ("viewer", []), ("admin", None)])
+def test_p6_a_record_made_from_claims_sees_no_apartment_unless_admin(prod, monkeypatch, role, seen):
+    """Decision of the memoria storica (22 November, ESITO point 3): the implicit record of someone who is not an
+    admin starts with no apartment (the admin assigns them); the first admin of set_claims.py still sees them all."""
+    uid = f"u-f1-new-{role}"
+    prod.add(uid, f"{uid}@f1.it", {"prod": {"tenant_id": TENANT, "role": role}})
+    token = {"uid": uid, "email": f"{uid}@f1.it", "email_verified": True, "iat": 1000,
+             "prod": {"tenant_id": TENANT, "role": role}}
+    user = run(auth._member(_request(monkeypatch, token)))
+    assert user.apartment_ids == seen and run(get_repository().get_user(uid)).apartment_ids == seen
+
+
+def test_p5_a_request_cancelled_between_the_write_and_the_second_check_leaves_no_record(prod, monkeypatch):
+    """The compensation covered HTTPException only: a request cancelled (instance stopping) after the write left the
+    record. Now any way out of the second check other than its success deletes it."""
+    old_token, _boss = _limited_operator(prod, "prod", "u-f1-cancel")
+    run(get_repository().delete_user("u-f1-cancel"))
+    calls = []
+    real = auth._claims_hold_now
+
+    async def second_cancelled(uid, tenant_id, role):
+        calls.append(uid)
+        if len(calls) == 2:
+            raise asyncio.CancelledError()
+        return await real(uid, tenant_id, role)
+    monkeypatch.setattr(auth, "_claims_hold_now", second_cancelled)
+    with pytest.raises(asyncio.CancelledError):
+        run(auth._member(_request(monkeypatch, old_token)))
+    assert len(calls) == 2 and run(get_repository().get_user("u-f1-cancel")) is None
+
+
+def test_an_invited_operator_keeps_the_apartments_of_the_invitation(prod, monkeypatch):
+    """The invitation path is not the implicit record: its apartments stay those the admin chose."""
+    repo = get_repository()
+    run(repo.upsert_user(User(uid="inv-f1-x", email="x@f1.it", tenant_id=TENANT, role="operator",
+                              apartment_ids=["apt-1", "apt-2"])))
+    prod.add("u-f1-inv", "x@f1.it", {})
+    token = {"uid": "u-f1-inv", "email": "x@f1.it", "email_verified": True, "iat": 1000}
+    user = run(auth._member(_request(monkeypatch, token)))
+    assert (user.role, user.apartment_ids) == ("operator", ["apt-1", "apt-2"])
