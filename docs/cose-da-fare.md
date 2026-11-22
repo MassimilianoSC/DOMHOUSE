@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1224 |
+| **Ultima domanda al committente** | 1225 |
 
 ## 2. Cose da fare
 
@@ -38,12 +38,13 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 51 | Manuale di manutenzione per il cliente (cosa fa il sistema da solo, email che arrivano e cosa fare, controlli mensili) | tempo morto; si consegna con la voce 27 | MS | deciso (1222 = a) | `produzione-cosa-manca.md` D.2 |
 | 52 | Sicurezza in appartamento: analisi scritta dei rischi (Wi-Fi, accesso fisico, Bluetooth), poi prova al banco da un portatile sul Wi-Fi del banco | analisi: tempo morto; prova: con Y in ufficio | MS, poi Y e C | deciso (1223 = a) | `produzione-cosa-manca.md` D.2 |
 | 53 | Usabilità dell'Autonomia: lettura da esperto di pagine e guida, poi prova con uno o due colleghi su compiti veri nello staging (fogli di compiti e domande della memoria storica) | lettura: tempo morto; prova: con i colleghi disponibili | MS, colleghi, C | deciso (1224 = a) | `produzione-cosa-manca.md` D.2 |
+| 54 | Prova dei ritorni indietro nello staging per ogni pezzo (server, sito, un motore, broker, agente), con i tempi; tabella «come si torna indietro» per il manuale (voce 51) | tempo morto | MS prepara, C lancia | deciso (1225 = a) | `produzione-cosa-manca.md` D.2 |
 
 ### B. Obblighi prima del primo appartamento vero
 
 | N. | Cosa | Condizione per partire | Chi | Stato | Dettaglio |
 |---|---|---|---|---|---|
-| 6 | Decisione scritta per ogni tipo di controllo mai fatto: attacco da fuori, ripristino vero dalle copie, dipendenze, sicurezza in appartamento, usabilità, ritorni indietro, lungo periodo | nessuna: si può fare ora | MS con o1 e o2; decide C | in corso: sicurezza dentro la VM fatta il 17 novembre; attacco da fuori: revisione fatta il 22 novembre, 16 difetti confermati (voci 44–48); ripristino vero, dipendenze, sicurezza in appartamento e usabilità decisi (voci 49–53); restano due tipi | `produzione-cosa-manca.md` D.2 |
+| 6 | Decisione scritta per ogni tipo di controllo mai fatto: attacco da fuori, ripristino vero dalle copie, dipendenze, sicurezza in appartamento, usabilità, ritorni indietro, lungo periodo | nessuna: si può fare ora | MS con o1 e o2; decide C | in corso: sicurezza dentro la VM fatta il 17 novembre; attacco da fuori: revisione fatta il 22 novembre, 16 difetti confermati (voci 44–48); ripristino vero, dipendenze, sicurezza in appartamento, usabilità e ritorni indietro decisi (voci 49–54); resta il lungo periodo | `produzione-cosa-manca.md` D.2 |
 | 7 | Prova di carico (P-84) | di notte, prima del passaggio in produzione | C lancia | strumento pronto | `procedura-prova-di-carico.md` |
 | 8 | Verifica in due passaggi all'accesso (P-69) | nessuna | o2, o1, MS, comandi di C | aperto | registro, P-69 |
 | 9 | Il sito resta vecchio dopo una pubblicazione (P-92, con E-29) | decisione fra le strade a, b, c | C, poi o2 | aperto | registro, P-92 |
