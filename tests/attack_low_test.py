@@ -332,9 +332,11 @@ def test_b4_a_real_address_with_a_slash_and_a_dot_passes():
 
 
 # -------- rereading of the low fixes, B-3: the rule of F-11 against Unicode --------
-LINKS_EVERYWHERE = ["https：//evil.example", "https：／／evil.example", "evil。example/login",
-                    "evil․example/login", "evil.example／login", "еvil.example/login",
-                    "evil.exаmple/login", "evil.com?x=1", "evil.com:8080", "evil.com\login", "10.0.0.1/login",
+# final rereading R-6: in an address a domain with a path counts only with a known top-level domain, so the examples
+# use .com; the homoglyph in the top-level domain and «.example» are refused in names (test_r4 below)
+LINKS_EVERYWHERE = ["https：//evil.example", "https：／／evil.example", "evil。com/login",
+                    "evil․com/login", "evil.com／login", "еvil.com/login",
+                    "evil.com?x=1", "evil.com:8080", "evil.com\\login", "10.0.0.1/login",
                     "//evil.com", "mailto:x@evil.com", "javascript:alert(1)"]
 INVISIBLE_ONES = ["a‎b", "a‏b", "a؜b", "a b", "a b", "a­b", "a⁡b", "aㅤb",
                   "a\U000e0041b", "ab", "a\U000f0000b"]
@@ -374,7 +376,7 @@ def test_b3_real_addresses_still_pass(address):
 
 # -------- rereading of the low fixes, B-11: the name taken from a token's «name» claim follows F-11's rule --------
 @pytest.mark.parametrize("name, kept", [
-    ("Clicca https://evil.example", "primo.admin"), ("x" * 90, "primo.admin"), ("Mario‮issoR", "primo.admin"),
+    ("Clicca https://evil.example", "primo-admin"), ("x" * 90, "primo-admin"), ("Mario‮issoR", "primo-admin"),
     ("Anna Bianchi", "Anna Bianchi"), ("", ""),
 ])
 def test_b11_the_first_admins_name_from_the_claims_follows_the_rule(name, kept):
@@ -383,7 +385,7 @@ def test_b11_the_first_admins_name_from_the_claims_follows_the_rule(name, kept):
     from bff import auth
     from bff.repository import get_repository
     repo = get_repository()
-    claims = {"uid": "u-b11", "email": "primo.admin@esempio.it", "email_verified": True, "name": name,
+    claims = {"uid": "u-b11", "email": "primo-admin@esempio.it", "email_verified": True, "name": name,
               "tenant_id": "t-flatsharing-demo", "role": "admin"}
     try:
         user = run(auth._from_claims(repo, claims))
@@ -409,3 +411,37 @@ def test_b2_an_apartment_whose_secret_cannot_be_read_answers_like_an_unknown_one
                                 headers={"X-Apartment-Id": "apt-bologna-01", "X-API-Key": "chiave-qualsiasi"})
     r = run(go())
     assert (r.status_code, r.json() if r.status_code != 500 else r.text) == (unknown.status_code, unknown.json())
+
+
+# -------- final rereading R-1, R-4, R-6: Italian titles pass, any domain is refused in a name, real addresses pass --------
+@pytest.mark.parametrize("name", ["Sig.ra Maria Rossi", "Sig.na Bianchi", "Avv.to Rossi", "Spett.le Ditta",
+                                  "Ill.mo Prof. Verdi", "Gent.mo Rossi", "Gent.ma Sig.ra Neri", "Coop.va Sociale",
+                                  "Ass.ne Culturale", "Egr.gio Sig. Rossi", "Dott.ssa Bianchi", "Prof.ssa Gialli",
+                                  "Arch.tto Neri", "S.r.l. Rossi & Figli", "S.p.A. Verdi", "F.lli Bianchi"])
+def test_r1_italian_titles_and_company_forms_pass_in_a_name(name):
+    r = run(_send_as("PATCH", "/app/me", {"display_name": name}))
+    assert r.status_code == 200, (name, r.text[:200])
+
+
+@pytest.mark.parametrize("name", ["Vai su evil.zip", "evil.bank", "evil.icu", "evil.ninja", "evil.academy",
+                                  "evil-dom.house", "evil.museum", "evil.pro", "пример.рф",
+                                  "evil.comа", "evil.com_x", "evil.example/login", "evil.exаmple/login"],
+                         ids=repr)
+def test_r4_any_domain_is_refused_in_a_name(name):
+    r = run(_send_as("PATCH", "/app/me", {"display_name": name}))
+    assert r.status_code == 422 and r.json()["message"] == "Il nome non può contenere un indirizzo web.", (name, r.text)
+
+
+@pytest.mark.parametrize("address", ["Fraz.Colle/2", "Loc.Prato/Fraz.Colle", "Via Sta.Maria/3", "Loc.Tà/3",
+                                     "Via Roma 1 Tel: 06123456", "c/o Rossi, V.le Monza 12/14", "Km 12.300",
+                                     "Str.Prov.le 12/A"])
+def test_r6_real_addresses_with_dots_and_slashes_pass(address):
+    from bff import plain_text
+    assert plain_text.address_problem(address) is None, address
+
+
+@pytest.mark.parametrize("address", ["Vedi evil.com/login", "evil.it/x", "www.evil.example", "https://evil.example",
+                                     "10.0.0.1/x", "mailto:a@evil.com"])
+def test_r6_web_addresses_are_still_refused_in_an_address(address):
+    from bff import plain_text
+    assert plain_text.address_problem(address) is not None, address

@@ -5,15 +5,16 @@ and save fields of about 1 MiB. Now a name is at most 80 characters and an addre
 Refused: 422 invalid_text with the field and an Italian sentence (a6, 22 November; bff/main.py turns the validation
 error into that answer; the apartment's address is checked in its route, only when it changes, rereading B-4).
 
-The rule (rereading of the low fixes, B-3): the text is first brought to NFKC (full-width «：／．» become «:/.»), and the
-ideographic full stops become «.»; then
+The rule (rereadings B-3 and R-1, R-4, R-6): the text is first brought to NFKC (full-width «：／．» become «:/.»), and
+the ideographic full stops become «.»; then
 - refused characters by Unicode category: control (Cc), format (Cf: direction marks, soft hyphen, tags), line and
   paragraph separators (Zl, Zp), private use (Co), unassigned (Cn), surrogates (Cs), and the blank fillers;
-- refused everywhere: a scheme («://», «mailto:», «javascript:»…), «//», «www.», an IPv4 address, and a domain followed
-  by a path, a query, a port or a backslash («esempio.it/…», «evil.com:8080»), labels in any script (homoglyphs);
-- in a name also a domain alone with a common top-level domain («Casa.it», «evil-domhouse.com»): Gmail and Outlook make
-  it a link in the invitation email; an address may name one. A label has at least 2 characters before its dot and an
-  abbreviation is not a domain, so «M. Rossi», «Dott.ssa Bianchi», «S.r.l.» and «Via S.Maria/3» pass."""
+- refused everywhere: a scheme («://», «mailto:», «javascript:»…), «//», «www.», an IPv4 address;
+- in a name: any «label.letters» not followed by a letter, in any script (a domain, bare or with a path, also with a
+  homoglyph at its end), after the Italian titles and forms are taken out («Sig.ra», «Avv.to», «Spett.le», «Dott.ssa»…);
+  and «tel:», «sms:». «M. Rossi», «S.r.l.», «F.lli» pass (a label has at least 2 characters);
+- in an address: a domain followed by a path, a query, a port or a backslash only with a known top-level domain
+  («Fraz.Colle/2», «Via Sta.Maria/3», «Tel: 06…» are addresses); a bare domain is allowed."""
 import re
 import unicodedata
 from typing import Annotated
@@ -24,13 +25,26 @@ from pydantic_core import PydanticCustomError
 REFUSED_CATEGORIES = {"Cc", "Cf", "Zl", "Zp", "Co", "Cn", "Cs"}
 BLANK_FILLERS = {"ᅟ", "ᅠ", "ㅤ", "ﾠ", "⠀"}
 FULL_STOPS = str.maketrans({"。": ".", "｡": ".", "︒": "."})
-LINK_ANYWHERE = re.compile(
-    r"(?i)(://|//|\bwww\.|\b(?:mailto|https?|ftp|file|javascript|data|tel|sms|ws|wss):"
-    r"|\b\d{1,3}(?:\.\d{1,3}){3}\b"
-    r"|[\w-]{2,}\.[^\W\d_]{2,24}(?=[/?#:\\]))")
+SCHEMES = "mailto|https?|ftp|file|javascript|data|ws|wss"
+LINK_ALWAYS = rf"://|//|\bwww\.|\b(?:{SCHEMES}):|\b\d{{1,3}}(?:\.\d{{1,3}}){{3}}\b"
+LETTERS = r"[^\W\d_]"                     # letters of any script
+# final rereading R-1: Italian titles and forms are «letters.letters» like a domain: taken out before the check
+ABBREVIATIONS = re.compile(
+    r"(?i)(?<![\w.])(?:sig\.r[aie]|sig\.na|avv\.t[oa]|spett\.l[ei]|ill\.m[oai]|gent\.m[oaie]|egr\.gi[oa]?|coop\.va|"
+    r"ass\.ne|dott\.ssa|dott\.re|prof\.ssa|arch\.tt[oa]|ing\.re|rag\.re|geom\.ra|on\.le|ecc\.mo|rev\.mo|mons\.re)"
+    rf"(?!{LETTERS})")
+# final rereading R-4: in a name any «label.letters» (letters of any script, also a homoglyph at its end) not followed by
+# a letter is a domain: a linkifier may make a link of «evil.zip», «evil-dom.house» or «evil.com» in «evil.comа»
+NAME_LINK = re.compile(rf"(?i)(?:{LINK_ALWAYS}|\b(?:tel|sms):|[\w-]{{2,}}\.{LETTERS}{{2,}}(?!{LETTERS}))")
+# final rereading R-6: in an address a domain with a path only with a known top-level domain («Fraz.Colle/2»,
+# «Via Sta.Maria/3», «Loc.Tà/3» are addresses), and no tel:/sms: («Tel: 06…» is a phone number); a bare domain is allowed
 TOP_LEVEL = ("com|net|org|info|biz|xyz|top|app|dev|online|site|shop|store|link|click|live|tech|club|website|page|"
-             "cloud|email|login|support|help|services|digital|network|today|news|world|life|vip|win|bid|loan|work")
-DOMAIN_ALONE = re.compile(rf"(?i)[\w-]{{2,}}\.(?:[a-z]{{2}}|{TOP_LEVEL})\b")
+             "cloud|email|login|support|help|services|digital|network|today|news|world|life|vip|win|bid|loan|work|zip|"
+             "mov|bank|icu|pro|ninja|academy|house|museum|"
+             "it|eu|co|io|me|ru|cn|uk|de|fr|es|ch|at|nl|be|us|tv|ly|to|cc|ws|tk|ml|ga|cf|gq|su|in|br|pl|cz|ro|gr|pt|"
+             "se|dk|fi|ie|hu|sk|si|hr|rs|bg|ua|by|kz|jp|kr|tw|hk|sg|au|nz|ca|mx|ar|cl|za|ng|ke|ir|tr|il|ae|sa|pk|vn|"
+             "th|id|ph|my|gg|sh|ai|gl|im|am|fm|la")
+ADDRESS_LINK = re.compile(rf"(?i)(?:{LINK_ALWAYS}|[\w-]{{2,}}\.(?:{TOP_LEVEL})(?!{LETTERS})(?=[/?#:\\]))")
 ERROR = "invalid_text"
 
 
@@ -38,8 +52,9 @@ def _normal(value: str) -> str:
     return unicodedata.normalize("NFKC", value).translate(FULL_STOPS)
 
 
-def _rule(subject: str, longest: int, domain_alone: bool):
-    """subject: «Il nome» or «L'indirizzo», the start of each sentence; domain_alone: a bare domain is refused too."""
+def _rule(subject: str, longest: int, links: re.Pattern, titles: bool):
+    """subject: «Il nome» or «L'indirizzo», the start of each sentence; links: what reads as a web address there;
+    titles: the Italian abbreviations are taken out first (names)."""
     def check(value: str | None) -> str | None:
         if value is None:
             return value
@@ -48,14 +63,16 @@ def _rule(subject: str, longest: int, domain_alone: bool):
         text = _normal(value)
         if any(unicodedata.category(c) in REFUSED_CATEGORIES or c in BLANK_FILLERS for c in value + text):
             raise PydanticCustomError(ERROR, f"{subject} contiene caratteri non ammessi.")
-        if LINK_ANYWHERE.search(text) or (domain_alone and DOMAIN_ALONE.search(text)):
+        if titles:
+            text = ABBREVIATIONS.sub(" ", text)
+        if links.search(text):
             raise PydanticCustomError(ERROR, f"{subject} non può contenere un indirizzo web.")
         return value
     return check
 
 
-_name_rule = _rule("Il nome", 80, domain_alone=True)
-_address_rule = _rule("L'indirizzo", 200, domain_alone=False)
+_name_rule = _rule("Il nome", 80, NAME_LINK, titles=True)
+_address_rule = _rule("L'indirizzo", 200, ADDRESS_LINK, titles=False)
 PlainName = Annotated[str, AfterValidator(_name_rule)]
 PlainAddress = Annotated[str, AfterValidator(_address_rule)]
 
