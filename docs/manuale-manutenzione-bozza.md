@@ -14,7 +14,9 @@ consegna si rilegge tutto e si converte in HTML, come la guida.*
 | **Fotografia del disco della macchina virtuale** | periodica [da completare: frequenza e durata] | niente |
 | **Rinnovo del certificato** del collegamento cifrato dei dispositivi | da solo, prima della scadenza | un allarme solo se il rinnovo non riesce |
 | **Riavvio dei sistemi domotici** se si fermano | da solo | un allarme se un sistema resta muto |
-| **Aggiornamenti di sicurezza** della macchina virtuale e delle librerie | [da completare con la voce 50] | [da completare] |
+| **Proposte di aggiornamento delle librerie** (Dependabot su GitHub) | ogni lunedì, al massimo una richiesta per tipo di libreria (Python, sito, immagini, azioni) | le richieste su GitHub: non si uniscono da sole; il tecnico le prova e le unisce con la CI verde, oppure le chiude |
+| **Controllo dei difetti noti** nella CI («difetti-noti») | a ogni modifica | se è rosso, una libreria ha un difetto grave o critico: il tecnico legge l'avviso stampato e aggiorna la libreria, con le prove, prima della pubblicazione successiva |
+| **Aggiornamenti di sicurezza** della macchina virtuale | [da completare con la voce 50] | [da completare] |
 | **Pulizia dei dati vecchi** secondo i tempi di conservazione decisi | da sola | niente |
 
 ## 2. Le email che possono arrivare e che cosa fare
