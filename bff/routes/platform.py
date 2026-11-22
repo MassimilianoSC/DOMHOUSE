@@ -435,11 +435,13 @@ async def create_tenant_apartment(tenant_id: str, body: ApartmentCreate, identit
 # ---------- A2: an apartment created from the app (docs/proposta-a2.md §2) ----------
 def _made_by_the_app(apt: Apartment) -> JSONResponse | None:
     """Code review A2, point 5: the old link and delete would leave engine, broker and secrets behind and free the
-    port: an apartment created from the app changes only through its creation («Riprova», «Annulla»), until A6."""
+    port: an apartment created from the app changes its link only through its creation; its Italianway code changes
+    here (usability reading), its deletion is A6's. The message names the site's buttons (a6, 22 November)."""
     if apt.creazione is None:
         return None
-    return err(409, "created_from_app", "Questo appartamento è stato creato dall'app: si gestisce dalla sua "
-               "creazione («Riprova», «Annulla»); l'eliminazione arriverà con A6.")
+    return err(409, "created_from_app", "Questo appartamento è stato creato dall'app: il collegamento si gestisce dalla "
+               "sua creazione («Riprova», «Annulla creazione»); il codice Italianway si cambia con «Codice Italianway», "
+               "l'eliminazione con «Disattiva» ed «Elimina».")
 
 
 

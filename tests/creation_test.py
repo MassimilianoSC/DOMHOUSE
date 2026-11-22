@@ -491,3 +491,14 @@ def test_a_code_already_used_is_refused_on_an_apartment_created_from_the_app(wor
     assert call("PATCH", f"{base}/lab-a2-01", json={"italianway_id": "IW-A2-SAME"}).status_code == 200
     r = call("PATCH", f"{base}/lab-a2-02", json={"italianway_id": "IW-A2-SAME"})
     assert (r.status_code, r.json()["error"]) == (409, "external_id_in_use")
+
+
+def test_the_created_from_app_refusal_names_the_sites_buttons(world):
+    """a6, 22 November: A6 is there, and the code changes from here now; the same names as the site's buttons."""
+    new()
+    r = call("PATCH", f"/app/platform/tenants/{DEMO_TENANT}/apartments/lab-a2-01", json={"port": 8199})
+    assert r.status_code == 409 and r.json() == {
+        "error": "created_from_app",
+        "message": "Questo appartamento è stato creato dall'app: il collegamento si gestisce dalla sua creazione "
+                   "(«Riprova», «Annulla creazione»); il codice Italianway si cambia con «Codice Italianway», "
+                   "l'eliminazione con «Disattiva» ed «Elimina»."}
