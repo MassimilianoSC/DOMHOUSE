@@ -185,15 +185,15 @@ describe("gestore della piattaforma senza organizzazione (D-178)", () => {
 
 // F-11 (o1 ee5899d): my own name at most 80 characters; a refused one says why under the field
 describe("Impostazioni > Account: nome rifiutato dal server (F-11)", () => {
-  it("«Il nome non può contenere un indirizzo web.» sotto il campo, niente avviso rosso; sparisce scrivendo", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "invalid_text", field: "display_name", message: "Il nome non può contenere un indirizzo web." }), { status: 422, headers: { "Content-Type": "application/json" } })));
+  it("«Il nome contiene caratteri non ammessi.» sotto il campo, niente avviso rosso; sparisce scrivendo", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "invalid_text", field: "display_name", message: "Il nome contiene caratteri non ammessi." }), { status: 422, headers: { "Content-Type": "application/json" } })));
     render(<AccountSettings />);
     expect(screen.getByTestId("account-name-input")).toHaveAttribute("maxLength", "80");
-    type("account-name-input", "Gestore www.esempio.it/x");
+    type("account-name-input", "Gestore\u200b Uno");
     await act(async () => {
       fireEvent.click(screen.getByTestId("account-name-save"));
     });
-    expect(await screen.findByTestId("account-name-problem")).toHaveTextContent("Il nome non può contenere un indirizzo web.");
+    expect(await screen.findByTestId("account-name-problem")).toHaveTextContent("Il nome contiene caratteri non ammessi.");
     expect(toast.error).not.toHaveBeenCalled();
     expect(toast.success).not.toHaveBeenCalled();
     expect(state.auth.refreshMe).not.toHaveBeenCalled();
