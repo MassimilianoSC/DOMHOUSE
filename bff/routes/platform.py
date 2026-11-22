@@ -109,7 +109,7 @@ async def create_tenant(body: TenantCreate, identity: Identity = Depends(require
         invited = await create_invitation(tenant_id, body.admin_email, "admin", body.admin_display_name.strip())
     except InviteRefused as exc:
         await repo.release_tenant_name(key, tenant_id)
-        return err(409, "email_taken", exc.message)
+        return err(exc.status, exc.error or "email_taken", exc.message)
     t = await repo.upsert_tenant(Tenant(tenant_id=tenant_id, name=name, created_by=identity.email,
                                         first_admin_email=normalize_email(body.admin_email)))
     who = audit.by_platform(identity)

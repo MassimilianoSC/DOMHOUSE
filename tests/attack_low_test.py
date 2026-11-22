@@ -239,3 +239,62 @@ def test_f11_the_refusal_of_an_address_says_why_in_italian(address, message):
 def test_f11_other_validation_errors_keep_their_usual_answer():
     r = run(_send_as("POST", "/app/admin/users", {"email": "non-una-email", "role": "viewer"}))
     assert r.status_code == 422 and "detail" in r.json()
+
+
+# -------- F-14: an invitation of A to an email whose Firebase account holds the claims of B (answer 1243) --------
+@pytest.fixture
+def firebase_claims(monkeypatch):
+    import types
+    from bff import accounts
+
+    class Fake:
+        class UserNotFoundError(Exception):
+            pass
+
+        def __init__(self):
+            self.users, self.fail = {}, False
+
+        def get_user_by_email(self, email, app=None):
+            if self.fail:
+                raise RuntimeError("Firebase non risponde")
+            if email not in self.users:
+                raise self.UserNotFoundError(email)
+            return types.SimpleNamespace(uid=f"u-{email}", email=email, custom_claims=self.users[email])
+
+        def set_custom_user_claims(self, uid, claims, app=None):
+            raise AssertionError("claims changed")
+    fake = Fake()
+    s = dataclasses.replace(get_settings(), auth_mode="firebase")
+    monkeypatch.setattr(accounts, "get_settings", lambda: s)
+    monkeypatch.setattr(accounts, "_auth", lambda: (fake, None))
+    return fake
+
+
+def test_f14_an_email_enabled_in_another_organisation_by_claims_is_refused_like_a_record_there(firebase_claims):
+    """A person enabled in B with claims only (e.g. the first admin of set_claims.py, never signed in, so no record)
+    invited by A's admin: at the first sign-in the invitation won and B lost the person without deciding it."""
+    from bff.repository import get_repository
+    firebase_claims.users["f14@esempio.it"] = {"tenant_id": "t-altra-f14", "role": "admin"}
+    r = run(_send_as("POST", "/app/admin/users", {"email": "f14@esempio.it", "role": "viewer"}))
+    assert r.status_code == 409 and r.json() == {"error": "already_exists",
+                                                 "message": "Questa email non può essere invitata"}, r.text
+    assert run(get_repository().get_user_by_email("f14@esempio.it")) is None
+    assert firebase_claims.users["f14@esempio.it"] == {"tenant_id": "t-altra-f14", "role": "admin"}   # untouched
+
+
+def test_f14_claims_of_the_same_organisation_or_none_still_invite(firebase_claims):
+    from bff.repository import get_repository
+    firebase_claims.users["f14-stessa@esempio.it"] = {"tenant_id": "t-flatsharing-demo", "role": "viewer"}
+    firebase_claims.users["f14-nessuno@esempio.it"] = {}
+    for email in ("f14-stessa@esempio.it", "f14-nessuno@esempio.it", "f14-nuova@esempio.it"):
+        r = run(_send_as("POST", "/app/admin/users", {"email": email, "role": "viewer"}))
+        assert r.status_code == 201, (email, r.text[:200])
+        run(get_repository().delete_user(r.json()["uid"]))
+
+
+def test_f14_firebase_silent_is_try_again_never_an_invitation(firebase_claims):
+    from bff.repository import get_repository
+    firebase_claims.fail = True
+    r = run(_send_as("POST", "/app/admin/users", {"email": "f14-silenzio@esempio.it", "role": "viewer"}))
+    assert r.status_code == 503 and r.json()["error"] == "auth_unavailable", r.text
+    assert run(get_repository().get_user_by_email("f14-silenzio@esempio.it")) is None

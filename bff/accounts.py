@@ -145,6 +145,20 @@ def current_env_claims(uid: str) -> dict | None:
     return env_claims(record.custom_claims)
 
 
+def env_claims_of_email(email: str) -> dict | None:
+    """F-14: this environment's tenant and role that Firebase holds for this email now; {} when there is no account;
+    None when the accounts module is off (dev). Errors go to the caller."""
+    if not _enabled():
+        return None
+    fb_auth, app = _auth()
+    from .auth import env_claims
+    try:
+        record = fb_auth.get_user_by_email(email, app=app)
+    except fb_auth.UserNotFoundError:
+        return {}
+    return env_claims(record.custom_claims)
+
+
 def move_env_claims(uid: str, tenant_id: str, role: str) -> None:
     """R4-1: an invitation accepted in another organisation than the one the claims name (left by an earlier
     membership): this environment's claims follow the invitation, the flat copy of before P-67 too. No revocation: the

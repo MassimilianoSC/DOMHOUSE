@@ -172,9 +172,9 @@ async def send_invitation(email: str, display_name: str, role: str, tenant_name:
 
 
 class InviteRefused(Exception):
-    def __init__(self, message: str):
+    def __init__(self, message: str, status: int = 409, error: str | None = None):
         super().__init__(message)
-        self.message = message
+        self.message, self.status, self.error = message, status, error
 
 
 def invite_uid(email: str) -> str:
@@ -195,6 +195,17 @@ async def create_invitation(tenant_id: str, email: str, role: str, display_name:
     if existing := await repo.get_user_by_email(email):
         raise InviteRefused("È già un utente della tua organizzazione" if existing.tenant_id == tenant_id
                             else "Questa email non può essere invitata")
+    # F-14 (attack-from-outside review, answer 1243): a person enabled in another organisation by claims only (the first
+    # admin of set_claims.py, never signed in, so no record) was invited and, at the first sign-in, the invitation won:
+    # the other organisation lost the person without deciding it. Refused like a record there, the same neutral words
+    from . import accounts
+    try:
+        claims = await asyncio.to_thread(accounts.env_claims_of_email, email)
+    except Exception as exc:
+        warn("invite: claims of the email not read", error=type(exc).__name__)
+        raise InviteRefused("Controllo dell'accesso non disponibile: riprova tra poco", 503, "auth_unavailable")
+    if claims and claims.get("tenant_id") and claims.get("tenant_id") != tenant_id:
+        raise InviteRefused("Questa email non può essere invitata")
     user = User(uid=invite_uid(email), email=email, display_name=display_name, tenant_id=tenant_id, role=role,
                 apartment_ids=apartment_ids)
     if not await repo.create_user_if_absent(user):  # someone created the same invitation a moment ago

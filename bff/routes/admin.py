@@ -77,7 +77,7 @@ async def invite_user(body: InviteBody, user: CurrentUser = Depends(require_admi
     try:  # D-63 messages and the atomic, idempotent record live in invites.create_invitation (P-36)
         created = await create_invitation(user.tenant_id, body.email, body.role, body.display_name, apartment_ids)
     except InviteRefused as exc:
-        return err(409, "already_exists", exc.message)
+        return err(exc.status, exc.error or "already_exists", exc.message)
     await audit.record("invite_sent", audit.by_user(user), user.tenant_id, audit.user_target(created),
                        role=created.role, apartment_ids=scope_out(created.apartment_ids, created.role))
     return {**user_out(created), "email_status": await _notify(created, user)}
