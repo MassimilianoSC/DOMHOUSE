@@ -5,15 +5,18 @@ a declared Content-Length over the limit is refused without reading; otherwise t
 and refused as soon as it passes the limit (bodies in pieces carry no Content-Length). Under the limit the application
 gets the same body in one message, then the server's own messages (the disconnect of a stream).
 
-The limits, from the largest legitimate body (22 November): every /app route and the agent's results carry a few KiB at
-most; the engines' way to the model carries the system prompt with the apartment's state (devices, recent decisions,
-schedules), some tens of KiB; an Italianway booking is under 2 KiB. A JSON body parsed by Python takes about 12 times
-its size, and parsing happens before the access check: so the limits stay well below 1 MiB."""
+The limits, from the largest legitimate bodies measured on 22 November (rereading P-2, P-4; offline, with the engine's
+own request builder of scripts/measure_model.py): the engines' way to the model, for an apartment of 200 devices (the
+agent's MAX_DEVICES) with 10 long recent decisions, about 77 KiB (ASCII-escaped, with spaces; 71 KiB compact UTF-8):
+256 KiB, more than 3 times. Everything else 64 KiB: every rule of an apartment changed at once 0.7 KiB, a copy of the
+rules to 100 apartments 7.5 KiB, an agent's result a few KiB, an Italianway booking under 2 KiB. A typed body is parsed
+before the access check, and a JSON body takes up to about 24 times its size once parsed (256 KiB of [{},…] about
+6 MiB and 30 ms of CPU): so nothing reachable without an account parses more than 64 KiB."""
 from starlette.datastructures import Headers
 
 WEBHOOK_LIMIT = 64 * 1024
 AI_CHAT_LIMIT = 256 * 1024
-DEFAULT_LIMIT = 256 * 1024
+DEFAULT_LIMIT = 64 * 1024
 LIMITS = {"/webhooks/": WEBHOOK_LIMIT, "/internal/ai/chat": AI_CHAT_LIMIT}
 
 _BODY = (b'{"error":"payload_too_large","message":"Richiesta troppo grande"}')

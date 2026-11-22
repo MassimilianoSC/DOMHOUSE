@@ -190,7 +190,7 @@ def test_under_the_limit_the_app_gets_the_whole_body_then_the_disconnect():
 
 def test_the_root_path_prefix_counts_for_the_webhook_limit():
     assert body_limit.limit_for("/api/webhooks/italianway", "/api") == 64 * 1024
-    assert body_limit.limit_for("/api/app/me", "/api") == body_limit.DEFAULT_LIMIT == 256 * 1024
+    assert body_limit.limit_for("/api/app/me", "/api") == body_limit.DEFAULT_LIMIT
 
 
 def test_p1_a_body_in_drops_of_2_bytes_costs_about_its_size():
@@ -229,3 +229,17 @@ def test_a_declared_length_that_is_not_ascii_digits_is_refused_not_an_error():
         sent.clear()
         run(body_limit.BodyLimit(lambda *a: None)(_scope("/app/me", [(b"content-length", value.encode("latin-1"))]), None, send))
         assert sent[0]["status"] == 413, value
+
+
+def test_p2_the_app_routes_parse_at_most_64_kib_before_the_access():
+    """Rereading P-2: under 256 KiB a typed body of /app/* was still parsed before the access check (256 KiB of [{},…]
+    about 6 MiB and 30 ms of CPU, without an account). The largest legitimate bodies, measured on 22 November: the
+    assistant's request for 200 devices about 77 KiB (its own 256 KiB), every rule changed 0.7 KiB, a copy to 100
+    apartments 7.5 KiB."""
+    assert body_limit.DEFAULT_LIMIT == 64 * 1024
+    for path in ("/app/me/notification-prefs", "/app/apartments/a/instance/rules", "/app/apartments/a/rules/copy",
+                 "/internal/agent/risultati"):
+        assert body_limit.limit_for(path) == 64 * 1024, path
+    assert body_limit.limit_for("/internal/ai/chat") == 256 * 1024
+    many = b"[" + b"{}," * 30_000 + b"{}]"                       # about 90 KiB
+    _too_large(run(_put("/app/me/notification-prefs", many)))
