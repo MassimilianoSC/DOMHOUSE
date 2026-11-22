@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1231 |
+| **Ultima domanda al committente** | 1232 |
 
 ## 2. Cose da fare
 
@@ -53,7 +53,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 12 | Informativa privacy approvata dal consulente del titolare; condizioni d'uso (P-70) | il consulente | C | bozza fatta | `informativa-privacy-bozza.md` |
 | 13 | Notifiche push provate su telefoni veri (P-11) | telefoni veri | C, colleghi | in parte | registro, P-11; `limiti-noti.md` |
 | 14 | Email dal dominio del prodotto e indirizzo dell'app (P-53) | decisione | C | rinviata (D-93) | registro, P-53 |
-| 15 | Stagione del riscaldamento per appartamento (E1, 1231 = a): due date proposte secondo la zona climatica di legge, modificabili dall'amministratore; fuori stagione niente caldaia per il comfort, antigelo sempre attivo. Caldaia rotta con il comando che funziona (E2): da decidere | E1: prima del primo appartamento vero | o1, o2; E2: C | E1 deciso; E2 da decidere | `limiti-noti.md`, P-90 |
+| 15 | Stagione del riscaldamento per appartamento (E1, 1231 = a): due date proposte secondo la zona climatica di legge, modificabili dall'amministratore; fuori stagione niente caldaia per il comfort, antigelo sempre attivo. Caldaia rotta con il comando che funziona (E2, 1232 = a): avviso «la temperatura non risale» se la stanza resta sotto l'antigelo per un tempo regolabile con la caldaia comandata accesa | prima del primo appartamento vero | o1, o2 | decisi | `limiti-noti.md`, P-90 |
 | 16 | Collaudo finale: checklist con i colleghi, relè vero, appartamenti | a fine implementazione | colleghi, Y, C | aperto | `checklist-collaudo.md` |
 
 ### C. Piano generale (Autonomia e primo appartamento)

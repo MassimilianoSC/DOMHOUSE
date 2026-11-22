@@ -111,7 +111,7 @@
 | **Climatizzatore spento col telecomando** | Viene creduto spento solo dopo 5 minuti di consumo sotto 15 W: nei primi 5 minuti l'app lo mostra acceso | Accettato (risposta 1101) |
 | **Sensore della finestra senza segnale** | Una finestra il cui sensore va offline conta come chiusa: se è davvero aperta, si scalda finché qualcuno non interviene | Accettato (risposta 1102) |
 | **Il motore non sa la stagione** | In comfort la caldaia è abilitata alla temperatura di comfort tutto l'anno: una notte fresca d'estate può accenderla | Deciso il 22 novembre (risposta 1231 = a): stagione del riscaldamento per appartamento, date della zona climatica modificabili, antigelo sempre attivo; da fare prima del primo appartamento vero |
-| **Caldaia rotta con il comando che funziona** | Nessun avviso se la temperatura resta sotto l'antigelo e non risale | Da decidere (P-90, osservazione E2) |
+| **Caldaia rotta con il comando che funziona** | Nessun avviso se la temperatura resta sotto l'antigelo e non risale | Deciso il 22 novembre (risposta 1232 = a): avviso «la temperatura non risale» sotto l'antigelo, con un tempo d'attesa regolabile; da fare prima del primo appartamento vero |
 | **Prezzo dell'Excel** | L'importo usa il prezzo in vigore il giorno in cui si scarica il file, anche per i mesi passati | Accettato (scritto in guida) |
 
 ## Orari e cambio d'ora
