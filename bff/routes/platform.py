@@ -572,7 +572,9 @@ async def relink_tenant_apartment(tenant_id: str, apartment_id: str, body: Apart
     apt = await _tenant_apartment(tenant_id, apartment_id)
     if isinstance(apt, JSONResponse):
         return apt
-    if refused := _made_by_the_app(apt):
+    # usability reading (22 November, D-198): «Nuovo appartamento» says the Italianway code «Si può aggiungere anche
+    # dopo»; on an apartment created from the app only that code changes here (its link stays the creation's)
+    if (refused := _made_by_the_app(apt)) and body.model_fields_set != {"italianway_id"}:
         return refused
     repo = get_repository()
     old_url, old_port, old_code, old_sim = apt.instance_url, apt.port, apt.external_ids.italianway, apt.simulated

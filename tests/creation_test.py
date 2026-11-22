@@ -461,3 +461,33 @@ def test_review5_the_old_link_and_delete_refuse_an_apartment_created_from_the_ap
     r = call("DELETE", base)
     assert (r.status_code, r.json()["error"]) == (409, "use_elimina")      # A6: never the old way, for any apartment
     assert "lab-a2-01" in get_repository().apartments
+
+
+def test_the_italianway_code_is_added_and_removed_on_an_apartment_created_from_the_app(world):
+    """Usability reading (22 November, D-198): «Nuovo appartamento» says the Italianway code «Si può aggiungere anche
+    dopo», but the old link refused every change of an apartment created from the app (409 created_from_app), so the
+    code could never come and the bookings never arrived. Now PATCH with italianway_id alone changes it (null removes
+    it), with its italianway_changed entry; any other field still gets 409 created_from_app."""
+    from bff import audit
+    new()
+    base = f"/app/platform/tenants/{DEMO_TENANT}/apartments/lab-a2-01"
+    r = call("PATCH", base, json={"italianway_id": "IW-A2-01"})
+    assert r.status_code == 200 and r.json()["italianway_id"] == "IW-A2-01", r.text
+    assert get_repository().apartments["lab-a2-01"].external_ids.italianway == "IW-A2-01"
+    r = call("PATCH", base, json={"italianway_id": "IW-A2-01", "port": 8199})
+    assert (r.status_code, r.json()["error"]) == (409, "created_from_app")
+    assert (call("PATCH", base, json={"instance_url": "http://10.198.0.2:8151"}).json()["error"]) == "created_from_app"
+    r = call("PATCH", base, json={"italianway_id": None})
+    assert r.status_code == 200 and r.json()["italianway_id"] is None
+    items = run(audit.page(DEMO_TENANT, 20, None, viewer="platform"))["items"]
+    changed = [i for i in items if i["action"] == "italianway_changed" and i["target"]["id"] == "lab-a2-01"]
+    assert [(i["details"]["from"], i["details"]["to"]) for i in changed][:2] == [("IW-A2-01", None), (None, "IW-A2-01")]
+
+
+def test_a_code_already_used_is_refused_on_an_apartment_created_from_the_app(world):
+    new()
+    new("lab-a2-02")
+    base = f"/app/platform/tenants/{DEMO_TENANT}/apartments"
+    assert call("PATCH", f"{base}/lab-a2-01", json={"italianway_id": "IW-A2-SAME"}).status_code == 200
+    r = call("PATCH", f"{base}/lab-a2-02", json={"italianway_id": "IW-A2-SAME"})
+    assert (r.status_code, r.json()["error"]) == (409, "external_id_in_use")
