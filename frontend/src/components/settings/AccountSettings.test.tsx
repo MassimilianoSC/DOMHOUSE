@@ -182,3 +182,20 @@ describe("gestore della piattaforma senza organizzazione (D-178)", () => {
     expect(toast.error).not.toHaveBeenCalled();
   });
 });
+
+// F-15: while this device is shared for this person, a line says it and how to remove it
+describe("Impostazioni > Account: dispositivo condiviso (F-15)", () => {
+  afterEach(() => localStorage.clear());
+
+  it("con la scelta attiva per questa persona: la riga", () => {
+    localStorage.setItem("domotica.shared.u1", String(Date.now()));
+    render(<AccountSettings />);
+    expect(screen.getByTestId("account-shared-device")).toHaveTextContent("Dispositivo condiviso: uscita automatica dopo 30 minuti senza usare l'app. Per toglierla esci e accedi di nuovo senza la casella.");
+  });
+
+  it("senza scelta, o con la scelta di un'altra persona: niente riga", () => {
+    localStorage.setItem("domotica.shared.altra", String(Date.now()));
+    render(<AccountSettings />);
+    expect(screen.queryByTestId("account-shared-device")).toBeNull();
+  });
+});

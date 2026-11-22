@@ -8,6 +8,7 @@ import type { ProblemCause } from "@/components/layout/PageProblem";
 import { t } from "@/i18n";
 import { reloadOnce } from "@/lib/lazyPage";
 import { disablePush, forgetPushResume } from "@/lib/push";
+import { adoptSharedChoice, isShared, markAutoLogout, sharedExpired, touchShared } from "@/lib/sharedDevice";
 import { clearUserData } from "@/lib/session";
 import { endSupportSession, startSupportSession, supportSession, type SupportSession } from "@/lib/support";
 import { env, newCorrelationId } from "@/lib/utils";
@@ -116,6 +117,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    *  at their own next sign-in here if it was on (P-44). */
   const leaveDevice = () => disablePush({ resume: true }).catch(() => undefined);
 
+  /** «Esci»: also the automatic exit of a shared device (F-15), with the same cleaning of the push (P-44). */
+  const leave = useCallback(async () => {
+    await closeOwnSupport();
+    await leaveDevice(); // while still signed in: the BFF needs the user's token to drop the push registration
+    if (env.authMode === "dev") localStorage.removeItem(DEV_KEY);
+    else await firebaseSignOut();
+    signedOut();
+  }, [signedOut]);
+
+  /** F-15: 30 minutes without using the app on a shared device; the sign-in page says why the person is out. */
+  const autoLeave = useRef<() => Promise<void>>(async () => {});
+  autoLeave.current = async () => {
+    markAutoLogout();
+    await leave();
+  };
+
   /** The assistance access ended (closed, expired): back to the manager's own area, the tab emptied (P-50). */
   const dropSupport = useCallback((expired: boolean) => {
     const s = supportSession();
@@ -175,6 +192,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       for (;;) {
         try {
           const next = await bffFetch<Me>("/app/me");
+          // F-15: the box of this sign-in becomes this person's choice; an opening after 30 minutes on a shared
+          // device asks the sign-in again, before any page is shown
+          const now = Date.now();
+          adoptSharedChoice(next.user.uid, now);
+          if (sharedExpired(next.user.uid, now)) {
+            await autoLeave.current();
+            return;
+          }
+          touchShared(next.user.uid, now);
           if (lastUid.current && lastUid.current !== next.user.uid) clearUserData(queryClient);
           lastUid.current = next.user.uid;
           setMe(next);
@@ -256,6 +282,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => unsub();
   }, [loadMe, signedOut]);
 
+  // F-15: on a shared device a tap or a key is a use; every minute, and on coming back from the background (before the
+  // return counts as a use), more than 30 minutes since the last use means the automatic exit.
+  const sharedUid = status === "authenticated" ? me?.user.uid : undefined;
+  useEffect(() => {
+    if (!sharedUid || !isShared(sharedUid)) return;
+    const check = () => {
+      if (sharedExpired(sharedUid, Date.now())) {
+        void autoLeave.current();
+        return true;
+      }
+      return false;
+    };
+    const used = () => {
+      if (!check()) touchShared(sharedUid, Date.now());
+    };
+    const back = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    const every = setInterval(check, 60_000);
+    window.addEventListener("pointerdown", used, true);
+    window.addEventListener("keydown", used, true);
+    document.addEventListener("visibilitychange", back);
+    return () => {
+      clearInterval(every);
+      window.removeEventListener("pointerdown", used, true);
+      window.removeEventListener("keydown", used, true);
+      document.removeEventListener("visibilitychange", back);
+    };
+  }, [sharedUid]);
+
   // E-29: without this a start that never answers is a loading state for ever, with no request and no message.
   useEffect(() => {
     if (status !== "loading") return;
@@ -281,13 +337,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { signInWithPopup, GoogleAuthProvider } = await import("firebase/auth");
         await signInWithPopup(await firebaseAuth(), new GoogleAuthProvider());
       },
-      logout: async () => {
-        await closeOwnSupport();
-        await leaveDevice(); // while still signed in: the BFF needs the user's token to drop the push registration
-        if (env.authMode === "dev") localStorage.removeItem(DEV_KEY);
-        else await firebaseSignOut();
-        signedOut();
-      },
+      logout: leave,
       refreshMe: loadMe,
       enterSupport: async (s) => {
         startSupportSession(s);
@@ -328,7 +378,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (uid) forgetPushResume(uid); // the account is gone: nothing to bring back (P-44)
       },
     }),
-    [status, problem, me, providers, loadMe, signedOut, leaveSupport, queryClient],
+    [status, problem, me, providers, loadMe, signedOut, leaveSupport, queryClient, leave],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

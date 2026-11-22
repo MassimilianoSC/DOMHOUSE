@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Navigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { KeyRound, UserRound } from "lucide-react";
@@ -8,6 +8,7 @@ import type { DevUser } from "@/api/types";
 import { authErrorMessage, useAuth } from "@/auth/AuthProvider";
 import { firebaseConfigured } from "@/auth/firebase";
 import { showLoginError } from "@/lib/loginErrors";
+import { clearAutoLogout, rememberSharedChoice, wasAutoLogout } from "@/lib/sharedDevice";
 import { PageProblem } from "@/components/layout/PageProblem";
 import { Button } from "@/components/ui/button";
 import { Card, Input, Label, Skeleton } from "@/components/ui/primitives";
@@ -121,8 +122,42 @@ function FirebaseLogin() {
   );
 }
 
+/**
+ * F-15: «Questo è un dispositivo condiviso», off at first. Its state is what the next sign-in takes (lib/sharedDevice):
+ * written at once and at every change, so signing in without ticking it removes the choice for that person.
+ */
+function SharedDeviceBox() {
+  const [shared, setShared] = useState(false);
+  useEffect(() => rememberSharedChoice(false), []);
+  return (
+    <label className="mt-5 flex items-start gap-3 rounded-xl border bg-secondary/40 px-3 py-2.5 text-sm" data-testid="login-shared-device">
+      <input
+        type="checkbox"
+        className="mt-0.5 size-[18px] shrink-0 accent-foreground"
+        checked={shared}
+        onChange={(e) => {
+          setShared(e.target.checked);
+          rememberSharedChoice(e.target.checked);
+        }}
+        aria-describedby="login-shared-device-hint"
+        data-testid="login-shared-device-box"
+      />
+      <span>
+        <span className="block font-semibold">{t("login.sharedDevice")}</span>
+        <span id="login-shared-device-hint" className="block text-xs text-muted-foreground">{t("login.sharedDeviceHint")}</span>
+      </span>
+    </label>
+  );
+}
+
 export default function LoginPage() {
   const { status, problem } = useAuth();
+  // the notice stays while the page is open and does not come back at the next visit: read at the first render,
+  // cleared once shown (not inside the render: React renders twice in development)
+  const [autoLoggedOut] = useState(wasAutoLogout);
+  useEffect(() => {
+    if (autoLoggedOut) clearAutoLogout();
+  }, [autoLoggedOut]);
   if (status === "authenticated") return <Navigate to="/" replace />;
   // D-211: signed in but the profile could not be read (no network, 5xx), or a start that never ended: the form would
   // not help, the person is still signed in.
@@ -143,7 +178,13 @@ export default function LoginPage() {
         <Card className="w-full max-w-md p-5 sm:p-8">
           <h1 className="text-2xl font-bold">{t("login.title")}</h1>
           <p className="mb-6 mt-1 text-sm text-muted-foreground">{t("login.subtitle")}</p>
+          {autoLoggedOut && (
+            <p className="mb-5 rounded-xl border border-warning-border bg-warning-bg px-3 py-2.5 text-sm text-warning-fg" role="status" data-testid="login-auto-logout">
+              {t("login.autoLoggedOut")}
+            </p>
+          )}
           {env.authMode === "dev" ? <DevLogin /> : <FirebaseLogin />}
+          <SharedDeviceBox />
         </Card>
       </section>
     </div>

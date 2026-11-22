@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/primitives";
 import { SettingsSection } from "@/components/settings/SettingsSection";
 import { t } from "@/i18n";
+import { isShared } from "@/lib/sharedDevice";
 import { env } from "@/lib/utils";
 
 const MIN_PASSWORD = 8;
@@ -52,6 +53,13 @@ function DisplayName() {
       <Button type="submit" variant="outline" disabled={busy || name.trim() === (me?.user.display_name ?? "")} data-testid="account-name-save">{t("common.save")}</Button>
     </form>
   );
+}
+
+/** F-15: while this device is shared for this person (the box at the last sign-in). */
+function SharedDeviceNote() {
+  const { me } = useAuth();
+  if (!me || !isShared(me.user.uid)) return null;
+  return <p className="mt-3 text-sm text-muted-foreground" data-testid="account-shared-device">{t("account.sharedDevice")}</p>;
 }
 
 function ChangePassword() {
@@ -133,6 +141,7 @@ export function AccountSettings({ profile }: { profile?: ReactNode }) {
         {profile}
         <div className={profile ? "mt-4 border-t pt-4" : undefined}>
           <DisplayName />
+          <SharedDeviceNote />
         </div>
       </Section>
 
