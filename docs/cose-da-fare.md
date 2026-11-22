@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 21 novembre, 12:39, da `880fdbd` (revisione `domotica-bff-staging-00027-ll9`); `lab-01` a `engine:9576073` |
 | **Solo nello staging** | A1, A2, A3, A5, A6, A7 (Autonomia, strumento A base), stile di Luca, correzioni dopo il 17 novembre (fra cui E-37). In produzione vale ancora il vecchio «Elimina» |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1240 |
+| **Ultima domanda al committente** | 1241 |
 
 ## 2. Cose da fare
 
@@ -34,7 +34,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 47 | Verifiche dal vivo in sola lettura dell'attacco da fuori (12: memoria e limiti di Cloud Run, istanze, firewall della VM, impostazioni di Firebase…) | tempo morto | MS, C per 3, 7, 8, 10 | in parte: 1, 2, 4, 5, 6, 11 fatti il 22 novembre (F-16 confermato, nessun Cloud Armor); restano 3, 7, 8, 9, 10 | `VERIFICHE-DAL-VIVO.md` |
 | 48 | Guida, parte 1: «Come è stato controllato DOMHOUSE», dalla bozza `DOMOTICA/testi-guida/controlli-fatti-bozza.md` (cinque punti «da verificare»); i difetti dell'attacco da fuori si descrivono dopo la correzione | con le correzioni pubblicate | MS | bozza fatta | bozza |
 | 49 | Prova di ripristino completa su copie: dati dell'app in un database nuovo, dati di un motore su un motore di prova, fotografia del disco accesa come VM temporanea; tempi e dati persi misurati; procedura «cosa fare se» | prima della produzione; tempo morto | MS prepara, C lancia, o1 | deciso (1221 = a) | `produzione-cosa-manca.md` D.2 |
-| 50 | Dipendenze, parte automatica: aggiornamenti di sicurezza della VM da soli con riavvio a orario fisso, Dependabot con la CI, controllo delle immagini con email | tempo morto | o1, MS prepara, C lancia | deciso (1222 = a) | `produzione-cosa-manca.md` D.2 |
+| 50 | Dipendenze, parte automatica: aggiornamenti di sicurezza della VM da soli con riavvio a orario fisso, Dependabot con la CI, controllo delle immagini con email | tempo morto | o2 (repository), o1, MS prepara, C lancia | in corso: Dependabot e controllo nella CI mandati a o2 il 22 novembre (1241); VM e immagini dopo | `produzione-cosa-manca.md` D.2 |
 | 51 | Manuale di manutenzione per il cliente (cosa fa il sistema da solo, email che arrivano e cosa fare, controlli mensili) | tempo morto; si consegna con la voce 27 | MS | bozza fatta il 22 novembre, parti «da completare» con le voci 49, 50, 54 | `manuale-manutenzione-bozza.md` |
 | 52 | Sicurezza in appartamento: analisi scritta dei rischi (Wi-Fi, accesso fisico, Bluetooth), poi prova al banco da un portatile sul Wi-Fi del banco | prova: con Y in ufficio | Y e C | analisi fatta il 22 novembre (10 rischi, 8 prove; rischio aperto: sensore Bluetooth finto); prova da fare | `analisi-sicurezza-appartamento.md` |
 | 53 | Usabilità dell'Autonomia: lettura da esperto di pagine e guida, poi prova con uno o due colleghi su compiti veri nello staging (fogli di compiti e domande della memoria storica) | lettura: tempo morto; prova: con i colleghi disponibili | MS, colleghi, C | lettura fatta il 22 novembre (53 punti: 10 alti, 31 medi, 12 bassi; voci 56–57); prova con i colleghi da fare | `DOMOTICA/revisione-usabilita/LETTURA-ESPERTO.md` |
