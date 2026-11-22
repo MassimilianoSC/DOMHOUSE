@@ -27,7 +27,7 @@ function requestIdOf(err: ApiError, correlationId: string): string {
   return typeof op?.op_id === "string" ? op.op_id : err.correlationId ?? correlationId;
 }
 
-function FormField({ id, label, hint, problem, problemTestId, children }: { id: string; label: string; hint?: string; problem?: string | null; problemTestId?: string; children: ReactNode }) {
+export function FormField({ id, label, hint, problem, problemTestId, children }: { id: string; label: string; hint?: string; problem?: string | null; problemTestId?: string; children: ReactNode }) {
   return (
     <div className="field-cell">
       <Label htmlFor={id}>{label}</Label>

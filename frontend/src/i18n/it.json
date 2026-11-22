@@ -747,6 +747,13 @@
     "aptEditTitle": "Collegamento di «{name}»",
     "aptEditHint": "Qui cambi il collegamento al sistema domotico e il codice Italianway: nome, stato e funzioni dell'appartamento li gestisce l'amministratore dell'organizzazione.",
     "italianwayHint": "Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.",
+    "italianwayCode": {
+      "button": "Codice Italianway",
+      "title": "Codice Italianway di «{name}»",
+      "hint": "Il collegamento al sistema domotico resta quello creato dall'app: qui cambi solo il codice.",
+      "saved": "Codice Italianway di «{name}» salvato.",
+      "removed": "Codice Italianway di «{name}» tolto."
+    },
     "aptSaved": "Collegamento aggiornato",
     "aptEmpty": "Nessun appartamento in questa organizzazione",
     "creation": {
@@ -759,7 +766,7 @@
       "idHint": "Scegli un nome breve e stabile, per esempio lab-milano-roma-12. Nello staging comincia con lab- o test-; lettere minuscole, cifre e trattini. Non si cambia e non si potrà riusare, nemmeno dopo l'eliminazione.",
       "idInvalid": "ID non valido: nello staging lab-… o test-…, lettere minuscole, cifre e trattini.",
       "idTaken": "Identificativo non disponibile: è già usato, o lo è stato.",
-      "italianwayHint": "Si può aggiungere anche dopo.",
+      "italianwayHint": "Si può aggiungere anche dopo, con «Codice Italianway» nella riga dell'appartamento.",
       "limitInfo": "Si possono creare al massimo {limit} appartamenti all'ora per ogni organizzazione. Nell'ultima ora: {used} su {limit}.",
       "limitInfoPlain": "Si possono creare al massimo {limit} appartamenti all'ora per ogni organizzazione.",
       "limitReached": "Limite raggiunto: questa organizzazione ha già creato {limit} appartamenti nell'ultima ora. Potrai crearne un altro {when}.",

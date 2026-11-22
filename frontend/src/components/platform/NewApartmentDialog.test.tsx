@@ -101,7 +101,7 @@ describe("i campi (§2.1)", () => {
     expect(screen.getByText(/Ci vogliono alcuni minuti/)).toHaveTextContent("finché non premi «Riprova» o «Annulla creazione».");
     expect(screen.getByTestId("apt-form-timezone")).toHaveValue("Europe/Rome");
     expect(screen.getByText("Scegli un nome breve e stabile, per esempio lab-milano-roma-12. Nello staging comincia con lab- o test-; lettere minuscole, cifre e trattini. Non si cambia e non si potrà riusare, nemmeno dopo l'eliminazione.")).toBeInTheDocument();
-    expect(screen.getByText("Si può aggiungere anche dopo.")).toBeInTheDocument();
+    expect(screen.getByText("Si può aggiungere anche dopo, con «Codice Italianway» nella riga dell'appartamento.")).toBeInTheDocument();
     // no address or port: the server chooses them
     expect(screen.queryByTestId("apt-form-instance_url")).toBeNull();
     expect(screen.queryByTestId("apt-form-port")).toBeNull();
