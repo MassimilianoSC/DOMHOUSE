@@ -2,6 +2,8 @@ import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette._utils import get_route_path
@@ -134,6 +136,15 @@ def create_app() -> FastAPI:
     async def http_error(_request: Request, exc: HTTPException):
         detail = exc.detail if isinstance(exc.detail, dict) else {"error": "error", "message": str(exc.detail)}
         return JSONResponse(status_code=exc.status_code, content=detail)
+
+    @app.exception_handler(RequestValidationError)
+    async def validation_error(request: Request, exc: RequestValidationError):
+        # F-11: a name or an address out of its rules says why, in Italian (bff/plain_text.py); every other validation
+        # error keeps FastAPI's usual answer
+        from .plain_text import invalid_text
+        if (answer := invalid_text(exc.errors())) is not None:
+            return JSONResponse(status_code=422, content=answer)
+        return await request_validation_exception_handler(request, exc)
 
     # /healthz serves only Cloud Run's own startup/liveness probes: from outside, Cloud Run's front end reserves paths
     # ending in "z" and answers 404 itself (https://cloud.google.com/run/docs/known-issues#reserved-url-paths, E-12).

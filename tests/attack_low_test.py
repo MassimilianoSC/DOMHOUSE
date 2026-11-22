@@ -208,3 +208,34 @@ def test_f8_firebase_in_error_reuses_the_last_known_answer_even_old(firebase, mo
 def test_f8_an_account_disabled_in_firebase_is_refused(firebase):
     firebase.disabled = True
     assert _check() == 401
+
+
+# -------- F-11, the answer: one error code with the field and an Italian sentence (a6, 22 November) --------
+@pytest.mark.parametrize("name, message", [
+    ("x" * 81, "Il nome può avere al massimo 80 caratteri."),
+    ("Mario\nRossi", "Il nome contiene caratteri non ammessi."),
+    ("Mario‮issoR", "Il nome contiene caratteri non ammessi."),
+    ("Vai su www.evil.example", "Il nome non può contenere un indirizzo web."),
+])
+def test_f11_the_refusal_of_a_name_says_why_in_italian(name, message):
+    for method, path, body in (("POST", "/app/admin/users", {"email": "f11-msg@esempio.it", "role": "viewer",
+                                                            "display_name": name}),
+                               ("PATCH", "/app/me", {"display_name": name})):
+        r = run(_send_as(method, path, body))
+        assert r.status_code == 422 and r.json() == {"error": "invalid_text", "field": "display_name",
+                                                     "message": message}, (path, r.text[:200])
+
+
+@pytest.mark.parametrize("address, message", [
+    ("v" * 201, "L'indirizzo può avere al massimo 200 caratteri."),
+    ("Via\tRoma 1", "L'indirizzo contiene caratteri non ammessi."),
+    ("Via Roma 1 https://evil.example", "L'indirizzo non può contenere un indirizzo web."),
+])
+def test_f11_the_refusal_of_an_address_says_why_in_italian(address, message):
+    r = run(_send_as("PATCH", "/app/admin/apartments/apt-rimini-01", {"address": address}))
+    assert r.status_code == 422 and r.json() == {"error": "invalid_text", "field": "address", "message": message}
+
+
+def test_f11_other_validation_errors_keep_their_usual_answer():
+    r = run(_send_as("POST", "/app/admin/users", {"email": "non-una-email", "role": "viewer"}))
+    assert r.status_code == 422 and "detail" in r.json()
