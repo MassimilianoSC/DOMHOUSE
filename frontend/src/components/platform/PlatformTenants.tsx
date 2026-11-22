@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { EmailStatus } from "@/api/admin";
 import { platformApi, type PlatformTenant } from "@/api/platform";
 import { useAuth } from "@/auth/AuthProvider";
+import { AiQuota } from "@/components/platform/AiQuota";
 import { PlatformApartments } from "@/components/platform/PlatformApartments";
 import { PlatformError } from "@/components/platform/PlatformError";
 import { Button } from "@/components/ui/button";
@@ -346,6 +347,8 @@ export function PlatformTenants({ openTenant = null }: { openTenant?: string | n
             <div className="border-t pt-3 text-sm text-muted-foreground">
               {t("platform.firstAdmin")}: <AdminState tenant={tn} />
             </div>
+            {/* F-13: the assistant's monthly quota of this organisation */}
+            <AiQuota tenantId={tn.tenant_id} tenantName={tn.name} />
             {openApts === tn.tenant_id && (
               <div className="border-t pt-3">
                 <PlatformApartments tenantId={tn.tenant_id} tenantName={tn.name} showStopped={seeStopped} />

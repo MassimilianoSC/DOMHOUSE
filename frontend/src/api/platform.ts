@@ -141,6 +141,17 @@ export const PLATFORM_SCOPE = "platform";
 const enc = encodeURIComponent;
 const apts = (tenantId: string) => `/app/platform/tenants/${enc(tenantId)}/apartments`;
 
+/** F-13 (o1 59f3ba7): the assistant's monthly quota of an organisation. quota_eur null = the project's cap. */
+export interface AiQuotaView {
+  tenant_id: string;
+  quota_eur: number | null;
+  /** «2026-11» */
+  month: string;
+  spent_eur: number;
+  project_cap_eur: number;
+  project_spent_eur: number;
+}
+
 export const platformApi = {
   /** «Registro attività» (P-47) of one organization, or "platform" for the actions without one (managers added and removed). */
   audit: (scope: string, before?: string) =>
@@ -148,6 +159,10 @@ export const platformApi = {
   tenants: () => bffFetch<PlatformTenant[]>("/app/platform/tenants"),
   /** One organization, with the creations of the last hour (A2, before opening «Nuovo appartamento»). */
   tenant: (tenantId: string) => bffFetch<PlatformTenantDetail>(`/app/platform/tenants/${enc(tenantId)}`),
+  /** F-13: GET; PUT {quota_eur: number or null} (the field is required); 422 invalid_quota with the server's limits. */
+  aiQuota: (tenantId: string) => bffFetch<AiQuotaView>(`/app/platform/tenants/${enc(tenantId)}/ai-quota`),
+  setAiQuota: (tenantId: string, quotaEur: number | null, correlationId: string) =>
+    bffFetch<AiQuotaView>(`/app/platform/tenants/${enc(tenantId)}/ai-quota`, { method: "PUT", body: { quota_eur: quotaEur }, correlationId }),
   /** One call: the BFF checks name and email first, then creates organization and invitation, then sends the email. */
   createTenant: (body: { name: string; admin_email: string; admin_display_name?: string }, correlationId: string) =>
     bffFetch<CreatedTenant>("/app/platform/tenants", { method: "POST", body, correlationId, timeoutMs: SLOW_CALL_TIMEOUT_MS }),

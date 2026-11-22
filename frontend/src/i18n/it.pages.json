@@ -600,9 +600,12 @@
       "apartment_simulated_changed": "{actor} ha cambiato l'appartamento {target} fra dimostrativo e reale",
       "simulator_reset": "{actor} ha ripristinato lo stato iniziale dell'appartamento simulato {target}",
       "rules_changed": "{actor} ha modificato le regole dell'appartamento {target}",
-      "timezone_changed": "Fuso orario dell'appartamento {target} cambiato sul motore: {from} → {to}"
+      "timezone_changed": "Fuso orario dell'appartamento {target} cambiato sul motore: {from} → {to}",
+      "ai_quota_changed": "{actor} ha impostato la quota mensile dell'assistente di {target} a {to} €"
     },
-    "deletionFailedNoStep": "Eliminazione dell'appartamento {target} non riuscita: serve «Riprova»."
+    "deletionFailedNoStep": "Eliminazione dell'appartamento {target} non riuscita: serve «Riprova».",
+    "aiQuotaChanged": "{actor} ha impostato la quota mensile dell'assistente di {target} da {from} a {to} €",
+    "aiQuotaRemoved": "{actor} ha tolto la quota mensile dell'assistente di {target}: vale il tetto del progetto"
   },
   "capacity": {
     "places": "Posti liberi {env}: {count} ({when})",
