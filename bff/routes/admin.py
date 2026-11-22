@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, Field
 from .. import accounts, actors, ai_stats, audit, deletion, instances, support
 from ..auth import CurrentUser, require_admin, scope_out
 from ..logs import warn
+from ..plain_text import PlainName, address_problem
 from ..features import APP_FEATURES
 from ..invites import InviteRefused, create_invitation, send_invitation, shown
 from ..repository import Apartment, Tenant, User, get_repository
@@ -37,13 +38,13 @@ ApartmentScope = Literal["all"] | list[str]
 class InviteBody(BaseModel):
     email: EmailStr
     role: Role
-    display_name: str = ""
+    display_name: PlainName = ""            # F-11: in the invitation email
     apartment_ids: ApartmentScope = "all"
 
 
 class UserPatch(BaseModel):
     role: Role | None = None
-    display_name: str | None = None
+    display_name: PlainName | None = None   # F-11
     apartment_ids: ApartmentScope | None = None  # missing = no change; an explicit null is refused in patch_user
 
 
@@ -76,7 +77,7 @@ async def invite_user(body: InviteBody, user: CurrentUser = Depends(require_admi
     try:  # D-63 messages and the atomic, idempotent record live in invites.create_invitation (P-36)
         created = await create_invitation(user.tenant_id, body.email, body.role, body.display_name, apartment_ids)
     except InviteRefused as exc:
-        return err(409, "already_exists", exc.message)
+        return err(exc.status, exc.error or "already_exists", exc.message)
     await audit.record("invite_sent", audit.by_user(user), user.tenant_id, audit.user_target(created),
                        role=created.role, apartment_ids=scope_out(created.apartment_ids, created.role))
     return {**user_out(created), "email_status": await _notify(created, user)}
@@ -84,8 +85,7 @@ async def invite_user(body: InviteBody, user: CurrentUser = Depends(require_admi
 
 async def _notify(target: User, inviter: CurrentUser) -> str:
     tenant = await get_repository().get_tenant(inviter.tenant_id)
-    status = await send_invitation(target.email, target.display_name, target.role, tenant.name if tenant else "",
-                                   inviter.display_name or inviter.email, inviter.tenant_id)
+    status = await send_invitation(target.email, target.role, tenant.name if tenant else "", inviter.tenant_id)
     if status == "deferred":  # P-49: the invitation stays; only the log says why the email did not leave
         await audit.record("invite_email_deferred", audit.by_user(inviter), inviter.tenant_id, audit.user_target(target))
     return shown(status)
@@ -187,12 +187,16 @@ async def delete_user(uid: str, user: CurrentUser = Depends(require_admin)):
         warn("admin: firebase account not detached", uid=target.uid, error=str(exc))
         await repo.upsert_user(target)  # put the record back: the person is not half removed
         return err(502, "auth_unavailable", "Rimozione non riuscita, riprova tra poco")
+    # F-1 (attack-from-outside review): once more, now that Firebase no longer holds the claims: a request of the
+    # person that made the record again between the first deletion and this point leaves nothing (bff/auth.py checks
+    # Firebase again after making a record, for a request that writes after this)
+    await repo.delete_user(target.uid)
     await audit.record("user_removed", audit.by_user(user), user.tenant_id, audit.user_target(target))
 
 
 class ApartmentPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=120)
-    address: str | None = None
+    address: str | None = None              # F-11: checked in patch_apartment, only when it changes (rereading B-4)
     timezone: str | None = None        # D-177: accepted and ignored (the engine's TIMEZONE is the one source)
     instance_url: str | None = None
     instance_secret_name: str | None = None
@@ -292,6 +296,8 @@ async def patch_apartment(apartment_id: str, body: ApartmentPatch, user: Current
         return refused
     if "italianway_id" in body.model_fields_set and (refused := _code_refused(body.italianway_id, apt.external_ids.italianway)):
         return refused  # D-72: only the platform changes the code; the same value resent by the form is ignored
+    if body.address is not None and body.address != apt.address and (problem := address_problem(body.address)):
+        return JSONResponse(status_code=422, content=problem)     # F-11, only a changed address (rereading B-4)
     data = body.model_dump(exclude_unset=True, exclude={"italianway_id", "enabled_features", "clear_features",
                                                         "instance_secret_name", "instance_url", "port",
                                                         "energy_price_eur_kwh", "timezone"})
@@ -358,8 +364,9 @@ async def remove_apartment(apt: Apartment) -> None:
     # P-18: the id leaves every list, and a list stays a list even when it empties (never None, which means "all")
     for u in await repo.list_users(apt.tenant_id):
         if u.apartment_ids is not None and apt.apartment_id in u.apartment_ids:
-            u.apartment_ids = [a for a in u.apartment_ids if a != apt.apartment_id]
-            await repo.upsert_user(u)
+            # F-1: a person removed since the list was read is not written back
+            await repo.update_user_if_present(u.uid, lambda cur: cur.model_copy(update={"apartment_ids": None if (
+                cur.apartment_ids is None) else [a for a in cur.apartment_ids if a != apt.apartment_id]}))
     instances.invalidate_version(apt.apartment_id)
     hub_manager.drop(apt.apartment_id)
 

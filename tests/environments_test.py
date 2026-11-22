@@ -33,7 +33,17 @@ def env(monkeypatch):
     return set_env
 
 
+HELD: dict[str, dict] = {}       # what Firebase holds for each account of these tests: the claims of its token
+
+
+@pytest.fixture(autouse=True)
+def firebase_holds_the_claims(monkeypatch):
+    """F-1: a record is made from claims only when Firebase holds them now (bff/auth.py, _claims_hold_now)."""
+    monkeypatch.setattr(accounts, "current_env_claims", lambda uid: auth.env_claims(HELD.get(uid)))
+
+
 def claims(uid, **per_env):
+    HELD[uid] = dict(per_env)
     return {"uid": uid, "email": f"{uid}@esempio.it", "email_verified": True, **per_env}
 
 

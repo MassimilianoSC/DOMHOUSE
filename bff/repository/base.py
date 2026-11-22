@@ -1,7 +1,12 @@
+import math
+import time
+import uuid
 from datetime import UTC, datetime
 from typing import Literal, Protocol
 
 from pydantic import BaseModel, Field, model_validator
+
+from ..logs import warn
 
 Role = Literal["admin", "operator", "viewer"]
 
@@ -27,6 +32,9 @@ class Tenant(BaseModel):
     suspended_at: str | None = None
     suspended_reason: str | None = None
     energy_price_eur_kwh: float | None = None   # P-52 (D-92): set by the admin; None = not set
+    # F-13 (answer 1242): the assistant's monthly quota of this organisation in euro, set by the platform; None = only
+    # the project's cap (AI_MONTHLY_CAP_EUR), which always counts as well; 0 = only the quick assistant
+    ai_monthly_quota_eur: float | None = None
 
 
 def tenant_name_key(name: str) -> str:
@@ -220,7 +228,63 @@ WEBHOOK_LOG_LIMIT = 100
 # D54 (P-83): calls without a valid signature (nobody's organisation) keep their own few rows: a flood of them never
 # pushes out the unattributed calls signed with an unknown code, the ones the diagnosis needs
 UNSIGNED_LOG_LIMIT = 20
-EMPTY_AI_USAGE = {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0, "alerted": False}
+# F-4: reserved_eur is what the calls running now may still cost at most (reserved before, settled after)
+EMPTY_AI_USAGE = {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0, "alerted": False,
+                  "reserved_eur": 0.0}
+
+
+def reservable(amount) -> bool:
+    """Rereading of the medium fixes, P-1: a reservation is a positive finite number of euro; a negative one (from a
+    negative max_tokens) let every other call pass the cap, and left a huge reservation at its settling."""
+    return isinstance(amount, (int, float)) and not isinstance(amount, bool) and math.isfinite(amount) and amount > 0
+
+
+# Rereading of the low fixes, B-10: every reservation is kept by its key with an expiry; one never settled (its
+# instance stopped mid-call, a cancellation landing just after the reservation) stops counting after this
+RESERVATION_TTL_S = 3600.0
+
+
+def reservation_clock() -> float:
+    return time.time()
+
+
+def _live(u: dict) -> dict:
+    now = reservation_clock()
+    return {k: v for k, v in (u.get("reservations") or {}).items() if v.get("until", 0) > now}
+
+
+def live_usage(u: dict) -> dict:
+    """The usage as read: reserved_eur = the reservations still running; the map itself stays inside."""
+    out = {k: v for k, v in u.items() if k != "reservations"}
+    out["reserved_eur"] = sum(v["eur"] for v in _live(u).values())
+    return out
+
+
+def room_left(u: dict, amount: float, cap: float | None) -> bool:
+    return cap is None or u.get("cost_eur", 0.0) + sum(v["eur"] for v in _live(u).values()) + amount <= cap
+
+
+def add_reservation(u: dict, key: str, amount: float) -> None:
+    live = _live(u)
+    live[key] = {"eur": amount, "until": reservation_clock() + RESERVATION_TTL_S}
+    u["reservations"], u["reserved_eur"] = live, sum(v["eur"] for v in live.values())
+
+
+def drop_reservation(u: dict, key: str | None, amount: float, month: str) -> None:
+    """The settled reservation goes; one not found (expired, settled twice) is an accounting fact said in the log,
+    never a negative reservation. key None: the first running one of the same amount (callers without a key)."""
+    live = _live(u)
+    if key is None:
+        key = next((k for k, v in live.items() if abs(v["eur"] - amount) < 1e-12), None)
+    if key in live:
+        live.pop(key)
+    else:
+        warn("assistant reservation not found", month=month, eur=round(amount, 6))
+    u["reservations"], u["reserved_eur"] = live, sum(v["eur"] for v in live.values())
+
+
+def reservation_key() -> str:
+    return uuid.uuid4().hex
 
 
 def ai_stats_added(doc: dict | None, apartment_id: str, week: str, bounds: tuple[str, str], asks: int, timeouts: int,
@@ -275,6 +339,7 @@ AuditAction = Literal[
     # A6 (docs/proposta-a6.md §6): switched off (by either button) and on again; the deletion started, and a step stopped
     # (written by the system); apartment_deleted when it is gone
     "apartment_disabled", "apartment_reenabled", "apartment_deletion_started", "apartment_deletion_failed",
+    "ai_quota_changed",   # F-13 (answer 1242): the assistant's monthly quota of an organisation, set by the platform
 ]
 
 
@@ -487,7 +552,8 @@ class Repository(Protocol):
     async def put_summary(self, summary: dict) -> dict: ...
     async def list_summaries(self, apartment_id: str, limit: int = 20) -> list[dict]: ...
 
-    async def get_ai_usage(self, month: str) -> dict: ...
+    # F-13: with tenant_id, that organisation's spending of the month (ai_usage_tenants/{tenant}__{month})
+    async def get_ai_usage(self, month: str, tenant_id: str | None = None) -> dict: ...
     # D-201: work done once whatever the number of instances. claim_work is atomic: "mine", "taken" (someone else has it
     # and its lease is running) or "done"; a lease run out can be taken over, attempts counts the claims. With a payload
     # the claim is listed by due_work when its lease runs out, so a process that dies does not lose the work.
@@ -509,6 +575,15 @@ class Repository(Protocol):
                            twins: int = 0, quick: str | None = None, ask_id: str | None = None) -> bool: ...
     async def get_ai_stats(self, keys: list[str]) -> dict[str, dict]: ...
     async def add_ai_usage(self, month: str, cost_eur: float, input_tokens: int, output_tokens: int) -> dict: ...
+    # F-4 (attack-from-outside review): atomic. reserve: True and reserved_eur raised when cost_eur + reserved_eur +
+    # amount stays within cap, else False and nothing changes. settle: the reservation goes back and the real cost (and
+    # the call, when counted) is added; the totals after
+    # F-13: with tenant_id the organisation's document moves too, in the same transaction; tenant_cap None = no quota
+    # B-10: key names the reservation (expires after RESERVATION_TTL_S); None = one made here / the first of that amount
+    async def reserve_ai_cost(self, month: str, amount: float, cap: float, tenant_id: str | None = None,
+                              tenant_cap: float | None = None, key: str | None = None) -> bool: ...
+    async def settle_ai_cost(self, month: str, reserved: float, cost_eur: float, input_tokens: int, output_tokens: int,
+                             calls: int, tenant_id: str | None = None, key: str | None = None) -> dict: ...
     async def mark_ai_alert(self, month: str) -> bool: ...
 
     # pseudonyms towards the engine (P-48): claim is atomic (the existing one wins), forget removes both directions

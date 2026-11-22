@@ -76,7 +76,7 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
             return None
         try:
             return json.loads(raw)
-        except ValueError:
+        except (ValueError, RecursionError):   # F-2 point f: nested too deep is bad JSON too, never a 500
             raise MockError(400, "bad_request", "JSON non valido")
 
     def ctx(request: Request):

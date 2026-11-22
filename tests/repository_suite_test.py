@@ -388,7 +388,7 @@ def test_list_demos_reads_firestore_and_says_when_it_does_not_answer():
 def test_ai_usage_adds_up_and_alerts_once(repo):
     """P-60 step 9: the assistant's spending of a month adds up atomically; the 80 % alert is claimed once."""
     assert run(repo.get_ai_usage("2026-10")) == {"cost_eur": 0.0, "calls": 0, "input_tokens": 0, "output_tokens": 0,
-                                                "alerted": False}
+                                                "alerted": False, "reserved_eur": 0.0}
     run(repo.add_ai_usage("2026-10", 0.5, 1000, 200))
     totals = run(repo.add_ai_usage("2026-10", 0.25, 10, 2))
     assert (totals["calls"], totals["input_tokens"], totals["output_tokens"]) == (2, 1010, 202)
@@ -397,6 +397,32 @@ def test_ai_usage_adds_up_and_alerts_once(repo):
     assert run(repo.mark_ai_alert("2026-10")) is True
     assert run(repo.mark_ai_alert("2026-10")) is False
     assert run(repo.get_ai_usage("2026-10"))["alerted"] is True and run(repo.mark_ai_alert("2026-11")) is True
+
+
+def test_ai_cost_reserved_then_settled_never_passes_the_cap(repo):
+    """F-4: the most a call may cost is reserved within the cap, atomically, and settled with the real cost."""
+    assert run(repo.reserve_ai_cost("2026-09", 0.6, 1.0)) is True
+    assert run(repo.reserve_ai_cost("2026-09", 0.6, 1.0)) is False                   # 0.6 + 0.6 > 1.0: refused
+    assert run(repo.get_ai_usage("2026-09"))["reserved_eur"] == pytest.approx(0.6)
+    totals = run(repo.settle_ai_cost("2026-09", 0.6, 0.2, 100, 50, 1))
+    assert totals["reserved_eur"] == pytest.approx(0.0) and totals["cost_eur"] == pytest.approx(0.2)
+    assert (totals["calls"], totals["input_tokens"], totals["output_tokens"]) == (1, 100, 50)
+    assert run(repo.reserve_ai_cost("2026-09", 0.8, 1.0)) is True                    # 0.2 spent + 0.8 = the cap
+    run(repo.settle_ai_cost("2026-09", 0.8, 0.0, 0, 0, 0))                          # a failed call: nothing counted
+    u = run(repo.get_ai_usage("2026-09"))
+    assert (u["calls"], u["reserved_eur"]) == (1, pytest.approx(0.0))
+
+
+def test_f13_an_organisations_quota_and_the_project_cap_in_one_reservation(repo):
+    """F-13: the organisation's document and the project's move together; either cap refuses."""
+    assert run(repo.reserve_ai_cost("2026-06", 0.6, 20.0, "t-q", 1.0)) is True
+    assert run(repo.reserve_ai_cost("2026-06", 0.6, 20.0, "t-q", 1.0)) is False
+    assert run(repo.get_ai_usage("2026-06"))["reserved_eur"] == pytest.approx(0.6)
+    totals = run(repo.settle_ai_cost("2026-06", 0.6, 0.25, 10, 5, 1, "t-q"))
+    assert totals["cost_eur"] == pytest.approx(0.25)
+    assert run(repo.get_ai_usage("2026-06", "t-q"))["cost_eur"] == pytest.approx(0.25)
+    assert run(repo.get_ai_usage("2026-06", "t-q"))["reserved_eur"] == pytest.approx(0.0)
+    assert run(repo.reserve_ai_cost("2026-06", 0.6, 0.5, "t-r", None)) is False        # the project's cap refuses
 
 
 def test_mail_quota_all_or_nothing(repo):

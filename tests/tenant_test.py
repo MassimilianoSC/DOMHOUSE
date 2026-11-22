@@ -225,6 +225,8 @@ def test_suspension_stops_sign_in_streams_and_comes_back(monkeypatch):
     repo = get_repository()
     run(repo.upsert_tenant(Tenant(tenant_id="t-susp", name="Sospesa")))
     run(_from_claims(repo, claims("u-susp", "t-susp", "viewer")))               # cached as active
+    # rereading P-6: a viewer made from claims starts with no apartment; the admin gives them all
+    run(repo.update_user_if_present("u-susp", lambda u: u.model_copy(update={"apartment_ids": None})))
     viewer = CurrentUser("u-susp", "u-susp@nuovo.it", "t-susp", "viewer")
     run(repo.upsert_apartment(Apartment(apartment_id="apt-susp", tenant_id="t-susp", name="S", instance_url="mock://builtin")))
     assert run(still_sees(viewer, "apt-susp")) is True

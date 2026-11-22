@@ -55,8 +55,10 @@ SETTINGS: dict[str, tuple[float, float, float]] = {
     # D-137, F1: at the check-out's switch to "empty", motion seen within these minutes and after the departure time
     # asks the manager first. D-151: only the first value of checkout_eco's presence_minutes, then set from the app
     "CHECKOUT_PRESENCE_MINUTES": (30.0, 5.0, 180.0),
-    # P-60 step 9 (D-132): questions to the assistant a day per apartment, counted before calling the model
-    "ASK_DAILY_LIMIT": (50.0, 1.0, 1000.0),
+    # P-60 step 9 (D-132): questions to the assistant a day per apartment, counted before calling the model. At most
+    # 100 (rereading of the attack-from-outside fixes, P-9): the BFF counts 200 a UTC day on /internal/ai/chat
+    # (bff/routes/ai.py ENGINE_DAILY_CALLS), twice this, because a UTC day holds parts of two local days
+    "ASK_DAILY_LIMIT": (50.0, 1.0, 100.0),
     # D-137, F2: in an empty apartment, a meter above these watts for these minutes asks to switch the device off
     "EMPTY_POWER_WATTS": (300.0, 20.0, 5000.0),
     "EMPTY_POWER_MINUTES": (15.0, 5.0, 240.0),
@@ -183,7 +185,11 @@ def load_config(env: Mapping[str, str] | None = None) -> EngineConfig:
             if not low <= settings[name] <= high:
                 raise ValueError
         except ValueError:
-            problems.append(f"{name} must be a number between {low:g} and {high:g}")
+            # rereading of the attack-from-outside low fixes, B-7: ASK_DAILY_LIMIT's maximum came down from 1000 to
+            # 100 on 22 November 2026; an engine still set above it says why it does not start
+            why = (" (since 22 November 2026: the BFF counts at most 200 calls a UTC day per apartment)"
+                   if name == "ASK_DAILY_LIMIT" else "")
+            problems.append(f"{name} must be a number between {low:g} and {high:g}{why}")
     for name, (default, allowed) in CHOICES.items():
         value = env.get(name, "").strip().lower() or default
         if value not in allowed:

@@ -23,6 +23,13 @@ from ..sse_hub import QUEUE_FULL, SseEvent, hub_manager
 router = APIRouter(prefix="/app")
 
 PING_SECONDS = 25.0
+# F-6 (attack-from-outside review): one account, even a reader, could open 750 streams and hold every slot of the 3
+# instances (250 each). Per instance, at most this many open streams per person (a6, 22 November: a manager with many
+# tabs on computer, phone and tablet) and in all; 429 too_many_streams over them, which the site retries as a
+# reconnection. Counted in this process only: production has up to 3 instances
+STREAMS_PER_USER = 10
+STREAMS_PER_INSTANCE = 200
+_open_streams: dict[str, int] = {}     # uid -> streams open in this process
 ACCESS_RECHECK_SECONDS = 30.0  # D-44: an open stream notices within 30 s that its apartment is no longer visible
 PROXY_BLOCKED = {"bookings", "stream", "openapi.json"}
 # F1 (D-70): allow-list of the contract's first segments, instead of a deny-list
@@ -32,8 +39,12 @@ PROXY_ALLOWED = {"apartment", "devices", "commands", "energy", "schedule", "rule
 
 def clean_instance_path(path: str) -> bool:
     """Only plain segments: no empty, "." or ".." segment (the path arrives already percent-decoded), no leftover "%"
-    (double encoding) and no backslash. Anything else could leave the apartment's /api/v1 on the instance."""
-    return all(seg not in ("", ".", "..") and "%" not in seg and "\\" not in seg for seg in path.split("/"))
+    (double encoding) and no backslash. Anything else could leave the apartment's /api/v1 on the instance.
+    F-7 (attack-from-outside review): no «?», «#» nor control character either: %3F arrives decoded as «?», the feature
+    check found no feature for «commands?» and skipped, and httpx took «?» as the start of the query, so a command ran
+    on an apartment whose administrator had switched «Comandi» off."""
+    return not instances.unsafe_path(path) and all(
+        seg not in ("", ".", "..") and "%" not in seg and "\\" not in seg for seg in path.split("/"))
 
 
 def err(status: int, error: str, message: str, **details) -> JSONResponse:
@@ -381,7 +392,9 @@ async def simulator_booking(apartment_id: str, request: Request, user: CurrentUs
     ctx_correlation.set(correlation_id)
     try:
         payload = await request.json()
-    except ValueError:
+    except (ValueError, RecursionError):          # rereading P-3: nested too deep is not JSON either
+        return err(400, "bad_request", "JSON non valido")
+    if not isinstance(payload, dict):             # a list gave TypeError below: a 500
         return err(400, "bad_request", "JSON non valido")
     try:
         _, ev = SimulatorTranslator().translate({**payload, "apartment_id": apartment_id, "source": "simulator"})
@@ -394,18 +407,56 @@ async def simulator_booking(apartment_id: str, request: Request, user: CurrentUs
     return {"correlation_id": correlation_id, **result}
 
 
+class _CountedStream(StreamingResponse):
+    """F-6: the stream's slot goes back however the response ends, also before its first step (a browser gone at once
+    never starts the generator, so a finally inside it would not run)."""
+
+    def __init__(self, *args, uid: str, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._uid = uid
+
+    async def __call__(self, scope, receive, send):
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            _release_stream(self._uid)
+
+
+def _take_stream(uid: str) -> bool:
+    if _open_streams.get(uid, 0) >= STREAMS_PER_USER or sum(_open_streams.values()) >= STREAMS_PER_INSTANCE:
+        return False
+    _open_streams[uid] = _open_streams.get(uid, 0) + 1
+    return True
+
+
+def _release_stream(uid: str) -> None:
+    left = _open_streams.get(uid, 0) - 1
+    if left > 0:
+        _open_streams[uid] = left
+    else:
+        _open_streams.pop(uid, None)
+
+
 @router.get("/apartments/{apartment_id}/stream")
 async def stream(apartment_id: str, request: Request, user: CurrentUser = Depends(resolve_user)):
     apt = await get_tenant_apartment(user, apartment_id)
-    last_event_id = request.headers.get("Last-Event-ID")
-    hub = hub_manager.hub(apt)
-    if apt.enabled:                                    # D-201: a disabled apartment has no connection to its engine
-        hub.start(last_event_id)
-    settings = get_settings()
-    ends = time.monotonic() + settings.stream_max_s    # D-197 (E-27): a normal end of the response; the site reopens
-
-    # P-50: a support stream ends at the exact expiry of the access, not at the next periodic check
-    deadline = support.parse(user.support_expires_at).timestamp() if user.support_expires_at else None
+    if not _take_stream(user.uid):
+        info("stream refused: too many open", open_for_user=_open_streams.get(user.uid, 0),
+             open_here=sum(_open_streams.values()))
+        return err(429, "too_many_streams", "Troppe connessioni aperte: chiudi qualche scheda e riprova")
+    try:
+        # rereading of the medium fixes, P-5: whatever fails before the response exists gives the slot back
+        last_event_id = request.headers.get("Last-Event-ID")
+        hub = hub_manager.hub(apt)
+        if apt.enabled:                                # D-201: a disabled apartment has no connection to its engine
+            hub.start(last_event_id)
+        settings = get_settings()
+        ends = time.monotonic() + settings.stream_max_s    # D-197 (E-27): a normal end of the response; the site reopens
+        # P-50: a support stream ends at the exact expiry of the access, not at the next periodic check
+        deadline = support.parse(user.support_expires_at).timestamp() if user.support_expires_at else None
+    except BaseException:
+        _release_stream(user.uid)
+        raise
 
     async def gen():
         checked = time.monotonic()
@@ -465,8 +516,9 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
             hub.subscribers.discard(queue)
             runtime.stream_closed(stream_id, apt.apartment_id, reason)
 
-    return StreamingResponse(
+    return _CountedStream(
         gen(),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
+        uid=user.uid,
     )

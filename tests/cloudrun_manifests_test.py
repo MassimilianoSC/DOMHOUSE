@@ -12,7 +12,13 @@ WANTED = {"APP_ENV": ("staging", "prod"), "FIRESTORE_DATABASE": ("staging", "(de
           "CORS_ORIGINS": ("https://your-staging-site.web.app,https://your-staging-site.firebaseapp.com",
                            "https://your-gcp-project-id.web.app,https://your-gcp-project-id.firebaseapp.com"),
           "APP_PUBLIC_URL": ("https://your-staging-site.web.app", "https://your-gcp-project-id.web.app"),
-          "AI_DEMOS": ("true", "false")}       # D-202: the demonstrations, and their real model, only in staging
+          "AI_DEMOS": ("true", "false"),       # D-202: the demonstrations, and their real model, only in staging
+          # D04 (P-83) and F-3: each environment's engines, never one of the other's (dev 8100 serves production until
+          # the second VM, A10)
+          "INSTANCE_ALLOWED": ("your-vm-internal-ip:8100,your-vm-internal-ip:8150-8169",
+                               "your-vm-internal-ip:8100,your-vm-internal-ip:8101-8149"),
+          # F-16: each environment its own webhook secret
+          "ITALIANWAY_WEBHOOK_SECRET": ("secret:italianway-webhook-secret-staging", "secret:italianway-webhook-secret")}
 
 
 def env(manifest: str) -> dict[str, str]:
@@ -30,8 +36,7 @@ def annotation(manifest: str, key: str) -> str | None:
     return m.group(1).strip() if m else None
 
 
-ONLY_STAGING = {"INSTANCE_ALLOWED",      # D04 (P-83): the engines staging may reach; production has no list
-                # tool A, A1 (I5.1): the order receiver on the VM, staging only; without them production's agent is
+ONLY_STAGING = {# tool A, A1 (I5.1): the order receiver on the VM, staging only; without them production's agent is
                 # off (bff/agent.py: 503, and the results' route 401), until the second VM (§5.4)
                 "AGENT_AMBIENTE", "AGENT_ORDERS_TOPIC", "AGENT_PUSH_AUDIENCE", "AGENT_PUSH_EMAIL",
                 "AGENT_PUSH_SUBSCRIPTION",
@@ -157,3 +162,11 @@ def test_a5_staging_reads_the_refusals_from_its_log_view_only():
     assert staging["DEVICE_REFUSALS_VIEW"] == ("projects/your-gcp-project-id/locations/global/buckets/domhouse-rifiuti/"
                                                "views/_AllLogs")
     assert "DEVICE_REFUSALS_VIEW" not in prod
+
+
+def test_f16_staging_signs_its_webhooks_with_a_secret_of_its_own():
+    """F-16 (attack-from-outside review): both manifests read italianway-webhook-secret; whoever took staging could sign
+    bookings that production accepted. Staging reads italianway-webhook-secret-staging; production keeps its own."""
+    staging, prod = env(STAGING), env(PROD)
+    assert prod["ITALIANWAY_WEBHOOK_SECRET"] == "secret:italianway-webhook-secret"
+    assert staging["ITALIANWAY_WEBHOOK_SECRET"] == "secret:italianway-webhook-secret-staging"

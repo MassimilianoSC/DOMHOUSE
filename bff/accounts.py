@@ -7,6 +7,7 @@
 
 The functions are blocking (firebase-admin is synchronous): call them through asyncio.to_thread.
 """
+import math
 import time
 
 from .config import get_settings
@@ -28,8 +29,15 @@ def _auth():
     return fb_auth, firebase_app()
 
 
+class RevocationUnknown(Exception):
+    """F-8: Firebase did not answer and nothing is known of this account yet: the caller answers 503, never «valid»."""
+
+
 def token_revoked(uid: str, issued_at: float) -> bool:
-    """True when the account was deleted or its sessions were revoked after the token was issued."""
+    """True when the account was deleted or disabled, or its sessions were revoked after the token was issued.
+    F-8 (attack-from-outside review): when Firebase answers with an error, the last known answer counts, however old;
+    with none, RevocationUnknown (503: try again), no longer «not revoked» (a revoked token stayed valid up to an hour).
+    An account disabled in Firebase's console counts as revoked (record.disabled was never read)."""
     if not _enabled():
         return False
     now = time.monotonic()
@@ -38,14 +46,17 @@ def token_revoked(uid: str, issued_at: float) -> bool:
         fb_auth, app = _auth()
         try:
             record = fb_auth.get_user(uid, app=app)
-            valid_after = (record.tokens_valid_after_timestamp or 0) / 1000
+            valid_after = math.inf if getattr(record, "disabled", False) else (
+                (record.tokens_valid_after_timestamp or 0) / 1000)
+            cached = (now, valid_after)
+            _valid_after[uid] = cached
         except fb_auth.UserNotFoundError:
-            valid_after = None
-        except Exception as exc:  # Auth API unreachable: do not lock everybody out
-            warn("auth: revocation check failed", uid=uid, error=str(exc))
-            return False
-        cached = (now, valid_after)
-        _valid_after[uid] = cached
+            cached = (now, None)
+            _valid_after[uid] = cached
+        except Exception as exc:  # Auth API unreachable: the last known answer, else «try again»
+            warn("auth: revocation check failed", uid=uid, error=type(exc).__name__, known=cached is not None)
+            if cached is None:
+                raise RevocationUnknown(type(exc).__name__) from None
     valid_after = cached[1]
     return valid_after is None or issued_at < valid_after
 
@@ -121,12 +132,31 @@ def delete_account(uid: str | None = None, email: str | None = None, protect: bo
 
 def current_env_claims(uid: str) -> dict | None:
     """R4-1: this environment's tenant and role as Firebase holds them NOW (a token carries a copy up to an hour old);
+    None when the accounts module is off (dev); {} when the account no longer exists (F-1: deleted by its owner or as
+    never used). Other errors go to the caller."""
+    if not _enabled():
+        return None
+    fb_auth, app = _auth()
+    from .auth import env_claims
+    try:
+        record = fb_auth.get_user(uid, app=app)
+    except fb_auth.UserNotFoundError:
+        return {}
+    return env_claims(record.custom_claims)
+
+
+def env_claims_of_email(email: str) -> dict | None:
+    """F-14: this environment's tenant and role that Firebase holds for this email now; {} when there is no account;
     None when the accounts module is off (dev). Errors go to the caller."""
     if not _enabled():
         return None
     fb_auth, app = _auth()
     from .auth import env_claims
-    return env_claims(fb_auth.get_user(uid, app=app).custom_claims)
+    try:
+        record = fb_auth.get_user_by_email(email, app=app)
+    except fb_auth.UserNotFoundError:
+        return {}
+    return env_claims(record.custom_claims)
 
 
 def move_env_claims(uid: str, tenant_id: str, role: str) -> None:

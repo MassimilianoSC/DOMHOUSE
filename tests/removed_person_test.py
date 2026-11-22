@@ -1,0 +1,377 @@
+"""F-1 (attack-from-outside review, 22 November 2026, serious): a person removed from the organisation (or an account
+deleted by its owner) was made again by _from_claims from the claims of the token, with apartment_ids None, that is
+every apartment: in staging always (staging never revokes), in production within the revocation cache of another
+instance. And the conveniences of /app/me (push, preferences, name) wrote the record back if it went in the meantime.
+Now a record is made from claims alone only when Firebase holds them now (403 when not, 503 when it does not answer), and
+the conveniences change only a record that exists. Fake Firebase Auth, memory repository, no network."""
+import asyncio
+import dataclasses
+import time
+import types
+
+import pytest
+from fastapi import HTTPException
+
+from bff import accounts, auth
+from bff.auth import CurrentUser, Identity
+from bff.config import get_settings
+from bff.repository import NotificationPrefs, Tenant, User, get_repository
+from bff.routes import account, admin, push
+
+TENANT = "t-f1"
+
+
+class UserNotFoundError(Exception):
+    pass
+
+
+class FakeAuth:
+    """The subset of firebase_admin.auth used by bff/accounts.py (as in tests/firebase_flows_test.py)."""
+    UserNotFoundError = UserNotFoundError
+
+    def __init__(self):
+        self.users: dict[str, types.SimpleNamespace] = {}
+        self.down = False
+
+    def add(self, uid, email, claims, email_verified=True):
+        self.users[uid] = types.SimpleNamespace(uid=uid, email=email, custom_claims=claims, email_verified=email_verified,
+                                                tokens_valid_after_timestamp=0)
+
+    def get_user(self, uid, app=None):
+        if self.down:
+            raise RuntimeError("Auth non raggiungibile")
+        if uid not in self.users:
+            raise UserNotFoundError(uid)
+        return self.users[uid]
+
+    def get_user_by_email(self, email, app=None):
+        for u in self.users.values():
+            if u.email == email:
+                return u
+        raise UserNotFoundError(email)
+
+    def set_custom_user_claims(self, uid, claims, app=None):
+        self.users[uid].custom_claims = claims
+
+    def revoke_refresh_tokens(self, uid, app=None):
+        self.users[uid].tokens_valid_after_timestamp = 5_000_000          # seconds 5000, in ms
+
+    def delete_user(self, uid, app=None):
+        del self.users[uid]
+
+
+def run(coro):
+    return asyncio.run(coro)
+
+
+def _env(monkeypatch, env):
+    from bff import config
+    fake = FakeAuth()
+    settings = dataclasses.replace(get_settings(), app_env=env, auth_mode="firebase")
+    for module in (config, auth, accounts):
+        monkeypatch.setattr(module, "get_settings", lambda: settings)
+    monkeypatch.setattr(accounts, "_auth", lambda: (fake, None))
+    accounts._valid_after.clear()
+    auth._known_tenants.clear()
+    getattr(auth, "_refused_claims", {}).clear()                   # rereading P-7: refusals remembered per token
+    run(get_repository().upsert_tenant(Tenant(tenant_id=TENANT, name="F-1")))
+    return fake
+
+
+@pytest.fixture
+def staging(monkeypatch):
+    return _env(monkeypatch, "staging")
+
+
+@pytest.fixture
+def prod(monkeypatch):
+    return _env(monkeypatch, "prod")
+
+
+def _request(monkeypatch, claims):
+    """A request carrying a token with these claims (the token's signature is not what is tested here)."""
+    monkeypatch.setattr(auth, "_verify_firebase_token", lambda token: dict(claims))
+    return types.SimpleNamespace(headers={"Authorization": "Bearer token-vecchio"})
+
+
+def _refused(request) -> tuple[int, str]:
+    with pytest.raises(HTTPException) as e:
+        run(auth._member(request))
+    return e.value.status_code, e.value.detail["error"]
+
+
+def _limited_operator(fb, env, uid):
+    repo = get_repository()
+    fb.add(uid, f"{uid}@f1.it", {env: {"tenant_id": TENANT, "role": "operator"}})
+    run(repo.upsert_user(User(uid=uid, email=f"{uid}@f1.it", tenant_id=TENANT, role="operator", apartment_ids=["apt-1"])))
+    run(repo.upsert_user(User(uid=f"{uid}-boss", email=f"boss-{uid}@f1.it", tenant_id=TENANT, role="admin")))
+    old_token = {"uid": uid, "email": f"{uid}@f1.it", "email_verified": True, "iat": 1000,
+                 env: {"tenant_id": TENANT, "role": "operator"}}
+    return old_token, CurrentUser(f"{uid}-boss", f"boss-{uid}@f1.it", TENANT, "admin")
+
+
+# -------- (a) staging: removed, the old token with the claims never makes the record again --------
+def test_a_staging_a_removed_operator_never_comes_back(staging, monkeypatch):
+    repo = get_repository()
+    old_token, boss = _limited_operator(staging, "staging", "u-f1-a")
+    assert run(admin.delete_user("u-f1-a", boss)) is None                          # 204
+    assert "staging" not in (staging.users["u-f1-a"].custom_claims or {})          # staging forgot its claims
+    assert _refused(_request(monkeypatch, old_token)) == (403, "forbidden")        # the old token still carries them
+    assert run(repo.get_user("u-f1-a")) is None
+    without = {k: v for k, v in old_token.items() if k != "staging"}
+    assert _refused(_request(monkeypatch, without)) == (403, "forbidden")          # then a token without them
+    assert run(repo.get_user("u-f1-a")) is None
+
+
+# -------- (b) production: another instance still holds «not revoked» in its 60 s --------
+def test_b_production_a_removed_operator_never_comes_back_through_another_instance(prod, monkeypatch):
+    repo = get_repository()
+    old_token, boss = _limited_operator(prod, "prod", "u-f1-b")
+    run(admin.delete_user("u-f1-b", boss))
+    accounts._valid_after["u-f1-b"] = (time.monotonic(), 0.0)                      # the other instance's memory
+    assert _refused(_request(monkeypatch, old_token)) == (403, "forbidden")
+    assert run(repo.get_user("u-f1-b")) is None
+
+
+def test_b_production_an_account_deleted_by_its_owner_is_not_made_again(prod, monkeypatch):
+    repo = get_repository()
+    old_token, _boss = _limited_operator(prod, "prod", "u-f1-own")
+    me = CurrentUser("u-f1-own", "u-f1-own@f1.it", TENANT, "operator", apartment_ids=["apt-1"])
+    run(account.delete_account(Identity(uid=me.uid, email=me.email, display_name="", user=me, platform_manager=False)))
+    assert "u-f1-own" not in prod.users                                            # really deleted (N3)
+    accounts._valid_after["u-f1-own"] = (time.monotonic(), 0.0)
+    assert _refused(_request(monkeypatch, old_token)) == (403, "forbidden")
+    assert run(repo.get_user("u-f1-own")) is None
+
+
+def test_firebase_silent_when_a_record_would_be_made_is_try_again(prod, monkeypatch):
+    old_token, _boss = _limited_operator(prod, "prod", "u-f1-down")
+    run(get_repository().delete_user("u-f1-down"))
+    accounts._valid_after["u-f1-down"] = (time.monotonic(), 0.0)
+    prod.down = True
+    assert _refused(_request(monkeypatch, old_token)) == (503, "auth_unavailable")
+    assert run(get_repository().get_user("u-f1-down")) is None
+
+
+@pytest.mark.parametrize("env", ["staging", "prod"])
+def test_the_first_admin_of_set_claims_still_gets_a_record(monkeypatch, env):
+    """scripts/set_claims.py: claims in Firebase, no record yet; Firebase confirms them, so the record is made."""
+    fb = _env(monkeypatch, env)
+    fb.add("u-f1-first", "first@f1.it", {env: {"tenant_id": TENANT, "role": "admin"}})
+    token = {"uid": "u-f1-first", "email": "first@f1.it", "email_verified": True, "iat": 1000,
+             env: {"tenant_id": TENANT, "role": "admin"}}
+    user = run(auth._member(_request(monkeypatch, token)))
+    assert (user.tenant_id, user.role) == (TENANT, "admin")
+    assert run(get_repository().get_user("u-f1-first")).role == "admin"
+
+
+# -------- (c) the record goes while a convenience of /app/me is under way: never written back --------
+def _gone(uid):
+    """A person resolved a moment ago, whose record was removed since."""
+    return CurrentUser(uid, f"{uid}@f1.it", TENANT, "operator", apartment_ids=["apt-1"])
+
+
+def test_c_notification_preferences_never_make_the_record_again():
+    run(push.set_prefs(NotificationPrefs(), _gone("u-f1-prefs")))
+    assert run(get_repository().get_user("u-f1-prefs")) is None
+
+
+def test_c_the_name_never_makes_the_record_again():
+    me = _gone("u-f1-name")
+    run(account.patch_profile(account.ProfilePatch(display_name="Torno"),
+                              Identity(uid=me.uid, email=me.email, display_name="", user=me, platform_manager=False)))
+    assert run(get_repository().get_user("u-f1-name")) is None
+
+
+def test_c_push_routes_never_make_the_record_again():
+    repo = get_repository()
+    me = _gone("u-f1-push")
+    run(push.subscribe(push.TokenBody(token="token-push-f1-1"), me))
+    run(push.unsubscribe(push.TokenBody(token="token-push-f1-1"),
+                         Identity(uid=me.uid, email=me.email, display_name="", user=me, platform_manager=False)))
+    run(push.status(me))
+    assert run(repo.get_user("u-f1-push")) is None
+
+
+def test_c_another_holder_removed_meanwhile_is_not_written_back(monkeypatch):
+    """subscribe takes the token from its other holders: one of them removed between the read and the write."""
+    repo = get_repository()
+    run(repo.upsert_user(User(uid="u-f1-me", email="me@f1.it", tenant_id=TENANT, role="operator")))
+    stale = User(uid="u-f1-left", email="left@f1.it", tenant_id=TENANT, role="operator", push_tokens=["token-push-f1-2"])
+
+    async def holders(token):
+        return [stale.model_copy(deep=True)]
+    monkeypatch.setattr(repo, "users_with_push_token", holders)
+    run(push.subscribe(push.TokenBody(token="token-push-f1-2"), CurrentUser("u-f1-me", "me@f1.it", TENANT, "operator")))
+    assert run(repo.get_user("u-f1-left")) is None
+    assert "token-push-f1-2" in run(repo.get_user("u-f1-me")).push_tokens
+
+
+# -------- the race between a request and the removal --------
+def test_claims_taken_away_between_the_check_and_the_write_leave_no_record(prod, monkeypatch):
+    """The request checked Firebase (claims there), the removal took them away, then the request wrote the record:
+    Firebase is asked again after the write, and the record goes."""
+    old_token, _boss = _limited_operator(prod, "prod", "u-f1-race")
+    run(get_repository().delete_user("u-f1-race"))
+    answers = [{"tenant_id": TENANT, "role": "operator"}, {}]
+    monkeypatch.setattr(accounts, "current_env_claims", lambda uid: answers.pop(0))
+    assert _refused(_request(monkeypatch, old_token)) == (403, "forbidden")
+    assert run(get_repository().get_user("u-f1-race")) is None and answers == []
+
+
+def _made_again_meanwhile(monkeypatch, uid):
+    """While Firebase is being changed, a request of the person writes the record back (it checked before)."""
+    real = accounts.delete_account
+
+    def racing(*args, **kwargs):
+        get_repository().users[uid] = User(uid=uid, email=f"{uid}@f1.it", tenant_id=TENANT, role="operator")
+        return real(*args, **kwargs)
+    monkeypatch.setattr(accounts, "delete_account", racing)
+
+
+def test_the_admin_removal_deletes_the_record_again_after_firebase(prod, monkeypatch):
+    _old_token, boss = _limited_operator(prod, "prod", "u-f1-again")
+    _made_again_meanwhile(monkeypatch, "u-f1-again")
+    run(admin.delete_user("u-f1-again", boss))
+    assert run(get_repository().get_user("u-f1-again")) is None
+
+
+def test_the_owner_deletion_deletes_the_record_again_after_firebase(prod, monkeypatch):
+    _limited_operator(prod, "prod", "u-f1-own2")
+    _made_again_meanwhile(monkeypatch, "u-f1-own2")
+    me = CurrentUser("u-f1-own2", "u-f1-own2@f1.it", TENANT, "operator", apartment_ids=["apt-1"])
+    run(account.delete_account(Identity(uid=me.uid, email=me.email, display_name="", user=me, platform_manager=False)))
+    assert run(get_repository().get_user("u-f1-own2")) is None
+
+
+def test_an_email_change_never_writes_back_a_record_removed_meanwhile(prod, monkeypatch):
+    """_from_claims read the record, then adopted the new email of Firebase with a write of that copy."""
+    repo = get_repository()
+    prod.add("u-f1-mail", "nuova@f1.it", {"prod": {"tenant_id": TENANT, "role": "operator"}})
+    run(repo.upsert_user(User(uid="u-f1-mail", email="vecchia@f1.it", tenant_id=TENANT, role="operator",
+                              apartment_ids=["apt-1"])))
+    token = {"uid": "u-f1-mail", "email": "nuova@f1.it", "email_verified": True, "iat": 1000,
+             "prod": {"tenant_id": TENANT, "role": "operator"}}
+    real = repo.get_user_by_email
+
+    async def removed_now(email):                     # the removal lands while the request looks for a clash
+        repo.users.pop("u-f1-mail", None)
+        return await real(email)
+    monkeypatch.setattr(repo, "get_user_by_email", removed_now)
+    assert _refused(_request(monkeypatch, token)) == (403, "forbidden")
+    assert run(repo.get_user("u-f1-mail")) is None
+
+
+def test_an_apartment_deleted_never_writes_back_a_person_removed_meanwhile(monkeypatch):
+    """remove_apartment (A6 deletion) takes the apartment out of every list, from a copy of the users read before."""
+    from bff.repository import Apartment
+    repo = get_repository()
+    apt = Apartment(apartment_id="apt-f1-del", tenant_id=TENANT, name="F-1", instance_url="mock://builtin")
+    run(repo.upsert_apartment(apt))
+    stale = User(uid="u-f1-list", email="list@f1.it", tenant_id=TENANT, role="operator", apartment_ids=["apt-f1-del"])
+
+    async def users(tenant_id=None):
+        return [stale.model_copy(deep=True)]
+    monkeypatch.setattr(repo, "list_users", users)
+    run(admin.remove_apartment(apt))
+    assert run(repo.get_user("u-f1-list")) is None
+
+
+# -------- rereading P-5, P-6: the record made from claims --------
+@pytest.mark.parametrize("role, seen", [("operator", []), ("viewer", []), ("admin", None)])
+def test_p6_a_record_made_from_claims_sees_no_apartment_unless_admin(prod, monkeypatch, role, seen):
+    """Decision of the memoria storica (22 November, ESITO point 3): the implicit record of someone who is not an
+    admin starts with no apartment (the admin assigns them); the first admin of set_claims.py still sees them all."""
+    uid = f"u-f1-new-{role}"
+    prod.add(uid, f"{uid}@f1.it", {"prod": {"tenant_id": TENANT, "role": role}})
+    token = {"uid": uid, "email": f"{uid}@f1.it", "email_verified": True, "iat": 1000,
+             "prod": {"tenant_id": TENANT, "role": role}}
+    user = run(auth._member(_request(monkeypatch, token)))
+    assert user.apartment_ids == seen and run(get_repository().get_user(uid)).apartment_ids == seen
+
+
+def test_p5_a_request_cancelled_between_the_write_and_the_second_check_leaves_no_record(prod, monkeypatch):
+    """The compensation covered HTTPException only: a request cancelled (instance stopping) after the write left the
+    record. Now any way out of the second check other than its success deletes it."""
+    old_token, _boss = _limited_operator(prod, "prod", "u-f1-cancel")
+    run(get_repository().delete_user("u-f1-cancel"))
+    calls = []
+    real = auth._claims_hold_now
+
+    async def second_cancelled(uid, tenant_id, role):
+        calls.append(uid)
+        if len(calls) == 2:
+            raise asyncio.CancelledError()
+        return await real(uid, tenant_id, role)
+    monkeypatch.setattr(auth, "_claims_hold_now", second_cancelled)
+    with pytest.raises(asyncio.CancelledError):
+        run(auth._member(_request(monkeypatch, old_token)))
+    assert len(calls) == 2 and run(get_repository().get_user("u-f1-cancel")) is None
+
+
+def test_an_invited_operator_keeps_the_apartments_of_the_invitation(prod, monkeypatch):
+    """The invitation path is not the implicit record: its apartments stay those the admin chose."""
+    repo = get_repository()
+    run(repo.upsert_user(User(uid="inv-f1-x", email="x@f1.it", tenant_id=TENANT, role="operator",
+                              apartment_ids=["apt-1", "apt-2"])))
+    prod.add("u-f1-inv", "x@f1.it", {})
+    token = {"uid": "u-f1-inv", "email": "x@f1.it", "email_verified": True, "iat": 1000}
+    user = run(auth._member(_request(monkeypatch, token)))
+    assert (user.role, user.apartment_ids) == ("operator", ["apt-1", "apt-2"])
+
+
+# -------- rereading P-7: a refusal confirmed by Firebase is remembered for that token --------
+def test_p7_a_removed_person_with_a_script_asks_firebase_once_per_token(prod, monkeypatch):
+    """_claims_hold_now asked Firebase (a thread of the small pool) at every request of a token with claims and no
+    record: in staging a removed person could keep it busy for an hour. Now the «no» is remembered for (uid, iat)
+    until the token expires; a new token asks again. Only a refusal is remembered."""
+    now = time.time()
+    old_token, boss = _limited_operator(prod, "prod", "u-f1-script")
+    old_token["iat"] = now - 60
+    run(admin.delete_user("u-f1-script", boss))
+    accounts._valid_after["u-f1-script"] = (time.monotonic(), 0.0)
+    asked = []
+    real = accounts.current_env_claims
+    monkeypatch.setattr(accounts, "current_env_claims", lambda uid: asked.append(uid) or real(uid))
+    for _ in range(5):
+        assert _refused(_request(monkeypatch, old_token)) == (403, "forbidden")
+    assert len(asked) == 1
+    newer = {**old_token, "iat": now}                                              # another token: asked again
+    assert _refused(_request(monkeypatch, newer)) == (403, "forbidden") and len(asked) == 2
+
+
+def test_p7_an_expired_refusal_is_forgotten_and_firebase_unanswered_is_never_remembered(prod, monkeypatch):
+    old_token, _boss = _limited_operator(prod, "prod", "u-f1-forget")
+    old_token["iat"] = time.time() - 60
+    run(get_repository().delete_user("u-f1-forget"))
+    accounts._valid_after["u-f1-forget"] = (time.monotonic(), 0.0)
+    prod.down = True
+    assert _refused(_request(monkeypatch, old_token)) == (503, "auth_unavailable")
+    prod.down = False                                    # a 503 says nothing, so it was not kept: asked again
+    assert run(auth._member(_request(monkeypatch, old_token))).uid == "u-f1-forget"   # the claims are still there
+    assert run(get_repository().get_user("u-f1-forget")) is not None
+
+
+def test_p7_a_remembered_refusal_ends_with_its_token(prod, monkeypatch):
+    old_token, boss = _limited_operator(prod, "prod", "u-f1-end")
+    run(admin.delete_user("u-f1-end", boss))
+    accounts._valid_after["u-f1-end"] = (time.monotonic(), 0.0)
+    asked = []
+    real = accounts.current_env_claims
+    monkeypatch.setattr(accounts, "current_env_claims", lambda uid: asked.append(uid) or real(uid))
+    old_token["iat"] = time.time() - 3600 + 1                      # a token about to expire
+    assert _refused(_request(monkeypatch, old_token))[0] == 403
+    monkeypatch.setattr(auth.time, "time", lambda: old_token["iat"] + 3601)   # expired: forgotten, never kept longer
+    assert _refused(_request(monkeypatch, old_token))[0] == 403 and len(asked) == 2
+
+
+def test_p7_the_remembered_refusals_are_bounded(prod, monkeypatch):
+    monkeypatch.setattr(auth, "REFUSED_CLAIMS_MAX", 3)
+    now = time.time()
+    for i in range(6):
+        token = {"uid": f"u-f1-many-{i}", "email": f"m{i}@f1.it", "email_verified": True, "iat": now - i,
+                 "prod": {"tenant_id": TENANT, "role": "operator"}}
+        prod.add(f"u-f1-many-{i}", f"m{i}@f1.it", {})                                # claims taken away
+        assert _refused(_request(monkeypatch, token))[0] == 403
+    assert len(auth._refused_claims) == 3
+    assert ("u-f1-many-5", now - 5) in auth._refused_claims                          # the newest kept

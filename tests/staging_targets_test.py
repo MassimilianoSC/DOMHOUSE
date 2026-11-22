@@ -53,10 +53,13 @@ def test_any_other_engine_is_refused(staging, url, port):
     assert instances.target_problem(url, port) == instances.MSG_NOT_ALLOWED
 
 
-def test_production_has_no_list_and_nothing_changes(monkeypatch):
-    s = dataclasses.replace(get_settings(), instance_mode="real", app_env="prod", instance_allowed="")
+def test_production_reaches_its_own_band_never_staging_s(monkeypatch):
+    """F-3: production has its list now (tests/production_targets_test.py); staging's engines are not in it."""
+    s = dataclasses.replace(get_settings(), instance_mode="real", app_env="prod",
+                            instance_allowed="10.198.0.2:8100,10.198.0.2:8101-8149")
     monkeypatch.setattr(instances, "get_settings", lambda: s)
     assert instances.target_problem("http://10.198.0.2:8101") is None
+    assert instances.target_problem("http://10.198.0.2:8150") == instances.MSG_NOT_ALLOWED_PROD
 
 
 def test_linking_a_real_engine_in_staging_is_refused_without_reading_any_key(staging):
@@ -97,14 +100,16 @@ def test_staging_does_not_start_without_its_list(allowed, refused):
             main.check_access_settings(s, {})
     else:
         main.check_access_settings(s, {})
-    main.check_access_settings(dataclasses.replace(s, app_env="prod", instance_allowed=""), {})   # production: no list
+    if refused:                                       # F-3: production needs its list too
+        with pytest.raises(SystemExit, match="INSTANCE_ALLOWED"):
+            main.check_access_settings(dataclasses.replace(s, app_env="prod"), {})
 
 
-def test_the_staging_manifest_lists_dev_and_the_load_test_and_production_none():
+def test_the_staging_manifest_lists_dev_and_the_load_test_and_production_its_band():
     staging_yaml = (ROOT / "bff" / "cloudrun.staging.yaml").read_text(encoding="utf-8")
     prod_yaml = (ROOT / "bff" / "cloudrun.yaml").read_text(encoding="utf-8")
     assert "value: your-vm-internal-ip:8100,your-vm-internal-ip:8150-8169" in staging_yaml
-    assert "INSTANCE_ALLOWED" not in prod_yaml
+    assert "value: your-vm-internal-ip:8100,your-vm-internal-ip:8101-8149" in prod_yaml        # F-3
     deploy = (ROOT / "scripts" / "deploy.sh").read_text(encoding="utf-8")
     assert 's#your-vm-internal-ip#${VM_INTERNAL_IP:-}#g' in deploy and "set VM_INTERNAL_IP" in deploy
     conf = (ROOT / "scripts" / "publish-settings.conf").read_text(encoding="utf-8")

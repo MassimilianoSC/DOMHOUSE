@@ -131,6 +131,18 @@ def env_claims(claims: dict | None) -> dict:
     return {}
 
 
+def claims_name(claims: dict) -> str:
+    """Rereading of the attack-from-outside low fixes, B-11: a name taken from a token's «name» claim (Google's) follows
+    F-11's rule, because it becomes the inviter's name in the invitation emails; out of the rule, the part of the email
+    before «@» when that passes, else nothing."""
+    from .plain_text import acceptable_name
+    name = (claims.get("name") or "").strip()
+    if not name or acceptable_name(name):
+        return name
+    local = (claims.get("email") or "").split("@")[0]
+    return local if local and acceptable_name(local) else ""
+
+
 async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> CurrentUser:
     """Custom claims (tenant_id, role) are the source of truth; an invited user without claims yet is
     recognised by email and its `inv-*` record is migrated to the real uid on first login."""
@@ -170,27 +182,98 @@ async def _from_claims(repo, claims: dict, allow_suspended: bool = False) -> Cur
     if stored is None:
         # Account enabled by custom claims only (e.g. the first admin from scripts/set_claims.py): give it an app
         # record so it appears in the admin area and can keep a display name and notification preferences.
-        stored = await repo.upsert_user(User(uid=uid, email=email, display_name=claims.get("name", "") or "",
-                                             tenant_id=tenant_id, role=role))
+        # F-1 (attack-from-outside review): only when Firebase holds these claims NOW. A removed person's token keeps
+        # its copy for up to an hour (staging never revokes; production's revocation is cached 60 s per instance), and
+        # a record made from it gave back the role with every apartment (apartment_ids None)
+        issued_at = float(claims.get("iat", 0))
+        await _held_for_token(uid, tenant_id, role, issued_at)
+        # rereading P-6 (decision of the memoria storica, 22 November, ESITO point 3): someone who is not an admin
+        # starts with no apartment, the admin assigns them; so a record left by a race never opens every apartment
+        stored = await repo.upsert_user(User(uid=uid, email=email, display_name=claims_name(claims),
+                                             tenant_id=tenant_id, role=role,
+                                             apartment_ids=None if role == "admin" else []))
+        # and again after the write: a removal that took the claims away while this request was between its check and
+        # its write leaves no record (the removal deletes the record once more after Firebase, bff/routes/admin.py).
+        # Rereading P-5: whatever ends the check other than its success (403, 503, a request cancelled) deletes it
+        confirmed = False
+        try:
+            await _held_for_token(uid, tenant_id, role, issued_at)
+            confirmed = True
+        finally:
+            if not confirmed:
+                await asyncio.shield(repo.delete_user(uid))
     if (stored.tenant_id != tenant_id or stored.role != role) and own.get("tenant_id"):
-        stored.tenant_id, stored.role = tenant_id, role
-        await repo.upsert_user(stored)
+        # F-1: only a record that is still there (a removal may have deleted it since it was read)
+        stored = await _still_there(repo, uid, lambda cur: cur.model_copy(update={"tenant_id": tenant_id, "role": role}))
     if email and stored.email != email:  # email changed in Firebase (verifyBeforeUpdateEmail)
         # L6 (D-70): an email maps to one uid only. If another record already has it (an invite or a user in another
         # organisation), do not adopt it, or two records would share an email and a delete-by-email could hit the wrong
         # account. The record keeps its previous email; access still works by uid.
         clash = await repo.get_user_by_email(email)
         if clash is None or clash.uid == uid:
-            if stored.email not in stored.former_emails:   # D-91 (F3): the previous address is erased with the person
-                stored.former_emails = [*stored.former_emails, stored.email]
-            stored.email = email
-            await repo.upsert_user(stored)
+            def new_email(cur: User) -> User:
+                former = cur.former_emails if cur.email in cur.former_emails else [*cur.former_emails, cur.email]
+                return cur.model_copy(update={"email": email, "former_emails": former})   # D-91 (F3)
+            stored = await _still_there(repo, uid, new_email)
         else:
             warn("auth: email change not adopted, already used by another account", uid=uid)
             email = stored.email
     return CurrentUser(uid=uid, email=email, tenant_id=tenant_id, role=role,
-                       display_name=(stored.display_name if stored else claims.get("name", "")) or "",
+                       display_name=(stored.display_name if stored else claims_name(claims)) or "",
                        apartment_ids=stored.apartment_ids, issued_at=float(claims.get("iat", 0)))
+
+
+TOKEN_LIFETIME_S = 3600            # a Firebase ID token's life: iat + 1 hour
+REFUSED_CLAIMS_MAX = 10_000
+_refused_claims: dict[tuple[str, float], float] = {}     # (uid, token iat) -> until (epoch s): Firebase said no
+
+
+async def _held_for_token(uid: str, tenant_id: str, role: str, issued_at: float) -> None:
+    """Rereading P-7: _claims_hold_now asked Firebase (a thread of a small pool) at every request of a token with claims
+    and no record, so a removed person with a script could keep it busy for the token's hour. A refusal (403) is
+    remembered for that token (uid, iat) until it expires; another token asks again; a 503 says nothing and is never
+    kept. Safe: it only refuses."""
+    now = time.time()
+    until = _refused_claims.get((uid, issued_at))
+    if until is not None:
+        if until > now:
+            raise _err(403, "forbidden", "Account non abilitato: mancano tenant o ruolo")
+        _refused_claims.pop((uid, issued_at), None)
+    try:
+        await _claims_hold_now(uid, tenant_id, role)
+    except HTTPException as exc:
+        until = issued_at + TOKEN_LIFETIME_S
+        if exc.status_code == 403 and until > now:
+            if len(_refused_claims) >= REFUSED_CLAIMS_MAX:
+                for key in [k for k, t in _refused_claims.items() if t <= now]:
+                    del _refused_claims[key]
+                while len(_refused_claims) >= REFUSED_CLAIMS_MAX:
+                    _refused_claims.pop(next(iter(_refused_claims)))       # the oldest first
+            _refused_claims[(uid, issued_at)] = until
+        raise
+
+
+async def _claims_hold_now(uid: str, tenant_id: str, role: str) -> None:
+    """F-1: before a record is made from a token's claims alone, Firebase must hold the same for this environment now:
+    403 when it holds others or none (claims taken away with the person, account deleted), 503 when it does not answer.
+    Development (accounts module off): nothing to ask."""
+    try:
+        current = await asyncio.wait_for(asyncio.to_thread(accounts.current_env_claims, uid),
+                                         timeout=get_settings().token_check_timeout_s)
+    except Exception as exc:
+        warn("auth: current claims not read, no record made", uid=uid, error=type(exc).__name__)
+        raise _err(503, "auth_unavailable", "Controllo dell'accesso non disponibile: riprova tra poco")
+    if current is not None and (current.get("tenant_id"), current.get("role")) != (tenant_id, role):
+        warn("auth: no record made from claims Firebase no longer holds", uid=uid)
+        raise _err(403, "forbidden", "Account non abilitato: mancano tenant o ruolo")
+
+
+async def _still_there(repo, uid: str, change) -> User:
+    """F-1: a change to the person's record only if it still exists; gone meanwhile (removed): 403, never made again."""
+    changed = await repo.update_user_if_present(uid, change)
+    if changed is None:
+        raise _err(403, "forbidden", "Account non abilitato: mancano tenant o ruolo")
+    return changed
 
 
 async def _claims_confirmed(uid: str, tenant_id: str, role: str) -> bool:
@@ -215,8 +298,8 @@ async def _revoked_or_not_known(uid: str, issued_at: float) -> bool:
     """For a stream already open: if Google does not answer it stays open, and the next check asks again."""
     try:
         return await _revoked(uid, issued_at)
-    except TimeoutError:
-        warn("session check not available", error="TimeoutError")
+    except (TimeoutError, accounts.RevocationUnknown) as exc:
+        warn("session check not available", error=type(exc).__name__)
         return False
 
 
@@ -237,8 +320,8 @@ async def _verified_claims(request: Request) -> dict:
         raise _err(401, "unauthorized", "Sessione non valida o scaduta")
     try:
         revoked = await _revoked(claims["uid"], float(claims.get("iat", 0)))
-    except TimeoutError:
-        warn("token check not available", error="TimeoutError")
+    except (TimeoutError, accounts.RevocationUnknown) as exc:          # F-8: Firebase in error, nothing known yet
+        warn("token check not available", error=type(exc).__name__)
         raise _err(503, "auth_unavailable", "Controllo dell'accesso non disponibile: riprova tra poco")
     if revoked:
         raise _err(401, "unauthorized", "Sessione non valida o scaduta")
@@ -255,7 +338,7 @@ async def _caller(request: Request) -> tuple[str, str, bool, str, float]:
         return (stored.uid if stored else f"dev-{email}"), email, True, (stored.display_name if stored else ""), 0.0
     claims = await _verified_claims(request)
     return (claims["uid"], (claims.get("email") or "").lower(), bool(claims.get("email_verified")),
-            claims.get("name", "") or "", float(claims.get("iat", 0)))
+            claims_name(claims), float(claims.get("iat", 0)))
 
 
 async def _support_user(request: Request, tenant_id: str) -> CurrentUser:
@@ -386,7 +469,7 @@ async def _identity(request: Request, allow_suspended: bool = False) -> Identity
             if exc.detail.get("error") != "forbidden":  # unverified invitation, inactive tenant: same answer as resolve_user
                 raise
             user = None
-        name = (user.display_name if user else claims.get("name", "")) or ""
+        name = (user.display_name if user else claims_name(claims)) or ""
     platform = await _is_platform_member(email, verified, name)
     if user is None and platform:                 # D-178: the name saved in the managers' list
         member = await repo.get_platform_member(normalize_email(email))

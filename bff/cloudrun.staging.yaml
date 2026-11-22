@@ -123,10 +123,11 @@ spec:
               value: projects/your-gcp-project-id/locations/global/buckets/domhouse-rifiuti/views/_AllLogs
             - name: ITALIANWAY_SIGNATURE_HEADER
               value: X-Signature
+            # F-16: staging's own secret, never production's (whoever took staging could sign bookings production accepted)
             - name: ITALIANWAY_WEBHOOK_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: italianway-webhook-secret
+                  name: italianway-webhook-secret-staging
                   key: latest
             - name: APP_PUBLIC_URL
               value: https://your-staging-site.web.app
