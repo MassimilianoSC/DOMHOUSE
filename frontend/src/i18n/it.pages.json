@@ -296,7 +296,7 @@
       "one": "Un accesso rifiutato nelle ultime 24 ore, {when}.",
       "whenToday": "alle {time}",
       "whenDay": "il {date} alle {time}",
-      "todo": "Cosa fare: nello Shelly utente o password non corrispondono. Controlla l'utente in «Dati di collegamento»; la password non si può rivedere: se non l'hai più, «Rigenera» e scrivi la nuova nello Shelly.",
+      "todo": "Cosa fare: nello Shelly utente o password non corrispondono. Controlla l'utente in «Dati di collegamento» e quello scritto nella pagina dello Shelly (per aprirla devi essere sulla sua stessa rete Wi-Fi); la password non si può rivedere: se non l'hai più, «Rigenera» e scrivi la nuova nello Shelly.",
       "delay": "I tentativi compaiono con circa 10 minuti di ritardo e restano contati per 24 ore.",
       "past": "Tutti prima dell'ultima modifica: se lo Shelly ha i dati nuovi, non serve fare niente.",
       "revoked": "Lo Shelly prova ancora a collegarsi: spegnilo, oppure «Registra di nuovo»."
@@ -313,7 +313,7 @@
     "actionsOf": "Azioni per {id}",
     "states": {
       "in_attesa": "In preparazione",
-      "pronto": "Pronto",
+      "pronto": "Abilitato",
       "cambio_in_corso": "Cambio password in corso",
       "revoca_in_corso": "Revoca in corso",
       "revocato": "Revocato",
@@ -321,7 +321,7 @@
     },
     "lines": {
       "in_attesa": "Registrato: il sistema domotico lo sta abilitando.",
-      "pronto": "Può collegarsi.",
+      "pronto": "Può collegarsi, ma da qui non si vede se l'ha già fatto.",
       "cambio_in_corso": "Finché il sistema non conferma, vale ancora la password vecchia.",
       "revoca_in_corso": "Finché il sistema non conferma, il dispositivo può ancora collegarsi.",
       "revocato": "Revocato il {date}. Non può più collegarsi."
@@ -357,9 +357,9 @@
     "password": {
       "title": "Password di {name}",
       "onlyNow": "La vedi solo ora.",
-      "onlyNowText": "Copiala nella pagina dello Shelly prima di chiudere: dopo non si può più leggere, né qui né altrove. Se la perdi, usa «Rigenera».",
-      "intro": "Nella pagina MQTT dello Shelly compila i campi così, nell'ordine:",
-      "clipboard": "Se il tuo PC sincronizza gli appunti con altri dispositivi, dopo la copia svuotali.",
+      "onlyNowText": "Copiala adesso nella pagina dello Shelly: non ricaricare la pagina e non chiudere la scheda finché non hai finito. Dopo non si può più leggere, né qui né altrove. Se la perdi, usa «Rigenera».",
+      "intro": "Nella pagina MQTT dello Shelly (la voce delle impostazioni dove si scrive a quale server collegarsi) compila i campi così, nell'ordine:",
+      "clipboard": "Se il tuo PC sincronizza gli appunti con altri dispositivi, dopo la copia svuotali (su Windows: tasto Windows + V, poi «Cancella tutto»).",
       "copied": "Ho copiato la password nello Shelly",
       "close": "Chiudi"
     },
@@ -420,7 +420,7 @@
     "subtitle": "Per ogni dispositivo dell'appartamento: se è in linea, quando si è fatto sentire l'ultima volta e cosa controllare se non risponde.",
     "summary": "In linea: {online} · Offline: {offline} · Mai collegati: {never}",
     "summaryBattery": " · Batterie da cambiare: {count}",
-    "empty": "Nessun dispositivo in questo appartamento.",
+    "empty": "Nessun dispositivo nell'elenco di questo appartamento. Gli Shelly registrati compaiono qui quando l'assistenza HQE ha scritto l'elenco dei dispositivi.",
     "unreachable": "Il sistema domotico dell'appartamento non risponde: qui sotto c'è l'ultimo stato ricevuto.",
     "unreachableNoData": "Il sistema domotico dell'appartamento non risponde: lo stato dei dispositivi si vedrà quando torna raggiungibile.",
     "connectorDown": "Il collegamento fra il sistema domotico e i dispositivi è fermo, quindi tutti risultano offline: finché non riparte, lo stato dei singoli dispositivi non dice niente.",
@@ -454,7 +454,7 @@
       "days": "{count} giorni"
     },
     "advice": {
-      "neverDevice": "Non si è mai collegato. Controlla che abbia corrente, che sia collegato al Wi-Fi dell'appartamento e che le impostazioni del broker sul dispositivo siano giuste.",
+      "neverDevice": "Non si è mai collegato. Controlla che abbia corrente, che sia collegato al Wi-Fi dell'appartamento e che i dati della pagina MQTT dello Shelly siano quelli di «Credenziali dei dispositivi»: lì vedi anche gli accessi rifiutati.",
       "neverSensor": "Non si è mai fatto sentire. Controlla che abbia la batteria, che sia abbinato al suo ponte e che non sia troppo lontano dal ponte.",
       "offlineDevice": "Prima funzionava, ora non risponde. Controlla che abbia corrente e che il Wi-Fi dell'appartamento funzioni.",
       "offlineSensor": "Prima funzionava, ora non manda più letture. Controlla la batteria e che il ponte sia acceso e in linea.",
@@ -606,7 +606,7 @@
   },
   "capacity": {
     "places": "Posti liberi {env}: {count} ({when})",
-    "zero": "Nessun posto libero: serve una VM più grande o la seconda VM ({when})",
+    "zero": "Nessun posto libero sulla macchina virtuale: per ora non si creano appartamenti. Scrivi all'assistenza HQE. ({when})",
     "unread": "Capienza non ancora letta",
     "envStaging": "nello staging",
     "envProd": "in produzione",

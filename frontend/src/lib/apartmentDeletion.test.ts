@@ -54,13 +54,13 @@ describe("i passi dell'eliminazione", () => {
   });
 
   it("«Cosa è successo»: il testo del sito per i codici noti, altrimenti la frase del server", () => {
-    expect(deletionWhat(elim({ stato: "non_riuscita", codice: "tempo_scaduto" }))).toBe("Nessuna risposta dalla macchina virtuale in 20 minuti: «Riprova».");
-    expect(deletionWhat(elim({ stato: "non_riuscita", codice: "non_inviato" }))).toBe("L'ordine non è partito verso la macchina virtuale: «Riprova».");
-    expect(deletionWhat(elim({ stato: "non_riuscita", codice: "chiavi_non_distrutte" }))).toBe("Il sistema domotico è stato tolto, ma le chiavi no: «Riprova».");
-    expect(deletionWhat(elim({ stato: "non_riuscita", codice: "non_creato_da_agente" }))).toBe("Il sistema domotico sulla macchina virtuale non risulta creato dall'app: serve il supporto (ID richiesta).");
-    expect(deletionWhat(elim({ stato: "non_riuscita", codice: "errore_interno" }))).toBe("Errore interno del server: «Riprova», e se succede ancora serve un controllo (ID richiesta).");
+    expect(deletionWhat(elim({ stato: "non_riuscita", codice: "tempo_scaduto" }))).toBe("Nessuna risposta dalla macchina virtuale in 20 minuti: premi «Riprova».");
+    expect(deletionWhat(elim({ stato: "non_riuscita", codice: "non_inviato" }))).toBe("L'ordine non è partito verso la macchina virtuale: premi «Riprova».");
+    expect(deletionWhat(elim({ stato: "non_riuscita", codice: "chiavi_non_distrutte" }))).toBe("Il sistema domotico è stato tolto, ma le chiavi no: premi «Riprova».");
+    expect(deletionWhat(elim({ stato: "non_riuscita", codice: "non_creato_da_agente" }))).toBe("Il sistema domotico sulla macchina virtuale non risulta creato dall'app: scrivi all'assistenza HQE con l'ID qui sotto.");
+    expect(deletionWhat(elim({ stato: "non_riuscita", codice: "errore_interno" }))).toBe("Errore interno del server. Premi «Riprova»; se succede ancora, scrivi all'assistenza HQE con l'ID qui sotto.");
     expect(deletionWhat(elim({ stato: "non_riuscita", codice: "nuovo", messaggio: "Frase del server" }))).toBe("Frase del server");
-    expect(deletionWhat(elim({ stato: "non_riuscita", codice: null, messaggio: null }))).toBe("L'eliminazione si è fermata prima della fine: «Riprova».");
+    expect(deletionWhat(elim({ stato: "non_riuscita", codice: null, messaggio: null }))).toBe("L'eliminazione si è fermata prima della fine: premi «Riprova».");
   });
 
   it("si rilegge solo mentre è in corso; «Riprova» cambia la version e riapre i 20 minuti", () => {

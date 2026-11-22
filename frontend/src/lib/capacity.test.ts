@@ -20,7 +20,7 @@ describe("la riga dei posti liberi", () => {
 
   it("zero posti: la frase decisa, con l'ora della lettura, in giallo", () => {
     expect(capacityLine(reading({ posti_liberi: 0, motivo: "staging_pieno" }), NOW)).toEqual({
-      kind: "zero", text: "Nessun posto libero: serve una VM più grande o la seconda VM (letto alle 15:58)",
+      kind: "zero", text: "Nessun posto libero sulla macchina virtuale: per ora non si creano appartamenti. Scrivi all'assistenza HQE. (letto alle 15:58)",
     });
   });
 

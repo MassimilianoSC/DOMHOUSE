@@ -110,6 +110,9 @@ describe.each(["mock", "real"])("Amministrazione > Appartamenti, ambiente %s: li
     expect(within(dialog).getByTestId("apt-form-connection-locked")).not.toHaveTextContent(":8101:8101");
     expect(within(dialog).getByTestId("apt-form-connection-locked")).toHaveTextContent(t("admin.apartments.connectionByPlatform"));
     expect(within(dialog).getByTestId("apt-form-italianway-locked")).toHaveTextContent("IW-7");
+    // one name for the code, in fields and sentences (usability texts, 22 Nov)
+    expect(dialog).toHaveTextContent("Codice Italianway");
+    expect(dialog).not.toHaveTextContent("ID Italianway");
     expect(within(dialog).getByTestId("apt-form-italianway-locked")).toHaveTextContent(t("admin.apartments.italianwayByPlatform"));
     // D-183: the time zone is shown, set on the engine, not editable here
     expect(screen.queryByTestId("apt-form-timezone")).not.toBeInTheDocument();
@@ -308,7 +311,8 @@ describe("appartamenti dimostrativi (D-97, D-98)", () => {
 });
 
 describe("disattivare un appartamento chiede conferma, riattivarlo no (P-90 T2, 1107 = a)", () => {
-  const CONFIRM = "Disattivare «Milano Centro»? Gli automatismi continuano; notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.";
+  // usability reading 5.3: the same words as the manager's window; the 7 days stay in the manager's only (20 Nov)
+  const CONFIRM = "Disattivare «Milano Centro»? Gli automatismi del sistema domotico continuano. Si fermano notifiche (anche le gravi, come «sistema domotico non raggiungibile»), riepilogo del lunedì, prenotazioni da Italianway ed export Excel; le prenotazioni arrivate nel frattempo non si recuperano alla riattivazione. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.";
   afterEach(() => vi.restoreAllMocks());
 
   it("interruttore della riga, confermato: si salva disattivato", async () => {

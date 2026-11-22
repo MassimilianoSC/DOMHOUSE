@@ -151,7 +151,7 @@ describe("Stato dei dispositivi: cosa mostra", () => {
 
   it("nessun dispositivo: lo dice", () => {
     openPage([]);
-    expect(screen.getByTestId("device-status-empty")).toHaveTextContent("Nessun dispositivo in questo appartamento.");
+    expect(screen.getByTestId("device-status-empty")).toHaveTextContent("Nessun dispositivo nell'elenco di questo appartamento. Gli Shelly registrati compaiono qui quando l'assistenza HQE ha scritto l'elenco dei dispositivi.");
   });
 
   it("batteria: colonna «Batteria», «—» per lo Shelly, giallo sotto il 20 %, conteggio nel riepilogo e prima in elenco", () => {

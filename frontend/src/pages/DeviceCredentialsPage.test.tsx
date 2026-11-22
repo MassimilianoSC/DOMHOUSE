@@ -115,8 +115,11 @@ describe("l'elenco", () => {
     openApp("/a/apt-001/credenziali");
     const rows = await screen.findAllByTestId(/^credential-row-/, undefined, LAZY_PAGE);
     expect(rows.map((r) => r.dataset.testid)).toEqual(["credential-row-shellyi4-ko", "credential-row-shelly1pm-attesa", "credential-row-shellyhtg3-cambio", "credential-row-shellyplugmg3-pronto"]);
-    expect(screen.getByTestId("credential-state-shellyplugmg3-pronto")).toHaveTextContent("Pronto");
-    expect(screen.getByTestId("credential-row-shellyplugmg3-pronto")).toHaveTextContent("Può collegarsi.");
+    expect(screen.getByTestId("credential-state-shellyplugmg3-pronto")).toHaveTextContent("Abilitato");
+    // usability reading 2.2: «Abilitato» is not «connected»: a neutral badge, green stays for «In linea» only
+    expect(screen.getByTestId("credential-state-shellyplugmg3-pronto").className).toMatch(/bg-neutral-bg/);
+    expect(screen.getByTestId("credential-state-shellyplugmg3-pronto").className).not.toMatch(/positive/);
+    expect(screen.getByTestId("credential-row-shellyplugmg3-pronto")).toHaveTextContent("Può collegarsi, ma da qui non si vede se l'ha già fatto.");
     expect(screen.getByTestId("credential-state-shelly1pm-attesa")).toHaveTextContent("In preparazione");
     expect(screen.getByTestId("credential-state-shellyhtg3-cambio")).toHaveTextContent("Cambio password in corso");
     expect(screen.getByTestId("credential-row-shellyhtg3-cambio")).toHaveTextContent("vale ancora la password vecchia");

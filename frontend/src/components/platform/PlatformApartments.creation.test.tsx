@@ -145,10 +145,10 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
     expect(within(r).getByTestId("creation-state-lab-ponte")).toHaveTextContent("Non creato");
     const box = within(r).getByTestId("creation-what-lab-ponte");
     expect(box).toHaveTextContent("Cosa è successo");
-    expect(box).toHaveTextContent("Il sistema domotico non è partito: «Riprova», e se succede ancora serve un controllo.");
+    expect(box).toHaveTextContent("Il sistema domotico non è partito. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto.");
     expect(box).not.toHaveTextContent("Motore non sano");
     expect(box).toHaveTextContent("Si è fermata a: installazione del sistema domotico (passo 4 di 5)");
-    expect(box).toHaveTextContent("L'id lab-ponte e la porta 8152 restano riservati finché non premi «Riprova» o «Annulla creazione».");
+    expect(box).toHaveTextContent("L'ID lab-ponte e la porta 8152 restano riservati finché non premi «Riprova» o «Annulla creazione».");
     expect(box).toHaveTextContent("Ultimo tentativo: 19 nov 2026, 17:05, Giulia Rossi");
     expect(within(box).getByTestId("creation-op-lab-ponte")).toHaveTextContent("3f9c2a71");
     expect(within(r).getByTestId("creation-retry-lab-ponte")).toHaveTextContent("Riprova");
@@ -194,7 +194,7 @@ describe("la riga dell'appartamento in creazione (§3)", () => {
     await click(screen.getByTestId("creation-cancel-lab-ponte"));
     const dlg = screen.getByTestId("creation-cancel-dialog");
     expect(dlg).toHaveTextContent("Annullare la creazione di Bilocale Ponte?");
-    expect(dlg).toHaveTextContent("Togli tutto quello che è stato preparato per Bilocale Ponte: sistema domotico, accesso dei dispositivi e chiavi. L'id lab-ponte non si potrà più usare; la porta torna libera. Le chiavi si possono recuperare per 7 giorni.");
+    expect(dlg).toHaveTextContent("Togli tutto quello che è stato preparato per Bilocale Ponte: sistema domotico, accesso dei dispositivi e chiavi. L'ID lab-ponte non si potrà più usare; la porta torna libera. Le chiavi si possono recuperare per 7 giorni.");
     await click(within(dlg).getByTestId("creation-cancel-back"));
     expect(screen.queryByTestId("creation-cancel-dialog")).toBeNull();
     expect(s.cancelCreation).not.toHaveBeenCalled();
@@ -245,7 +245,7 @@ describe("pronto (§3.4)", () => {
   it("creato dall'app e nessuno Shelly registrato: verifica, agente, credenziali e l'invito", async () => {
     await open([CREATED]);
     const r = row("lab-corte");
-    expect(await within(r).findByTestId("creation-ready-lab-corte")).toHaveTextContent("Pronto. Prossimi passi: registra gli Shelly e scrivi l'elenco dei dispositivi.");
+    expect(await within(r).findByTestId("creation-ready-lab-corte")).toHaveTextContent("Pronto. Prossimo passo: registra gli Shelly con il pulsante «Credenziali dei dispositivi». L'elenco dei dispositivi per ora lo scrive l'assistenza HQE.");
     expect(within(r).getByTestId("platform-apt-verify-lab-corte")).toBeInTheDocument();
     expect(within(r).getByTestId("platform-apt-credentials-btn-lab-corte")).toBeInTheDocument();
   });
@@ -324,5 +324,32 @@ describe("rilettura e avvisi alla fine (§3.2, §3.3)", () => {
     const n = s.apartments.mock.calls.length;
     await wait(12_000);
     expect(s.apartments.mock.calls.length).toBe(n);
+  });
+});
+
+// Usability reading (22 Nov, answers of the memoria): every message ends with the action (1.3); where no order reached
+// the VM, the apartment's ID with its own label (8.1); a note under «Collega un sistema esistente» (1.11).
+describe("testi dalla lettura di usabilità", () => {
+  it("non creato senza un ordine dietro: la frase con l'azione e l'ID dell'appartamento qui sotto", async () => {
+    const bare = apt("lab-nudo-12", "Bilocale Nudo", creazione({ stato: "non_creato", passo: "riserva", porta: null, codice: null, messaggio: null, op: null }));
+    await open([bare]);
+    const box = screen.getByTestId("creation-what-lab-nudo-12");
+    expect(box).toHaveTextContent("La creazione si è fermata prima della fine. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto.");
+    expect(box).toHaveTextContent("Si è fermata a: ID e porta riservati (passo 1 di 5)");
+    expect(box).toHaveTextContent("ID dell'appartamento");
+    expect(box).not.toHaveTextContent("ID richiesta");
+    expect(within(box).getByTestId("creation-apt-id-lab-nudo-12")).toHaveTextContent("lab-nudo-12");
+  });
+
+  it("con un ordine dietro resta l'ID richiesta, e non l'ID dell'appartamento", async () => {
+    await open([STOPPED]);
+    const box = screen.getByTestId("creation-what-lab-ponte");
+    expect(within(box).getByTestId("creation-op-lab-ponte")).toBeInTheDocument();
+    expect(within(box).queryByTestId("creation-apt-id-lab-ponte")).toBeNull();
+  });
+
+  it("sotto «Collega un sistema esistente»: per chi è", async () => {
+    await open();
+    expect(screen.getByTestId("platform-apt-add-note-t-1")).toHaveTextContent("Per un sistema domotico già installato a mano: di solito serve solo all'assistenza HQE.");
   });
 });

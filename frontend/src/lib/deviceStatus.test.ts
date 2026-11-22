@@ -48,7 +48,7 @@ describe("cosa fare", () => {
   });
 
   it.each([
-    ["mai collegato, Shelly", dev("a", false, null), "Non si è mai collegato. Controlla che abbia corrente, che sia collegato al Wi-Fi dell'appartamento e che le impostazioni del broker sul dispositivo siano giuste."],
+    ["mai collegato, Shelly", dev("a", false, null), "Non si è mai collegato. Controlla che abbia corrente, che sia collegato al Wi-Fi dell'appartamento e che i dati della pagina MQTT dello Shelly siano quelli di «Credenziali dei dispositivi»: lì vedi anche gli accessi rifiutati."],
     ["mai collegato, sensore", dev("a", false, null, sensor), "Non si è mai fatto sentire. Controlla che abbia la batteria, che sia abbinato al suo ponte e che non sia troppo lontano dal ponte."],
     ["offline, Shelly", dev("a", false, ago(30)), "Prima funzionava, ora non risponde. Controlla che abbia corrente e che il Wi-Fi dell'appartamento funzioni."],
     ["offline, sensore", dev("a", false, ago(30), sensor), "Prima funzionava, ora non manda più letture. Controlla la batteria e che il ponte sia acceso e in linea."],
