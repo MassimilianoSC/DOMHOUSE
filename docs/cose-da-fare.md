@@ -3,7 +3,7 @@
 *Elenco unico, chiesto dal committente il 22 novembre 2026. Alla domanda «a che punto siamo» o «cosa resta da fare» si
 risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 
-**Aggiornato:** 23 novembre 2026, 09:31 (memoria storica).
+**Aggiornato:** 23 novembre 2026 (sera), 09:31 (memoria storica).
 
 ## 1. Dove siamo oggi
 
@@ -53,7 +53,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 12 | Informativa privacy approvata dal consulente del titolare; condizioni d'uso (P-70) | il consulente | C | bozza fatta | `informativa-privacy-bozza.md` |
 | 13 | Notifiche push provate su telefoni veri (P-11) | telefoni veri | C, colleghi | in parte | registro, P-11; `limiti-noti.md` |
 | 14 | Email dal dominio del prodotto e indirizzo dell'app (P-53): il dominio lo sceglie il cliente nel passo 8 (1233 = a), poi o1 collega e MS prepara i comandi | dopo la risposta del cliente (voce 19) | cliente, poi o1, MS, C | in attesa del cliente | registro, P-53 |
-| 15 | Stagione del riscaldamento per appartamento (E1, 1231 = a): due date proposte secondo la zona climatica di legge, modificabili dall'amministratore; fuori stagione niente caldaia per il comfort, antigelo sempre attivo. Caldaia rotta con il comando che funziona (E2, 1232 = a): avviso «la temperatura non risale» se la stanza resta sotto l'antigelo per un tempo regolabile con la caldaia comandata accesa | prima del primo appartamento vero | o1, o2 | unita in main il 23 novembre (`ba4833b`, con le correzioni di Python 3.11 e la chiusura ordinata del motore); mancano push e CI, pubblicazione nello staging e aggiornamento di `lab-01`, verifiche e testi di guida e checklist (`testi-guida/stagione-guida-checklist.md`) | `limiti-noti.md`, P-90 |
+| 15 | Stagione del riscaldamento per appartamento (E1, 1231 = a): due date proposte secondo la zona climatica di legge, modificabili dall'amministratore; fuori stagione niente caldaia per il comfort, antigelo sempre attivo. Caldaia rotta con il comando che funziona (E2, 1232 = a): avviso «la temperatura non risale» se la stanza resta sotto l'antigelo per un tempo regolabile con la caldaia comandata accesa | prima del primo appartamento vero | o1, o2 | unita in main il 23 novembre (`ba4833b`, con le correzioni di Python 3.11 e la chiusura ordinata del motore); CI #140 verde su `280abb1`; mancano pubblicazione nello staging e aggiornamento di `lab-01` (voce 62), verifiche, testi di guida e checklist (`testi-guida/stagione-guida-checklist.md`) | `limiti-noti.md`, P-90 |
 | 16 | Collaudo finale: checklist con i colleghi, relè vero, appartamenti | a fine implementazione | colleghi, Y, C | aperto | `checklist-collaudo.md` |
 
 ### C. Piano generale (Autonomia e primo appartamento)
