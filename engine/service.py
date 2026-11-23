@@ -107,8 +107,10 @@ def create_engine_app(config: EngineConfig, connector=None):
             # cancel, as asyncio.wait_for did on 3.11), and the wait has a limit: a reader that never ends is written,
             # not waited for ever
             try:
-                async with asyncio.timeout(SHUTDOWN_WAIT_S):  # o1-chiusura: Shelly awaits its tasks and its transport
+                async with asyncio.timeout(SHUTDOWN_WAIT_S) as limit:  # o1-chiusura: Shelly awaits its tasks
                     await connector.stop()
+                if limit.expired():                           # a stop that swallowed the cancel (Shelly's and the
+                    raise TimeoutError()                      # MQTT transport's suppress): no TimeoutError came out
             except Exception as exc:                          # TimeoutError included: written, the stop goes on
                 log.warn("connector stop failed", error_type=type(exc).__name__, error=str(exc)[:200],
                          waited_s=SHUTDOWN_WAIT_S)
