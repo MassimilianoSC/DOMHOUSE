@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 23 novembre, 11:19, da `3417dcf` (revisione `domotica-bff-staging-00029-qtv`); `lab-01` ancora a `engine:9576073` (aggiornamento del motore a parte); immagine approvata per le creazioni `engine:3417dcf` |
 | **Solo nello staging** | creazione degli appartamenti dall'app, credenziali dei dispositivi, «Prova l'agente» (in produzione con la seconda VM, voce 26); tutto il resto è anche in produzione dal 23 novembre |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1279 |
+| **Ultima domanda al committente** | 1281 |
 
 ## 2. Cose da fare
 
@@ -53,7 +53,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | 12 | Informativa privacy approvata dal consulente del titolare; condizioni d'uso (P-70) | il consulente | C | bozza fatta | `informativa-privacy-bozza.md` |
 | 13 | Notifiche push provate su telefoni veri (P-11) | telefoni veri | C, colleghi | in parte | registro, P-11; `limiti-noti.md` |
 | 14 | Email dal dominio del prodotto e indirizzo dell'app (P-53): il dominio lo sceglie il cliente nel passo 8 (1233 = a), poi o1 collega e MS prepara i comandi | dopo la risposta del cliente (voce 19) | cliente, poi o1, MS, C | in attesa del cliente | registro, P-53 |
-| 15 | Stagione del riscaldamento per appartamento (E1, 1231 = a): due date proposte secondo la zona climatica di legge, modificabili dall'amministratore; fuori stagione niente caldaia per il comfort, antigelo sempre attivo. Caldaia rotta con il comando che funziona (E2, 1232 = a): avviso «la temperatura non risale» se la stanza resta sotto l'antigelo per un tempo regolabile con la caldaia comandata accesa | prima del primo appartamento vero | o1, o2 | decisi (anche 1256–1262, 23 novembre); in lavorazione: o1 `o1-stagione` (motore, nessun cambio del contratto), o2 `o2-stagione` (sito) | `limiti-noti.md`, P-90 |
+| 15 | Stagione del riscaldamento per appartamento (E1, 1231 = a): due date proposte secondo la zona climatica di legge, modificabili dall'amministratore; fuori stagione niente caldaia per il comfort, antigelo sempre attivo. Caldaia rotta con il comando che funziona (E2, 1232 = a): avviso «la temperatura non risale» se la stanza resta sotto l'antigelo per un tempo regolabile con la caldaia comandata accesa | prima del primo appartamento vero | o1, o2 | decisi (anche 1256–1262, 1268, 1269); motore e sito riletti e corretti; giro completo e parte Linux verdi sull'unione di prova `integrazione-stagione` (`7c0e561`, con le correzioni di Python 3.11); si unisce in main insieme a `o1-chiusura` (chiusura ordinata del motore, 1281 = b), poi staging e `lab-01` | `limiti-noti.md`, P-90 |
 | 16 | Collaudo finale: checklist con i colleghi, relè vero, appartamenti | a fine implementazione | colleghi, Y, C | aperto | `checklist-collaudo.md` |
 
 ### C. Piano generale (Autonomia e primo appartamento)
