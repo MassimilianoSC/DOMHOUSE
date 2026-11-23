@@ -145,7 +145,7 @@ def test_the_recognizer_on_the_demonstrations_and_the_daily_limit(engines, monke
         raise AssertionError("no model on a demonstration without AI_DEMOS")
     monkeypatch.setattr(ai_gateway, "call_model", never)
     p = propose("antigelo a 10 gradi").json()
-    assert p["changes"] == [{"rule_id": "frost_protection", "label": "Antigelo a casa vuota", "field": "celsius",
+    assert p["changes"] == [{"rule_id": "frost_protection", "label": "Antigelo", "field": "celsius",
                              "old": 8, "new": 10}]
     assert propose("spegni la regola dell'antimuffa").json()["changes"][0] == {
         "rule_id": "mold_protection", "label": "Antimuffa a casa vuota", "field": "enabled", "old": True, "new": False}
@@ -404,3 +404,41 @@ def test_the_first_values_and_the_meaning_follow_the_engine():
     assert "ospiti" not in meaning and "telecomando" in meaning and "antigelo" in meaning
     assert "summer_min" in meaning and "summer_max" in meaning and "comfort_celsius < comfort_cool_celsius" in meaning
     assert "almeno" not in rp.MEANING["frost_protection"] and "anche con la regola spenta" in rp.MEANING["frost_protection"]
+    # item 15: the season's dates and the alert's minutes, with the engine's first values and their meaning
+    frost = next(r for r in core.DEFAULT_RULES if r["rule_id"] == "frost_protection")["params"]
+    assert {k: v for k, v in rp.DEFAULTS["frost_protection"].items() if k != "enabled"} == frost
+    assert all(k in meaning for k in ("season_start_month", "season_start_day", "season_end_month", "season_end_day"))
+    assert "no_rise_minutes" in rp.MEANING["frost_protection"] and "fuori dalla stagione" in rp.MEANING["frost_protection"]
+
+
+def test_item_15_a_proposal_with_a_date_that_does_not_exist_is_refused():
+    ruleset = fresh_rules()
+    with pytest.raises(rp.ProposalError) as exc:
+        rp.changes(ruleset, [{"rule_id": "setpoint_limits", "params": {"season_end_day": 31}}])     # 31 April
+    assert (exc.value.status, exc.value.error, exc.value.message) == (
+        422, "invalid_date", "La data di fine della stagione non esiste (31/4).")
+    assert rp.changes(ruleset, [{"rule_id": "setpoint_limits", "params": {"season_end_day": 30}}])[1][0]["new"] == 30
+
+
+def test_1269_the_seasons_dates_stay_out_of_the_copy(engines):
+    """Answer 1269 = a: each apartment keeps its season's dates, changed only from its own Rules page: the copy neither
+    sends them nor shows them, as a change or as the destination's own values; the rest of the rule is copied."""
+    rimini = core.ApartmentEngine(RIMINI, SimulatedConnector(), seed=False)
+    engines.engines[RIMINI] = rimini
+    rimini.update_rules({"rules": [{"rule_id": "setpoint_limits", "params": {"season_start_month": 11,
+                                                                             "season_start_day": 1}}]}, "x@hqe.it", "c")
+    src = core.ApartmentEngine(BOLOGNA, SimulatedConnector(), seed=False)
+    engines.engines[BOLOGNA] = src
+    src.update_rules({"rules": [{"rule_id": "setpoint_limits", "params": {"season_start_month": 12, "season_start_day": 1,
+                                                                          "season_end_month": 3, "season_end_day": 31,
+                                                                          "eco_celsius": 17}}]}, "x@hqe.it", "c")
+    p = copy("/preview", {"to": [RIMINI]}).json()
+    t = p["targets"][0]
+    assert [(c["field"], c["old"], c["new"]) for c in t["changes"]] == [("eco_celsius", 18, 17)]
+    assert not any(k.startswith("season_") for r in p["rules"] for k in r.get("params", {}))
+    assert t["customized"] == []                                       # its own dates are not «customized» either
+    r = copy("", {"to": [RIMINI], "from_based_on": p["from"]["based_on"],
+                  "based_on": {x["apartment_id"]: x["based_on"] for x in p["targets"]}})
+    assert r.json()["results"][0]["outcome"] == "applied"
+    sl = rimini.rule("setpoint_limits")["params"]
+    assert (sl["eco_celsius"], sl["season_start_month"], sl["season_start_day"], sl["season_end_month"]) == (17, 11, 1, 4)

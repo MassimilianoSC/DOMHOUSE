@@ -20,6 +20,7 @@ TTL_SECONDS = {"approval": 3600, "device_offline": 86400, "instance_down": 86400
                "summary": 7 * 86400,   # P-60 step 11: the weekly summary stays a week
                "frost_inactive": 86400,  # D-164: a boiler without its sensor in «casa vuota»
                "heating_unregulated": 86400,  # P-90 S18: a boiler commanded by hand without its sensor
+               "heating_not_rising": 86400,  # item 15, E2: a boiler on and the room still under the frost protection
                "schedule_failed": 86400}  # D-219: scheduled actions not done
 
 _offline_timers: dict[tuple[str, str], asyncio.Task] = {}
@@ -148,6 +149,15 @@ def heating_unregulated_push(apt: Apartment, device_id: str, reasoning: str | No
     body = (reasoning or "").strip() or "Sensore di temperatura mancante: la caldaia segue il comando manuale senza regolazione"
     return build_push("heating_unregulated", apt, f"{apt.name}: caldaia senza regolazione", body,
                       f"/a/{apt.apartment_id}/decisioni", f"unregulated:{apt.apartment_id}:{device_id}", ts,
+                      device_id=device_id)
+
+
+def heating_not_rising_push(apt: Apartment, device_id: str, reasoning: str | None, ts: str | None):
+    """Item 15, E2 (answer 1232 = a): the boiler is on but its room stays under the frost protection's threshold (the
+    engine writes one decision per episode)."""
+    body = (reasoning or "").strip() or "La caldaia è accesa, ma la temperatura resta sotto l'antigelo. Controlla la caldaia."
+    return build_push("heating_not_rising", apt, f"{apt.name}: la temperatura non risale", body,
+                      f"/a/{apt.apartment_id}/decisioni", f"notrising:{apt.apartment_id}:{device_id}", ts,
                       device_id=device_id)
 
 
@@ -697,6 +707,11 @@ async def on_stream_event(apt: Apartment, ev: SseEvent) -> None:
         # was already notified for an episode is stopped by the claim
         _alert_minutes.pop(apt.apartment_id, None)
         _spawn(resume_watches(apt), "device_offline", apt.apartment_id)
+    elif ev.event == "decision.logged" and data.get("action") == "heating_not_rising":     # item 15, E2
+        device_id = str((data.get("target") or {}).get("device_id", ""))
+        _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "offline",
+                           *heating_not_rising_push(apt, device_id, data.get("reasoning"), ts)),
+               "heating_not_rising", apt.apartment_id)
     elif ev.event == "decision.logged" and data.get("action") == "frost_inactive":     # D-164
         device_id = str((data.get("target") or {}).get("device_id", ""))
         _spawn(notify_once(event_key(apt, ev, ts), apt.tenant_id, "offline", *frost_inactive_push(apt, device_id, data.get("reasoning"), ts)),

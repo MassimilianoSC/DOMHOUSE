@@ -108,3 +108,20 @@ def test_timezone_of_a_demonstration_from_the_bff_header():
         assert r.json()["timezone"] == "Europe/Lisbon"                                 # not a time zone: ignored
         r = client.get("/apt-prova-01/api/v1/apartment", headers={**h, "X-Demo-Timezone": "Europe/Madrid"})
         assert r.json()["timezone"] == "Europe/Madrid"                                 # an engine already built too
+
+
+
+# -------- item 15 (second rereading of o1-stagione): MOCK_TODAY, only with the simulated connector --------
+def test_mock_today_written_wrong_stops_the_simulated_engine_with_a_clear_message():
+    with pytest.raises(ConfigError, match="MOCK_TODAY must be a date YYYY-MM-DD"):
+        load_config({**BASE, "MOCK_TODAY": "15/01/2026"})
+    assert load_config({**BASE, "MOCK_TODAY": "2026-01-15"}).apartment_id == "apt-prova-01"
+    assert load_config({**BASE, "CONNECTOR": "shelly", "MOCK_TODAY": "15/01/2026"}).connector == "shelly"   # ignored
+
+
+def test_mock_today_written_wrong_says_so_also_for_an_engine_made_in_the_bff(monkeypatch):
+    from engine import core
+    monkeypatch.setattr(core.ApartmentEngine, "_today", lambda self: core.engine_today(self))   # the real one
+    monkeypatch.setenv("MOCK_TODAY", "15/01/2026")
+    with pytest.raises(ValueError, match="MOCK_TODAY must be a date YYYY-MM-DD"):
+        core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
