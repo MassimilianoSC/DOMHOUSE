@@ -29,8 +29,10 @@ export default defineConfig({
         {
           command: `"${PYTHON}" -m uvicorn bff.main:app --host 127.0.0.1 --port ${BFF_PORT}`,
           cwd: REPO_ROOT,
-          // PORT too: the BFF calls its built-in simulated engines on its own port (8000 when missing)
-          env: { APP_ENV: "dev", AUTH_MODE: "dev", INSTANCE_MODE: "mock", REPOSITORY: "memory", FCM_ENABLED: "false", SUMMARY_JOB: "false", PORT: String(BFF_PORT) },
+          // PORT too: the BFF calls its built-in simulated engines on its own port (8000 when missing). MOCK_TODAY (item 15,
+          // o1 037f0a5; simulated connector only): a winter day, so the heating season is on whatever the real date, and
+          // the checks that count on a boiler at 21 °C give the same result in summer
+          env: { APP_ENV: "dev", AUTH_MODE: "dev", INSTANCE_MODE: "mock", REPOSITORY: "memory", FCM_ENABLED: "false", SUMMARY_JOB: "false", PORT: String(BFF_PORT), MOCK_TODAY: "2026-01-15" },
           url: `http://127.0.0.1:${BFF_PORT}/openapi.json`,
           reuseExistingServer: false,
           timeout: 60_000,
