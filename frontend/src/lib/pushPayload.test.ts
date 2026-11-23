@@ -120,6 +120,15 @@ describe("push: antigelo non attivo (lotto 30)", () => {
   });
 });
 
+describe("push: la temperatura non risale (voce 15)", () => {
+  it("kind «heating_not_rising»: apre le Decisioni, raggruppata per caldaia, e sulla pagina dell'appartamento si vede", () => {
+    const msg = { data: { kind: "heating_not_rising", title: "Milano Centro: la temperatura non risale", body: "Caldaia: accesa da 120 minuti, ma la temperatura resta sotto l'antigelo (8 °C). Controlla la caldaia.", link: "/a/apt-001/decisioni", tag: "notrising:apt-001:dev-caldaia", apartment_id: "apt-001", device_id: "dev-caldaia" } };
+    const n = toNotice(msg, "DOMHOUSE");
+    expect(n).toEqual({ title: msg.data.title, body: msg.data.body, link: "/a/apt-001/decisioni", tag: "notrising:apt-001:dev-caldaia", apartmentId: "apt-001", kind: "heating_not_rising" });
+    expect(toastWanted(n, "/a/apt-001")).toBe(true);
+  });
+});
+
 describe("push: revisione P-83", () => {
   const on = (kind: string) => toNotice({ data: { ...approval.data, kind } }, "D");
 

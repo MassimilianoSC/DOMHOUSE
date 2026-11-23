@@ -165,6 +165,16 @@ describe("Impostazioni > Notifiche: uscita e rientro (P-44)", () => {
   });
 });
 
+describe("Impostazioni > Notifiche: la riga sotto «Dispositivi e sistema domotico offline» (voce 15)", () => {
+  it("cita anche la temperatura che non risale con la caldaia accesa", async () => {
+    const card = renderCard();
+    await screen.findByTestId("settings-pref-offline");
+    expect(card).toHaveTextContent(
+      "Dispositivo offline oltre la soglia della regola, sistema domotico non raggiungibile da 15 minuti, antigelo non attivo, caldaia senza regolazione, temperatura che non risale con la caldaia accesa",
+    );
+  });
+});
+
 describe("Impostazioni > Notifiche: «Prenotazioni» (D-123)", () => {
   beforeEach(() => {
     state.prefs = { approvals: true, offline: true, decisions: false, bookings: true };

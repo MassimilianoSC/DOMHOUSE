@@ -81,10 +81,27 @@
     "groups": {
       "winter": "Inverno (riscaldamento)",
       "summer": "Estate (raffrescamento)",
-      "split": "Climatizzatore con misuratore"
+      "split": "Climatizzatore con misuratore",
+      "season": "Stagione del riscaldamento"
     },
     "notes": {
-      "off_watts": "Sotto questo consumo il climatizzatore risulta spento. Vale anche con la regola spenta. Riguarda solo i climatizzatori a infrarossi controllati da un misuratore."
+      "off_watts": "Sotto questo consumo il climatizzatore risulta spento. Vale anche con la regola spenta. Riguarda solo i climatizzatori a infrarossi controllati da un misuratore.",
+      "season": "Fuori da queste date la caldaia resta solo sull'antigelo. Vale anche con la regola spenta. La zona del comune è nell'allegato A del DPR 412/1993; il sindaco può allungare il periodo con un'ordinanza."
+    },
+    "season": {
+      "start": "Inizio",
+      "end": "Fine",
+      "from": "dal {date}",
+      "fromElided": "dall'{date}",
+      "to": "al {date}",
+      "toElided": "all'{date}",
+      "range": "{from} {to}",
+      "allYear": "Tutto l'anno",
+      "withZone": "{season} (zona {zone})",
+      "zones": "Date di legge per zona climatica:",
+      "zoneRange": "Zona {zone}: {from} {to}",
+      "zoneAllYear": "Zona {zone}: tutto l'anno",
+      "missingDay": "Il {date} non esiste: scegli un altro giorno."
     },
     "rangeWarning": "«Limiti del setpoint» da correggere: {problem}.",
     "dirty": "{count} regole modificate",
@@ -107,7 +124,12 @@
       "comfort_cool_celsius": "Raffrescamento in comfort (°C)",
       "summer_min": "Minimo (°C)",
       "summer_max": "Massimo (°C)",
-      "off_watts": "Soglia di spento (W)"
+      "off_watts": "Soglia di spento (W)",
+      "season_start_day": "Inizio: giorno",
+      "season_start_month": "Inizio: mese",
+      "season_end_day": "Fine: giorno",
+      "season_end_month": "Fine: mese",
+      "no_rise_minutes": "Avviso se la temperatura non risale (minuti)"
     },
     "desc": {
       "window_open_off": "Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.",
@@ -118,6 +140,13 @@
       "checkout_eco": "Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.",
       "compressor_min_off": "Pausa minima tra spegnimento e riaccensione del compressore.",
       "offline_alert": "Avvisa quando un dispositivo resta offline oltre i minuti indicati. L'avviso «sistema domotico non raggiungibile» non dipende da questa regola: arriva sempre dopo 15 minuti."
+    },
+    "descSeason": {
+      "frost_protection": "Con la casa vuota, e fuori dalla stagione del riscaldamento anche in comfort ed eco, la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare."
+    },
+    "descExtra": {
+      "season": "Fuori dalla stagione del riscaldamento la caldaia resta solo sull'antigelo e il climatizzatore non scalda da solo.",
+      "noRise": "Anche con la regola spenta, se la caldaia è accesa ma la temperatura resta sotto l'antigelo per i minuti indicati, lo registra nelle Decisioni e avvisa con una notifica."
     },
     "proposal": {
       "title": "Chiedi all'assistente",
@@ -141,6 +170,7 @@
     "copy": {
       "title": "Applica le stesse regole ad altri appartamenti",
       "hint": "Copia le regole salvate di questo appartamento (attive o spente e valori) sugli appartamenti che scegli. Prima vedi che cosa cambia in ciascuno, poi confermi.",
+      "hintSeason": "Copia le regole salvate di questo appartamento (attive o spente e valori, tranne le date della stagione del riscaldamento) sugli appartamenti che scegli. Prima vedi che cosa cambia in ciascuno, poi confermi.",
       "noOthers": "Nessun altro appartamento nella tua organizzazione",
       "selectAll": "Seleziona tutti",
       "preview": "Vedi che cosa cambia",
@@ -250,7 +280,9 @@
       "frost_inactive": "Antigelo non attivo",
       "setpoint_limits_ignored": "Limiti del setpoint ignorati",
       "instance_reachable": "Sistema domotico di nuovo raggiungibile",
-      "window_restore": "Finestra chiusa: riacceso"
+      "window_restore": "Finestra chiusa: riacceso",
+      "heating_season": "Stagione del riscaldamento",
+      "heating_not_rising": "Caldaia: la temperatura non risale"
     },
     "title": "Decisioni",
     "subtitle": "Tutto ciò che il motore e i gestori hanno fatto, e perché",

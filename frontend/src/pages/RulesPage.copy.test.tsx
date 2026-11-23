@@ -36,16 +36,17 @@ const RESULTS = {
   ],
 };
 
-const s = vi.hoisted(() => ({ role: { canWrite: true, isAdmin: true }, answer: { preview: null as unknown, copy: null as unknown }, calls: [] as { path: string; body: unknown }[] }));
+const s = vi.hoisted(() => ({ rules: null as unknown, role: { canWrite: true, isAdmin: true }, answer: { preview: null as unknown, copy: null as unknown }, calls: [] as { path: string; body: unknown }[] }));
 
 vi.mock("@/auth/AuthProvider", () => ({ useRole: () => s.role }));
-vi.mock("@/api/instance", () => ({ instanceApi: () => ({ getRules: async () => RULES }) }));
+vi.mock("@/api/instance", () => ({ instanceApi: () => ({ getRules: async () => s.rules ?? RULES }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warning: vi.fn() } }));
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  s.rules = null;
   s.role = { canWrite: true, isAdmin: true };
   s.answer = { preview: json(PREVIEW), copy: json(RESULTS) };
   s.calls = [];
@@ -73,6 +74,28 @@ async function open() {
   );
   await screen.findByTestId("rule-card-window_open_off");
 }
+
+// Answer 1269 = a: the dates of the heating season are not copied (o1 leaves them out on the server); the hint says so,
+// only with an engine that has them, like the other sentences of item 15.
+describe("la copia e le date della stagione (risposta 1269)", () => {
+  const SEASON_RULE = {
+    rule_id: "setpoint_limits", label: "Limiti del setpoint", enabled: true, editable: true,
+    params: { min: 16, max: 24, season_start_month: 10, season_start_day: 15, season_end_month: 4, season_end_day: 15 },
+    limits: { min: { min: 7, max: 20 }, max: { min: 20, max: 28 }, season_start_month: { min: 1, max: 12 }, season_start_day: { min: 1, max: 31 }, season_end_month: { min: 1, max: 12 }, season_end_day: { min: 1, max: 31 } },
+  };
+
+  it("con un motore che ha le date: la riga dice che le date non si copiano", async () => {
+    s.rules = { ...RULES, rules: [...RULES.rules, SEASON_RULE] };
+    await open();
+    expect(screen.getByTestId("rules-copy-hint")).toHaveTextContent("Copia le regole salvate di questo appartamento (attive o spente e valori, tranne le date della stagione del riscaldamento) sugli appartamenti che scegli. Prima vedi che cosa cambia in ciascuno, poi confermi.");
+  });
+
+  it("con un motore di prima: la riga di prima, senza stagione", async () => {
+    await open();
+    expect(screen.getByTestId("rules-copy-hint")).toHaveTextContent("Copia le regole salvate di questo appartamento (attive o spente e valori) sugli appartamenti che scegli. Prima vedi che cosa cambia in ciascuno, poi confermi.");
+    expect(screen.getByTestId("rules-copy-hint")).not.toHaveTextContent("stagione");
+  });
+});
 
 const click = (el: HTMLElement) => act(async () => {
   fireEvent.click(el);
