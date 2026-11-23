@@ -1,6 +1,6 @@
 # Limiti noti di DOMHOUSE
 
-*Aggiornato il 23 novembre 2026 (correzioni dell'attacco da fuori, P-92 e F-15 pubblicate nello staging). Regola del committente (D-204): ogni limite che conosciamo sta scritto qui.*
+*Aggiornato il 23 novembre 2026 (correzioni dell'attacco da fuori, P-92 e F-15 pubblicate in staging e produzione). Regola del committente (D-204): ogni limite che conosciamo sta scritto qui.*
 
 **Come leggerlo:** «Stato» dice se il limite è accettato, se è in lavorazione o se va ancora verificato.
 
@@ -34,7 +34,7 @@
 | **Una sola VM** | Se la VM si ferma, i motori degli appartamenti si fermano con lei | Accettato per ora |
 | **Staging diverso dalla produzione** | Lo staging ha al massimo 1 istanza, la produzione 3: un difetto che compare solo con più istanze non si vede in staging, salvo la prova dedicata | Accettato (D-202) |
 | **Sospensione di un'organizzazione** | Con più istanze, l'effetto può arrivare fino a 30 secondi dopo | Accettato (risposta 338) |
-| **Firebase non raggiungibile all'avvio di un'istanza** (F-8) | Finché Firebase non risponde almeno una volta, le richieste ricevono 503 | Accettato; nello staging dal 23 novembre, in produzione alla prossima pubblicazione |
+| **Firebase non raggiungibile all'avvio di un'istanza** (F-8) | Finché Firebase non risponde almeno una volta, le richieste ricevono 503 | Accettato; in staging e produzione dal 23 novembre |
 
 ## Staging
 
@@ -60,15 +60,15 @@
 | **Pagina in sottofondo** | L'app non si aggiorna in tempo reale; si rimette in pari quando torni | Voluto |
 | **Browser che se ne va** | Il server può non accorgersene: lo stream resta aperto al massimo 4 minuti | Accettato |
 | **Mai provato su un telefono** | La riapertura degli stream è stata provata solo su computer | Da verificare (checklist D27) |
-| **Al massimo 10 per persona per istanza** (F-6) | Ogni istanza del server tiene al massimo 10 aggiornamenti in diretta aperti per persona: oltre 10 schede sulla stessa istanza, la successiva mostra «Riconnessione…» finché non se ne chiude una | Accettato; nello staging dal 23 novembre, in produzione alla prossima pubblicazione |
-| **Al massimo 200 per istanza** (B-9) | 200 aggiornamenti in diretta per istanza del server: fino a 600 in produzione con 3 istanze | Da chiedere al cliente se bastano (domanda 19.15); nello staging dal 23 novembre, in produzione alla prossima pubblicazione |
+| **Al massimo 10 per persona per istanza** (F-6) | Ogni istanza del server tiene al massimo 10 aggiornamenti in diretta aperti per persona: oltre 10 schede sulla stessa istanza, la successiva mostra «Riconnessione…» finché non se ne chiude una | Accettato; in staging e produzione dal 23 novembre |
+| **Al massimo 200 per istanza** (B-9) | 200 aggiornamenti in diretta per istanza del server: fino a 600 in produzione con 3 istanze | Da chiedere al cliente se bastano (domanda 19.15); in staging e produzione dal 23 novembre |
 
 ## App nel browser
 
 | Limite | Cosa succede | Stato |
 |---|---|---|
-| **Copia dell'app bloccata (E-29)** | Il 9 novembre la copia salvata in Chrome non è partita e il sito non si apriva; chiudere e riaprire Chrome l'ha risolto. Probabile blocco di Chrome, non dimostrato; in teoria può capitare a chiunque; un caso solo finora | **Corretto con P-92** (gestore `fetch` tolto dalla copia salvata): nello staging dal 23 novembre, in produzione alla prossima pubblicazione. Chi resta bloccato ancora una volta chiude del tutto Chrome e lo riapre |
-| **Sito vecchio dopo una pubblicazione (P-92)** | La prima apertura dopo una pubblicazione mostra ancora il sito vecchio: si aggiorna solo ricaricando o riaprendo l'app. Chi non ricarica mai resta vecchio. Con il server nuovo può vedere scritte tecniche (per esempio «summer_min») o campi mancanti; i dati non si rovinano | **Corretto (P-92, risposta 1227):** l'app si ricarica da sola o mostra «È disponibile una versione nuova» con «Aggiorna»; nello staging dal 23 novembre, in produzione alla prossima pubblicazione. Sul telefono del committente, dopo una chiusura e riapertura, la versione nuova è arrivata (23 novembre); il ricaricamento da solo si vede alla prossima pubblicazione. In produzione, fino ad allora, dopo ogni pubblicazione ricaricare la pagina |
+| **Copia dell'app bloccata (E-29)** | Il 9 novembre la copia salvata in Chrome non è partita e il sito non si apriva; chiudere e riaprire Chrome l'ha risolto. Probabile blocco di Chrome, non dimostrato; in teoria può capitare a chiunque; un caso solo finora | **Corretto con P-92** (gestore `fetch` tolto dalla copia salvata): in staging e produzione dal 23 novembre. Chi resta bloccato ancora una volta chiude del tutto Chrome e lo riapre |
+| **Sito vecchio dopo una pubblicazione (P-92)** | La prima apertura dopo una pubblicazione mostra ancora il sito vecchio: si aggiorna solo ricaricando o riaprendo l'app. Chi non ricarica mai resta vecchio. Con il server nuovo può vedere scritte tecniche (per esempio «summer_min») o campi mancanti; i dati non si rovinano | **Corretto (P-92, risposta 1227):** l'app si ricarica da sola o mostra «È disponibile una versione nuova» con «Aggiorna»; in staging e produzione dal 23 novembre. Sul telefono del committente, dopo una chiusura e riapertura, la versione nuova è arrivata (23 novembre); il ricaricamento da solo si vede alla prossima pubblicazione. |
 | **Avvio lento (E-29)** | Dal lotto 37, se l'app non si apre entro 15 secondi compare «Non riesco ad aprire la pagina» con «Ricarica»; se la risposta arriva prima di 30 secondi, l'app entra da sola. Senza risposta, dal lotto 37 (D-211) compare una pagina con «Ricarica» invece della pagina di accesso, e la sessione resta valida. Sullo staging spento il messaggio può comparire per qualche secondo | Accettato |
 | **Chiamate che scadono** | Dal lotto 37 ogni chiamata al server ha 30 secondi (90 per le operazioni lente); poi compare «Server non raggiungibile» | Accettato |
 | **Comando scaduto** | Un'operazione che scade può essere andata a buon fine sul server: il messaggio non lo può sapere. Comandi e salvataggi non vengono ritentati in automatico | Accettato |
@@ -81,8 +81,8 @@
 | **Casi coperti solo dalle prove automatiche** | «Il servizio non risponde» e le riletture del profilo diverse da quella periodica dell'amministratore (fine di un accesso di assistenza, cambio del nome) | Accettato |
 | **Attese massime non provabili a mano** | Il limite di 30 e 90 secondi, la pagina «Non riesco ad aprire la pagina» dopo 15 secondi e il messaggio per un errore di disegno si verificano solo con le prove automatiche: senza rete l'errore arriva subito. Il collaudo a mano (sezione O) prova solo l'assenza di rete | Accettato |
 | **Correzione E-29 non provata del tutto** | Non provata con Firebase vero, su Safari o su un telefono vero | Da verificare |
-| **Senza rete l'app non si apre** (P-92) | La pagina principale arriva sempre dalla rete: senza rete il browser mostra una sua pagina di errore | Voluto (risposta 1227); nello staging dal 23 novembre, in produzione alla prossima pubblicazione |
-| **Dispositivo condiviso** (F-15) | L'uscita dopo 30 minuti senza usare l'app avviene solo nel browser. Il server non la impone: la sessione resta valida finché l'app non esce da sola, e chi apre gli strumenti del browser può togliere la scelta | Accettato; nello staging dal 23 novembre, in produzione alla prossima pubblicazione. Una scadenza della sessione anche sul server è un lavoro di o1, da decidere |
+| **Senza rete l'app non si apre** (P-92) | La pagina principale arriva sempre dalla rete: senza rete il browser mostra una sua pagina di errore | Voluto (risposta 1227); in staging e produzione dal 23 novembre |
+| **Dispositivo condiviso** (F-15) | L'uscita dopo 30 minuti senza usare l'app avviene solo nel browser. Il server non la impone: la sessione resta valida finché l'app non esce da sola, e chi apre gli strumenti del browser può togliere la scelta | Accettato; in staging e produzione dal 23 novembre. Una scadenza della sessione anche sul server è un lavoro di o1, da decidere |
 
 ## Contratto dell'app
 
@@ -96,7 +96,7 @@
 |---|---|---|
 | **Formato di Italianway non ancora noto** | Il traduttore delle prenotazioni è provvisorio: con prenotazioni reali di Italianway il pre-arrivo automatico e il risparmio al check-out **non sono disponibili** finché Italianway non manda il formato vero | Da chiedere a Leonardo (committente) |
 | **Check-in e check-out effettivi** | Non sappiamo se Italianway li manderà. Se li manda: il check-in effettivo non porta il comfort a un ospite arrivato prima del pre-arrivo (S22); il check-out effettivo non anticipa il risparmio (S23); un check-in ritentato dopo una modifica viene scartato (S24) | Da chiedere a Leonardo; riparazioni dopo la risposta (P-90) |
-| **Prenotazioni non firmate e firme finte** (F-5, B-6) | Chiunque può mandare al server prenotazioni non firmate o con firme della forma giusta: vengono rifiutate, ma oltre 10 al minuto per istanza non si scrivono nel registro dei webhook e si contano soltanto in una riga al minuto; un errore vero di firma di Italianway può quindi non avere la sua riga | Accettato; nello staging dal 23 novembre, in produzione alla prossima pubblicazione |
+| **Prenotazioni non firmate e firme finte** (F-5, B-6) | Chiunque può mandare al server prenotazioni non firmate o con firme della forma giusta: vengono rifiutate, ma oltre 10 al minuto per istanza non si scrivono nel registro dei webhook e si contano soltanto in una riga al minuto; un errore vero di firma di Italianway può quindi non avere la sua riga | Accettato; in staging e produzione dal 23 novembre |
 | **Segreto delle prenotazioni dello staging** (F-16) | Dal 23 novembre lo staging ha un segreto suo (`italianway-webhook-secret-staging`), diverso da quello della produzione. Se Italianway manda prove allo staging, va concordato con loro il valore nuovo | Fatto il 23 novembre |
 | **Occupazione prima del check-in** | Fino all'orario di check-in della prenotazione l'occupazione è «Vuoto», anche durante il pre-arrivo | Accettato (guida corretta il 13 novembre) |
 
@@ -104,7 +104,7 @@
 
 | Limite | Cosa succede | Stato |
 |---|---|---|
-| **Domande al giorno** (P-9, F-4) | Ogni motore accetta al massimo 100 domande al giorno all'assistente (`ASK_DAILY_LIMIT`, all'inizio 50); il server ne conta al massimo 200 per giorno UTC per appartamento. Oltre, il motore usa la risposta rapida come al tetto mensile | Accettato; nello staging dal 23 novembre, in produzione alla prossima pubblicazione |
+| **Domande al giorno** (P-9, F-4) | Ogni motore accetta al massimo 100 domande al giorno all'assistente (`ASK_DAILY_LIMIT`, all'inizio 50); il server ne conta al massimo 200 per giorno UTC per appartamento. Oltre, il motore usa la risposta rapida come al tetto mensile | Accettato; in staging e produzione dal 23 novembre |
 | **Vicino al tetto mensile** (F-4) | Restano inutilizzati circa 0,08 € del tetto | Accettato |
 | **Chiamate tagliate o in timeout** (R-9) | Una chiamata tagliata, in timeout o persa dopo l'invio si conta al massimo possibile dell'ingresso (un token per byte, per ogni richiesta partita): per il testo italiano circa 4 volte il vero, il doppio con la richiesta gemella. È nella direzione sicura per il tetto, ma con molti timeout la spesa contata e la quota dell'organizzazione salgono più del vero | Accettato |
 | **Tempi di risposta diversi** (F-12) | L'accesso dei motori all'assistente risponde un po' prima per un appartamento inesistente che per una chiave sbagliata (una lettura di Secret Manager): non dice altro | Accettato |
@@ -115,7 +115,7 @@
 |---|---|---|
 | **Persone tolte prima del 22 novembre** (R-2) | Una persona tolta da un'organizzazione prima del 22 novembre 2026 può avere ancora i claim di quell'organizzazione: finché questa esiste ed è attiva, un'altra organizzazione non può invitarla («Questa email non può essere invitata»). Il gestore della piattaforma la sblocca togliendo i claim vecchi: `REPOSITORY=firestore GCP_PROJECT_ID=<progetto> python scripts/set_claims.py --orphan-claims` (elenco, sola lettura), poi `… --orphan-claims --apply --email <email>` (nello staging `FIRESTORE_DATABASE=staging` e `--env staging`) | Accettato |
 | **`set_claims.py --create` con un invito in attesa** (R-3) | Se la piattaforma abilita con `set_claims.py --create` una persona che ha già un invito in attesa di un'altra organizzazione, al primo accesso vince l'invito e i claim lo seguono. Regola: `--create` solo per email senza inviti in attesa; il reinvio di un invito non ricontrolla i claim | Accettato |
-| **Nomi e indirizzi** (F-11, risposta 1246) | Accettano qualsiasi testo leggibile entro 80 caratteri (nomi) e 200 (indirizzi); rifiutati solo i caratteri invisibili o di controllo. Un testo che sembra un indirizzo web è ammesso, perché nelle email dell'app non entrano testi scritti dagli utenti | Accettato; nello staging dal 23 novembre, in produzione alla prossima pubblicazione |
+| **Nomi e indirizzi** (F-11, risposta 1246) | Accettano qualsiasi testo leggibile entro 80 caratteri (nomi) e 200 (indirizzi); rifiutati solo i caratteri invisibili o di controllo. Un testo che sembra un indirizzo web è ammesso, perché nelle email dell'app non entrano testi scritti dagli utenti | Accettato; in staging e produzione dal 23 novembre |
 
 ## Motore
 

@@ -1,7 +1,7 @@
 # Guida all'app DOMHOUSE
 
 Tutto quello che l'app sa fare, spiegato passo per passo e diviso per ruolo. Non servono conoscenze tecniche.
-*Versione del 9 novembre 2026 (lotto 36).*
+*Versione del 23 novembre 2026.*
 
 > **Ambiente di prova**
 >
@@ -141,8 +141,8 @@ appartamento, anche da lontano.
 | 13 | Prove sull'infrastruttura | 9–11 novembre 2026 | Due copie del server insieme (9 nov); certificato di sicurezza del collegamento dei dispositivi rinnovato e revocato (10 nov); porte raggiungibili da internet (10 nov); macchina virtuale spenta e riaccesa (11 nov) | Tutte riuscite. Da internet si raggiunge solo l'ingresso previsto per i dispositivi. In più: al riavvio del 19 novembre trovato un difetto di avvio, corretto e riprovato lo stesso giorno |
 | 14 | Prove con dispositivi veri | dal 12 novembre 2026 | Il collegamento vero fra app e dispositivi in laboratorio: dato letto dalla presa e comando acceso/spento | Il dato arriva dalla presa all'app e il comando arriva dall'app alla presa, con conferma. Trovati 2 difetti (un messaggio d'errore fuorviante, troppi comandi di fila alla caldaia): corretti |
 | 15 | Rodaggio della produzione, con un rapporto ogni lunedì | dal 9 novembre 2026 | Come si comporta la produzione nel tempo: disponibilità, riavvii, allarmi, errori, memoria e disco | Due rapporti (settimane 9–15 e 16–22 novembre): server disponibile al 100 %, nessun difetto della produzione; un difetto in uno dei controlli automatici, corretto il 17 novembre |
-| 16 | Revisione «attacco da fuori» del sito e del server | 22 novembre 2026 | Che cosa può fare uno sconosciuto da internet, o una persona tolta da un'organizzazione: accessi, richieste enormi, limiti, sessioni, chiavi | Tre revisori indipendenti e un verificatore: 16 difetti confermati (2 gravi: una persona tolta poteva rientrare; richieste molto grandi potevano fermare il server). Per ognuno una prova automatica che rifà l'attacco, poi la correzione, ricontrollata. Nei registri del server nessun segno di richieste enormi. Nell'ambiente di prova dal 23 novembre, con le verifiche dal vivo; in produzione alla prossima pubblicazione |
-| 17 | Lettura da esperto della facilità d'uso | 22 novembre 2026 | Pagine e guida lette nei panni di chi non è tecnico, per la creazione degli appartamenti | 53 punti (10 alti). Gli alti corretti nei testi dell'app e della guida, nell'ambiente di prova dal 23 novembre; i medi e i bassi in corso |
+| 16 | Revisione «attacco da fuori» del sito e del server | 22 novembre 2026 | Che cosa può fare uno sconosciuto da internet, o una persona tolta da un'organizzazione: accessi, richieste enormi, limiti, sessioni, chiavi | Tre revisori indipendenti e un verificatore: 16 difetti confermati (2 gravi: una persona tolta poteva rientrare; richieste molto grandi potevano fermare il server). Per ognuno una prova automatica che rifà l'attacco, poi la correzione, ricontrollata. Nei registri del server nessun segno di richieste enormi. Nell'ambiente di prova e in produzione dal 23 novembre, con le verifiche dal vivo nell'ambiente di prova |
+| 17 | Lettura da esperto della facilità d'uso | 22 novembre 2026 | Pagine e guida lette nei panni di chi non è tecnico, per la creazione degli appartamenti | 53 punti (10 alti). Gli alti corretti nei testi dell'app e della guida, dal 23 novembre; i medi e i bassi in corso |
 
 **Dettaglio della riga 9: una revisione per ogni parte nuova.**
 
@@ -168,7 +168,7 @@ appartamento, anche da lontano.
 | N. | Tipo di controllo | La domanda | Stato |
 |---|---|---|---|
 | 1 | Sicurezza dentro la macchina virtuale | Se un pezzo del sistema diventasse ostile, fin dove arriverebbe? | Fatto il 17 novembre 2026 (riga 10 dei controlli fatti) |
-| 2 | Attacco da fuori al sito e al server | Che cosa può fare uno sconosciuto da internet? | Fatto il 22 novembre 2026 (riga 16 dei controlli fatti); in produzione alla prossima pubblicazione |
+| 2 | Attacco da fuori al sito e al server | Che cosa può fare uno sconosciuto da internet? | Fatto il 22 novembre 2026 (riga 16 dei controlli fatti); correzioni in produzione dal 23 novembre |
 | 3 | Prova di carico | Quante persone e quanti appartamenti regge il sistema insieme? | Procedura pronta; da fare prima della produzione vera |
 | 4 | Ripristino vero dalle copie | Se si perdono il database o il disco, si torna indietro davvero? In quanto tempo, con quali dati? | Deciso il 22 novembre 2026: prova completa su copie che non toccano niente di vero, con tempi e dati persi misurati; da fare prima della produzione vera |
 | 5 | Librerie e aggiornamenti di sicurezza | Chi controlla, e quando, librerie, programmi e firmware dei dispositivi con difetti noti? | Deciso il 22 novembre 2026: controllo automatico delle librerie a ogni modifica (attivo dal 22 novembre), aggiornamenti automatici dove è sicuro, un controllo a mano ogni mese (il primo il 23 novembre) |
@@ -215,7 +215,7 @@ di un'organizzazione).
 | Su computer, a sinistra, un pannello scuro con «Riscaldamento, clima e consumi dei tuoi appartamenti» | Che cosa fa l'app |
 | «Accedi» e, sotto, «Area riservata ai gestori degli appartamenti» | Il titolo della scheda di accesso |
 | «Accesso di sviluppo» con «Modalità sviluppo: scegli un utente di prova, nessuna password richiesta.» | Esiste solo nell'ambiente di sviluppo tecnico: nell'ambiente di prova e in quello vero non c'è |
-| La casella «Questo è un dispositivo condiviso», sopra i pulsanti di accesso (dal 23 novembre 2026, per ora solo nello staging) | Da spuntare su un telefono o un computer usato da più persone (vedi sotto) |
+| La casella «Questo è un dispositivo condiviso», sopra i pulsanti di accesso (dal 23 novembre 2026) | Da spuntare su un telefono o un computer usato da più persone (vedi sotto) |
 
 > **Attenzione**
 >
@@ -225,7 +225,7 @@ di un'organizzazione).
 > - **Se chiudi tu** la finestra di Google, non compare nulla.
 > - **I messaggi possibili** sono nella parte 11.
 
-**Dispositivo condiviso** (dal 23 novembre 2026, per ora solo nello staging)**:**
+**Dispositivo condiviso** (dal 23 novembre 2026)**:**
 
 Sotto la casella l'app spiega: «Dopo 30 minuti senza usare l'app l'uscita è automatica, e alla riapertura serve di
 nuovo l'accesso. Lasciala spenta sul tuo telefono o computer personale.»
@@ -278,7 +278,7 @@ la frase «Aggiungi l'app alla schermata Home: si apre a schermo intero e riceve
 
 ### L'app si aggiorna da sola
 
-**Dopo ogni aggiornamento di DOMHOUSE l'app si apre già nuova** (dal 23 novembre 2026, per ora solo nello staging).
+**Dopo ogni aggiornamento di DOMHOUSE l'app si apre già nuova** (dal 23 novembre 2026).
 
 Se l'app era già aperta:
 
@@ -1641,7 +1641,7 @@ Gli appartamenti stanno in un solo riquadro, una riga per appartamento.
 - **Spento**, l'appartamento ha il badge «disattivato» in Amministrazione e «Disattivato» nell'elenco
   «Appartamenti».
 - **Le operazioni** rispondono «Appartamento disattivato».
-- **Nello staging, dal 21 novembre 2026** (in produzione con la prossima pubblicazione):
+- **Dal 21 novembre 2026 nello staging e dal 23 novembre in produzione:**
   - la conferma aggiunge «Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono
     un'email.»;
   - spento, sotto l'indirizzo compare «Disattivato il 18 nov 2026, 18:22 da Giulia Rossi (gestore della
@@ -1891,7 +1891,7 @@ Compila i campi così, nell'ordine:
 | Stato | Cosa vuol dire |
 |---|---|
 | «In preparazione» | Registrato: il sistema domotico lo sta abilitando |
-| «Abilitato» (colore neutro, con l'icona della chiave) (dal 23 novembre 2026, per ora solo nello staging) | «Può collegarsi, ma da qui non si vede se l'ha già fatto.» Se è in linea lo dice «Stato dei dispositivi», con «In linea» in verde |
+| «Abilitato» (colore neutro, con l'icona della chiave) (dal 23 novembre 2026) | «Può collegarsi, ma da qui non si vede se l'ha già fatto.» Se è in linea lo dice «Stato dei dispositivi», con «In linea» in verde |
 | «Cambio password in corso» | Vale ancora la password vecchia |
 | «Revoca in corso» | Può ancora collegarsi |
 | «Revocato» | Non può più collegarsi. I revocati stanno in fondo, nella sezione chiusa «Revocati» |
@@ -2074,7 +2074,7 @@ pagina, che finisce con `?scheda=gestori`, `?scheda=non-attribuite` o `?scheda=r
 | Gli accessi di assistenza aperti | Chi di HQE è dentro, fino a quando |
 | I pulsanti «Appartamenti» (con la freccia) e «Accesso di assistenza», oppure «Entra come assistenza» e «Chiudi accesso» | Le azioni più frequenti |
 | Il menu «⋯» («Altre azioni per …») | «Rinomina», «Reinvia invito» (finché il primo amministratore non è entrato), «Sospendi» in rosso oppure «Riattiva» |
-| «Quota mensile dell'assistente (€)» con «Salva» (dal 23 novembre 2026, per ora solo nello staging) | Quanto può spendere al mese l'assistente di questa organizzazione (vedi sotto) |
+| «Quota mensile dell'assistente (€)» con «Salva» (dal 23 novembre 2026) | Quanto può spendere al mese l'assistente di questa organizzazione (vedi sotto) |
 | «Nessuna organizzazione» | Non ce n'è nessuna |
 
 **«Nuova organizzazione»** spiega: «L'organizzazione nasce con il suo primo amministratore: riceve un'email per
@@ -2099,7 +2099,7 @@ entrare, poi invita gli altri utenti.».
   attivo: avvisa tu …».
 - **Se è già entrato**: «L'amministratore ha già effettuato l'accesso».
 
-**«Quota mensile dell'assistente (€)»** (dal 23 novembre 2026, per ora solo nello staging)**:**
+**«Quota mensile dell'assistente (€)»** (dal 23 novembre 2026)**:**
 
 1. **Scrivi la quota** nel campo della scheda.
 2. **Premi «Salva»**: compare «Quota dell'assistente di «…» salvata: … € al mese.»
@@ -2236,7 +2236,7 @@ entrare, poi invita gli altri utenti.».
 | 13 | «L'ordine non è partito verso la macchina virtuale: premi «Riprova».» |
 | 14 | «La creazione si è fermata prima della fine. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto.» |
 
-**Aggiungere o cambiare il codice Italianway di un appartamento creato dall'app** (dal 23 novembre 2026, per ora solo nello staging)**:**
+**Aggiungere o cambiare il codice Italianway di un appartamento creato dall'app** (dal 23 novembre 2026)**:**
 
 1. **Nella riga dell'appartamento** premi «Codice Italianway».
 2. **Scrivi il codice** nel campo «Codice Italianway», oppure cambialo.
@@ -2295,7 +2295,7 @@ dell'organizzazione.»).
 - «Fuso orario non valido»
 - «Indirizzo non valido: deve cominciare con http:// o https://»
 - «In questo ambiente di prova scrivi mock://builtin nel campo Indirizzo del sistema domotico»
-- In produzione, dalla prossima pubblicazione: «Indirizzo del motore non ammesso: in questo ambiente si collegano
+- In produzione (dal 23 novembre 2026): «Indirizzo del motore non ammesso: in questo ambiente si collegano
   solo i motori della produzione». Si collegano solo il motore di sviluppo (porta 8100), finché non c'è la seconda
   macchina virtuale, e le porte da 8101 a 8149 della macchina virtuale.
 
@@ -2349,7 +2349,7 @@ Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»):
 - **Il gestore legge anche** i problemi della chiave: «Chiave del sistema domotico non trovata in Secret Manager:
   crea il segreto …», «Chiave del sistema domotico non leggibile dal server: manca il permesso su …».
 
-**Eliminare un appartamento (nello staging dal 21 novembre 2026):**
+**Eliminare un appartamento (nello staging dal 21 novembre 2026, in produzione dal 23 novembre):**
 
 1. Premi «Disattiva» nella riga dell'appartamento.
 2. Leggi la finestra e premi «Disattiva».
@@ -2377,7 +2377,7 @@ Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»):
   l'aiuto dell'assistenza HQE.»
 - **Creato dall'app, in giallo:** «Gli Shelly restano montati e, per quanto sappiamo oggi, restano come sono in quel
   momento: se la caldaia è accesa, può restare accesa senza che nessuno la comandi. Prima di eliminare metti
-  l'appartamento in «Casa vuota», oppure fai togliere gli Shelly.» (dal 23 novembre 2026, per ora solo nello staging)
+  l'appartamento in «Casa vuota», oppure fai togliere gli Shelly.» (dal 23 novembre 2026)
 - **Collegato a mano o dimostrativo:** «L'appartamento sparisce dall'app per tutti i suoi utenti.» e «Restano
   prenotazioni e riepiloghi per 12 mesi e il registro dell'organizzazione per 24 mesi.»
 - **Collegato a mano a un sistema vero** (come `lab-01`), in giallo: «Il sistema domotico sulla macchina virtuale
@@ -2428,10 +2428,6 @@ Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»):
 - **Nel registro dell'organizzazione:** «ha disattivato l'appartamento», «ha riattivato l'appartamento», «ha avviato
   l'eliminazione dell'appartamento», «ha eliminato l'appartamento»; una riga del «Sistema» per ogni passo fermo
   («Eliminazione dell'appartamento «…» non riuscita al passo «…»: serve «Riprova».»).
-
-**In produzione, fino alla prossima pubblicazione,** vale ancora il vecchio «Elimina»: chiede «Eliminare
-l'appartamento … («…») dell'organizzazione …? Sparirà per tutti i suoi utenti. Il suo sistema domotico non viene
-toccato.» e mostra «Appartamento … eliminato». L'identificativo non si può riusare.
 
 **«Prova l'agente»** (solo per gli appartamenti di prova: «lab-…», «test-…» e «dev»):
 
@@ -2509,7 +2505,7 @@ tolti).»
   semplici (D-182).»
 - **Il tetto** non si cambia dall'app.
 
-**Disattivazione ed eliminazione** (nello staging dal 21 novembre 2026): un'email a ogni disattivazione, anche
+**Disattivazione ed eliminazione** (nello staging dal 21 novembre 2026, in produzione dal 23 novembre): un'email a ogni disattivazione, anche
 fatta dall'amministratore con «Attivo», e all'inizio di ogni eliminazione.
 
 **Avvisi di monitoraggio del servizio**, ai responsabili indicati nella configurazione:
@@ -3445,8 +3441,12 @@ Per ogni problema annota:
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
 
-### 23 novembre 2026 (staging)
+### 23 novembre 2026 (staging e produzione)
 
+- **In produzione** arriva tutto quello che era solo nello staging, per esempio «Disattiva» ed «Elimina» con i 7
+  giorni (parte 7). Restano solo nello staging, fino alla seconda macchina virtuale, la creazione dall'app, le
+  credenziali dei dispositivi e «Prova l'agente». Dopo l'aggiornamento chiudi e riapri l'app una volta; chi ha
+  già installato l'app la reinstalla per vedere l'icona nuova (su iPhone sempre).
 - **L'app si aggiorna da sola:** dopo un aggiornamento si apre già nuova; se è aperta compare «È disponibile una
   versione nuova» con «Aggiorna». Senza rete l'app non si apre (parte 2).
 - **Dispositivo condiviso:** nella pagina «Accedi» la casella «Questo è un dispositivo condiviso»: dopo 30 minuti
