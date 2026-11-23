@@ -185,7 +185,10 @@ class SimulatedConnector:
             while not self._stopped:
                 wait = self.reading_every_s - (utcnow() - self._last_reading).total_seconds()
                 try:
-                    change = await asyncio.wait_for(queue.get(), timeout=max(wait, 0.0))
+                    # not asyncio.wait_for: on Python 3.11 (the engine's image) it lost a cancel that came with a ready
+                    # change, and the reader never stopped (Linux CI, 23 November)
+                    async with asyncio.timeout(max(wait, 0.0)):
+                        change = await queue.get()
                 except TimeoutError:
                     self.read_meters()                 # pushed to every reader, this one included
                     continue

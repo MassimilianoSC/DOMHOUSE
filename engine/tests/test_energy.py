@@ -213,6 +213,30 @@ def test_a_meter_drawing_power_reads_through_changes_on_its_own():
     assert all(c.capability == "power_meter" and "energy_total_wh" in c.state for c in got)
 
 
+def test_a_reader_cancelled_while_a_change_is_ready_stops():
+    # Linux CI, 23 November: on Python 3.11 (the engine's image) asyncio.wait_for gave back a change that was ready in
+    # the same turn and lost the cancel; the reader waited for ever and asyncio.run never ended
+    import asyncio
+
+    async def main():
+        conn = SimulatedConnector()
+        conn.reading_every_s = 3600                                  # no meter reading meanwhile
+        got = []
+
+        async def read():
+            async for change in conn.changes():
+                got.append(change)
+        task = asyncio.create_task(read())
+        await asyncio.sleep(0.05)                                    # the reader waits for a change
+        conn._push(StateChange("dev-caldaia", "state", datetime.now(UTC), capability="heating", state={"on": True}))
+        task.cancel()                                                # in the same turn as the change
+        done, _ = await asyncio.wait({task}, timeout=2)
+        if not done:
+            await conn.stop()                                        # let the test end, red
+        return task in done and task.cancelled()
+    assert asyncio.run(main()) is True
+
+
 # -------- the demonstration apartments (step 6c): an invented profile before the engine started --------
 def test_a_demonstration_shows_a_repeatable_profile_from_2026_per_meter(monkeypatch):
     Clock(monkeypatch, datetime(2026, 10, 20, 15, 30, tzinfo=UTC))
