@@ -100,7 +100,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | N. | Cosa | Condizione per partire | Chi | Stato | Dettaglio |
 |---|---|---|---|---|---|
 | 29 | Rimettere il permesso DNS per il rinnovo del certificato | quando `cert_days` scende a 35 (primi di gennaio 2027) | MS prepara, C lancia | aperto | `procedura-permesso-dns.md` |
-| 30 | Leggere le novità di Mosquitto 3.0 | prima di aggiornare il broker | o1 | aperto | `limiti-noti.md` |
+| 30 | Leggere le novità di Mosquitto 3.0 | prima di aggiornare il broker | o1 | letto il 23 novembre (3.0 non uscita; servono i plugin al posto di tre opzioni; broker già 2.1.2): resta il passaggio ai plugin, provato nello staging, prima di aggiornare il broker | `limiti-noti.md` |
 | 31 | Riverificare il fermo E-27 con stream aperti | da decidere | o1 | aperto | `limiti-noti.md` |
 | 32 | P-82: benestare di Y su «PER SCARANTINO», poi consegna al cliente | Y | C, Y | in parte | registro, P-82 |
 | 33 | Colonne superate allineate (§15.1, documento 2, `produzione-cosa-manca.md`, `limiti-noti.md`, tabelle degli errori e P): restano due verifiche con o1 | nessuna | MS | fatto il 22 novembre; resta da verificare con o1 una riga di `limiti-noti.md` (risposte a nome di un altro dispositivo attive sulla VM); R1 chiusa il 22 novembre | controllo del 22 novembre |
