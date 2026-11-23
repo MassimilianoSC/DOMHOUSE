@@ -35,13 +35,13 @@ jobs:
   contratto-e-mock:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Il contratto è invariato (v1.0.6)
         run: |
           echo "${CONTRACT_SHA256}  contract/openapi.yaml" | sha256sum -c -
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -93,9 +93,9 @@ jobs:
     # on the PC (Docker)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -112,9 +112,9 @@ jobs:
     # l'immagine che va sulla VM (engine/Dockerfile): senza chiave non parte, con la chiave rispetta il contratto
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -156,15 +156,15 @@ jobs:
   repository:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
-      - uses: actions/setup-java@v4          # firebase-tools richiede Java 21+ per l'emulatore
+      - uses: actions/setup-java@v6          # firebase-tools richiede Java 21+ per l'emulatore
         with:
           distribution: temurin
           java-version: "21"
@@ -205,12 +205,12 @@ jobs:
     # memoria, motori simulati). Nessun rilancio: una prova instabile si corregge, non si ripete (come P-64).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: yarn
@@ -244,11 +244,11 @@ jobs:
     # versioni le cambia o1, con le prove; gli aggiornamenti proposti arrivano da Dependabot (.github/dependabot.yml).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
 
