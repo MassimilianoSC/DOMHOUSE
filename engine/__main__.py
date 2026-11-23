@@ -14,6 +14,18 @@ from . import log
 from .config import ConfigError, load_config, prepare_data_dir
 from .service import StartupError, create_engine_app
 
+# o1-chiusura (23 Nov): at the stop uvicorn waits at most this long for open connections (the BFF's stream never
+# closes by itself), then cancels them and runs the app's stop (connector, engine.db, «engine stopped»). Without it,
+# Docker's SIGKILL after its grace period came first and the stop never ran. Cancelling a stream writes uvicorn's own
+# text traceback («Exception in ASGI application»): not JSON, so not a «righe di errore» line (level=error only)
+GRACEFUL_SHUTDOWN_S = 2
+
+
+def server_settings(config) -> dict:
+    """uvicorn's settings of the engine: main() runs with them, the tests serve with them."""
+    return {"host": config.host, "port": config.port, "log_level": "warning", "access_log": False,
+            "timeout_graceful_shutdown": GRACEFUL_SHUTDOWN_S}
+
 
 def main() -> int:
     try:
@@ -36,7 +48,7 @@ def main() -> int:
         print(f"{exc.msg}: {exc.fields}", file=sys.stderr)
         return 3
     try:
-        uvicorn.run(app, host=config.host, port=config.port, log_level="warning", access_log=False)
+        uvicorn.run(app, **server_settings(config))
     except SystemExit as exc:
         # D36 (P-83): uvicorn exits 3 when the start fails (the start itself wrote its JSON line) or the port is taken;
         # 3 is the connector's code here, so 4, with a line of ours in any case

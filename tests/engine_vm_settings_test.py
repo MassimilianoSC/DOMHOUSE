@@ -680,6 +680,18 @@ def test_compose_has_no_default_connector():
     assert "CONNECTOR: ${CONNECTOR:?CONNECTOR}" in text and "CONNECTOR:-" not in text
 
 
+def test_compose_gives_the_engine_its_stop_before_sigkill():
+    """o1-chiusura (23 Nov): Docker's default 10 s were less than the engine's stop; its parts must fit in the grace."""
+    import yaml
+    sys.path.insert(0, str(ROOT))
+    from engine import service
+    from engine.__main__ import GRACEFUL_SHUTDOWN_S
+    engine_service = yaml.safe_load((ROOT / "engine" / "compose.yaml").read_text(encoding="utf-8"))["services"]["engine"]
+    grace = engine_service.get("stop_grace_period", "10s")
+    assert re.fullmatch(r"\d+s", grace), grace
+    assert int(grace[:-1]) >= GRACEFUL_SHUTDOWN_S + 2 * service.SHUTDOWN_WAIT_S + 5     # + 5 s of margin
+
+
 def test_an_old_settings_file_without_the_connector_gets_simulated_once(vm):
     """D62: a settings file written before CONNECTOR existed (only simulated engines then) gets the line, said in the
     output; without it compose (now without a default) would stop, and the broker's file was added (empty ≠ simulated)."""
