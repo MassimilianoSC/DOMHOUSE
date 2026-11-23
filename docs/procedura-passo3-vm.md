@@ -127,7 +127,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 ## P3. Il broker: la rete nuova, l'uscita chiusa, TLS 1.2 (scrive sulla VM; il broker si ferma meno di un minuto)
 
-Non fra le 22:15 e le 23:15 UTC.
+Non fra le 22:15 e le 00:45 UTC (copia dei motori alle 22:30, snapshot del disco verso le 00:17 UTC; 23 novembre).
 
 ```bash
 # Git Bash
@@ -297,7 +297,7 @@ gcloud compute ssh langbrain-dev --zone=europe-west8-a --tunnel-through-iap --pr
 
 ## P10. Pacchetti di Docker e Google, poi il riavvio (scrive sulla VM; il fermo più lungo)
 
-Non fra le 22:15 e le 23:15 UTC.
+Non fra le 22:15 e le 00:45 UTC (copia dei motori alle 22:30, snapshot del disco verso le 00:17 UTC; 23 novembre).
 
 **P10.1 Una copia del disco di avvio (scrive su Google Cloud).** Il disco delle chiavi (`langbrain-dev-tls`) non ha copie per scelta (C-12) e il riavvio non lo tocca.
 

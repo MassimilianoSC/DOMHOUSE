@@ -9,9 +9,9 @@ consegna si rilegge tutto e si converte in HTML, come la guida.*
 
 | Cosa | Quando | Che cosa vedi |
 |---|---|---|
-| **Copia dei dati dell'app** (utenti, organizzazioni, appartamenti, prenotazioni, registro) | ogni giorno, tenuta 14 giorni | niente, salvo un allarme se manca |
+| **Copia dei dati dell'app** (utenti, organizzazioni, appartamenti, prenotazioni, registro) | ogni giorno, tenuta 14 giorni | niente: oggi non c'è un allarme se manca [da completare: controllo nel resoconto del lunedì, allarme prima della produzione] |
 | **Copia dei dati di ogni sistema domotico** (regole, decisioni, consumi) | ogni giorno, sulla macchina virtuale | niente, salvo l'allarme «backup mancato» |
-| **Fotografia del disco della macchina virtuale** | periodica [da completare: frequenza e durata] | niente |
+| **Fotografia del disco della macchina virtuale** | ogni giorno, verso le 01:17 ora italiana d'inverno, tenuta 30 giorni | niente: oggi non c'è un allarme se manca |
 | **Rinnovo del certificato** del collegamento cifrato dei dispositivi | da solo, prima della scadenza | un allarme solo se il rinnovo non riesce |
 | **Riavvio dei sistemi domotici** se si fermano | da solo | un allarme se un sistema resta muto |
 | **Proposte di aggiornamento delle librerie** (Dependabot su GitHub) | ogni lunedì, al massimo una richiesta per tipo di libreria (Python, sito, immagini, azioni) | le richieste su GitHub: non si uniscono da sole; il tecnico le prova e le unisce con la CI verde, oppure le chiude |

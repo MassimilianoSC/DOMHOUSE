@@ -23,8 +23,8 @@ Come funziona sulla VM (lo fa `scripts/engine-vm.sh`, che gira sulla VM come roo
   root. Lo script legge il segreto solo per scrivere questo file: non lo stampa, non lo scrive nei log;
 - `/data/<apartment_id>/`: `engine.db` (SQLite in WAL), proprietario uid 10001, l'utente del container; in
   `backup/` le copie quotidiane `engine-<data UTC>.db` degli ultimi 7 giorni (sezione E);
-- il timer systemd `domhouse-engine-backup.timer`: ogni giorno alle 22:30 UTC, prima dello snapshot del disco delle
-  23:00, fa il backup di tutti gli appartamenti installati;
+- il timer systemd `domhouse-engine-backup.timer`: ogni giorno alle 22:30 UTC, prima dello snapshot del disco
+  (verso le 00:17 UTC dal 2 novembre, le 23:17 UTC con l'ora legale americana: la pianificazione dichiara le 23:00 con una finestra di 4 ore), fa il backup di tutti gli appartamenti installati;
 - il container `engine-<apartment_id>` (progetto Compose `domhouse-<apartment_id>`), `restart: unless-stopped`, porta
   81xx sull'IP interno, log JSON di Docker ruotati.
 
@@ -340,7 +340,7 @@ I decimali si scrivono con il punto (per esempio `0.5`): la virgola non è accet
 Ogni giorno alle 22:30 UTC il timer `domhouse-engine-backup.timer` lancia `engine-vm.sh backup-all`: per ogni
 appartamento installato, una copia coerente di `engine.db` fatta con la funzione di backup di SQLite (anche mentre il
 motore scrive), controllata con `PRAGMA integrity_check`, in `/data/<apartment_id>/backup/engine-<data UTC>.db`; le
-copie più vecchie di 7 giorni si cancellano. Lo snapshot del disco delle 23:00 contiene quindi anche le copie. Il
+copie più vecchie di 7 giorni si cancellano. Lo snapshot quotidiano del disco (verso le 00:17 UTC, vedi sopra) contiene quindi anche le copie. Il
 ripristino rimette una copia al posto di `engine.db` a motore fermo e conserva il database di prima.
 
 **E1. Un backup adesso** (scrive sulla VM).
@@ -588,7 +588,7 @@ Cartelle:
 | Dove | Cosa | Snapshot |
 |---|---|---|
 | `/mnt/domhouse-tls` (disco `langbrain-dev-tls`) | chiavi: `broker/` (certificato servito), `acme/` (conto Let's Encrypt e certificati di lego) | no |
-| `/opt/domhouse/_broker` | compose, configurazione, impostazioni, regola del limite | sì (23:00) |
+| `/opt/domhouse/_broker` | compose, configurazione, impostazioni, regola del limite | sì (snapshot quotidiano) |
 | `/etc/domhouse/_broker` | utenti (solo hash), elenco appartamenti, `acme.settings` | sì |
 | `/data/_broker` | sessioni e messaggi in coda | sì |
 
@@ -895,7 +895,7 @@ Il disco delle chiavi non ha snapshot: il certificato **non si ripristina, si ri
 
 1. **Utenti:** la fonte sono i segreti; `sync` riscrive gli hash in qualunque momento.
 2. **Certificato e conto ACME:** non si salvano, si rifanno (B3).
-3. **`/data/_broker`:** sessioni e messaggi conservati, già nello snapshot delle 23:00. Se si perde, i relè si ricollegano e il connector rilegge lo stato.
+3. **`/data/_broker`:** sessioni e messaggi conservati, già nello snapshot quotidiano. Se si perde, i relè si ricollegano e il connector rilegge lo stato.
 
 ## G3. Porte dei motori creati dall'app: quelle segnate «occupate» (A2, risposta 1208)
 
