@@ -8,7 +8,7 @@ import RulesPage from "./RulesPage";
 // the shortcuts of the climatic zones (DPR 74/2013, art. 4), the minutes of the «not rising» warning in «Antigelo».
 // Texts agreed with the memoria storica (A1–A7, B1–B3).
 const SETPOINT = () => ({
-  rule_id: "setpoint_limits", label: "Limiti del setpoint", enabled: s.enabled, editable: true,
+  rule_id: "setpoint_limits", label: "Limiti del setpoint", enabled: s.enabled, editable: s.editable,
   params: { min: 16, max: 24, comfort_celsius: 21, eco_celsius: 18, comfort_cool_celsius: 25, summer_min: 18, summer_max: 28, ...s.season },
   limits: {
     min: { min: 7, max: 20 }, max: { min: 20, max: 28 }, comfort_celsius: { min: 16, max: 26 }, eco_celsius: { min: 10, max: 22 },
@@ -16,18 +16,23 @@ const SETPOINT = () => ({
     ...(s.season ? { season_start_month: { min: 1, max: 12 }, season_start_day: { min: 1, max: 31 }, season_end_month: { min: 1, max: 12 }, season_end_day: { min: 1, max: 31 } } : {}),
   },
 });
-const FROST = { rule_id: "frost_protection", label: "Antigelo", enabled: true, editable: true, params: { celsius: 8, no_rise_minutes: 120 }, limits: { celsius: { min: 5, max: 12 }, no_rise_minutes: { min: 30, max: 480 } } };
+// an engine from before item 15 (s.noRise false) has neither the minutes nor the season
+const FROST = () => (s.noRise
+  ? { rule_id: "frost_protection", label: "Antigelo", enabled: true, editable: true, params: { celsius: 8, no_rise_minutes: 120 }, limits: { celsius: { min: 5, max: 12 }, no_rise_minutes: { min: 30, max: 480 } } }
+  : { rule_id: "frost_protection", label: "Antigelo a casa vuota", enabled: true, editable: true, params: { celsius: 8 }, limits: { celsius: { min: 5, max: 12 } } });
 const ZONE_E = { season_start_month: 10, season_start_day: 15, season_end_month: 4, season_end_day: 15 };
 
 const s = vi.hoisted(() => ({
   canWrite: true,
   enabled: true,
+  editable: true,
+  noRise: true,
   season: null as Record<string, number> | null,
   update: vi.fn(),
 }));
 
 vi.mock("@/auth/AuthProvider", () => ({ useRole: () => ({ canWrite: s.canWrite, isAdmin: false }) }));
-vi.mock("@/api/instance", () => ({ instanceApi: () => ({ getRules: async () => ({ updated_at: "2026-11-23T08:00:00.000Z", rules: [SETPOINT(), FROST] }), updateRules: s.update }) }));
+vi.mock("@/api/instance", () => ({ instanceApi: () => ({ getRules: async () => ({ updated_at: "2026-11-23T08:00:00.000Z", rules: [SETPOINT(), FROST()] }), updateRules: s.update }) }));
 vi.mock("sonner", () => ({ toast: { error: vi.fn(), info: vi.fn(), success: vi.fn(), warning: vi.fn() } }));
 
 async function open() {
@@ -51,8 +56,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   s.canWrite = true;
   s.enabled = true;
+  s.editable = true;
+  s.noRise = true;
   s.season = { ...ZONE_E };
-  s.update.mockImplementation(async () => ({ updated_at: "2026-11-23T08:01:00.000Z", rules: [SETPOINT(), FROST] }));
+  s.update.mockImplementation(async () => ({ updated_at: "2026-11-23T08:01:00.000Z", rules: [SETPOINT(), FROST()] }));
 });
 
 describe("Regole: la stagione del riscaldamento (voce 15)", () => {
@@ -174,7 +181,7 @@ describe("Regole: la stagione del riscaldamento (voce 15)", () => {
 
   it("la descrizione di «Limiti del setpoint» dice che cosa succede fuori stagione", async () => {
     const c = await open();
-    expect(c).toHaveTextContent("Fuori dalla stagione del riscaldamento la caldaia resta solo sull'antigelo.");
+    expect(c).toHaveTextContent("Fuori dalla stagione del riscaldamento la caldaia resta solo sull'antigelo e il climatizzatore non scalda da solo.");
   });
 });
 
@@ -184,8 +191,90 @@ describe("Regole › Antigelo: l'avviso «la temperatura non risale» (voce 15)"
     const c = screen.getByTestId("rule-card-frost_protection");
     expect(c).toHaveTextContent("Avviso se la temperatura non risale (minuti) (da 30 a 480)");
     expect(screen.getByTestId("rule-param-frost_protection-no_rise_minutes")).toHaveValue(120);
-    expect(c).toHaveTextContent(
-      "Anche con la regola spenta, se la caldaia è accesa ma la temperatura resta sotto l'antigelo per i minuti indicati, lo registra nelle Decisioni e avvisa con una notifica.",
-    );
+    expect(c).toHaveTextContent("Anche con la regola spenta, se la caldaia è accesa ma la temperatura resta sotto l'antigelo per i minuti indicati, lo registra nelle Decisioni e avvisa con una notifica.");
+    // review point 4: out of season, comfort and eco too go to this temperature
+    expect(c).toHaveTextContent("Con la casa vuota, e fuori dalla stagione del riscaldamento anche in comfort ed eco, la caldaia va a questa temperatura anche con la regola spenta.");
+  });
+});
+
+// Review of a6498e2 (first independent reviewer): the points its mutations found without a test.
+describe("rilettura della voce 15", () => {
+  it("punto 1: con un motore di prima le descrizioni non parlano di stagione né dell'avviso", async () => {
+    s.season = null;
+    s.noRise = false;
+    const sl = await open();
+    const frost = screen.getByTestId("rule-card-frost_protection");
+    expect(sl).not.toHaveTextContent("stagione");
+    expect(frost).not.toHaveTextContent("stagione");
+    expect(frost).not.toHaveTextContent("per i minuti indicati");
+    expect(frost).toHaveTextContent("Con la casa vuota la caldaia va a questa temperatura anche con la regola spenta.");
+  });
+
+  it("punto 3: un giorno decimale si ferma prima del salvataggio, senza nessuna chiamata", async () => {
+    await open();
+    set("season_start_day", "15.5");
+    expect(screen.getByTestId("rule-param-error-setpoint_limits-season_start_day")).toHaveTextContent("Valore fuori dai limiti (1–31)");
+    expect(box("season_start_day")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByTestId("rules-save-btn")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("rules-save-btn"));
+    expect(s.update).not.toHaveBeenCalled();
+  });
+
+  it("punto 5: il mese porta all'errore della data; «Stagione del riscaldamento» un livello sotto «Inverno»", async () => {
+    await open();
+    expect(screen.getByRole("heading", { level: 4, name: "Inverno (riscaldamento)" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 5, name: "Stagione del riscaldamento" })).toBeInTheDocument();
+    expect(box("season_end_month")).not.toHaveAttribute("aria-describedby");
+    set("season_end_month", "4");
+    set("season_end_day", "31");
+    expect(box("season_end_month")).toHaveAttribute("aria-describedby", "rule-season-error-end");
+    expect(box("season_end_month")).toHaveAttribute("aria-invalid", "true");
+  });
+
+  it("punto 6: «1º» per il primo del mese, «dall'8» e «all'11»", async () => {
+    await open();
+    expect(screen.getByTestId("rule-season-zone-A")).toHaveAccessibleName("Zona A: dal 1º dicembre al 15 marzo");
+    expect(screen.getByTestId("rule-season-zone-D")).toHaveAccessibleName("Zona D: dal 1º novembre al 15 aprile");
+    set("season_start_month", "11");
+    set("season_start_day", "8");
+    set("season_end_month", "3");
+    set("season_end_day", "11");
+    expect(screen.getByTestId("rule-season-summary")).toHaveTextContent(/^Dall'8 novembre all'11 marzo$/);
+    set("season_start_day", "11");
+    set("season_end_day", "8");
+    expect(screen.getByTestId("rule-season-summary")).toHaveTextContent(/^Dall'11 novembre all'8 marzo$/);
+    set("season_start_day", "1");
+    set("season_end_day", "1");
+    expect(screen.getByTestId("rule-season-summary")).toHaveTextContent(/^Dal 1º novembre al 1º marzo$/);
+  });
+
+  it("punto 7 e prova mancante: niente riepilogo con il 31 aprile né con la casella del giorno vuota", async () => {
+    await open();
+    set("season_end_day", "31");
+    expect(screen.queryByTestId("rule-season-summary")).toBeNull();
+    set("season_end_day", "15");
+    expect(screen.getByTestId("rule-season-summary")).toBeInTheDocument();
+    set("season_start_day", "");
+    expect(screen.queryByTestId("rule-season-summary")).toBeNull();
+  });
+
+  it("prova mancante: una regola bloccata dal motore ha caselle e pulsanti A–F spenti", async () => {
+    s.editable = false;
+    await open();
+    expect(box("season_start_day")).toBeDisabled();
+    expect(box("season_start_month")).toBeDisabled();
+    expect(screen.getByTestId("rule-season-zone-A")).toBeDisabled();
+    expect(screen.getByTestId("rule-season-zone-F")).toBeDisabled();
+  });
+
+  it("prova mancante: «Annulla le modifiche» dopo una scorciatoia rimette le date salvate", async () => {
+    await open();
+    fireEvent.click(screen.getByTestId("rule-season-zone-B"));
+    expect(box("season_start_month")).toHaveValue("12");
+    fireEvent.click(screen.getByTestId("rules-discard-btn"));
+    expect(box("season_start_month")).toHaveValue("10");
+    expect(box("season_end_day")).toHaveValue(15);
+    expect(screen.getByTestId("rule-season-summary")).toHaveTextContent("Dal 15 ottobre al 15 aprile (zona E)");
+    expect(screen.queryByTestId("rules-save-bar")).toBeNull();
   });
 });

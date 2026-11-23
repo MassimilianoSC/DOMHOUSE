@@ -91,11 +91,15 @@
     "season": {
       "start": "Inizio",
       "end": "Fine",
-      "range": "Dal {start} al {end}",
+      "from": "dal {date}",
+      "fromElided": "dall'{date}",
+      "to": "al {date}",
+      "toElided": "all'{date}",
+      "range": "{from} {to}",
       "allYear": "Tutto l'anno",
       "withZone": "{season} (zona {zone})",
       "zones": "Date di legge per zona climatica:",
-      "zoneRange": "Zona {zone}: dal {start} al {end}",
+      "zoneRange": "Zona {zone}: {from} {to}",
       "zoneAllYear": "Zona {zone}: tutto l'anno",
       "missingDay": "Il {date} non esiste: scegli un altro giorno."
     },
@@ -129,13 +133,20 @@
     },
     "desc": {
       "window_open_off": "Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.",
-      "setpoint_limits": "Limita la temperatura che si può impostare dall'app e dall'assistente, e quella usata da modalità e programmi; non vale per il telecomando del climatizzatore né per l'antigelo. Inverno: caldaia e clima che scalda restano fra minimo e massimo invernali; in comfort scaldano fino alla temperatura comfort, in eco la caldaia sta alla temperatura eco. Estate: il clima che raffresca o deumidifica resta fra minimo e massimo estivi e raffresca sopra la temperatura di raffrescamento, se nella stanza c'è un sensore di temperatura. Il raffrescamento deve essere più alto del comfort. Fuori dalla stagione del riscaldamento la caldaia resta solo sull'antigelo.",
-      "frost_protection": "Con la casa vuota la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare. Anche con la regola spenta, se la caldaia è accesa ma la temperatura resta sotto l'antigelo per i minuti indicati, lo registra nelle Decisioni e avvisa con una notifica.",
+      "setpoint_limits": "Limita la temperatura che si può impostare dall'app e dall'assistente, e quella usata da modalità e programmi; non vale per il telecomando del climatizzatore né per l'antigelo. Inverno: caldaia e clima che scalda restano fra minimo e massimo invernali; in comfort scaldano fino alla temperatura comfort, in eco la caldaia sta alla temperatura eco. Estate: il clima che raffresca o deumidifica resta fra minimo e massimo estivi e raffresca sopra la temperatura di raffrescamento, se nella stanza c'è un sensore di temperatura. Il raffrescamento deve essere più alto del comfort.",
+      "frost_protection": "Con la casa vuota la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare.",
       "mold_protection": "Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.",
       "prearrival": "Porta la casa in comfort prima dell'arrivo degli ospiti.",
       "checkout_eco": "Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.",
       "compressor_min_off": "Pausa minima tra spegnimento e riaccensione del compressore.",
       "offline_alert": "Avvisa quando un dispositivo resta offline oltre i minuti indicati. L'avviso «sistema domotico non raggiungibile» non dipende da questa regola: arriva sempre dopo 15 minuti."
+    },
+    "descSeason": {
+      "frost_protection": "Con la casa vuota, e fuori dalla stagione del riscaldamento anche in comfort ed eco, la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare."
+    },
+    "descExtra": {
+      "season": "Fuori dalla stagione del riscaldamento la caldaia resta solo sull'antigelo e il climatizzatore non scalda da solo.",
+      "noRise": "Anche con la regola spenta, se la caldaia è accesa ma la temperatura resta sotto l'antigelo per i minuti indicati, lo registra nelle Decisioni e avvisa con una notifica."
     },
     "proposal": {
       "title": "Chiedi all'assistente",

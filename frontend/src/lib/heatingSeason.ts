@@ -54,8 +54,11 @@ export function seasonOf(params: Record<string, number | undefined>): Season | n
 const MONTHS = new Intl.DateTimeFormat("it-IT", { month: "long", timeZone: "UTC" });
 export const monthName = (month: number): string => MONTHS.format(Date.UTC(2024, month - 1, 1));
 
-/** «15 ottobre». */
-export const dayName = (d: DayOfYear): string => `${d.day} ${monthName(d.month)}`;
+/** «15 ottobre»; «1º dicembre» for the first of the month (review point 6). */
+export const dayName = (d: DayOfYear): string => `${d.day === 1 ? "1º" : d.day} ${monthName(d.month)}`;
+
+/** The days read with a vowel sound, «otto» and «undici»: «dall'8», «all'11» (review point 6). */
+export const elides = (day: number): boolean => day === 8 || day === 11;
 
 /** A month parameter of the season (season_start_month, season_end_month). */
 export const isSeasonMonth = (key: string): boolean => key === SEASON_KEYS.startMonth || key === SEASON_KEYS.endMonth;
