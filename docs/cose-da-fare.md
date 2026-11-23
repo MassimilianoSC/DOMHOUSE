@@ -62,7 +62,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 |---|---|---|---|---|---|
 | 17 | Passo 5: prove al banco 1–7 (Matter via MQTT sulla 2.x; seconda rete Wi-Fi; orologio del ponte; versione dei sensori BLU; portata e sensori per ponte; antigelo con lo script; impianto vero) | Y in ufficio; la 6 solo se il cliente la sceglie; la 7 con caldaia e split veri | Y | in parte | documento 2 dell'Autonomia |
 | 18 | Passo 7: richiudere le righe «da verificare» del documento 2 | dopo il 17 | MS | in parte | documento 2 dell'Autonomia |
-| 19 | Passo 8: risposta scritta del cliente alle domande della tabella «Domande per il cliente» qui sotto (19.1–19.15) | il documento 3 è completo e consegnato (la proposta di progetto del 12 novembre è un'altra cosa) | MS prepara, C consegna, cliente risponde | da preparare | documento 3 dell'Autonomia |
+| 19 | Passo 8: risposta scritta del cliente alle domande della tabella «Domande per il cliente» qui sotto (19.1–19.15) | il documento 3 è completo e consegnato (la proposta di progetto del 12 novembre è un'altra cosa) | MS prepara, C consegna, cliente risponde | domande scritte nel documento 3, §8 punti 1–14 (23 novembre; copia di prima `3-DA-CONSEGNARE-AL-CLIENTE.prima-del-23-nov.md`); restano §9 «Tempi e costi» (committente) e §10, e le righe «da verificare» del documento 2 (voce 18, dopo le prove al banco) | documento 3 dell'Autonomia |
 | 20 | Passo 6: messaggio a L, poi segreto e formato delle prenotazioni di Italianway (P-9, P-10) | contratto di vendita firmato | C, L | aperto | `da-inviare/messaggio-italianway-per-leonardo.md` |
 | 21 | Passo 9: lavori per il primo appartamento (infrarossi, Italianway vero, relè della caldaia, revisione del codice) | dopo il passo 8; infrarossi dopo l'acquisto | o1, o2, Y | aperto | §15 |
 | 22 | Passo 11: A4, catalogo dei dispositivi, con il collaudo guidato | dopo il passo 5 | o1, o2, Y | aperto | §15, documento 2 riga 20 |
@@ -79,21 +79,21 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 
 | N. | Domanda | Da dove viene | Stato |
 |---|---|---|---|
-| 19.1 | Responsabilità: chi risponde di che cosa, fra cliente e HQE | piano, passo 8 | da chiedere |
-| 19.2 | Assistenza ai gestori: chi la fa, con quali tempi | piano, passo 8 | da chiedere |
-| 19.3 | Chi crea ed elimina gli appartamenti, e con quale numero massimo (nota tecnica: una rotta nuova di creazione per il cliente deve passare da `creation.create` e dal suo controllo dell'identificativo, prova da estendere) | D-232 | da chiedere |
-| 19.4 | Chi prepara i kit dei dispositivi | piano, passo 8 | da chiedere |
-| 19.5 | Relè della caldaia: una delle tre possibilità, anche «resta com'era» | §15.3, punto 4 | da chiedere |
-| 19.6 | Una rete Wi-Fi solo per i dispositivi, separata da quella degli ospiti | decisione 6 della proposta | da chiedere |
-| 19.7 | Fatturazione: quale strada | P-81 | da chiedere |
-| 19.8 | Climatizzatori dual split (due unità su un misuratore) | P-90, S8 | da chiedere |
-| 19.9 | Acquisto del trasmettitore a infrarossi e di un climatizzatore su cui provarlo | decisione 1141 | da chiedere |
-| 19.10 | Antigelo: minuti di attesa e sensore H&T muto | risposte di Youssouf | da chiedere |
-| 19.11 | Manutenzione dopo la consegna: del cliente; assistenza HQE facoltativa a pagamento | 1222 | da chiedere |
-| 19.12 | Check-out con movimento: tenere la domanda al gestore come oggi, o passare sempre a casa vuota come nella proposta | P-88, 1229 | da chiedere |
-| 19.13 | Consumi alti durante le pulizie: le pulizie usano prese comandate? | 1230 | da chiedere |
-| 19.14 | Dominio dell'app e delle email (il marchio del cliente) | P-53, 1233 | da chiedere |
-| 19.15 | Quante persone collegate insieme all'app prevedete? Oggi il limite è circa 600 in produzione (200 per istanza, fino a 3 istanze) | rilettura dei bassi, B-9 | da chiedere |
+| 19.1 | Responsabilità: chi risponde di che cosa, fra cliente e HQE | piano, passo 8 | scritta nel documento 3, §8 punto 1 (23 novembre) |
+| 19.2 | Assistenza ai gestori: chi la fa, con quali tempi | piano, passo 8 | scritta nel documento 3, §8 punto 2 (23 novembre) |
+| 19.3 | Chi crea ed elimina gli appartamenti, e con quale numero massimo (nota tecnica: una rotta nuova di creazione per il cliente deve passare da `creation.create` e dal suo controllo dell'identificativo, prova da estendere) | D-232 | scritta nel documento 3, §8 punto 3 (23 novembre) |
+| 19.4 | Chi prepara i kit dei dispositivi | piano, passo 8 | scritta nel documento 3, §8 punto 4 (23 novembre) |
+| 19.5 | Relè della caldaia: una delle tre possibilità, anche «resta com'era» | §15.3, punto 4 | scritta nel documento 3, §8 punto 5 (23 novembre) |
+| 19.6 | Una rete Wi-Fi solo per i dispositivi, separata da quella degli ospiti | decisione 6 della proposta | scritta nel documento 3, §8 punto 6 (23 novembre) |
+| 19.7 | Fatturazione: quale strada | P-81 | scritta nel documento 3, §8 punto 14 (23 novembre) |
+| 19.8 | Climatizzatori dual split (due unità su un misuratore) | P-90, S8 | scritta nel documento 3, §8 punto 8 (23 novembre) |
+| 19.9 | Acquisto del trasmettitore a infrarossi e di un climatizzatore su cui provarlo | decisione 1141 | scritta nel documento 3, §8 punto 7 (23 novembre) |
+| 19.10 | Antigelo: minuti di attesa e sensore H&T muto | risposte di Youssouf | scritta nel documento 3, §8 punto 5 (23 novembre) |
+| 19.11 | Manutenzione dopo la consegna: del cliente; assistenza HQE facoltativa a pagamento | 1222 | scritta nel documento 3, §8 punto 13 (23 novembre) |
+| 19.12 | Check-out con movimento: tenere la domanda al gestore come oggi, o passare sempre a casa vuota come nella proposta | P-88, 1229 | scritta nel documento 3, §8 punto 9 (23 novembre) |
+| 19.13 | Consumi alti durante le pulizie: le pulizie usano prese comandate? | 1230 | scritta nel documento 3, §8 punto 10 (23 novembre) |
+| 19.14 | Dominio dell'app e delle email (il marchio del cliente) | P-53, 1233 | scritta nel documento 3, §8 punto 12 (23 novembre) |
+| 19.15 | Quante persone collegate insieme all'app prevedete? Oggi il limite è circa 600 in produzione (200 per istanza, fino a 3 istanze) | rilettura dei bassi, B-9 | scritta nel documento 3, §8 punto 11 (23 novembre) |
 
 ### D. Manutenzione e residui
 
