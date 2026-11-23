@@ -170,6 +170,7 @@
     "copy": {
       "title": "Applica le stesse regole ad altri appartamenti",
       "hint": "Copia le regole salvate di questo appartamento (attive o spente e valori) sugli appartamenti che scegli. Prima vedi che cosa cambia in ciascuno, poi confermi.",
+      "hintSeason": "Copia le regole salvate di questo appartamento (attive o spente e valori, tranne le date della stagione del riscaldamento) sugli appartamenti che scegli. Prima vedi che cosa cambia in ciascuno, poi confermi.",
       "noOthers": "Nessun altro appartamento nella tua organizzazione",
       "selectAll": "Seleziona tutti",
       "preview": "Vedi che cosa cambia",

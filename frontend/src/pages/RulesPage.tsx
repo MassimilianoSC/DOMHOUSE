@@ -429,7 +429,7 @@ export default function RulesPage() {
         />
       )}
       {/* D-151 point 6: the same rules on other apartments of the organization, admins only */}
-      {isAdmin && canWrite && q.data && <CopyRulesCard aptId={aptId} hasManualChanges={patches.length > 0} />}
+      {isAdmin && canWrite && q.data && <CopyRulesCard aptId={aptId} hasManualChanges={patches.length > 0} withSeason={Boolean(sl && hasSeason(sl))} />}
       {patches.length > 0 && (
         // a full bar along the bottom edge, solid with a 1 px top border and a light shadow (design lot 2)
         <div ref={barRef} className="fixed inset-x-0 bottom-0 z-30 border-t bg-card px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 lg:px-10 shadow-[0_-4px_12px_hsl(var(--foreground)/0.06)] md:left-64" data-testid="rules-save-bar">
