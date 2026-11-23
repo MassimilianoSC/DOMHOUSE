@@ -470,6 +470,14 @@ def test_a_demo_made_in_summer_does_not_heat(monkeypatch):
         await wait_min_switch()
         await regulate_and_wait(e)
         assert e.relay[BOILER] is False and season_decisions(e) == []
+        # second rereading: the demonstration's split, heating at 21 °C in the catalog, does not heat in summer either
+        for _ in range(3):
+            await asyncio.sleep(0.4)                                    # the compressor's pause, the regulation's minutes
+            await regulate_and_wait(e)
+            await commands_done(e)
+        heating_climates = [d["device_id"] for d in e.devices.values() if "climate" in d["capabilities"]
+                            and d["capabilities"]["climate"].get("on") and d["capabilities"]["climate"].get("mode") == "heat"]
+        assert heating_climates == []
     asyncio.run(main())
 
 
@@ -550,4 +558,30 @@ def test_out_of_season_the_window_keeps_the_frost_protection_and_says_it():
         await commands_done(e)                                         # the decision comes with the command's outcome
         off = [d for d in e.decisions if d["target"].get("device_id") == BOILER and d["actor"] == "rule:window_open_off"]
         assert off and off[-1]["reasoning"].endswith("; l'antigelo resta attivo")
+    asyncio.run(main())
+
+
+
+def test_an_error_in_the_middle_of_the_change_is_retried_at_the_next_minute_with_one_decision():
+    async def main():
+        e = engine()
+        e._today = lambda: WINTER
+        e.ensure_started()
+        e.set_mode("comfort", ACTOR, CORR, "prova")
+        await commands_done(e)
+        e._today = lambda: SUMMER
+        real, failures = e._apply_limits, []
+
+        def once(*a, **k):
+            if not failures:
+                failures.append(1)
+                raise RuntimeError("guasto")
+            return real(*a, **k)
+        e._apply_limits = once
+        await regulate_and_wait(e)                                      # fails: nothing changed, nothing said
+        assert e.season_on is True and season_decisions(e) == [] and e.store.get_meta("heating_season") is True
+        await regulate_and_wait(e)                                      # the next minute: done, once
+        assert e.season_on is False and len(season_decisions(e)) == 1
+        assert e.store.get_meta("heating_season") is False
+        assert e.devices[BOILER]["capabilities"]["heating"]["setpoint"] == 8
     asyncio.run(main())

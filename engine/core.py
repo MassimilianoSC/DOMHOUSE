@@ -245,7 +245,10 @@ def engine_today(engine):
     real date; with real devices it is ignored."""
     forced = os.environ.get("MOCK_TODAY", "").strip()
     if forced and isinstance(engine.connector, SimulatedConnector):
-        return date.fromisoformat(forced)
+        try:
+            return date.fromisoformat(forced)
+        except ValueError:
+            raise ValueError(f"MOCK_TODAY must be a date YYYY-MM-DD (e.g. 2026-01-15), not {forced!r}") from None
     return local_today(engine.timezone, utcnow())
 
 
@@ -490,6 +493,11 @@ class ApartmentEngine:
                     if "heating" in device["capabilities"]:
                         device["capabilities"]["heating"].update(on=True, setpoint=self._mode_heating_setpoint(device))
                         self._heating_set_by(device["device_id"], mode=True)
+                # second rereading: out of season its climates are the comfort regulation's (D-169), which switches off
+                # one that heats (1257 = a); before, the demo's split stayed heating at 21 °C in July
+                if self.mode == "comfort" and not self.season_on:
+                    self.climate_by_mode = {d["device_id"] for d in self.devices.values() if "climate" in d["capabilities"]}
+                    self.store.put_meta("climate_by_mode", sorted(self.climate_by_mode))
             self._apply_limits()
             for device in self.devices.values():
                 self._save_device(device)
@@ -1468,7 +1476,17 @@ class ApartmentEngine:
             return
         if any(c["device_id"] in self.heating_by_mode and c["status"] not in FINAL for c in self.commands.values()):
             return                                           # a mode's command still running would undo it: next minute
+        before = self.season_on
         self.season_on = now_on                              # in memory now; in the store last (a crash redoes it)
+        try:
+            self._season_change(now_on)
+        except Exception:
+            self.season_on = before                          # second rereading, N1: the next minute tries again
+            raise
+
+    def _season_change(self, now_on: bool) -> None:
+        """_season_check's change: the mode's boilers, the limits, then the decision and the saved state (an error
+        before the decision leaves nothing said, and the next minute does it all again)."""
         corr = str(uuid.uuid4())
         sl = self.rule("setpoint_limits")["params"]
 
@@ -1483,8 +1501,6 @@ class ApartmentEngine:
         else:
             reasoning = (f"Inizio della stagione del riscaldamento ({start}): {words}" if now_on
                          else f"Fine della stagione del riscaldamento ({end}): {words}")
-        self.log("system", {"type": "apartment"}, "heating_season", "fuori stagione" if now_on else "in stagione",
-                 "in stagione" if now_on else "fuori stagione", reasoning, "applied", corr)
         if self.mode in ("comfort", "eco"):
             for device_id in sorted(self.heating_by_mode):
                 device = self.devices.get(device_id)
@@ -1495,6 +1511,8 @@ class ApartmentEngine:
                 self._save_device(device)
                 self.emit("device.state", {"device_id": device_id, "capability": "heating", "state": state}, corr)
         self._apply_limits(corr, emit=True)
+        self.log("system", {"type": "apartment"}, "heating_season", "fuori stagione" if now_on else "in stagione",
+                 "in stagione" if now_on else "fuori stagione", reasoning, "applied", corr)
         self.store.put_meta("heating_season", now_on)          # last: a crash before it makes the change again
         self._season_dates_changed = False
 
