@@ -145,7 +145,7 @@ def test_the_recognizer_on_the_demonstrations_and_the_daily_limit(engines, monke
         raise AssertionError("no model on a demonstration without AI_DEMOS")
     monkeypatch.setattr(ai_gateway, "call_model", never)
     p = propose("antigelo a 10 gradi").json()
-    assert p["changes"] == [{"rule_id": "frost_protection", "label": "Antigelo a casa vuota", "field": "celsius",
+    assert p["changes"] == [{"rule_id": "frost_protection", "label": "Antigelo", "field": "celsius",
                              "old": 8, "new": 10}]
     assert propose("spegni la regola dell'antimuffa").json()["changes"][0] == {
         "rule_id": "mold_protection", "label": "Antimuffa a casa vuota", "field": "enabled", "old": True, "new": False}
@@ -404,3 +404,8 @@ def test_the_first_values_and_the_meaning_follow_the_engine():
     assert "ospiti" not in meaning and "telecomando" in meaning and "antigelo" in meaning
     assert "summer_min" in meaning and "summer_max" in meaning and "comfort_celsius < comfort_cool_celsius" in meaning
     assert "almeno" not in rp.MEANING["frost_protection"] and "anche con la regola spenta" in rp.MEANING["frost_protection"]
+    # item 15: the season's dates and the alert's minutes, with the engine's first values and their meaning
+    frost = next(r for r in core.DEFAULT_RULES if r["rule_id"] == "frost_protection")["params"]
+    assert {k: v for k, v in rp.DEFAULTS["frost_protection"].items() if k != "enabled"} == frost
+    assert all(k in meaning for k in ("season_start_month", "season_start_day", "season_end_month", "season_end_day"))
+    assert "no_rise_minutes" in rp.MEANING["frost_protection"] and "fuori dalla stagione" in rp.MEANING["frost_protection"]

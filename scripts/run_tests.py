@@ -46,7 +46,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 HTTP_SUITES = ["tests/backend_test.py", "tests/backend_phase2_test.py", "tests/backend_phase3_test.py", "tests/backend_phase4_test.py",
                "tests/backend_isolation_test.py", "tests/backend_platform_test.py"]
-LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py", "tests/broker_accounts_test.py", "tests/broker_vm_cert_test.py", "tests/broker_vm_sync_test.py", "tests/broker_vm_egress_test.py", "tests/host_vm_test.py", "tests/agent_comune_test.py", "tests/agent_esecutore_test.py", "tests/agent_lettore_test.py", "tests/agent_vm_test.py", "tests/agent_gcp_test.py", "tests/agent_server_test.py", "tests/device_credentials_test.py", "tests/agent_firme_test.py", "tests/device_credentials_routes_test.py", "tests/device_refusals_test.py", "tests/agent_a3_vm_test.py", "tests/agent_a2_vm_test.py", "tests/migra_credenziali_test.py", "tests/secret_admin_test.py", "tests/creation_test.py", "tests/deletion_test.py", "tests/capacity_test.py", "tests/broker_container_test.py", "tests/push_test.py", "tests/hub_align_test.py",
+LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py", "tests/broker_accounts_test.py", "tests/broker_vm_cert_test.py", "tests/broker_vm_sync_test.py", "tests/broker_vm_egress_test.py", "tests/host_vm_test.py", "tests/agent_comune_test.py", "tests/agent_esecutore_test.py", "tests/agent_lettore_test.py", "tests/agent_vm_test.py", "tests/agent_gcp_test.py", "tests/agent_server_test.py", "tests/device_credentials_test.py", "tests/agent_firme_test.py", "tests/device_credentials_routes_test.py", "tests/device_refusals_test.py", "tests/agent_a3_vm_test.py", "tests/agent_a2_vm_test.py", "tests/migra_credenziali_test.py", "tests/secret_admin_test.py", "tests/creation_test.py", "tests/deletion_test.py", "tests/capacity_test.py", "tests/broker_container_test.py", "tests/push_test.py", "tests/heating_not_rising_push_test.py", "tests/hub_align_test.py",
                 "tests/apartment_scope_test.py", "tests/tenant_test.py", "tests/routes_test.py", "tests/webhook_test.py",
                 "tests/platform_test.py", "tests/real_mode_test.py", "tests/firebase_flows_test.py",
                 "tests/proxy_path_test.py", "tests/mock_exposure_test.py", "tests/run_tests_checks_test.py",
@@ -79,6 +79,7 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "engine/tests/test_approval_sources.py", "engine/tests/test_approvals_restart.py",
                 "engine/tests/test_assistant.py", "engine/tests/test_health.py",
                 "engine/tests/test_mode_temperatures.py", "engine/tests/test_priorities.py",
+                "engine/tests/test_heating_season.py", "engine/tests/test_heating_not_rising.py",
                 "engine/tests/test_setpoint_limits.py", "engine/tests/test_stream_queue.py",
                 # the verification of 10 November (o2) and D-198 (o1); tests/run_tests_checks_test.py is red when a
                 # test file of the repository is in no list

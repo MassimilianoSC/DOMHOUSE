@@ -82,6 +82,18 @@ NAMES = {"apt-rimini-01": "Via Roma 12 – int. 3", "apt-bologna-01": "Corso Ita
 OFF_WATTS_LIMITS = (5, 100)   # A8: the app's range for setpoint_limits.off_watts (W)
 OFF_WATTS_ABOVE_ON = 5        # A8: a split is seen on (absolute) at off_watts + this, if above CONFIRM_ON_WATTS
 
+# Item 15 (E1, answer 1231 = a; E2, answer 1232 = a; a6, 23 November 2026): the committente's choices, each in one place.
+# Decided: out of season a person's command is obeyed, to the boiler and to a climate (1256 = a, 1257 = a); the
+# climates of the mode only cool (1257 = a); the first dates zone E for every apartment (1258 = a); the alert's wait 120
+# minutes, 30-480 (1259 = a); the alert always on, also with «Antigelo» switched off (1260 = a); the rule's label
+# «Antigelo» (1261 = a).
+SEASON_DEFAULT = (10, 15, 4, 15)    # 1258 = a: zone E (DPR 74/2013), 15 October - 15 April (month, day, month, day)
+NOT_RISING_MINUTES = (120, 30, 480)  # 1259 = a: the alert's wait, first value, min, max
+FROST_LABEL = "Antigelo"            # 1261 = a: was «Antigelo a casa vuota»; out of season it acts in every mode
+MONTHS = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre", "ottobre",
+          "novembre", "dicembre")
+SEASON_KEYS = ("season_start_month", "season_start_day", "season_end_month", "season_end_day")
+
 DEFAULT_RULES = [
     {"rule_id": "window_open_off", "label": "Finestra aperta spegne il clima", "enabled": True, "editable": True,
      "params": {"minutes": 5}, "limits": {"minutes": {"min": 1, "max": 30}}},
@@ -95,14 +107,21 @@ DEFAULT_RULES = [
      # first values 16–24 and 18–28 (answer 1099)
      # A8 (16 November 2026): off_watts, the watts under which an infrared split confirmed by its meter is off; valid
      # also with the rule off (a measure of the split, not a limit); first value CONFIRM_OFF_WATTS (_off_watts_from_settings)
+     # Item 15, E1: the heating season, two dates (both included; across the new year when the start is later), valid
+     # also with the rule off, as off_watts
      "params": {"min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18, "comfort_cool_celsius": 25,
-                "summer_min": 18, "summer_max": 28, "off_watts": 15},
+                "summer_min": 18, "summer_max": 28, "off_watts": 15, **dict(zip(SEASON_KEYS, SEASON_DEFAULT))},
      "limits": {"min": {"min": 7, "max": 20}, "max": {"min": 20, "max": 28}, "comfort_celsius": {"min": 16, "max": 26},
                 "eco_celsius": {"min": 10, "max": 22}, "comfort_cool_celsius": {"min": 22, "max": 28},
                 "summer_min": {"min": 16, "max": 28}, "summer_max": {"min": 22, "max": 30},
-                "off_watts": {"min": OFF_WATTS_LIMITS[0], "max": OFF_WATTS_LIMITS[1]}}},
-    {"rule_id": "frost_protection", "label": "Antigelo a casa vuota", "enabled": True, "editable": True,
-     "params": {"celsius": 8}, "limits": {"celsius": {"min": 5, "max": 12}}},
+                "off_watts": {"min": OFF_WATTS_LIMITS[0], "max": OFF_WATTS_LIMITS[1]},
+                "season_start_month": {"min": 1, "max": 12}, "season_start_day": {"min": 1, "max": 31},
+                "season_end_month": {"min": 1, "max": 12}, "season_end_day": {"min": 1, "max": 31}}},
+    # Item 15, E2: no_rise_minutes, the wait of the alert «la temperatura non risale»
+    {"rule_id": "frost_protection", "label": FROST_LABEL, "enabled": True, "editable": True,
+     "params": {"celsius": 8, "no_rise_minutes": NOT_RISING_MINUTES[0]},
+     "limits": {"celsius": {"min": 5, "max": 12},
+                "no_rise_minutes": {"min": NOT_RISING_MINUTES[1], "max": NOT_RISING_MINUTES[2]}}},
     {"rule_id": "mold_protection", "label": "Antimuffa a casa vuota", "enabled": True, "editable": True,
      "params": {"humidity_percent": 65}, "limits": {"humidity_percent": {"min": 50, "max": 80}}},
     {"rule_id": "prearrival", "label": "Pre-arrivo", "enabled": True, "editable": True,
@@ -212,6 +231,29 @@ def parse_dt(value) -> datetime:
 
 def fmt_num(n) -> str:
     return f"{n:g}".replace(".", ",")
+
+
+def in_heating_season(params: dict, day) -> bool:
+    """Item 15, E1: whether `day` (a date) is inside the heating season of these parameters, both dates included; a
+    start later than the end is a season across the new year (15 October - 15 April)."""
+    start = (params["season_start_month"], params["season_start_day"])
+    end = (params["season_end_month"], params["season_end_day"])
+    today = (day.month, day.day)
+    if start <= end:
+        return start <= today <= end
+    return today >= start or today <= end
+
+
+def season_errors(params: dict) -> list[tuple[int, str, str]]:
+    """Item 15, E1: a date of the season that does not exist (31 April, a half day); 29 February exists. The first."""
+    days = (31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+    for which, month, day in (("inizio", params["season_start_month"], params["season_start_day"]),
+                              ("fine", params["season_end_month"], params["season_end_day"])):
+        whole = all(float(v).is_integer() for v in (month, day))
+        if not whole or not 1 <= int(month) <= 12 or not 1 <= int(day) <= days[int(month) - 1]:
+            return [(422, "invalid_date",
+                     f"La data di {which} della stagione non esiste ({fmt_num(day)}/{fmt_num(month)}).")]
+    return []
 
 
 def battery_level(value) -> int | None:
@@ -369,6 +411,8 @@ class ApartmentEngine:
         self.relay_busy: set[str] = set()            # boilers with a thermostat switch running
         self.thermostat_issue: dict[str, str] = {}   # boiler -> the sensor episode already reported (D-164)
         self.heating_by_mode: set[str] = set()       # D-164: boilers whose intention a mode set (not a person)
+        self.season_on = True                        # item 15, E1: the heating season applied (kept in the store)
+        self.not_rising: dict[str, dict] = {}        # item 15, E2: boiler -> {"since": monotonic, "noted": bool}
         self.climate_by_mode: set[str] = set()       # D-169: climates comfort regulates (no person touched them since)
         self.climate_switched: dict[str, float] = {}  # D-169: climate -> monotonic time of its last automatic change
         self._auto_climate = False                   # D-169: a climate command of the mode or of the regulation
@@ -430,6 +474,14 @@ class ApartmentEngine:
                 self._seed_history(variant)
                 self._seed_energy_profile()
             self.store.put_meta("initialized", {"at": iso(utcnow()), "seeded": seeded})
+        # Item 15, E1: the season applied. An engine made now starts in today's; one from before (nothing saved) was «in
+        # season» all year, so out of season its first regulation's minute makes the change, with its decision
+        saved = self.store.get_meta("heating_season")
+        if saved is None:
+            self.season_on = self.heating_season_now() if not self.restored else True
+            self.store.put_meta("heating_season", self.season_on)
+        else:
+            self.season_on = bool(saved)
 
     # ---- infrastructure -------------------------------------------------
     def setting(self, name: str):
@@ -462,6 +514,7 @@ class ApartmentEngine:
             base = defaults.get(rule["rule_id"])
             if not base:
                 continue
+            rule["label"] = base["label"]                # the engine's words (item 15: «Antigelo»), never the user's
             for key, value in base["params"].items():
                 if key not in rule["params"]:
                     rule["params"][key] = value
@@ -961,7 +1014,7 @@ class ApartmentEngine:
                     conflicts.add(key)
                     if key not in self.limits_conflicts:
                         self._note_limits_conflict(d, cap, correlation_id)
-                frost = cap == "heating" and self.mode == "empty" and (d["device_id"] in self.heating_by_mode
+                frost = cap == "heating" and self._frost_held() and (d["device_id"] in self.heating_by_mode
                                                                        or not c.get("on"))
                 bound = self.frost_limits(d["device_id"]) if frost else (lo, hi)
                 sp = c.get("setpoint")
@@ -1287,7 +1340,7 @@ class ApartmentEngine:
         intention = intention if intention is not None else device["capabilities"]["heating"]
         enabled = bool(intention.get("on"))
         frost_rule = self.rule("frost_protection")
-        frost = self.mode == "empty" and frost_rule["enabled"]
+        frost = self._frost_held() and frost_rule["enabled"]              # item 15: out of season in every mode
         candidates = ([float(intention["setpoint"])] if enabled and isinstance(intention.get("setpoint"), (int, float))
                       else [])
         if frost:
@@ -1310,6 +1363,7 @@ class ApartmentEngine:
         """Once a "minute": every boiler's relay where its thermostat wants it, at most one switch every
         THERMOSTAT_MIN_SWITCH_MINUTES. Decisions: the frost protection's every switch, the sensor's problems. With the
         connector down nothing can be switched: it waits for it (D-131)."""
+        self._season_check()                                 # item 15, E1: intentions only, also with the connector down
         if not self.connector_was_up:
             return
         self._mode_pending_send()                            # D16: what the mode could not send before
@@ -1326,6 +1380,7 @@ class ApartmentEngine:
             episode = self._sensor_episode(device, problem)
             if episode != self.thermostat_issue.get(device_id):
                 self._sensor_issue(device, problem, episode)
+            self._not_rising_check(device, problem)          # item 15, E2
             if device_id in self.relay_busy or any(r[0] == device_id for r in self.inflight):
                 continue
             want, temperature, setpoint, frost = self.thermostat(device)
@@ -1344,10 +1399,83 @@ class ApartmentEngine:
         """The boiler's setpoint of the current mode, as mode_commands gives it."""
         sl = self.rule("setpoint_limits")["params"]
         h = device["capabilities"]["heating"]
-        target = {"comfort": sl["comfort_celsius"], "eco": sl["eco_celsius"],
-                  "empty": self.rule("frost_protection")["params"]["celsius"]}[self.mode]
-        lo, hi = self.frost_limits(device["device_id"]) if self.mode == "empty" else (h["setpoint_min"], h["setpoint_max"])
+        frost = self._frost_held()
+        target = self.rule("frost_protection")["params"]["celsius"] if frost else \
+            {"comfort": sl["comfort_celsius"], "eco": sl["eco_celsius"]}[self.mode]
+        lo, hi = self.frost_limits(device["device_id"]) if frost else (h["setpoint_min"], h["setpoint_max"])
         return min(max(target, lo), hi)
+
+    # ---- item 15: the heating season (E1) and «la temperatura non risale» (E2) ----
+    def _today(self):
+        return utcnow().astimezone(ZoneInfo(self.timezone)).date()
+
+    def heating_season_now(self) -> bool:
+        return in_heating_season(self.rule("setpoint_limits")["params"], self._today())
+
+    def _frost_held(self, mode: str | None = None) -> bool:
+        """Whether a mode keeps the boilers on the frost protection: «casa vuota» always, comfort and eco out of the
+        heating season (E1: the frost protection always on, nothing heats for comfort)."""
+        mode = mode or self.mode
+        return mode == "empty" or (mode in ("comfort", "eco") and not self.season_on)
+
+    def _climate_heats(self) -> bool:
+        """E1, answer 1257 = a: a climate of the mode heats in comfort only in the heating season (a person's command
+        is obeyed: it takes the climate out of the mode, create_command)."""
+        return self.season_on
+
+    def _season_check(self) -> None:
+        """E1: when the date crosses the season's start or end (or new dates move it), the mode's boilers go to their new
+        setpoint once, with one decision; the state is kept, so a restart neither loses nor repeats it. During a hold
+        it waits for its end. Offline boilers too (their intention is the engine's, D16). A boiler a person commanded
+        is left as it is; one the window rule turned off comes back
+        with the new setpoint (_mode_heating_setpoint). The climates follow at the comfort regulation's minute."""
+        now_on = self.heating_season_now()
+        if now_on == self.season_on or self.hold:
+            return
+        if any(c["device_id"] in self.heating_by_mode and c["status"] not in FINAL for c in self.commands.values()):
+            return                                           # a mode's command still running would undo it: next minute
+        self.season_on = now_on
+        self.store.put_meta("heating_season", now_on)
+        corr = str(uuid.uuid4())
+        sl = self.rule("setpoint_limits")["params"]
+        month, day = ((sl["season_start_month"], sl["season_start_day"]) if now_on
+                      else (sl["season_end_month"], sl["season_end_day"]))
+        when = f"{int(day)} {MONTHS[int(month) - 1]}"
+        reasoning = (f"Inizio della stagione del riscaldamento ({when}): la caldaia torna a comfort ed eco" if now_on
+                     else f"Fine della stagione del riscaldamento ({when}): la caldaia resta solo sull'antigelo")
+        self.log("system", {"type": "apartment"}, "heating_season", "fuori stagione" if now_on else "in stagione",
+                 "in stagione" if now_on else "fuori stagione", reasoning, "applied", corr)
+        if self.mode in ("comfort", "eco"):
+            for device_id in sorted(self.heating_by_mode):
+                device = self.devices.get(device_id)
+                if device is None or "heating" not in device["capabilities"] or device_id in self.window_off:
+                    continue
+                state = device["capabilities"]["heating"]
+                state.update(on=True, setpoint=self._mode_heating_setpoint(device))   # the thermostat switches the relay
+                self._save_device(device)
+                self.emit("device.state", {"device_id": device_id, "capability": "heating", "state": state}, corr)
+        self._apply_limits(corr, emit=True)
+
+    def _not_rising_check(self, device: dict, problem: str | None) -> None:
+        """E2: the relay on and the room under the frost protection's threshold for no_rise_minutes: one informational
+        decision per episode (the BFF's push). The episode ends when the room reaches the threshold or the relay goes
+        off; without a usable sensor nothing (D-164 says it). Every mode; with the rule off too (1260 = a)."""
+        device_id = device["device_id"]
+        rule = self.rule("frost_protection")
+        threshold = float(rule["params"]["celsius"])
+        temperature = None if problem else self._sensor(device)[0]
+        if self.relay.get(device_id) is not True or temperature is None or temperature >= threshold:
+            self.not_rising.pop(device_id, None)
+            return
+        episode = self.not_rising.setdefault(device_id, {"since": time.monotonic(), "noted": False})
+        minutes = rule["params"]["no_rise_minutes"]
+        if episode["noted"] or time.monotonic() - episode["since"] < minutes * seconds_per_minute():
+            return
+        episode["noted"] = True
+        self.log("system", {"type": "device", "device_id": device_id}, "heating_not_rising", None,
+                 f"{fmt_num(temperature)} °C",
+                 f"{device['label']}: accesa da {fmt_num(minutes)} minuti, ma la temperatura resta sotto l'antigelo "
+                 f"({fmt_num(threshold)} °C). Controlla la caldaia.", "informational", str(uuid.uuid4()))
 
     def _restore_after_window(self) -> None:
         """D-218 point 1 (answer 811): what the window rule turned off comes back when no window is open any more and they
@@ -1422,7 +1550,7 @@ class ApartmentEngine:
         sl = self.rule("setpoint_limits")["params"]
         heat, cool = sl["comfort_celsius"], sl["comfort_cool_celsius"]
         margin = self.setting("THERMOSTAT_HYSTERESIS_C")
-        if room < heat - margin:
+        if room < heat - margin and self._climate_heats():                # item 15, answer 1257 = a
             climate_mode, target = "heat", heat
         elif room > cool + margin:
             climate_mode, target = "cool", cool
@@ -1461,10 +1589,23 @@ class ApartmentEngine:
             if self.window_open() and self.window_rule_active():
                 continue
             c = device["capabilities"]["climate"]
-            if room < heat - margin and not (c["on"] and c["mode"] == "heat"):
+            heats = self._climate_heats()                    # item 15, answer 1257 = a
+            if room < heat - margin and heats and not (c["on"] and c["mode"] == "heat"):
                 climate_mode, target, words = "heat", heat, f"sotto {fmt_num(heat)} °C: scalda"
             elif room > cool + margin and not (c["on"] and c["mode"] == "cool"):
                 climate_mode, target, words = "cool", cool, f"sopra {fmt_num(cool)} °C: raffresca"
+            elif not heats and c["on"] and c["mode"] == "heat":
+                self.climate_switched[device_id] = time.monotonic()
+                self._auto_climate = True
+                try:
+                    self.create_command(device_id, {"capability": "climate", "action": "turn_off"}, "system:engine",
+                                        str(uuid.uuid4()), decision_actor="system",
+                                        reasoning=f"{device['label']}: fuori dalla stagione del riscaldamento, spento")
+                except MockError:
+                    pass
+                finally:
+                    self._auto_climate = False
+                continue
             else:
                 continue
             lo, hi, _ = self.effective_limits(device_id, "climate", climate_mode)   # 1098 = b: the new mode's
@@ -1491,7 +1632,7 @@ class ApartmentEngine:
         heating = device["capabilities"]["heating"]
         if heating.get("on") and device["device_id"] not in self.heating_by_mode:
             return "manuale"
-        if self.mode == "empty" and self.rule("frost_protection")["enabled"]:
+        if self._frost_held() and self.rule("frost_protection")["enabled"]:
             return "antigelo"
         return "regolazione"
 
@@ -1543,7 +1684,7 @@ class ApartmentEngine:
                     f"+ {fmt_num(self.setting('THERMOSTAT_HYSTERESIS_C'))}")
             self.log("rule:frost_protection", {"type": "device", "device_id": device_id},
                      "frost_heating_on" if on else "frost_heating_off", "off" if on else "on", "on" if on else "off",
-                     f"Antigelo a casa vuota: {what}", "applied", corr)
+                     f"{FROST_LABEL}: {what}", "applied", corr)
 
     def _device_lock(self, device_id: str) -> asyncio.Lock:
         lock = self.device_locks.get(device_id)
@@ -1717,7 +1858,7 @@ class ApartmentEngine:
                     else:
                         self.no_sensor_noted.discard(d["device_id"])
                         heat, cool = sl["comfort_celsius"], sl["comfort_cool_celsius"]
-                        if room < heat or room > cool:
+                        if (room < heat and self._climate_heats()) or room > cool:       # item 15, answer 1257 = a
                             climate_mode, target = ("heat", heat) if room < heat else ("cool", cool)
                             lo, hi, _ = self.effective_limits(d["device_id"], "climate", climate_mode)   # 1098 = b
                             sp, note = self._clamped(d, "climate", target, lo, hi)
@@ -1726,8 +1867,9 @@ class ApartmentEngine:
                                                          "params": {"on": True, "mode": climate_mode, "setpoint": sp}}))
             if "heating" in caps:
                 h = caps["heating"]
-                target = {"comfort": sl["comfort_celsius"], "eco": sl["eco_celsius"], "empty": frost}[mode]
-                lo, hi = (self.frost_limits(d["device_id"]) if mode == "empty"     # D-183 point 125
+                held = self._frost_held(mode)                                    # item 15: out of season too
+                target = frost if held else {"comfort": sl["comfort_celsius"], "eco": sl["eco_celsius"]}[mode]
+                lo, hi = (self.frost_limits(d["device_id"]) if held             # D-183 point 125
                           else (h["setpoint_min"], h["setpoint_max"]))
                 sp, note = self._clamped(d, "heating", target, lo, hi)
                 self._mode_note(d["device_id"], note)
@@ -1755,7 +1897,8 @@ class ApartmentEngine:
             return True
         room = self.room_temperature(device)
         sl = self.rule("setpoint_limits")["params"]
-        return room is not None and (room < sl["comfort_celsius"] or room > sl["comfort_cool_celsius"])
+        return room is not None and ((room < sl["comfort_celsius"] and self._climate_heats())
+                                     or room > sl["comfort_cool_celsius"])
 
     def _mode_wait(self, device_id: str, body: dict, mode: str, correlation_id: str) -> None:
         """D16 (P-83): a device the mode could not reach (offline, or the connector down). The boiler's intention is the
@@ -1838,7 +1981,7 @@ class ApartmentEngine:
             raise bad_request("Modalità non valida")
         command_ids = []
         self._auto_climate = True
-        self._frost_command = mode == "empty"
+        self._frost_command = self._frost_held(mode)        # item 15: comfort and eco out of season too
         self._mode_in_progress = mode
         self.mode_cmds = {}                              # S3: the previous mode's commands that fail are not repeated
         try:
@@ -2578,7 +2721,7 @@ class ApartmentEngine:
         # looks again (_keep_window_off, D03)
         skip = set(skip) | {c["device_id"] for c in self.commands.values() if c["status"] not in FINAL}
         corr = str(uuid.uuid4())
-        frost = self.mode == "empty" and self.rule("frost_protection")["enabled"]
+        frost = self._frost_held() and self.rule("frost_protection")["enabled"]
         for d in list(self.devices.values()):
             for cap in ("climate", "heating"):
                 st = d["capabilities"].get(cap)
@@ -2701,6 +2844,8 @@ class ApartmentEngine:
                 rule["params"][key] = value
         sl = by_id["setpoint_limits"]["params"]
         for status, error, message in range_errors(sl, any(p.get("rule_id") == "setpoint_limits" for p in patches)):
+            raise MockError(status, error, message)
+        for status, error, message in season_errors(sl):                 # item 15, E1
             raise MockError(status, error, message)
         self.rules = staged
         self.rules_updated_at = iso(utcnow())

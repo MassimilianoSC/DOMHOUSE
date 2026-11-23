@@ -35,8 +35,10 @@ ENABLED_FIELD = "attiva"      # the tool's name for on/off: valore 1 = attiva, 0
 DEFAULTS = {
     "window_open_off": {"enabled": True, "minutes": 5},
     "setpoint_limits": {"enabled": True, "min": 16, "max": 24, "comfort_celsius": 21, "eco_celsius": 18,
-                        "comfort_cool_celsius": 25, "summer_min": 18, "summer_max": 28, "off_watts": 15},
-    "frost_protection": {"enabled": True, "celsius": 8},
+                        "comfort_cool_celsius": 25, "summer_min": 18, "summer_max": 28, "off_watts": 15,
+                        # item 15, E1 (1258 = a): the heating season, zone E
+                        "season_start_month": 10, "season_start_day": 15, "season_end_month": 4, "season_end_day": 15},
+    "frost_protection": {"enabled": True, "celsius": 8, "no_rise_minutes": 120},     # item 15, E2 (1259 = a)
     "mold_protection": {"enabled": True, "humidity_percent": 65},
     "prearrival": {"enabled": True, "hours_before": 2},
     "checkout_eco": {"enabled": True, "minutes_after": 30, "presence_minutes": 30},
@@ -56,10 +58,17 @@ MEANING = {
                         "min ≤ eco_celsius ≤ comfort_celsius ≤ max, summer_min ≤ comfort_cool_celsius ≤ summer_max e "
                         "comfort_celsius < comfort_cool_celsius; off_watts (A8): sotto questo consumo in watt un "
                         "climatizzatore a infrarossi controllato dal suo misuratore risulta spento, e vale anche con la "
-                        "regola spenta"),
+                        "regola spenta; stagione del riscaldamento dal giorno season_start_day del mese season_start_month "
+                        "al giorno season_end_day del mese season_end_month, date comprese, valida anche con la regola "
+                        "spenta: fuori stagione in comfort ed eco la caldaia sta all'antigelo e il clima non scalda da "
+                        "solo, i comandi di una persona valgono sempre"),
     # D31 (o2 6e84f1d): the frost protection is the boiler's setpoint in «casa vuota», not «at least»
-    "frost_protection": ("con la casa vuota la caldaia va a celsius gradi anche con la regola spenta; con la regola "
-                         "accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura"),
+    # item 15 (1231 = a, 1232 = a): out of the heating season in every mode; the alert after no_rise_minutes
+    "frost_protection": ("con la casa vuota, e fuori dalla stagione del riscaldamento anche in comfort ed eco, la caldaia "
+                         "va a celsius gradi anche con la regola spenta; con la regola accesa la mantiene anche se "
+                         "qualcuno spegne la caldaia o abbassa la temperatura; se la caldaia è accesa e la stanza resta "
+                         "sotto celsius gradi per no_rise_minutes minuti arriva l'avviso «la temperatura non risale», "
+                         "anche con la regola spenta"),
     # verification of 10 November 2026: it said «deumidifica», but the engine only warns (engine/mold.py)
     "mold_protection": ("con la casa vuota, se l'umidità supera humidity_percent, registra un avviso nelle Decisioni, al "
                         "massimo uno al giorno; non deumidifica da sola"),
