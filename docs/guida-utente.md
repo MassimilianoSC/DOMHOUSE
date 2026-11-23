@@ -209,7 +209,8 @@ di un'organizzazione).
 
 | Cosa vedi | Cosa vuol dire |
 |---|---|
-| L'indirizzo dell'ambiente di prova | [https://domotica-poc-511707.web.app](https://domotica-poc-511707.web.app) |
+| L'indirizzo dell'ambiente di prova | [https://domhouse-staging.web.app](https://domhouse-staging.web.app) |
+| L'indirizzo del sito vero | [https://domotica-poc-511707.web.app](https://domotica-poc-511707.web.app) |
 | Il marchio e il nome «DOMHOUSE» sopra la scheda | Ci sono a ogni larghezza di schermo |
 | Su computer, a sinistra, un pannello scuro con «Riscaldamento, clima e consumi dei tuoi appartamenti» | Che cosa fa l'app |
 | «Accedi» e, sotto, «Area riservata ai gestori degli appartamenti» | Il titolo della scheda di accesso |
@@ -335,7 +336,7 @@ Se l'app era già aperta:
 
 > **Da sapere**
 >
-> - **La pagina aperta** è bianca, con un filo arancione a sinistra.
+> - **La pagina aperta** ha lo sfondo chiaro e un filo a sinistra nel colore della palette.
 > - **Se le schede di una pagina** non stanno nello schermo, la loro barra scorre in orizzontale.
 > - **Mentre i dati arrivano** la pagina mostra già la sua forma (fascia, striscia, righe) in grigio chiaro, al
 >   posto di un rettangolo grigio.
