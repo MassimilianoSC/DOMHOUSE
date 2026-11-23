@@ -168,6 +168,9 @@ function SeasonBlock({ rule, draft, editable, onParams }: { rule: Rule; draft?: 
         {SEASON_SIDES.map(([side, monthKey, dayKey]) => {
           const problem = problems[side];
           const errorId = `rule-season-error-${side}`;
+          const limitsId = `rule-param-error-${rule.rule_id}-${dayKey}`;
+          // second review N4: the day box points to whichever message is shown, the limits one or «does not exist»
+          const dayDescribedBy = [errs[dayKey] ? limitsId : "", problem ? errorId : ""].filter(Boolean).join(" ") || undefined;
           return (
             <div key={side} className="field-cell" data-testid={`rule-season-${side}`}>
               <span className="text-[13px] font-medium text-muted-foreground">{side === "start" ? t("rules.season.start") : t("rules.season.end")}</span>
@@ -185,7 +188,7 @@ function SeasonBlock({ rule, draft, editable, onParams }: { rule: Rule; draft?: 
                     aria-disabled={!editable}
                     aria-label={tOr(`rules.params.${dayKey}`, dayKey)}
                     aria-invalid={Boolean(errs[dayKey] || problem)}
-                    aria-describedby={problem ? errorId : undefined}
+                    aria-describedby={dayDescribedBy}
                     onChange={(e) => onParams({ [dayKey]: e.target.value })}
                     className={cn("w-20 shrink-0 tabular", (errs[dayKey] || problem) && "border-destructive focus-visible:ring-destructive")}
                     data-testid={`rule-param-${rule.rule_id}-${dayKey}`}
@@ -205,7 +208,7 @@ function SeasonBlock({ rule, draft, editable, onParams }: { rule: Rule; draft?: 
                     {MONTHS.map((m) => <option key={m} value={String(m)}>{monthName(m)}</option>)}
                   </NativeSelect>
                 </div>
-                {errs[dayKey] && <p className="text-xs font-medium text-destructive" data-testid={`rule-param-error-${rule.rule_id}-${dayKey}`}>{errs[dayKey]}</p>}
+                {errs[dayKey] && <p id={limitsId} className="text-xs font-medium text-destructive" data-testid={limitsId}>{errs[dayKey]}</p>}
                 {problem && <p id={errorId} className="text-xs font-medium text-destructive" data-testid={errorId}>{problem}</p>}
               </div>
             </div>

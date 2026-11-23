@@ -215,6 +215,9 @@ describe("rilettura della voce 15", () => {
     set("season_start_day", "15.5");
     expect(screen.getByTestId("rule-param-error-setpoint_limits-season_start_day")).toHaveTextContent("Valore fuori dai limiti (1–31)");
     expect(box("season_start_day")).toHaveAttribute("aria-invalid", "true");
+    // second review N4: the box points to the limits message too, not only to the «does not exist» one
+    expect(screen.getByTestId("rule-param-error-setpoint_limits-season_start_day")).toHaveAttribute("id", "rule-param-error-setpoint_limits-season_start_day");
+    expect(box("season_start_day")).toHaveAttribute("aria-describedby", "rule-param-error-setpoint_limits-season_start_day");
     expect(screen.getByTestId("rules-save-btn")).toBeDisabled();
     fireEvent.click(screen.getByTestId("rules-save-btn"));
     expect(s.update).not.toHaveBeenCalled();
