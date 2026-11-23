@@ -468,12 +468,17 @@ class SlowStopConnector(CatalogConnector):
         self.how = how
 
     async def stop(self):
+        if self.how == "swallows":                                      # as Shelly and the MQTT transport stop
+            import contextlib
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await asyncio.Event().wait()
+            return
         if self.how == "hangs":
             await asyncio.Event().wait()
         raise RuntimeError("guasto")
 
 
-@pytest.mark.parametrize("how", ["hangs", "fails"])
+@pytest.mark.parametrize("how", ["hangs", "fails", "swallows"])
 def test_a_connector_that_does_not_stop_is_written_and_the_stop_goes_on(tmp_path, monkeypatch, caplog, how):
     # point 3: connector.stop() had no limit (Shelly awaits its tasks and its transport)
     from engine import service
@@ -483,7 +488,7 @@ def test_a_connector_that_does_not_stop_is_written_and_the_stop_goes_on(tmp_path
                                                   connector=SlowStopConnector(how)), 10)
     assert ok and "engine stopped" in caplog.messages
     line = next(r for r in caplog.records if r.getMessage() == "connector stop failed")
-    assert line.fields["error_type"] == ("TimeoutError" if how == "hangs" else "RuntimeError")
+    assert line.fields["error_type"] == ("RuntimeError" if how == "fails" else "TimeoutError")
 
 
 class BrokenReaderConnector(CatalogConnector):
