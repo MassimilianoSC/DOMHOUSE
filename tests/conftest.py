@@ -5,6 +5,13 @@ import pytest
 
 
 @pytest.fixture(autouse=True)
+def _a_winter_day(monkeypatch):
+    """Item 15: the built-in engines (simulated connector) follow MOCK_TODAY for the heating season, a fixed winter day:
+    no test depends on today's date (from 16 April to 14 October the boilers would stay on the frost protection)."""
+    monkeypatch.setenv("MOCK_TODAY", "2026-01-15")
+
+
+@pytest.fixture(autouse=True)
 def _per_process_counters_fresh():
     """F-5: bff/routes/webhooks.py lets UNSIGNED_ROWS_PER_MINUTE unsigned calls a minute write their row, per process;
     each test starts with a fresh minute, or one test's unsigned calls would leave the next without its rows. Nothing

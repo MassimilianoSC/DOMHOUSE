@@ -12,6 +12,7 @@ import pytest
 
 from engine import core
 from engine.connector.simulated import SimulatedConnector
+from engine.store import SqliteStore
 
 ACTOR, CORR = "prova@hqe.it", "2f0a6a4e-7a5d-4b0b-9a5e-3b1f1a2c9d10"
 BOILER, SENSOR = "dev-caldaia", "dev-ambiente-soggiorno"
@@ -41,9 +42,10 @@ async def past_the_wait():
     await asyncio.sleep(WAIT * MINUTE + 0.08)
 
 
-async def started():
+async def started(store=None):
     """apt-prova-01: comfort, boiler enabled at 21 °C, relay on; the alert waits WAIT minutes."""
-    e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False)
+    e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False,
+                             **({"store": store} if store is not None else {}))
     e.ensure_started()
     e.update_rules({"rules": [{"rule_id": "frost_protection", "params": {"no_rise_minutes": WAIT}}]}, ACTOR, CORR)
     await asyncio.sleep(0.1)
@@ -135,4 +137,66 @@ def test_1260_also_with_the_frost_rule_switched_off():
         await past_the_wait()
         await regulate_and_wait(e)
         assert len(alerts(e)) == 1
+    asyncio.run(main())
+
+
+# -------- rereading of o1-stagione (a6, 23 November) --------
+def test_an_alert_already_given_is_not_given_again_after_a_restart(tmp_path):
+    db = tmp_path / "engine.db"
+
+    async def first():
+        e = await started(SqliteStore(db))
+        temperature(e, 6.0)
+        await regulate_and_wait(e)
+        await past_the_wait()
+        await regulate_and_wait(e)
+        assert len(alerts(e)) == 1
+        for task in list(e.tasks) + [t for t in (e.loop_task, e.consumer_task) if t]:
+            task.cancel()
+        await asyncio.sleep(0)
+        e.store.close()
+    asyncio.run(first())
+
+    async def second():
+        e = core.ApartmentEngine("apt-prova-01", SimulatedConnector(), seed=False, store=SqliteStore(db))
+        e.ensure_started()
+        await asyncio.sleep(0.1)
+        before = len(alerts(e))
+        temperature(e, 6.0)                                            # the same episode, still cold
+        await regulate_and_wait(e)
+        await past_the_wait()
+        await regulate_and_wait(e)
+        assert len(alerts(e)) == before
+    asyncio.run(second())
+
+
+def test_a_boiler_offline_meanwhile_starts_a_new_wait_when_it_returns():
+    async def main():
+        e = await started()
+        temperature(e, 6.0)
+        await regulate_and_wait(e)
+        await asyncio.sleep(WAIT * MINUTE * 0.6)
+        e.test_state({"device_id": BOILER, "online": False}, ACTOR, CORR)
+        await regulate_and_wait(e)
+        await asyncio.sleep(WAIT * MINUTE * 0.6)
+        e.test_state({"device_id": BOILER, "online": True}, ACTOR, CORR)
+        await regulate_and_wait(e)
+        assert alerts(e) == []                                         # not at once: its wait starts again
+        await past_the_wait()
+        await regulate_and_wait(e)
+        assert len(alerts(e)) == 1
+    asyncio.run(main())
+
+
+def test_an_error_in_the_alert_does_not_stop_the_thermostat():
+    async def main():
+        e = await started()
+
+        def broken(*a):
+            raise RuntimeError("guasto")
+        e._not_rising_check = broken
+        temperature(e, 23.0)
+        await asyncio.sleep(core.DEFAULT_SETTINGS["THERMOSTAT_MIN_SWITCH_MINUTES"] * MINUTE + 0.05)
+        await regulate_and_wait(e)
+        assert e.relay[BOILER] is False
     asyncio.run(main())

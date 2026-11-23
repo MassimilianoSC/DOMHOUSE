@@ -9,13 +9,14 @@ it reports through changes()."""
 import asyncio
 import calendar
 import copy
+import os
 import random
 import re
 import time
 import traceback
 import uuid
 from collections import deque
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from . import log as logs
@@ -233,6 +234,21 @@ def fmt_num(n) -> str:
     return f"{n:g}".replace(".", ",")
 
 
+def local_today(timezone: str, now: datetime):
+    """Item 15: the apartment's calendar day (15 April 22:30 UTC is already the 16th in Rome)."""
+    return now.astimezone(ZoneInfo(timezone)).date()
+
+
+def engine_today(engine):
+    """Item 15 (rereading of o1-stagione): today for the heating season. MOCK_TODAY (YYYY-MM-DD) fixes it, only with the
+    simulated connector: the HTTP suites (scripts/run_tests.py, ci/engine.vars, tests/conftest.py) never depend on the
+    real date; with real devices it is ignored."""
+    forced = os.environ.get("MOCK_TODAY", "").strip()
+    if forced and isinstance(engine.connector, SimulatedConnector):
+        return date.fromisoformat(forced)
+    return local_today(engine.timezone, utcnow())
+
+
 def in_heating_season(params: dict, day) -> bool:
     """Item 15, E1: whether `day` (a date) is inside the heating season of these parameters, both dates included; a
     start later than the end is a season across the new year (15 October - 15 April)."""
@@ -412,6 +428,7 @@ class ApartmentEngine:
         self.thermostat_issue: dict[str, str] = {}   # boiler -> the sensor episode already reported (D-164)
         self.heating_by_mode: set[str] = set()       # D-164: boilers whose intention a mode set (not a person)
         self.season_on = True                        # item 15, E1: the heating season applied (kept in the store)
+        self._season_dates_changed = False            # item 15: the next change comes from new dates, not the calendar
         self.not_rising: dict[str, dict] = {}        # item 15, E2: boiler -> {"since": monotonic, "noted": bool}
         self.climate_by_mode: set[str] = set()       # D-169: climates comfort regulates (no person touched them since)
         self.climate_switched: dict[str, float] = {}  # D-169: climate -> monotonic time of its last automatic change
@@ -464,7 +481,15 @@ class ApartmentEngine:
         if self.restored:
             self._load()
         else:
+            self.season_on = self.heating_season_now()   # item 15: before the devices (a demonstration in summer)
             self.devices = {d.device_id: self._device_from(d) for d in self.connector.devices()}
+            if seeded and self.mode in ("comfort", "eco"):
+                # rereading of o1-stagione: the demonstration starts in its mode, so its boilers are the mode's, at the
+                # mode's setpoint (on the frost protection out of season): before, a demo made in July heated to 21 °C
+                for device in self.devices.values():
+                    if "heating" in device["capabilities"]:
+                        device["capabilities"]["heating"].update(on=True, setpoint=self._mode_heating_setpoint(device))
+                        self._heating_set_by(device["device_id"], mode=True)
             self._apply_limits()
             for device in self.devices.values():
                 self._save_device(device)
@@ -478,10 +503,14 @@ class ApartmentEngine:
         # season» all year, so out of season its first regulation's minute makes the change, with its decision
         saved = self.store.get_meta("heating_season")
         if saved is None:
-            self.season_on = self.heating_season_now() if not self.restored else True
+            if self.restored:
+                self.season_on = True
             self.store.put_meta("heating_season", self.season_on)
         else:
             self.season_on = bool(saved)
+        # E2 (rereading): the boilers already alerted in their current episode, not alerted again after a restart
+        for device_id in self.store.get_meta("not_rising_noted", []) or []:
+            self.not_rising[device_id] = {"since": time.monotonic(), "noted": True}
 
     # ---- infrastructure -------------------------------------------------
     def setting(self, name: str):
@@ -1363,7 +1392,7 @@ class ApartmentEngine:
         """Once a "minute": every boiler's relay where its thermostat wants it, at most one switch every
         THERMOSTAT_MIN_SWITCH_MINUTES. Decisions: the frost protection's every switch, the sensor's problems. With the
         connector down nothing can be switched: it waits for it (D-131)."""
-        self._season_check()                                 # item 15, E1: intentions only, also with the connector down
+        self._guarded("season", self._season_check)          # item 15, E1: intentions only, also with the connector down
         if not self.connector_was_up:
             return
         self._mode_pending_send()                            # D16: what the mode could not send before
@@ -1373,6 +1402,8 @@ class ApartmentEngine:
         self._keep_window_off()                              # D03: and what is still on with the window open goes off
         in_force = self.window_in_force()
         for device in self.devices.values():
+            if "heating" in device["capabilities"] and not device["online"]:
+                self._not_rising_end(device["device_id"])      # E2: a new wait when it is back
             if "heating" not in device["capabilities"] or not device["online"]:
                 continue
             device_id = device["device_id"]
@@ -1380,7 +1411,7 @@ class ApartmentEngine:
             episode = self._sensor_episode(device, problem)
             if episode != self.thermostat_issue.get(device_id):
                 self._sensor_issue(device, problem, episode)
-            self._not_rising_check(device, problem)          # item 15, E2
+            self._guarded("not_rising", self._not_rising_check, device, problem)   # item 15, E2
             if device_id in self.relay_busy or any(r[0] == device_id for r in self.inflight):
                 continue
             want, temperature, setpoint, frost = self.thermostat(device)
@@ -1407,7 +1438,7 @@ class ApartmentEngine:
 
     # ---- item 15: the heating season (E1) and «la temperatura non risale» (E2) ----
     def _today(self):
-        return utcnow().astimezone(ZoneInfo(self.timezone)).date()
+        return engine_today(self)
 
     def heating_season_now(self) -> bool:
         return in_heating_season(self.rule("setpoint_limits")["params"], self._today())
@@ -1430,19 +1461,28 @@ class ApartmentEngine:
         is left as it is; one the window rule turned off comes back
         with the new setpoint (_mode_heating_setpoint). The climates follow at the comfort regulation's minute."""
         now_on = self.heating_season_now()
-        if now_on == self.season_on or self.hold:
+        if now_on == self.season_on:
+            self._season_dates_changed = False               # new dates that leave the season as it was
+            return
+        if self.hold:
             return
         if any(c["device_id"] in self.heating_by_mode and c["status"] not in FINAL for c in self.commands.values()):
             return                                           # a mode's command still running would undo it: next minute
-        self.season_on = now_on
-        self.store.put_meta("heating_season", now_on)
+        self.season_on = now_on                              # in memory now; in the store last (a crash redoes it)
         corr = str(uuid.uuid4())
         sl = self.rule("setpoint_limits")["params"]
-        month, day = ((sl["season_start_month"], sl["season_start_day"]) if now_on
-                      else (sl["season_end_month"], sl["season_end_day"]))
-        when = f"{int(day)} {MONTHS[int(month) - 1]}"
-        reasoning = (f"Inizio della stagione del riscaldamento ({when}): la caldaia torna a comfort ed eco" if now_on
-                     else f"Fine della stagione del riscaldamento ({when}): la caldaia resta solo sull'antigelo")
+
+        def day_of(month, day):
+            return f"{int(day)} {MONTHS[int(month) - 1]}"
+        start = day_of(sl["season_start_month"], sl["season_start_day"])
+        end = day_of(sl["season_end_month"], sl["season_end_day"])
+        words = "la caldaia torna a comfort ed eco" if now_on else "la caldaia resta solo sull'antigelo"
+        if self._season_dates_changed:
+            reasoning = (f"Date della stagione del riscaldamento cambiate ({start} – {end}): ora è "
+                         f"{'in stagione' if now_on else 'fuori stagione'}, {words}")
+        else:
+            reasoning = (f"Inizio della stagione del riscaldamento ({start}): {words}" if now_on
+                         else f"Fine della stagione del riscaldamento ({end}): {words}")
         self.log("system", {"type": "apartment"}, "heating_season", "fuori stagione" if now_on else "in stagione",
                  "in stagione" if now_on else "fuori stagione", reasoning, "applied", corr)
         if self.mode in ("comfort", "eco"):
@@ -1455,6 +1495,17 @@ class ApartmentEngine:
                 self._save_device(device)
                 self.emit("device.state", {"device_id": device_id, "capability": "heating", "state": state}, corr)
         self._apply_limits(corr, emit=True)
+        self.store.put_meta("heating_season", now_on)          # last: a crash before it makes the change again
+        self._season_dates_changed = False
+
+    def _not_rising_end(self, device_id: str) -> None:
+        """E2: the episode is over (the room warm enough, the relay off, the boiler offline)."""
+        episode = self.not_rising.pop(device_id, None)
+        if episode and episode["noted"]:
+            self._not_rising_save()
+
+    def _not_rising_save(self) -> None:
+        self.store.put_meta("not_rising_noted", sorted(k for k, v in self.not_rising.items() if v["noted"]))
 
     def _not_rising_check(self, device: dict, problem: str | None) -> None:
         """E2: the relay on and the room under the frost protection's threshold for no_rise_minutes: one informational
@@ -1465,13 +1516,14 @@ class ApartmentEngine:
         threshold = float(rule["params"]["celsius"])
         temperature = None if problem else self._sensor(device)[0]
         if self.relay.get(device_id) is not True or temperature is None or temperature >= threshold:
-            self.not_rising.pop(device_id, None)
+            self._not_rising_end(device_id)
             return
         episode = self.not_rising.setdefault(device_id, {"since": time.monotonic(), "noted": False})
         minutes = rule["params"]["no_rise_minutes"]
         if episode["noted"] or time.monotonic() - episode["since"] < minutes * seconds_per_minute():
             return
         episode["noted"] = True
+        self._not_rising_save()
         self.log("system", {"type": "device", "device_id": device_id}, "heating_not_rising", None,
                  f"{fmt_num(temperature)} °C",
                  f"{device['label']}: accesa da {fmt_num(minutes)} minuti, ma la temperatura resta sotto l'antigelo "
@@ -1945,6 +1997,9 @@ class ApartmentEngine:
             if not device["online"]:
                 continue
             self.mode_pending.pop(device_id, None)
+            if (wait["body"].get("capability") == "climate" and (wait["body"].get("params") or {}).get("mode") == "heat"
+                    and not self._climate_heats()):
+                continue                                     # item 15 (1257 = a): the season ended meanwhile
             self._auto_climate = True
             try:
                 cmd = self.create_command(device_id, wait["body"], "system:engine", str(uuid.uuid4()),
@@ -2847,6 +2902,9 @@ class ApartmentEngine:
             raise MockError(status, error, message)
         for status, error, message in season_errors(sl):                 # item 15, E1
             raise MockError(status, error, message)
+        if any(k in (p.get("params") or {}) for p in patches if p.get("rule_id") == "setpoint_limits"
+               for k in SEASON_KEYS):
+            self._season_dates_changed = True
         self.rules = staged
         self.rules_updated_at = iso(utcnow())
         self._save_apartment()

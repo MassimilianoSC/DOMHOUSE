@@ -7,7 +7,7 @@ boilers to their new setpoint once, with one decision; its state is kept across 
 Run: python -m pytest engine/tests -q
 """
 import asyncio
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 
@@ -285,6 +285,19 @@ def test_new_dates_take_effect_at_the_next_minute():
         set_season(e, season_start_month=12, season_start_day=1, season_end_month=3, season_end_day=31)   # zone A
         await regulate_and_wait(e)
         assert e.season_on is False and len(season_decisions(e)) == 1
+        assert season_decisions(e)[0]["reasoning"] == ("Date della stagione del riscaldamento cambiate (1 dicembre – "
+                                                       "31 marzo): ora è fuori stagione, la caldaia resta solo "
+                                                       "sull'antigelo")
+        set_season(e, season_start_month=11, season_start_day=1)                    # back in season, by the dates
+        await regulate_and_wait(e)
+        assert season_decisions(e)[1]["reasoning"] == ("Date della stagione del riscaldamento cambiate (1 novembre – "
+                                                       "31 marzo): ora è in stagione, la caldaia torna a comfort ed eco")
+        set_season(e, season_end_day=30)                                         # new dates, the same season
+        await regulate_and_wait(e)
+        assert len(season_decisions(e)) == 2
+        e._today = lambda: date(2027, 4, 1)                                      # the calendar: its own words
+        await regulate_and_wait(e)
+        assert season_decisions(e)[2]["reasoning"].startswith("Fine della stagione del riscaldamento (30 marzo)")
     asyncio.run(main())
 
 
@@ -427,4 +440,114 @@ def test_a_boiler_the_window_turned_off_is_left_to_its_return():
         heating = e.devices[BOILER]["capabilities"]["heating"]
         assert e.season_on is False and heating["on"] is False                # not turned on with the window open
         assert e._mode_heating_setpoint(e.devices[BOILER]) == 8                # its return will bring the new one
+    asyncio.run(main())
+
+
+# -------- rereading of o1-stagione (a6, 23 November) --------
+def test_today_is_the_apartments_local_date_and_mock_today_only_for_the_simulator(monkeypatch):
+    assert core.local_today("Europe/Rome", datetime(2026, 4, 15, 22, 30, tzinfo=UTC)) == date(2026, 4, 16)
+    assert core.local_today("Europe/Rome", datetime(2026, 4, 15, 21, 30, tzinfo=UTC)) == date(2026, 4, 15)
+    e = engine()
+    monkeypatch.setattr(core, "utcnow", lambda: datetime(2026, 4, 15, 22, 30, tzinfo=UTC))
+    assert core.engine_today(e) == date(2026, 4, 16)                    # in Rome already the 16th: out of season
+    monkeypatch.setenv("MOCK_TODAY", "2026-07-01")                      # the HTTP suites' simulator
+    assert core.engine_today(e) == date(2026, 7, 1)
+
+    class Real:                                                          # not the simulator: the real date
+        timezone, connector = "Europe/Rome", object()
+    assert core.engine_today(Real()) == date(2026, 4, 16)
+
+
+def test_a_demo_made_in_summer_does_not_heat(monkeypatch):
+    monkeypatch.setattr(core.ApartmentEngine, "_today", lambda self: SUMMER)
+
+    async def main():
+        e = core.ApartmentEngine("apt-rimini-01")                       # the demonstration, in comfort
+        assert e.mode == "comfort" and e.season_on is False
+        heating = e.devices[BOILER]["capabilities"]["heating"]
+        assert heating["setpoint"] == 8 and BOILER in e.heating_by_mode
+        e.ensure_started()
+        await wait_min_switch()
+        await regulate_and_wait(e)
+        assert e.relay[BOILER] is False and season_decisions(e) == []
+    asyncio.run(main())
+
+
+def test_a_crash_during_the_change_does_not_lose_it(tmp_path):
+    db = tmp_path / "engine.db"
+
+    async def first():
+        e = engine(store=SqliteStore(db))
+        e._today = lambda: WINTER
+        e.ensure_started()
+        e.set_mode("comfort", ACTOR, CORR, "prova")
+        await commands_done(e)
+        e._today = lambda: SUMMER
+
+        def crash(*a, **k):
+            raise RuntimeError("crash")
+        e.emit = crash                                                  # dies while moving the boilers
+        with pytest.raises(RuntimeError):
+            e._season_check()
+        for task in list(e.tasks) + [t for t in (e.loop_task, e.consumer_task) if t]:
+            task.cancel()
+        await asyncio.sleep(0)
+        e.store.close()
+    asyncio.run(first())
+    e = engine(store=SqliteStore(db))
+    assert e.season_on is True                                          # not saved: the change is made again
+    e._today = lambda: SUMMER
+    e._season_check()
+    assert e.season_on is False and e.devices[BOILER]["capabilities"]["heating"]["setpoint"] == 8
+
+
+def test_a_climate_waiting_for_its_heat_command_does_not_get_it_out_of_season():
+    async def main():
+        e = engine()
+        e._today = lambda: WINTER
+        e.ensure_started()
+        e.devices[SENSOR]["capabilities"]["temperature"]["celsius"] = 17.0
+        e.test_state({"device_id": CLIMA, "online": False}, ACTOR, CORR)
+        e.set_mode("comfort", ACTOR, CORR, "prova")
+        assert e.mode_pending[CLIMA]["body"]["params"]["mode"] == "heat"
+        e._today = lambda: SUMMER
+        await regulate_and_wait(e)
+        e.test_state({"device_id": CLIMA, "online": True}, ACTOR, CORR)
+        await regulate_and_wait(e)
+        await commands_done(e)
+        sent = [c for c in e.commands.values() if c["device_id"] == CLIMA and c["params"].get("mode") == "heat"]
+        assert e.season_on is False and sent == [] and CLIMA not in e.mode_pending
+    asyncio.run(main())
+
+
+def test_an_error_in_the_season_check_does_not_stop_the_thermostat():
+    async def main():
+        e = engine()
+        e._today = lambda: WINTER
+        e.ensure_started()
+        e.set_mode("comfort", ACTOR, CORR, "prova")
+        await commands_done(e)
+
+        def broken():
+            raise RuntimeError("guasto")
+        e._season_check = broken
+        temperature(e, 23.0)                                           # above 21 + 0.5: the relay goes off
+        await wait_min_switch()
+        await regulate_and_wait(e)
+        assert e.relay[BOILER] is False
+    asyncio.run(main())
+
+
+def test_out_of_season_the_window_keeps_the_frost_protection_and_says_it():
+    async def main():
+        e = engine()
+        e._today = lambda: SUMMER
+        e.ensure_started()
+        await regulate_and_wait(e)
+        e.set_mode("comfort", ACTOR, CORR, "prova")
+        await commands_done(e)
+        e._window_turn_off("dev-finestra-camera", "Finestra camera aperta da oltre 5 minuti")
+        await commands_done(e)                                         # the decision comes with the command's outcome
+        off = [d for d in e.decisions if d["target"].get("device_id") == BOILER and d["actor"] == "rule:window_open_off"]
+        assert off and off[-1]["reasoning"].endswith("; l'antigelo resta attivo")
     asyncio.run(main())

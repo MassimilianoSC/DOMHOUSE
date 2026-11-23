@@ -22,7 +22,7 @@ import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from engine.core import range_errors
+from engine.core import SEASON_KEYS, range_errors, season_errors
 
 DAILY_LIMIT = 20
 TEXT_MAX = 500
@@ -142,17 +142,24 @@ def changes(ruleset: dict, patches: list) -> tuple[list[dict], list[dict]]:
     touched = any(isinstance(p, dict) and p.get("rule_id") == "setpoint_limits" for p in patches)
     for status, error, message in (range_errors(sl, touched) if sl else []):
         raise ProposalError(status, error, message)
+    # item 15 (rereading of o1-stagione): the season's dates, the engine's check, when the rule has them (an older
+    # engine may not)
+    for status, error, message in (season_errors(sl) if sl and all(k in sl for k in SEASON_KEYS) else []):
+        raise ProposalError(status, error, message)
     return clean, out
 
 
 def customized(ruleset: dict) -> list[dict]:
-    """The editable values that differ from the predefined ones (D-151 point 22 d)."""
+    """The editable values that differ from the predefined ones (D-151 point 22 d): what a copy would overwrite, so not
+    the heating season's dates, which the copy leaves alone (answer 1269 = a)."""
     out = []
     for r in ruleset.get("rules") or []:
         base = DEFAULTS.get(r["rule_id"])
         if not base or not r["editable"]:
             continue
         for field, default in base.items():
+            if field in SEASON_KEYS:
+                continue
             value = r["enabled"] if field == "enabled" else r["params"].get(field)
             if value is not None and value != default:
                 out.append({"rule_id": r["rule_id"], "label": r["label"], "field": field, "value": value,

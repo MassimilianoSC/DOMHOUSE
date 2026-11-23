@@ -816,7 +816,11 @@ Esempio di risposta di #38 a «la finestra aperta spegne dopo 10 minuti e la pre
 ## Copia delle regole (P-60 passo 12, D-151 punto 22)
 
 Solo gli amministratori. Si copiano tutte le regole modificabili dell'appartamento di partenza (attiva o spenta e
-parametri) sugli appartamenti scelti, sempre in due tempi.
+parametri) sugli appartamenti scelti, sempre in due tempi. Restano fuori le quattro date della stagione del
+riscaldamento (`season_start_month`, `season_start_day`, `season_end_month`, `season_end_day`, risposta 1269 = a):
+ogni appartamento tiene le sue, che si cambiano solo dalla sua pagina Regole; non compaiono né in `rules` né fra i
+`changes` né fra i valori personalizzati (`customized`). Una proposta che porta una data inesistente risponde 422
+`invalid_date` con la frase del motore.
 
 1. **Anteprima (#40)**, corpo `{"to": ["apt-rimini-01", …]}`. Non cambia niente. Esempio di risposta:
 

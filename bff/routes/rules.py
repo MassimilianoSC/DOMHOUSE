@@ -154,8 +154,10 @@ COPY_PARALLEL = 5
 
 
 def _copy_patches(source: dict) -> list[dict]:
-    """Every editable rule of the source apartment: on/off and parameters."""
-    return [{"rule_id": r["rule_id"], "enabled": r["enabled"], "params": dict(r["params"])}
+    """Every editable rule of the source apartment: on/off and parameters. Not the heating season's dates (answer 1269 =
+    a): each apartment keeps its own, changed only from its Rules page."""
+    return [{"rule_id": r["rule_id"], "enabled": r["enabled"],
+             "params": {k: v for k, v in r["params"].items() if k not in rp.SEASON_KEYS}}
             for r in source.get("rules") or [] if r["editable"]]
 
 

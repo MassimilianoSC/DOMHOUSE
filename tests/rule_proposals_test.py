@@ -409,3 +409,36 @@ def test_the_first_values_and_the_meaning_follow_the_engine():
     assert {k: v for k, v in rp.DEFAULTS["frost_protection"].items() if k != "enabled"} == frost
     assert all(k in meaning for k in ("season_start_month", "season_start_day", "season_end_month", "season_end_day"))
     assert "no_rise_minutes" in rp.MEANING["frost_protection"] and "fuori dalla stagione" in rp.MEANING["frost_protection"]
+
+
+def test_item_15_a_proposal_with_a_date_that_does_not_exist_is_refused():
+    ruleset = fresh_rules()
+    with pytest.raises(rp.ProposalError) as exc:
+        rp.changes(ruleset, [{"rule_id": "setpoint_limits", "params": {"season_end_day": 31}}])     # 31 April
+    assert (exc.value.status, exc.value.error, exc.value.message) == (
+        422, "invalid_date", "La data di fine della stagione non esiste (31/4).")
+    assert rp.changes(ruleset, [{"rule_id": "setpoint_limits", "params": {"season_end_day": 30}}])[1][0]["new"] == 30
+
+
+def test_1269_the_seasons_dates_stay_out_of_the_copy(engines):
+    """Answer 1269 = a: each apartment keeps its season's dates, changed only from its own Rules page: the copy neither
+    sends them nor shows them, as a change or as the destination's own values; the rest of the rule is copied."""
+    rimini = core.ApartmentEngine(RIMINI, SimulatedConnector(), seed=False)
+    engines.engines[RIMINI] = rimini
+    rimini.update_rules({"rules": [{"rule_id": "setpoint_limits", "params": {"season_start_month": 11,
+                                                                             "season_start_day": 1}}]}, "x@hqe.it", "c")
+    src = core.ApartmentEngine(BOLOGNA, SimulatedConnector(), seed=False)
+    engines.engines[BOLOGNA] = src
+    src.update_rules({"rules": [{"rule_id": "setpoint_limits", "params": {"season_start_month": 12, "season_start_day": 1,
+                                                                          "season_end_month": 3, "season_end_day": 31,
+                                                                          "eco_celsius": 17}}]}, "x@hqe.it", "c")
+    p = copy("/preview", {"to": [RIMINI]}).json()
+    t = p["targets"][0]
+    assert [(c["field"], c["old"], c["new"]) for c in t["changes"]] == [("eco_celsius", 18, 17)]
+    assert not any(k.startswith("season_") for r in p["rules"] for k in r.get("params", {}))
+    assert t["customized"] == []                                       # its own dates are not «customized» either
+    r = copy("", {"to": [RIMINI], "from_based_on": p["from"]["based_on"],
+                  "based_on": {x["apartment_id"]: x["based_on"] for x in p["targets"]}})
+    assert r.json()["results"][0]["outcome"] == "applied"
+    sl = rimini.rule("setpoint_limits")["params"]
+    assert (sl["eco_celsius"], sl["season_start_month"], sl["season_start_day"], sl["season_end_month"]) == (17, 11, 1, 4)

@@ -141,6 +141,7 @@ BFF_ENV = {
     "BFF_ROOT_PATH": "",
     "INSTANCE_API_KEY_FALLBACK": "dev-key",
     "MOCK_TIME_SCALE": "1",
+    "MOCK_TODAY": "2026-01-15",  # item 15: the heating season of the built-in engines, never the real date
     "GCP_PROJECT_ID": "your-gcp-project-id",
     "FIREBASE_PROJECT_ID": "your-gcp-project-id",
     "CORS_ORIGINS": "",
