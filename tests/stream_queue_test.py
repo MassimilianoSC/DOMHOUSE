@@ -193,3 +193,29 @@ def test_the_replay_buffer_has_a_limit_too(apt, monkeypatch):
     asyncio.run(main())
     assert [e.id for e in hub.buffer] == ["2", "3", "4"] and [e.id for e in hub.replay_after("3")] == ["4"]
 
+
+
+def test_a_stream_cancelled_while_an_event_is_ready_stops(apt, monkeypatch):
+    # Linux CI, 23 November: on Python 3.11 (the BFF's image) asyncio.wait_for gave back an event that was ready in the
+    # same turn and lost the cancel (the browser gone, the instance stopping): the stream went on up to its limit
+    opened = stream(apt, monkeypatch, 3)
+
+    async def main():
+        body, hub = await opened()
+        assert "connected" in await anext(body)
+
+        async def read():
+            async for _ in body:
+                pass
+        task = asyncio.create_task(read())
+        await asyncio.sleep(0.05)                                      # the stream waits for an event
+        await hub._publish(event(1))
+        task.cancel()                                                  # in the same turn as the event
+        done, _ = await asyncio.wait({task}, timeout=2)
+        if not done:
+            for queue in list(hub.subscribers):
+                queue.put_nowait(None)                                 # let the test end, red
+            await asyncio.wait({task}, timeout=2)
+        return done, task, hub
+    done, task, hub = asyncio.run(main())
+    assert task in done and task.cancelled() and hub.subscribers == set()
