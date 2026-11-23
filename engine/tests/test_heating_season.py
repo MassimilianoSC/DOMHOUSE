@@ -285,12 +285,12 @@ def test_new_dates_take_effect_at_the_next_minute():
         set_season(e, season_start_month=12, season_start_day=1, season_end_month=3, season_end_day=31)   # zone A
         await regulate_and_wait(e)
         assert e.season_on is False and len(season_decisions(e)) == 1
-        assert season_decisions(e)[0]["reasoning"] == ("Date della stagione del riscaldamento cambiate (1 dicembre – "
+        assert season_decisions(e)[0]["reasoning"] == ("Date della stagione del riscaldamento cambiate (1º dicembre – "
                                                        "31 marzo): ora è fuori stagione, la caldaia resta solo "
                                                        "sull'antigelo")
         set_season(e, season_start_month=11, season_start_day=1)                    # back in season, by the dates
         await regulate_and_wait(e)
-        assert season_decisions(e)[1]["reasoning"] == ("Date della stagione del riscaldamento cambiate (1 novembre – "
+        assert season_decisions(e)[1]["reasoning"] == ("Date della stagione del riscaldamento cambiate (1º novembre – "
                                                        "31 marzo): ora è in stagione, la caldaia torna a comfort ed eco")
         set_season(e, season_end_day=30)                                         # new dates, the same season
         await regulate_and_wait(e)

@@ -1472,8 +1472,8 @@ class ApartmentEngine:
         corr = str(uuid.uuid4())
         sl = self.rule("setpoint_limits")["params"]
 
-        def day_of(month, day):
-            return f"{int(day)} {MONTHS[int(month) - 1]}"
+        def day_of(month, day):                              # «1º dicembre», as the site writes it (a6)
+            return f"{int(day)}{'º' if int(day) == 1 else ''} {MONTHS[int(month) - 1]}"
         start = day_of(sl["season_start_month"], sl["season_start_day"])
         end = day_of(sl["season_end_month"], sl["season_end_day"])
         words = "la caldaia torna a comfort ed eco" if now_on else "la caldaia resta solo sull'antigelo"
