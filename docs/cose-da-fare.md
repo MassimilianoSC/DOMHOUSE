@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 23 novembre, 11:19, da `3417dcf` (revisione `domotica-bff-staging-00029-qtv`); `lab-01` ancora a `engine:9576073` (aggiornamento del motore a parte); immagine approvata per le creazioni `engine:3417dcf` |
 | **Solo nello staging** | creazione degli appartamenti dall'app, credenziali dei dispositivi, «Prova l'agente» (in produzione con la seconda VM, voce 26); tutto il resto è anche in produzione dal 23 novembre |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1269 |
+| **Ultima domanda al committente** | 1270 |
 
 ## 2. Cose da fare
 
