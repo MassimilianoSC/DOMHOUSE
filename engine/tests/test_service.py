@@ -261,6 +261,69 @@ class CatalogConnector:
             self.running -= 1
 
 
+class DeafConnector(CatalogConnector):
+    """A connector whose reader misses the cancel (asyncio.wait_for on Python 3.11 did): it ends at stop(), or never."""
+
+    def __init__(self, ends_at_stop=True):
+        super().__init__()
+        self.ends_at_stop, self.done = ends_at_stop, False
+
+    async def stop(self):
+        if self.ends_at_stop:
+            self.done = True
+
+    async def changes(self):
+        while not self.done:
+            try:
+                await asyncio.sleep(0.02)
+            except asyncio.CancelledError:
+                continue                                                # the cancel lost
+        return
+        yield  # pragma: no cover
+
+
+def stopped_within(app, seconds):
+    """Start and stop the app's lifespan in a thread: True when the stop ends within `seconds`."""
+    import threading
+
+    def run():
+        with TestClient(app):
+            pass
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    thread.join(seconds)
+    return not thread.is_alive(), thread
+
+
+def test_the_engine_stops_also_when_its_reader_misses_the_cancel(tmp_path, caplog):
+    # rereading of o1-wait-for: the shutdown waited for the reader before stopping the connector, without a limit;
+    # now the connector stops first and its reader ends at once, without waiting for the limit
+    caplog.set_level(logging.INFO, logger="engine")
+    deaf = DeafConnector()
+    ok, thread = stopped_within(create_engine_app(config(CONNECTOR="prova", DATA_DIR=str(tmp_path)), connector=deaf), 10)
+    deaf.done = True                                                    # let a red test end
+    thread.join(5)
+    assert ok and "engine tasks still running at stop" not in caplog.messages
+
+
+def test_the_engine_stops_within_its_limit_when_the_reader_never_ends(tmp_path, monkeypatch, caplog):
+    # a reader deaf to every cancel: the engine's stop does not wait for it past SHUTDOWN_WAIT_S and says so (the event
+    # loop's own end would still wait for it: that is outside the engine)
+    import time
+    from engine import service
+    monkeypatch.setattr(service, "SHUTDOWN_WAIT_S", 0.5)
+    caplog.set_level(logging.INFO, logger="engine")
+    deaf = DeafConnector(ends_at_stop=False)
+    _, thread = stopped_within(create_engine_app(config(CONNECTOR="prova", DATA_DIR=str(tmp_path)), connector=deaf), 0)
+    until = time.monotonic() + 10
+    while time.monotonic() < until and "engine stopped" not in caplog.messages:
+        time.sleep(0.05)
+    stopped = "engine stopped" in caplog.messages
+    deaf.done = True                                                    # let the event loop end
+    thread.join(5)
+    assert stopped and "engine tasks still running at stop" in caplog.messages
+
+
 def test_catalog_and_energy_as_the_contract_wants():
     engine = core.ApartmentEngine("apt-prova-01", CatalogConnector(), seed=False)
     presa = engine.devices["dev-presa"]["capabilities"]

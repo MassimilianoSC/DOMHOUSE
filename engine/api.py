@@ -317,8 +317,9 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
                 yield ": connected\n\n"
                 while True:
                     try:
-                        # not asyncio.wait_for: on Python 3.11 (the engine's image) it lost a cancel that came with
-                        # a ready event, and the stream went on for ever (Linux CI, 23 November)
+                        # not asyncio.wait_for: on Python 3.11 (the engine's image), outside an anyio scope (bare
+                        # tasks, tests), it lost a cancel that came with a ready event and the loop went on; served by
+                        # uvicorn the scope repeats the cancel (Linux CI and its rereading, 23 November)
                         async with asyncio.timeout(ping):
                             env = await queue.get()
                     except TimeoutError:
