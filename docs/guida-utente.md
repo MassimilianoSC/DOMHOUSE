@@ -96,6 +96,94 @@ appartamento, anche da lontano.
 > Il gestore della piattaforma, da solo, non vede dispositivi, consumi, decisioni né utenti delle organizzazioni:
 > può entrarci solo con un **accesso di assistenza** a tempo, che l'amministratore vede e può chiudere (parte 8).
 
+### Come è stato controllato DOMHOUSE
+
+**Quali controlli ha fatto HQE sul sistema, quando, su che cosa e con quale esito.**
+
+- Un sistema che comanda caldaie e climatizzatori deve fare quello che promette e restare chiuso agli estranei.
+- Per questo ogni parte nuova passa da più controlli, ognuno con un compito diverso.
+- L'elenco cresce: quando un controllo trova un problema di un tipo nuovo, si aggiunge un controllo per quel tipo.
+
+**Come sono fatti i controlli:**
+
+- **Chi controlla non ha scritto il codice.** Molti controlli sono fatti da revisori automatici indipendenti
+  (programmi di intelligenza artificiale), che leggono soltanto e non cambiano nulla.
+- **Ogni problema trovato viene ricontrollato** da un secondo revisore prima della correzione.
+- **Per i difetti del codice** si scrive prima una prova automatica che riproduce il problema, poi si corregge.
+- **Le decisioni le prende HQE**: che cosa correggere, che cosa accettare come limite noto.
+
+| Parola | Che cosa vuol dire |
+|---|---|
+| Ambiente di prova | La copia di DOMHOUSE con dati separati da quelli veri, dove si prova tutto prima (lo staging) |
+| Produzione | L'ambiente vero, quello che usano le organizzazioni |
+| Macchina virtuale | Il computer nel cloud su cui girano i sistemi domotici degli appartamenti |
+| Pubblicazione | Il momento in cui una modifica arriva nell'ambiente di prova o in produzione |
+| Rodaggio | La produzione tenuta sempre accesa fino alla consegna, per vedere i difetti che compaiono solo col tempo |
+
+### Come è stato controllato: i controlli fatti
+
+**Ogni controllo, con la data e l'esito.**
+
+| N. | Controllo | Quando | Che cosa ha guardato | Esito |
+|---|---|---|---|---|
+| 1 | Revisione «da avversario» della separazione fra organizzazioni | 16 ottobre 2026; ripetuta sulle parti nuove il 16 e 17 ottobre | Se una persona di un'organizzazione può vedere o comandare gli appartamenti di un'altra | Trovati 6 problemi importanti (2 gravi, 4 medi) e alcuni minori. I 6 importanti corretti o risolti con una decisione, e ricontrollati, prima della pubblicazione del 16 ottobre. I minori in parte corretti, in parte accettati come limiti noti. Le revisioni ripetute: nessun problema grave; i medi corretti e pubblicati il 16 e 17 ottobre |
+| 2 | Analisi dell'aspetto e della chiarezza dell'app | 23 ottobre 2026 | Colori, caratteri, testi e coerenza delle pagine, anche sul telefono | Proposte divise in tre gruppi di modifiche, tutte applicate e in produzione dal 23 ottobre |
+| 3 | Spiegazione passo per passo, dal sensore all'app e ritorno | 10 novembre 2026 | Il percorso di un dato e di un comando attraverso tutto il sistema | Non era una revisione, ma ha trovato 5 difetti veri: corretti e pubblicati il 10 novembre |
+| 4 | Revisione completa del codice con revisori indipendenti, più l'infrastruttura vista da fuori | 10–11 novembre 2026 | Il codice di sito, server e sistemi domotici; librerie con difetti noti; password dimenticate nella storia del codice; permessi nel cloud, firewall, segreti, account | Circa 75 segnalazioni. Dopo la verifica: 1 difetto grave e 24 importanti confermati, gli altri minori o smentiti. Tutti quelli del nostro codice corretti e pubblicati il 12 novembre. Nessuna password vera nella storia del codice. Infrastruttura: un solo problema (separazione insufficiente fra ambiente di prova e produzione), corretto il 12 novembre. I punti del codice di collegamento ai dispositivi, passati al suo sviluppatore, sono stati corretti da lui, ricontrollati e uniti al resto fra l'11 e il 13 novembre |
+| 5 | Revisione per scenari della vita reale | 13 novembre 2026 | Che cosa fa il sistema in casi concreti: finestra aperta, prenotazioni spostate, telecomando, dispositivo senza segnale, ruoli e notifiche | 30 rilievi (7 gravi), ricontrollati da 5 verificatori: nessuno smentito. Corretti e pubblicati il 13 novembre tutti quelli decisi. Ne restano 6, che dipendono da dispositivi non ancora installati, da una risposta del cliente o dai dati di Italianway. Lo stesso giorno corretti anche i testi della guida |
+| 6 | Revisione delle modifiche al codice che collega i dispositivi | dall'11 novembre 2026, a ogni modifica | Ogni modifica dello sviluppatore del collegamento, prima di unirla al resto; e la forza delle sue prove (con guasti voluti, per vedere se le prove se ne accorgono) | Unite solo le modifiche giudicate pronte. Quelle con problemi (per esempio un sensore muto che tornava «in linea» con valori vecchi) rimandate allo sviluppatore e corrette prima dell'unione. L'orologio del ponte dei sensori Bluetooth è stato misurato in laboratorio dallo sviluppatore: dopo un riavvio l'ora è giusta in pochi secondi; la correzione per un caso raro di orologio sbagliato è stata ricontrollata, anche con guasti voluti, e unita il 16 novembre. L'orologio sarà tenuto sotto controllo anche nel tempo |
+| 7 | Revisione delle procedure | 13 novembre 2026 e a ogni procedura nuova | Che i comandi dati a HQE per installare e cambiare il sistema siano giusti e sicuri | Ogni procedura letta prima dell'uso. Esempi: procedura delle prove con i dispositivi, 21 punti, nessuno bloccante, tutti corretti (13 novembre); rafforzamento della macchina virtuale, 12 punti corretti e seconda lettura «eseguibile» (17 novembre) |
+| 8 | Revisione di sicurezza del progetto per la creazione degli appartamenti dall'app | 15 novembre 2026, due letture | Il progetto, letto da avversario, prima di scrivere il codice | 5 problemi bloccanti e 20 punti minori, tutti corretti nel progetto; seconda lettura: «si può cominciare il codice». In più ha trovato 3 difetti già presenti nella macchina virtuale: corretti il 17 novembre |
+| 9 | Revisioni di sicurezza del codice per la creazione degli appartamenti dall'app | 16–21 novembre 2026, una per ogni parte | Il codice di ogni parte nuova prima di installarla nell'ambiente di prova | Per ogni parte: «installabile dopo correzioni», correzioni fatte e seconda lettura prima dell'installazione. Dettaglio nella tabella sotto |
+| 10 | Controllo di sicurezza dentro la macchina virtuale | 17 novembre 2026 | Fin dove arriverebbe un pezzo del sistema diventato ostile: permessi, porte aperte, contenitori, file | Nessun problema grave. 2 punti medi e alcuni minori: tutti corretti entro la manutenzione del 19 novembre e ricontrollati; uno accettato come limite noto |
+| 11 | Prove automatiche a ogni gruppo di modifiche | a ogni gruppo; l'ultimo giro completo il 22 novembre 2026 | Che il codice faccia quello che le prove descrivono: server, database, sistemi domotici, sito, browser, Linux | Ultimo giro completo: **4.191 prove**. Le 4 non passate avevano 2 cause: un difetto vero (un servizio interno riceveva un rifiuto che gli faceva ripetere all'infinito un messaggio troppo grande) e una prova da aggiornare al testo nuovo «L'ID», su tre larghezze di schermo. Corretti e riprovati |
+| 12 | Prove a mano nell'ambiente di prova e lista di collaudo | a ogni gruppo di modifiche | Quello che vede e fa chi usa l'app | I difetti trovati corretti subito e riprovati: per esempio 2 il 23 ottobre e 2 il 13 novembre. Il collaudo dei colleghi non tecnici non è ancora fatto |
+| 13 | Prove sull'infrastruttura | 9–11 novembre 2026 | Due copie del server insieme (9 nov); certificato di sicurezza del collegamento dei dispositivi rinnovato e revocato (10 nov); porte raggiungibili da internet (10 nov); macchina virtuale spenta e riaccesa (11 nov) | Tutte riuscite. Da internet si raggiunge solo l'ingresso previsto per i dispositivi. In più: al riavvio del 19 novembre trovato un difetto di avvio, corretto e riprovato lo stesso giorno |
+| 14 | Prove con dispositivi veri | dal 12 novembre 2026 | Il collegamento vero fra app e dispositivi in laboratorio: dato letto dalla presa e comando acceso/spento | Il dato arriva dalla presa all'app e il comando arriva dall'app alla presa, con conferma. Trovati 2 difetti (un messaggio d'errore fuorviante, troppi comandi di fila alla caldaia): corretti |
+| 15 | Rodaggio della produzione, con un rapporto ogni lunedì | dal 9 novembre 2026 | Come si comporta la produzione nel tempo: disponibilità, riavvii, allarmi, errori, memoria e disco | Due rapporti (settimane 9–15 e 16–22 novembre): server disponibile al 100 %, nessun difetto della produzione; un difetto in uno dei controlli automatici, corretto il 17 novembre |
+| 16 | Revisione «attacco da fuori» del sito e del server | 22 novembre 2026 | Che cosa può fare uno sconosciuto da internet, o una persona tolta da un'organizzazione: accessi, richieste enormi, limiti, sessioni, chiavi | Tre revisori indipendenti e un verificatore: 16 difetti confermati (2 gravi: una persona tolta poteva rientrare; richieste molto grandi potevano fermare il server). Per ognuno una prova automatica che rifà l'attacco, poi la correzione, ricontrollata. Nei registri del server nessun segno di richieste enormi. Nell'ambiente di prova dal 23 novembre, con le verifiche dal vivo; in produzione alla prossima pubblicazione |
+| 17 | Lettura da esperto della facilità d'uso | 22 novembre 2026 | Pagine e guida lette nei panni di chi non è tecnico, per la creazione degli appartamenti | 53 punti (10 alti). Gli alti corretti nei testi dell'app e della guida, nell'ambiente di prova dal 23 novembre; i medi e i bassi in corso |
+
+**Dettaglio della riga 9: una revisione per ogni parte nuova.**
+
+| N. | Parte nuova | Quando | Esito |
+|---|---|---|---|
+| 1 | Collegamento sicuro fra il server e la macchina virtuale (esegue solo un elenco chiuso di ordini firmati) | 16 novembre 2026 | 3 punti da correggere prima dell'installazione e altri minori; tre letture; esito finale «installabile» |
+| 2 | Progetto della creazione di un appartamento e delle password dei dispositivi | 19 novembre 2026 | 8 punti medi; dopo le correzioni «eseguibile», con una correzione piccola fatta lo stesso giorno e verificata nel codice il 20 novembre |
+| 3 | Password dei dispositivi registrate e rigenerate dall'app | 19 novembre 2026 | 9 punti (1 medio), tutti corretti prima dell'installazione |
+| 4 | Creare un appartamento dall'app | 20 novembre 2026 | 9 punti (2 medi), tutti corretti; seconda lettura «installabile»; 2 osservazioni minori della seconda lettura corrette |
+| 5 | Posti liberi sulla macchina virtuale | 20 novembre 2026 | 6 punti (2 medi): 5 chiusi, 1 è una nota per un lavoro futuro e oggi non fa danni |
+| 6 | Accessi rifiutati dei dispositivi | 20–21 novembre 2026 | 6 punti (2 medi), corretti; seconda lettura: 3 punti nuovi, corretti; terza lettura dopo una decisione di HQE |
+| 7 | Disattivare ed eliminare un appartamento | 20 novembre 2026 | 12 punti (2 medi), corretti; seconda lettura: 1 punto nuovo, corretto |
+
+> **Da sapere**
+>
+> Le parti della riga 9 sono installate solo nell'ambiente di prova. Prima della produzione passano dagli stessi
+> controlli.
+
+### Come è stato controllato: controlli decisi e in corso
+
+**I tipi di controllo non ancora fatti del tutto. Dal 22 novembre 2026 ognuno ha la sua decisione scritta.**
+
+| N. | Tipo di controllo | La domanda | Stato |
+|---|---|---|---|
+| 1 | Sicurezza dentro la macchina virtuale | Se un pezzo del sistema diventasse ostile, fin dove arriverebbe? | Fatto il 17 novembre 2026 (riga 10 dei controlli fatti) |
+| 2 | Attacco da fuori al sito e al server | Che cosa può fare uno sconosciuto da internet? | Fatto il 22 novembre 2026 (riga 16 dei controlli fatti); in produzione alla prossima pubblicazione |
+| 3 | Prova di carico | Quante persone e quanti appartamenti regge il sistema insieme? | Procedura pronta; da fare prima della produzione vera |
+| 4 | Ripristino vero dalle copie | Se si perdono il database o il disco, si torna indietro davvero? In quanto tempo, con quali dati? | Deciso il 22 novembre 2026: prova completa su copie che non toccano niente di vero, con tempi e dati persi misurati; da fare prima della produzione vera |
+| 5 | Librerie e aggiornamenti di sicurezza | Chi controlla, e quando, librerie, programmi e firmware dei dispositivi con difetti noti? | Deciso il 22 novembre 2026: controllo automatico delle librerie a ogni modifica (attivo dal 22 novembre), aggiornamenti automatici dove è sicuro, un controllo a mano ogni mese (il primo il 23 novembre) |
+| 6 | Dati personali | L'informativa e i trattamenti sono corretti per il titolare? | Bozza pronta; manca il parere del consulente del titolare |
+| 7 | Sicurezza in appartamento | Un ospite collegato al Wi-Fi di casa può aprire o disturbare i dispositivi? | Deciso il 22 novembre 2026: analisi scritta dei rischi fatta lo stesso giorno; prova al banco con i dispositivi da fare |
+| 8 | Facilità d'uso per chi non è tecnico | Gestori, operatori e cliente capiscono app e guide senza aiuto? | Deciso il 22 novembre 2026: lettura da esperto fatta (riga 17 dei controlli fatti); manca la prova con i colleghi |
+| 9 | Aggiornamenti e ritorni indietro | Una pubblicazione sbagliata si annulla davvero, anche sui sistemi domotici? | Deciso il 22 novembre 2026: prova nell'ambiente di prova per ogni pezzo, con i tempi; da fare |
+| 10 | Lungo periodo con dispositivi veri | Batterie, orologi, disconnessioni e firmware dopo settimane | Deciso il 22 novembre 2026: elenco di 16 misure con le loro soglie, da misurare prima sul banco di prova e poi nel mese di prove del primo appartamento |
+
+> **Da sapere**
+>
+> - Un problema compare in questa pagina solo dopo che è stato corretto e pubblicato.
+> - Nessun controllo dimostra che non esiste più nessun problema: ogni controllo abbassa il rischio.
+> - Per questo i controlli continuano anche dopo la consegna, e l'elenco si allunga.
+
 ## 2. Primi passi, uguali per tutti
 
 ### Ricevere l'invito ed entrare
@@ -105,8 +193,8 @@ appartamento, anche da lontano.
 Non ci si registra da soli: si entra sempre con un invito di un amministratore (o di HQE per il primo amministratore
 di un'organizzazione).
 
-1. **Ricevi un'email** con oggetto «Invito a DOMHOUSE». Dentro ci sono il nome dell'organizzazione, il tuo ruolo e
-   chi ti ha invitato. Controlla anche lo spam.
+1. **Ricevi un'email** con oggetto «Invito a DOMHOUSE». Comincia con «Ciao,» e dice il nome dell'organizzazione e il
+   tuo ruolo; non contiene nomi scritti da persone, nemmeno quello di chi ti ha invitato. Controlla anche lo spam.
 2. **Se la tua email è un account Google** (per esempio Gmail): premi «Apri l'app», poi «Accedi con Google» e scegli
    quello stesso indirizzo.
 3. **Altrimenti premi «Scegli la password»** nell'email e scegli una password. Il link vale 1 ora.
@@ -126,6 +214,7 @@ di un'organizzazione).
 | Su computer, a sinistra, un pannello scuro con «Riscaldamento, clima e consumi dei tuoi appartamenti» | Che cosa fa l'app |
 | «Accedi» e, sotto, «Area riservata ai gestori degli appartamenti» | Il titolo della scheda di accesso |
 | «Accesso di sviluppo» con «Modalità sviluppo: scegli un utente di prova, nessuna password richiesta.» | Esiste solo nell'ambiente di sviluppo tecnico: nell'ambiente di prova e in quello vero non c'è |
+| La casella «Questo è un dispositivo condiviso», sopra i pulsanti di accesso (dal 23 novembre 2026, per ora solo nello staging) | Da spuntare su un telefono o un computer usato da più persone (vedi sotto) |
 
 > **Attenzione**
 >
@@ -134,6 +223,22 @@ di un'organizzazione).
 > - **Quel codice non è** l'«ID richiesta» delle altre pagine.
 > - **Se chiudi tu** la finestra di Google, non compare nulla.
 > - **I messaggi possibili** sono nella parte 11.
+
+**Dispositivo condiviso** (dal 23 novembre 2026, per ora solo nello staging)**:**
+
+Sotto la casella l'app spiega: «Dopo 30 minuti senza usare l'app l'uscita è automatica, e alla riapertura serve di
+nuovo l'accesso. Lasciala spenta sul tuo telefono o computer personale.»
+
+1. **Spunta** «Questo è un dispositivo condiviso» prima di premere «Accedi» o «Accedi con Google».
+2. **Usa l'app** come sempre.
+3. **Dopo 30 minuti senza usarla** esci da solo. La pagina «Accedi» dice «Uscita automatica: l'app non è stata usata
+   per 30 minuti su un dispositivo condiviso. Accedi di nuovo per continuare.»
+
+- **Finché vale**, in Impostazioni > Profilo c'è la riga «Dispositivo condiviso: uscita automatica dopo 30 minuti
+  senza usare l'app. Per toglierla esci e accedi di nuovo senza la casella.»
+- **Se il browser non lo permette** leggi «Su questo browser l'uscita automatica non è disponibile: premi «Esci»
+  quando hai finito.»
+- **Vale anche** se chiudi l'app e la riapri dopo più di 30 minuti.
 
 ### Password dimenticata
 
@@ -169,6 +274,33 @@ la frase «Aggiungi l'app alla schermata Home: si apre a schermo intero e riceve
 > - **Il pulsante «Installa»** compare solo se il browser lo permette; con altri browser restano le istruzioni
 >   scritte.
 > - **Installare l'app non attiva da sola le notifiche**: vedi «Notifiche sul telefono».
+
+### L'app si aggiorna da sola
+
+**Dopo ogni aggiornamento di DOMHOUSE l'app si apre già nuova** (dal 23 novembre 2026, per ora solo nello staging).
+
+Se l'app era già aperta:
+
+| Quando | Cosa succede |
+|---|---|
+| Torni a guardare l'app (anche dallo sfondo del telefono) e non l'hai ancora toccata da quando l'hai aperta | Si ricarica da sola nei primi secondi |
+| L'hai già usata, oppure hai una finestra aperta o stai scrivendo in un campo | In alto compare «È disponibile una versione nuova» con «Aggiorna»: quello che non hai salvato resta |
+| Dopo l'avviso passi a un'altra pagina | La pagina nuova si apre già con la versione nuova |
+| Un salvataggio o un comando sta ancora aspettando la risposta | L'app aspetta la risposta: si aggiorna al cambio di pagina successivo |
+
+1. **Per aggiornare subito**, premi «Aggiorna».
+2. **Se non lo premi**, l'app si aggiorna da sola al primo cambio di pagina.
+3. **Prima di premere «Aggiorna»**, salva quello che stai scrivendo.
+
+> **Da sapere**
+>
+> - **La prima volta dopo l'aggiornamento del 23 novembre** chiudi e riapri l'app una volta: da lì in poi vale la
+>   tabella.
+> - **Senza rete l'app non si apre:** il browser mostra una sua pagina di errore. Riattiva la rete e riapri l'app.
+> - **Con l'app aperta, il controllo** si ripete ogni 10 minuti e ogni volta che torni all'app.
+> - **Al massimo una ricarica da sola ogni 10 minuti:** se ne serve un'altra prima, resta solo l'avviso.
+> - **I dati non si perdono:** la ricarica non tocca niente di salvato. Si perde solo quello che stavi scrivendo e
+>   non hai salvato.
 
 ### Muoversi nell'app
 
@@ -258,7 +390,7 @@ a sinistra e il contenuto a destra.
 
 - **«Come il telefono o il computer»** segue l'impostazione chiara o scura del telefono o del computer; «Chiara» e
   «Scura» la fissano.
-- **La palette vale per tutte le schermate.** I colori degli stati (verde «Pronto» e «Online», giallo per ciò che è
+- **La palette vale per tutte le schermate.** I colori degli stati (verde «In linea» e «Online», giallo per ciò che è
   in corso, rosso per «Non applicato» e gli errori) e delle modalità restano gli stessi in tutte le palette.
 - **La scelta resta solo in questo browser**: un altro telefono o computer parte da Sorgente, «Come il telefono o il
   computer».
@@ -272,10 +404,14 @@ a sinistra e il contenuto a destra.
   «nessun appartamento».
 - **«Lingua»** dice «Italiano», l'unica lingua disponibile: non c'è nulla da scegliere.
 - **Durante un accesso di assistenza** il profilo mostra l'organizzazione assistita.
+- **«Dispositivo condiviso: …»** compare se sei entrato con la casella «Questo è un dispositivo condiviso» (vedi
+  «Ricevere l'invito ed entrare»).
 
 **«Nome visualizzato»**, in fondo al «Profilo»:
 
-- **Il campo** (al massimo 80 caratteri) e «Salva»; compare «Nome aggiornato».
+- **Il campo** e «Salva»; compare «Nome aggiornato».
+- **Al massimo 80 caratteri:** oltre, il campo non accetta altro, né scritto né incollato.
+- **Un nome con un punto, una barra o un indirizzo web** (per esempio «Dott.Bianchi») è accettato.
 - **È il nome** che vedono i colleghi nelle Decisioni, nelle approvazioni, nei registri e in fondo al menu.
 
 ### Impostazioni: password ed email
@@ -536,7 +672,7 @@ La prima schermata, «Appartamenti», ha in alto una fascia con una foto e sotto
 | La striscia di salute | «In salute», «Degradata» o «Ferma», poi «… dispositivi connessi» | Lo stato del sistema domotico e il collegamento con i dispositivi |
 | La striscia di salute | «Dettagli tecnici» | Apre «Connettore» («attivo» o «fermo»), «Modello», «Versione» con il contratto e «Ultimo evento» |
 | La striscia di salute | «Sistema domotico non raggiungibile» | Il sistema domotico non risponde |
-| La striscia di salute | «Versione del contratto non compatibile» e «Il sistema domotico dichiara il contratto …: questa app supporta solo la versione 1.x. Contatta il supporto tecnico.» | La versione del sistema non è compatibile |
+| La striscia di salute | «Versione del contratto non compatibile» e «Il sistema domotico dichiara il contratto …: questa app supporta solo la versione 1.x. Scrivi all'assistenza HQE.» | La versione del sistema non è compatibile |
 | La fascia di stato | Sei caselle: «Modalità», «Occupazione», «Prossimo check-in» o «Prossimo check-out», «Finestre», «Consumo di oggi», «Dispositivi online» | Come sta la casa adesso (tabella sotto) |
 | «Modalità» | La scelta fra Comfort, Eco e Casa vuota: quella in corso ha il colore della modalità (tabella sotto) | La modalità in corso |
 | «Forza per…» | «Forzatura … attiva fino alle …» e «ancora …», in un riquadro ambra | C'è una forzatura in corso |
@@ -1363,7 +1499,7 @@ hanno avuto risposta in tempo dall'assistente completo e quante hanno avuto una 
 Il riquadro «Invita un utente» spiega: «L'utente riceve un'email con il link all'app: entra con Google o sceglie una
 password. Il ruolo decide cosa può fare.».
 
-1. **Compila «Email»**, «Nome» e «Ruolo» («Amministratore», «Operatore», «Sola lettura»).
+1. **Compila «Email»**, «Nome» (al massimo 80 caratteri) e «Ruolo» («Amministratore», «Operatore», «Sola lettura»).
 2. **Per operatore e sola lettura** scegli «Appartamenti visibili» («Tutti gli appartamenti» oppure le caselle).
 3. **Premi «Invita»** e leggi l'esito (tabella sotto).
 
@@ -1373,11 +1509,13 @@ password. Il ruolo decide cosa può fare.».
 | «Invito registrato, ma l'email a … non è partita. Riprova con «Reinvia».» | L'invito c'è, l'email no: usa «Reinvia» |
 | «Invito registrato. L'invio email non è attivo: avvisa tu …» | L'invito c'è, l'email non è attiva: avvisa tu la persona |
 | «È già un utente della tua organizzazione» | Una persona può stare in una sola organizzazione |
-| «Questa email non può essere invitata» | Le persone di HQE non si possono invitare, e nemmeno un'email già usata in un'altra organizzazione: chiedi alla persona un altro indirizzo |
+| «Questa email non può essere invitata» | Le persone di HQE non si possono invitare, e nemmeno un'email già usata in un'altra organizzazione, anche da una persona che non è ancora entrata: chiedi alla persona un altro indirizzo |
 
 > **Da sapere**
 >
-> L'invito resta registrato anche se l'email non parte.
+> - **L'invito resta registrato** anche se l'email non parte.
+> - **L'email d'invito** comincia con «Ciao,» e dice «Un amministratore di «…» ti ha invitato a usare DOMHOUSE, con il
+>   ruolo …»: non contiene il tuo nome né quello che scrivi nel campo «Nome».
 
 **L'elenco degli utenti, una riga per persona:**
 
@@ -1459,7 +1597,7 @@ Gli appartamenti stanno in un solo riquadro, una riga per appartamento.
 | «Ultima verifica» («mai eseguita», «riuscita il …», «non riuscita il …») | L'esito dell'ultima «Verifica connessione» |
 | L'interruttore «Attivo» e «Modifica», a destra | Spegnere l'appartamento; cambiare nome, indirizzo e prezzo |
 | «Verifica connessione» con la nota «Se la verifica non riesce, avvisa l'assistenza.» | Provare il collegamento |
-| «Dettagli tecnici» | Apre «Codice», «Fuso orario», «Collegamento al sistema domotico», «ID Italianway» e «Funzioni» (con i nomi del menu, per esempio «Approvazioni, Consumi») |
+| «Dettagli tecnici» | Apre «Codice», «Fuso orario», «Collegamento al sistema domotico», «Codice Italianway» e «Funzioni» (con i nomi del menu, per esempio «Approvazioni, Consumi») |
 
 - **Il «Codice»** dell'appartamento, in «Dettagli tecnici», si copia toccandolo (compare «Copiato»).
 - **Non ci sono «Nuovo appartamento» né cestino**: «I nuovi appartamenti li aggiunge il gestore della piattaforma
@@ -1494,9 +1632,11 @@ Gli appartamenti stanno in un solo riquadro, una riga per appartamento.
 
 **«Attivo»** (l'interruttore nella riga, o in Modifica):
 
-- **Per spegnerlo** (dal 13 novembre) l'app chiede conferma: «Disattivare «…»? Gli automatismi continuano;
-  notifiche, riepiloghi, prenotazioni ed export Excel si fermano finché non lo riattivi.» Per riattivarlo basta un
-  tocco.
+- **Per spegnerlo** (dal 13 novembre) l'app chiede conferma: «Disattivare «…»? Gli automatismi del sistema domotico
+  continuano. Si fermano notifiche (anche le gravi, come «sistema domotico non raggiungibile»), riepilogo del lunedì,
+  prenotazioni da Italianway ed export Excel; le prenotazioni arrivate nel frattempo non si recuperano alla
+  riattivazione. Gli amministratori dell'organizzazione e i gestori della piattaforma ricevono un'email.» Per
+  riattivarlo basta un tocco.
 - **Spento**, l'appartamento ha il badge «disattivato» in Amministrazione e «Disattivato» nell'elenco
   «Appartamenti».
 - **Le operazioni** rispondono «Appartamento disattivato».
@@ -1692,7 +1832,7 @@ in ciascuno, poi confermi.».
 |---|---|
 | In linea, batteria a posto | «Niente da fare» |
 | Sensore in linea, batteria bassa | «Batteria quasi scarica: cambiala presto, prima che il sensore smetta di mandare letture.» |
-| Dispositivo a corrente mai collegato | «Non si è mai collegato. Controlla che abbia corrente, che sia collegato al Wi-Fi dell'appartamento e che le impostazioni del broker sul dispositivo siano giuste.» |
+| Dispositivo a corrente mai collegato | «Non si è mai collegato. Controlla che abbia corrente, che sia collegato al Wi-Fi dell'appartamento e che i dati della pagina MQTT dello Shelly siano quelli di «Credenziali dei dispositivi»: lì vedi anche gli accessi rifiutati.» |
 | Sensore a batteria mai collegato | «Non si è mai fatto sentire. Controlla che abbia la batteria, che sia abbinato al suo ponte e che non sia troppo lontano dal ponte.» |
 | Dispositivo a corrente offline | «Prima funzionava, ora non risponde. Controlla che abbia corrente e che il Wi-Fi dell'appartamento funzioni.» |
 | Sensore offline, batteria buona o non nota | «Prima funzionava, ora non manda più letture. Controlla la batteria e che il ponte sia acceso e in linea.» |
@@ -1706,7 +1846,8 @@ in ciascuno, poi confermi.».
 >   risponde: lo stato dei dispositivi si vedrà quando torna raggiungibile.»
 > - **Collegamento ai dispositivi fermo**: «Il collegamento fra il sistema domotico e i dispositivi è fermo, quindi
 >   tutti risultano offline: finché non riparte, lo stato dei singoli dispositivi non dice niente.»
-> - **Senza dispositivi** leggi «Nessun dispositivo in questo appartamento.»
+> - **Senza dispositivi** leggi «Nessun dispositivo nell'elenco di questo appartamento. Gli Shelly registrati compaiono
+>   qui quando l'assistenza HQE ha scritto l'elenco dei dispositivi.»
 > - **La batteria** arriva dai sensori Shelly BLU; con un sistema domotico non ancora aggiornato compare «non nota».
 
 ### Credenziali dei dispositivi
@@ -1721,10 +1862,18 @@ in ciascuno, poi confermi.».
 **Registrare uno Shelly, prima di montarlo:**
 
 1. «Registra un dispositivo».
-2. Scrivi il codice dello Shelly: lettere minuscole, cifre e trattini.
+2. Scrivi il «Codice del dispositivo»: «Il codice è scritto sullo Shelly o nella sua pagina, per esempio
+   shellyplugmg3-9070695cb0d0.» Lettere minuscole, cifre e trattini: se lo scrivi in maiuscolo diventa minuscolo da solo.
 3. «Registra»: si apre la finestra della password.
 
-**La password si vede una volta sola.** Copiala nella pagina MQTT dello Shelly, campo per campo:
+**La password si vede una volta sola.** «Copiala adesso nella pagina dello Shelly: non ricaricare la pagina e non
+chiudere la scheda finché non hai finito. Dopo non si può più leggere, né qui né altrove. Se la perdi, usa
+«Rigenera».»
+
+- **La pagina MQTT dello Shelly** è la voce delle sue impostazioni dove si scrive a quale server collegarsi.
+- **Per aprire la pagina dello Shelly** devi essere sulla sua stessa rete Wi-Fi.
+
+Compila i campi così, nell'ordine:
 
 | Campo nella pagina dello Shelly | Cosa scrivere |
 |---|---|
@@ -1732,7 +1881,8 @@ in ciascuno, poi confermi.».
 | «MQTT prefix», «Server», «Client ID», «Username», «Password» | il valore della finestra, con il suo «Copia» |
 
 - Poi spunta «Ho copiato la password nello Shelly» e premi «Chiudi»: prima della spunta la finestra non si chiude.
-- Se il PC sincronizza gli appunti con altri dispositivi, svuotali dopo la copia.
+- Se il PC sincronizza gli appunti con altri dispositivi, svuotali dopo la copia (su Windows: tasto Windows + V, poi
+  «Cancella tutto»).
 - «Dati di collegamento» mostra di nuovo tutto **tranne** la password.
 - **In alto** il conteggio «Attivi: … · Revocati: …»; **sul telefono** una scheda per dispositivo, con «Ultima
   modifica: … · nome».
@@ -1740,7 +1890,7 @@ in ciascuno, poi confermi.».
 | Stato | Cosa vuol dire |
 |---|---|
 | «In preparazione» | Registrato: il sistema domotico lo sta abilitando |
-| «Pronto» | Può collegarsi. Se è davvero in linea lo dice «Stato dei dispositivi» |
+| «Abilitato» (colore neutro, con l'icona della chiave) (dal 23 novembre 2026, per ora solo nello staging) | «Può collegarsi, ma da qui non si vede se l'ha già fatto.» Se è in linea lo dice «Stato dei dispositivi», con «In linea» in verde |
 | «Cambio password in corso» | Vale ancora la password vecchia |
 | «Revoca in corso» | Può ancora collegarsi |
 | «Revocato» | Non può più collegarsi. I revocati stanno in fondo, nella sezione chiusa «Revocati» |
@@ -1761,7 +1911,8 @@ in ciascuno, poi confermi.».
 
 1. Guarda la riga sotto lo stato: quanti tentativi rifiutati nelle ultime 24 ore e l'ora dell'ultimo.
 2. Se il riquadro è giallo, segui «Cosa fare».
-3. Apri «Dati di collegamento» e controlla che l'utente nello Shelly sia uguale.
+3. Apri «Dati di collegamento» e controlla che l'utente nella pagina dello Shelly sia uguale (per aprirla devi essere
+   sulla sua stessa rete Wi-Fi).
 4. La password non si può rivedere: se non l'hai più, «Rigenera» nel menu «⋯» e scrivi la nuova nello Shelly.
 5. Dopo la correzione la riga diventa grigia: i tentativi vecchi restano contati per 24 ore.
 
@@ -1784,12 +1935,31 @@ in ciascuno, poi confermi.».
 > **Da sapere**
 >
 > - **Revoca non applicata**: il dispositivo può ancora collegarsi. Si chiude solo con «Riprova» e compare anche nel
->   Registro attività, come riga di «Sistema». Parte anche un avviso per email.
+>   registro dell'organizzazione, come riga di «Sistema». Parte anche un avviso per email.
 > - **«Elenco aggiornato: …»**: qualcuno ha cambiato il dispositivo nel frattempo. Guarda lo stato nuovo prima di
 >   riprovare.
 > - **«Non sappiamo se la password è stata creata…»**: rileggi l'elenco. Se il dispositivo risulta registrato, usa
 >   «Rigenera».
 
+### Uno Shelly non si collega e non ci sono accessi rifiutati
+
+**Dopo 10 minuti lo Shelly non è «In linea» e in «Credenziali dei dispositivi» non compare nessun accesso
+rifiutato.** Vuol dire che lo Shelly non arriva nemmeno a chiedere l'accesso. Controlla nella pagina dello Shelly, in
+quest'ordine:
+
+| N. | Controlla | Come deve essere |
+|---|---|---|
+| 1 | La rete Wi-Fi | Lo Shelly è collegato alla rete dell'appartamento a 2,4 GHz (non a 5 GHz) |
+| 2 | MQTT acceso | Nella pagina MQTT la voce di attivazione è accesa |
+| 3 | Server e porta | Uguali a «Dati di collegamento», carattere per carattere |
+| 4 | Collegamento cifrato | In «Connection type» è scelto «Default TLS» |
+| 5 | Utente | Uguale a «Dati di collegamento», carattere per carattere, tutto minuscolo |
+| 6 | Salvato e riavviato | Dopo il salvataggio lo Shelly si riavvia: aspetta 2 minuti |
+
+- **Se è tutto giusto e dopo 10 minuti ancora niente:** scrivi all'assistenza HQE con il nome dell'appartamento e il
+  codice del dispositivo.
+- **Se compare un accesso rifiutato:** segui «Cosa fare» di quella riga (utente o password sbagliati).
+- **Le parole esatte della pagina dello Shelly** arriveranno con la guida del kit.
 
 ### Simulatore: finestre, movimento, connettività, approvazione
 
@@ -1903,6 +2073,7 @@ pagina, che finisce con `?scheda=gestori`, `?scheda=non-attribuite` o `?scheda=r
 | Gli accessi di assistenza aperti | Chi di HQE è dentro, fino a quando |
 | I pulsanti «Appartamenti» (con la freccia) e «Accesso di assistenza», oppure «Entra come assistenza» e «Chiudi accesso» | Le azioni più frequenti |
 | Il menu «⋯» («Altre azioni per …») | «Rinomina», «Reinvia invito» (finché il primo amministratore non è entrato), «Sospendi» in rosso oppure «Riattiva» |
+| «Quota mensile dell'assistente (€)» con «Salva» (dal 23 novembre 2026, per ora solo nello staging) | Quanto può spendere al mese l'assistente di questa organizzazione (vedi sotto) |
 | «Nessuna organizzazione» | Non ce n'è nessuna |
 
 **«Nuova organizzazione»** spiega: «L'organizzazione nasce con il suo primo amministratore: riceve un'email per
@@ -1926,6 +2097,24 @@ entrare, poi invita gli altri utenti.».
 - **Esiti**: «Invito inviato di nuovo a …», «L'email a … non è partita: riprova più tardi.», «L'invio email non è
   attivo: avvisa tu …».
 - **Se è già entrato**: «L'amministratore ha già effettuato l'accesso».
+
+**«Quota mensile dell'assistente (€)»** (dal 23 novembre 2026, per ora solo nello staging)**:**
+
+1. **Scrivi la quota** nel campo della scheda.
+2. **Premi «Salva»**: compare «Quota dell'assistente di «…» salvata: … € al mese.»
+
+| Nel campo | Cosa vuol dire |
+|---|---|
+| Vuoto | Vale il tetto del progetto, uguale per tutte le organizzazioni insieme («… tolta: vale il tetto del progetto.») |
+| 0 | Solo risposte rapide: l'assistente completo non si usa |
+| Da 1,00 € al tetto del progetto (oggi 20,00 €) | Il massimo di questa organizzazione in un mese |
+
+- **Sotto il campo** l'app ricorda «Vuoto: vale il tetto del progetto. 0: solo risposte rapide, l'assistente completo
+  non si usa.» e la spesa del mese: «Speso a novembre 2026: … € su … €.», oppure, senza quota, «Speso a …: … €. Senza
+  quota vale il tetto del progetto: … € al mese per tutte le organizzazioni insieme, già spesi … €.»
+- **Un valore non ammesso** (per esempio 0,5) dà «La quota deve essere 0 oppure un importo da 1,00 a 20,00 € (al
+  massimo due decimali), oppure vuota per usare il tetto del progetto.» e non salva niente.
+- **Il registro della piattaforma** scrive chi ha impostato la quota.
 
 ### Elenco organizzazioni: rinominare, sospendere, riattivare
 
@@ -1969,9 +2158,13 @@ entrare, poi invita gli altri utenti.».
 
 1. **Apri** «Organizzazioni», poi «Appartamenti» dell'organizzazione.
 2. **Premi «Nuovo appartamento»**: si apre «Nuovo appartamento in …».
-3. **Scrivi l'«ID»**: nello staging comincia con `lab-` o `test-`; lettere minuscole, cifre e trattini. Non si cambia più.
+3. **Scrivi l'«ID»**: «Scegli un nome breve e stabile, per esempio lab-milano-roma-12. Nello staging comincia con lab-
+   o test-; lettere minuscole, cifre e trattini. Non si cambia e non si potrà riusare, nemmeno dopo l'eliminazione.»
+   Un punto, una barra o una maiuscola danno «ID non valido: nello staging lab-… o test-…, lettere minuscole, cifre e
+   trattini.»
 4. **Scrivi il «Nome»**; il «Fuso orario» è già Europe/Rome.
-5. **L'«ID Italianway»** è facoltativo: si può aggiungere anche dopo.
+5. **Il «Codice Italianway»** è facoltativo: «Si può aggiungere anche dopo, con «Codice Italianway» nella riga
+   dell'appartamento.»
 6. **Premi «Crea»**: ci vogliono alcuni minuti. In cima al modulo: «Se la creazione si ferma a metà, l'appartamento
    resta nell'elenco come «Non creato» finché non premi «Riprova» o «Annulla creazione».»
 
@@ -1991,38 +2184,73 @@ entrare, poi invita gli altri utenti.».
 | La riga dice | Cosa vuol dire | Cosa fai |
 |---|---|---|
 | «Posti liberi nello staging: N (…)» | Ci sono N posti | Puoi creare |
-| «Nessun posto libero: serve una VM più grande o la seconda VM (…)» | La macchina virtuale è piena | Non creare: avvisa il supporto |
+| «Nessun posto libero sulla macchina virtuale: per ora non si creano appartamenti. Scrivi all'assistenza HQE. (…)» | La macchina virtuale è piena: «Crea» è spento | Scrivi all'assistenza HQE |
 | «Capienza non ancora letta» | Nessuna lettura recente | «Aggiorna» |
 | «Lettura non riuscita: …» | La macchina virtuale non ha risposto | Riprova più tardi con «Aggiorna» |
 
-- **Se crei senza posto**, la creazione si ferma come «Non creato» con «La macchina virtuale non ha memoria per un
-  sistema domotico in più.»: premi «Annulla creazione».
+- **Se il posto finisce mentre crei** (per esempio la lettura era vecchia), la creazione si ferma come «Non creato»
+  con il messaggio della riga 1 della tabella «Se la creazione si ferma» qui sotto.
 
 **Gli stati della creazione:**
 
 | Stato | Cosa vedi | Cosa fai |
 |---|---|---|
-| In preparazione | I 5 passi: prenotazione di id e porta, chiavi, spazio sulla macchina virtuale, installazione del sistema domotico, collegamento all'app; sotto, «Di solito ci vogliono da 1 a 5 minuti; la prima volta può volerci di più. Puoi chiudere la pagina: la creazione continua.» | Niente: puoi chiudere la pagina |
-| Non creato | Riga rossa in cima, con «Cosa è successo», il passo a cui si è fermata e l'«ID richiesta» | «Riprova» oppure «Annulla creazione», secondo il messaggio |
+| In preparazione | I 5 passi: ID e porta riservati, chiavi, spazio sulla macchina virtuale, installazione del sistema domotico, collegamento all'app; sotto, «Di solito ci vogliono da 1 a 5 minuti; la prima volta può volerci di più. Puoi chiudere la pagina: la creazione continua.» | Niente: puoi chiudere la pagina |
+| Non creato | Riga rossa in cima, con «Cosa è successo», il passo a cui si è fermata e l'«ID richiesta» (se manca, l'«ID dell'appartamento») | Quello che dice il messaggio: ogni messaggio dice cosa premere (tabella qui sotto) |
 | Annullamento in corso | La riga resta finché tutto è tolto, poi sparisce con l'avviso | Niente |
-| Pronto | La riga come gli altri appartamenti, con l'invito a registrare gli Shelly | Credenziali dei dispositivi |
+| Pronto | L'avviso «… è pronto.» e la riga come gli altri appartamenti, con «Prossimo passo: registra gli Shelly con il pulsante «Credenziali dei dispositivi». L'elenco dei dispositivi per ora lo scrive l'assistenza HQE.» | «Credenziali dei dispositivi» |
 
-- **Un appartamento creato dall'app** non ha «Modifica collegamento». Si elimina come gli altri: «Disattiva», 7
-  giorni, «Elimina» (qui sotto, «verifica ed eliminazione»).
-- **«Non creato»** tiene riservati id e porta finché non premi «Riprova» o «Annulla creazione».
-- **«Annulla creazione»** chiede conferma: toglie sistema domotico, accesso dei dispositivi e chiavi. L'id non si
+- **Un appartamento creato dall'app** non ha «Modifica collegamento»: il suo codice Italianway si cambia con «Codice
+  Italianway» (qui sotto). Si elimina come gli altri: «Disattiva», 7 giorni, «Elimina» (qui sotto, «verifica ed
+  eliminazione»).
+- **«Non creato»** tiene riservati ID e porta finché non premi «Riprova» o «Annulla creazione».
+- **«Annulla creazione»** chiede conferma: toglie sistema domotico, accesso dei dispositivi e chiavi. L'ID non si
   potrà più usare; le chiavi si recuperano per 7 giorni.
 - **Sulla scheda dell'organizzazione**, anche a elenco chiuso: riga rossa «1 appartamento non creato: serve
   «Riprova» o «Annulla creazione»» con «Vedi»; riga grigia per quelli in preparazione.
-- **Il registro attività** scrive «ha fatto ripartire la creazione» e «ha annullato la creazione».
+- **Il registro dell'organizzazione** scrive «ha fatto ripartire la creazione» e «ha annullato la creazione».
 
-**Messaggi di «Cosa è successo» da conoscere:**
+**Se la creazione si ferma («Non creato»): ogni messaggio dice cosa premere.** La regola:
 
-| Messaggio | Cosa fare |
+1. **Premi «Riprova»** quando il messaggio lo dice: tieni lo stesso ID.
+2. **Non premere «Annulla creazione» per tentativi:** libera tutto, ma l'ID non si potrà più usare.
+3. **Se si ferma di nuovo, non annullare:** scrivi all'assistenza HQE con l'ID qui sotto (l'«ID richiesta»,
+   oppure l'«ID dell'appartamento» se l'ID richiesta manca).
+4. **Spazio esaurito:** chiedi all'assistenza HQE di fare posto, poi premi «Riprova».
+
+| N. | «Cosa è successo» |
 |---|---|
-| «La porta scelta è occupata sulla VM: «Riprova» ne prende un'altra.» | «Riprova» usa la porta libera successiva; quella occupata resta segnata finché il supporto non la controlla. «Annulla» invece la libera |
-| «C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla creazione» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che il supporto ha tolto quella chiave.» | «Annulla creazione» e un ID diverso. Nel modulo, prima di «Crea», lo stesso caso dice «C'è già una chiave con questo nome, creata fuori dall'app: scegli un altro ID.» |
-| «Il sistema domotico è stato tolto, ma le chiavi no: «Annulla creazione» di nuovo.» | Premi di nuovo «Annulla creazione» |
+| 1 | «La macchina virtuale non ha memoria per un sistema domotico in più. Se puoi aspettare, chiedi all'assistenza HQE di fare posto e poi premi «Riprova»: tieni lo stesso ID. «Annulla creazione» libera tutto, ma l'ID non si potrà più usare.» |
+| 2 | «Lo staging ha già il numero massimo di sistemi domotici. Se puoi aspettare, chiedi all'assistenza HQE di fare posto e poi premi «Riprova»: tieni lo stesso ID.» |
+| 3 | «La porta scelta è occupata sulla macchina virtuale: premi «Riprova», ne prende un'altra.» (quella occupata resta segnata finché l'assistenza HQE non la controlla) |
+| 4 | «Richiesta rifiutata dal sistema. Non annullare: scrivi all'assistenza HQE con l'ID qui sotto.» |
+| 5 | «I permessi sulle chiavi non sono ancora attivi: aspetta qualche minuto e premi «Riprova».» |
+| 6 | «Il sistema domotico non è partito. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto.» |
+| 7 | «L'accesso dei dispositivi non è stato preparato: premi «Riprova».» |
+| 8 | «Nessuna risposta dalla macchina virtuale in 20 minuti: premi «Riprova».» |
+| 9 | «Le chiavi non sono state create: premi «Riprova».» |
+| 10 | «C'è già una chiave con questo nome, creata fuori dall'app. Premi «Annulla creazione» e crea l'appartamento con un altro ID; «Riprova» serve solo dopo che l'assistenza HQE ha tolto quella chiave.» (nel modulo, prima di «Crea», lo stesso caso dice «C'è già una chiave con questo nome, creata fuori dall'app: scegli un altro ID.») |
+| 11 | «Il sistema domotico è installato ma l'app non lo raggiunge: premi «Riprova».» |
+| 12 | «Il sistema domotico è stato tolto, ma le chiavi no: premi di nuovo «Annulla creazione».» |
+| 13 | «L'ordine non è partito verso la macchina virtuale: premi «Riprova».» |
+| 14 | «La creazione si è fermata prima della fine. Premi «Riprova»; se si ferma di nuovo, non annullare: scrivi all'assistenza HQE con l'ID qui sotto.» |
+
+**Aggiungere o cambiare il codice Italianway di un appartamento creato dall'app** (dal 23 novembre 2026, per ora solo nello staging)**:**
+
+1. **Nella riga dell'appartamento** premi «Codice Italianway».
+2. **Scrivi il codice** nel campo «Codice Italianway», oppure cambialo.
+3. **Premi «Salva».**
+
+| Cosa vedi | Cosa vuol dire |
+|---|---|
+| «Codice Italianway di «…»» con «Il collegamento al sistema domotico resta quello creato dall'app: qui cambi solo il codice.» | La finestra: c'è solo il codice |
+| «Salva» spento | Il codice è uguale a quello di oggi |
+| «Codice Italianway già in uso», in rosso sotto il campo | Un altro appartamento ha già quel codice |
+| Avviso verde «Codice Italianway di «…» salvato.» | Fatto: la riga mostra il codice |
+| Avviso verde «Codice Italianway di «…» tolto.» | Hai svuotato il campo: l'appartamento non ha più un codice |
+
+- **Campo vuoto = nessun codice:** le prenotazioni di Italianway non arrivano più a questo appartamento.
+- **Il collegamento al sistema domotico** non si cambia: è quello della creazione.
 
 **Collegare un sistema esistente (la parte tecnica: identificativo, collegamento, codice Italianway):**
 
@@ -2035,7 +2263,8 @@ entrare, poi invita gli altri utenti.».
 - **Senza appartamenti** leggi «Nessun appartamento in questa organizzazione».
 - **Da qui** non si aprono Panoramica, dispositivi o consumi.
 
-**«Collega un sistema esistente»** apre «Collega un sistema esistente a …» («L'identificativo non si potrà più cambiare: usa minuscole,
+**«Collega un sistema esistente»** (sotto il pulsante: «Per un sistema domotico già installato a mano: di solito serve
+solo all'assistenza HQE.») apre «Collega un sistema esistente a …» («L'identificativo non si potrà più cambiare: usa minuscole,
 numeri e trattini; deve essere unico su tutta la piattaforma. Nome, stato e funzioni li gestirà poi l'amministratore
 dell'organizzazione.»).
 
@@ -2046,7 +2275,7 @@ dell'organizzazione.»).
 | «Indirizzo del sistema domotico» | In produzione «Scrivi l'indirizzo del motore dell'appartamento; i dimostrativi si provano in staging»; nell'ambiente di prova «Per un appartamento dimostrativo scrivi mock://builtin; per uno vero, l'indirizzo del suo motore» |
 | «Porta» | Da 1 a 65535, facoltativa |
 | «Fuso orario» | Europe/Rome all'inizio; «Valore iniziale: dopo la creazione il fuso orario si imposta sul motore.» |
-| «ID Italianway» | Fino a 120 caratteri; «Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.» |
+| «Codice Italianway» | Fino a 120 caratteri; «Decide a quale appartamento arrivano le prenotazioni di Italianway. Vuoto = nessun codice.» |
 | «Attivo», «Appartamento dimostrativo» | Le due caselle |
 
 1. **Compila i campi** e premi «Salva».
@@ -2065,6 +2294,9 @@ dell'organizzazione.»).
 - «Fuso orario non valido»
 - «Indirizzo non valido: deve cominciare con http:// o https://»
 - «In questo ambiente di prova scrivi mock://builtin nel campo Indirizzo del sistema domotico»
+- In produzione, dalla prossima pubblicazione: «Indirizzo del motore non ammesso: in questo ambiente si collegano
+  solo i motori della produzione». Si collegano solo il motore di sviluppo (porta 8100), finché non c'è la seconda
+  macchina virtuale, e le porte da 8101 a 8149 della macchina virtuale.
 
 ### Appartamenti di un'organizzazione: collegamento e dimostrativo
 
@@ -2073,7 +2305,7 @@ dell'organizzazione.»).
 **«Modifica collegamento»** apre «Collegamento di «…»» («Qui cambi il collegamento al sistema domotico e il codice
 Italianway: nome, stato e funzioni dell'appartamento li gestisce l'amministratore dell'organizzazione.»):
 
-1. **Compila «Indirizzo del sistema domotico»**, «Porta», «ID Italianway».
+1. **Compila «Indirizzo del sistema domotico»**, «Porta», «Codice Italianway».
 2. **Premi «Salva»** («Collegamento aggiornato»).
 3. **Un indirizzo senza http** diventa http; poi verifica la connessione.
 4. **Il codice Italianway** deve essere unico su tutta la piattaforma.
@@ -2140,12 +2372,15 @@ Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»):
 - «Eliminare «{nome}»?» con sotto «ID {id} · organizzazione {organizzazione}».
 - **Creato dall'app:** «Si perdono il sistema domotico con i suoi dati e le credenziali dei dispositivi;
   l'appartamento sparisce dall'app per tutti i suoi utenti.» e «Restano prenotazioni e riepiloghi per 12 mesi e il
-  registro attività per 24 mesi. Lo storico del sistema domotico si può recuperare per 30 giorni, con l'aiuto del
-  supporto.»
+  registro dell'organizzazione per 24 mesi. Lo storico del sistema domotico si può recuperare per 30 giorni, con
+  l'aiuto dell'assistenza HQE.»
+- **Creato dall'app, in giallo:** «Gli Shelly restano montati e, per quanto sappiamo oggi, restano come sono in quel
+  momento: se la caldaia è accesa, può restare accesa senza che nessuno la comandi. Prima di eliminare metti
+  l'appartamento in «Casa vuota», oppure fai togliere gli Shelly.» (dal 23 novembre 2026, per ora solo nello staging)
 - **Collegato a mano o dimostrativo:** «L'appartamento sparisce dall'app per tutti i suoi utenti.» e «Restano
-  prenotazioni e riepiloghi per 12 mesi e il registro attività per 24 mesi.»
+  prenotazioni e riepiloghi per 12 mesi e il registro dell'organizzazione per 24 mesi.»
 - **Collegato a mano a un sistema vero** (come `lab-01`), in giallo: «Il sistema domotico sulla macchina virtuale
-  resta: va tolto a mano dal supporto.»
+  resta: lo toglie a mano l'assistenza HQE.»
 - «L'ID {id} non si potrà più usare.» e la frase dell'email.
 - Il campo «Scrivi il nome dell'appartamento per confermare», con sotto «Il nome è «{nome}», maiuscole comprese.»:
   «Elimina» si accende solo con il nome esatto.
@@ -2171,12 +2406,12 @@ Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»):
 
 | Messaggio | Cosa fare |
 |---|---|
-| «Il sistema domotico è stato tolto, ma le chiavi no: «Riprova».» | «Riprova» |
-| «L'ordine non è partito verso la macchina virtuale: «Riprova».» | «Riprova» |
-| «Nessuna risposta dalla macchina virtuale in 20 minuti: «Riprova».» | «Riprova» |
-| «Errore interno del server: «Riprova», e se succede ancora serve un controllo (ID richiesta).» | «Riprova»; se si ripete, l'ID richiesta all'assistenza |
-| «Il sistema domotico sulla macchina virtuale non risulta creato dall'app: serve il supporto (ID richiesta).» | L'ID richiesta all'assistenza |
-| «L'eliminazione si è fermata prima della fine: «Riprova».» | «Riprova» |
+| «Il sistema domotico è stato tolto, ma le chiavi no: premi «Riprova».» | «Riprova» |
+| «L'ordine non è partito verso la macchina virtuale: premi «Riprova».» | «Riprova» |
+| «Nessuna risposta dalla macchina virtuale in 20 minuti: premi «Riprova».» | «Riprova» |
+| «Errore interno del server. Premi «Riprova»; se succede ancora, scrivi all'assistenza HQE con l'ID qui sotto.» | «Riprova»; se si ripete, l'ID all'assistenza HQE |
+| «Il sistema domotico sulla macchina virtuale non risulta creato dall'app: scrivi all'assistenza HQE con l'ID qui sotto.» | L'ID all'assistenza HQE |
+| «L'eliminazione si è fermata prima della fine: premi «Riprova».» | «Riprova» |
 
 **Messaggi della finestra «Elimina»:**
 
@@ -2189,7 +2424,7 @@ Simulatore di questo appartamento, e ogni elenco lo segna «Dimostrativo».»):
 
 - **Avvisi verdi:** «{nome} disattivato.», «{nome} riattivato.», «Eliminazione di {nome} avviata: ci vogliono
   alcuni minuti.», «{nome} eliminato.»
-- **Nel registro attività:** «ha disattivato l'appartamento», «ha riattivato l'appartamento», «ha avviato
+- **Nel registro dell'organizzazione:** «ha disattivato l'appartamento», «ha riattivato l'appartamento», «ha avviato
   l'eliminazione dell'appartamento», «ha eliminato l'appartamento»; una riga del «Sistema» per ogni passo fermo
   («Eliminazione dell'appartamento «…» non riuscita al passo «…»: serve «Riprova».»).
 
@@ -2199,8 +2434,8 @@ toccato.» e mostra «Appartamento … eliminato». L'identificativo non si può
 
 **«Prova l'agente»** (solo per gli appartamenti di prova: «lab-…», «test-…» e «dev»):
 
-- **Manda** un ordine di prova al programma sulla VM che in futuro creerà gli appartamenti dall'app.
-- **In attesa** leggi «Ordine inviato all'agente sulla VM, in attesa della risposta»; l'app ricontrolla da sola.
+- **Manda** un ordine di prova al programma sulla macchina virtuale che crea gli appartamenti dall'app.
+- **In attesa** l'app ricontrolla da sola.
 - **Se va bene**: «Agente raggiungibile. Motore: sano · collegamento ai dispositivi: attivo · versione: …».
 - **Se no**: il motivo in rosso, con un codice da copiare per l'assistenza.
 - **Senza risposta entro 20 minuti**: «Nessuna risposta dall'agente entro 20 minuti: riprova».
@@ -2997,13 +3232,15 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | «Devi confermare il tuo indirizzo email, ma l'invio del link non è riuscito. Riprova tra qualche minuto.» | L'email di conferma non è partita | Riprova tra qualche minuto |
 | «Impossibile caricare il profilo, riprova tra poco» | Il server ha rifiutato per un momento la richiesta (per esempio troppe richieste) | Riprova dopo qualche minuto |
 | «Controllo dell'accesso non disponibile: riprova tra poco» | Il controllo dell'accesso non ha risposto in tempo; la sessione resta valida | Riprova dopo qualche minuto |
-| «Sei senza connessione» con «La pagina si riapre da sola quando torna la connessione.» | Il telefono o il computer non ha rete: modalità aereo, Wi-Fi e dati spenti (dal lotto 37) | Riattiva la rete: la pagina si riapre da sola dopo un istante |
+| «Sei senza connessione» con «La pagina si riapre da sola quando torna la connessione.» | La rete è caduta mentre l'app si apriva. Se manca già prima, l'app non si apre: il browser mostra una sua pagina di errore | Riattiva la rete: la pagina si riapre da sola dopo un istante |
 | «Il servizio non risponde, riprova fra poco» con «Premi Ricarica fra qualche minuto. Se il problema resta, contatta HQE.» | La rete c'è, ma il servizio DOMHOUSE ha risposto con un errore (dal lotto 37) | Premi «Ricarica» fra qualche minuto; se il problema resta, contatta HQE |
 | «Non riesco ad aprire la pagina» con «Controlla la connessione e premi Ricarica. Se il problema resta, contatta HQE.» | L'app non capisce se manca la rete o il servizio (per esempio un Wi-Fi senza internet), non si è aperta entro 15 secondi, o una pagina ha dato un errore (dal lotto 37) | Controlla la connessione e premi «Ricarica»; se la risposta arriva poco dopo, l'app si apre da sola |
 | «Server non raggiungibile» dopo un'attesa | Il server non ha risposto entro 30 secondi, oppure 90 per assistente, proposte di regole, inviti, copia delle regole, verifica della connessione ed Excel (dal lotto 37) | Riprova; se era un comando, controlla prima se è già stato eseguito |
 | «La tua organizzazione non è attiva: contatta HQE.» | L'organizzazione non è ancora pronta | Contatta HQE |
 | «La tua organizzazione è sospesa: l'app non è disponibile. Per informazioni contatta l'assistenza HQE.» | HQE ha sospeso la tua organizzazione | Contatta l'assistenza HQE |
 | «Indirizzo email non valido» | L'email scritta non è un indirizzo | Correggi l'indirizzo |
+| «Uscita automatica: l'app non è stata usata per 30 minuti su un dispositivo condiviso. Accedi di nuovo per continuare.» | Eri entrato con «Questo è un dispositivo condiviso» e non hai usato l'app per 30 minuti | Accedi di nuovo |
+| «Su questo browser l'uscita automatica non è disponibile: premi «Esci» quando hai finito.» | Il browser non permette l'uscita automatica | Premi «Esci» quando hai finito |
 
 **Con le tre pagine «Sei senza connessione», «Il servizio non risponde» e «Non riesco ad aprire la pagina»:**
 
@@ -3020,6 +3257,7 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | «Operazione non riuscita», «Errore …» | Il server ha risposto con un errore senza spiegazione | Riprova; se continua, copia l'«ID richiesta» e segnala |
 | «Richiesta non accettata dal server: ricarica la pagina e riprova.» | La pagina è vecchia rispetto al server | Ricarica la pagina |
 | «Accesso richiesto», «Sessione non valida o scaduta» | La sessione è finita | Accedi di nuovo |
+| «È disponibile una versione nuova» con «Aggiorna» | DOMHOUSE è stato aggiornato mentre l'app era aperta | Premi «Aggiorna», oppure passa a un'altra pagina |
 | «Organizzazione non attiva», «Organizzazione sospesa: contatta l'assistenza HQE» | La tua organizzazione non è disponibile | Contatta HQE |
 | «L'accesso di assistenza è scaduto o è stato chiuso» | L'accesso di assistenza è finito | Torni alla tua area; se serve, aprine uno nuovo |
 | «Il tuo ruolo consente solo la lettura» | Hai il ruolo sola lettura | Chiedi a un operatore o a un amministratore |
@@ -3028,7 +3266,7 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | «Appartamento disattivato» | L'amministratore ha spento «Attivo» | Chiedi all'amministratore |
 | «Funzione non disponibile per questo appartamento» | La funzione è spenta o il sistema domotico non la ha | Chiedi all'amministratore (scheda «Funzioni») |
 | «Sistema domotico non raggiungibile» | Il sistema domotico dell'appartamento non risponde | Aspetta; se continua, «Verifica connessione» e assistenza |
-| «Versione del contratto non compatibile» | Il sistema domotico è di una versione non supportata | Contatta il supporto tecnico |
+| «Versione del contratto non compatibile» | Il sistema domotico è di una versione non supportata | Scrivi all'assistenza HQE |
 | «Pagina non trovata» | L'indirizzo non esiste, oppure non hai il ruolo per quella pagina | Torna al menu |
 
 ### Sui comandi e in Panoramica
@@ -3090,7 +3328,10 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 
 | Cosa vedi | Cosa significa | Cosa fare |
 |---|---|---|
-| «È già un utente della tua organizzazione», «Questa email non può essere invitata» | La persona è già dentro, oppure è di HQE, oppure l'email è già usata in un'altra organizzazione | Non invitare; per HQE serve la procedura tecnica; negli altri casi chiedi un altro indirizzo |
+| «È già un utente della tua organizzazione», «Questa email non può essere invitata» | La persona è già dentro, oppure è di HQE, oppure l'email è già usata in un'altra organizzazione (anche da una persona che non è ancora entrata) | Non invitare; per HQE serve la procedura tecnica; negli altri casi chiedi un altro indirizzo |
+| «Il nome può avere al massimo 80 caratteri.», «L'indirizzo può avere al massimo 200 caratteri.» | Nome o indirizzo troppo lungo. Nell'app il campo non accetta oltre il limite: il messaggio arriva solo se il limite viene aggirato fuori dall'app | Accorcia il testo |
+| «Il nome contiene caratteri non ammessi.», «L'indirizzo contiene caratteri non ammessi.» | Nel testo c'è un carattere invisibile o di controllo (spesso arriva incollando da un altro programma) | Riscrivi il testo a mano |
+| «La quota deve essere 0 oppure un importo da 1,00 a 20,00 € (al massimo due decimali), oppure vuota per usare il tetto del progetto.» | Quota dell'assistente non ammessa | Scrivi 0, un importo da 1,00 € o lascia vuoto |
 | «Gli amministratori vedono sempre tutti gli appartamenti» | Non si limitano gli appartamenti di un amministratore | Cambia ruolo se serve |
 | «Utente inesistente», «L'utente ha già effettuato l'accesso» | Il reinvio non è possibile | Rileggi l'elenco |
 | «Non puoi togliere a te stesso il ruolo di amministratore», «Non puoi eliminare il tuo stesso account» | Protezioni sul proprio ruolo | Chiedi a un altro amministratore |
@@ -3112,6 +3353,7 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | «Identificativo non disponibile», «Collegamento già usato da un altro appartamento» | Valori già usati o non riusabili | Scegli valori diversi |
 | «Codice Italianway già in uso» | Valori già usati o non riusabili | Scegli valori diversi |
 | «Indirizzo non valido: deve cominciare con http:// o https://», «In questo ambiente di prova scrivi mock://builtin nel campo Indirizzo del sistema domotico» | Collegamento scritto male o non ammesso | Correggi il collegamento |
+| «Indirizzo del motore non ammesso: in questo ambiente si collegano solo i motori della produzione» | In produzione si collegano solo i motori della produzione | Controlla indirizzo e porta; se servono, chiedi all'assistenza HQE |
 | «Ha già il ruolo di gestore della piattaforma», «Non è un gestore della piattaforma» | Condizioni sui gestori | Rileggi l'elenco |
 | «È l'ultimo gestore della piattaforma: nomina prima qualcun altro» | Condizioni sui gestori | Rileggi l'elenco |
 
@@ -3201,6 +3443,27 @@ Per ogni problema annota:
 ## 14. Novità
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
+
+### 23 novembre 2026 (staging)
+
+- **L'app si aggiorna da sola:** dopo un aggiornamento si apre già nuova; se è aperta compare «È disponibile una
+  versione nuova» con «Aggiorna». Senza rete l'app non si apre (parte 2).
+- **Dispositivo condiviso:** nella pagina «Accedi» la casella «Questo è un dispositivo condiviso»: dopo 30 minuti
+  senza usare l'app l'uscita è automatica (parte 2).
+- **Email:** l'invito e le altre email dell'app non contengono più nomi scritti da persone; l'invito comincia con
+  «Ciao,» (parti 2 e 6).
+- **Nomi e indirizzi:** al massimo 80 caratteri per un nome e 200 per un indirizzo (parti 2 e 6).
+- **Inviti:** una persona già abilitata in un'altra organizzazione non si può invitare, anche se non è ancora entrata
+  (parte 6).
+- **Credenziali dei dispositivi:** «Pronto» si chiama «Abilitato», con un colore neutro; testi più chiari sulla
+  password e sulla pagina MQTT; nuova sezione «Uno Shelly non si collega e non ci sono accessi rifiutati» (parte 6).
+- **Organizzazioni:** «Quota mensile dell'assistente (€)» per ogni organizzazione; un appartamento creato dall'app
+  riceve o cambia il codice Italianway con «Codice Italianway»; senza posti liberi «Crea» è spento; ogni messaggio di
+  «Non creato» dice cosa premere; nella finestra «Elimina» una riga gialla su Shelly e caldaia (parte 7).
+- **Parole:** «Codice Italianway», «registro dell'organizzazione», «l'assistenza HQE», «macchina virtuale», «ID»
+  in tutta l'app.
+- **Sicurezza:** corretti i 16 difetti trovati dalla revisione «attacco da fuori» (parte 1, «Come è stato
+  controllato DOMHOUSE»).
 
 ### 21 novembre 2026 (staging)
 
