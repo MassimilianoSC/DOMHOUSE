@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 23 novembre, 11:19, da `3417dcf` (revisione `domotica-bff-staging-00029-qtv`); `lab-01` ancora a `engine:9576073` (aggiornamento del motore a parte); immagine approvata per le creazioni `engine:3417dcf` |
 | **Solo nello staging** | creazione degli appartamenti dall'app, credenziali dei dispositivi, «Prova l'agente» (in produzione con la seconda VM, voce 26); tutto il resto è anche in produzione dal 23 novembre |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1271 |
+| **Ultima domanda al committente** | 1272 |
 
 ## 2. Cose da fare
 
@@ -127,6 +127,8 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
    correggere) entra qui subito.
 3. **Ogni lunedì**, con il resoconto settimanale, la memoria storica rilegge le fonti e corregge le differenze.
 4. **Una voce chiusa** si toglie da qui; resta nel registro.
+5. **Documenti da consegnare** ad altri (cliente, utenti, tester, Leonardo, Youssouf, Luca, consulente): elenco a parte in
+   `DOMOTICA/da-consegnare/ELENCO.md` (risposta 1272 = a). Alla domanda «cosa resta» si risponde anche da lì.
 5. **Fonti del dettaglio:** `registro.md`; §15 di `documenti-interni/autonomia/1-INTERNO-analisi-e-stime.md`;
    `documenti-interni/autonomia/2-INTERNO-da-confermare-prima-della-consegna.md`; `produzione-cosa-manca.md`;
    `limiti-noti.md`.
