@@ -81,10 +81,23 @@
     "groups": {
       "winter": "Inverno (riscaldamento)",
       "summer": "Estate (raffrescamento)",
-      "split": "Climatizzatore con misuratore"
+      "split": "Climatizzatore con misuratore",
+      "season": "Stagione del riscaldamento"
     },
     "notes": {
-      "off_watts": "Sotto questo consumo il climatizzatore risulta spento. Vale anche con la regola spenta. Riguarda solo i climatizzatori a infrarossi controllati da un misuratore."
+      "off_watts": "Sotto questo consumo il climatizzatore risulta spento. Vale anche con la regola spenta. Riguarda solo i climatizzatori a infrarossi controllati da un misuratore.",
+      "season": "Fuori da queste date la caldaia resta solo sull'antigelo. Vale anche con la regola spenta. La zona del comune è nell'allegato A del DPR 412/1993; il sindaco può allungare il periodo con un'ordinanza."
+    },
+    "season": {
+      "start": "Inizio",
+      "end": "Fine",
+      "range": "Dal {start} al {end}",
+      "allYear": "Tutto l'anno",
+      "withZone": "{season} (zona {zone})",
+      "zones": "Date di legge per zona climatica:",
+      "zoneRange": "Zona {zone}: dal {start} al {end}",
+      "zoneAllYear": "Zona {zone}: tutto l'anno",
+      "missingDay": "Il {date} non esiste: scegli un altro giorno."
     },
     "rangeWarning": "«Limiti del setpoint» da correggere: {problem}.",
     "dirty": "{count} regole modificate",
@@ -107,12 +120,17 @@
       "comfort_cool_celsius": "Raffrescamento in comfort (°C)",
       "summer_min": "Minimo (°C)",
       "summer_max": "Massimo (°C)",
-      "off_watts": "Soglia di spento (W)"
+      "off_watts": "Soglia di spento (W)",
+      "season_start_day": "Inizio: giorno",
+      "season_start_month": "Inizio: mese",
+      "season_end_day": "Fine: giorno",
+      "season_end_month": "Fine: mese",
+      "no_rise_minutes": "Avviso se la temperatura non risale (minuti)"
     },
     "desc": {
       "window_open_off": "Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.",
-      "setpoint_limits": "Limita la temperatura che si può impostare dall'app e dall'assistente, e quella usata da modalità e programmi; non vale per il telecomando del climatizzatore né per l'antigelo. Inverno: caldaia e clima che scalda restano fra minimo e massimo invernali; in comfort scaldano fino alla temperatura comfort, in eco la caldaia sta alla temperatura eco. Estate: il clima che raffresca o deumidifica resta fra minimo e massimo estivi e raffresca sopra la temperatura di raffrescamento, se nella stanza c'è un sensore di temperatura. Il raffrescamento deve essere più alto del comfort.",
-      "frost_protection": "Con la casa vuota la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare.",
+      "setpoint_limits": "Limita la temperatura che si può impostare dall'app e dall'assistente, e quella usata da modalità e programmi; non vale per il telecomando del climatizzatore né per l'antigelo. Inverno: caldaia e clima che scalda restano fra minimo e massimo invernali; in comfort scaldano fino alla temperatura comfort, in eco la caldaia sta alla temperatura eco. Estate: il clima che raffresca o deumidifica resta fra minimo e massimo estivi e raffresca sopra la temperatura di raffrescamento, se nella stanza c'è un sensore di temperatura. Il raffrescamento deve essere più alto del comfort. Fuori dalla stagione del riscaldamento la caldaia resta solo sull'antigelo.",
+      "frost_protection": "Con la casa vuota la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare. Anche con la regola spenta, se la caldaia è accesa ma la temperatura resta sotto l'antigelo per i minuti indicati, lo registra nelle Decisioni e avvisa con una notifica.",
       "mold_protection": "Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.",
       "prearrival": "Porta la casa in comfort prima dell'arrivo degli ospiti.",
       "checkout_eco": "Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.",
@@ -250,7 +268,9 @@
       "frost_inactive": "Antigelo non attivo",
       "setpoint_limits_ignored": "Limiti del setpoint ignorati",
       "instance_reachable": "Sistema domotico di nuovo raggiungibile",
-      "window_restore": "Finestra chiusa: riacceso"
+      "window_restore": "Finestra chiusa: riacceso",
+      "heating_season": "Stagione del riscaldamento",
+      "heating_not_rising": "Caldaia: la temperatura non risale"
     },
     "title": "Decisioni",
     "subtitle": "Tutto ciò che il motore e i gestori hanno fatto, e perché",
