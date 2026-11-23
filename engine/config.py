@@ -16,14 +16,16 @@ its range stops the engine at start, as a missing key does. The thresholds the a
 TIMEZONE (D-177, Europe/Rome by default): the apartment's time zone, an IANA name; the engine declares it in
 /apartment.timezone and the BFF reads it from there; a name that is not a time zone stops the engine at start.
 
-With CONNECTOR=simulated also: MOCK_TIME_SCALE (real seconds per simulated minute: 60 = real time, the default here)
-and DOMOTICA_TEST_CONNECTOR_DOWN=1 (the connector reported down: conformance scenario C14). A connector receives a
+With CONNECTOR=simulated also: MOCK_TIME_SCALE (real seconds per simulated minute: 60 = real time, the default here),
+MOCK_TODAY (item 15: the day of the heating season, YYYY-MM-DD, instead of the real date; the test suites set a winter
+day; written wrong it stops the engine at start) and DOMOTICA_TEST_CONNECTOR_DOWN=1 (the connector reported down: conformance scenario C14). A connector receives a
 ConnectorConfig (for_connector()): no key, and of the environment only its own variables, <NAME>_* (connector-v2.md §2.7).
 """
 import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 from .connector.interface import ConnectorConfig
@@ -195,6 +197,12 @@ def load_config(env: Mapping[str, str] | None = None) -> EngineConfig:
         if value not in allowed:
             problems.append(f"{name} must be one of: {', '.join(allowed)}")
         settings[name] = value
+    mock_today = env.get("MOCK_TODAY", "").strip()
+    if mock_today and connector == "simulated":               # item 15: ignored with real devices
+        try:
+            date.fromisoformat(mock_today)
+        except ValueError:
+            problems.append("MOCK_TODAY must be a date YYYY-MM-DD (e.g. 2026-01-15)")
     timezone = env.get("TIMEZONE", "").strip() or TEXT_SETTINGS["TIMEZONE"]
     if not valid_timezone(timezone):
         problems.append("TIMEZONE must be a time zone name, e.g. Europe/Rome")

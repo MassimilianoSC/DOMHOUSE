@@ -490,7 +490,7 @@
       "approvals": "Approvazioni richieste",
       "approvalsHint": "Quando il motore chiede il tuo consenso",
       "offline": "Dispositivi e sistema domotico offline",
-      "offlineHint": "Dispositivo offline oltre la soglia della regola, sistema domotico non raggiungibile da 15 minuti, antigelo non attivo, caldaia senza regolazione",
+      "offlineHint": "Dispositivo offline oltre la soglia della regola, sistema domotico non raggiungibile da 15 minuti, antigelo non attivo, caldaia senza regolazione, temperatura che non risale con la caldaia accesa",
       "bookings": "Prenotazioni",
       "bookingsHint": "Avvisi sulle prenotazioni che cambiano il programma dell'appartamento",
       "summary": "Riepilogo",

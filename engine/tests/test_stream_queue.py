@@ -84,3 +84,30 @@ def test_a_replay_longer_than_the_limit_fits():
         return next(iter(e.subscribers))
     queue = asyncio.run(main())
     assert queue.maxsize == 4 and len(drained(queue)) == 3
+
+
+
+def test_a_stream_cancelled_while_an_event_is_ready_stops():
+    # Linux CI, 23 November: on Python 3.11 (the engine's image) asyncio.wait_for gave back an event that was ready in
+    # the same turn and lost the cancel (a reader gone, the engine stopping): the stream went on for ever
+    async def main():
+        e = engine()
+        response = await stream_route(e)(request(), apartment_id="apt-prova-01")
+        body = response.body_iterator
+        assert "connected" in await anext(body)
+
+        async def read():
+            async for _ in body:
+                pass
+        task = asyncio.create_task(read())
+        await asyncio.sleep(0.05)                                     # the stream waits for an event
+        e.emit("device.online", {"device_id": "0"}, None)
+        task.cancel()                                                 # in the same turn as the event
+        done, _ = await asyncio.wait({task}, timeout=2)
+        if not done:
+            for queue in list(e.subscribers):
+                queue.put_nowait(core.QUEUE_FULL)                     # let the test end, red
+            await asyncio.wait({task}, timeout=2)
+        return done, task, e
+    done, task, e = asyncio.run(main())
+    assert task in done and task.cancelled() and e.subscribers == set()

@@ -70,7 +70,8 @@ function outcomeText(r: CopyResult): string {
  * preview with what changes in each and an explicit warning where customized rules will be overwritten, then the
  * outcome per apartment. The saved rules are copied: unsaved changes made by hand must be saved or discarded first.
  */
-export function CopyRulesCard({ aptId, hasManualChanges }: { aptId: string; hasManualChanges: boolean }) {
+/** withSeason: the engine has the heating season (item 15), whose dates are not copied (answer 1269 = a). */
+export function CopyRulesCard({ aptId, hasManualChanges, withSeason = false }: { aptId: string; hasManualChanges: boolean; withSeason?: boolean }) {
   const api = ruleCopyApi(aptId);
   const all = useApartments();
   const others = useMemo(() => (all.data ?? []).filter((a) => a.apartment_id !== aptId), [all.data, aptId]);
@@ -112,7 +113,7 @@ export function CopyRulesCard({ aptId, hasManualChanges }: { aptId: string; hasM
     <Card className="space-y-4 p-5" data-testid="rules-copy">
       <div>
         <h2 className="text-base font-semibold">{t("rules.copy.title")}</h2>
-        <p className="text-sm text-muted-foreground">{t("rules.copy.hint")}</p>
+        <p className="text-sm text-muted-foreground" data-testid="rules-copy-hint">{withSeason ? t("rules.copy.hintSeason") : t("rules.copy.hint")}</p>
       </div>
 
       {!preview && !results && (

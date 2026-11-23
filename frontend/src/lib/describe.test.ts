@@ -106,6 +106,9 @@ describe("decisioni: il tipo di azione in italiano (D-125)", () => {
     // P-90 (o1, 1101 e 1102): split spento col telecomando (S1); contatto finestra senza segnale contato come chiuso (S6)
     expect(actionLabel("climate_remote_off")).toBe("Clima: spento col telecomando");
     expect(actionLabel("window_contact_offline")).toBe("Finestra: senza segnale, considerata chiusa");
+    // voce 15 (o1, ramo o1-stagione): inizio e fine della stagione in una sola azione; caldaia accesa che non scalda
+    expect(actionLabel("heating_season")).toBe("Stagione del riscaldamento");
+    expect(actionLabel("heating_not_rising")).toBe("Caldaia: la temperatura non risale");
   });
 
   it("ogni azione che il motore scrive nelle decisioni è nell'elenco del sito (controllo automatico, lotto 39)", () => {

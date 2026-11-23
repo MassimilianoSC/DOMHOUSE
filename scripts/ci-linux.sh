@@ -10,17 +10,24 @@
 #   bash scripts/ci-linux.sh <commit>   # any commit
 #   bash scripts/ci-linux.sh --help
 #
-# Needs Docker running (Docker Desktop on Windows; Git Bash or Linux shell). Takes about 3 minutes.
+# Needs Docker running (Docker Desktop on Windows; Git Bash or Linux shell). Takes about 15 minutes on this PC (the
+# engine's tests about 12). At most CI_LINUX_LIMIT_S seconds (1800 by default): then the container stops by itself and
+# the line is "PASSO tempo massimo: ROSSO (tempo scaduto ...)". An engine test longer than 120 s writes its stack at once
+# (pytest's faulthandler), so a hang says which test and where.
 # Output: a "PASSO <name>: ok" or "PASSO <name>: ROSSO" line per step, then "ESITO: <n> rossi su <m> passi".
 # Exit code: 0 all green, 1 some step red, 3 Docker or git missing. scripts/run_tests.py runs it as the "linux" suite.
 set -uo pipefail
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-  sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'
   exit 0
 fi
 REF="${1:-HEAD}"
 IMAGE="python:3.11-slim"
+LIMIT_S="${CI_LINUX_LIMIT_S:-1800}"     # 23 Nov: the engine's tests hung 28 minutes in a container nobody stopped
+[[ "$LIMIT_S" =~ ^[1-9][0-9]*$ ]] || { echo "PASSO preparazione: ROSSO (CI_LINUX_LIMIT_S non è un numero di secondi)"; exit 3; }
+# faulthandler's first line, also after pytest's dots on the same line («.....Timeout (0:02:00)!»): grep -E
+STACK_PATTERN='Timeout \([0-9:]*\)!'
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 command -v git > /dev/null || { echo "PASSO preparazione: ROSSO (git non trovato)"; exit 3; }
@@ -29,7 +36,10 @@ docker info > /dev/null 2>&1 || { echo "PASSO preparazione: ROSSO (Docker non ri
 SHA="$(git -C "$ROOT" rev-parse --short "$REF" 2>/dev/null)" || { echo "PASSO preparazione: ROSSO (commit $REF sconosciuto)"; exit 3; }
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# o1-chiusura: a named container, removed here at any end of the script (run_tests.py removes it by name when it stops
+# this script from outside: taskkill on Windows ends the docker client, not the container)
+NAME="${CI_LINUX_CONTAINER:-ci-linux-${SHA}-$$}"
+trap 'docker rm -f "$NAME" > /dev/null 2>&1; rm -rf "$WORK"' EXIT
 git -C "$ROOT" -c core.autocrlf=false archive "$SHA" | tar -x -C "$WORK" \
   || { echo "PASSO preparazione: ROSSO (git archive di $SHA non riuscito)"; exit 3; }
 echo "ci-linux: commit $SHA in $IMAGE (utente non root)"
@@ -40,8 +50,11 @@ USER_ID="$(id -u)"; GROUP_ID="$(id -g)"
 [[ "$USER_ID" == "0" ]] && { USER_ID=1000; GROUP_ID=1000; }             # never root inside, as on the runner
 
 # The steps of the job, one by one; each prints its PASSO line. The engine is stopped by its PID (no pkill in -slim).
-MSYS_NO_PATHCONV=1 docker run -i --rm --user "$USER_ID:$GROUP_ID" -e HOME=/tmp/home -v "$MOUNT:/repo" -w /repo "$IMAGE" \
-  bash -s <<'STEPS'
+# `timeout` is the container's first process: at the limit it ends, and the container with it (stopping the docker
+# client from outside would leave the container running).
+MSYS_NO_PATHCONV=1 docker run -i --rm --name "$NAME" --user "$USER_ID:$GROUP_ID" -e HOME=/tmp/home \
+  -e "STACK_PATTERN=$STACK_PATTERN" -v "$MOUNT:/repo" -w /repo "$IMAGE" \
+  timeout -s KILL "$LIMIT_S" bash -s <<'STEPS'
 set -u
 mkdir -p "$HOME"
 RED=0; STEPS=0
@@ -57,7 +70,10 @@ python -m venv /tmp/venv && . /tmp/venv/bin/activate \
 rc=$?; step dipendenze $rc
 [ $rc -eq 0 ] || finish
 
-pytest engine -p no:cacheprovider -q 2>&1 | tail -25; step "prove del motore" "${PIPESTATUS[0]}"
+# the stack of a test longer than 120 s is printed as soon as it is written, not at the end behind tail
+pytest engine -p no:cacheprovider -q -o faulthandler_timeout=120 2>&1 | tee /tmp/engine-tests.log \
+  | grep --line-buffered -E -A120 "$STACK_PATTERN"
+rc=${PIPESTATUS[0]}; tail -25 /tmp/engine-tests.log; step "prove del motore" $rc
 
 TEMP="$(mktemp -d)"
 set -a; . ci/engine.vars; set +a
@@ -85,3 +101,16 @@ rc=${PIPESTATUS[0]}; step "C14 connector fermo" $rc
 kill $DPID; wait $DPID 2>/dev/null
 finish
 STEPS
+rc=$?
+if [[ $rc -eq 137 || $rc -eq 124 ]]; then
+  # 137 is also a docker kill from outside: the time passed tells the two apart (o1-chiusura, point 6)
+  if (( SECONDS >= LIMIT_S )); then
+    echo "PASSO tempo massimo: ROSSO (tempo scaduto: oltre $((LIMIT_S / 60)) minuti, container fermato)"
+    echo "ESITO: tempo scaduto"
+  else
+    echo "PASSO tempo massimo: ROSSO (container fermato da fuori dopo $((SECONDS / 60)) minuti, prima del limite di $((LIMIT_S / 60)))"
+    echo "ESITO: container fermato da fuori"
+  fi
+  exit 1
+fi
+exit $rc

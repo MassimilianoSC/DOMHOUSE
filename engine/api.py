@@ -317,7 +317,11 @@ def create_contract_app(engine_of: Callable[[str], ApartmentEngine], api_key: st
                 yield ": connected\n\n"
                 while True:
                     try:
-                        env = await asyncio.wait_for(queue.get(), timeout=ping)
+                        # not asyncio.wait_for: on Python 3.11 (the engine's image), outside an anyio scope (bare
+                        # tasks, tests), it lost a cancel that came with a ready event and the loop went on; served by
+                        # uvicorn the scope repeats the cancel (Linux CI and its rereading, 23 November)
+                        async with asyncio.timeout(ping):
+                            env = await queue.get()
                     except TimeoutError:
                         if await request.is_disconnected():
                             break

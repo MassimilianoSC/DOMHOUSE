@@ -16,6 +16,7 @@ from .store import SqliteStore
 ENGINE_VERSION = "0.3.0"
 IMPLEMENTATION = {"name": "domhouse-engine", "version": ENGINE_VERSION}
 DB_NAME = "engine.db"           # in DATA_DIR, with its WAL files next to it
+SHUTDOWN_WAIT_S = 5.0           # at most this long for the loop and the reader after their cancel, then the stop goes on
 
 
 class StartupError(Exception):
@@ -102,8 +103,26 @@ def create_engine_app(config: EngineConfig, connector=None):
             for task in [engine.loop_task, engine.consumer_task, *engine.tasks]:
                 if task is not None and not task.done():
                     task.cancel()
-            await asyncio.gather(*(t for t in [engine.loop_task, engine.consumer_task] if t), return_exceptions=True)
-            await connector.stop()
+            # rereading of o1-wait-for (23 Nov): the connector stops first (its reader ends even if it missed the
+            # cancel, as asyncio.wait_for did on 3.11), and the wait has a limit: a reader that never ends is written,
+            # not waited for ever
+            try:
+                async with asyncio.timeout(SHUTDOWN_WAIT_S) as limit:  # o1-chiusura: Shelly awaits its tasks
+                    await connector.stop()
+                if limit.expired():                           # a stop that swallowed the cancel (Shelly's and the
+                    raise TimeoutError()                      # MQTT transport's suppress): no TimeoutError came out
+            except Exception as exc:                          # TimeoutError included: written, the stop goes on
+                log.warn("connector stop failed", error_type=type(exc).__name__, error=str(exc)[:200],
+                         waited_s=SHUTDOWN_WAIT_S)
+            own = [t for t in [engine.loop_task, engine.consumer_task] if t]
+            if own:
+                done, pending = await asyncio.wait(own, timeout=SHUTDOWN_WAIT_S)
+                if pending:
+                    log.warn("engine tasks still running at stop", tasks=len(pending), waited_s=SHUTDOWN_WAIT_S)
+                for task in done:                             # read, so never «Task exception was never retrieved»
+                    if not task.cancelled() and task.exception() is not None:
+                        exc = task.exception()
+                        log.warn("engine task failed at stop", error_type=type(exc).__name__, error=str(exc)[:200])
             store.close()
             log.info("engine stopped")
 

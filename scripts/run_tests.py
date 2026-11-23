@@ -37,6 +37,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -46,7 +47,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 HTTP_SUITES = ["tests/backend_test.py", "tests/backend_phase2_test.py", "tests/backend_phase3_test.py", "tests/backend_phase4_test.py",
                "tests/backend_isolation_test.py", "tests/backend_platform_test.py"]
-LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py", "tests/broker_accounts_test.py", "tests/broker_vm_cert_test.py", "tests/broker_vm_sync_test.py", "tests/broker_vm_egress_test.py", "tests/host_vm_test.py", "tests/agent_comune_test.py", "tests/agent_esecutore_test.py", "tests/agent_lettore_test.py", "tests/agent_vm_test.py", "tests/agent_gcp_test.py", "tests/agent_server_test.py", "tests/device_credentials_test.py", "tests/agent_firme_test.py", "tests/device_credentials_routes_test.py", "tests/device_refusals_test.py", "tests/agent_a3_vm_test.py", "tests/agent_a2_vm_test.py", "tests/migra_credenziali_test.py", "tests/secret_admin_test.py", "tests/creation_test.py", "tests/deletion_test.py", "tests/capacity_test.py", "tests/broker_container_test.py", "tests/push_test.py", "tests/hub_align_test.py",
+LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py", "tests/broker_accounts_test.py", "tests/broker_vm_cert_test.py", "tests/broker_vm_sync_test.py", "tests/broker_vm_egress_test.py", "tests/host_vm_test.py", "tests/agent_comune_test.py", "tests/agent_esecutore_test.py", "tests/agent_lettore_test.py", "tests/agent_vm_test.py", "tests/agent_gcp_test.py", "tests/agent_server_test.py", "tests/device_credentials_test.py", "tests/agent_firme_test.py", "tests/device_credentials_routes_test.py", "tests/device_refusals_test.py", "tests/agent_a3_vm_test.py", "tests/agent_a2_vm_test.py", "tests/migra_credenziali_test.py", "tests/secret_admin_test.py", "tests/creation_test.py", "tests/deletion_test.py", "tests/capacity_test.py", "tests/broker_container_test.py", "tests/push_test.py", "tests/heating_not_rising_push_test.py", "tests/hub_align_test.py",
                 "tests/apartment_scope_test.py", "tests/tenant_test.py", "tests/routes_test.py", "tests/webhook_test.py",
                 "tests/platform_test.py", "tests/real_mode_test.py", "tests/firebase_flows_test.py",
                 "tests/proxy_path_test.py", "tests/mock_exposure_test.py", "tests/run_tests_checks_test.py",
@@ -79,6 +80,7 @@ LOCAL_SUITES = ["tests/repository_suite_test.py", "tests/instances_url_test.py",
                 "engine/tests/test_approval_sources.py", "engine/tests/test_approvals_restart.py",
                 "engine/tests/test_assistant.py", "engine/tests/test_health.py",
                 "engine/tests/test_mode_temperatures.py", "engine/tests/test_priorities.py",
+                "engine/tests/test_heating_season.py", "engine/tests/test_heating_not_rising.py",
                 "engine/tests/test_setpoint_limits.py", "engine/tests/test_stream_queue.py",
                 # the verification of 10 November (o2) and D-198 (o1); tests/run_tests_checks_test.py is red when a
                 # test file of the repository is in no list
@@ -124,8 +126,9 @@ E2E_PORTS = (8011, 5174)                   # frontend/playwright.config.ts: the 
 E2E_TIMEOUT_S = 600
 LINUX_SUITE = "linux"
 LINUX_SCRIPT = ROOT / "scripts" / "ci-linux.sh"
-LINUX_TIMEOUT_S = 900
+LINUX_TIMEOUT_S = 2100         # a backstop: scripts/ci-linux.sh stops its own container first (CI_LINUX_LIMIT_S, 1800)
 SUITE_TIMEOUT_S = 900          # 15 minutes for one pytest suite (the longest takes about 2)
+TEST_STACK_AFTER_S = 120       # 23 Nov: one test longer than this writes its stack (faulthandler) in the run's output
 SIZE_EXIT = {1: "blocco principale sopra la soglia", 2: "build mancante"}
 # Suites known to be red while a planned piece of work is open: shown as such, never hidden or skipped.
 EXPECTED_RED: dict[str, str] = {}  # e.g. {SIZE_SUITE: "P-20 in corso"} (P-20 closed on 16/10: empty)
@@ -140,6 +143,7 @@ BFF_ENV = {
     "BFF_ROOT_PATH": "",
     "INSTANCE_API_KEY_FALLBACK": "dev-key",
     "MOCK_TIME_SCALE": "1",
+    "MOCK_TODAY": "2026-01-15",  # item 15: the heating season of the built-in engines, never the real date
     "GCP_PROJECT_ID": "your-gcp-project-id",
     "FIREBASE_PROJECT_ID": "your-gcp-project-id",
     "CORS_ORIGINS": "",
@@ -221,7 +225,8 @@ def run_pytest(suite: str, work: Path, extra: list[str], env: dict) -> dict:
     """One pytest suite in its own process, at most SUITE_TIMEOUT_S: a suite that hangs (seen once on 21 Oct,
     support_access for 36 minutes, never reproduced) is stopped and counted red with the reason, the run goes on."""
     junit = work / f"{Path(suite).stem}.xml"
-    cmd = [sys.executable, "-m", "pytest", suite, "-q", "-rfE", "-p", "no:cacheprovider", f"--junitxml={junit}", *extra]
+    cmd = [sys.executable, "-m", "pytest", suite, "-q", "-rfE", "-p", "no:cacheprovider", f"--junitxml={junit}",
+           "-o", f"faulthandler_timeout={TEST_STACK_AFTER_S}", *extra]
     proc = subprocess.Popen(cmd, cwd=ROOT, env=env)
     try:
         code = proc.wait(timeout=SUITE_TIMEOUT_S)
@@ -487,7 +492,10 @@ def stop_tree(proc: subprocess.Popen) -> None:
     alone leaves the emulator running. Kill the whole tree."""
     if os.name == "nt":
         subprocess.call(["taskkill", "/PID", str(proc.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        proc.wait()
+        try:
+            proc.wait(timeout=60)                  # o1-chiusura: never a wait without a limit
+        except subprocess.TimeoutExpired:
+            pass
     else:
         stop(proc)
 
@@ -539,6 +547,14 @@ def linux_counts(lines: list[str], code: int) -> dict:
     return c
 
 
+def remove_container(name: str) -> None:
+    """The Linux part's container, by name: stopping its script from outside leaves it running (Windows)."""
+    try:
+        subprocess.run(["docker", "rm", "-f", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
 def run_linux_suite(skip: bool) -> dict:
     """The CI job on the last commit, in Linux (scripts/ci-linux.sh); its output goes to the console as it comes."""
     if skip:
@@ -546,19 +562,31 @@ def run_linux_suite(skip: bool) -> dict:
     bash = git_bash()
     if not bash:
         return result(errors=1, note="bash non trovato (su Windows serve Git Bash)")
-    print(f"\n=== {LINUX_SUITE}: bash scripts/ci-linux.sh (job contratto-e-mock in python:3.11-slim, circa 3 minuti)")
+    print(f"\n=== {LINUX_SUITE}: bash scripts/ci-linux.sh (job contratto-e-mock in python:3.11-slim, circa 15 minuti)")
     lines: list[str] = []
     try:
+        # o1-chiusura: the container has a name the run knows (removed at the run's limit) and the script's own limit
+        # comes 5 minutes before the run's
+        container = f"ci-linux-run-{os.getpid()}"
+        env = {**os.environ, "CI_LINUX_CONTAINER": container, "CI_LINUX_LIMIT_S": str(LINUX_TIMEOUT_S - 300)}
         proc = subprocess.Popen([bash, str(LINUX_SCRIPT)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, encoding="utf-8", errors="replace")
+                                text=True, encoding="utf-8", errors="replace", env=env)
         assert proc.stdout is not None
-        start = time.monotonic()
-        for line in proc.stdout:
-            print(line, end="")
-            lines.append(line.rstrip("\n"))
-            if time.monotonic() - start > LINUX_TIMEOUT_S:
-                proc.kill()
-                break
+
+        def read(stream) -> None:
+            for line in stream:
+                print(line, end="")
+                lines.append(line.rstrip("\n"))
+        # 23 Nov: the limit on a reader thread, not a check at each line: the part hung 28 minutes printing nothing
+        # and the limit never came. Stopped, its pipe may stay open (Git Bash's children): it is not waited for
+        reader = threading.Thread(target=read, args=(proc.stdout,), daemon=True)
+        reader.start()
+        reader.join(LINUX_TIMEOUT_S)
+        if reader.is_alive():
+            stop_tree(proc)
+            remove_container(container)
+            return result(tests=max(1, len([x for x in lines if x.startswith("PASSO ")])), errors=1,
+                          note=f"tempo scaduto: ferma oltre {LINUX_TIMEOUT_S // 60} minuti, fermata dal giro")
         code = proc.wait(timeout=60)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return result(errors=1, note=f"scripts/ci-linux.sh non avviato o bloccato: {exc}")

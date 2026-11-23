@@ -1,5 +1,6 @@
 import { t, tOr } from "@/i18n";
 import { fmtNumber } from "@/lib/format";
+import { isSeasonMonth, monthName } from "@/lib/heatingSeason";
 
 // One changed value of a rule, as the Regole page and the «Registro attività» show it (D-151): the field with the same
 // label as the page («Minuti», «Stato») and the values («5», «attiva»).
@@ -14,9 +15,11 @@ export interface ChangeLike {
 /** «Stato» for enabled, else the parameter's label on the Regole page; an unknown parameter by its name. */
 export const fieldLabel = (field: string): string => (field === "enabled" ? t("rules.proposal.state") : tOr(`rules.params.${field}`, field));
 
-/** «attiva» / «spenta» for the state, a number in Italian, «—» for anything else. */
+/** «attiva» / «spenta» for the state, a month of the heating season by its name (item 15), a number in Italian, «—»
+ *  for anything else. */
 export function changeValue(field: string, v: unknown): string {
   if (field === "enabled" && typeof v === "boolean") return v ? t("rules.proposal.on") : t("rules.proposal.off");
+  if (isSeasonMonth(field) && typeof v === "number" && Number.isInteger(v) && v >= 1 && v <= 12) return monthName(v);
   return typeof v === "number" ? fmtNumber(v, 2) : "—";
 }
 

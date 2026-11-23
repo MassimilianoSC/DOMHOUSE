@@ -11,14 +11,18 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { CopyRulesCard } from "@/components/rules/CopyRulesCard";
 import { RuleProposalCard } from "@/components/rules/RuleProposalCard";
 import { Button } from "@/components/ui/button";
-import { Badge, Card, Input, Skeleton, Switch, Tip } from "@/components/ui/primitives";
+import { Badge, Card, Input, NativeSelect, Skeleton, Switch, Tip } from "@/components/ui/primitives";
 import { t, tOr } from "@/i18n";
 import { runAction } from "@/lib/actions";
 import { DEFAULT_TZ, fmtDateTime, fmtNumber } from "@/lib/format";
+import { SEASON_KEYS, ZONES, dayExists, dayName, elides, monthName, seasonParams, zoneOf, type Season, type ZoneId } from "@/lib/heatingSeason";
 import { cn } from "@/lib/utils";
 import { useApartmentStore } from "@/store/apartmentStore";
 
 type Draft = Record<string, { enabled?: boolean; params: Record<string, string> }>;
+
+/** Item 15: the four numbers of the heating season, drawn as two dates inside the winter group (SeasonBlock). */
+const SEASON_PARAMS: string[] = Object.values(SEASON_KEYS);
 
 function paramErrors(rule: Rule, draft: Draft[string] | undefined): Record<string, string> {
   const errs: Record<string, string> = {};
@@ -26,7 +30,7 @@ function paramErrors(rule: Rule, draft: Draft[string] | undefined): Record<strin
     const raw = draft?.params[key];
     if (raw === undefined) continue;
     const n = Number(raw);
-    if (raw.trim() === "" || Number.isNaN(n) || n < lim.min || n > lim.max) errs[key] = t("rules.outOfRange", { min: fmtNumber(lim.min), max: fmtNumber(lim.max) });
+    if (raw.trim() === "" || Number.isNaN(n) || n < lim.min || n > lim.max || (SEASON_PARAMS.includes(key) && !Number.isInteger(n))) errs[key] = t("rules.outOfRange", { min: fmtNumber(lim.min), max: fmtNumber(lim.max) });
   }
   return errs;
 }
@@ -91,9 +95,153 @@ function LimitMessages({ ruleId, place, problems }: { ruleId: string; place: Pla
   );
 }
 
+const hasSeason = (rule: Rule) => rule.rule_id === "setpoint_limits" && SEASON_PARAMS.every((k) => k in rule.limits);
+
+type SeasonSide = "start" | "end";
+const SEASON_SIDES = [
+  ["start", SEASON_KEYS.startMonth, SEASON_KEYS.startDay],
+  ["end", SEASON_KEYS.endMonth, SEASON_KEYS.endDay],
+] as const;
+
+/** Item 15: a day that does not exist in its month (31 April), said under its date before saving (the engine refuses it
+ *  with invalid_date); a month or day outside the limits is the usual check of every box. 29 February is accepted. */
+function seasonProblems(rule: Rule, d: Draft[string] | undefined): Partial<Record<SeasonSide, string>> {
+  if (!hasSeason(rule)) return {};
+  const out: Partial<Record<SeasonSide, string>> = {};
+  const value = (key: string) => Number(d?.params[key] ?? rule.params[key]);
+  const inLimits = (key: string, v: number) => Number.isInteger(v) && v >= rule.limits[key].min && v <= rule.limits[key].max;
+  for (const [side, monthKey, dayKey] of SEASON_SIDES) {
+    const month = value(monthKey);
+    const day = value(dayKey);
+    if (inLimits(monthKey, month) && inLimits(dayKey, day) && !dayExists(month, day)) out[side] = t("rules.season.missingDay", { date: dayName({ month, day }) });
+  }
+  return out;
+}
+
+const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/** «dal 15 ottobre», «dall'8 novembre»; «al 15 aprile», «all'11 marzo» (review point 6). */
+function fromTo(season: Season) {
+  const date = (d: Season["start"]) => ({ date: dayName(d) });
+  return {
+    from: elides(season.start.day) ? t("rules.season.fromElided", date(season.start)) : t("rules.season.from", date(season.start)),
+    to: elides(season.end.day) ? t("rules.season.toElided", date(season.end)) : t("rules.season.to", date(season.end)),
+  };
+}
+
+/** Review point 7: the season the boxes hold now; null when one is empty, not a whole number or the date does not
+ *  exist, so the summary never shows the saved dates under different boxes. */
+function seasonInBoxes(rule: Rule, d: Draft[string] | undefined): Season | null {
+  // an empty box reads 0, a day that does not exist
+  const read = (key: string) => Number(d?.params[key] ?? rule.params[key] ?? NaN);
+  const [sm, sd, em, ed] = [SEASON_KEYS.startMonth, SEASON_KEYS.startDay, SEASON_KEYS.endMonth, SEASON_KEYS.endDay].map(read);
+  return dayExists(sm, sd) && dayExists(em, ed) ? { start: { month: sm, day: sd }, end: { month: em, day: ed } } : null;
+}
+
+/** The rule's description; review point 1: the sentences of item 15 only with an engine that has its parameters. */
+function ruleDescription(rule: Rule): string {
+  const noRise = rule.rule_id === "frost_protection" && "no_rise_minutes" in rule.limits;
+  return [
+    noRise ? t("rules.descSeason.frost_protection") : tOr(`rules.desc.${rule.rule_id}`, ""),
+    hasSeason(rule) ? t("rules.descExtra.season") : "",
+    noRise ? t("rules.descExtra.noRise") : "",
+  ].filter(Boolean).join(" ");
+}
+
+/** Item 15 (texts A1–A7 agreed with the memoria storica): start and end of the heating season, the summary with the
+ *  climatic zone when the dates are exactly a zone's, the shortcuts A–F, the note. Valid also with the rule off, so the
+ *  boxes follow only the right to write. */
+function SeasonBlock({ rule, draft, editable, onParams }: { rule: Rule; draft?: Draft[string]; editable: boolean; onParams: (changes: Record<string, string>) => void }) {
+  const errs = paramErrors(rule, draft);
+  const problems = seasonProblems(rule, draft);
+  const season = seasonInBoxes(rule, draft);
+  const zone = zoneOf(season);
+  const range = !season ? null : zone === "F" ? t("rules.season.allYear") : capitalize(t("rules.season.range", fromTo(season)));
+  const boxValue = (key: string) => draft?.params[key] ?? String(rule.params[key] ?? "");
+  const zoneLabel = (z: ZoneId) => (z === "F" ? t("rules.season.zoneAllYear", { zone: z }) : t("rules.season.zoneRange", { zone: z, ...fromTo(ZONES[z]) }));
+  return (
+    <div className="space-y-3 border-t pt-3" data-testid={`rule-season-${rule.rule_id}`}>
+      <h5 className="text-sm font-semibold">{t("rules.groups.season")}</h5>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {SEASON_SIDES.map(([side, monthKey, dayKey]) => {
+          const problem = problems[side];
+          const errorId = `rule-season-error-${side}`;
+          const limitsId = `rule-param-error-${rule.rule_id}-${dayKey}`;
+          // second review N4: the day box points to whichever message is shown, the limits one or «does not exist»
+          const dayDescribedBy = [errs[dayKey] ? limitsId : "", problem ? errorId : ""].filter(Boolean).join(" ") || undefined;
+          return (
+            <div key={side} className="field-cell" data-testid={`rule-season-${side}`}>
+              <span className="text-[13px] font-medium text-muted-foreground">{side === "start" ? t("rules.season.start") : t("rules.season.end")}</span>
+              <div className="space-y-1">
+                <div className="flex gap-2">
+                  <Input
+                    id={`rule-${rule.rule_id}-${dayKey}`}
+                    type="number"
+                    inputMode="numeric"
+                    min={rule.limits[dayKey].min}
+                    max={rule.limits[dayKey].max}
+                    step={1}
+                    value={boxValue(dayKey)}
+                    disabled={!editable}
+                    aria-disabled={!editable}
+                    aria-label={tOr(`rules.params.${dayKey}`, dayKey)}
+                    aria-invalid={Boolean(errs[dayKey] || problem)}
+                    aria-describedby={dayDescribedBy}
+                    onChange={(e) => onParams({ [dayKey]: e.target.value })}
+                    className={cn("w-20 shrink-0 tabular", (errs[dayKey] || problem) && "border-destructive focus-visible:ring-destructive")}
+                    data-testid={`rule-param-${rule.rule_id}-${dayKey}`}
+                  />
+                  <NativeSelect
+                    id={`rule-${rule.rule_id}-${monthKey}`}
+                    value={boxValue(monthKey)}
+                    disabled={!editable}
+                    aria-disabled={!editable}
+                    aria-label={tOr(`rules.params.${monthKey}`, monthKey)}
+                    aria-invalid={Boolean(problem)}
+                    aria-describedby={problem ? errorId : undefined}
+                    onChange={(e) => onParams({ [monthKey]: e.target.value })}
+                    className={cn("min-w-0 flex-1", problem && "border-destructive focus-visible:ring-destructive")}
+                    data-testid={`rule-param-${rule.rule_id}-${monthKey}`}
+                  >
+                    {MONTHS.map((m) => <option key={m} value={String(m)}>{monthName(m)}</option>)}
+                  </NativeSelect>
+                </div>
+                {errs[dayKey] && <p id={limitsId} className="text-xs font-medium text-destructive" data-testid={limitsId}>{errs[dayKey]}</p>}
+                {problem && <p id={errorId} className="text-xs font-medium text-destructive" data-testid={errorId}>{problem}</p>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {range && <p className="text-sm font-medium" data-testid="rule-season-summary">{zone ? t("rules.season.withZone", { season: range, zone }) : range}</p>}
+      <div className="flex flex-wrap items-center gap-2" data-testid="rule-season-zones">
+        <span className="text-[13px] text-muted-foreground">{t("rules.season.zones")}</span>
+        {(Object.keys(ZONES) as ZoneId[]).map((z) => (
+          <Tip key={z} content={zoneLabel(z)}>
+            <Button
+              type="button"
+              variant="outline"
+              size="iconSm"
+              aria-label={zoneLabel(z)}
+              disabled={!editable}
+              onClick={() => onParams(Object.fromEntries(Object.entries(seasonParams(ZONES[z])).map(([k, v]) => [k, String(v)])))}
+              data-testid={`rule-season-zone-${z}`}
+            >
+              {z}
+            </Button>
+          </Tip>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground" data-testid="rule-season-note">{t("rules.notes.season")}</p>
+    </div>
+  );
+}
+
 function groupsOf(rule: Rule): Group[] {
   const known = (GROUPS[rule.rule_id] ?? []).map((g) => ({ ...g, keys: g.keys.filter((k) => k in rule.limits) })).filter((g) => g.keys.length);
-  const grouped = new Set(known.flatMap((g) => g.keys));
+  const grouped = new Set([...known.flatMap((g) => g.keys), ...(hasSeason(rule) ? SEASON_PARAMS : [])]);
   const rest = Object.keys(rule.limits).filter((k) => !grouped.has(k));
   return rest.length ? [...known, { id: "", keys: rest }] : known;
 }
@@ -103,6 +251,15 @@ function RuleCard({ rule, draft, onChange, canWrite, problems = [] }: { rule: Ru
   const eff = effective(rule, draft);
   const errs = paramErrors(rule, draft);
   const dirty = draft && (draft.enabled !== undefined || Object.keys(draft.params).length > 0);
+  /** Boxes changed together (a zone's four dates): a value back to the saved one leaves the draft. */
+  const setParams = (changes: Record<string, string>) => {
+    const params = { ...(draft?.params ?? {}) };
+    for (const [key, value] of Object.entries(changes)) {
+      if (value === String(rule.params[key])) delete params[key];
+      else params[key] = value;
+    }
+    onChange({ enabled: draft?.enabled, params });
+  };
   // D-198: the problems of the chain show under their group (winter, summer; «between» after winter), the boxes they
   // concern get the red border; a place without its group shows at the end of the card, never nowhere.
   const groups = groupsOf(rule);
@@ -114,7 +271,7 @@ function RuleCard({ rule, draft, onChange, canWrite, problems = [] }: { rule: Ru
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1 basis-48">
           <h3 className="text-base font-semibold">{rule.label}</h3>
-          <p className="text-sm text-muted-foreground">{tOr(`rules.desc.${rule.rule_id}`, "")}</p>
+          <p className="text-sm text-muted-foreground">{ruleDescription(rule)}</p>
         </div>
         <div className="flex items-center gap-2">
           {!rule.editable && (
@@ -157,12 +314,7 @@ function RuleCard({ rule, draft, onChange, canWrite, problems = [] }: { rule: Ru
                   aria-disabled={!editable}
                   aria-invalid={Boolean(errs[key] || describedBy(key))}
                   aria-describedby={describedBy(key)}
-                  onChange={(e) => {
-                    const params = { ...(draft?.params ?? {}) };
-                    if (e.target.value === String(rule.params[key])) delete params[key];
-                    else params[key] = e.target.value;
-                    onChange({ enabled: draft?.enabled, params });
-                  }}
+                  onChange={(e) => setParams({ [key]: e.target.value })}
                   className={cn("tabular", (errs[key] || describedBy(key)) && "border-destructive focus-visible:ring-destructive")}
                   data-testid={`rule-param-${rule.rule_id}-${key}`}
                 />
@@ -173,6 +325,7 @@ function RuleCard({ rule, draft, onChange, canWrite, problems = [] }: { rule: Ru
           </div>
           {group.note && <p className="text-xs text-muted-foreground" data-testid={`rule-group-note-${rule.rule_id}-${group.id}`}>{group.note()}</p>}
           {(group.id === "winter" || group.id === "summer") && <LimitMessages ruleId={rule.rule_id} place={group.id} problems={problems} />}
+          {group.id === "winter" && hasSeason(rule) && <SeasonBlock rule={rule} draft={draft} editable={canWrite && rule.editable} onParams={setParams} />}
         </div>
         {group.id === "winter" && <LimitMessages ruleId={rule.rule_id} place="between" problems={problems} />}
         </Fragment>
@@ -204,7 +357,7 @@ export default function RulesPage() {
     if (Object.keys(params).length) p.params = params;
     return p.enabled === undefined && !p.params ? [] : [p];
   });
-  const hasErrors = rules.some((r) => Object.keys(paramErrors(r, draft[r.rule_id])).length > 0);
+  const hasErrors = rules.some((r) => Object.keys(paramErrors(r, draft[r.rule_id])).length > 0 || Object.keys(seasonProblems(r, draft[r.rule_id])).length > 0);
   const sl = rules.find((r) => r.rule_id === "setpoint_limits");
   const slTouched = Boolean(sl && patches.some((p) => p.rule_id === sl.rule_id));
   const problems = limitProblems(sl, sl && draft[sl.rule_id], slTouched);
@@ -279,7 +432,7 @@ export default function RulesPage() {
         />
       )}
       {/* D-151 point 6: the same rules on other apartments of the organization, admins only */}
-      {isAdmin && canWrite && q.data && <CopyRulesCard aptId={aptId} hasManualChanges={patches.length > 0} />}
+      {isAdmin && canWrite && q.data && <CopyRulesCard aptId={aptId} hasManualChanges={patches.length > 0} withSeason={Boolean(sl && hasSeason(sl))} />}
       {patches.length > 0 && (
         // a full bar along the bottom edge, solid with a 1 px top border and a light shadow (design lot 2)
         <div ref={barRef} className="fixed inset-x-0 bottom-0 z-30 border-t bg-card px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 sm:px-6 lg:px-10 shadow-[0_-4px_12px_hsl(var(--foreground)/0.06)] md:left-64" data-testid="rules-save-bar">

@@ -10,7 +10,7 @@ import RulesPage from "./RulesPage";
 // warns when the room's sensor is missing (engine/core.py thermostat() and mode_commands()).
 const s = vi.hoisted(() => ({ enabled: true }));
 const frost = () => ({
-  rule_id: "frost_protection", label: "Antigelo a casa vuota", enabled: s.enabled, editable: true,
+  rule_id: "frost_protection", label: "Antigelo", enabled: s.enabled, editable: true,
   params: { celsius: 8 }, limits: { celsius: { min: 5, max: 12 } },
 });
 
@@ -33,7 +33,7 @@ async function card() {
   return screen.findByTestId("rule-card-frost_protection");
 }
 
-describe("Antigelo a casa vuota: la descrizione dice che cosa resta con la regola spenta (P-83, D31)", () => {
+describe("Antigelo (etichetta del motore, risposta 1261): la descrizione dice che cosa resta con la regola spenta (P-83, D31)", () => {
   it.each([true, false])("regola %s: la temperatura resta anche spenta; accesa vale anche contro lo spegnimento a mano", async (enabled) => {
     s.enabled = enabled;
     const c = await card();
