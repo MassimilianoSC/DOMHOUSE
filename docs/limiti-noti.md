@@ -58,6 +58,7 @@
 
 | Limite | Cosa succede | Stato |
 |---|---|---|
+| **Attese con tempo massimo in Python 3.11** (23 novembre) | In Python 3.11 `asyncio.wait_for` può perdere una cancellazione. Dentro un ciclo il task non si ferma più: era così negli stream degli aggiornamenti in diretta del motore e del server (corretto sul ramo `o1-wait-for`, con le prove su 3.11). Gli altri `wait_for` (assistente, comandi, conferma con il misuratore, accesso, accessi rifiutati, rete, regole) aspettano una sola cosa, non un ciclo: con una cancellazione persa quel lavoro finisce e poi il task si ferma, senza blocchi | Corretto sul ramo, da unire e pubblicare; gli altri accettati |
 | **Pagina in sottofondo** | L'app non si aggiorna in tempo reale; si rimette in pari quando torni | Voluto |
 | **Browser che se ne va** | Il server può non accorgersene: lo stream resta aperto al massimo 4 minuti | Accettato |
 | **Mai provato su un telefono** | La riapertura degli stream è stata provata solo su computer | Da verificare (checklist D27) |
