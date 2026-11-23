@@ -13,7 +13,7 @@ risponde da qui. Il dettaglio resta nelle fonti della colonna «Dettaglio».*
 | **Staging** | pubblicato il 23 novembre, 11:19, da `3417dcf` (revisione `domotica-bff-staging-00029-qtv`); `lab-01` ancora a `engine:9576073` (aggiornamento del motore a parte); immagine approvata per le creazioni `engine:3417dcf` |
 | **Solo nello staging** | creazione degli appartamenti dall'app, credenziali dei dispositivi, «Prova l'agente» (in produzione con la seconda VM, voce 26); tutto il resto è anche in produzione dal 23 novembre |
 | **Piano generale** (§15 del documento 1 dell'Autonomia) | passi 1–4 fatti; 5, 7, 10 e 14 in parte; gli altri aperti |
-| **Ultima domanda al committente** | 1262 |
+| **Ultima domanda al committente** | 1267 |
 
 ## 2. Cose da fare
 
@@ -47,7 +47,7 @@ Colonna «Condizione per partire»: «tempo morto» = si fa mentre si aspettano 
 | N. | Cosa | Condizione per partire | Chi | Stato | Dettaglio |
 |---|---|---|---|---|---|
 | 7 | Prova di carico (P-84) | di notte, prima del passaggio in produzione | C lancia | strumento pronto | `procedura-prova-di-carico.md` |
-| 8 | Verifica in due passaggi all'accesso (P-69) | nessuna | o2, o1, MS, comandi di C | aperto | registro, P-69 |
+| 8 | Verifica in due passaggi all'accesso (P-69) | nessuna | o2, o1, MS, comandi di C | decisa (1263–1267, 23 novembre: come D-141, anche con Google, sblocco dall'amministratore e dal gestore, attivazione subito per chi c'è già, consiglio della copia di riserva); prossimo: o2 e o1 preparano upgrade di Firebase, comando del TOTP e cinque verifiche nello staging; poi codice | registro, P-69 |
 | 9 | Il sito resta vecchio dopo una pubblicazione (P-92, con E-29): avviso «versione nuova — Aggiorna» con ricaricamento automatico, più `index.html` sempre dalla rete (tolto il gestore fetch) | deciso (1227 = a); poi verifica sul telefono del committente | o2, poi C | in staging e produzione dal 23 novembre; sul telefono del committente la versione nuova arriva dopo una chiusura e riapertura (staging e, alle 11:39, anche produzione: casella «dispositivo condiviso» visibile); resta da vedere alla prossima pubblicazione il ricaricamento da solo o l'avviso «È disponibile una versione nuova» (G4, G5) | registro, P-92 |
 | 11 | Procedura di assistenza al gestore: approvata (1234, 1235); da convertire in HTML | prima della produzione | MS | approvata; HTML fatto il 22 novembre (`procedura-assistenza-gestore.html`, da rigenerare se cambia: `python docs/strumenti/guida_html.py --source docs/procedura-assistenza-gestore.md --template docs/strumenti/procedura_modello.html --output docs/procedura-assistenza-gestore.html`); da rileggere dopo la risposta 19.2 del cliente | `procedura-assistenza-gestore.md` |
 | 12 | Informativa privacy approvata dal consulente del titolare; condizioni d'uso (P-70) | il consulente | C | bozza fatta | `informativa-privacy-bozza.md` |
