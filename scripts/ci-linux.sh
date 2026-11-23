@@ -26,6 +26,8 @@ REF="${1:-HEAD}"
 IMAGE="python:3.11-slim"
 LIMIT_S="${CI_LINUX_LIMIT_S:-1800}"     # 23 Nov: the engine's tests hung 28 minutes in a container nobody stopped
 [[ "$LIMIT_S" =~ ^[1-9][0-9]*$ ]] || { echo "PASSO preparazione: ROSSO (CI_LINUX_LIMIT_S non è un numero di secondi)"; exit 3; }
+# faulthandler's first line, also after pytest's dots on the same line («.....Timeout (0:02:00)!»): grep -E
+STACK_PATTERN='Timeout \([0-9:]*\)!'
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 command -v git > /dev/null || { echo "PASSO preparazione: ROSSO (git non trovato)"; exit 3; }
@@ -34,7 +36,10 @@ docker info > /dev/null 2>&1 || { echo "PASSO preparazione: ROSSO (Docker non ri
 SHA="$(git -C "$ROOT" rev-parse --short "$REF" 2>/dev/null)" || { echo "PASSO preparazione: ROSSO (commit $REF sconosciuto)"; exit 3; }
 
 WORK="$(mktemp -d)"
-trap 'rm -rf "$WORK"' EXIT
+# o1-chiusura: a named container, removed here at any end of the script (run_tests.py removes it by name when it stops
+# this script from outside: taskkill on Windows ends the docker client, not the container)
+NAME="${CI_LINUX_CONTAINER:-ci-linux-${SHA}-$$}"
+trap 'docker rm -f "$NAME" > /dev/null 2>&1; rm -rf "$WORK"' EXIT
 git -C "$ROOT" -c core.autocrlf=false archive "$SHA" | tar -x -C "$WORK" \
   || { echo "PASSO preparazione: ROSSO (git archive di $SHA non riuscito)"; exit 3; }
 echo "ci-linux: commit $SHA in $IMAGE (utente non root)"
@@ -47,7 +52,8 @@ USER_ID="$(id -u)"; GROUP_ID="$(id -g)"
 # The steps of the job, one by one; each prints its PASSO line. The engine is stopped by its PID (no pkill in -slim).
 # `timeout` is the container's first process: at the limit it ends, and the container with it (stopping the docker
 # client from outside would leave the container running).
-MSYS_NO_PATHCONV=1 docker run -i --rm --user "$USER_ID:$GROUP_ID" -e HOME=/tmp/home -v "$MOUNT:/repo" -w /repo "$IMAGE" \
+MSYS_NO_PATHCONV=1 docker run -i --rm --name "$NAME" --user "$USER_ID:$GROUP_ID" -e HOME=/tmp/home \
+  -e "STACK_PATTERN=$STACK_PATTERN" -v "$MOUNT:/repo" -w /repo "$IMAGE" \
   timeout -s KILL "$LIMIT_S" bash -s <<'STEPS'
 set -u
 mkdir -p "$HOME"
@@ -66,7 +72,7 @@ rc=$?; step dipendenze $rc
 
 # the stack of a test longer than 120 s is printed as soon as it is written, not at the end behind tail
 pytest engine -p no:cacheprovider -q -o faulthandler_timeout=120 2>&1 | tee /tmp/engine-tests.log \
-  | grep --line-buffered -A40 '^Timeout ('
+  | grep --line-buffered -E -A120 "$STACK_PATTERN"
 rc=${PIPESTATUS[0]}; tail -25 /tmp/engine-tests.log; step "prove del motore" $rc
 
 TEMP="$(mktemp -d)"
@@ -97,8 +103,14 @@ finish
 STEPS
 rc=$?
 if [[ $rc -eq 137 || $rc -eq 124 ]]; then
-  echo "PASSO tempo massimo: ROSSO (tempo scaduto: oltre $((LIMIT_S / 60)) minuti, container fermato)"
-  echo "ESITO: tempo scaduto"
+  # 137 is also a docker kill from outside: the time passed tells the two apart (o1-chiusura, point 6)
+  if (( SECONDS >= LIMIT_S )); then
+    echo "PASSO tempo massimo: ROSSO (tempo scaduto: oltre $((LIMIT_S / 60)) minuti, container fermato)"
+    echo "ESITO: tempo scaduto"
+  else
+    echo "PASSO tempo massimo: ROSSO (container fermato da fuori dopo $((SECONDS / 60)) minuti, prima del limite di $((LIMIT_S / 60)))"
+    echo "ESITO: container fermato da fuori"
+  fi
   exit 1
 fi
 exit $rc
