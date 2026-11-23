@@ -420,3 +420,86 @@ def test_log_line_and_no_secrets():
         ("info", "command sent", "apt-prova-01", "dev-presa")
     assert line["ts"].endswith("Z") and KEY not in json.dumps(line)
     assert line["api_key"] == line["shelly_token"] == line["password"] == "[redacted]"
+
+
+
+# ---- o1-chiusura: the stop of the served engine ---------------------------------------------------------------------
+def free_port():
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def test_a_served_engine_with_a_stream_open_still_runs_its_stop(tmp_path, caplog):
+    # rereading of o1-wait-for (point 2): uvicorn waited for ever for the BFF's stream, always open; Docker killed the
+    # engine after 10 s and the stop (connector, engine.db, «engine stopped») never ran. Now uvicorn's graceful wait
+    # has a limit (the same settings main() uses)
+    import socket
+    import threading
+    import time
+    import uvicorn
+    from engine.__main__ import server_settings
+    caplog.set_level(logging.INFO, logger="engine")
+    cfg = config(DATA_DIR=str(tmp_path), PORT=str(free_port()), HOST="127.0.0.1", MOCK_PING_S="1")
+    server = uvicorn.Server(uvicorn.Config(create_engine_app(cfg), **server_settings(cfg)))
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    until = time.monotonic() + 15
+    while not server.started and time.monotonic() < until:
+        time.sleep(0.05)
+    with socket.create_connection(("127.0.0.1", cfg.port)) as s:
+        s.sendall((f"GET /api/v1/stream HTTP/1.1\r\nHost: x\r\nX-API-Key: {KEY}\r\nX-Actor: a@b.it\r\n"
+                   f"X-Correlation-Id: {CORR}\r\n\r\n").encode())
+        assert b"200" in s.recv(200)
+        server.should_exit = True
+        until = time.monotonic() + 10
+        while "engine stopped" not in caplog.messages and time.monotonic() < until:
+            time.sleep(0.05)
+        stopped = "engine stopped" in caplog.messages
+    server.force_exit = True                                            # let a red test end
+    thread.join(10)
+    assert stopped
+
+
+class SlowStopConnector(CatalogConnector):
+    def __init__(self, how):
+        super().__init__()
+        self.how = how
+
+    async def stop(self):
+        if self.how == "hangs":
+            await asyncio.Event().wait()
+        raise RuntimeError("guasto")
+
+
+@pytest.mark.parametrize("how", ["hangs", "fails"])
+def test_a_connector_that_does_not_stop_is_written_and_the_stop_goes_on(tmp_path, monkeypatch, caplog, how):
+    # point 3: connector.stop() had no limit (Shelly awaits its tasks and its transport)
+    from engine import service
+    monkeypatch.setattr(service, "SHUTDOWN_WAIT_S", 0.5)
+    caplog.set_level(logging.INFO, logger="engine")
+    ok, thread = stopped_within(create_engine_app(config(CONNECTOR="prova", DATA_DIR=str(tmp_path)),
+                                                  connector=SlowStopConnector(how)), 10)
+    assert ok and "engine stopped" in caplog.messages
+    line = next(r for r in caplog.records if r.getMessage() == "connector stop failed")
+    assert line.fields["error_type"] == ("TimeoutError" if how == "hangs" else "RuntimeError")
+
+
+class BrokenReaderConnector(CatalogConnector):
+    async def changes(self):
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            raise RuntimeError("guasto alla chiusura") from None
+        yield  # pragma: no cover
+
+
+def test_a_task_that_ends_with_an_error_at_stop_is_written(tmp_path, caplog):
+    # point 4: the error of a task ended in the wait was never read («Task exception was never retrieved»)
+    caplog.set_level(logging.INFO, logger="engine")
+    ok, _ = stopped_within(create_engine_app(config(CONNECTOR="prova", DATA_DIR=str(tmp_path)),
+                                             connector=BrokenReaderConnector()), 10)
+    assert ok
+    line = next(r for r in caplog.records if r.getMessage() == "engine task failed at stop")
+    assert line.fields["error_type"] == "RuntimeError"

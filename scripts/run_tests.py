@@ -492,7 +492,10 @@ def stop_tree(proc: subprocess.Popen) -> None:
     alone leaves the emulator running. Kill the whole tree."""
     if os.name == "nt":
         subprocess.call(["taskkill", "/PID", str(proc.pid), "/T", "/F"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        proc.wait()
+        try:
+            proc.wait(timeout=60)                  # o1-chiusura: never a wait without a limit
+        except subprocess.TimeoutExpired:
+            pass
     else:
         stop(proc)
 
@@ -544,6 +547,14 @@ def linux_counts(lines: list[str], code: int) -> dict:
     return c
 
 
+def remove_container(name: str) -> None:
+    """The Linux part's container, by name: stopping its script from outside leaves it running (Windows)."""
+    try:
+        subprocess.run(["docker", "rm", "-f", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+
+
 def run_linux_suite(skip: bool) -> dict:
     """The CI job on the last commit, in Linux (scripts/ci-linux.sh); its output goes to the console as it comes."""
     if skip:
@@ -554,8 +565,12 @@ def run_linux_suite(skip: bool) -> dict:
     print(f"\n=== {LINUX_SUITE}: bash scripts/ci-linux.sh (job contratto-e-mock in python:3.11-slim, circa 15 minuti)")
     lines: list[str] = []
     try:
+        # o1-chiusura: the container has a name the run knows (removed at the run's limit) and the script's own limit
+        # comes 5 minutes before the run's
+        container = f"ci-linux-run-{os.getpid()}"
+        env = {**os.environ, "CI_LINUX_CONTAINER": container, "CI_LINUX_LIMIT_S": str(LINUX_TIMEOUT_S - 300)}
         proc = subprocess.Popen([bash, str(LINUX_SCRIPT)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                text=True, encoding="utf-8", errors="replace")
+                                text=True, encoding="utf-8", errors="replace", env=env)
         assert proc.stdout is not None
 
         def read(stream) -> None:
@@ -569,6 +584,7 @@ def run_linux_suite(skip: bool) -> dict:
         reader.join(LINUX_TIMEOUT_S)
         if reader.is_alive():
             stop_tree(proc)
+            remove_container(container)
             return result(tests=max(1, len([x for x in lines if x.startswith("PASSO ")])), errors=1,
                           note=f"tempo scaduto: ferma oltre {LINUX_TIMEOUT_S // 60} minuti, fermata dal giro")
         code = proc.wait(timeout=60)

@@ -106,12 +106,21 @@ def create_engine_app(config: EngineConfig, connector=None):
             # rereading of o1-wait-for (23 Nov): the connector stops first (its reader ends even if it missed the
             # cancel, as asyncio.wait_for did on 3.11), and the wait has a limit: a reader that never ends is written,
             # not waited for ever
-            await asyncio.gather(connector.stop(), return_exceptions=True)
+            try:
+                async with asyncio.timeout(SHUTDOWN_WAIT_S):  # o1-chiusura: Shelly awaits its tasks and its transport
+                    await connector.stop()
+            except Exception as exc:                          # TimeoutError included: written, the stop goes on
+                log.warn("connector stop failed", error_type=type(exc).__name__, error=str(exc)[:200],
+                         waited_s=SHUTDOWN_WAIT_S)
             own = [t for t in [engine.loop_task, engine.consumer_task] if t]
             if own:
-                _, pending = await asyncio.wait(own, timeout=SHUTDOWN_WAIT_S)
+                done, pending = await asyncio.wait(own, timeout=SHUTDOWN_WAIT_S)
                 if pending:
                     log.warn("engine tasks still running at stop", tasks=len(pending), waited_s=SHUTDOWN_WAIT_S)
+                for task in done:                             # read, so never «Task exception was never retrieved»
+                    if not task.cancelled() and task.exception() is not None:
+                        exc = task.exception()
+                        log.warn("engine task failed at stop", error_type=type(exc).__name__, error=str(exc)[:200])
             store.close()
             log.info("engine stopped")
 

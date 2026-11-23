@@ -22,6 +22,9 @@ services:
     image: ${ENGINE_IMAGE:?ENGINE_IMAGE}
     container_name: engine-${APARTMENT_ID}
     restart: unless-stopped
+    # o1-chiusura (23 Nov): Docker's 10 s were less than the engine's stop (uvicorn 2 s for the open streams, then at
+    # most 5 s for the connector and 5 s for its tasks): at 20 s the stop always runs before SIGKILL
+    stop_grace_period: 20s
     environment:
       APARTMENT_ID: ${APARTMENT_ID}
       CONNECTOR: ${CONNECTOR:?CONNECTOR}     # D62 (P-83): no default, a real apartment never starts simulated

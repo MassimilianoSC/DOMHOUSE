@@ -333,14 +333,53 @@ def test_a_linux_part_that_goes_silent_is_stopped_at_its_limit(tmp_path, monkeyp
     bash = rt.git_bash()
     if not bash:
         pytest.skip("bash non disponibile")
+    seen = tmp_path / "visto.txt"
     script = tmp_path / "silenzioso.sh"
-    script.write_text("echo 'ci-linux: commit abc'\necho 'PASSO contratto: ok'\nsleep 60\n", encoding="utf-8")
+    script.write_text(f"echo \"$CI_LINUX_CONTAINER $CI_LINUX_LIMIT_S\" > '{seen.as_posix()}'\n"
+                      "echo 'ci-linux: commit abc'\necho 'PASSO contratto: ok'\nsleep 60\n", encoding="utf-8")
+    removed = []
     monkeypatch.setattr(rt, "LINUX_SCRIPT", script)
     monkeypatch.setattr(rt, "LINUX_TIMEOUT_S", 3)
+    monkeypatch.setattr(rt, "remove_container", removed.append)
     start = __import__("time").monotonic()
     c = rt.run_linux_suite(skip=False)
     assert __import__("time").monotonic() - start < 30
     assert c["failures"] + c["errors"] >= 1 and "tempo scaduto" in c["note"]
+    # o1-chiusura (point 5): taskkill does not stop the container; the run names it, removes it at its limit, and the
+    # script's own limit comes first
+    name, limit = seen.read_text(encoding="utf-8").split()
+    assert name.startswith("ci-linux-") and removed == [name] and int(limit) < rt.LINUX_TIMEOUT_S
+
+
+def test_the_stack_filter_of_ci_linux_finds_faulthandler_after_the_dots(tmp_path):
+    """o1-chiusura (point 1): with -q faulthandler writes «.....Timeout (0:02:00)!» on the dots' line, so a pattern
+    anchored at the line's start found nothing. The script's own STACK_PATTERN, tried with grep on that line."""
+    rt = _runner()
+    bash = rt.git_bash()
+    if not bash:
+        pytest.skip("bash non disponibile")
+    script = (ROOT / "scripts" / "ci-linux.sh").as_posix()
+    probe = tmp_path / "filtro.sh"
+    probe.write_text(f"eval \"$(grep '^STACK_PATTERN=' '{script}')\"\n"
+                     "printf '%s\\n' '.......Timeout (0:02:00)!' 'Thread 0x1 (most recent call first):' "
+                     "'  File \"/repo/engine/tests/test_x.py\", line 9 in test_ferma' '.......' | "
+                     "grep -E -A120 \"$STACK_PATTERN\"\n"
+                     "echo ---\nprintf '%s\\n' '........ [ 50%]' '1 passed' | grep -E -A120 \"$STACK_PATTERN\"\n"
+                     "echo fine\n", encoding="utf-8")
+    out = subprocess.run([bash, str(probe)], capture_output=True, text=True, encoding="utf-8", timeout=30).stdout
+    found, rest = out.split("---")
+    assert "test_x.py\", line 9 in test_ferma" in found and "Timeout (0:02:00)!" in found
+    assert rest.strip() == "fine"
+    text = (ROOT / "scripts" / "ci-linux.sh").read_text(encoding="utf-8")
+    assert 'grep --line-buffered -E -A120 "$STACK_PATTERN"' in text
+
+
+def test_ci_linux_names_its_container_and_removes_it(tmp_path):
+    """o1-chiusura (points 5, 6): a named container, removed by the script's trap; exit 137 may be a kill from outside."""
+    text = (ROOT / "scripts" / "ci-linux.sh").read_text(encoding="utf-8")
+    assert 'NAME="${CI_LINUX_CONTAINER:-ci-linux-${SHA}-$$}"' in text and '--name "$NAME"' in text
+    assert "docker rm -f \"$NAME\"" in text.split("trap ", 1)[1].splitlines()[0]
+    assert "if (( SECONDS >= LIMIT_S )); then" in text and "container fermato da fuori dopo" in text
 
 
 def test_a_test_that_hangs_writes_its_name_and_stack_in_the_run(tmp_path, monkeypatch, capfd):
