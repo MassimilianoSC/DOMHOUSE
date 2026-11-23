@@ -37,6 +37,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -125,8 +126,9 @@ E2E_PORTS = (8011, 5174)                   # frontend/playwright.config.ts: the 
 E2E_TIMEOUT_S = 600
 LINUX_SUITE = "linux"
 LINUX_SCRIPT = ROOT / "scripts" / "ci-linux.sh"
-LINUX_TIMEOUT_S = 900
+LINUX_TIMEOUT_S = 2100         # a backstop: scripts/ci-linux.sh stops its own container first (CI_LINUX_LIMIT_S, 1800)
 SUITE_TIMEOUT_S = 900          # 15 minutes for one pytest suite (the longest takes about 2)
+TEST_STACK_AFTER_S = 120       # 23 Nov: one test longer than this writes its stack (faulthandler) in the run's output
 SIZE_EXIT = {1: "blocco principale sopra la soglia", 2: "build mancante"}
 # Suites known to be red while a planned piece of work is open: shown as such, never hidden or skipped.
 EXPECTED_RED: dict[str, str] = {}  # e.g. {SIZE_SUITE: "P-20 in corso"} (P-20 closed on 16/10: empty)
@@ -223,7 +225,8 @@ def run_pytest(suite: str, work: Path, extra: list[str], env: dict) -> dict:
     """One pytest suite in its own process, at most SUITE_TIMEOUT_S: a suite that hangs (seen once on 21 Oct,
     support_access for 36 minutes, never reproduced) is stopped and counted red with the reason, the run goes on."""
     junit = work / f"{Path(suite).stem}.xml"
-    cmd = [sys.executable, "-m", "pytest", suite, "-q", "-rfE", "-p", "no:cacheprovider", f"--junitxml={junit}", *extra]
+    cmd = [sys.executable, "-m", "pytest", suite, "-q", "-rfE", "-p", "no:cacheprovider", f"--junitxml={junit}",
+           "-o", f"faulthandler_timeout={TEST_STACK_AFTER_S}", *extra]
     proc = subprocess.Popen(cmd, cwd=ROOT, env=env)
     try:
         code = proc.wait(timeout=SUITE_TIMEOUT_S)
@@ -548,19 +551,26 @@ def run_linux_suite(skip: bool) -> dict:
     bash = git_bash()
     if not bash:
         return result(errors=1, note="bash non trovato (su Windows serve Git Bash)")
-    print(f"\n=== {LINUX_SUITE}: bash scripts/ci-linux.sh (job contratto-e-mock in python:3.11-slim, circa 3 minuti)")
+    print(f"\n=== {LINUX_SUITE}: bash scripts/ci-linux.sh (job contratto-e-mock in python:3.11-slim, circa 15 minuti)")
     lines: list[str] = []
     try:
         proc = subprocess.Popen([bash, str(LINUX_SCRIPT)], cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, encoding="utf-8", errors="replace")
         assert proc.stdout is not None
-        start = time.monotonic()
-        for line in proc.stdout:
-            print(line, end="")
-            lines.append(line.rstrip("\n"))
-            if time.monotonic() - start > LINUX_TIMEOUT_S:
-                proc.kill()
-                break
+
+        def read(stream) -> None:
+            for line in stream:
+                print(line, end="")
+                lines.append(line.rstrip("\n"))
+        # 23 Nov: the limit on a reader thread, not a check at each line: the part hung 28 minutes printing nothing
+        # and the limit never came. Stopped, its pipe may stay open (Git Bash's children): it is not waited for
+        reader = threading.Thread(target=read, args=(proc.stdout,), daemon=True)
+        reader.start()
+        reader.join(LINUX_TIMEOUT_S)
+        if reader.is_alive():
+            stop_tree(proc)
+            return result(tests=max(1, len([x for x in lines if x.startswith("PASSO ")])), errors=1,
+                          note=f"tempo scaduto: ferma oltre {LINUX_TIMEOUT_S // 60} minuti, fermata dal giro")
         code = proc.wait(timeout=60)
     except (OSError, subprocess.TimeoutExpired) as exc:
         return result(errors=1, note=f"scripts/ci-linux.sh non avviato o bloccato: {exc}")

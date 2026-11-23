@@ -479,7 +479,10 @@ async def stream(apartment_id: str, request: Request, user: CurrentUser = Depend
                 if deadline is not None:
                     wait = min(wait, max(0.0, deadline - time.time()))
                 try:
-                    ev = await asyncio.wait_for(queue.get(), timeout=wait)
+                    # not asyncio.wait_for: on Python 3.11 (the BFF's image) it lost a cancel that came with a ready
+                    # event, and the stream went on up to its limit (Linux CI, 23 November)
+                    async with asyncio.timeout(wait):
+                        ev = await queue.get()
                     if ev is QUEUE_FULL:   # D-198: this browser stopped reading (logged by the hub): it reopens and reloads
                         reason = "queue_full"
                         break

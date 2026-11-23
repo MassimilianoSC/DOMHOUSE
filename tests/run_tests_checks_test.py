@@ -287,7 +287,8 @@ def test_ci_linux_script_exists_is_executable_and_says_what_it_does():
     out = subprocess.run([bash, str(script), "--help"], cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
                          timeout=30)
     assert out.returncode == 0, out.stderr
-    for words in ("contratto-e-mock", "python:3.11-slim", "non-root", "core.autocrlf=false", "C14", "PASSO", "ESITO"):
+    for words in ("contratto-e-mock", "python:3.11-slim", "non-root", "core.autocrlf=false", "C14", "PASSO", "ESITO",
+                  "CI_LINUX_LIMIT_S", "tempo scaduto", "faulthandler"):
         assert words in out.stdout, words
 
 
@@ -323,6 +324,36 @@ def test_a_suite_that_hangs_is_stopped_and_counted_red(tmp_path, monkeypatch):
     suite.write_text("import time\n\ndef test_ferma():\n    time.sleep(60)\n", encoding="utf-8")
     c = rt.run_pytest(str(suite), tmp_path, [], {**__import__("os").environ})
     assert c["errors"] == 1 and "bloccata" in c["note"]
+
+
+def test_a_linux_part_that_goes_silent_is_stopped_at_its_limit(tmp_path, monkeypatch):
+    """23 Nov: the Linux part hung 28 minutes after its last line (pytest behind «tail -25»): the limit was checked only
+    when a line arrived. Now a timer stops it, red with «tempo scaduto», also when it prints nothing."""
+    rt = _runner()
+    bash = rt.git_bash()
+    if not bash:
+        pytest.skip("bash non disponibile")
+    script = tmp_path / "silenzioso.sh"
+    script.write_text("echo 'ci-linux: commit abc'\necho 'PASSO contratto: ok'\nsleep 60\n", encoding="utf-8")
+    monkeypatch.setattr(rt, "LINUX_SCRIPT", script)
+    monkeypatch.setattr(rt, "LINUX_TIMEOUT_S", 3)
+    start = __import__("time").monotonic()
+    c = rt.run_linux_suite(skip=False)
+    assert __import__("time").monotonic() - start < 30
+    assert c["failures"] + c["errors"] >= 1 and "tempo scaduto" in c["note"]
+
+
+def test_a_test_that_hangs_writes_its_name_and_stack_in_the_run(tmp_path, monkeypatch, capfd):
+    """23 Nov: a test stuck in the engine's suite left no trace of which one. pytest's faulthandler_timeout writes the
+    stack (file, test, line) in the run's output after TEST_STACK_AFTER_S; the suite's limit still stops it."""
+    rt = _runner()
+    monkeypatch.setattr(rt, "TEST_STACK_AFTER_S", 1)
+    suite = tmp_path / "lenta_test.py"
+    suite.write_text("import time\n\ndef test_lenta_per_davvero():\n    time.sleep(3)\n", encoding="utf-8")
+    c = rt.run_pytest(str(suite), tmp_path, [], {**__import__("os").environ})
+    out = capfd.readouterr()
+    assert c["failures"] == 0 and c["tests"] == 1
+    assert "Timeout" in out.err + out.out and "test_lenta_per_davvero" in out.err + out.out
 
 
 def test_e2e_totals_from_the_playwright_report():
