@@ -1,7 +1,7 @@
 # Checklist di collaudo — DOMHOUSE
 
 Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md`.
-*Versione del 23 novembre 2026 (staging del 23 novembre: allineata a tutte le funzionalità dell'app). Si collauda sul sito di prova https://domhouse-staging.web.app; il sito vero https://domotica-poc-511707.web.app serve solo per le prove L2 e L4.*
+*Versione del 24 novembre 2026 (staging del 24 novembre: allineata a tutte le funzionalità dell'app). Si collauda sul sito di prova https://domhouse-staging.web.app; il sito vero https://domotica-poc-511707.web.app serve solo per le prove L2 e L4.*
 
 ## Come si usa
 - Ogni riga è una prova: segui i passi e confronta con il risultato atteso.
@@ -160,6 +160,13 @@ Per i collaboratori che collaudano l'app. Si usa insieme a `docs/guida-utente.md
 | D47 | Operatore | Regole: cambia due valori senza salvare. Premi «Annulla le modifiche». | Prima la barra dice «2 regole modificate». Dopo «Annulla le modifiche» i valori tornano quelli salvati e la barra sparisce. | |
 | D48 | Operatore | Assistente: fai una domanda. Ricarica la pagina. Premi «Svuota conversazione». | Dopo la ricarica la conversazione c'è ancora. Dopo lo svuotamento «Nessuna conversazione in questa sessione». | |
 | D49 | Amministratore (su un dimostrativo) | Simulatore › «Evento prenotazione»: «Prenotazione creata», check-in domani. In Programmazione c'è l'azione «pre-arrivo». In Regole spegni «Pre-arrivo» e salva. Torna in Programmazione. Riaccendi «Pre-arrivo» e salva. | Con la regola spenta l'azione «pre-arrivo» non è più «In programma» («Annullata» nello «Storico»). Riaccesa la regola, l'azione torna in programma. | |
+| D50 | Operatore o amministratore | Regole › «Limiti del setpoint»: guarda «Stagione del riscaldamento». | «Inizio» 15 ottobre e «Fine» 15 aprile; la riga «Dal 15 ottobre al 15 aprile (zona E)»; «Date di legge per zona climatica:» con i pulsanti A–F; la nota con il DPR 412/1993. | |
+| D51 | Operatore o amministratore | Tocca «C», poi «Salva le modifiche». | Le date diventano 15 novembre e 31 marzo, con la riga «… (zona C)», e compare «Regole aggiornate». | |
+| D52 | Operatore o amministratore | Metti 31 e «aprile» come fine. | Sotto la data «Il 31 aprile non esiste: scegli un altro giorno.», il giorno in rosso, il salvataggio spento. | |
+| D53 | Operatore o amministratore | Tocca «F» e salva; poi tocca «E» e salva. | Prima «Tutto l'anno (zona F)», poi di nuovo la zona E. | |
+| D54 | Operatore o amministratore | Spegni la regola «Limiti del setpoint». | Le date della stagione restano modificabili. | |
+| D55 | Sola lettura | Apri Regole. | Date e zona si vedono; caselle e pulsanti A–F sono spenti. | |
+| D56 | Operatore o amministratore | Apri la regola «Antigelo». | Il nome è «Antigelo» (non più «a casa vuota»); il campo «Avviso se la temperatura non risale (minuti)» vale 120, da 30 a 480; la descrizione finisce con «Anche con la regola spenta, se la caldaia è accesa…». | |
 
 ## E. Amministrazione
 
@@ -407,3 +414,4 @@ Queste funzioni ci sono, ma servono condizioni che oggi nello staging mancano. S
 | Q10 | Quando c'è la condizione | Ricarica da sola dopo una pubblicazione (G4, G5): provala come dicono le righe citate. | Si prova solo con questa condizione: una pubblicazione dello staging durante la prova. Oggi scrivi «non fatta». | |
 | Q11 | Quando c'è la condizione | Riepilogo del lunedì (M4): provala come dicono le righe citate. | Si prova solo con questa condizione: il lunedì dopo le 8. Oggi scrivi «non fatta». | |
 | Q12 | Quando c'è la condizione | Prove del sito vero (L2, L4, I10, I16): provala come dicono le righe citate. | Si prova solo con questa condizione: solo nel sito vero; L4 e I16 solo con il gestore. Oggi scrivi «non fatta». | |
+| Q13 | Quando c'è la condizione | «Caldaia: la temperatura non risale» (D56): provala come dicono le righe citate. | Si prova solo con questa condizione: una caldaia vera accesa e una stanza che resta sotto l'antigelo per i minuti della regola. Oggi scrivi «non fatta». | |

@@ -1,7 +1,7 @@
 # Guida all'app DOMHOUSE
 
 Tutto quello che l'app sa fare, spiegato passo per passo e diviso per ruolo. Non servono conoscenze tecniche.
-*Versione del 23 novembre 2026.*
+*Versione del 24 novembre 2026.*
 
 > **Ambiente di prova**
 >
@@ -561,6 +561,7 @@ Tutte hanno il nome dell'appartamento davanti.
 | «Dispositivi e sistema domotico offline» | «…: dispositivo offline», «… non risponde da oltre … minuti» | Dopo i minuti della regola «Avviso dispositivo offline» (15 all'inizio); regola spenta, niente avviso. Con il sistema già segnalato fermo non arriva | «Panoramica» |
 | «Dispositivi e sistema domotico offline» | «…: sistema domotico non raggiungibile», con «Il connettore domotico risulta fermo» oppure (dal lotto 38) «Il sistema domotico non risponde da N minuti: i comandi dall'app non arrivano e le regole automatiche potrebbero essere ferme.» (dopo due ore «N ore», dopo due giorni «N giorni»: è il tempo da quando tace, D75) | Sistema domotico fermo o irraggiungibile da 15 minuti, sempre, anche con la regola offline spenta (dal 13 novembre); una volta per episodio | «Panoramica» |
 | «Dispositivi e sistema domotico offline» | «…: antigelo non attivo», «Sensore di temperatura mancante: antigelo non attivo» | A casa vuota, caldaia senza sensore utilizzabile; subito, una volta per episodio | «Decisioni» |
+| «Dispositivi e sistema domotico offline» | «…: la temperatura non risale», «La caldaia è accesa, ma la temperatura resta sotto l'antigelo. Controlla la caldaia.» | Dal 24 novembre (staging): caldaia accesa e stanza sotto l'antigelo per i minuti della regola «Antigelo» (120 all'inizio), anche con la regola spenta; una volta per episodio | «Decisioni» |
 | «Dispositivi e sistema domotico offline» | «…: caldaia senza regolazione», «Caldaia: …; segue il comando manuale senza regolazione» | Dal 13 novembre: caldaia comandata a mano e sensore di temperatura che non risponde; la caldaia resta accesa senza sosta | «Decisioni» |
 | «Prenotazioni» | «…: prenotazione annullata, appartamento rimesso a vuoto» | Disdetta dopo che l'appartamento era già stato preparato per l'arrivo | «Decisioni» |
 | «Prenotazioni» (pre-arrivo, check-out, casa vuota) oppure «Dispositivi e sistema domotico offline» (le altre) | «…: azione programmata non eseguita» con il motivo, oppure «N azioni programmate non eseguite. La prima: …» se più d'una entro un minuto; dopo uno spegnimento programmato «Durante la manutenzione N azioni programmate non sono state eseguite» | Un'azione programmata rifiutata alla sua ora o saltata perché il sistema era fermo (dal lotto 38); dopo uno spegnimento programmato le azioni saltate non arrivano una per una | «Programmazione» |
@@ -787,7 +788,7 @@ per 24 mesi.
 |---|---|
 | Prima linea, in nero: il tipo di azione e i valori prima → dopo | Per esempio «Modalità» con «comfort → casa vuota» |
 | Il tipo di azione, in italiano | Per esempio «Modalità», «Forzatura scaduta», «Programma: spostata», «Prenotazione annullata» |
-| Altri esempi di tipo | «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo»; dal lotto 40 «Modalità: comando in sospeso» (un dispositivo non raggiungibile durante il cambio di modalità: il comando parte quando torna raggiungibile) |
+| Altri esempi di tipo | «Disdetta dopo il pre-arrivo», «Antigelo: caldaia accesa», «Regolazione automatica disattivata», «Antigelo non attivo»; dal 24 novembre (staging) «Stagione del riscaldamento» e «Caldaia: la temperatura non risale»; dal lotto 40 «Modalità: comando in sospeso» (un dispositivo non raggiungibile durante il cambio di modalità: il comando parte quando torna raggiungibile) |
 | A destra della prima linea: l'esito, in un badge colorato | «Applicata» verde; «Respinta» e «Non riuscita» rosso mattone; «in attesa di approvazione» ambra; «Informativa» grigio |
 | Seconda linea, in grigio: la data · chi ha deciso · su cosa | «Motore AI», «Regola «…»», «Gestore», «Assistente», «Sistema»; «appartamento», «dispositivo», «regole», «programmazione» |
 | Chi ha deciso, se ha eliminato l'account | «utente rimosso» |
@@ -1218,7 +1219,8 @@ Nelle Decisioni compare «Approvazione scaduta».
 | Gruppo «Inverno (riscaldamento)»: «Minimo (°C)», «Massimo (°C)», «Temperatura in eco (°C)», «Temperatura in comfort (°C)» | «Limiti del setpoint» |
 | Gruppo «Estate (raffrescamento)»: «Minimo (°C)», «Massimo (°C)», «Raffrescamento in comfort (°C)» | «Limiti del setpoint» |
 | Gruppo «Climatizzatore con misuratore»: «Soglia di spento (W)» | «Limiti del setpoint» |
-| «Temperatura (°C)» | «Antigelo a casa vuota» |
+| «Stagione del riscaldamento»: «Inizio» e «Fine» (giorno e mese) | «Limiti del setpoint» |
+| «Temperatura (°C)», «Avviso se la temperatura non risale (minuti)» | «Antigelo» |
 | «Umidità (%)» | «Antimuffa a casa vuota» |
 | «Ore prima del check-in» | «Pre-arrivo» |
 | «Minuti dopo il check-out», «Minuti di presenza dopo il check-out» | «Risparmio al check-out» |
@@ -1235,6 +1237,7 @@ Nelle Decisioni compare «Approvazione scaduta».
 | «Il minimo estivo non può superare il massimo estivo» | Minimo estivo sopra il massimo estivo |
 | «La temperatura di raffrescamento deve stare fra il minimo e il massimo estivi» | Raffrescamento fuori dall'intervallo estivo |
 | «La temperatura di raffrescamento deve essere più alta di quella comfort» | Raffrescamento non sopra comfort |
+| «Il … non esiste: scegli un altro giorno.» (per esempio «Il 31 aprile non esiste…») | Una data della stagione del riscaldamento che non c'è nel calendario |
 
 > **Da sapere**
 >
@@ -1247,6 +1250,36 @@ Nelle Decisioni compare «Approvazione scaduta».
 >   automatica del clima.
 > - **Sul telefono**, mentre scrivi in un campo, la barra «Salva le modifiche» non lo copre: il campo resta sopra
 >   la barra.
+
+**La stagione del riscaldamento** (dal 24 novembre, nello staging). In «Limiti del setpoint», sotto «Stagione del
+riscaldamento»:
+
+1. **Scegli «Inizio» e «Fine»**: giorno e mese. All'inizio: dal 15 ottobre al 15 aprile (zona E).
+2. **Oppure tocca una zona** in «Date di legge per zona climatica:» (A–F): mette le date di legge della zona.
+   F vuol dire tutto l'anno.
+3. **Premi «Salva le modifiche».** Sotto le date c'è il riepilogo, per esempio «Dal 15 ottobre al 15 aprile
+   (zona E)»; la zona compare solo se le date sono proprio quelle di una zona.
+
+| Zona | Date di legge |
+|---|---|
+| A | Dal 1° dicembre al 15 marzo |
+| B | Dal 1° dicembre al 31 marzo |
+| C | Dal 15 novembre al 31 marzo |
+| D | Dal 1° novembre al 15 aprile |
+| E | Dal 15 ottobre al 15 aprile |
+| F | Tutto l'anno |
+
+> **Da sapere**
+>
+> - **Fuori da queste date** la caldaia resta solo sull'antigelo, anche con gli ospiti in casa; il climatizzatore
+>   raffresca ma non scalda da solo.
+> - **Le date valgono anche con la regola spenta.**
+> - **Un comando a mano fuori stagione** funziona: la caldaia si accende, il climatizzatore scalda.
+> - **Nelle Decisioni** compare «Stagione del riscaldamento» all'inizio e alla fine della stagione.
+> - **La zona del comune** è nell'allegato A del DPR 412/1993. Le ore massime al giorno della zona e le
+>   proroghe del sindaco non sono automatiche: per una proroga sposta le date a mano.
+> - **«Applica le stesse regole ad altri appartamenti»** non copia le date della stagione: ogni appartamento
+>   tiene le sue.
 
 ### Regole: chiedere una proposta all'assistente
 
@@ -2899,7 +2932,10 @@ Vedi la parte 5, «Approvazioni: approvare o respingere». In breve:
 |---|---|---|
 | «comfort» | Abilitata alla «Temperatura in comfort (°C)» (21 all'inizio); il termostato la accende e spegne intorno a quel valore. | Con un sensore di temperatura nella stessa stanza: regolazione automatica (sotto). Senza sensore nella stanza non lo tocca e scrive una volta «Regolazione automatica disattivata». |
 | «eco» | Abilitata alla «Temperatura in eco (°C)» (18 all'inizio). | Spento. |
-| «casa vuota» | Abilitata alla temperatura dell'«Antigelo a casa vuota» (8 °C all'inizio). | Spento. |
+| «casa vuota» | Abilitata alla temperatura dell'«Antigelo» (8 °C all'inizio). | Spento. |
+
+> **Fuori dalla stagione del riscaldamento** (dal 24 novembre, nello staging) la caldaia sta alla temperatura
+> dell'«Antigelo» anche in «comfort» ed «eco», e il climatizzatore non scalda da solo.
 
 **La regolazione automatica del clima in comfort:**
 
@@ -2936,8 +2972,8 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | Regola | Descrizione nell'app | Valori di partenza e limiti |
 |---|---|---|
 | «Finestra aperta spegne il clima» | «Spegne clima e caldaia se una finestra resta aperta più dei minuti indicati.» | «Minuti»: 5, da 1 a 30 |
-| «Limiti del setpoint» | «Limita la temperatura che si può impostare dall'app e dall'assistente, e quella usata da modalità e programmi; non vale per il telecomando del climatizzatore né per l'antigelo. Inverno: caldaia e clima che scalda restano fra minimo e massimo invernali; in comfort scaldano fino alla temperatura comfort, in eco la caldaia sta alla temperatura eco. Estate: il clima che raffresca o deumidifica resta fra minimo e massimo estivi e raffresca sopra la temperatura di raffrescamento, se nella stanza c'è un sensore di temperatura. Il raffrescamento deve essere più alto del comfort.» | Vedi la tabella sotto |
-| «Antigelo a casa vuota» | «Con la casa vuota la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare.» (D31) | «Temperatura (°C)»: 8, da 5 a 12 |
+| «Limiti del setpoint» | «Limita la temperatura che si può impostare dall'app e dall'assistente, e quella usata da modalità e programmi; non vale per il telecomando del climatizzatore né per l'antigelo. Inverno: caldaia e clima che scalda restano fra minimo e massimo invernali; in comfort scaldano fino alla temperatura comfort, in eco la caldaia sta alla temperatura eco. Estate: il clima che raffresca o deumidifica resta fra minimo e massimo estivi e raffresca sopra la temperatura di raffrescamento, se nella stanza c'è un sensore di temperatura. Il raffrescamento deve essere più alto del comfort. Fuori dalla stagione del riscaldamento la caldaia resta solo sull'antigelo e il climatizzatore non scalda da solo.» | Vedi la tabella sotto |
+| «Antigelo» (prima «Antigelo a casa vuota») | «Con la casa vuota, e fuori dalla stagione del riscaldamento anche in comfort ed eco, la caldaia va a questa temperatura anche con la regola spenta. Con la regola accesa la mantiene anche se qualcuno spegne la caldaia o abbassa la temperatura, registra nelle Decisioni ogni accensione e spegnimento e avvisa se manca il sensore della stanza, senza il quale non può scaldare. Anche con la regola spenta, se la caldaia è accesa ma la temperatura resta sotto l'antigelo per i minuti indicati, lo registra nelle Decisioni e avvisa con una notifica.» (D31) | «Temperatura (°C)»: 8, da 5 a 12; «Avviso se la temperatura non risale (minuti)»: 120, da 30 a 480 |
 | «Antimuffa a casa vuota» | «Con la casa vuota, se l'umidità supera questa soglia registra un avviso nelle Decisioni, al massimo uno al giorno; non deumidifica da sola.» | «Umidità (%)»: 65, da 50 a 80 |
 | «Pre-arrivo» | «Porta la casa in comfort prima dell'arrivo degli ospiti.» | «Ore prima del check-in»: 2, da 0 a 6 |
 | «Risparmio al check-out» | «Passa a casa vuota dopo il check-out; se il sensore ha visto qualcuno negli ultimi minuti indicati, chiede prima a te.» | «Minuti dopo il check-out»: 30, da 0 a 180; «Minuti di presenza dopo il check-out»: 30, da 5 a 180 |
@@ -2956,6 +2992,8 @@ Tutte partono attive. Sette si modificano dall'app, una no.
 | «Estate (raffrescamento)» | «Massimo (°C)» | 28 | Da 22 a 30 |
 | «Estate (raffrescamento)» | «Raffrescamento in comfort (°C)» | 25 | Da 22 a 28 |
 | «Climatizzatore con misuratore» | «Soglia di spento (W)» | 15 | Da 5 a 100 |
+| «Stagione del riscaldamento» | «Inizio» | 15 ottobre | Un giorno che esiste |
+| «Stagione del riscaldamento» | «Fine» | 15 aprile | Un giorno che esiste |
 
 **Le temperature vanno in quest'ordine.** La pagina Regole non salva valori fuori ordine:
 
@@ -3000,13 +3038,19 @@ Tutte partono attive. Sette si modificano dall'app, una no.
   - resta la notifica «dispositivo offline», perché qualcuno cambi la batteria;
   - se il sensore torna e la finestra è ancora aperta, la regola riparte;
   - attenzione: se la finestra è davvero aperta, si scalda finché qualcuno non interviene.
-- **«Antigelo a casa vuota»**: a casa vuota accende la caldaia sotto la soglia e la spegne sopra la soglia più
+- **«Antigelo»** (fino al 23 novembre «Antigelo a casa vuota»): a casa vuota, e fuori stagione anche in
+  comfort ed eco, accende la caldaia sotto la soglia e la spegne sopra la soglia più
   0,5 °C, anche se il riscaldamento è disabilitato («Antigelo: caldaia accesa», «Antigelo: caldaia spenta»). Serve
   un sensore: senza, «Antigelo non attivo».
 - **Antigelo con la regola spenta** (D31, risposta 1089): al passaggio a casa vuota la caldaia va comunque alla
   temperatura dell'antigelo. Ma se qualcuno la spegne o abbassa la temperatura a mano, resta così: vince la scelta a
   mano, e senza sensore non arriva nessun avviso.
 - **Con la regola accesa** (come all'inizio) la caldaia torna alla soglia anche dopo uno spegnimento a mano.
+- **«La temperatura non risale»** (dal 24 novembre, nello staging): la caldaia è accesa ma la stanza resta sotto
+  l'antigelo per i minuti di «Avviso se la temperatura non risale (minuti)» (120 all'inizio):
+  - nelle Decisioni: «Caldaia: la temperatura non risale»;
+  - la notifica «…: la temperatura non risale»;
+  - vale anche con la regola spenta; controlla la caldaia.
 - **«Antimuffa a casa vuota»**: scrive «Avviso antimuffa» nelle Decisioni, al massimo una volta al giorno, a casa
   vuota; durante una forzatura scrive che è sospesa. Non comanda la deumidificazione.
 - **«Pre-arrivo»**: ogni prenotazione creata o modificata programma il comfort. Cambiare le ore vale per le
@@ -3440,6 +3484,15 @@ Per ogni problema annota:
 ## 14. Novità
 
 **Che cosa è cambiato, aggiornamento per aggiornamento.**
+
+### 24 novembre 2026 (staging)
+
+- **Stagione del riscaldamento** per appartamento, in «Limiti del setpoint»: date di inizio e fine, con le zone
+  di legge A–F a un tocco. Fuori stagione la caldaia resta sull'antigelo e il climatizzatore non scalda da solo
+  (parti 5 e 10).
+- **«La temperatura non risale»**: se la caldaia è accesa ma la stanza resta sotto l'antigelo, una decisione e
+  una notifica dopo i minuti scelti nella regola (parti 2 e 10).
+- **Nome della regola:** «Antigelo» al posto di «Antigelo a casa vuota».
 
 ### 23 novembre 2026 (staging e produzione)
 
